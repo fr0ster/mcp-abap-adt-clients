@@ -75,25 +75,70 @@ happen by accident. `unlockAll()` already returns `LockFailure[]` for whatever i
 could not release; nothing new is needed. The details belong to that repository's
 own design, not here.
 
-## What this means for `ILockWindowAware`
+## Decision: what a window is for
 
-Named plainly: putting lock windows on the connection was a layering mistake of
-mine. `beginWindow('Class/ZCL_FOO')` carries a domain concept into a layer that
-cannot act on it — which is exactly why the teardown ended up blocking on a
-counter it could not interpret.
+**A window marks a span in which a short per-request timeout must not abort a
+request.** That is its whole purpose, and it is squarely the connection's own
+risk: aborting mid-flight tears down the socket, which drops the stateful ABAP
+session and orphans whatever it held. Deciding how long its own requests may run
+is the connection's business, and nobody else's.
 
-It ships in `interfaces` 11.5.0 and `connection` 2.0.0, and nothing calls it:
-`beginWindow()` has zero callers in either repository. Removing it is therefore
-cheap in practice and breaking in form. **Not decided here** — the options are to
-deprecate it now and remove it in the next major, or to leave it as an unused
-capability nobody implements. Either way it stops being load-bearing.
+**A window is not lock bookkeeping.** Say a caller locks five objects, works on
+them, unlocks them. The window model can *represent* that — `Symbol(label)` is
+unique per occurrence, so five tokens close independently, and even the same
+label twice does not collide. But representing is all it does. Five open windows
+give the connection five opaque strings: it cannot say which object, find a
+handle, send an `UNLOCK`, or judge whether any of them still matters.
+
+What models that case properly already exists a layer up:
+
+```ts
+private readonly locks = new Map<string, UnlockThunk>();   // LockRegistry
+track(key: string, unlock: UnlockThunk): void
+```
+
+Keyed by object, valued by *the function that releases it*. Five objects, five
+entries, each knowing how to unlock itself; `unlockAll()` runs the batch keeping
+the session stateful throughout and returns `LockFailure[]` for what it could
+not. It models the case **and can act on it**. Windows duplicated the fraction
+that cannot.
+
+There is a conceptual error in the old reading too: a "window" suggests a span
+that owns the session. With five overlapping windows there is still one ABAP
+session shared by all of them, so the windows partition nothing — they are a
+counter. Which is why blocking a teardown on `liveWindows > 0` was meaningless:
+it waited for "some span is open" over a session every span shares anyway.
+
+### Consequence: as shipped, a window does nothing
+
+`beginWindow()` delegates to the lifecycle and stops there. It does not touch a
+timeout. The behaviour the decision above describes is implemented elsewhere, in
+the reference-counted pair that has carried it since 1.9.0:
+
+```ts
+const effectiveTimeout = this.inCriticalSection
+  ? Math.max(timeout ?? 0, getCriticalSectionTimeout())
+  : timeout;
+```
+
+So there are two mechanisms for one idea: `beginCriticalSection()`, which acts
+but is unnamed and uncounted per span, and `beginWindow(label)`, which is named
+and counted but inert. **They should be one.** Opening a window raises the
+effective timeout ceiling for its duration; closing the last one restores it —
+which is what the critical section already does by reference count. The label
+stays, because "which span" is worth having in a log even when it is not worth
+blocking on.
+
+The teardown does not wait on windows either way.
 
 ## Not done
 
-- **No teardown strategy or hook in the connection.** The previous draft proposed
-  one. It is the same layering error one step removed: a seam in the connection
-  for a decision that belongs to the layer above, which can simply act before
-  calling `disconnect()`.
+- **No teardown strategy or hook in the connection.** An earlier draft proposed
+  one. It is a layering error one step removed: a seam in the connection for a
+  decision that belongs to the layer above, which can simply act before calling
+  `disconnect()`.
+- **Windows are not removed.** They have a real job — see the decision above —
+  and it is the connection's own.
 - **No request is aborted** by a teardown.
 - **`disconnect()` is never refused** because something is open.
 - **No default timeout** anywhere.
@@ -106,6 +151,14 @@ Connection, at `SessionLifecycle` level — no server:
   `connect()` is not blocked — the regression this exists to prevent
 - an open window does not delay a teardown
 - no request is aborted or errored by the teardown itself
+
+Connection, on the window's actual job:
+
+- a request issued inside a window is not aborted by a short per-request timeout
+- five concurrent windows: the ceiling holds until the last one closes, and
+  closing them out of order works — this is the case that exposed the old
+  reading
+- outside any window the caller's timeout applies verbatim, unchanged
 
 adt-clients: its close path unlocks before disconnecting, and reports what it
 could not release — verifiable against the trial system, where the existing
