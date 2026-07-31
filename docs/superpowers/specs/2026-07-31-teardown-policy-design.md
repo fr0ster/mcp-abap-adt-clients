@@ -227,12 +227,15 @@ So the close path is a barrier, in this order:
 1. **Refuse new chains** — a chain not yet admitted is rejected from this point,
    so the set of outstanding chains can only shrink. An already-admitted chain is
    not interrupted: it runs its remaining steps, `LOCK` included.
-   **Cleanup is not new work.** `unlockAll()`, and the unlock of a lock already
-   held, stay admissible after `close()` has returned. What is refused is work
-   that could acquire a *new* lock. This says nothing about whether a second
-   attempt will succeed; it says the caller is allowed to make one. A barrier
-   that permanently refused cleanup would decide that question on their behalf,
-   and it is not ours to decide.
+   **Cleanup is not a new chain.** `unlockAll()`, and the unlock of a lock already
+   held, stay admissible after `close()` has returned. What is refused is the
+   admission of a *new chain* — never a step of one already admitted, and never
+   cleanup. An earlier draft said "work that could acquire a new lock", which an
+   implementation could read as licence to reject the `LOCK` step of a chain
+   already running, contradicting the promise two lines above. This says nothing
+   about whether a second unlock attempt will succeed; it says the caller is
+   allowed to make one. A barrier that permanently refused cleanup would decide
+   that question on their behalf, and it is not ours to decide.
 2. **Wait for running chains, up to a deadline**, so a `LOCK` already in flight
    lands and registers rather than appearing after the snapshot.
 3. **`unlockAll()`**, now over a registry that cannot grow.
@@ -304,16 +307,24 @@ this spec states elsewhere.
 
 So the granularity is the **chain**, not the request:
 
-- a chain declares its intent when it is admitted, since the object it will work
-  on is known from its config before any request goes out;
+- a **lock-capable** chain declares its intent when it is admitted, since both the
+  object and whether the flow can lock at all are known from its config before any
+  request goes out;
 - an admitted chain may run **all** its remaining steps, `LOCK` included — that is
   what "not aborted" means;
 - only a **new** chain is refused after step 1.
 
-A chain that turns out never to lock — a read-only flow, or one that fails before
-`LOCK` — resolves its declaration as not-taken and is not reported. The cost of
-declaring early is a declaration that usually resolves to nothing, which is
-cheap; the cost of declaring late is a lock nobody knows about.
+**A read-only chain declares nothing.** An earlier draft had every chain declare,
+which puts a false entry in the report: a read-only flow still running at the
+deadline would be named in `unresolvedIntents` — an object it could never have
+locked — breaking the guarantee that every entry there describes a lock that may
+exist. A read-only chain still outstanding is covered by `timedOut: true`, which
+says what is true: the barrier stopped while work was in progress.
+
+A lock-capable chain that fails before its `LOCK` resolves its declaration as
+not-taken and is not reported. The cost of declaring at admission is a declaration
+that often resolves to nothing; the cost of declaring later is a lock nobody knows
+about.
 
 A declaration is identified **per attempt, not per key.** The registry is
 `Map<string, UnlockThunk>` today, keyed by object, and that is enough for
@@ -532,11 +543,26 @@ they asked for something the contract cannot provide; treating it as unbounded
 discards the guarantee outright; clamping a negative to `0` turns "I made a
 mistake" into "close immediately", which is destructive.
 
-**No maximum.** Any finite value is bounded, which is all the guarantee requires,
-and choosing a ceiling on someone's patience during their own shutdown would be
-the overreach this document rejects everywhere else.
+**No maximum, but the wait must be built to honour one.** Any finite value is
+bounded, which is what the guarantee requires, and capping someone's patience
+during their own shutdown would be the overreach this document rejects everywhere
+else. That obliges the implementation rather than the caller: a single
+`setTimeout` cannot carry an arbitrary finite value — anything past the runtime's
+32-bit range overflows and fires almost immediately, turning a very patient close
+into an instant one, which is the opposite of what was asked and fails silently.
 
-`close()` resolves in all cases; it never rejects for a lock it could not
+So the deadline is **absolute, not a timer**: compute the instant it expires,
+compare against the clock, and re-arm the wait in safe-sized chunks until then.
+`SessionLifecycle` already works this way for its own ceiling —
+`deadline = teardownAt + ceilingMs`, then loop on the remaining time — so the
+pattern is established rather than invented here.
+
+**"Always resolves" is scoped to valid input.** With an invalid `deadlineMs` the
+call throws instead, before doing anything, as above. The guarantee is that a
+`close()` which starts will finish; it is not a promise to accept nonsense.
+
+`close()` resolves in all cases where it starts at all — that is, for valid
+options; see the deadline rules above. It never rejects for a lock it could not
 release, since the report is the answer.
 
 ### Calling it more than once
