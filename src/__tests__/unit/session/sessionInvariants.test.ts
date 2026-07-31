@@ -8,7 +8,7 @@
  * an "object is locked and inactive" incident on a live system.
  *
  * Run without SAP credentials:
- *   MCP_ENV_PATH=/tmp/nonexistent-env npx jest src/__tests__/unit/session
+ *   npx jest src/__tests__/unit/session
  */
 
 import { AdtClass } from '../../../core/class/AdtClass';
@@ -16,6 +16,13 @@ import { AdtDomain } from '../../../core/domain/AdtDomain';
 import { LockRegistry } from '../../../core/shared/LockRegistry';
 import { noopLogger } from '../../../utils/noopLogger';
 import { createSessionRecorder } from './sessionRecorder';
+
+// These tests talk to a local stub and finish in well under a second. The suite
+// default is 15 minutes, meant for integration runs — long enough that anything
+// stuck here reads as a hang rather than a failure, with no test named and no
+// stack. A tight ceiling turns that into an ordinary timeout that says which
+// test and where.
+jest.setTimeout(20_000);
 
 const SOURCE = 'CLASS zcl_a DEFINITION PUBLIC. ENDCLASS.';
 

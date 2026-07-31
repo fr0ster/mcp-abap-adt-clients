@@ -3,6 +3,20 @@
 All notable changes to this package are documented here.  
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **`AdtClient` refuses a handler over a connection nobody connected.** Every `getXxx()` factory checks first, and throws with `code: ADT_NOT_CONNECTED`. Connecting stays the **consumer's** job — this library does not own the connection and must not connect on anyone's behalf — but a connector injected without `connect()` used to surface deep inside an operation chain: the handlers collect failures into `state.errors` rather than stopping, so the result was a state object full of `ADT_NOT_CONNECTED` after the chain had walked its whole length. It now fails before anything happens.
+
+  Only asked of a connection that **answers the question** — `isConnected()` lives on `ISessionLifecycleAware`, not on `IAbapConnection`. An RFC connection has no HTTP session and no such method, and a transport that cannot answer is not blocked on its silence. That is a real limit rather than an oversight: a transport with no session has no "not connected" state to catch, so the guarantee is narrower than "every `IAbapConnection`".
+
+  The check looks for `isConnected` alone, which is the only method it calls. Deliberately *not* the whole atom: a type **predicate** narrows to the whole interface and so must verify all of it, but this asks one question, and demanding the other two would only make it step aside for a connection that could have answered.
+
+### Changed
+- Requires `@mcp-abap-adt/interfaces` **^11.5.0** (connection capability atoms), and the dev-time connector moves to **^2.0.0**.
+- **Unit tests run without SAP, with the plain command.** `globalSetup`'s connectivity preflight now skips a unit-only run, and is bounded by a timeout (`SAP_PREFLIGHT_TIMEOUT_MS`, default 10s) when it does run. Before, `npx jest src/__tests__/unit` demanded a reachable SAP: with a stale `.env` it aborted the whole suite, and against a host that accepts a socket then says nothing it simply waited — and since `testTimeout` is 15 minutes, that was indistinguishable from a hung test, with the blame landing on whichever test was next. Running unit tests needed an undocumented `MCP_ENV_PATH=/tmp/nonexistent-env` to sidestep it; that trick is no longer necessary.
+- **Test contract updated to the 2.0.0 lifecycle.** `connectorSessionContract.test.ts` had a test documenting the old defect — a request on a never-connected connector opened a session on the fly, and `reset()` was followed by a silent new session under the same conversation id. It now pins the fix from the other side: the request is refused, and **nothing reaches the server**, which is the part that matters — a refusal after the LOCK landed would still have left a lock behind.
+
 ## [8.0.0] - 2026-07-22
 
 ### Changed (BREAKING)

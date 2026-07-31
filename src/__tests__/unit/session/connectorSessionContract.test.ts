@@ -21,12 +21,19 @@
  * from the header question above.
  *
  * Local HTTP stub — no SAP, no credentials:
- *   MCP_ENV_PATH=/tmp/nonexistent-env npx jest src/__tests__/unit/session
+ *   npx jest src/__tests__/unit/session
  */
 
 import { createAbapConnection } from '@mcp-abap-adt/connection';
-import type { ISapConfig } from '@mcp-abap-adt/interfaces';
+import { ADT_SESSION_ERROR, type ISapConfig } from '@mcp-abap-adt/interfaces';
 import { type AdtStub, startAdtStub } from './adtStubServer';
+
+// These tests talk to a local stub and finish in well under a second. The suite
+// default is 15 minutes, meant for integration runs — long enough that anything
+// stuck here reads as a hang rather than a failure, with no test named and no
+// stack. A tight ceiling turns that into an ordinary timeout that says which
+// test and where.
+jest.setTimeout(20_000);
 
 const configFor = (baseUrl: string): ISapConfig => ({
   url: baseUrl,
@@ -38,17 +45,39 @@ const configFor = (baseUrl: string): ISapConfig => ({
 
 describe('connector session contract (real @mcp-abap-adt/connection)', () => {
   let stub: AdtStub;
+  /**
+   * Every connection this file opens, so every one gets torn down.
+   *
+   * These tests used to create connections and abandon them. Each holds a
+   * keep-alive socket to the stub, and an abandoned socket is exactly the kind
+   * of thing that keeps a jest worker alive past the last assertion — visible
+   * here only as the "Force exiting Jest" line, because `forceExit: true` in the
+   * config kills the process before anyone has to notice. Closing them makes the
+   * run terminate on its own merits, and 2.0.0 is the release that finally
+   * provides the means.
+   */
+  const opened: Array<{ disconnect?: () => Promise<unknown> }> = [];
+
+  function connectionTo(baseUrl: string) {
+    const conn = createAbapConnection(configFor(baseUrl), null);
+    opened.push(conn as { disconnect?: () => Promise<unknown> });
+    return conn;
+  }
 
   beforeEach(async () => {
     stub = await startAdtStub();
   });
 
   afterEach(async () => {
+    // Before the stub, so a teardown still has a server to talk to.
+    await Promise.all(opened.map((c) => c.disconnect?.()));
+    opened.length = 0;
     await stub.close();
   });
 
   it('marks ordinary requests stateful once the session is armed', async () => {
-    const conn = createAbapConnection(configFor(stub.baseUrl), null);
+    const conn = connectionTo(stub.baseUrl);
+    await conn.connect();
     conn.setSessionType('stateful');
 
     await conn.makeAdtRequest({
@@ -77,7 +106,8 @@ describe('connector session contract (real @mcp-abap-adt/connection)', () => {
    * benefit. That asymmetry is intended, not an oversight.
    */
   it('sends the CSRF fetch inside the conversation, with the connection id', async () => {
-    const conn = createAbapConnection(configFor(stub.baseUrl), null);
+    const conn = connectionTo(stub.baseUrl);
+    await conn.connect();
     conn.setSessionType('stateful');
 
     // A mutation with no cached token forces the connector to fetch one first.
@@ -100,7 +130,8 @@ describe('connector session contract (real @mcp-abap-adt/connection)', () => {
   });
 
   it('uses one connection id for the whole connector lifetime, including across reset()', async () => {
-    const conn = createAbapConnection(configFor(stub.baseUrl), null);
+    const conn = connectionTo(stub.baseUrl);
+    await conn.connect();
     conn.setSessionType('stateful');
 
     await conn.makeAdtRequest({
@@ -113,6 +144,10 @@ describe('connector session contract (real @mcp-abap-adt/connection)', () => {
     // connection id must survive, otherwise every recovery would present the
     // server with a different conversation.
     (conn as unknown as { reset: () => void }).reset();
+    // Reconnecting is required since 2.0.0, and is the point of the assertion
+    // below: a NEW session under the SAME conversation id. Previously the next
+    // request did this silently, which is what made a replacement invisible.
+    await conn.connect();
     await conn.makeAdtRequest({
       url: '/sap/bc/adt/ddic/domains/zstub',
       method: 'GET',
@@ -138,7 +173,8 @@ describe('connector session contract (real @mcp-abap-adt/connection)', () => {
    * decision rather than an accident.
    */
   it('sends the connection id as a dashed UUID, unlike the dashless Eclipse form', async () => {
-    const conn = createAbapConnection(configFor(stub.baseUrl), null);
+    const conn = connectionTo(stub.baseUrl);
+    await conn.connect();
     conn.setSessionType('stateful');
 
     await conn.makeAdtRequest({
@@ -157,52 +193,62 @@ describe('connector session contract (real @mcp-abap-adt/connection)', () => {
   });
 
   /**
-   * DEFECT — lifecycle. A connector should hold its session from connect() and
-   * refuse to work after it is torn down, so that a caller can never operate on
-   * a session it did not open.
+   * FIXED in @mcp-abap-adt/connection 2.0.0. This test used to document the
+   * defect; it now pins the fix, and is kept rather than deleted because the
+   * defect is what the whole design exists to prevent.
    *
-   * Neither half holds today:
-   *  - `connect()` is optional. A request on a never-connected connector opens
-   *    a session on the fly, so "connected" is not a state the caller controls.
-   *  - There is no `disconnect()` on the HTTP connections at all (only RFC has
-   *    close()). `reset()` tears the session down, and the very next request
-   *    silently opens a NEW one under the SAME connection id — the caller keeps
-   *    believing it holds the lock it acquired in the previous session.
+   * What it was: `connect()` was optional, so a request on a never-connected
+   * connector opened a session on the fly — "connected" was not a state the
+   * caller controlled. And `reset()` tore the session down while the next
+   * request silently opened a NEW one under the SAME connection id, so a caller
+   * went on believing it held a lock acquired in a session that no longer
+   * existed.
+   *
+   * Connecting remains the CONSUMER's job — this library must not connect on
+   * anyone's behalf. What changed is that failing to do so is now refused
+   * loudly, before anything reaches the server, instead of being papered over.
    */
-  it('opens a session without connect(), and silently opens another after reset()', async () => {
-    const conn = createAbapConnection(configFor(stub.baseUrl), null);
+  it('refuses a request without connect(), and again after reset()', async () => {
+    const conn = connectionTo(stub.baseUrl);
     conn.setSessionType('stateful');
 
-    // No connect() call anywhere — yet the mutation goes through.
-    await conn.makeAdtRequest({
+    const lock = {
       url: '/sap/bc/adt/ddic/domains/zstub?_action=LOCK&accessMode=MODIFY',
-      method: 'POST',
+      method: 'POST' as const,
       timeout: 5000,
       data: null,
+    };
+
+    // No connect(): refused, and — the part that matters — nothing is sent. An
+    // error after the LOCK landed would still have left a lock on the server.
+    await expect(conn.makeAdtRequest(lock)).rejects.toMatchObject({
+      code: ADT_SESSION_ERROR.NOT_CONNECTED,
     });
+    expect(stub.sessionsOpened()).toBe(0);
+    expect(stub.requests).toHaveLength(0);
+
+    await conn.connect();
+    await conn.makeAdtRequest(lock);
     expect(stub.sessionsOpened()).toBe(1);
-    const lockCookie = stub.matching('_action=LOCK')[0].headers.cookie;
 
     (conn as unknown as { reset: () => void }).reset();
 
-    // A teardown does not stop the connector: the next mutation quietly opens a
-    // second session. Nothing throws, nothing tells the caller.
-    await conn.makeAdtRequest({
-      url: '/sap/bc/adt/ddic/domains/zstub/source/main?lockHandle=LH-1',
-      method: 'PUT',
-      timeout: 5000,
-      data: 'x',
-    });
-    expect(stub.sessionsOpened()).toBe(2);
-
-    const write = stub.matching('/source/main')[0];
-    expect(write.headers.cookie).not.toBe(lockCookie);
-    // Same conversation id, different session — indistinguishable to the caller.
-    expect(write.headers['sap-adt-connection-id']).toBe(conn.getSessionId());
+    // A teardown now stops the connector. Previously this quietly opened a
+    // second session and told the caller nothing.
+    await expect(
+      conn.makeAdtRequest({
+        url: '/sap/bc/adt/ddic/domains/zstub/source/main?lockHandle=LH-1',
+        method: 'PUT',
+        timeout: 5000,
+        data: 'x',
+      }),
+    ).rejects.toMatchObject({ code: ADT_SESSION_ERROR.NOT_CONNECTED });
+    expect(stub.sessionsOpened()).toBe(1);
   });
 
   it('keeps the mid-window recovery fetch after a 403 inside the conversation', async () => {
-    const conn = createAbapConnection(configFor(stub.baseUrl), null);
+    const conn = connectionTo(stub.baseUrl);
+    await conn.connect();
     conn.setSessionType('stateful');
 
     // Arm the session and cache a token.
