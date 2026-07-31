@@ -15,24 +15,17 @@ They belong to different layers, and so do their risks:
 | `@mcp-abap-adt/connection` | the REST session | losing or silently replacing the HTTP conversation |
 | `@mcp-abap-adt/adt-clients` | the ABAP session's semantics — stateful mode, lock handles, the registry | leaving a lock on the server |
 
-**The server does not end the session.** Short of force majeure — the machine
-going away — every teardown originates on our side of the wire, from the
-consumer. That has two consequences worth stating, because the earlier design
-missed both:
+**The server does not end the session.** Every teardown originates on our side of
+the wire, from the consumer — which means that at teardown the ABAP session is
+still alive and an `UNLOCK` can simply be sent. Releasing a lock during shutdown
+is an ordinary operation, not a best-effort gamble. That is the case we handle,
+and handling it is cheap.
 
-1. **At teardown the ABAP session is still alive**, so an `UNLOCK` can still be
-   sent. Releasing a lock during shutdown is an ordinary operation, not a
-   best-effort gamble.
-2. **When it genuinely cannot be sent** — the server is gone — the lock does NOT
-   go with it. It stays in the enqueue table, and there is no programmatic
-   remedy: someone waits it out or clears it in SM12, by hand. That is precisely
-   why the object left behind has to be *named* — a human needs to know what to
-   clean.
-
-So an abandoned lock is not something to insure against with cleverness at the
-connection layer. In the ordinary case the layer above releases it; in the
-force-majeure case the layer above is also the only one that can say which
-object is stranded, because it is the only one that knows the object's name.
+**Out of scope: a server that goes away.** The lock survives in the enqueue table
+and is cleared by waiting or by SM12. That is SAP's risk and the operator's, not
+ours, and designing around it would mean insuring someone else's failure with our
+complexity. We release what we took, while we can. We do not build machinery for
+the case where we cannot.
 
 ## The defect that remains
 
@@ -78,11 +71,9 @@ exists.
 
 The shape is a close path on `AdtClient` — unlock what is held, then disconnect —
 so that "the client was closed without unlocking" stops being a thing that can
-happen by accident. `unlockAll()` already returns `LockFailure[]`, which is where
-anything it could not release belongs: after a server crash that list is the only
-record of what needs clearing in SM12, and a lock reported by object name is the
-difference between a two-minute cleanup and a hunt. The details belong to that
-repository's own design, not here.
+happen by accident. `unlockAll()` already returns `LockFailure[]` for whatever it
+could not release; nothing new is needed. The details belong to that repository's
+own design, not here.
 
 ## What this means for `ILockWindowAware`
 
