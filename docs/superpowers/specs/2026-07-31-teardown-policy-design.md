@@ -171,6 +171,22 @@ not raise a second teardown and does not attempt a second recovery.
 
 Test with two concurrent detectors, because one detector cannot distinguish an
 assertion from a rule.
+
+#### The permit does not outrank the caller
+
+It exempts its holder from the **generation** fence and from nothing else. In
+particular it does not touch the teardown **epoch**, and the existing rule stands
+unchanged: a recovery captures the epoch when it starts and refuses to publish if
+the caller has since requested a teardown.
+
+Without that boundary the permit would be a licence to resurrect. A caller calls
+`disconnect()` while a recovery is in flight; the recovery finishes, and — holding
+a permit that ignored the epoch — publishes a session over the top of a teardown
+the caller asked for. The caller would be left connected to something it
+explicitly ended.
+
+Two counters, two questions, and the permit answers only one of them: *is this
+still your session* — never *did the caller ask to stop*.
 - The request still resolves or rejects normally to **its own caller**. Fencing
   suppresses its effects on the connection, not its result.
 
@@ -280,8 +296,10 @@ interface ICloseReport {
   unresolvedIntents: string[];
   /** Whether the barrier stopped waiting rather than running out of work. */
   timedOut: boolean;
-  /** What the connection's own teardown could not finish. Carried, not swallowed. */
-  teardown: ITeardownReport;
+  /** What the connection's own teardown could not finish. Carried, not swallowed.
+   *  Absent when the injected connection does not implement
+   *  ISessionLifecycleAware — there was no teardown to report. */
+  teardown?: ITeardownReport;
 }
 
 close(options?: { deadlineMs?: number }): Promise<ICloseReport>;
@@ -300,14 +318,39 @@ the caller would see a successful `close()` and never learn that something is
 still held open. A wrapper that discards its inner result reports success it did
 not verify.
 
+It is **optional**, and that is not a hedge. `disconnect()` lives on
+`ISessionLifecycleAware`, which is a capability atom: an `IAbapConnection` is not
+required to implement it, and a batch recorder or a transport with no HTTP
+session does not. So step 4 narrows at runtime — exactly as `AdtClient`'s connect
+guard does, checking the method it actually calls — and when the capability is
+absent it is skipped, with `teardown` left undefined. Requiring it would
+contradict this spec's own layering argument: the atoms exist so that a transport
+is never forced to implement what it cannot honour, and a `close()` that demands
+`disconnect()` re-imposes exactly that. Steps 1 to 3 — refuse, wait, unlock —
+need no capability at all and run regardless.
+
+Test: `close()` over a connection that implements no lifecycle atom still
+unlocks, still reports, and does not throw.
+
 `deadlineMs` is in milliseconds, matching every other timeout in these packages.
-The default is **60 000 ms**, from `SAP_CLOSE_DEADLINE_MS`, alongside the existing
-`SAP_TIMEOUT_*` family. Named rather than left to each implementation, because a
-default nobody wrote down is a different default in every test. The value is
-chosen against what step 2 is waiting for: a chain's remaining requests, each of
-which allows 45s by default, so a shorter deadline would routinely cut short work
-that was about to finish, and a much longer one would turn a stuck close into a
-hang by another name.
+The default is **`SAP_TIMEOUT_CRITICAL`, i.e. 600 000 ms**, and it is deliberately
+the same number as the window ceiling rather than a value of its own.
+
+An earlier draft picked 60 000 ms, reasoning from a single request's 45s. That is
+the wrong reference. Step 2 waits for *chains*, and a chain inside a lock window
+is permitted to run to the critical ceiling — 600s — precisely because we decided
+its requests must not be cut short. A close deadline below that would routinely
+guillotine work the connection was told to protect, turning `unresolvedIntents`
+into the normal outcome of an ordinary shutdown rather than the exception it is
+meant to flag. Two numbers governing the same wait must agree; if they disagree,
+the smaller silently overrides the larger and the larger becomes a lie.
+
+It sounds long for a shutdown, and in practice it is not reached: the barrier
+waits only while chains are actually outstanding, and returns immediately when
+none are. The deadline bounds a pathology, it does not pace the normal path.
+
+Named rather than left to each implementation, because a default nobody wrote
+down is a different default in every test.
 
 `close()` resolves in all cases; it never rejects for a lock it could not
 release, since the report is the answer. The barrier and the intent declaration are the new parts, and they need four
