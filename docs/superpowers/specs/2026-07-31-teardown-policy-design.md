@@ -87,17 +87,51 @@ old request would be tearing down its successor.
 So the fencing is not an optional hardening; it is what makes removing the wait
 safe:
 
-- `admitRequest()` already returns a lease carrying the epoch at admission
-  (`RequestLease.epoch`). It exists and is currently used for nothing.
-- That epoch must reach the response handling. Every side effect on shared state
-  — cookie update, identity policy, CSRF cache, the recovery paths — is skipped
-  when the lease's epoch is not the current one.
+#### The teardown epoch is the wrong counter for it
+
+`RequestLease.epoch` exists and is used for nothing, so it is the obvious
+candidate. It is also insufficient, and the reason is deliberate:
+
+```ts
+if (origin === 'caller') {
+  this.epoch += 1;
+}
+```
+
+Only a **caller-initiated** teardown bumps it. An internal one — the cleanup that
+follows a lost session, and the recovery after it — does not, on purpose: a
+recovery must not cancel itself. So after a session loss and a successful
+recovery, requests issued against the dead session carry the *same* epoch as the
+new one and would sail straight through a fence built on it. That is precisely
+the case fencing exists for, and epoch cannot see it.
+
+Two counters answering two different questions:
+
+| counter | question | changes when |
+|---|---|---|
+| `epoch` (exists) | did the caller ask to stop? | a caller-initiated teardown |
+| **session generation** (new) | is this still the session you were issued against? | every `markConnected()` — however the session came to be |
+
+`markConnected()` currently increments nothing. It is the one place a session
+becomes current, whatever brought it there — first connect, reconnect, or
+recovery — which makes it the honest place to count generations. Epoch keeps its
+existing job untouched.
+
+#### The rule
+
+- A lease captures the **generation** at admission.
+- Every side effect on shared state — cookie update, identity policy, CSRF cache,
+  the recovery paths — is skipped when the lease's generation is not the current
+  one.
 - The request still resolves or rejects normally to **its own caller**. Fencing
   suppresses its effects on the connection, not its result.
 
-Test, explicitly ordered: issue request A, `disconnect()`, `connect()`, then let
-A settle — the new session's identity and cookies are untouched, and no teardown
-is raised.
+Tests, both orderings, because only the second distinguishes the two counters:
+
+- explicit: request A → `disconnect()` → `connect()` → A settles
+- **internal**: request A → session-lost teardown → recovery establishes a new
+  session → A settles. Same epoch throughout; the new session's identity and
+  cookies must still be untouched and no teardown raised.
 
 ### adt-clients
 
