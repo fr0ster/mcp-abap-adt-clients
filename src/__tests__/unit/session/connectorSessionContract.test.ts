@@ -38,17 +38,38 @@ const configFor = (baseUrl: string): ISapConfig => ({
 
 describe('connector session contract (real @mcp-abap-adt/connection)', () => {
   let stub: AdtStub;
+  /**
+   * Every connection this file opens, so every one gets torn down.
+   *
+   * These tests used to create connections and abandon them. Each holds a
+   * keep-alive socket to the stub, and an abandoned socket is exactly the kind
+   * of thing that keeps a jest worker alive past the last assertion — visible
+   * here only as the "Force exiting Jest" line, because `forceExit: true` in the
+   * config kills the process before anyone has to notice. Closing them makes the
+   * run terminate on its own merits, and 2.0.0 is the release that finally
+   * provides the means.
+   */
+  const opened: Array<{ disconnect?: () => Promise<unknown> }> = [];
+
+  function connectionTo(baseUrl: string) {
+    const conn = createAbapConnection(configFor(baseUrl), null);
+    opened.push(conn as { disconnect?: () => Promise<unknown> });
+    return conn;
+  }
 
   beforeEach(async () => {
     stub = await startAdtStub();
   });
 
   afterEach(async () => {
+    // Before the stub, so a teardown still has a server to talk to.
+    await Promise.all(opened.map((c) => c.disconnect?.()));
+    opened.length = 0;
     await stub.close();
   });
 
   it('marks ordinary requests stateful once the session is armed', async () => {
-    const conn = createAbapConnection(configFor(stub.baseUrl), null);
+    const conn = connectionTo(stub.baseUrl);
     await conn.connect();
     conn.setSessionType('stateful');
 
@@ -78,7 +99,7 @@ describe('connector session contract (real @mcp-abap-adt/connection)', () => {
    * benefit. That asymmetry is intended, not an oversight.
    */
   it('sends the CSRF fetch inside the conversation, with the connection id', async () => {
-    const conn = createAbapConnection(configFor(stub.baseUrl), null);
+    const conn = connectionTo(stub.baseUrl);
     await conn.connect();
     conn.setSessionType('stateful');
 
@@ -102,7 +123,7 @@ describe('connector session contract (real @mcp-abap-adt/connection)', () => {
   });
 
   it('uses one connection id for the whole connector lifetime, including across reset()', async () => {
-    const conn = createAbapConnection(configFor(stub.baseUrl), null);
+    const conn = connectionTo(stub.baseUrl);
     await conn.connect();
     conn.setSessionType('stateful');
 
@@ -145,7 +166,7 @@ describe('connector session contract (real @mcp-abap-adt/connection)', () => {
    * decision rather than an accident.
    */
   it('sends the connection id as a dashed UUID, unlike the dashless Eclipse form', async () => {
-    const conn = createAbapConnection(configFor(stub.baseUrl), null);
+    const conn = connectionTo(stub.baseUrl);
     await conn.connect();
     conn.setSessionType('stateful');
 
@@ -181,7 +202,7 @@ describe('connector session contract (real @mcp-abap-adt/connection)', () => {
    * loudly, before anything reaches the server, instead of being papered over.
    */
   it('refuses a request without connect(), and again after reset()', async () => {
-    const conn = createAbapConnection(configFor(stub.baseUrl), null);
+    const conn = connectionTo(stub.baseUrl);
     conn.setSessionType('stateful');
 
     const lock = {
@@ -219,7 +240,7 @@ describe('connector session contract (real @mcp-abap-adt/connection)', () => {
   });
 
   it('keeps the mid-window recovery fetch after a 403 inside the conversation', async () => {
-    const conn = createAbapConnection(configFor(stub.baseUrl), null);
+    const conn = connectionTo(stub.baseUrl);
     await conn.connect();
     conn.setSessionType('stateful');
 
