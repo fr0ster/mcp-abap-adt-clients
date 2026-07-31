@@ -453,11 +453,16 @@ it was handed one it did not create.
 
 A disposer returns `void`, so the report has nowhere to go. It is logged, and the
 distinction the report exists to draw must survive that: **failed unlocks and
-unresolved intents are logged separately**, since one says "held, retry it" and
-the other "unknown, go look". Flattening them into one warning would undo the
-work of separating them. The current message already gestures at this — it names
-the keys and suggests retrying — and it becomes accurate rather than hopeful once
-the retry path is guaranteed admissible.
+unresolved intents are logged separately**, because they are different
+observations — the server refused, versus no answer was obtained. Flattening them
+into one warning would undo the work of separating them.
+
+The log says what was observed and stops. The current message ends with "retry
+`unlockAll()` or rely on session-drop", which is advice, and this document has
+already established twice that the advice is not ours to give — once when it was
+optimistic and once when I replaced it with pessimistic advice instead. It goes.
+What replaces it is the names and the fact: these keys were refused, these were
+never resolved.
 
 A consumer that needs the report calls `close()` itself. `await using` is for the
 case where nobody is going to read it, and its job is to leave nothing behind
@@ -561,18 +566,37 @@ No request is bound to a particular window. While *any* window is open, **every*
 request on that connection gets the raised ceiling, including one that has
 nothing to do with the locked object.
 
-Accepted rather than fixed, because the alternative is worse. Binding a request
-to a window token would mean threading that token through every call site, and it
-would be a fiction anyway: those requests share one ABAP session, and a timeout
-that aborts an unrelated request mid-flight leaves that session in the same
-uncertain state — an operation whose outcome we do not know — during a span
-someone declared sensitive precisely to avoid that. The raise is a property of
-the session, not of a span, and the span is only what turns it on.
+The reasoning for the raise is sound: those requests share one ABAP session, and a
+timeout that aborts an unrelated request mid-flight leaves that session in the
+same uncertain state — an operation whose outcome we do not know — during a span
+someone declared sensitive precisely to avoid that. The raise is a property of the
+session, not of a span, and the span is only what turns it on.
 
-What that costs: an unrelated slow request will hang for the ceiling instead of
-its own short timeout. That is a real cost and it is the reason this is written
-down rather than left implicit. A test covers it, so the behaviour is a decision
-and not a surprise.
+**But an earlier draft said "accepted rather than fixed", and that was me keeping
+a decision that is not mine.** A caller who set a short timeout on an unrelated
+request has stated a preference, and the raise silently overrules it for as long
+as somebody else's window is open. There is currently no way to say otherwise.
+That is the exact shape this document criticises everywhere else: a default is
+ours to choose, a default nobody can escape is not.
+
+So the raise stays as the **default** — it is the safer side, and the caller who
+wants it has to do nothing — and a request may opt out of it:
+
+```ts
+makeAdtRequest({ ..., honourTimeout: true })
+```
+
+Meaning "apply my timeout as given, even inside a window". The caller then owns
+what follows, which is the point: they may know their request is unrelated to
+whatever is locked, and we do not.
+
+Rejected: binding every request to a window token. It threads a token through
+every call site to express something almost no caller needs to say, when a single
+opt-out says it where it is actually needed.
+
+What the default costs, stated so it is a decision rather than a surprise: an
+unrelated slow request waits for the ceiling instead of its own short timeout,
+unless it opts out. A test covers both sides.
 
 The teardown does not wait on windows either way — which leaves
 `ITeardownReport.abandonedWindows` needing a meaning it no longer has.
@@ -609,11 +633,11 @@ but it is still a change there, so the earlier claim that this work needs no
 - **No request is aborted** by a teardown.
 - **`disconnect()` is never refused** because something is open.
 - **No default timeout is introduced for an ordinary request.** Outside a window
-  the caller's value is passed verbatim, including none. This says nothing about
-  the window ceiling above, which is a different thing: it only ever *raises* an
-  effective timeout (`Math.max(caller, ceiling)`) and never shortens one, so it
-  extends a caller's choice rather than overruling it. That ceiling is a real
-  default — 600s, `SAP_TIMEOUT_CRITICAL` — and it predates this spec.
+  the caller's value is passed verbatim, including none. The window ceiling is a
+  different thing and it *does* override a caller's value — it raises rather than
+  shortens, which is milder, but a caller who wanted a short timeout does not get
+  one. That is why it now has an opt-out. The ceiling itself is a real default —
+  600s, `SAP_TIMEOUT_CRITICAL` — and it predates this spec.
 - **Nothing is aborted.** A teardown does not abort a request; `close()` does not
   abort a chain. Both stop waiting; neither cancels work.
 
@@ -634,6 +658,8 @@ Connection, on the window's actual job:
 - a request issued inside a window is not aborted by a short per-request timeout
 - **an unrelated request, issued while someone else's window is open, also gets
   the raised ceiling** — the connection-wide effect, pinned as a decision
+- **the same request with `honourTimeout: true` keeps its own timeout** — the
+  escape from that default, which is what keeps it a default rather than a rule
 - five concurrent windows: the ceiling holds until the last one closes, and
   closing them out of order works — this is the case that exposed the old
   reading
