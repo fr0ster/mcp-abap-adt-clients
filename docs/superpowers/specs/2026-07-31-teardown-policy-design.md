@@ -541,6 +541,15 @@ rather than coerced:
 | `Infinity`, `NaN`, negative | **rejected** — `close()` throws before doing anything |
 | beyond `MAX_SAFE_INTEGER - <monotonic now>` | **rejected** — the absolute deadline would not be exactly representable; see below |
 
+The two checks happen at different moments, deliberately. `Infinity`, `NaN` and
+negatives are rejected **immediately**, at the call, since they are wrong
+regardless of when the wait starts. Representability is checked against the
+**single monotonic reading** that also computes the deadline — one snapshot used
+for both, so there is no window between validating a value and using it. Checking
+it at the call and computing the deadline from a later reading would leave exactly
+that window: a value that passed could be out of safe range by the time the queued
+call reaches its own step 2.
+
 Rejected loudly rather than silently repaired, because every silent repair here is
 wrong in a way the caller cannot see. Coercing `Infinity` to a default hides that
 they asked for something the contract cannot provide; treating it as unbounded
@@ -599,6 +608,17 @@ Unavoidable now that the disposer delegates to it: `await using` will call
 rather than discovered.
 
 `close()` is **idempotent and serialized**. Calls queue; none is dropped.
+
+**A call's deadline starts when its own wait starts**, not when the call was made.
+A second `close()` may sit behind the first for a while, and charging that queueing
+time against its deadline would hand the caller less patience than they asked for,
+for a reason they cannot see — and in the limit expire the deadline before step 2
+even begins, producing a `timedOut: true` that never waited for anything.
+
+`deadlineMs` bounds *waiting for chains*, which is what step 2 does; time spent
+waiting for another `close()` is bounded by **that** call's deadline. So every
+call gets the semantics it asked for and the total stays bounded — worst case the
+sum of the queued deadlines, which is finite because each of them is.
 
 - **The barrier shuts once.** Step 1 has no meaning a second time — new work is
   already refused.
@@ -659,6 +679,9 @@ Tests:
   on the second call
 - `close()` returns `timedOut: true` → a second `close()` with a longer deadline
   waits again and picks up what finished in between
+- **two queued `close()` calls with different deadlines**: the second waits its
+  full `deadlineMs` measured from when its own wait begins, not from when it was
+  called — it does not arrive already expired
 - a **read-only** chain outstanding at the deadline → `timedOut: true` with
   `unresolvedIntents` empty; it is not named, because it could not have locked
 - the **wall** clock moves backwards mid-wait while the monotonic clock keeps
