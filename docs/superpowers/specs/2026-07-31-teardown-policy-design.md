@@ -430,10 +430,13 @@ took was confirmed released.
 Two more facts are worth stating because they are ours to know, and they are
 facts, not instructions:
 
-- A **refused** `UNLOCK` usually means the handle is no longer valid — the session
-  moved, its type was toggled, the handle expired. The same call with the same
-  handle will then get the same answer. This does not apply to an `unknown` one,
-  where nothing was learned about the handle at all.
+- A **refused** `UNLOCK` is often an invalid handle — the session moved, its type
+  was toggled, the handle expired. Often, not always, and the report says nothing
+  about which: distinguishing a permanent rejection from a transient one needs the
+  semantics of the specific SAP error code, and this library does not classify
+  them. An earlier draft of this bullet promised that repeating the call would get
+  the same answer, which the table above already contradicts. Nothing was learned
+  about the handle in an `unknown` outcome at all.
 - That kind of disturbance is usually caused by something on our side, between
   `LOCK` and `UNLOCK`. `unlockAll()` already holds the session stateful across the
   whole batch for exactly this reason.
@@ -612,8 +615,10 @@ The log says what was observed and stops. The current message ends with "retry
 `unlockAll()` or rely on session-drop", which is advice, and this document has
 already established twice that the advice is not ours to give — once when it was
 optimistic and once when I replaced it with pessimistic advice instead. It goes.
-What replaces it is the names and the fact: these keys were refused, these were
-never resolved.
+What replaces it is the names under all **three** headings: these keys were
+refused, these got no application-level answer, these never resolved. Naming two
+of the three here would reintroduce the conflation this section exists to
+prevent — and it did, in an earlier draft.
 
 A consumer that needs the report calls `close()` itself. `await using` is for the
 case where nobody is going to read it, and its job is to leave nothing behind
