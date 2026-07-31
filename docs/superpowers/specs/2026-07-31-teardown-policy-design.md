@@ -1,128 +1,120 @@
-# A teardown hook, so an open lock window can be dealt with
+# The lock safety net belongs to adt-clients, not to the connection
 
 Continuation of `2026-07-27-session-lifecycle-design.md`, and a correction to it.
 
-## The case this exists for
+## Two sessions, two layers
 
-A consumer opens a lock window, something odd happens, and it closes the client
-without unlocking. The lock stays on the server. Nobody is coming back for it.
+There is the **REST session** — cookies, CSRF token, connection id, the HTTP
+conversation — and there is the **ABAP session** the server keeps behind it,
+which is what actually holds a lock.
 
-That is the case worth insuring against, and it is what the window was for. The
-earlier design tried to insure against it by **waiting** — the teardown blocked
-until the window closed, bounded by a ceiling. That was the wrong instrument.
+They belong to different layers, and so do their risks:
 
-## Why waiting was wrong
+| layer | owns | its risk |
+|---|---|---|
+| `@mcp-abap-adt/connection` | the REST session | losing or silently replacing the HTTP conversation |
+| `@mcp-abap-adt/adt-clients` | the ABAP session's semantics — stateful mode, lock handles, the registry | leaving a lock on the server |
 
-Two reasons, and the second is decisive.
+**The server does not end the session.** Short of force majeure — the machine
+going away — every teardown originates on our side of the wire, from the
+consumer. That has two consequences worth stating, because the earlier design
+missed both:
 
-**It takes over a responsibility nobody transferred.** The consumer opened the
-window; closing it correctly is the consumer's job. A teardown that blocks until
-they get around to it has quietly assumed ownership of their problem.
+1. **At teardown the ABAP session is still alive**, so an `UNLOCK` can still be
+   sent. Releasing a lock during shutdown is an ordinary operation, not a
+   best-effort gamble.
+2. **When it genuinely cannot be sent** — the server is gone — the lock went with
+   the session it lived in. There is nothing left to release. The one case where
+   we cannot act is the case where acting is meaningless.
 
-**The connector cannot act on what it is waiting for.** It does not know a lock
-exists, what object it covers, or what handle would release it. It waits on a
-counter it cannot interpret, and when the counter never reaches zero it has no
-recourse — which is exactly the hole in the current implementation:
+So an abandoned lock is not something to insure against with cleverness at the
+connection layer. It is a case the layer above can simply handle.
+
+## The defect that remains
+
+Independent of any of the above, we publish this:
+
+```ts
+/** Resolves rather than throws — the report carries the failures. */
+disconnect(): Promise<ITeardownReport>;
+```
+
+and there is a path where it never resolves:
 
 ```ts
 while (this.inFlight > 0) {
-  await this.changed();      // no bound; disconnect() may never resolve
+  await this.changed();      // no bound
 }
 ```
 
-We publish `Resolves rather than throws` for `disconnect()`. That path breaks the
-promise. Waiting longer was never going to fix an abandoned lock; it only
-converted one problem into two.
+Because transitions are serialized, a teardown stuck there blocks every later
+`connect()` as well. That is a broken promise and it is squarely the connection
+layer's own business.
 
-## The instrument that fits
+## What each layer does
 
-Not a wait — **a hook**. At teardown, hand the open windows to a strategy the
-consumer supplied, and let the code that knows what a window means decide what to
-do about it.
+### The connection
 
-`adt-clients` holds the lock handle and the registry. Given the window's label it
-can find the handle and send the `UNLOCK`. That is auto-unlock, written by the
-only party able to write it, and it is opt-in: a consumer that wants nothing gets
-nothing.
+Stops waiting. `disconnect()` tears down the REST session and returns.
 
-```ts
-interface ITeardownContext {
-  /** Labels of windows still open, in the order they were opened. */
-  readonly openWindows: readonly string[];
-  /** False when the session is already gone, so nothing can be sent over it. */
-  readonly sessionUsable: boolean;
-}
+- No wait on in-flight requests. They continue as their caller arranged; nothing
+  is aborted.
+- No wait on open windows. The connection cannot interpret them — it does not
+  know a lock exists, what it covers, or what would release it.
+- The unbounded loop, the two-phase drain and its ceiling all go; nothing is left
+  to bound.
 
-interface ITeardownStrategy {
-  /**
-   * Called once, before the session is cleared, while requests are still
-   * admitted. Anything it needs to send, it sends here.
-   */
-  onTeardown(context: ITeardownContext): Promise<void>;
-}
-```
+This is the connection handling its own risk and stopping there.
 
-The default is no strategy at all: the teardown reports the open windows and
-proceeds. Today's consumers see the report they already see.
+### adt-clients
 
-### Why this is not the wait in disguise
+Releases its locks before it lets the connection go, because it is the only layer
+that can: it holds the handles, in `LockRegistry`, and `unlockAll()` already
+exists.
 
-The connector still does not wait on the counter. It calls a function the
-consumer provided and awaits **that** — the consumer's own code, with the
-consumer's own timeouts, doing work the consumer chose. If that code takes a
-while, the consumer decided so. If it hangs, that is theirs too, and it is
-visible in their stack rather than buried in ours.
+The shape is a close path on `AdtClient` — unlock what is held, then disconnect —
+so that "the client was closed without unlocking" stops being a thing that can
+happen by accident. The details belong to that repository's own design, not here.
 
-`sessionUsable` matters: when the teardown was raised because the session was
-lost, an `UNLOCK` cannot be sent — there is nothing to send it over. The strategy
-is told, so it can record the orphan instead of attempting a call that will fail.
+## What this means for `ILockWindowAware`
 
-### What still goes
+Named plainly: putting lock windows on the connection was a layering mistake of
+mine. `beginWindow('Class/ZCL_FOO')` carries a domain concept into a layer that
+cannot act on it — which is exactly why the teardown ended up blocking on a
+counter it could not interpret.
 
-Everything that was there to support waiting:
-
-- the unbounded post-expiry loop — the contract hole
-- the two-phase drain and its ceiling — nothing left to bound
-- waiting on in-flight requests: they continue exactly as their caller arranged,
-  nothing is aborted, and the connection is marked unusable before they land
+It ships in `interfaces` 11.5.0 and `connection` 2.0.0, and nothing calls it:
+`beginWindow()` has zero callers in either repository. Removing it is therefore
+cheap in practice and breaking in form. **Not decided here** — the options are to
+deprecate it now and remove it in the next major, or to leave it as an unused
+capability nobody implements. Either way it stops being load-bearing.
 
 ## Not done
 
-- **No request is aborted.** Aborting mid-flight drops a stateful session and
-  orphans a lock — the failure this whole design exists to prevent.
-- **`disconnect()` is never refused** because a window is open. A prohibition
-  invented to protect the caller from itself is not a contract.
-- **No default strategy.** Auto-unlock is a decision about someone else's locks;
-  shipping it as the default would make it ours.
-- **No default timeout** anywhere. That would cancel an explicit per-request
-  choice.
-
-## Open questions for review
-
-1. **One call with all windows, or one call per window?** All at once is proposed:
-   a consumer unlocking three objects may want to order or batch them, and per
-   window it cannot.
-2. **Is `sessionUsable` enough context**, or does the strategy also need the
-   reason (caller-requested vs session-lost)?
-3. **Where does `ITeardownStrategy` live?** It is implemented by consumers, so by
-   the standing rule it belongs in `@mcp-abap-adt/interfaces` — which means that
-   package ships first, as always.
+- **No teardown strategy or hook in the connection.** The previous draft proposed
+  one. It is the same layering error one step removed: a seam in the connection
+  for a decision that belongs to the layer above, which can simply act before
+  calling `disconnect()`.
+- **No request is aborted** by a teardown.
+- **`disconnect()` is never refused** because something is open.
+- **No default timeout** anywhere.
 
 ## Tests
 
-At `SessionLifecycle` / connection level — no server needed.
+Connection, at `SessionLifecycle` level — no server:
 
-- no strategy: `disconnect()` resolves, open windows reported, behaviour otherwise
-  as today
-- a strategy is called once, before the session is cleared, and can still send
-- a strategy sees `sessionUsable: false` after a session-lost teardown
-- a strategy that throws does not prevent the teardown from completing
-- an in-flight request neither blocks the teardown nor is aborted by it
-- `connect()` after a teardown is not blocked — the regression this exists to
-  prevent
+- a request that never settles: `disconnect()` resolves anyway, and a following
+  `connect()` is not blocked — the regression this exists to prevent
+- an open window does not delay a teardown
+- no request is aborted or errored by the teardown itself
+
+adt-clients: its close path unlocks before disconnecting, and reports what it
+could not release — verifiable against the trial system, where the existing
+`SessionLockRegistry` tests already exercise `unlockAll()`.
 
 ## Release
 
-`interfaces` gains the strategy types (minor), then `@mcp-abap-adt/connection`
-consumes them and changes `disconnect()`'s behaviour: it stops waiting. Versions
-are the user's call.
+`@mcp-abap-adt/connection`: a behavioural change to `disconnect()` — it stops
+waiting. No API change, and **no `interfaces` change**, so no cross-package
+ordering. `adt-clients` follows independently with its close path. Versions are
+the user's call.
