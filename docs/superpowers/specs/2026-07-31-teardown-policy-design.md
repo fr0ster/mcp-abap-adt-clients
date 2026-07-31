@@ -137,6 +137,13 @@ Epoch keeps its existing job untouched.
 - Every side effect on shared state — cookie update, identity policy, CSRF cache,
   the recovery paths — is skipped when the lease's generation is not the current
   one.
+- **Except for the request that raised the teardown.** A request detecting a lost
+  session raises an internal teardown, which bumps the generation and would
+  therefore make its own lease stale on the spot — leaving it fenced out of the
+  recovery it just triggered, with nobody else able to run it. The raiser is
+  rebased onto the generation it created and may proceed; every other lease from
+  the old session stays fenced. Being the one who noticed is what earns the
+  permit, and only one request can be that.
 - The request still resolves or rejects normally to **its own caller**. Fencing
   suppresses its effects on the connection, not its result.
 
@@ -149,6 +156,10 @@ Tests, both orderings, because only the second distinguishes the two counters:
 - **internal**: request A → session-lost teardown → recovery establishes a new
   session → A settles. Same epoch throughout; the new session's identity and
   cookies must still be untouched and no teardown raised.
+- **the raiser's permit**: request A detects the loss and raises the teardown,
+  request B is in flight from the same dead session. A completes its recovery; B
+  is fenced. Without the carve-out A fences itself and the recovery never happens
+  — this test fails on the rule as first written.
 
 ### adt-clients
 
@@ -196,7 +207,20 @@ attempted and failed, and here none was attempted at all.
 
 **So the registry records intent, not only possession.** A chain declares the key
 it is about to lock *before* it sends the `LOCK`, and resolves that declaration
-when the outcome is known — held, or confirmed not taken. `close()` then reports
+when the outcome is known — held, or confirmed not taken.
+
+A declaration is identified **per attempt, not per key.** The registry is
+`Map<string, UnlockThunk>` today, keyed by object, and that is enough for
+possession — one ABAP session cannot hold two locks on one object, so at most one
+entry per key can ever be *held*. It is not enough for intent: two chains may
+attempt `DOMA/Z` concurrently, and keying their declarations by object would let
+the loser's resolution clear the winner's, or one declaration overwrite the
+other. Each attempt therefore carries its own token, the same reasoning that made
+`WindowToken` a symbol rather than a label.
+
+The second attempt is expected to fail — the server will not grant it — and the
+point is that its failure must not corrupt the bookkeeping of the one that
+succeeded. `close()` then reports
 the declarations still unresolved at its deadline, which it *can* know, because
 they were made before it stopped waiting.
 
@@ -236,8 +260,9 @@ attempt, and for an unresolved intent no attempt was made.
 
 `deadlineMs` in milliseconds, to match every other timeout in these packages, and
 a finite default. `close()` resolves in all cases; it never rejects for a lock it
-could not release, since the report is the answer. The barrier and the intent declaration are the new parts, and they need three
-concurrency tests: a chain interrupted mid-`LOCK`, asserting the lock was
+could not release, since the report is the answer. The barrier and the intent declaration are the new parts, and they need four
+concurrency tests — including two chains attempting `DOMA/Z` at once, where the
+loser's failure must not disturb the winner's bookkeeping: a chain interrupted mid-`LOCK`, asserting the lock was
 released rather than stranded; a chain that never settles, asserting `close()`
 returns at its deadline and names the object it was working on; and a chain whose
 `LOCK` is confirmed to have failed, asserting it is NOT named — uncertainty is
@@ -317,6 +342,34 @@ which is what the critical section already does by reference count. The label
 stays, because "which span" is worth having in a log even when it is not worth
 blocking on.
 
+#### The raise is connection-wide, and that is deliberate
+
+Worth stating because the wording above invites the opposite reading. The
+mechanism is a flag plus a reference count:
+
+```ts
+const effectiveTimeout = this.inCriticalSection
+  ? Math.max(timeout ?? 0, getCriticalSectionTimeout())
+  : timeout;
+```
+
+No request is bound to a particular window. While *any* window is open, **every**
+request on that connection gets the raised ceiling, including one that has
+nothing to do with the locked object.
+
+Accepted rather than fixed, because the alternative is worse. Binding a request
+to a window token would mean threading that token through every call site, and it
+would be a fiction anyway: those requests share one ABAP session, and a timeout
+that aborts an unrelated request mid-flight leaves that session in the same
+uncertain state — an operation whose outcome we do not know — during a span
+someone declared sensitive precisely to avoid that. The raise is a property of
+the session, not of a span, and the span is only what turns it on.
+
+What that costs: an unrelated slow request will hang for the ceiling instead of
+its own short timeout. That is a real cost and it is the reason this is written
+down rather than left implicit. A test covers it, so the behaviour is a decision
+and not a surprise.
+
 The teardown does not wait on windows either way — which leaves
 `ITeardownReport.abandonedWindows` needing a meaning it no longer has.
 
@@ -375,6 +428,8 @@ Connection, at `SessionLifecycle` level — no server:
 Connection, on the window's actual job:
 
 - a request issued inside a window is not aborted by a short per-request timeout
+- **an unrelated request, issued while someone else's window is open, also gets
+  the raised ceiling** — the connection-wide effect, pinned as a decision
 - five concurrent windows: the ceiling holds until the last one closes, and
   closing them out of order works — this is the case that exposed the old
   reading
