@@ -226,6 +226,12 @@ So the close path is a barrier, in this order:
 
 1. **Refuse new work** — further operations and lock acquisitions are rejected
    from this point, so the set of outstanding chains can only shrink.
+   **Cleanup is not new work.** `unlockAll()`, and the unlock of a lock already
+   held, stay admissible after `close()` has returned. Refusing them would make
+   the preserved session useless: the whole reason `disconnect` defaults to false
+   is that a failed `UNLOCK` can be retried, and a barrier that then rejects the
+   retry hands back advice it has already blocked. What is refused is work that
+   could acquire a *new* lock.
 2. **Wait for running chains, up to a deadline**, so a `LOCK` already in flight
    lands and registers rather than appearing after the snapshot.
 3. **`unlockAll()`**, now over a registry that cannot grow.
@@ -325,13 +331,23 @@ interface ICloseReport {
   /** Whether the barrier stopped waiting rather than running out of work. */
   timedOut: boolean;
   /** What the connection's own teardown could not finish. Carried, not swallowed.
-   *  Absent when the injected connection does not implement
-   *  ISessionLifecycleAware — there was no teardown to report. */
+   *
+   *  Absent whenever no teardown happened, which is the ORDINARY case: it is
+   *  absent by default, since `disconnect` defaults to false, and absent when
+   *  `disconnect: true` was asked for but the connection implements no
+   *  ISessionLifecycleAware to ask. Present only when a teardown actually ran. */
   teardown?: ITeardownReport;
 }
 
-close(options?: { deadlineMs?: number }): Promise<ICloseReport>;
+close(options?: {
+  deadlineMs?: number;
+  /** Tear the connection down as well. Default false — see ownership, above. */
+  disconnect?: boolean;
+}): Promise<ICloseReport>;
 ```
+
+This is the normative signature; the sketch in the ownership section above is the
+same one, shown early for the argument it is making.
 
 Four facts, four fields, because collapsing any of them loses a distinction that
 matters to whoever reads the report. "This lock is definitely held and I could
@@ -396,8 +412,43 @@ Named rather than left to each implementation, because a default nobody wrote
 down is a different default in every test.
 
 `close()` resolves in all cases; it never rejects for a lock it could not
-release, since the report is the answer. The barrier and the intent declaration are the new parts, and they need four
-concurrency tests — including two chains attempting `DOMA/Z` at once, where the
+release, since the report is the answer.
+
+### `Symbol.asyncDispose` must go through it
+
+`AdtClient` already has a disposer, and it predates all of this:
+
+```ts
+async [Symbol.asyncDispose](): Promise<void> {
+  const failures = await this.unlockAll();
+  ...
+}
+```
+
+It calls `unlockAll()` directly. Left alone it would bypass every part of this
+design — the barrier, the intent declarations, the deadline, the report — which
+is the worse outcome for being the *idiomatic* path: `await using client = ...`
+is what a careful consumer reaches for, and it would get the weakest cleanup.
+
+So the disposer delegates: `close({ disconnect: false })`. The default is right
+for it twice over — a disposer cannot know whether the connection is shared, and
+it was handed one it did not create.
+
+A disposer returns `void`, so the report has nowhere to go. It is logged, and the
+distinction the report exists to draw must survive that: **failed unlocks and
+unresolved intents are logged separately**, since one says "held, retry it" and
+the other "unknown, go look". Flattening them into one warning would undo the
+work of separating them. The current message already gestures at this — it names
+the keys and suggests retrying — and it becomes accurate rather than hopeful once
+the retry path is guaranteed admissible.
+
+A consumer that needs the report calls `close()` itself. `await using` is for the
+case where nobody is going to read it, and its job is to leave nothing behind
+quietly. The barrier and the intent declaration are the new parts. One test is not about
+concurrency at all and matters most: **`close()` → an `UNLOCK` fails → the caller
+calls `unlockAll()` again → it succeeds.** That is the path the whole
+`disconnect: false` default exists to keep open, and it is the one a barrier
+written carelessly closes. Then four concurrency tests — including two chains attempting `DOMA/Z` at once, where the
 loser's failure must not disturb the winner's bookkeeping: a chain interrupted mid-`LOCK`, asserting the lock was
 released rather than stranded; a chain that never settles, asserting `close()`
 returns at its deadline and names the object it was working on; and a chain whose
