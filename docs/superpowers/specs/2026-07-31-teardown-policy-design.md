@@ -550,6 +550,13 @@ it at the call and computing the deadline from a later reading would leave exact
 that window: a value that passed could be out of safe range by the time the queued
 call reaches its own step 2.
 
+**That reading is taken after the call reaches the head of the queue and before
+step 1** — before the barrier shuts, before anything is refused, before any
+cleanup. Otherwise a `close()` carrying an unrepresentable deadline would shut the
+barrier and *then* throw, leaving the client permanently refusing new chains
+because of an argument that was never accepted. "Throws before doing anything" has
+to mean before the first mutation this call makes, not merely before its wait.
+
 Rejected loudly rather than silently repaired, because every silent repair here is
 wrong in a way the caller cannot see. Coercing `Infinity` to a default hides that
 they asked for something the contract cannot provide; treating it as unbounded
@@ -615,10 +622,17 @@ time against its deadline would hand the caller less patience than they asked fo
 for a reason they cannot see — and in the limit expire the deadline before step 2
 even begins, producing a `timedOut: true` that never waited for anything.
 
-`deadlineMs` bounds *waiting for chains*, which is what step 2 does; time spent
-waiting for another `close()` is bounded by **that** call's deadline. So every
-call gets the semantics it asked for and the total stays bounded — worst case the
-sum of the queued deadlines, which is finite because each of them is.
+`deadlineMs` bounds *waiting for chains*, which is what step 2 does — **and only
+that**. An earlier draft went on to promise the total was "the sum of the queued
+deadlines", which is not true: a predecessor still runs `unlockAll()` and possibly
+`disconnect()` after its wait, and neither is covered by `deadlineMs`. Those are
+ordinary requests, bounded by whatever timeouts are in force for them, which is
+not a number this option controls.
+
+So the honest statement is narrower. A queued caller waits for its predecessor's
+step 2 (bounded by *that* call's `deadlineMs`) plus its steps 3 and 4 (bounded by
+their request timeouts), and then gets its own full `deadlineMs`. Every part is
+bounded; the total is not a figure this contract can quote.
 
 - **The barrier shuts once.** Step 1 has no meaning a second time — new work is
   already refused.
@@ -682,6 +696,9 @@ Tests:
 - **two queued `close()` calls with different deadlines**: the second waits its
   full `deadlineMs` measured from when its own wait begins, not from when it was
   called — it does not arrive already expired
+- **an unrepresentable `deadlineMs` on the first `close()`**: it throws, and the
+  client is left able to admit new chains — the barrier must not have shut on a
+  call that was rejected
 - a **read-only** chain outstanding at the deadline → `timedOut: true` with
   `unresolvedIntents` empty; it is not named, because it could not have locked
 - the **wall** clock moves backwards mid-wait while the monotonic clock keeps
