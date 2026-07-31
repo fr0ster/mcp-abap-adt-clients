@@ -224,8 +224,9 @@ moments earlier. Sequencing two steps does not order what is running beside them
 
 So the close path is a barrier, in this order:
 
-1. **Refuse new work** — further operations and lock acquisitions are rejected
-   from this point, so the set of outstanding chains can only shrink.
+1. **Refuse new chains** — a chain not yet admitted is rejected from this point,
+   so the set of outstanding chains can only shrink. An already-admitted chain is
+   not interrupted: it runs its remaining steps, `LOCK` included.
    **Cleanup is not new work.** `unlockAll()`, and the unlock of a lock already
    held, stay admissible after `close()` has returned. What is refused is work
    that could acquire a *new* lock. This says nothing about whether a second
@@ -289,8 +290,30 @@ handed back. `LockFailure` would misdescribe it too: that means an `UNLOCK` was
 attempted and failed, and here none was attempted at all.
 
 **So the registry records intent, not only possession.** A chain declares the key
-it is about to lock *before* it sends the `LOCK`, and resolves that declaration
-when the outcome is known — held, or confirmed not taken.
+it may lock and resolves that declaration when the outcome is known — held, or
+confirmed not taken.
+
+**At admission, not immediately before the `LOCK`.** An earlier draft said "before
+it sends the `LOCK`", which is too late by exactly the gap that matters: a chain
+admitted before `close()` may be several steps short of its `LOCK` when the
+deadline arrives — validating, reading, checking — and would then hold no
+declaration at all. The report would not name it, and after `close()` returned it
+would either take a lock nobody recorded, or be refused mid-flight by a barrier
+that promised not to interrupt running chains. Both outcomes contradict something
+this spec states elsewhere.
+
+So the granularity is the **chain**, not the request:
+
+- a chain declares its intent when it is admitted, since the object it will work
+  on is known from its config before any request goes out;
+- an admitted chain may run **all** its remaining steps, `LOCK` included — that is
+  what "not aborted" means;
+- only a **new** chain is refused after step 1.
+
+A chain that turns out never to lock — a read-only flow, or one that fails before
+`LOCK` — resolves its declaration as not-taken and is not reported. The cost of
+declaring early is a declaration that usually resolves to nothing, which is
+cheap; the cost of declaring late is a lock nobody knows about.
 
 A declaration is identified **per attempt, not per key.** The registry is
 `Map<string, UnlockThunk>` today, keyed by object, and that is enough for
@@ -492,6 +515,26 @@ pathology; it does not pace the normal path.
 
 Named rather than left to each implementation, because a default nobody wrote
 down is a different default in every test.
+
+**Accepted values.** `number` admits `Infinity`, `NaN`, negatives and absurdities,
+and bounded completion is the central guarantee here — so the input is validated
+rather than coerced:
+
+| value | behaviour |
+|---|---|
+| finite, `>= 0` | used as given |
+| `0` | valid and meaningful: do not wait at all. Step 2 is skipped, step 3 runs over whatever is registered now |
+| `Infinity`, `NaN`, negative | **rejected** — `close()` throws before doing anything |
+
+Rejected loudly rather than silently repaired, because every silent repair here is
+wrong in a way the caller cannot see. Coercing `Infinity` to a default hides that
+they asked for something the contract cannot provide; treating it as unbounded
+discards the guarantee outright; clamping a negative to `0` turns "I made a
+mistake" into "close immediately", which is destructive.
+
+**No maximum.** Any finite value is bounded, which is all the guarantee requires,
+and choosing a ceiling on someone's patience during their own shutdown would be
+the overreach this document rejects everywhere else.
 
 `close()` resolves in all cases; it never rejects for a lock it could not
 release, since the report is the answer.
