@@ -227,11 +227,11 @@ So the close path is a barrier, in this order:
 1. **Refuse new work** — further operations and lock acquisitions are rejected
    from this point, so the set of outstanding chains can only shrink.
    **Cleanup is not new work.** `unlockAll()`, and the unlock of a lock already
-   held, stay admissible after `close()` has returned. Refusing them would make
-   the preserved session useless: the whole reason `disconnect` defaults to false
-   is that a failed `UNLOCK` can be retried, and a barrier that then rejects the
-   retry hands back advice it has already blocked. What is refused is work that
-   could acquire a *new* lock.
+   held, stay admissible after `close()` has returned. What is refused is work
+   that could acquire a *new* lock. This is not a promise that a second attempt
+   will succeed — a rejected `UNLOCK` usually will not, see below — but a barrier
+   that permanently refuses cleanup would leave a caller unable even to try, or
+   to release something whose intent resolved after the deadline.
 2. **Wait for running chains, up to a deadline**, so a `LOCK` already in flight
    lands and registers rather than appearing after the snapshot.
 3. **`unlockAll()`**, now over a registry that cannot grow.
@@ -350,19 +350,35 @@ This is the normative signature; the sketch in the ownership section above is th
 same one, shown early for the argument it is making.
 
 Four facts, four fields, because collapsing any of them loses a distinction that
-matters to whoever reads the report. "This lock is definitely held and I could
-not free it" calls for a retry; "I do not know whether this lock exists" calls
-for a look.
+matters to whoever reads the report.
 
-**A retry is only meaningful while the session lives**, and that is the second
-reason step 4 is opt-in. A lock handle belongs to the ABAP session that issued
-it: tear the session down and reconnect, and the new one cannot use the old
-handle — the lock is then beyond any code, and clearing it becomes SM12. So a
-`close()` that disconnected by default would hand back `unlockFailures` labelled
-retryable while having just destroyed the only session in which a retry could
-work. With the default, the session is still there and the advice is true. If the
-caller does pass `disconnect: true` and `unlockFailures` is non-empty, those locks
-are **not** retryable and the report should be read as operator cleanup. `LockFailure` cannot carry the second — it describes an attempt, and
+**A rejected `UNLOCK` is not "retry me".** An earlier draft said it was, and that
+was wishful. When the server answers "no", the usual reason is that the handle is
+no longer valid — the session changed underneath it, the session type was toggled,
+the handle expired — and repeating the same call with the same handle produces
+the same answer. Worse, the cause is typically **something we did**: an
+intervening request that moved the session, a chain that unlocked out of order.
+Retrying is not a remedy for that; it is the same mistake again, more slowly.
+
+So the two fields say different things and neither says "retry":
+
+| field | what happened | what it means |
+|---|---|---|
+| `unlockFailures` | the server answered, and refused | the handle is almost certainly dead. The lock stays until the session ends or an operator clears it. Retrying the same handle is not a plan |
+| `unresolvedIntents` | no answer came, or none was sought | the outcome is genuinely unknown. This is the one worth another look, because the lock may not exist at all |
+
+Where retrying *does* belong is the unknown case, and even there it is a fresh
+attempt at finding out rather than a repeat of a rejected call.
+
+This also removes a justification I had leaned on for `disconnect` defaulting to
+false — "so a retry can still work". The default does not need it. It stands on
+ownership alone: the connection was handed to us, so closing it is not ours to
+decide. That argument was always the load-bearing one.
+
+The real lesson of a rejected unlock is upstream: it means the session was
+disturbed between `LOCK` and `UNLOCK`. `unlockAll()` already keeps the session
+stateful for the whole batch precisely because of this, and the honest response to
+a rejection is to find what moved the session, not to send the call again. `LockFailure` cannot carry the second — it describes an attempt, and
 for an unresolved intent no attempt was made.
 
 The fourth exists because step 4 calls `disconnect()`, which returns an
@@ -445,10 +461,10 @@ the retry path is guaranteed admissible.
 A consumer that needs the report calls `close()` itself. `await using` is for the
 case where nobody is going to read it, and its job is to leave nothing behind
 quietly. The barrier and the intent declaration are the new parts. One test is not about
-concurrency at all and matters most: **`close()` → an `UNLOCK` fails → the caller
-calls `unlockAll()` again → it succeeds.** That is the path the whole
-`disconnect: false` default exists to keep open, and it is the one a barrier
-written carelessly closes. Then four concurrency tests — including two chains attempting `DOMA/Z` at once, where the
+concurrency at all: **`close()` → `unlockAll()` afterwards is still admitted**,
+i.e. the barrier does not permanently refuse cleanup. It asserts admission, not
+success — a rejected unlock is expected to be rejected again. Then four
+concurrency tests — including two chains attempting `DOMA/Z` at once, where the
 loser's failure must not disturb the winner's bookkeeping: a chain interrupted mid-`LOCK`, asserting the lock was
 released rather than stranded; a chain that never settles, asserting `close()`
 returns at its deadline and names the object it was working on; and a chain whose
