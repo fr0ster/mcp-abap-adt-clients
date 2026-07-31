@@ -1,10 +1,10 @@
-# disconnect() must settle, because we said it does
+# disconnect() settles, because the waiting was never ours to do
 
-Continuation of `2026-07-27-session-lifecycle-design.md`.
+Continuation of `2026-07-27-session-lifecycle-design.md`, and a correction to it.
 
 ## The defect
 
-The contract we publish says:
+We publish this:
 
 ```ts
 /**
@@ -16,7 +16,7 @@ disconnect(): Promise<ITeardownReport>;
 ```
 
 There is a path where it never resolves. After the ceiling expires,
-`SessionLifecycle.drain()` waits for in-flight requests with no bound:
+`drain()` waits for in-flight requests with no bound at all:
 
 ```ts
 while (this.inFlight > 0) {
@@ -24,106 +24,104 @@ while (this.inFlight > 0) {
 }
 ```
 
-`changed()` with no timeout resolves only when something wakes the lifecycle. If
-a request never settles, nothing does. The transition never completes, and since
-transitions are serialized, every later `connect()` queues behind it forever.
+`changed()` without a timeout resolves only when something wakes the lifecycle.
+If a request never settles, nothing does — and because transitions are
+serialized, every later `connect()` queues behind that teardown forever.
 
-That is the whole of it: **we declare that this settles, and it can fail to.**
-The declaration is wrong, or the implementation is — one of the two has to move.
+The declaration is a promise. This breaks it.
 
-## What this is not
+## The real mistake, which is larger
 
-Not a judgement about how anyone uses the library.
+`drain()` waits on two things:
 
-Outside a critical section the connector passes the caller's timeout verbatim, so
-a caller may pass none and mean it. That is a legitimate choice — a long poll
-looks exactly like that — and the connector honouring it is correct. Responsibility
-for that choice sits with the caller.
+```ts
+while (this.inFlight > 0 || this.liveWindows > 0) { ... }
+```
 
-So the following were considered and rejected, both for the same reason: each
-answers a question nobody asked us, by overruling a decision that is not ours.
+Both are the caller's, and neither is ours to wait for.
 
-| rejected | why |
-|---|---|
-| a default timeout outside a critical section | cancels an explicit choice on every request |
-| aborting in-flight requests at the ceiling | aborting mid-flight is what drops a stateful session and orphans a lock — the failure this design exists to prevent |
-| refusing `disconnect()` while a request is unbounded | a prohibition invented to protect the caller from itself |
+**A lock window is opened by the consumer.** It is the consumer's declaration
+that a span must not lose its session — so closing it correctly is the
+consumer's job too. A teardown that blocks until the consumer gets around to it
+has taken over responsibility that was never transferred.
 
-A library declares a contract and keeps it. It does not police the calls.
+**An in-flight request is issued by the consumer**, with the timeout the consumer
+chose — including none, which is a legitimate choice for a long poll. Waiting on
+a request the caller declared unbounded, and then calling that a teardown, is the
+same error in a different costume.
+
+And a fact that settles it: **nothing opens a window today.** `beginWindow()` is
+exposed on the connection and called by nobody — not by the connector, not by
+`adt-clients`, which has zero references to it. The waiting exists for a case
+that does not yet occur, and it is what breaks the contract that does.
+
+This is a correction to the earlier design, which is to say to my own: the
+mechanism was built ahead of any user, and the hole opened inside the part that
+was built ahead.
 
 ## Goal
 
-`disconnect()` settles. Always. Whatever is still outstanding is reported rather
-than waited on indefinitely.
+`disconnect()` settles. It tears the session down and returns.
 
 ## Design
 
-At the ceiling, the drain stops waiting and returns. Nothing is aborted, nothing
-is cancelled, nothing is forbidden — the in-flight request goes on exactly as the
-caller arranged. What changes is that the teardown no longer holds its own
-promise hostage to it.
+Remove the waiting.
 
-The report is the right place to say so, since it already exists to carry "what
-could not be finished". It needs one more fact:
+- **Windows are not waited for.** They are recorded in the report — the caller
+  learns which spans were open when it tore down — and closing them properly
+  stays with whoever opened them.
+- **In-flight requests are not waited for.** They continue exactly as their
+  caller arranged; nothing is aborted. They will settle or fail on their own
+  terms, and the connection is already marked unusable by then, so their outcome
+  cannot be mistaken for a healthy session.
+- The ceiling, and the two-phase drain built around it, go with them. There is
+  nothing left to bound.
 
-```ts
-interface ITeardownReport {
-  abandonedWindows: string[];
-  releasePending: boolean;
-  /** Requests admitted before the teardown were still running when it gave up. */
-  requestsInFlight: boolean;
-}
-```
+What the caller sees after a teardown is what the contract already says: the
+connection is not connected, and the next call raises `ADT_NOT_CONNECTED`. That
+is the whole notification mechanism, and it already exists — no new report field,
+no flag, no strategy.
 
-Not folded into `releasePending`: that one is about a transport resource, and a
-report that conflates two different facts is a report that lies about both.
+### Not done
 
-### Consequences to state plainly
+- **No request is aborted.** Aborting mid-flight drops a stateful session and
+  orphans a lock — the failure this whole design exists to prevent.
+- **`disconnect()` is not refused** because something is open. A prohibition
+  invented to protect the caller from itself is not a contract, it is a nanny.
+- **No default timeout** is introduced anywhere. That would cancel an explicit
+  choice on every request.
 
-- **Session state is cleared while a request may still be running.** Today's
-  unbounded wait exists to avoid exactly that. The trade is deliberate: a request
-  that outlives the ceiling is already beyond what the connection can manage, and
-  a teardown that never returns is worse than one that returns with a warning.
-  The request fails on its own terms rather than being cut off.
-- The caller learns this happened and can act — that is what the new field is for.
+### What was justified, and no longer is
 
-### The ceiling itself
+The one argument for waiting was to let a chain finish its `UNLOCK` rather than
+strand a lock server-side — the original incident. It does not survive contact
+with where the knowledge lives: the connector does not know a lock exists, what
+it covers, or whether unlocking it still makes sense. `adt-clients` holds the
+lock handle and the registry. If a chain must finish its unlock before a
+teardown, that is arranged by the code that took the lock, not by a connection
+blocking on a counter it cannot interpret.
 
-Currently fixed at the composition site:
+## Consequences to state plainly
 
-```ts
-protected readonly lifecycle = new SessionLifecycle();   // no options
-```
-
-`SessionLifecycle` already accepts `ceilingMs`. Nothing reaches it. Since the
-value now decides when a teardown gives up, a caller that wants a different one
-should be able to say so — a default we choose is fine, a default nobody can
-change is not.
-
-Kept **absolute**, measured from the teardown request, not from the last activity.
-Making it configurable must not make it sliding.
-
-## What must not change
-
-- A caller that configures nothing sees today's behaviour up to the ceiling.
-- No new required member on `IAbapConnection` or on either capability atom.
-- Admission still shuts before any await at expiry; windows are still abandoned
-  there.
-- No request is ever aborted by the teardown.
+- A teardown during an in-flight request now clears session state under it. That
+  request fails. It was going to fail anyway once the session went away; the
+  difference is that it fails promptly instead of holding a teardown open.
+- A teardown with an open window no longer waits for it. The report names the
+  window. Whatever it protected is the caller's to release.
+- `ITeardownReport` keeps both existing fields. `abandonedWindows` still means
+  "open when the teardown happened", which is the same fact it always carried.
 
 ## Tests
 
-All at `SessionLifecycle` level — no server, which is what makes them possible.
+At `SessionLifecycle` level — no server needed.
 
-- a request that never settles: `drain()` resolves at the ceiling, reports
-  `requestsInFlight`, and the request is neither aborted nor errored
-- `connect()` after such a teardown is not blocked — the regression this exists
-  to prevent
-- the ceiling stays absolute: a request settling late does not extend it
-- everything settling before the ceiling: report unchanged from today
-- a configured ceiling is honoured; an unconfigured one is 600s
+- a request that never settles: `disconnect()` resolves anyway, and a following
+  `connect()` is not blocked — the regression this exists to prevent
+- an open window: `disconnect()` resolves, the window is named in the report
+- nothing open: report unchanged from today
+- no request is aborted or errored by the teardown itself
 
 ## Release
 
-Additive except for the new report field, which lands in `interfaces` first as a
-minor, then the connector consumes it. Version numbers are the user's call.
+A behavioural change to `disconnect()` in `@mcp-abap-adt/connection`: it stops
+waiting. No API change, no `interfaces` change. Version is the user's call.
