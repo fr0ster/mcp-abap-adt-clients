@@ -404,9 +404,24 @@ need following up:
 - `timedOut: false` means the barrier ran out of work rather than out of patience,
   so the two emptiness checks above cover everything this client was doing.
 
-Only `unknown` outcomes and unresolved intents describe something that might
-still exist. Those are the entries where another look could change the answer;
-everywhere else the answer is already final.
+**Every entry in either field describes a lock that may still exist.** An earlier
+draft said only `unknown` outcomes and unresolved intents did, which contradicts
+the contract one section above: `unlockFailures` means *release not confirmed*,
+and that is true of both its outcomes. A refusal is an answer about the
+**attempt**, not about the lock — an invalid handle, typically because the session
+moved, tells us the `UNLOCK` did not happen, and the original lock is then sitting
+in the old ABAP session exactly as before.
+
+What the two outcomes distinguish is what was learned, not whether anything is
+left:
+
+| outcome | what is known | what changes it |
+|---|---|---|
+| `refused` | the `UNLOCK` did not take effect; the lock stands | not the same handle again — that answer is stable. The session ending, or an operator, does |
+| `unknown` | nothing about the outcome | another attempt, which may return an answer this time |
+
+Emptiness is the only final state: both fields empty means every lock this client
+took was confirmed released.
 
 Two more facts are worth stating because they are ours to know, and they are
 facts, not instructions:
@@ -576,9 +591,13 @@ the only diagnosis available to whoever runs this headless:
 
 | logged as | what was observed |
 |---|---|
-| refused unlocks | the server answered the `UNLOCK` and refused |
-| unknown-outcome unlocks | the `UNLOCK` went out, nothing came back |
+| refused unlocks | SAP answered **at application level** about this `UNLOCK` and refused it |
+| unknown-outcome unlocks | no application-level answer — a timeout, a reset, **or a gateway status such as 502/503/504**, which says nothing about what SAP did |
 | unresolved intents | the `LOCK` never resolved; there was nothing to unlock |
+
+The criteria are repeated here rather than referenced, because this is where an
+implementation is most likely to reach for `response !== undefined` and call it a
+refusal. A response is not by itself an answer from the application.
 
 Flattening them undoes the work of separating them, and this section previously
 did exactly that: it named two categories while the report carried three, and
