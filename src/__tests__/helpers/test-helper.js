@@ -2173,7 +2173,10 @@ async function ensureSharedDependency(client, type, name, logger) {
   // Check if the object already exists
   let exists = false;
   try {
-    if (type === 'tables') {
+    if (type === 'structures') {
+      const result = await client.getStructure().read({ structureName: name });
+      exists = !!result;
+    } else if (type === 'tables') {
       const result = await client.getTable().read({ tableName: name });
       // Table read returns { readResult: undefined } on 404 (quirk)
       exists = result?.readResult !== undefined;
@@ -2251,7 +2254,27 @@ async function ensureSharedDependency(client, type, name, logger) {
   // Create the object (high-level create does full chain: validate → create → lock → update → unlock → activate)
   logger?.info?.(`Creating shared ${type} ${name}...`);
   try {
-    if (type === 'tables') {
+    if (type === 'structures') {
+      await client.getStructure().create({
+        structureName: name,
+        packageName,
+        description: depConfig.description || 'Shared test structure',
+        ddlCode: depConfig.source,
+        transportRequest,
+      });
+      if (depConfig.source) {
+        logger?.info?.(`Activating shared structure ${name}...`);
+        await client.getStructure().update(
+          {
+            structureName: name,
+            ddlCode: depConfig.source,
+            transportRequest,
+          },
+          { activateOnUpdate: true, sourceCode: depConfig.source },
+        );
+        logger?.info?.(`Shared structure ${name} activated`);
+      }
+    } else if (type === 'tables') {
       await client.getTable().create({
         tableName: name,
         packageName,

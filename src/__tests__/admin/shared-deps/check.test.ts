@@ -50,6 +50,7 @@ function getSharedNames(
 
 /** All shared_dependencies sections */
 const ALL_SECTIONS = [
+  'structures',
   'tables',
   'views',
   'access_controls',

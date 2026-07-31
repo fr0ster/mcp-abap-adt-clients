@@ -299,6 +299,33 @@ describe('Admin: Teardown shared dependencies', () => {
         results.push({ type: 'tables', name: item.name, status });
       }
 
+      // 3b. Structures — LAST of the data-dictionary objects, because a table
+      // type names one as its row type. Deleting a structure while something
+      // still points at it is the mirror of creating it too late: the failure
+      // surfaces on the dependent object, not on the one actually at fault.
+      const structures = sharedConfig.structures || [];
+      for (const item of structures) {
+        if (shouldSkip(item, 'structure')) {
+          results.push({
+            type: 'structures',
+            name: item.name,
+            status: 'skipped',
+          });
+          continue;
+        }
+        const status = await safeDelete(
+          `structure ${item.name}`,
+          async () => {
+            await client.getStructure().delete({
+              structureName: item.name,
+              transportRequest,
+            });
+          },
+          testsLogger,
+        );
+        results.push({ type: 'structures', name: item.name, status });
+      }
+
       // 4. Function groups
       const functionGroups = sharedConfig.function_groups || [];
       for (const item of functionGroups) {

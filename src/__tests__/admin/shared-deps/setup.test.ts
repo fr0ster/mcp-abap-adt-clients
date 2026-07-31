@@ -94,8 +94,13 @@ describe('Admin: Setup shared dependencies', () => {
       testsLogger.info('Setting up shared package...');
       await ensureSharedPackage(client, testsLogger);
 
-      // Dependency order: tables → views → access_controls → behavior_definitions → service_definitions → service_bindings → classes → interfaces → function_groups → function_modules → programs
+      // Dependency order: structures → tables → views → access_controls → behavior_definitions → service_definitions → service_bindings → classes → interfaces → function_groups → function_modules → programs
+      //
+      // Structures come first because a table type names one as its row type,
+      // and an inactive or absent row type fails the activation rather than the
+      // create — the failure lands one step later than its cause.
       const typeOrder: Array<{ type: string; label: string }> = [
+        { type: 'structures', label: 'Structures' },
         { type: 'tables', label: 'Tables' },
         { type: 'views', label: 'Views' },
         { type: 'access_controls', label: 'Access controls' },
