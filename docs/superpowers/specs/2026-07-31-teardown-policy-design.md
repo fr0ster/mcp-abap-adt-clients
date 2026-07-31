@@ -358,7 +358,7 @@ The two fields record two different observations, and nothing more:
 |---|---|
 | `unlockFailures`, `outcome: 'refused'` | SAP answered this `UNLOCK` at application level and refused it. Carries the error it gave |
 | `unlockFailures`, `outcome: 'unknown'` | no application-level answer was obtained — a timeout, a reset, or a gateway status that says nothing about what SAP did. It may well have released the lock |
-| `unresolvedIntents` | the `LOCK` itself never resolved, so there is nothing to have unlocked. The outcome is unknown from further back |
+| `unresolvedIntents` | the `LOCK` itself never resolved, so no confirmed handle was ever available to unlock with. The lock may exist on SAP regardless — the answer simply had not arrived |
 
 The `outcome` discriminator is new, and it exists because an earlier draft
 declared that every entry meant "the server refused, the lock is known held".
@@ -408,17 +408,21 @@ need following up:
 draft said only `unknown` outcomes and unresolved intents did, which contradicts
 the contract one section above: `unlockFailures` means *release not confirmed*,
 and that is true of both its outcomes. A refusal is an answer about the
-**attempt**, not about the lock — an invalid handle, typically because the session
-moved, tells us the `UNLOCK` did not happen, and the original lock is then sitting
-in the old ABAP session exactly as before.
+**attempt**, not about the lock. It establishes that this `UNLOCK` was not
+confirmed to have succeeded, and nothing more: an invalid or expired handle is
+equally consistent with the lock still being held and with the lock or its session
+having already gone.
 
-What the two outcomes distinguish is what was learned, not whether anything is
-left:
+What the two outcomes distinguish is how much was learned about the attempt — not
+what state the lock is in, which neither of them settles:
 
-| outcome | what is known | what changes it |
+| outcome | what is established | what is not |
 |---|---|---|
-| `refused` | the `UNLOCK` did not take effect; the lock stands | not the same handle again — that answer is stable. The session ending, or an operator, does |
-| `unknown` | nothing about the outcome | another attempt, which may return an answer this time |
+| `refused` | SAP answered about this `UNLOCK` and did not confirm a release | whether the lock remains, and whether the same call would be refused again — an application-level error may be transient |
+| `unknown` | nothing at all about the outcome | the same, plus whether the call was even processed |
+
+Reading either as a verdict on the lock requires the semantics of the specific SAP
+error, which this library does not interpret. It reports what it was told.
 
 Emptiness is the only final state: both fields empty means every lock this client
 took was confirmed released.
@@ -593,7 +597,7 @@ the only diagnosis available to whoever runs this headless:
 |---|---|
 | refused unlocks | SAP answered **at application level** about this `UNLOCK` and refused it |
 | unknown-outcome unlocks | no application-level answer — a timeout, a reset, **or a gateway status such as 502/503/504**, which says nothing about what SAP did |
-| unresolved intents | the `LOCK` never resolved; there was nothing to unlock |
+| unresolved intents | the `LOCK` never resolved, so no confirmed handle was available to unlock with — **not** evidence that no lock was taken |
 
 The criteria are repeated here rather than referenced, because this is where an
 implementation is most likely to reach for `response !== undefined` and call it a
