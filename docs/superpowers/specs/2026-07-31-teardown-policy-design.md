@@ -228,10 +228,10 @@ So the close path is a barrier, in this order:
    from this point, so the set of outstanding chains can only shrink.
    **Cleanup is not new work.** `unlockAll()`, and the unlock of a lock already
    held, stay admissible after `close()` has returned. What is refused is work
-   that could acquire a *new* lock. This is not a promise that a second attempt
-   will succeed — a rejected `UNLOCK` usually will not, see below — but a barrier
-   that permanently refuses cleanup would leave a caller unable even to try, or
-   to release something whose intent resolved after the deadline.
+   that could acquire a *new* lock. This says nothing about whether a second
+   attempt will succeed; it says the caller is allowed to make one. A barrier
+   that permanently refused cleanup would decide that question on their behalf,
+   and it is not ours to decide.
 2. **Wait for running chains, up to a deadline**, so a `LOCK` already in flight
    lands and registers rather than appearing after the snapshot.
 3. **`unlockAll()`**, now over a registry that cannot grow.
@@ -352,33 +352,34 @@ same one, shown early for the argument it is making.
 Four facts, four fields, because collapsing any of them loses a distinction that
 matters to whoever reads the report.
 
-**A rejected `UNLOCK` is not "retry me".** An earlier draft said it was, and that
-was wishful. When the server answers "no", the usual reason is that the handle is
-no longer valid — the session changed underneath it, the session type was toggled,
-the handle expired — and repeating the same call with the same handle produces
-the same answer. Worse, the cause is typically **something we did**: an
-intervening request that moved the session, a chain that unlocked out of order.
-Retrying is not a remedy for that; it is the same mistake again, more slowly.
+The two fields record two different observations, and nothing more:
 
-So the two fields say different things and neither says "retry":
+| field | what was observed |
+|---|---|
+| `unlockFailures` | the server answered the `UNLOCK`, and refused it. Carries the error it gave |
+| `unresolvedIntents` | no answer was obtained — the intent was declared and never resolved. The outcome is unknown |
 
-| field | what happened | what it means |
-|---|---|---|
-| `unlockFailures` | the server answered, and refused | the handle is almost certainly dead. The lock stays until the session ends or an operator clears it. Retrying the same handle is not a plan |
-| `unresolvedIntents` | no answer came, or none was sought | the outcome is genuinely unknown. This is the one worth another look, because the lock may not exist at all |
+**What to do about either is the consumer's call.** Earlier drafts of this section
+told them: first that a failure "calls for a retry", then — after that turned out
+to be wishful — that retrying "is not a plan" and the lock is operator cleanup.
+Both were the same error. Whether to retry, wait for the session to end, escalate
+to an operator, or ignore it depends on what the caller was doing and what it can
+tolerate, none of which we know. We report what happened and hand it over.
 
-Where retrying *does* belong is the unknown case, and even there it is a fresh
-attempt at finding out rather than a repeat of a rejected call.
+Two facts are worth stating because they are ours to know, and they are facts, not
+instructions:
+
+- A refused `UNLOCK` usually means the handle is no longer valid — the session
+  moved, its type was toggled, the handle expired. The same call with the same
+  handle will then get the same answer.
+- That kind of disturbance is usually caused by something on our side, between
+  `LOCK` and `UNLOCK`. `unlockAll()` already holds the session stateful across the
+  whole batch for exactly this reason.
 
 This also removes a justification I had leaned on for `disconnect` defaulting to
-false — "so a retry can still work". The default does not need it. It stands on
-ownership alone: the connection was handed to us, so closing it is not ours to
-decide. That argument was always the load-bearing one.
-
-The real lesson of a rejected unlock is upstream: it means the session was
-disturbed between `LOCK` and `UNLOCK`. `unlockAll()` already keeps the session
-stateful for the whole batch precisely because of this, and the honest response to
-a rejection is to find what moved the session, not to send the call again. `LockFailure` cannot carry the second — it describes an attempt, and
+false — "so a retry can still work". The default does not need it and never did:
+it stands on ownership alone. The connection was handed to us, so closing it is
+not ours to decide. `LockFailure` cannot carry the second — it describes an attempt, and
 for an unresolved intent no attempt was made.
 
 The fourth exists because step 4 calls `disconnect()`, which returns an
