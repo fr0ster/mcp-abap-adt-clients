@@ -28,6 +28,13 @@ import { createAbapConnection } from '@mcp-abap-adt/connection';
 import { ADT_SESSION_ERROR, type ISapConfig } from '@mcp-abap-adt/interfaces';
 import { type AdtStub, startAdtStub } from './adtStubServer';
 
+// These tests talk to a local stub and finish in well under a second. The suite
+// default is 15 minutes, meant for integration runs — long enough that anything
+// stuck here reads as a hang rather than a failure, with no test named and no
+// stack. A tight ceiling turns that into an ordinary timeout that says which
+// test and where.
+jest.setTimeout(20_000);
+
 const configFor = (baseUrl: string): ISapConfig => ({
   url: baseUrl,
   client: '100',
