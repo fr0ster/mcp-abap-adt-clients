@@ -23,12 +23,16 @@ missed both:
 1. **At teardown the ABAP session is still alive**, so an `UNLOCK` can still be
    sent. Releasing a lock during shutdown is an ordinary operation, not a
    best-effort gamble.
-2. **When it genuinely cannot be sent** — the server is gone — the lock went with
-   the session it lived in. There is nothing left to release. The one case where
-   we cannot act is the case where acting is meaningless.
+2. **When it genuinely cannot be sent** — the server is gone — the lock does NOT
+   go with it. It stays in the enqueue table, and there is no programmatic
+   remedy: someone waits it out or clears it in SM12, by hand. That is precisely
+   why the object left behind has to be *named* — a human needs to know what to
+   clean.
 
 So an abandoned lock is not something to insure against with cleverness at the
-connection layer. It is a case the layer above can simply handle.
+connection layer. In the ordinary case the layer above releases it; in the
+force-majeure case the layer above is also the only one that can say which
+object is stranded, because it is the only one that knows the object's name.
 
 ## The defect that remains
 
@@ -74,7 +78,11 @@ exists.
 
 The shape is a close path on `AdtClient` — unlock what is held, then disconnect —
 so that "the client was closed without unlocking" stops being a thing that can
-happen by accident. The details belong to that repository's own design, not here.
+happen by accident. `unlockAll()` already returns `LockFailure[]`, which is where
+anything it could not release belongs: after a server crash that list is the only
+record of what needs clearing in SM12, and a lock reported by object name is the
+difference between a two-minute cleanup and a hunt. The details belong to that
+repository's own design, not here.
 
 ## What this means for `ILockWindowAware`
 
