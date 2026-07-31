@@ -554,7 +554,7 @@ that sum stops being exact — `Date.now() + Number.MAX_VALUE` is still finite a
 still useless, since the addition is absorbed entirely and the deadline can never
 be reached in any run of any program.
 
-So the accepted range is `0 <= deadlineMs <= Number.MAX_SAFE_INTEGER - Date.now()`,
+So the accepted range is `0 <= deadlineMs <= Number.MAX_SAFE_INTEGER - <clock now>`,
 which is still about 285,000 years and rejects nothing anyone means. Outside it,
 `close()` throws with the rest of the invalid input. The rejection is about
 arithmetic, not about preference: a value that cannot be added to a clock without
@@ -566,9 +566,21 @@ into an instant one, which is the opposite of what was asked and fails silently.
 
 So the deadline is **absolute, not a timer**: compute the instant it expires,
 compare against the clock, and re-arm the wait in safe-sized chunks until then.
-`SessionLifecycle` already works this way for its own ceiling —
-`deadline = teardownAt + ceilingMs`, then loop on the remaining time — so the
-pattern is established rather than invented here.
+
+**And the clock must be monotonic** — `performance.now()`, or an injected
+equivalent. `Date.now()` is a wall clock and can move backwards: an NTP
+correction or a manual change during the wait makes the remaining time longer than
+the caller asked for, and a large enough step back makes the deadline unreachable
+altogether. A duration is not a moment in the day, and measuring it against
+something adjustable forfeits the bound this section exists to guarantee.
+
+`SessionLifecycle` computes its own ceiling as `deadline = teardownAt + ceilingMs`
+with `now` defaulting to `Date.now()`, so the absolute-deadline shape is
+established there — **but its clock choice is not a precedent to follow.** An
+earlier draft cited it as though it were, which is an argument from what exists
+rather than from what is correct. The same fix belongs there: the injection point
+already exists, so it is a default to change, and it should happen in the same
+release rather than leaving one bounded wait honest and the other not.
 
 **"Always resolves" is scoped to valid input.** With an invalid `deadlineMs` the
 call throws instead, before doing anything, as above. The guarantee is that a
@@ -592,8 +604,9 @@ rather than discovered.
 - **Step 2 waits again if anything is still outstanding.** An earlier draft said
   it had "nothing left to wait for", which is true only when the first call
   finished on its own terms. A call that returned `timedOut: true` left chains
-  running and intents unresolved by definition, so a second call waits for them
-  again, under **its own** `deadlineMs`. Otherwise a caller who saw a timeout and
+  running, and *may* have left lock intents unresolved — may, because the
+  outstanding chain can be a read-only one, which declares none. Either way a
+  second call waits again, under **its own** `deadlineMs`. Otherwise a caller who saw a timeout and
   retried with more patience would get no more patience — and a lock those chains
   register in the meantime would never be picked up.
 - **Cleanup runs again**, because cleanup stays admissible after `close()`: a
@@ -647,6 +660,8 @@ Tests:
   waits again and picks up what finished in between
 - a **read-only** chain outstanding at the deadline → `timedOut: true` with
   `unresolvedIntents` empty; it is not named, because it could not have locked
+- the clock moves **backwards** mid-wait → `close()` still returns within the
+  requested duration; a wall-clock implementation fails this one
 - `disconnect()` reports `releasePending: true` → a later
   `close({ disconnect: true })` retries the release rather than reporting the
   teardown as done
