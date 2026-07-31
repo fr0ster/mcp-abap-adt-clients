@@ -536,7 +536,7 @@ rather than coerced:
 
 | value | behaviour |
 |---|---|
-| finite, `>= 0` | used as given |
+| finite, `0 <= v <= MAX_SAFE_INTEGER - <monotonic now>` | used as given |
 | `0` | valid and meaningful: do not wait at all. Step 2 is skipped, step 3 runs over whatever is registered now |
 | `Infinity`, `NaN`, negative | **rejected** — `close()` throws before doing anything |
 | beyond `MAX_SAFE_INTEGER - <monotonic now>` | **rejected** — the absolute deadline would not be exactly representable; see below |
@@ -922,6 +922,11 @@ Connection, at `SessionLifecycle` level — no server:
 - **request A → `disconnect()` → `connect()` → A settles**: the new session's
   cookies and identity are untouched and no teardown is raised — the fencing
   test, and the reason the wait cannot simply be deleted
+- **the lifecycle ceiling on a wound-back wall clock**: with the monotonic clock
+  advancing normally, `SessionLifecycle`'s own bounded wait still expires when it
+  should. The same regression as the `close()` one, against the ceiling that
+  already exists — and the reason the clock change belongs in this release rather
+  than a later one
 
 Connection, on the window's actual job:
 
@@ -948,9 +953,17 @@ longer exists. No type changes. Correcting an earlier draft of this spec, which
 claimed no `interfaces` change was needed — a field whose documentation describes
 a mechanism we removed is a contract that lies, and prose is part of the contract.
 
-Then `@mcp-abap-adt/connection`: `disconnect()` stops waiting, and the **session
-generation** fencing that makes that safe lands in the same release — they are one
-change, not two, and shipping the first without the second would be a regression.
+Then `@mcp-abap-adt/connection`, one release carrying three things that are one
+change:
+
+1. `disconnect()` stops waiting;
+2. the **session generation** fencing that makes that safe — shipping the first
+   without it would be a regression;
+3. `SessionLifecycle`'s own ceiling moves to a **monotonic** clock. Required by the
+   body of this spec and easy to lose here, since it is not part of the teardown
+   change and reads like housekeeping. It is not: leaving it on `Date.now()` keeps
+   one bounded wait honest and the other subject to a clock that can be wound
+   back, in the same file, which is worse than having neither.
 Generation, not epoch: an earlier draft of this plan said epoch, which is the
 variant the body of this spec rejects for missing every internal teardown.
 
