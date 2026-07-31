@@ -454,16 +454,30 @@ rather than discovered.
 
 `close()` is **idempotent and serialized**. Calls queue; none is dropped.
 
-- **The barrier closes once.** Step 1 has no meaning a second time — new work is
-  already refused — and step 2 has nothing left to wait for.
+- **The barrier shuts once.** Step 1 has no meaning a second time — new work is
+  already refused.
+- **Step 2 waits again if anything is still outstanding.** An earlier draft said
+  it had "nothing left to wait for", which is true only when the first call
+  finished on its own terms. A call that returned `timedOut: true` left chains
+  running and intents unresolved by definition, so a second call waits for them
+  again, under **its own** `deadlineMs`. Otherwise a caller who saw a timeout and
+  retried with more patience would get no more patience — and a lock those chains
+  register in the meantime would never be picked up.
 - **Cleanup runs again**, because cleanup stays admissible after `close()`: a
   second call re-attempts `unlockAll()` over whatever is still registered. This is
   what makes an explicit `close()` followed by a disposer harmless, and it is also
   how a caller re-attempts an `unknown` unlock without a separate API.
 - **`disconnect: true` is honoured whenever it is first asked for**, including on
-  a later call after a default `close()`. A caller may reasonably close the client
-  now and decide about the connection afterwards. Once a teardown has happened it
-  is not repeated.
+  a later call after a default `close()` — a caller may reasonably close the client
+  now and decide about the connection afterwards.
+
+  A teardown counts as finished only when it **released**. `disconnect()` reports
+  `releasePending: true` when a transport or session resource did not close, and
+  its own contract says a repeat call retries that release. So while
+  `releasePending` is true, a later `close({ disconnect: true })` calls
+  `disconnect()` again. Treating one attempt as final would take a retry the
+  connection explicitly offers and make it unreachable through the wrapper — worst
+  on RFC, where the pending release is a real handle still held open.
 - **Each call reports what that call did**, not a cached copy of the first. A
   second `close()` over a fully released registry returns empty arrays and
   `timedOut: false`, which is the truth about that call.
@@ -473,9 +487,16 @@ are serialized, so the second runs after the first and sees its effects. It does
 not join and receive a copy — joining would silently discard a `disconnect: true`
 that the first call never requested.
 
-Test: explicit `close()` → `Symbol.asyncDispose` → no throw, second report empty.
-And: default `close()` → `close({ disconnect: true })` → the connection is torn
-down on the second call.
+Tests:
+
+- explicit `close()` → `Symbol.asyncDispose` → no throw, second report empty
+- default `close()` → `close({ disconnect: true })` → the connection is torn down
+  on the second call
+- `close()` returns `timedOut: true` → a second `close()` with a longer deadline
+  waits again and picks up what finished in between
+- `disconnect()` reports `releasePending: true` → a later
+  `close({ disconnect: true })` retries the release rather than reporting the
+  teardown as done
 
 ### `Symbol.asyncDispose` must go through it
 
@@ -498,10 +519,20 @@ for it twice over — a disposer cannot know whether the connection is shared, a
 it was handed one it did not create.
 
 A disposer returns `void`, so the report has nowhere to go. It is logged, and the
-distinction the report exists to draw must survive that: **failed unlocks and
-unresolved intents are logged separately**, because they are different
-observations — the server refused, versus no answer was obtained. Flattening them
-into one warning would undo the work of separating them.
+distinctions the report exists to draw must survive that — **three categories,
+logged separately**, because they are three different observations and a log is
+the only diagnosis available to whoever runs this headless:
+
+| logged as | what was observed |
+|---|---|
+| refused unlocks | the server answered the `UNLOCK` and refused |
+| unknown-outcome unlocks | the `UNLOCK` went out, nothing came back |
+| unresolved intents | the `LOCK` never resolved; there was nothing to unlock |
+
+Flattening them undoes the work of separating them, and this section previously
+did exactly that: it named two categories while the report carried three, and
+called every unlock failure a refusal — the same conflation that had just been
+fixed one section above.
 
 The log says what was observed and stops. The current message ends with "retry
 `unlockAll()` or rely on session-drop", which is advice, and this document has
