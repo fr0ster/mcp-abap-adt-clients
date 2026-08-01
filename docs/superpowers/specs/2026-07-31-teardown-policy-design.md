@@ -359,8 +359,11 @@ two different things to report, and one of them is not a failure at all.
 
 ```ts
 interface ICloseReport {
-  /** UNLOCK was attempted and did not confirm release. Each entry says which. */
-  unlockFailures: Array<LockFailure & { outcome: 'refused' | 'unknown' }>;
+  /** A lock this client held that close() could not confirm released.
+   *  `outcome` says how far it got — see the table under the deadline rules. */
+  unlockFailures: Array<
+    LockFailure & { outcome: 'refused' | 'unknown' | 'not-attempted' }
+  >;
   /** Declared before the LOCK went out, still unresolved when waiting stopped.
    *  The outcome is UNKNOWN — it may be held, it may never have been taken. */
   unresolvedIntents: string[];
@@ -394,6 +397,7 @@ The two fields record two different observations, and nothing more:
 |---|---|
 | `unlockFailures`, `outcome: 'refused'` | SAP answered this `UNLOCK` at application level and refused it. Carries the error it gave |
 | `unlockFailures`, `outcome: 'unknown'` | no application-level answer was obtained — a timeout, a reset, or a gateway status that says nothing about what SAP did. It may well have released the lock |
+| `unlockFailures`, `outcome: 'not-attempted'` | the shutdown budget ran out before this lock's turn. Nothing was sent, so it is held as far as anything here knows |
 | `unresolvedIntents` | the `LOCK` itself never resolved, so no confirmed handle was ever available to unlock with. The lock may exist on SAP regardless — the answer simply had not arrived |
 
 The `outcome` discriminator is new, and it exists because an earlier draft
@@ -622,17 +626,41 @@ time against its deadline would hand the caller less patience than they asked fo
 for a reason they cannot see — and in the limit expire the deadline before step 2
 even begins, producing a `timedOut: true` that never waited for anything.
 
-`deadlineMs` bounds *waiting for chains*, which is what step 2 does — **and only
-that**. An earlier draft went on to promise the total was "the sum of the queued
-deadlines", which is not true: a predecessor still runs `unlockAll()` and possibly
-`disconnect()` after its wait, and neither is covered by `deadlineMs`. Those are
-ordinary requests, bounded by whatever timeouts are in force for them, which is
-not a number this option controls.
+**`deadlineMs` is the budget for the whole `close()`, not for step 2 alone.** Two
+earlier drafts scoped it to the wait, and both were wrong in the same way: they
+moved the original defect rather than removing it.
 
-So the honest statement is narrower. A queued caller waits for its predecessor's
-step 2 (bounded by *that* call's `deadlineMs`) plus its steps 3 and 4 (bounded by
-their request timeouts), and then gets its own full `deadlineMs`. Every part is
-bounded; the total is not a figure this contract can quote.
+The second draft said steps 3 and 4 are "bounded by whatever timeouts are in
+force". This document establishes elsewhere that an ordinary request may carry no
+timeout at all — that is the caller's legitimate choice — and `unlockAll()` awaits
+each unlock thunk in sequence with no bound of its own:
+
+```ts
+for (const [key, unlock] of [...this.locks]) {
+  try { await unlock(); ... }
+}
+```
+
+One hung `UNLOCK` therefore blocks this `close()` and every queued one, forever.
+That is the exact defect this spec opens with, relocated from step 2 to step 3.
+
+So the deadline covers steps 2 **and** 3. Unlike a request's timeout, these are
+requests *we* issue, on our own behalf, during our own shutdown — bounding them is
+not overruling anyone. When the budget runs out mid-cleanup, the remaining locks
+are reported rather than attempted, which needs a third outcome:
+
+| `outcome` | meaning |
+|---|---|
+| `refused` | attempted; SAP answered at application level and did not confirm release |
+| `unknown` | attempted; no application-level answer arrived |
+| `not-attempted` | the budget expired before this lock's turn — still held as far as we know, and nothing was sent |
+
+Step 4 needs no share of the budget: after this spec, `disconnect()` does not wait
+for anything, and a transport release that does not complete is already reported
+as `releasePending` rather than awaited.
+
+A queued caller therefore waits at most its predecessor's `deadlineMs`, plus that
+call's `disconnect()`, and then gets its own full budget.
 
 - **The barrier shuts once.** Step 1 has no meaning a second time — new work is
   already refused.
@@ -693,6 +721,10 @@ Tests:
   on the second call
 - `close()` returns `timedOut: true` → a second `close()` with a longer deadline
   waits again and picks up what finished in between
+- **an `UNLOCK` that never settles** → `close()` still returns when the budget
+  expires, that lock reported as `unknown`, any lock after it as `not-attempted`,
+  and a queued `close()` is not blocked — the regression this whole spec exists to
+  prevent, in the place it moved to last
 - **two queued `close()` calls with different deadlines**: the second waits its
   full `deadlineMs` measured from when its own wait begins, not from when it was
   called — it does not arrive already expired
@@ -742,6 +774,7 @@ the only diagnosis available to whoever runs this headless:
 
 | logged as | what was observed |
 |---|---|
+| not-attempted unlocks | the budget expired first; nothing was sent for this lock |
 | refused unlocks | SAP answered **at application level** about this `UNLOCK` and refused it |
 | unknown-outcome unlocks | no application-level answer — a timeout, a reset, **or a gateway status such as 502/503/504**, which says nothing about what SAP did |
 | unresolved intents | the `LOCK` never resolved, so no confirmed handle was available to unlock with — **not** evidence that no lock was taken |
