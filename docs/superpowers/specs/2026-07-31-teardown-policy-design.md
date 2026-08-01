@@ -358,16 +358,21 @@ The choice of a bound belongs to the caller. What is not optional is that there
 two different things to report, and one of them is not a failure at all.
 
 ```ts
+/** An attempt carries the error it got; a lock never tried has none to carry. */
+type UnlockOutcome =
+  | { key: string; outcome: 'refused' | 'unknown'; error: unknown }
+  | { key: string; outcome: 'not-attempted' };
+
 interface ICloseReport {
-  /** A lock this client held that close() could not confirm released.
-   *  `outcome` says how far it got — see the table under the deadline rules. */
-  unlockFailures: Array<
-    LockFailure & { outcome: 'refused' | 'unknown' | 'not-attempted' }
-  >;
+  /** Locks this client held and could not confirm released.
+   *  `outcome` says how far each got — see the table under the deadline rules. */
+  locksNotReleased: UnlockOutcome[];
   /** Declared before the LOCK went out, still unresolved when waiting stopped.
    *  The outcome is UNKNOWN — it may be held, it may never have been taken. */
   unresolvedIntents: string[];
-  /** Whether the barrier stopped waiting rather than running out of work. */
+  /** Whether the shutdown budget was exhausted — in step 2, in step 3, or both.
+   *  Not "the barrier stopped waiting": since the budget now covers cleanup, a
+   *  run whose chains all finished can still be cut short by a hung UNLOCK. */
   timedOut: boolean;
   /** What the connection's own teardown could not finish. Carried, not swallowed.
    *
@@ -395,9 +400,9 @@ The two fields record two different observations, and nothing more:
 
 | field | what was observed |
 |---|---|
-| `unlockFailures`, `outcome: 'refused'` | SAP answered this `UNLOCK` at application level and refused it. Carries the error it gave |
-| `unlockFailures`, `outcome: 'unknown'` | no application-level answer was obtained — a timeout, a reset, or a gateway status that says nothing about what SAP did. It may well have released the lock |
-| `unlockFailures`, `outcome: 'not-attempted'` | the shutdown budget ran out before this lock's turn. Nothing was sent, so it is held as far as anything here knows |
+| `locksNotReleased`, `outcome: 'refused'` | SAP answered this `UNLOCK` at application level and refused it. Carries the error it gave |
+| `locksNotReleased`, `outcome: 'unknown'` | no application-level answer was obtained — a timeout, a reset, or a gateway status that says nothing about what SAP did. It may well have released the lock |
+| `locksNotReleased`, `outcome: 'not-attempted'` | the shutdown budget ran out before this lock's turn. Nothing was sent, so it is held as far as anything here knows |
 | `unresolvedIntents` | the `LOCK` itself never resolved, so no confirmed handle was ever available to unlock with. The lock may exist on SAP regardless — the answer simply had not arrived |
 
 The `outcome` discriminator is new, and it exists because an earlier draft
@@ -435,7 +440,7 @@ tolerate, none of which we know. We report what happened and hand it over.
 that is worth spelling out, because otherwise every close looks like it might
 need following up:
 
-- `unlockFailures` empty **and** `unresolvedIntents` empty means every lock this
+- `locksNotReleased` empty **and** `unresolvedIntents` empty means every lock this
   client took was confirmed released. Nothing is outstanding; no retry is needed
   and none would find anything.
 - A `LOCK` confirmed to have **failed** is deliberately absent from both fields.
@@ -446,7 +451,7 @@ need following up:
 
 **Every entry in either field describes a lock that may still exist.** An earlier
 draft said only `unknown` outcomes and unresolved intents did, which contradicts
-the contract one section above: `unlockFailures` means *release not confirmed*,
+the contract one section above: `locksNotReleased` means *release not confirmed*,
 and that is true of both its outcomes. A refusal is an answer about the
 **attempt**, not about the lock. It establishes that this `UNLOCK` was not
 confirmed to have succeeded, and nothing more: an invalid or expired handle is
@@ -659,6 +664,25 @@ Step 4 needs no share of the budget: after this spec, `disconnect()` does not wa
 for anything, and a transport release that does not complete is already reported
 as `releasePending` rather than awaited.
 
+**A cleanup that stops being awaited is still running.** Bounding step 3 means
+`close()` returns while an `UNLOCK` may still be in flight — we stopped listening,
+we did not cancel it. The registry keeps that lock, so a later `close()` would
+otherwise send a *second* `UNLOCK` with the same handle while the first is
+unanswered, and the first's late arrival would then land on bookkeeping the second
+had already changed.
+
+So a lock carries a cleanup state, not just a presence:
+
+- while an `UNLOCK` for it is **in flight**, a later `close()` does not start
+  another. It observes the existing one, within its own budget, and reports
+  `unknown` if that budget expires first.
+- a **late success** removes the lock from the registry, whenever it arrives.
+- a **late failure** leaves it, so the next `close()` may attempt it afresh.
+
+Duplicate `UNLOCK`s are worth avoiding beyond the bookkeeping: the second would be
+sent with a handle the first may already have consumed, and its refusal would say
+nothing about whether the lock is held.
+
 A queued caller therefore waits at most its predecessor's `deadlineMs`, plus that
 call's `disconnect()`, and then gets its own full budget.
 
@@ -723,8 +747,13 @@ Tests:
   waits again and picks up what finished in between
 - **an `UNLOCK` that never settles** → `close()` still returns when the budget
   expires, that lock reported as `unknown`, any lock after it as `not-attempted`,
-  and a queued `close()` is not blocked — the regression this whole spec exists to
-  prevent, in the place it moved to last
+  `timedOut: true`, and a queued `close()` is not blocked — the regression this
+  whole spec exists to prevent, in the place it moved to last
+- **all chains finished, the last `UNLOCK` hangs** → `timedOut: true` even with no
+  `not-attempted` entries, since the budget was exhausted in step 3
+- **cleanup timeout → a second `close()` before the first `UNLOCK` settles → the
+  first settles late**: no duplicate `UNLOCK` is sent, and a late success removes
+  the lock while a late failure leaves it for the next attempt
 - **two queued `close()` calls with different deadlines**: the second waits its
   full `deadlineMs` measured from when its own wait begins, not from when it was
   called — it does not arrive already expired
@@ -768,7 +797,7 @@ for it twice over — a disposer cannot know whether the connection is shared, a
 it was handed one it did not create.
 
 A disposer returns `void`, so the report has nowhere to go. It is logged, and the
-distinctions the report exists to draw must survive that — **three categories,
+distinctions the report exists to draw must survive that — **four categories,
 logged separately**, because they are three different observations and a log is
 the only diagnosis available to whoever runs this headless:
 
