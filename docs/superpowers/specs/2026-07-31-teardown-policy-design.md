@@ -446,8 +446,9 @@ need following up:
 - A `LOCK` confirmed to have **failed** is deliberately absent from both fields.
   Nothing was taken, so there is nothing to release — absence here is a positive
   result, not a gap in the record.
-- `timedOut: false` means the barrier ran out of work rather than out of patience,
-  so the two emptiness checks above cover everything this client was doing.
+- `timedOut: false` means the budget was not exhausted — neither while waiting for
+  chains nor during cleanup — so the two emptiness checks above cover everything
+  this client was doing.
 
 **Every entry in either field describes a lock that may still exist.** An earlier
 draft said only `unknown` outcomes and unresolved intents did, which contradicts
@@ -660,9 +661,24 @@ are reported rather than attempted, which needs a third outcome:
 | `unknown` | attempted; no application-level answer arrived |
 | `not-attempted` | the budget expired before this lock's turn — still held as far as we know, and nothing was sent |
 
-Step 4 needs no share of the budget: after this spec, `disconnect()` does not wait
-for anything, and a transport release that does not complete is already reported
-as `releasePending` rather than awaited.
+**Step 4 is in the budget too.** An earlier draft excused it — "`disconnect()`
+does not wait for anything" — which is true of in-flight requests and open windows
+and false of the thing that actually blocks: the transport release. `disconnect()`
+has to await that to know whether `releasePending` is true, so an RFC `close()`
+that never settles takes the teardown, the report and every queued `close()` with
+it. "Already reported rather than awaited" named no mechanism; this is the
+mechanism.
+
+The release is awaited under whatever budget remains. When that runs out the
+release is **detached** — not cancelled, since cancelling a half-closed handle is
+not better than leaving it — and the teardown returns with `releasePending: true`.
+A release that completes afterwards does so unobserved, which is what
+`releasePending` has always meant: we could not confirm it.
+
+If the budget is already exhausted when step 4 begins, `disconnect()` is still
+called — the session state must go down regardless — and the release is detached
+immediately, with `releasePending: true`. Reporting that we did not confirm a
+release we never waited for is accurate.
 
 **A cleanup that stops being awaited is still running.** Bounding step 3 means
 `close()` returns while an `UNLOCK` may still be in flight — we stopped listening,
@@ -754,6 +770,8 @@ Tests:
 - **cleanup timeout → a second `close()` before the first `UNLOCK` settles → the
   first settles late**: no duplicate `UNLOCK` is sent, and a late success removes
   the lock while a late failure leaves it for the next attempt
+- **a transport release that never settles** → `close()` still returns, with
+  `releasePending: true`, and a queued `close()` is not blocked behind it
 - **two queued `close()` calls with different deadlines**: the second waits its
   full `deadlineMs` measured from when its own wait begins, not from when it was
   called — it does not arrive already expired
@@ -798,7 +816,7 @@ it was handed one it did not create.
 
 A disposer returns `void`, so the report has nowhere to go. It is logged, and the
 distinctions the report exists to draw must survive that — **four categories,
-logged separately**, because they are three different observations and a log is
+logged separately**, because they are four different observations and a log is
 the only diagnosis available to whoever runs this headless:
 
 | logged as | what was observed |
@@ -821,10 +839,12 @@ The log says what was observed and stops. The current message ends with "retry
 `unlockAll()` or rely on session-drop", which is advice, and this document has
 already established twice that the advice is not ours to give — once when it was
 optimistic and once when I replaced it with pessimistic advice instead. It goes.
-What replaces it is the names under all **three** headings: these keys were
-refused, these got no application-level answer, these never resolved. Naming two
-of the three here would reintroduce the conflation this section exists to
-prevent — and it did, in an earlier draft.
+What replaces it is the names under all **four** headings: these keys were never
+attempted, these were refused, these got no application-level answer, these never
+resolved. Naming a subset here would reintroduce the conflation this section
+exists to prevent — and it has, twice: once at three headings out of three, and
+again when a fourth outcome arrived and this sentence was not updated with the
+table above it.
 
 A consumer that needs the report calls `close()` itself. `await using` is for the
 case where nobody is going to read it, and its job is to leave nothing behind
