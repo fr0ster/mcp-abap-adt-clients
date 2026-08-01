@@ -370,9 +370,10 @@ interface ICloseReport {
   /** Declared before the LOCK went out, still unresolved when waiting stopped.
    *  The outcome is UNKNOWN — it may be held, it may never have been taken. */
   unresolvedIntents: string[];
-  /** Whether the shutdown budget was exhausted — in step 2, in step 3, or both.
-   *  Not "the barrier stopped waiting": since the budget now covers cleanup, a
-   *  run whose chains all finished can still be cut short by a hung UNLOCK. */
+  /** Whether the shutdown budget was exhausted — in step 2, 3 or 4, or several.
+   *  Not "the barrier stopped waiting": the budget covers the whole close, so a
+   *  run whose chains all finished can still be cut short by a hung UNLOCK, or by
+   *  a transport release that did not come back. */
   timedOut: boolean;
   /** What the connection's own teardown could not finish. Carried, not swallowed.
    *
@@ -446,9 +447,9 @@ need following up:
 - A `LOCK` confirmed to have **failed** is deliberately absent from both fields.
   Nothing was taken, so there is nothing to release — absence here is a positive
   result, not a gap in the record.
-- `timedOut: false` means the budget was not exhausted — neither while waiting for
-  chains nor during cleanup — so the two emptiness checks above cover everything
-  this client was doing.
+- `timedOut: false` means the budget was not exhausted anywhere — not while
+  waiting for chains, not during cleanup, not on the transport release — so the
+  two emptiness checks above cover everything this client was doing.
 
 **Every entry in either field describes a lock that may still exist.** An earlier
 draft said only `unknown` outcomes and unresolved intents did, which contradicts
@@ -669,16 +670,41 @@ that never settles takes the teardown, the report and every queued `close()` wit
 it. "Already reported rather than awaited" named no mechanism; this is the
 mechanism.
 
-The release is awaited under whatever budget remains. When that runs out the
-release is **detached** — not cancelled, since cancelling a half-closed handle is
-not better than leaving it — and the teardown returns with `releasePending: true`.
-A release that completes afterwards does so unobserved, which is what
-`releasePending` has always meant: we could not confirm it.
+**The bound belongs inside `disconnect()`, not around it.** An earlier draft had
+`close()` stop awaiting the teardown, which cannot work: `disconnect()` returns a
+report only when it resolves, so a wrapper that abandons the promise has no
+`abandonedWindows` and no honest way to claim `releasePending: true` — it would be
+inventing a report about work it can no longer see. A `Promise.race` in
+`AdtClient` is not a mechanism, it is a guess.
+
+So the connection takes the deadline:
+
+```ts
+disconnect(options?: { deadlineMs?: number }): Promise<ITeardownReport>;
+```
+
+It awaits its own release under that bound and, on expiry, returns its own report
+with `releasePending: true`. `close()` passes whatever budget remains and receives
+a report that was actually observed. This is also the right layer: the release is
+the connection's resource, so bounding it is the connection's job.
+
+**A detached release needs the same state machine as a detached `UNLOCK`.** On
+expiry the release is detached — not cancelled, since cancelling a half-closed
+handle is no better than leaving it — and it is still running. Without per-release
+state, the next `close({ disconnect: true })` (prompted by `releasePending: true`,
+as intended) would start a **second** release over a handle the first may be
+mid-way through closing, and a late success from the first would go unrecorded.
+
+So, mirroring the lock rule:
+
+- while a release is **in flight**, a later teardown observes it within its own
+  bound rather than starting another;
+- a **late success** clears `releasePending`, whenever it arrives;
+- a **late failure** leaves it set, so a later teardown may try afresh.
 
 If the budget is already exhausted when step 4 begins, `disconnect()` is still
-called — the session state must go down regardless — and the release is detached
-immediately, with `releasePending: true`. Reporting that we did not confirm a
-release we never waited for is accurate.
+called — the session state must go down regardless — with a zero bound, so the
+release is started and detached at once.
 
 **A cleanup that stops being awaited is still running.** Bounding step 3 means
 `close()` returns while an `UNLOCK` may still be in flight — we stopped listening,
@@ -771,7 +797,11 @@ Tests:
   first settles late**: no duplicate `UNLOCK` is sent, and a late success removes
   the lock while a late failure leaves it for the next attempt
 - **a transport release that never settles** → `close()` still returns, with
-  `releasePending: true`, and a queued `close()` is not blocked behind it
+  `releasePending: true` **and `timedOut: true`**, and a queued `close()` is not
+  blocked behind it
+- **release timeout → a second `close({ disconnect: true })` before the first
+  release settles → the first settles late**: no second release is started, and a
+  late success clears `releasePending` while a late failure leaves it set
 - **two queued `close()` calls with different deadlines**: the second waits its
   full `deadlineMs` measured from when its own wait begins, not from when it was
   called — it does not arrive already expired
@@ -1069,9 +1099,13 @@ assert the lock was released rather than stranded.
 
 ## Release
 
-`@mcp-abap-adt/interfaces` first, and only for prose: `abandonedWindows` is
-redocumented as a snapshot of what was open, since the wait it referred to no
-longer exists. No type changes. Correcting an earlier draft of this spec, which
+`@mcp-abap-adt/interfaces` first, for prose **and one signature**:
+`abandonedWindows` is redocumented as a snapshot of what was open, since the wait
+it referred to no longer exists, and `disconnect()` gains an optional
+`{ deadlineMs }` so the connection can bound its own transport release and still
+return a report it observed. Additive — an existing caller passing nothing is
+unaffected — but it is a type change, so an earlier claim in this section that
+there were none is corrected here. Correcting an earlier draft of this spec, which
 claimed no `interfaces` change was needed — a field whose documentation describes
 a mechanism we removed is a contract that lies, and prose is part of the contract.
 
