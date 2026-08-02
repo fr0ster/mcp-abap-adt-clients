@@ -1,47 +1,11 @@
-# The lock safety net belongs to adt-clients, not to the connection
+# disconnect() must settle, and most of what surrounds it should go
 
-Continuation of `2026-07-27-session-lifecycle-design.md`, and a correction to it.
+Continuation of `2026-07-27-session-lifecycle-design.md`, and a substantial
+correction to it.
 
-## Two sessions, two layers
+## The defect
 
-There is the **REST session** — cookies, CSRF token, connection id, the HTTP
-conversation — and there is the **ABAP session** the server keeps behind it,
-which is what actually holds a lock.
-
-They belong to different layers, and so do their risks:
-
-| layer | owns | its risk |
-|---|---|---|
-| `@mcp-abap-adt/connection` | the REST session | losing or silently replacing the HTTP conversation |
-| `@mcp-abap-adt/adt-clients` | the ABAP session's semantics — stateful mode, lock handles, the registry | leaving a lock on the server |
-
-**The server does not end the session.** In an orderly shutdown — the consumer
-deciding it is done — the teardown starts on our side of the wire, which means
-the ABAP session is still alive and an `UNLOCK` can simply be sent.
-
-That is a claim about orderly shutdown only, and it needs to be: teardowns also
-arise *internally*, when a lost session is detected and cleaned up before a
-recovery. Those are neither the consumer's doing nor a case where an `UNLOCK` can
-be sent, and they are what makes the fencing below non-optional. Releasing a lock during shutdown
-is an ordinary operation, not a best-effort gamble. That is the case we handle,
-and handling it is cheap.
-
-**Out of scope: a server that goes away.** The lock survives in the enqueue table
-and is cleared by waiting or by SM12. That is SAP's risk and the operator's, not
-ours, and designing around it would mean insuring someone else's failure with our
-complexity. We release what we took, while we can. We do not build machinery for
-the case where we cannot.
-
-## The defect that remains
-
-Independent of any of the above, we publish this:
-
-```ts
-/** Resolves rather than throws — the report carries the failures. */
-disconnect(): Promise<ITeardownReport>;
-```
-
-and there is a path where it never resolves:
+We publish a `disconnect()` that resolves. There is a path where it never does:
 
 ```ts
 while (this.inFlight > 0) {
@@ -49,34 +13,82 @@ while (this.inFlight > 0) {
 }
 ```
 
-Because transitions are serialized, a teardown stuck there blocks every later
-`connect()` as well. That is a broken promise and it is squarely the connection
-layer's own business.
+`changed()` without a timeout resolves only when something wakes the lifecycle. If
+a request never settles, nothing does — and because transitions are serialized, a
+teardown stuck there blocks every later `connect()` as well.
 
-## What each layer does
+That is the whole defect. Everything below is either fixing it or removing
+machinery built around it that never earned its place.
 
-### The connection
+## Two sessions, two layers
 
-Stops waiting. `disconnect()` tears down the REST session and returns.
+There is the **REST session** — cookies, CSRF token, connection id — and the
+**ABAP session** the server keeps behind it, which is what holds a lock.
+
+| layer | owns | its risk |
+|---|---|---|
+| `@mcp-abap-adt/connection` | the REST session | losing or silently replacing the HTTP conversation |
+| `@mcp-abap-adt/adt-clients` | the ABAP session's semantics — stateful mode, lock handles, the registry | leaving a lock on the server |
+
+**The server does not end the session.** In an orderly shutdown the teardown
+starts on our side, so the ABAP session is still alive and an `UNLOCK` can simply
+be sent. Teardowns also arise internally, when a lost session is detected before a
+recovery — those are neither the consumer's doing nor a case where an `UNLOCK` can
+be sent, and they are why the fencing below is not optional.
+
+**Out of scope: a server that goes away.** The lock survives in the enqueue table
+and is cleared by waiting or by SM12. That is SAP's risk and the operator's. We
+release what we took, while we can, and build nothing for the case where we
+cannot.
+
+## The connection
+
+### It stops waiting
+
+`disconnect()` tears down the REST session and returns.
 
 - No wait on in-flight requests. They continue as their caller arranged; nothing
-  is aborted.
-- No wait on open windows. The connection cannot interpret them — it does not
-  know a lock exists, what it covers, or what would release it.
-- The unbounded loop, the two-phase drain and its ceiling all go; nothing is left
-  to bound.
+  is aborted. Outside a critical section the connector passes the caller's timeout
+  verbatim, including none — a legitimate choice for a long poll — and waiting on
+  a request the caller declared unbounded is not a teardown.
+- The unbounded loop, the two-phase drain and its ceiling all go.
 
-This is the connection handling its own risk and stopping there — but only once
-the next section holds. Removing the wait without it is not a simplification, it
-is a hazard.
+### It returns nothing
+
+```ts
+disconnect(options?: { deadlineMs?: number }): Promise<void>;
+```
+
+`ITeardownReport` is **removed**, on a criterion this ecosystem already has:
+`@mcp-abap-adt/interfaces` holds what a **consumer imports**. Counted across all
+four repositories, `ITeardownReport` appears in one — the connector — and only to
+type its own method's return. No consumer imports it; the sole occurrence in
+`adt-clients` is a test stub building an object literal. Both its fields were
+vacuous in practice: `releasePending` was hard-coded `false`, and
+`abandonedWindows` drew from windows nothing opens.
+
+Earlier drafts of this document proposed growing it by two required fields —
+`teardownRan` and `releaseTimedOut` — which meant a **breaking major** on the
+shared contract so that `AdtClient.close()`, our own wrapper, could read the
+connector's internal state. Expanding a shared contract to carry information
+between two of our own packages is the wrong trade at any version number.
+
+**What those two facts become instead: nothing the caller has to handle.** They
+were "cleanup is owed" and "a transport resource is still held", and both are the
+connection's own state, so the connection settles them itself:
+
+- a repeat `disconnect()` performs whatever is still owed. It is idempotent, and a
+  caller wanting cleanup simply calls it again;
+- `connect()` settles the debt before establishing anything (below).
+
+No report, no query, no new member on any interface.
 
 ### Removing the wait requires generation fencing
 
-The wait had a second effect nobody designed but everybody relied on: it
-guaranteed that no request outlived the session it was issued against. Drop it
-and a request can settle **after** a later `connect()` has established a new one.
-
-That matters because the response path mutates shared state:
+The wait had a second effect nobody designed and everybody relied on: no request
+outlived the session it was issued against. Drop it and a request can settle
+**after** a later `connect()` established a new one — and the response path mutates
+shared state:
 
 ```ts
 private observeResponse(headers?: Record<string, unknown>): void {
@@ -84,18 +96,15 @@ private observeResponse(headers?: Record<string, unknown>): void {
 }
 ```
 
-A stale response reaching that would write its cookies over the new session's,
-and — worse — the identity policy could read the mismatch as a replacement and
-raise a session-lost teardown against a session that is perfectly healthy. The
-old request would be tearing down its successor.
+A stale response would write its cookies over the new session's and could be read
+as a replacement, raising a session-lost teardown against a healthy session. The
+old request would tear down its successor. So the fencing is not hardening; it is
+what makes removing the wait safe.
 
-So the fencing is not an optional hardening; it is what makes removing the wait
-safe:
-
-#### The teardown epoch is the wrong counter for it
+#### The teardown epoch is the wrong counter
 
 `RequestLease.epoch` exists and is used for nothing, so it is the obvious
-candidate. It is also insufficient, and the reason is deliberate:
+candidate. It is also insufficient, deliberately:
 
 ```ts
 if (origin === 'caller') {
@@ -103,285 +112,296 @@ if (origin === 'caller') {
 }
 ```
 
-Only a **caller-initiated** teardown bumps it. An internal one — the cleanup that
-follows a lost session, and the recovery after it — does not, on purpose: a
-recovery must not cancel itself. So after a session loss and a successful
-recovery, requests issued against the dead session carry the *same* epoch as the
-new one and would sail straight through a fence built on it. That is precisely
-the case fencing exists for, and epoch cannot see it.
-
-Two counters answering two different questions:
+Only a caller-initiated teardown bumps it, because a recovery must not cancel
+itself. After a session loss and a successful recovery, requests from the dead
+session carry the *same* epoch as the new one and sail through a fence built on
+it — precisely the case fencing exists for.
 
 | counter | question | changes when |
 |---|---|---|
 | `epoch` (exists) | did the caller ask to stop? | a caller-initiated teardown |
 | **session generation** (new) | is this still the session you were issued against? | every `markConnected()` **and** every `beginTeardown()` |
 
-`markConnected()` currently increments nothing. It is the one place a session
-becomes current, whatever brought it there — first connect, reconnect, or
-recovery — which makes it the honest place to count generations.
-
-**Counting only there leaves a gap**, and an earlier draft had it: between a
-`disconnect()` and the next `connect()` there is no new generation, so a lease
-taken before the teardown still matches. A response arriving in that window would
-write cookies and a CSRF token into the state `disconnect()` has just cleared,
-and the next `connect()` would begin over that debris. So a teardown starts a
-generation too: the moment the session stops being the current one is the moment
-leases against it go stale, whether or not a replacement exists yet.
-
-Epoch keeps its existing job untouched.
+Counting only at `markConnected()` leaves a gap: between a `disconnect()` and the
+next `connect()` a lease taken before the teardown still matches, and a response
+arriving then would write into state `disconnect()` has just cleared. A teardown
+starts a generation too — the moment a session stops being current is the moment
+leases against it go stale, whether or not a replacement exists.
 
 #### The rule
 
 - A lease captures the **generation** at admission.
 - Every side effect on shared state — cookie update, identity policy, CSRF cache,
-  the recovery paths — is skipped when the lease's generation is not the current
-  one.
+  the recovery paths — is skipped when the lease's generation is not current.
+- The request still resolves or rejects normally to **its own caller**. Fencing
+  suppresses its effects on the connection, not its result.
 - **Except for the request that raised the teardown**, which holds a permit.
 
-#### The permit is held for a transition, not for a generation number
+#### The permit
 
 A request detecting a lost session raises an internal teardown, which bumps the
 generation and would otherwise make its own lease stale on the spot — fencing it
 out of the recovery it just triggered, with nobody else able to run it.
 
-Rebasing it onto the generation the teardown created is not enough, and an
-earlier draft stopped there. A successful recovery calls `markConnected()`, which
-bumps the generation **again** — so the raiser goes stale a second time, now in
-the middle of the retry it exists to perform. Chasing the number does not work:
-the permit has to outlive every generation change the recovery itself causes.
+Rebasing it onto the generation the teardown created is not enough: a successful
+recovery calls `markConnected()`, bumping the generation again, so the raiser goes
+stale a second time in the middle of the retry the permit exists for. The permit
+is therefore scoped to the recovery **transition** — granted when the teardown is
+raised, surviving whatever the transition does to the counter, ending when the
+transition does, at which point the holder is rebased onto the generation actually
+published.
 
-So the permit is scoped to the recovery **transition**. It is granted when the
-teardown is raised, it survives whatever the transition does to the counter, and
-it ends when the transition does — at which point the holder is rebased onto the
-generation that was actually published, and continues as an ordinary lease of the
-new session. Everything else from the dead session stays fenced throughout.
+**Only one raiser, enforced.** Two responses can arrive together and both detect
+the loss; each would take a permit and invalidate the other's. Raising is a
+compare-and-set: the first request to move the lifecycle into the session-lost
+state takes the permit, and later detectors are fenced like any other stale lease.
 
-#### Only one raiser, and that has to be enforced
+**The permit does not outrank the caller.** It exempts its holder from the
+*generation* fence and nothing else — in particular not the epoch. A recovery
+still captures the epoch when it starts and refuses to publish if the caller has
+since requested a teardown. Otherwise the permit would be a licence to resurrect a
+session the caller explicitly ended.
 
-"Only one request can be the raiser" was an assertion, not a mechanism. Two
-responses can arrive together and both detect the loss; each would take a permit
-and each would invalidate the other's, which is worse than having no permit at
-all.
+### The transport release, bounded
 
-Raising is therefore a compare-and-set: the first request to move the lifecycle
-into the session-lost state takes the permit, and every later detector is told the
-teardown is already under way and is fenced like any other stale lease. It does
-not raise a second teardown and does not attempt a second recovery.
+`disconnect()` must await the transport release to know it happened, so an RFC
+close that never settles takes the teardown and every queued `connect()` with it.
 
-Test with two concurrent detectors, because one detector cannot distinguish an
-assertion from a rule.
+The release is awaited under `deadlineMs`, and on expiry it is **detached** — not
+cancelled, since cancelling a half-closed handle is no better than leaving it. The
+connection records that cleanup is owed.
 
-#### The permit does not outrank the caller
+**Omitting `deadlineMs` does not mean "no bound"**: it means
+`SAP_RELEASE_DEADLINE_MS`, 600 000 ms. The unchanged behaviour *is* the defect this
+document opens with, and a direct `disconnect()` — no `AdtClient` anywhere — is the
+commoner call of the two.
 
-It exempts its holder from the **generation** fence and from nothing else. In
-particular it does not touch the teardown **epoch**, and the existing rule stands
-unchanged: a recovery captures the epoch when it starts and refuses to publish if
-the caller has since requested a teardown.
+**`deadlineMs` is measured from the call.** The connection serializes transitions,
+so a `disconnect()` may sit behind a queued `connect()` or recovery. If the bound
+started when the transition began, that queue time would fall outside it. Counting
+from the call gives a standalone caller what it plainly asked for — a return within
+`deadlineMs` of asking.
 
-Without that boundary the permit would be a licence to resurrect. A caller calls
-`disconnect()` while a recovery is in flight; the recovery finishes, and — holding
-a permit that ignored the epoch — publishes a session over the top of a teardown
-the caller asked for. The caller would be left connected to something it
-explicitly ended.
+**Accepted values.** Bounded completion is the guarantee here, so the input is
+validated rather than coerced:
 
-Two counters, two questions, and the permit answers only one of them: *is this
-still your session* — never *did the caller ask to stop*.
-- The request still resolves or rejects normally to **its own caller**. Fencing
-  suppresses its effects on the connection, not its result.
+| value | behaviour |
+|---|---|
+| finite, `0 <= v <= MAX_SAFE_INTEGER - <monotonic now>` | used as given |
+| `0` | do not wait at all |
+| `Infinity`, `NaN`, negative, or beyond that range | **rejected** — throws before anything happens |
 
-Tests, both orderings, because only the second distinguishes the two counters:
+`Infinity` coerced to a default hides that the contract cannot do what was asked;
+treated as unbounded it discards the guarantee; a negative clamped to `0` turns a
+mistake into an immediate destructive close. And "finite" alone is too weak:
+`Date.now() + Number.MAX_VALUE` is finite and useless, since the addition is
+absorbed and the deadline can never be reached.
 
-- explicit: request A → `disconnect()` → `connect()` → A settles
-- **the gap**: request A → `disconnect()` → A settles → `connect()`. No new
-  session exists when A lands, and the cleared state must stay cleared — this is
-  the ordering that fails if generations are counted only at `markConnected()`
-- **internal**: request A → session-lost teardown → recovery establishes a new
-  session → A settles. Same epoch throughout; the new session's identity and
-  cookies must still be untouched and no teardown raised.
-- **the raiser's permit**: request A detects the loss and raises the teardown,
-  request B is in flight from the same dead session. A completes its recovery; B
-  is fenced. Without the carve-out A fences itself and the recovery never happens
-  — this test fails on the rule as first written.
-- **the permit survives `markConnected()`**: A's recovery publishes a new session,
-  and A's own retry still proceeds. Fails if the permit is a generation number
-  rather than a scope.
-- **two detectors**: A and B both see the loss at once. Exactly one teardown is
-  raised, exactly one recovery runs, and the loser is fenced rather than holding a
-  competing permit.
+**The clock is monotonic** — `performance.now()` or an injected equivalent. A wall
+clock can move backwards, making the remaining time longer than asked or the
+deadline unreachable. `SessionLifecycle`'s existing ceiling has the same flaw and
+is fixed in the same release; its `now` injection point already exists, so this is
+a default to change.
 
-### adt-clients
+### A detached release, and what it blocks
 
-Releases its locks before it lets the connection go, because it is the only layer
-that can: it holds the handles, in `LockRegistry`, and `unlockAll()` already
-exists.
+The release is still running after detachment, so it carries state:
 
-The shape is a close path on `AdtClient`, and "unlock what is held, then
-disconnect" is **not** enough on its own. Between the snapshot `unlockAll()`
-takes and the `disconnect()` that follows, a concurrent chain can complete its
-`LOCK` and register it — and close would then disconnect over a lock acquired
-moments earlier. Sequencing two steps does not order what is running beside them.
+- while **in flight**, a later teardown observes it within its own bound rather
+  than starting another. A duplicate would be sent over a handle the first may
+  already have consumed;
+- a **late success** clears the pending state whenever it arrives;
+- a **late failure** leaves it set, so a later attempt may retry.
 
-So the close path is a barrier, in this order:
+`connect()` must not proceed over it. Building a client over a handle still
+closing risks a duplicate release, and waiting for it hands back the unbounded
+wait this document removes.
 
-1. **Refuse new chains** — a chain not yet admitted is rejected from this point,
-   so the set of outstanding chains can only shrink. An already-admitted chain is
-   not interrupted: it runs its remaining steps, `LOCK` included.
-   **Cleanup is not a new chain.** `unlockAll()`, and the unlock of a lock already
-   held, stay admissible after `close()` has returned. What is refused is the
-   admission of a *new chain* — never a step of one already admitted, and never
-   cleanup. An earlier draft said "work that could acquire a new lock", which an
-   implementation could read as licence to reject the `LOCK` step of a chain
-   already running, contradicting the promise two lines above. This says nothing
-   about whether a second unlock attempt will succeed; it says the caller is
-   allowed to make one. A barrier that permanently refused cleanup would decide
-   that question on their behalf, and it is not ours to decide.
-2. **Wait for running chains, up to a deadline**, so a `LOCK` already in flight
-   lands and registers rather than appearing after the snapshot.
-3. **`unlockAll()`**, now over a registry that cannot grow.
-4. **`disconnect()` — only if asked.**
+This **amends** `2026-07-27-session-lifecycle-design.md`, which has `connect()`
+retry a pending release and reject only if the retry fails. That rule was written
+when a release could only be settled and failed; detaching one is new here, so the
+two split by state rather than one overruling the other:
 
-#### The connection is injected, so closing it is not ours
+| release state | `connect()` |
+|---|---|
+| **in flight** (detached, unsettled) | rejects immediately with `ADT_SESSION_ERROR.RELEASE_PENDING`. It does not wait and starts no second release |
+| **settled, failed** | retries it first, as the earlier spec requires — under `SAP_RELEASE_DEADLINE_MS`, since a retry that never settles would hang `connect()`. Proceeds on success; a **failed** retry keeps the state retriable, this row again; only **expiry** detaches it, moving to the first row |
+| **settled, succeeded late** | nothing pending; proceeds normally |
 
-`AdtClient` is handed an `IAbapConnection`. It did not create it and cannot know
-who else holds it — one connection may be shared by several clients, and an
-earlier draft had the first `close()` tear down the session underneath the
-second's running chains and held locks. Its barrier and its registry are its own;
-the connection is not.
+### Expiring while still queued
 
-We already refuse to `connect()` on the consumer's behalf, for exactly this
-reason. Disconnecting on their behalf is the same overreach with the sign
-flipped, and worse, because it destroys state instead of creating it.
+Counting queue time only helps if the queue moves. A `connect()` or recovery ahead
+can hang, and then the `disconnect()` callback never runs. So the bound is armed
+**outside** the serialized transition and can settle the public promise before the
+callback is reached.
 
-So step 4 is **opt-in**:
+**The intent still applies.** `disconnect()` shuts admission, bumps the epoch and
+starts a generation **synchronously at the call**, as the earlier lifecycle spec
+requires — a caller who asked to disconnect cannot have requests still going
+through while the transition waits its turn. So after a queue expiry:
+
+- the connection is **unusable**: admission shut, marked disconnected;
+- the transport is **not** cleaned — no drain, no `clearSessionState()`, no
+  release — and the connection records that cleanup is owed;
+- `connect()`, or a repeat `disconnect()`, settles the debt. Whichever comes
+  first.
+
+Rolling the intent back was rejected: a connection that accepted `disconnect()`
+and kept serving requests contradicts the published contract more seriously than
+an uncleaned transport.
+
+**The queued body is withdrawn**, not left to run later. Leaving it would fire a
+teardown requested for a session that may be long gone against whatever session
+exists by then — the successor-killing hazard the fencing prevents, arriving
+through the queue instead of through a response.
+
+**The race between expiring and starting** is resolved by compare-and-set on a
+per-call state, `queued → running | expired`; only the winner acts. A **zero**
+budget sets `expired` at the call, before anything is scheduled: `setTimeout(…, 0)`
+is a macrotask and would lose to a transition callback already queued, making the
+outcome depend on event-loop ordering.
+
+`connect()` settles an owed cleanup before establishing anything — the skipped
+`clearSessionState()` and release, under `SAP_RELEASE_DEADLINE_MS`. If that release
+does not complete it is detached and `connect()` rejects with `RELEASE_PENDING`,
+which is the first row of the table above and needs no separate rule.
+
+## Windows are removed
+
+`ILockWindowAware`, `WindowToken`, `beginWindow()`, `endWindow()` and the window
+accounting inside `SessionLifecycle` all go.
+
+**They do nothing.** `beginWindow()` delegates to the lifecycle and stops; it never
+touches a timeout. The behaviour they were meant to provide — a span where a short
+per-request timeout must not abort a request, because an aborted operation leaves
+an outcome we cannot determine and possibly a lock we cannot reach — is already
+implemented, and has been since 1.9.0:
 
 ```ts
-close(options?: { deadlineMs?: number; disconnect?: boolean }): Promise<ICloseReport>;
+const effectiveTimeout = this.inCriticalSection
+  ? Math.max(timeout ?? 0, getCriticalSectionTimeout())
+  : timeout;
 ```
 
-Default `false`. `close()` releases what this client holds and stops there,
-leaving the connection exactly as it found it. A caller that owns the connection
-and wants it gone says so — and by saying so takes responsibility for the other
-clients it may be shared with, which is a judgement only they can make.
+`beginCriticalSection()` / `endCriticalSection()` acts and is reference-counted.
+Windows are the inert duplicate. Keeping both means two mechanisms for one idea,
+one of which is a no-op that reads as though it works.
+
+**They cannot do lock bookkeeping either**, which is what the teardown was using
+them for. Five open windows give the connection five opaque strings: it cannot say
+which object, find a handle, send an `UNLOCK`, or judge whether any still matters.
+`LockRegistry` a layer up is keyed by object and valued by *the function that
+releases it* — it models the same case and can act on it.
+
+There is a conceptual error in them too: a "window" suggests a span that owns the
+session, but overlapping windows share one ABAP session, so they partition
+nothing. Blocking a teardown on `liveWindows > 0` waited for "some span is open"
+over a session every span shares anyway.
+
+**Nothing calls them.** Across all four repositories, `beginWindow` has zero
+callers outside the connector's own delegation.
+
+The critical section stays exactly as it is, including the fact that its raise is
+**connection-wide**: while it is active every request on that connection gets the
+raised ceiling, including unrelated ones. That is a property of the session rather
+than of a span, and the span is only what turns it on. There is deliberately no
+per-request escape — one caller withdrawing the guarantee another relies on, over
+a session neither owns alone, is not that caller's decision.
+
+## adt-clients
+
+`AdtClient` releases its locks before letting the connection go, because it is the
+only layer that can: it holds the handles, and `unlockAll()` already exists.
+
+"Unlock what is held, then disconnect" is not enough on its own. Between the
+snapshot `unlockAll()` takes and the `disconnect()` that follows, a concurrent
+chain can complete its `LOCK` and register it. Sequencing two steps does not order
+what runs beside them.
+
+### The close barrier
+
+1. **Refuse new chains.** A chain not yet admitted is rejected from this point. An
+   already-admitted chain is not interrupted: it runs its remaining steps, `LOCK`
+   included. **Cleanup is not a new chain** — `unlockAll()`, and the unlock of a
+   lock already held, stay admissible after `close()` returns. That says the caller
+   is allowed to try, not that trying will succeed; a barrier permanently refusing
+   cleanup would settle that question on their behalf.
+2. **Wait for running chains**, within the budget.
+3. **`unlockAll()`**, over a registry that cannot grow.
+4. **`disconnect()` — only if asked.**
+
+### The connection is injected, so closing it is not ours
+
+`AdtClient` is handed an `IAbapConnection`. It did not create it and cannot know
+who else holds it — one connection may serve several clients, and a `close()` that
+disconnected by default would tear the session down underneath another client's
+chains and locks. We already refuse to `connect()` on the consumer's behalf;
+disconnecting on their behalf is the same overreach with the sign flipped, and
+worse, because it destroys state rather than creating it.
+
+So step 4 is opt-in, default `false`. A caller that owns the connection and wants
+it gone says so, and thereby takes responsibility for whoever shares it.
 
 Rejected: a refcount on the connection so the last client out turns off the
-lights. It puts the library back in charge of a lifetime it was lent, and it fails
-the moment a consumer holds the connection itself without an `AdtClient` around
-it.
+lights. It puts the library back in charge of a lifetime it was lent, and fails as
+soon as a consumer holds the connection without an `AdtClient` around it.
 
-Step 2 needs a deadline, and saying so is not a detail. An earlier draft said
-"let running chains finish" with no policy for a chain that never settles —
-which would move the very defect this spec exists to remove one layer up:
-`disconnect()` guaranteed to return, and `close()` free to hang forever before
-reaching it. That is the same mistake twice, and it is worth recording rather
-than quietly fixing.
+### The budget covers steps 2 to 4
 
-`close()` therefore takes a deadline, with a finite default the caller can
-change, and always resolves:
+Bounding step 2 alone would move the defect rather than remove it. `unlockAll()`
+awaits each unlock thunk in sequence with no bound of its own, so one hung
+`UNLOCK` blocks this `close()` and every queued one — the same failure, two steps
+to the right. Unlike a caller's request, these are requests *we* issue during our
+own shutdown, so bounding them overrules nobody.
 
-- chains that finish inside it are unlocked normally;
-- a chain still running at the deadline is **not** aborted — the barrier stops
-  waiting, not the work — and `unlockAll()` proceeds over whatever is registered;
-- a **lock-capable** chain still running at the deadline is named in the result,
-  by the object it was working on. A read-only one is not — it appears only as
-  `timedOut: true`, since naming it would put an object in `unresolvedIntents`
-  that no `LOCK` could have touched.
+When the budget expires mid-cleanup the remaining locks are reported rather than
+attempted.
 
-That last point cannot be done by watching the registry, and an earlier draft
-promised exactly that: "a lock registered after the snapshot is reported by
-name". Impossible. At the moment `close()` returns, that lock is not in the
-registry yet — and once it returns it cannot amend a result it has already
-handed back. `LockFailure` would misdescribe it too: that means an `UNLOCK` was
-attempted and failed, and here none was attempted at all.
+**A timeout plus `disconnect: true` can strand a lock.** If step 2 hit its
+deadline, chains are still running; step 4 then clears the REST session, and a
+`LOCK` completing afterwards produces a handle belonging to a session nobody can
+reach. We still do it — the caller asked, and refusing because *we* ran out of
+patience would overrule them — but it is stated here and visible as
+`timedOut: true`. The safe order costs nothing, since `close()` is idempotent:
+close without `disconnect`, read the report, ask for the teardown once `timedOut`
+is false.
 
-**So the registry records intent, not only possession.** A chain declares the key
-it may lock and resolves that declaration when the outcome is known — held, or
-confirmed not taken.
+### Intents, declared at admission
 
-**At admission, not immediately before the `LOCK`.** An earlier draft said "before
-it sends the `LOCK`", which is too late by exactly the gap that matters: a chain
-admitted before `close()` may be several steps short of its `LOCK` when the
-deadline arrives — validating, reading, checking — and would then hold no
-declaration at all. The report would not name it, and after `close()` returned it
-would either take a lock nobody recorded, or be refused mid-flight by a barrier
-that promised not to interrupt running chains. Both outcomes contradict something
-this spec states elsewhere.
+A chain still running at the deadline must be nameable, and watching the registry
+cannot do it: at the moment `close()` returns, that chain's lock is not registered
+yet, and once returned the result cannot be amended.
 
-So the granularity is the **chain**, not the request:
+So the registry records **intent**, not only possession. A **lock-capable** chain
+declares the key it may lock when it is **admitted** — the object and whether the
+flow can lock at all are known from its config before any request goes out — and
+resolves that declaration when the outcome is known.
 
-- a **lock-capable** chain declares its intent when it is admitted, since both the
-  object and whether the flow can lock at all are known from its config before any
-  request goes out;
-- an admitted chain may run **all** its remaining steps, `LOCK` included — that is
-  what "not aborted" means;
-- only a **new** chain is refused after step 1.
+- **At admission, not before the `LOCK`.** A chain admitted before `close()` may be
+  several steps short of its `LOCK` when the deadline arrives and would hold no
+  declaration at all.
+- **Per attempt, not per key.** Two chains may attempt `DOMA/Z` concurrently;
+  keying declarations by object would let the loser's resolution clear the
+  winner's. The second attempt is expected to fail — the point is that its failure
+  must not corrupt the bookkeeping of the one that succeeded.
+- **Read-only chains declare nothing.** One still running at the deadline would
+  otherwise be named for an object no `LOCK` could have touched. It shows up as
+  `timedOut: true`, which is what is true.
 
-**A read-only chain declares nothing.** An earlier draft had every chain declare,
-which puts a false entry in the report: a read-only flow still running at the
-deadline would be named in `unresolvedIntents` — an object it could never have
-locked — breaking the guarantee that every entry there describes a lock that may
-exist. A read-only chain still outstanding is covered by `timedOut: true`, which
-says what is true: the barrier stopped while work was in progress.
-
-A lock-capable chain that fails before its `LOCK` resolves its declaration as
-not-taken and is not reported. The cost of declaring at admission is a declaration
-that often resolves to nothing; the cost of declaring later is a lock nobody knows
-about.
-
-A declaration is identified **per attempt, not per key.** The registry is
-`Map<string, UnlockThunk>` today, keyed by object, and that is enough for
-possession — one ABAP session cannot hold two locks on one object, so at most one
-entry per key can ever be *held*. It is not enough for intent: two chains may
-attempt `DOMA/Z` concurrently, and keying their declarations by object would let
-the loser's resolution clear the winner's, or one declaration overwrite the
-other. Each attempt therefore carries its own token, the same reasoning that made
-`WindowToken` a symbol rather than a label.
-
-The second attempt is expected to fail — the server will not grant it — and the
-point is that its failure must not corrupt the bookkeeping of the one that
-succeeded. `close()` then reports
-the declarations still unresolved at its deadline, which it *can* know, because
-they were made before it stopped waiting.
-
-This is the rule the session-lifecycle spec already arrived at for windows —
-*"what it tracks is 'a lock may be held', not 'an unlock happened'"* — applied at
-the layer that can act on it. Uncertainty is reported as uncertainty. A chain
-whose `LOCK` was confirmed to have failed resolves its declaration and is not
-reported, because nothing was taken.
-
-The choice of a bound belongs to the caller. What is not optional is that there
-*is* one: a close path that can hang is not a close path.
-
-### The shape of `close()`
-
-`unlockAll()` returns `LockFailure[]`, which is not enough: the barrier now has
-two different things to report, and one of them is not a failure at all.
+### `ICloseReport`
 
 ```ts
-/** An attempt carries the error it got; a lock never tried has none to carry. */
 type UnlockOutcome =
   | { key: string; outcome: 'refused' | 'unknown'; error: unknown }
   | { key: string; outcome: 'not-attempted' };
 
 interface ICloseReport {
-  /** Locks this client held and could not confirm released.
-   *  `outcome` says how far each got — see the table under the deadline rules. */
+  /** Locks this client held and could not confirm released. */
   locksNotReleased: UnlockOutcome[];
-  /** Declared before the LOCK went out, still unresolved when waiting stopped.
-   *  The outcome is UNKNOWN — it may be held, it may never have been taken. */
+  /** Declared before the LOCK went out, still unresolved when waiting stopped. */
   unresolvedIntents: string[];
-  /** Whether the shutdown budget was exhausted — in step 2, 3 or 4, or several.
-   *  Not "the barrier stopped waiting": the budget covers the whole close, so a
-   *  run whose chains all finished can still be cut short by a hung UNLOCK, or by
-   *  a transport release that did not come back. */
+  /** Whether the shutdown budget was exhausted — in step 2, 3 or 4. */
   timedOut: boolean;
-  /** What the connection's own teardown could not finish. Carried, not swallowed.
-   *
-   *  Absent whenever no teardown happened, which is the ORDINARY case: it is
-   *  absent by default, since `disconnect` defaults to false, and absent when
-   *  `disconnect: true` was asked for but the connection implements no
-   *  ISessionLifecycleAware to ask. Present only when a teardown actually ran. */
-  teardown?: ITeardownReport;
 }
 
 close(options?: {
@@ -391,979 +411,170 @@ close(options?: {
 }): Promise<ICloseReport>;
 ```
 
-This is the normative signature; the sketch in the ownership section above is the
-same one, shown early for the argument it is making.
+This one **is** a consumer-facing type: whoever calls `AdtClient.close()` reads it.
+It lives in `adt-clients`, not in `interfaces`, until someone else imports it.
 
-Four facts, four fields, because collapsing any of them loses a distinction that
-matters to whoever reads the report.
-
-The two fields record two different observations, and nothing more:
-
-| field | what was observed |
+| field / outcome | what was observed |
 |---|---|
-| `locksNotReleased`, `outcome: 'refused'` | SAP answered this `UNLOCK` at application level and refused it. Carries the error it gave |
-| `locksNotReleased`, `outcome: 'unknown'` | no application-level answer was obtained — a timeout, a reset, or a gateway status that says nothing about what SAP did. It may well have released the lock |
-| `locksNotReleased`, `outcome: 'not-attempted'` | the shutdown budget ran out before this lock's turn. Nothing was sent, so it is held as far as anything here knows |
-| `unresolvedIntents` | the `LOCK` itself never resolved, so no confirmed handle was ever available to unlock with. The lock may exist on SAP regardless — the answer simply had not arrived |
-
-The `outcome` discriminator is new, and it exists because an earlier draft
-declared that every entry meant "the server refused, the lock is known held".
-`unlockAll()` records a `LockFailure` for **any** exception — a timeout, a
-connection reset, a DNS failure — and in those cases the `UNLOCK` may have
-arrived and worked. Claiming otherwise would state as fact something we did not
-observe, which is the same error the `unresolvedIntents` field was introduced to
-avoid, made on the unlock side after being fixed on the lock side.
-
-Distinguishing them is deliberately conservative, and "a response with a status
-means refused" is **not** the rule — an earlier draft said it was. A 502, 503 or
-504 comes from a proxy or gateway and says nothing about what SAP did with the
-`UNLOCK`; the request may have reached the server and worked. `isNetworkError`
-separates transport failures from responses, which is useful and not sufficient:
-a response is not by itself an answer from the application.
-
-So `refused` requires an **application-level answer about this operation** — an
-ADT error payload, or a status the ADT layer attributes to SAP's handling of the
-call. Everything else is `unknown`: gateway and proxy statuses, transport
-failures, timeouts, anything unparseable.
-
-The asymmetry is intended. Misfiling an unknown as a refusal asserts something we
-did not observe; misfiling a refusal as unknown only understates our certainty.
-When the classification is itself uncertain, it goes to `unknown`.
-
-**What to do about either is the consumer's call.** Earlier drafts of this section
-told them: first that a failure "calls for a retry", then — after that turned out
-to be wishful — that retrying "is not a plan" and the lock is operator cleanup.
-Both were the same error. Whether to retry, wait for the session to end, escalate
-to an operator, or ignore it depends on what the caller was doing and what it can
-tolerate, none of which we know. We report what happened and hand it over.
-
-**When there is nothing to do.** The report is also a statement of absence, and
-that is worth spelling out, because otherwise every close looks like it might
-need following up:
-
-- `locksNotReleased` empty **and** `unresolvedIntents` empty means every lock this
-  client took was confirmed released. Nothing is outstanding; no retry is needed
-  and none would find anything.
-- A `LOCK` confirmed to have **failed** is deliberately absent from both fields.
-  Nothing was taken, so there is nothing to release — absence here is a positive
-  result, not a gap in the record.
-- `timedOut: false` means the budget was not exhausted anywhere — not while
-  waiting for chains, not during cleanup, not on the transport release — so the
-  two emptiness checks above cover everything this client was doing.
-
-**Every entry in either field describes a lock that may still exist.** An earlier
-draft said only `unknown` outcomes and unresolved intents did, which contradicts
-the contract one section above: `locksNotReleased` means *release not confirmed*,
-and that is true of both its outcomes. A refusal is an answer about the
-**attempt**, not about the lock. It establishes that this `UNLOCK` was not
-confirmed to have succeeded, and nothing more: an invalid or expired handle is
-equally consistent with the lock still being held and with the lock or its session
-having already gone.
-
-What the two outcomes distinguish is how much was learned about the attempt — not
-what state the lock is in, which neither of them settles:
-
-| outcome | what is established | what is not |
-|---|---|---|
-| `refused` | SAP answered about this `UNLOCK` and did not confirm a release | whether the lock remains, and whether the same call would be refused again — an application-level error may be transient |
-| `unknown` | nothing at all about the outcome | the same, plus whether the call was even processed |
-
-Reading either as a verdict on the lock requires the semantics of the specific SAP
-error, which this library does not interpret. It reports what it was told.
-
-Emptiness is the only final state: both fields empty means every lock this client
-took was confirmed released.
-
-Two more facts are worth stating because they are ours to know, and they are
-facts, not instructions:
-
-- A **refused** `UNLOCK` is often an invalid handle — the session moved, its type
-  was toggled, the handle expired. Often, not always, and the report says nothing
-  about which: distinguishing a permanent rejection from a transient one needs the
-  semantics of the specific SAP error code, and this library does not classify
-  them. An earlier draft of this bullet promised that repeating the call would get
-  the same answer, which the table above already contradicts. Nothing was learned
-  about the handle in an `unknown` outcome at all.
-- That kind of disturbance is usually caused by something on our side, between
-  `LOCK` and `UNLOCK`. `unlockAll()` already holds the session stateful across the
-  whole batch for exactly this reason.
-
-This also removes a justification I had leaned on for `disconnect` defaulting to
-false — "so a retry can still work". The default does not need it and never did:
-it stands on ownership alone. The connection was handed to us, so closing it is
-not ours to decide. `LockFailure` cannot carry the second — it describes an attempt, and
-for an unresolved intent no attempt was made.
-
-The fourth exists because step 4 calls `disconnect()`, which returns an
-`ITeardownReport` of its own, and an earlier draft simply dropped it. That would
-be worst on RFC, where `releasePending` says a transport resource did not close:
-the caller would see a successful `close()` and never learn that something is
-still held open. A wrapper that discards its inner result reports success it did
-not verify.
-
-It is **optional**, and that is not a hedge. `disconnect()` lives on
-`ISessionLifecycleAware`, which is a capability atom: an `IAbapConnection` is not
-required to implement it, and a batch recorder or a transport with no HTTP
-session does not. So step 4 narrows at runtime — exactly as `AdtClient`'s connect
-guard does, checking the method it actually calls — and when the capability is
-absent it is skipped, with `teardown` left undefined. Requiring it would
-contradict this spec's own layering argument: the atoms exist so that a transport
-is never forced to implement what it cannot honour, and a `close()` that demands
-`disconnect()` re-imposes exactly that. Steps 1 to 3 — refuse, wait, unlock —
-need no capability at all and run regardless.
-
-Test: `close()` over a connection that implements no lifecycle atom still
-unlocks, still reports, and does not throw.
-
-`deadlineMs` is in milliseconds, matching every other timeout in these packages.
-The default is **600 000 ms**, from `SAP_CLOSE_DEADLINE_MS`.
-
-It is a shutdown policy, not a bound derived from anything. Two earlier drafts
-tried to derive it and both were wrong: 60s from a single request's 45s, then
-600s by equating it with `SAP_TIMEOUT_CRITICAL`. The second is no better than the
-first, because that ceiling applies **per request** — a chain runs several in
-sequence, so nothing caps a chain's total duration, and matching the numbers
-reconciles nothing.
-
-Stated honestly instead: **`close()` may stop waiting while a legitimate chain is
-still working.** That is what a shutdown deadline is for. The chain is not
-aborted. Any outstanding chain shows up as `timedOut: true`; a **lock-capable** one
-also appears in `unresolvedIntents`, since only those declare. Either way the
-caller learns that something was still in progress when they asked to stop. 600s is chosen as
-patience — long enough that reaching it means something is wrong rather than
-merely slow — and it is configurable because how patient to be during shutdown is
-the caller's judgement, not ours.
-
-In practice it is not reached: the barrier waits only while chains are actually
-outstanding and returns immediately when none are. The deadline bounds a
-pathology; it does not pace the normal path.
-
-Named rather than left to each implementation, because a default nobody wrote
-down is a different default in every test.
-
-**Accepted values.** `number` admits `Infinity`, `NaN`, negatives and absurdities,
-and bounded completion is the central guarantee here — so the input is validated
-rather than coerced:
-
-| value | behaviour |
-|---|---|
-| finite, `0 <= v <= MAX_SAFE_INTEGER - <monotonic now>` | used as given |
-| `0` | valid and meaningful: do not wait at all. Step 2 is skipped, step 3 runs over whatever is registered now |
-| `Infinity`, `NaN`, negative | **rejected** — `close()` throws before doing anything |
-| beyond `MAX_SAFE_INTEGER - <monotonic now>` | **rejected** — the absolute deadline would not be exactly representable; see below |
-
-The two checks happen at different moments, deliberately. `Infinity`, `NaN` and
-negatives are rejected **immediately**, at the call, since they are wrong
-regardless of when the wait starts. Representability is checked against the
-**single monotonic reading** that also computes the deadline — one snapshot used
-for both, so there is no window between validating a value and using it. Checking
-it at the call and computing the deadline from a later reading would leave exactly
-that window: a value that passed could be out of safe range by the time the queued
-call reaches its own step 2.
-
-**That reading is taken after the call reaches the head of the queue and before
-step 1** — before the barrier shuts, before anything is refused, before any
-cleanup. Otherwise a `close()` carrying an unrepresentable deadline would shut the
-barrier and *then* throw, leaving the client permanently refusing new chains
-because of an argument that was never accepted. "Throws before doing anything" has
-to mean before the first mutation this call makes, not merely before its wait.
-
-Rejected loudly rather than silently repaired, because every silent repair here is
-wrong in a way the caller cannot see. Coercing `Infinity` to a default hides that
-they asked for something the contract cannot provide; treating it as unbounded
-discards the guarantee outright; clamping a negative to `0` turns "I made a
-mistake" into "close immediately", which is destructive.
-
-**No cap on patience — but the value must be representable.** Capping how long
-someone waits during their own shutdown is the overreach this document rejects
-everywhere else, and that is not what this is. "Finite" turned out to be too weak
-a test: the absolute deadline is `now + deadlineMs`, and past `MAX_SAFE_INTEGER`
-that sum stops being exact — `Date.now() + Number.MAX_VALUE` is still finite and
-still useless, since the addition is absorbed entirely and the deadline can never
-be reached in any run of any program.
-
-So the accepted range is `0 <= deadlineMs <= Number.MAX_SAFE_INTEGER - <monotonic now>`,
-which is still about 285,000 years and rejects nothing anyone means. Outside it,
-`close()` throws with the rest of the invalid input. The rejection is about
-arithmetic, not about preference: a value that cannot be added to a clock without
-losing precision is not a longer wait, it is an unrepresentable one, and accepting
-it would be promising a bound we cannot compute. That obliges the implementation rather than the caller: a single
-`setTimeout` cannot carry an arbitrary finite value — anything past the runtime's
-32-bit range overflows and fires almost immediately, turning a very patient close
-into an instant one, which is the opposite of what was asked and fails silently.
-
-So the deadline is **absolute, not a timer**: compute the instant it expires,
-compare against the clock, and re-arm the wait in safe-sized chunks until then.
-
-**And the clock must be monotonic** — `performance.now()`, or an injected
-equivalent. `Date.now()` is a wall clock and can move backwards: an NTP
-correction or a manual change during the wait makes the remaining time longer than
-the caller asked for, and a large enough step back makes the deadline unreachable
-altogether. A duration is not a moment in the day, and measuring it against
-something adjustable forfeits the bound this section exists to guarantee.
-
-`SessionLifecycle` computes its own ceiling as `deadline = teardownAt + ceilingMs`
-with `now` defaulting to `Date.now()`, so the absolute-deadline shape is
-established there — **but its clock choice is not a precedent to follow.** An
-earlier draft cited it as though it were, which is an argument from what exists
-rather than from what is correct. The same fix belongs there: the injection point
-already exists, so it is a default to change, and it should happen in the same
-release rather than leaving one bounded wait honest and the other not.
-
-**"Always resolves" is scoped to valid input.** With an invalid `deadlineMs` the
-call throws instead, before doing anything, as above. The guarantee is that a
-`close()` which starts will finish; it is not a promise to accept nonsense.
-
-`close()` resolves in all cases where it starts at all — that is, for valid
-options; see the deadline rules above. It never rejects for a lock it could not
-release, since the report is the answer.
-
-### Calling it more than once
-
-Unavoidable now that the disposer delegates to it: `await using` will call
-`close()` on a client the caller has already closed by hand. Two concurrent
-`close()` calls are equally ordinary. So the semantics have to be written down
-rather than discovered.
-
-`close()` is **idempotent and serialized**. Calls queue; none is dropped.
-
-**A call's deadline starts when its own wait starts**, not when the call was made.
-A second `close()` may sit behind the first for a while, and charging that queueing
-time against its deadline would hand the caller less patience than they asked for,
-for a reason they cannot see — and in the limit expire the deadline before step 2
-even begins, producing a `timedOut: true` that never waited for anything.
-
-**`deadlineMs` is the budget for the whole `close()`, not for step 2 alone.** Two
-earlier drafts scoped it to the wait, and both were wrong in the same way: they
-moved the original defect rather than removing it.
-
-The second draft said steps 3 and 4 are "bounded by whatever timeouts are in
-force". This document establishes elsewhere that an ordinary request may carry no
-timeout at all — that is the caller's legitimate choice — and `unlockAll()` awaits
-each unlock thunk in sequence with no bound of its own:
-
-```ts
-for (const [key, unlock] of [...this.locks]) {
-  try { await unlock(); ... }
-}
-```
-
-One hung `UNLOCK` therefore blocks this `close()` and every queued one, forever.
-That is the exact defect this spec opens with, relocated from step 2 to step 3.
-
-So the deadline covers steps 2 **and** 3. Unlike a request's timeout, these are
-requests *we* issue, on our own behalf, during our own shutdown — bounding them is
-not overruling anyone. When the budget runs out mid-cleanup, the remaining locks
-are reported rather than attempted, which needs a third outcome:
-
-| `outcome` | meaning |
-|---|---|
-| `refused` | attempted; SAP answered at application level and did not confirm release |
-| `unknown` | attempted; no application-level answer arrived |
-| `not-attempted` | the budget expired before this lock's turn — still held as far as we know, and nothing was sent |
-
-**Step 4 is in the budget too.** An earlier draft excused it — "`disconnect()`
-does not wait for anything" — which is true of in-flight requests and open windows
-and false of the thing that actually blocks: the transport release. `disconnect()`
-has to await that to know whether `releasePending` is true, so an RFC `close()`
-that never settles takes the teardown, the report and every queued `close()` with
-it. "Already reported rather than awaited" named no mechanism; this is the
-mechanism.
-
-**The bound belongs inside `disconnect()`, not around it.** An earlier draft had
-`close()` stop awaiting the teardown, which cannot work: `disconnect()` returns a
-report only when it resolves, so a wrapper that abandons the promise has no
-`abandonedWindows` and no honest way to claim `releasePending: true` — it would be
-inventing a report about work it can no longer see. A `Promise.race` in
-`AdtClient` is not a mechanism, it is a guess.
-
-So the connection takes the deadline:
-
-```ts
-disconnect(options?: { deadlineMs?: number }): Promise<ITeardownReport>;
-```
-
-The report's full shape is given once, under *Expiring while still queued* below,
-since that is where its last field comes from.
-
-It awaits its own release under that bound and, on expiry, returns its own report
-with `releasePending: true` and `releaseTimedOut: true`. `close()` passes whatever
-budget remains and receives a report it actually observed. This is also the right
-layer: the release is the connection's resource, so bounding it is its job.
-
-**`deadlineMs` is measured from the call, not from when the transition starts.**
-The connection serializes transitions, so a `disconnect()` may sit behind a queued
-`connect()` or a recovery before it does anything. If the bound started when the
-transition began, that queue time would fall outside it — and a nested
-`disconnect()` given `close()`'s *remaining* budget could spend all of it waiting
-its turn and then begin a fresh, full release wait, putting step 4 outside the
-whole-close budget it was supposed to be inside.
-
-Counting from the call fixes both cases with one rule: `close()` passes the budget
-it has left at the moment it calls, and a standalone caller gets what it plainly
-asked for — a return within `deadlineMs` of asking, not of some internal event it
-cannot see.
-
-(This differs from `close()`'s own anchor, deliberately. There the queue is
-`AdtClient`'s own and a caller waiting behind another `close()` should still get
-its full patience for *chains*; here the queue is inside the resource being
-bounded, so time spent in it is time the caller is waiting for this teardown.)
-
-#### Expiring while still queued
-
-Counting queue time only helps if the queue moves. It may not: a `connect()` or a
-recovery ahead can hang, and then the `disconnect()` callback never runs at all.
-So the bound is armed **outside** the serialized transition and can settle the
-public promise before the callback is ever reached — which raises three questions
-an earlier draft left open.
-
-**What is returned.** A report, since `disconnect()` resolves rather than throws.
-A teardown that never started must not look like one that finished cleanly, so the
-report carries whether it ran. This is the type's one definition:
-
-```ts
-interface ITeardownReport {
-  /** False when the deadline expired before the teardown body began. The intent
-   *  still took effect — see below — but nothing was drained, cleared or
-   *  released. */
-  teardownRan: boolean;
-  abandonedWindows: string[];
-  releasePending: boolean;
-  /** Why a release is pending: true when its deadline expired, false when it
-   *  failed on its own. Without it a caller cannot tell a slow release from a
-   *  broken one, and `close()` cannot set `timedOut` honestly — deriving it from
-   *  elapsed time in the wrapper would be racing its own clock. */
-  releaseTimedOut: boolean;
-}
-```
-
-`abandonedWindows` is honest even here: open windows are readable synchronously,
-without being inside the transition. `releasePending` and `releaseTimedOut` are
-both `false` — no release was attempted, and what expired was the queue wait.
-
-**"Nothing was mutated" would be false, and an earlier draft said it.**
-`disconnect()` applies its intent **synchronously at the call**, before any
-queueing: `beginTeardown()` shuts admission, bumps the epoch and starts a new
-generation. That is required by `2026-07-27-session-lifecycle-design.md`, and it
-must stay — a caller who has asked to disconnect cannot have requests still going
-through while the transition waits its turn, and a recovery must not be able to
-publish a session over a teardown already requested.
-
-So the intent survives the expiry; only the **body** is withdrawn. Concretely,
-after a queue-expired `disconnect()`:
-
-- the connection is **unusable**: admission stays shut, and it is marked
-  disconnected — the caller asked to disconnect and got that much;
-- the transport is **not** cleaned: no drain, no `clearSessionState()`, no
-  release. Whatever was held is still held, which is what `teardownRan: false`
-  says;
-- the connection records that **cleanup is owed**. Without that state the
-  skipped work is merely hoped for: an earlier draft said "a later `disconnect()`
-  performs it", with nothing recording the debt and nothing stopping a `connect()`
-  from establishing a new session over a stale axios instance, stale cookies and
-  possibly a transport handle still held.
-
-`connect()` therefore settles the debt before it establishes anything. It performs
-the skipped cleanup — `clearSessionState()` and the release, under
-`SAP_RELEASE_DEADLINE_MS` — and then proceeds. If the release does not complete
-within that bound it is detached and `connect()` rejects with
-`ADT_SESSION_ERROR.RELEASE_PENDING`, which lands in the in-flight row of the table
-below and needs no separate rule. A later `disconnect()` may also settle the debt;
-whichever comes first clears it.
-
-The alternative — rolling the intent back on expiry — was rejected: it would leave
-a connection that accepted `disconnect()` and then kept serving requests, which
-contradicts the published contract more seriously than an uncleaned transport.
-
-**Whether the queued body still runs.** It does not. Leaving it would fire a
-teardown, requested for a session that may be long gone, against whatever session
-exists by then — the same "an old operation tears down its successor" hazard the
-generation fencing prevents, arriving through the queue instead of through a
-response.
-
-**The race between expiring and starting.** Saying expiry and withdrawal happen in
-one synchronous step covers the timer and not the other side: the queue can dequeue
-this very transition at the same moment. So the call carries a state that is
-resolved by **compare-and-set** — `queued → running | expired` — and only the
-winner acts. The queue callback that finds `expired` does nothing; the timer that
-finds `running` lets the teardown proceed and reports on it normally. Without
-that, an implementation can return `teardownRan: false` and then run the teardown
-anyway.
-
-**Omitting `deadlineMs` does not mean "no bound".** It means the default —
-`SAP_RELEASE_DEADLINE_MS`, 600 000 ms — under the same rules as `close()`'s
-budget: finite, non-negative, representable against a **monotonic** clock, one
-snapshot serving both validation and expiry, invalid values rejected before
-anything happens.
-
-That matters more than it looks. An earlier draft reassured that "an existing
-caller passing nothing is unaffected", which is the wrong reassurance: the
-unchanged behaviour *is* the defect this document opens with. A direct
-`disconnect()`, with no `AdtClient` anywhere, must return — and bounding it only
-through the wrapper would fix the path that already had a budget while leaving the
-bare one hanging.
-
-**A detached release needs the same state machine as a detached `UNLOCK`.** On
-expiry the release is detached — not cancelled, since cancelling a half-closed
-handle is no better than leaving it — and it is still running. Without per-release
-state, the next `close({ disconnect: true })` (prompted by `releasePending: true`,
-as intended) would start a **second** release over a handle the first may be
-mid-way through closing, and a late success from the first would go unrecorded.
-
-So, mirroring the lock rule:
-
-- while a release is **in flight**, a later teardown observes it within its own
-  bound rather than starting another;
-- a **late success** clears `releasePending`, whenever it arrives;
-- a **late failure** leaves it set, so a later teardown may try afresh.
-
-If the budget is already exhausted when step 4 begins, `disconnect()` is still
-called — the session state must go down regardless — with a zero bound. An earlier
-draft added "so the release is started and detached at once", which contradicts
-the withdrawal rule below: with no budget nothing is started. What happens is the
-queue-expiry case — the intent applies, `teardownRan` is `false`, and the cleanup
-is owed.
-
-**A zero budget is decided synchronously, not by a timer.** Saying "the expiry
-wins the compare-and-set" is not enough on its own: `setTimeout(..., 0)` is a
-macrotask and loses to a transition callback already sitting in the microtask
-queue, so the body could claim `running` first and the outcome would depend on
-event-loop scheduling — as would any test written against it. So a remaining
-budget of zero sets `expired` **at the call**, before anything is scheduled, and
-the body can never claim the transition.
-
-#### `connect()` while a release is still detached
-
-The transition queue is free once the bounded `disconnect()` returns, so nothing
-stops a `connect()` — and it must not proceed. Building a new client over a handle
-that is still closing risks a duplicate release, and waiting for the in-flight one
-would hand back the unbounded wait this whole document removes.
-
-This **amends** `2026-07-27-session-lifecycle-design.md`, which says `connect()`
-with a pending release retries that release first and rejects only if the retry
-fails. That rule was written when a release could only be *settled and failed* —
-detaching one is new here — and it stays correct for that case. What it cannot
-cover is a release still running, where retrying means a duplicate and waiting
-means an unbounded wait.
-
-So the two split by state, and the earlier rule is narrowed rather than replaced:
-
-| release state | `connect()` |
-|---|---|
-| **in flight** (detached, unsettled) | rejects immediately with `ADT_SESSION_ERROR.RELEASE_PENDING` — code `ADT_RELEASE_PENDING`. It does not wait and does not start a second one |
-| **settled, failed** | retries the release first, as the earlier spec requires — **under `SAP_RELEASE_DEADLINE_MS`**, since a retry that never settles would hang `connect()` and undo the point of all of this. It proceeds on success. On a **retry that fails** it rejects with the same code and the state stays *settled, failed* — retriable, this row again. Only on **expiry** is the attempt detached and in flight, moving the state to the first row |
-| **settled, succeeded late** | nothing pending; proceeds normally |
-
-An earlier draft had both failure and expiry leave the attempt "detached and in
-flight". That is true only of expiry: a failure is already settled, and filing it
-as in-flight would send the next `connect()` to the first row, where it rejects
-immediately and forever over a release that is not running at all.
-
-The earlier spec's test list needs the first row added; its existing case is the
-second row and stays as it is.
-
-#### `releaseTimedOut` invariants
-
-Two booleans can contradict each other, so the relationship is fixed rather than
-implied:
-
-- `releaseTimedOut: true` is permitted **only** with `releasePending: true`, and
-  only when the attempt described by *this* report exhausted its bound;
-- a report after a **late success** has both `false` — the release completed, so
-  neither the pending state nor the reason for it survives;
-- a release that failed on its own, inside the bound, is
-  `{ releasePending: true, releaseTimedOut: false }`;
-- nothing to release is `{ releasePending: false, releaseTimedOut: false }`.
-
-`{ releasePending: false, releaseTimedOut: true }` is unrepresentable by
-construction: there is no state it could describe.
-
-**A cleanup that stops being awaited is still running.** Bounding step 3 means
-`close()` returns while an `UNLOCK` may still be in flight — we stopped listening,
-we did not cancel it. The registry keeps that lock, so a later `close()` would
-otherwise send a *second* `UNLOCK` with the same handle while the first is
-unanswered, and the first's late arrival would then land on bookkeeping the second
-had already changed.
-
-So a lock carries a cleanup state, not just a presence:
-
-- while an `UNLOCK` for it is **in flight**, a later `close()` does not start
-  another. It observes the existing one, within its own budget, and reports
-  `unknown` if that budget expires first.
-- a **late success** removes the lock from the registry, whenever it arrives.
-- a **late failure** leaves it, so the next `close()` may attempt it afresh.
-
-Duplicate `UNLOCK`s are worth avoiding beyond the bookkeeping: the second would be
-sent with a handle the first may already have consumed, and its refusal would say
-nothing about whether the lock is held.
-
-A queued caller therefore waits at most its predecessor's `deadlineMs` — the whole
-of it, teardown included — and then gets its own full budget. An earlier draft
-added "plus that call's `disconnect()`", which was true while step 4 sat outside
-the budget and stopped being true when it moved in.
-
-- **The barrier shuts once.** Step 1 has no meaning a second time — new work is
-  already refused.
-- **Step 2 waits again if anything is still outstanding.** An earlier draft said
-  it had "nothing left to wait for", which is true only when the first call
-  finished on its own terms. A call that returned `timedOut: true` left chains
-  running, and *may* have left lock intents unresolved — may, because the
-  outstanding chain can be a read-only one, which declares none. Either way a
-  second call waits again, under **its own** `deadlineMs`. Otherwise a caller who saw a timeout and
-  retried with more patience would get no more patience — and a lock those chains
-  register in the meantime would never be picked up.
-- **Cleanup runs again**, because cleanup stays admissible after `close()`: a
-  second call re-attempts `unlockAll()` over whatever is still registered. This is
-  what makes an explicit `close()` followed by a disposer harmless, and it is also
-  how a caller re-attempts an `unknown` unlock without a separate API.
-- **`disconnect: true` is honoured whenever it is first asked for**, including on
-  a later call after a default `close()` — a caller may reasonably close the client
-  now and decide about the connection afterwards.
-
-  **A timeout plus `disconnect: true` can strand a lock, and this is where.** If
-  step 2 hit its deadline, chains are still running; step 4 then clears the REST
-  session, and a `LOCK` those chains complete afterwards produces a handle that
-  belongs to a session no longer reachable. A later `close()` will wait again as
-  promised, but its `unlockAll()` has nothing usable to unlock with. The lock is
-  then beyond this library.
-
-  We do it anyway. The caller asked to disconnect and owns that decision; refusing
-  it because we timed out would be us overruling them on the basis of our own
-  impatience. What we owe them is that it is not a surprise: `timedOut: true`
-  together with a present `teardown` is exactly this situation, stated here and
-  visible in the report.
-
-  The safe order exists and costs nothing, because `close()` is idempotent: call
-  it **without** `disconnect`, read the report, and ask for the teardown once
-  `timedOut` is false and the intents are resolved. A caller who cannot wait keeps
-  the combined call and accepts the trade knowingly.
-
-  A teardown counts as finished only when it both **ran** and **released**. So a
-  later `close({ disconnect: true })` calls `disconnect()` again while **either**
-  is outstanding:
-
-  | previous report | why it repeats |
-  |---|---|
-  | `releasePending: true` | a transport or session resource did not close, and `disconnect()`'s own contract says a repeat call retries that release |
-  | `teardownRan: false` | the deadline expired in the queue, so the body never ran: nothing was drained, cleared or released, and the cleanup is owed |
-
-  An earlier draft keyed only on `releasePending`, which leaves the second case
-  stranded — after a queue expiry it is `false`, because no release was ever
-  attempted. A caller doing exactly the right thing, calling
-  `close({ disconnect: true })` again to settle the debt, would have been told the
-  teardown was already done. `connect()` also settles the debt, but a caller who
-  never reconnects would carry it forever.
-
-  Treating one attempt as final would also take a retry the connection explicitly
-  offers and make it unreachable through the wrapper — worst on RFC, where a
-  pending release is a real handle still held open.
-- **Each call reports what that call did**, not a cached copy of the first. A
-  second `close()` over a fully released registry returns empty arrays and
-  `timedOut: false`, which is the truth about that call.
-
-Concurrent callers are the one case where "what that call did" needs care: they
-are serialized, so the second runs after the first and sees its effects. It does
-not join and receive a copy — joining would silently discard a `disconnect: true`
-that the first call never requested.
-
-Tests:
-
-- explicit `close()` → `Symbol.asyncDispose` → no throw, second report empty
-- default `close()` → `close({ disconnect: true })` → the connection is torn down
-  on the second call
-- `close()` returns `timedOut: true` → a second `close()` with a longer deadline
-  waits again and picks up what finished in between
-- **an `UNLOCK` that never settles** → `close()` still returns when the budget
-  expires, that lock reported as `unknown`, any lock after it as `not-attempted`,
-  `timedOut: true`, and a queued `close()` is not blocked — the regression this
-  whole spec exists to prevent, in the place it moved to last
-- **all chains finished, the last `UNLOCK` hangs** → `timedOut: true` even with no
-  `not-attempted` entries, since the budget was exhausted in step 3
-- **cleanup timeout → a second `close()` before the first `UNLOCK` settles → the
-  first settles late**: no duplicate `UNLOCK` is sent, and a late success removes
-  the lock while a late failure leaves it for the next attempt
-- **a transport release that never settles** → `close()` still returns, with
-  `releasePending: true`, `releaseTimedOut: true` and `timedOut: true`, and a
-  queued `close()` is not blocked behind it
-- **a release that fails immediately** → `releasePending: true` with
-  `releaseTimedOut: false`, and `close()` reports `timedOut: false`; the two must
-  not be conflated
-- **a bare `disconnect()` whose release never settles** → returns at the default
-  bound, no `AdtClient` involved
-- **`disconnect()` times out → `connect()` before the release settles** → rejects
-  with `ADT_SESSION_ERROR.RELEASE_PENDING` immediately, waiting for nothing and
-  starting no second release; a **late success** then lets the next `connect()`
-  through, while after a **late failure** `connect()` retries the release itself,
-  per the earlier spec's rule for a settled failure
-- **a nested `disconnect()` queued behind a recovery that never settles** → the
-  call still returns at its deadline, with `teardownRan: false`, and the queued
-  body is withdrawn rather than firing later. A merely slow predecessor does not
-  test this; the head of the queue has to never settle
-- **after that expiry the connection is unusable** — a request is refused and a
-  recovery cannot publish — while the transport is still uncleaned and the debt is
-  recorded
-- **`connect()` after a queue-expired `disconnect()`** → it clears the stale
-  transport and releases before establishing, and never builds a session over the
-  old one; if that release hangs it rejects with `RELEASE_PENDING` rather than
-  proceeding
-- **`close()` reaching step 4 with no budget left** → `teardownRan: false`, no
-  release started, and the debt recorded — not a release started and instantly
-  detached. Deterministic, not scheduling-dependent: run it with a transition
-  callback already pending and the result must not change
-- **`connect()` retry fails (settled, not expired)** → the state stays retriable,
-  so a further `connect()` attempts the release again rather than rejecting
-  immediately over an operation that is not running
-- **the queue dequeues at the instant the bound fires** → exactly one of the two
-  wins: either the teardown runs and is reported, or `teardownRan: false` is
-  returned and it never runs. Never both
-- **`connect()` retrying a settled-failed release, and the retry never settles** →
-  `connect()` rejects at `SAP_RELEASE_DEADLINE_MS` with the release left detached,
-  not hanging
-- **release timeout → a second `close({ disconnect: true })` before the first
-  release settles → the first settles late**: no second release is started, and a
-  late success clears `releasePending` while a late failure leaves it set
-- **two queued `close()` calls with different deadlines**: the second waits its
-  full `deadlineMs` measured from when its own wait begins, not from when it was
-  called — it does not arrive already expired
-- **an unrepresentable `deadlineMs` on the first `close()`**: it throws, and the
-  client is left able to admit new chains — the barrier must not have shut on a
-  call that was rejected
-- a **read-only** chain outstanding at the deadline → `timedOut: true` with
-  `unresolvedIntents` empty; it is not named, because it could not have locked
-- the **wall** clock moves backwards mid-wait while the monotonic clock keeps
-  advancing normally → `close()` still returns within the requested duration. It
-  has to be posed this way round: winding back the injected monotonic clock would
-  break that clock's own contract and prove nothing about the implementation. What
-  is under test is which source the wait reads, so only the source that can
-  legitimately move must move.
-- `disconnect()` reports `releasePending: true` → a later
-  `close({ disconnect: true })` retries the release rather than reporting the
-  teardown as done
-- **`teardownRan: false` → a later `close({ disconnect: true })` runs the teardown**
-  rather than treating it as already performed; without this the cleanup debt
-  survives every subsequent close
-- `close({ disconnect: true })` that times out → the teardown still happens, the
-  report shows `timedOut: true` with a `teardown` present, and a lock completing
-  afterwards is **not** recoverable by a later `close()` — the documented cost,
-  pinned so it cannot be mistaken for a bug
-
-### `Symbol.asyncDispose` must go through it
-
-`AdtClient` already has a disposer, and it predates all of this:
-
-```ts
-async [Symbol.asyncDispose](): Promise<void> {
-  const failures = await this.unlockAll();
-  ...
-}
-```
-
-It calls `unlockAll()` directly. Left alone it would bypass every part of this
-design — the barrier, the intent declarations, the deadline, the report — which
-is the worse outcome for being the *idiomatic* path: `await using client = ...`
-is what a careful consumer reaches for, and it would get the weakest cleanup.
-
-So the disposer delegates: `close({ disconnect: false })`. The default is right
-for it twice over — a disposer cannot know whether the connection is shared, and
-it was handed one it did not create.
-
-A disposer returns `void`, so the report has nowhere to go. It is logged, and the
-distinctions the report exists to draw must survive that — **four categories,
-logged separately**, because they are four different observations and a log is
-the only diagnosis available to whoever runs this headless:
-
-| logged as | what was observed |
-|---|---|
-| not-attempted unlocks | the budget expired first; nothing was sent for this lock |
-| refused unlocks | SAP answered **at application level** about this `UNLOCK` and refused it |
-| unknown-outcome unlocks | no application-level answer — a timeout, a reset, **or a gateway status such as 502/503/504**, which says nothing about what SAP did |
-| unresolved intents | the `LOCK` never resolved, so no confirmed handle was available to unlock with — **not** evidence that no lock was taken |
-
-The criteria are repeated here rather than referenced, because this is where an
-implementation is most likely to reach for `response !== undefined` and call it a
-refusal. A response is not by itself an answer from the application.
-
-Flattening them undoes the work of separating them, and this section previously
-did exactly that: it named two categories while the report carried three, and
-called every unlock failure a refusal — the same conflation that had just been
-fixed one section above.
-
-The log says what was observed and stops. The current message ends with "retry
-`unlockAll()` or rely on session-drop", which is advice, and this document has
-already established twice that the advice is not ours to give — once when it was
-optimistic and once when I replaced it with pessimistic advice instead. It goes.
-What replaces it is the names under all **four** headings: these keys were never
-attempted, these were refused, these got no application-level answer, these never
-resolved. Naming a subset here would reintroduce the conflation this section
-exists to prevent — and it has, twice: once at three headings out of three, and
-again when a fourth outcome arrived and this sentence was not updated with the
-table above it.
-
-A consumer that needs the report calls `close()` itself. `await using` is for the
-case where nobody is going to read it, and its job is to leave nothing behind
-quietly. The barrier and the intent declaration are the new parts. One test is not about
-concurrency at all: **`close()` → `unlockAll()` afterwards is still admitted**,
-i.e. the barrier does not permanently refuse cleanup. It asserts admission, not
-success — a rejected unlock is expected to be rejected again. Then four
-concurrency tests — including two chains attempting `DOMA/Z` at once, where the
-loser's failure must not disturb the winner's bookkeeping: a chain interrupted mid-`LOCK`, asserting the lock was
-released rather than stranded; a chain that never settles, asserting `close()`
-returns at its deadline and names the object it was working on; and a chain whose
-`LOCK` is confirmed to have failed, asserting it is NOT named — uncertainty is
-reported, a known non-event is not. The details belong to that repository's
-own design, not here.
-
-## Decision: what a window is for
-
-**A window marks a span in which a short per-request timeout must not abort a
-request.** That is its whole purpose, and it is squarely the connection's own
-risk: deciding how long its own requests may run is its business and nobody
-else's.
-
-The risk is **an operation whose outcome is unknown**, not a session presumed
-dead. A `LOCK` that times out client-side may well have succeeded on the server;
-we simply stopped listening. The lock is then held by a session we are still in,
-by a handle we never received — unreachable and unreleasable, which is the
-orphan. A `PUT` aborted the same way leaves us unable to say whether it landed.
-
-An earlier draft justified this differently — "aborting tears down the socket,
-which drops the stateful ABAP session" — and that claim does not hold. The socket
-belongs to the local agent; the ABAP session lives on the server and is carried
-by a cookie, which is why it survives a local `disconnect()` and why a
-reconnect can find it again. Dropping one TCP connection does not demonstrate the
-end of a cookie-backed session, and this repository has already retracted one
-belief of that family: *"a stateless request kills a stateful session"* turned out
-to be false when checked against Eclipse's actual traffic.
-
-The corrected reasoning does not weaken the case for a window; it sharpens it.
-An operation with an unknown outcome is dangerous precisely *because* the session
-survives — the lock outlives our uncertainty about it. If the session died on
-every timeout, the lock would die with it and there would be less to protect.
-
-**A window is not lock bookkeeping.** Say a caller locks five objects, works on
-them, unlocks them. The window model can *represent* that — `Symbol(label)` is
-unique per occurrence, so five tokens close independently, and even the same
-label twice does not collide. But representing is all it does. Five open windows
-give the connection five opaque strings: it cannot say which object, find a
-handle, send an `UNLOCK`, or judge whether any of them still matters.
-
-What models that case properly already exists a layer up:
-
-```ts
-private readonly locks = new Map<string, UnlockThunk>();   // LockRegistry
-track(key: string, unlock: UnlockThunk): void
-```
-
-Keyed by object, valued by *the function that releases it*. Five objects, five
-entries, each knowing how to unlock itself; `unlockAll()` runs the batch keeping
-the session stateful throughout and returns `LockFailure[]` for what it could
-not. It models the case **and can act on it**. Windows duplicated the fraction
-that cannot.
-
-There is a conceptual error in the old reading too: a "window" suggests a span
-that owns the session. With five overlapping windows there is still one ABAP
-session shared by all of them, so the windows partition nothing — they are a
-counter. Which is why blocking a teardown on `liveWindows > 0` was meaningless:
-it waited for "some span is open" over a session every span shares anyway.
-
-### Consequence: as shipped, a window does nothing
-
-`beginWindow()` delegates to the lifecycle and stops there. It does not touch a
-timeout. The behaviour the decision above describes is implemented elsewhere, in
-the reference-counted pair that has carried it since 1.9.0:
-
-```ts
-const effectiveTimeout = this.inCriticalSection
-  ? Math.max(timeout ?? 0, getCriticalSectionTimeout())
-  : timeout;
-```
-
-So there are two mechanisms for one idea: `beginCriticalSection()`, which acts
-but is unnamed and uncounted per span, and `beginWindow(label)`, which is named
-and counted but inert. **They should be one.** Opening a window raises the
-effective timeout ceiling for its duration; closing the last one restores it —
-which is what the critical section already does by reference count. The label
-stays, because "which span" is worth having in a log even when it is not worth
-blocking on.
-
-#### The raise is connection-wide, and that is deliberate
-
-Worth stating because the wording above invites the opposite reading. The
-mechanism is a flag plus a reference count:
-
-```ts
-const effectiveTimeout = this.inCriticalSection
-  ? Math.max(timeout ?? 0, getCriticalSectionTimeout())
-  : timeout;
-```
-
-No request is bound to a particular window. While *any* window is open, **every**
-request on that connection gets the raised ceiling, including one that has
-nothing to do with the locked object.
-
-The reasoning for the raise is sound: those requests share one ABAP session, and a
-timeout that aborts an unrelated request mid-flight leaves that session in the
-same uncertain state — an operation whose outcome we do not know — during a span
-someone declared sensitive precisely to avoid that. The raise is a property of the
-session, not of a span, and the span is only what turns it on.
-
-**No per-request opt-out**, and this is the one place in this document where a
-caller's stated preference is overruled with no escape. It is worth being explicit
-about why that is not the same error as the others.
-
-A draft did add one — `honourTimeout: true`, "apply my timeout as given, even
-inside a window" — on the grounds that a caller may know their request is
-unrelated to what is locked. It reinstates precisely the hazard the window exists
-to remove. A request aborted mid-flight leaves an operation whose outcome is
-unknown, and that outcome lands in the **shared** ABAP session, not in the
-caller's private corner of it. "Unrelated" is a judgement about the object; the
-damage is to the session. A caller can be right about the first and still cause
-the second.
-
-The choice is not removed, it is made **earlier and once**: at `beginWindow()`.
-Opening a window is opt-in, and it is a statement that this session must not have
-requests torn out from under it for the duration. Everything that follows is the
-consequence the caller asked for. A per-request escape would let one caller
-withdraw a guarantee another one is relying on, over a session neither of them
-owns alone — which is not that caller's decision to make.
-
-This is the connection defending its own risk, which is the same rule applied
-consistently: the REST session and its state belong to this layer, so protecting
-them is its job. Elsewhere in this document the connection is told to stop
-interpreting locks, stop waiting on windows and stop closing a connection it was
-lent — all cases of it reaching into someone else's business. This is the
-opposite case, and the boundary works in both directions.
-
-Rejected too: binding every request to a window token. Beyond threading a token
-through every call site, it would encode the same false premise — that the
-protection is per span, when the thing being protected is shared.
-
-What the default costs, stated so it is a decision rather than a surprise: an
-unrelated slow request waits for the ceiling instead of its own short timeout,
-for as long as any window is open. A test pins it.
-
-The teardown does not wait on windows either way — which leaves
-`ITeardownReport.abandonedWindows` needing a meaning it no longer has.
-
-### `abandonedWindows` after the wait is gone
-
-Its published documentation says:
-
-> Labels of the lock windows still open when the bounded wait gave up.
-
-There is no bounded wait any more, so that sentence describes nothing. Two
-honest options, and this spec picks the first:
-
-- **A snapshot**: the labels of windows open at the moment of teardown. Same
-  field, same type, a narrower and truthful claim — "these spans were open when
-  you tore down", with no implication that anything was waited for or given up
-  on. Useful in a log, and it costs nothing.
-- Deprecate the field and always return `[]`. Rejected: it throws away
-  information that is free to collect, and leaves a field in the contract whose
-  only purpose is to be empty.
-
-This is a documentation change in `@mcp-abap-adt/interfaces`, not a type change —
-but it is still a change there, so the earlier claim that this work needs no
-`interfaces` release is wrong and is corrected below.
+| `refused` | SAP answered this `UNLOCK` at application level and refused it |
+| `unknown` | no application-level answer — a timeout, a reset, or a gateway status that says nothing about what SAP did |
+| `not-attempted` | the budget expired before this lock's turn; nothing was sent |
+| `unresolvedIntents` | the `LOCK` never resolved, so no confirmed handle was available — **not** evidence that no lock was taken |
+
+`refused` requires an **application-level answer about this operation**. A 502, 503
+or 504 comes from a proxy and says nothing about what SAP did. The asymmetry is
+deliberate: misfiling an unknown as a refusal asserts something unobserved, while
+the reverse only understates certainty.
+
+**What to do about any of it is the consumer's call.** Earlier drafts told them —
+first that a failure "calls for a retry", then that retrying "is not a plan" — and
+both were the same error. Two facts are worth stating because they are ours to
+know: a refused `UNLOCK` is often an invalid handle, and that kind of disturbance
+usually comes from our own side between `LOCK` and `UNLOCK`, which is why
+`unlockAll()` holds the session stateful across the batch.
+
+**Every entry describes a lock that may still exist.** A refusal is an answer about
+the *attempt*, not about the lock. Emptiness is the only final state: both fields
+empty means every lock this client took was confirmed released, and a `LOCK`
+confirmed to have failed is absent from both by design — nothing was taken.
+
+### Calling `close()` more than once
+
+Unavoidable, since the disposer delegates to it. `close()` is idempotent and
+serialized; calls queue and none is dropped.
+
+**A call's deadline starts when its own wait starts**, not when the call was made —
+charging queueing time against it would hand the caller less patience than asked
+for, invisibly, and in the limit expire before step 2 began.
+
+- The barrier shuts once.
+- Step 2 waits again if anything is still outstanding. A call that returned
+  `timedOut: true` left chains running, so a second call waits again under its own
+  budget.
+- Cleanup runs again over whatever is still registered.
+- `disconnect: true` is honoured whenever first asked for, and simply calls
+  `disconnect()` again on a later request. Whether anything is still owed is the
+  connection's own state and its own business; a repeat `disconnect()` is
+  idempotent by design.
+- Each call reports what that call did, not a cached copy. Concurrent callers are
+  serialized rather than joined: joining would silently discard a
+  `disconnect: true` the first call never requested.
+
+### `Symbol.asyncDispose`
+
+`AdtClient` already has a disposer, and it calls `unlockAll()` directly. Left alone
+it bypasses the barrier, the intents, the budget and the report — worst because
+`await using` is the idiomatic path, so the most careful consumer would get the
+weakest cleanup.
+
+It delegates to `close({ disconnect: false })`. The default is right for it twice:
+a disposer cannot know whether the connection is shared, and it did not create it.
+
+A disposer returns `void`, so the report is logged — **four categories,
+separately**, since they are four different observations and a log is the only
+diagnosis available to whoever runs this headless: not-attempted, refused,
+unknown-outcome, unresolved intents. The current message ends with "retry
+`unlockAll()` or rely on session-drop", which is advice; it goes, replaced by the
+names under each heading.
 
 ## Not done
 
-- **No teardown strategy or hook in the connection.** An earlier draft proposed
-  one. It is a layering error one step removed: a seam in the connection for a
-  decision that belongs to the layer above, which can simply act before calling
-  `disconnect()`.
-- **Windows are not removed.** They have a real job — see the decision above —
-  and it is the connection's own.
-- **No request is aborted** by a teardown.
+- **No teardown strategy or hook in the connection.** A seam for a decision that
+  belongs to the layer above, which can act before calling `disconnect()`.
+- **No request is aborted**, by a teardown or by `close()`. Both stop waiting;
+  neither cancels work.
 - **`disconnect()` is never refused** because something is open.
-- **No default timeout is introduced for an ordinary request.** Outside a window
-  the caller's value is passed verbatim, including none. The window ceiling is a
-  different thing and it *does* override a caller's value — it raises rather than
-  shortens, which is milder, but a caller who wanted a short timeout does not get
-  one while a window is open. Deliberately, and with no per-request escape: the
-  choice is made once, by opening the window. The ceiling itself is a real default
-  — 600s, `SAP_TIMEOUT_CRITICAL` — and it predates this spec.
-- **Nothing is aborted.** A teardown does not abort a request; `close()` does not
-  abort a chain. Both stop waiting; neither cancels work.
+- **No default timeout for an ordinary request.** Outside a critical section the
+  caller's value is passed verbatim, including none.
 
 ## Tests
 
 Connection, at `SessionLifecycle` level — no server:
 
 - a request that never settles: `disconnect()` resolves anyway, and a following
-  `connect()` is not blocked — the regression this exists to prevent
-- an open window does not delay a teardown, and is reported as a snapshot
-- no request is aborted or errored by the teardown itself
-- **request A → `disconnect()` → `connect()` → A settles**: the new session's
-  cookies and identity are untouched and no teardown is raised — the fencing
-  test, and the reason the wait cannot simply be deleted
-- **the lifecycle ceiling on a wound-back wall clock**: with the monotonic clock
-  advancing normally, `SessionLifecycle`'s own bounded wait still expires when it
-  should. The same regression as the `close()` one, against the ceiling that
-  already exists — and the reason the clock change belongs in this release rather
-  than a later one
+  `connect()` is not blocked
+- request A → `disconnect()` → `connect()` → A settles: the new session's cookies
+  and identity are untouched, no teardown raised
+- request A → `disconnect()` → A settles → `connect()`: the cleared state stays
+  cleared — fails if generations are counted only at `markConnected()`
+- request A → session-lost teardown → recovery → A settles: same epoch throughout,
+  new session untouched
+- the raiser's permit: A raises and completes its recovery while B, from the same
+  dead session, is fenced
+- the permit survives `markConnected()`
+- two detectors: exactly one teardown, one recovery, the loser fenced
+- the wall clock moves backwards while the monotonic clock advances: `disconnect()`
+  still returns within the requested duration. Posed this way round deliberately —
+  winding back the injected monotonic clock would break its own contract and prove
+  nothing
+- the lifecycle ceiling under the same rollback
+- a transport release that never settles: `disconnect()` returns, the release is
+  detached, a queued `connect()` is not blocked
+- release timeout → `connect()` before it settles → rejects `RELEASE_PENDING`
+  immediately; a late success lets the next through, a late failure has `connect()`
+  retry the release itself
+- `connect()`'s retry never settles → rejects at `SAP_RELEASE_DEADLINE_MS`, release
+  left detached
+- a nested `disconnect()` queued behind a recovery that never settles: returns at
+  its deadline, the queued body withdrawn. A merely slow predecessor does not test
+  this
+- after that expiry: the connection is unusable, the transport uncleaned, the debt
+  recorded; `connect()` then clears and releases before establishing
+- the queue dequeues at the instant the bound fires: exactly one of the two wins,
+  never both
+- a zero budget is deterministic with a transition callback already pending
 
-Connection, on the window's actual job:
+adt-clients:
 
-- a request issued inside a window is not aborted by a short per-request timeout
-- **an unrelated request, issued while someone else's window is open, also gets
-  the raised ceiling** — the connection-wide effect, pinned as a decision
-  There is deliberately no per-request escape from it
-- five concurrent windows: the ceiling holds until the last one closes, and
-  closing them out of order works — this is the case that exposed the old
-  reading
-- outside any window the caller's timeout applies verbatim, unchanged
-
-adt-clients: its close path unlocks before disconnecting, and reports what it
-could not release — verifiable against the trial system, where the existing
-`SessionLockRegistry` tests already exercise `unlockAll()`. Plus the race
-explicitly: start a chain, call `close()` while its `LOCK` is in flight, and
-assert the lock was released rather than stranded.
+- `close()` → `unlockAll()` afterwards is still admitted. Asserts admission, not
+  success
+- a chain interrupted mid-`LOCK`: the lock is released, not stranded
+- a chain that never settles: `close()` returns at its deadline and names the
+  object
+- a chain whose `LOCK` is confirmed to have failed: **not** named
+- a read-only chain outstanding: `timedOut: true`, `unresolvedIntents` empty
+- two chains attempting `DOMA/Z` at once: the loser's failure does not disturb the
+  winner's bookkeeping
+- an `UNLOCK` that never settles: `close()` returns at the budget, that lock
+  `unknown`, later ones `not-attempted`, `timedOut: true`, a queued `close()` not
+  blocked
+- all chains finished, the last `UNLOCK` hangs: `timedOut: true` with no
+  `not-attempted` entries
+- cleanup timeout → a second `close()` before the first `UNLOCK` settles → the
+  first settles late: no duplicate sent, a late success removes the lock
+- explicit `close()` → `Symbol.asyncDispose`: no throw, second report empty
+- default `close()` → `close({ disconnect: true })`: torn down on the second call
+- `close({ disconnect: true })` that times out: the teardown still happens and a
+  lock completing afterwards is not recoverable — the documented cost
+- an unrepresentable `deadlineMs`: throws, and the client can still admit chains
+- two queued `close()` calls with different deadlines: the second gets its full
+  budget from when its own wait begins
+- `close()` over a connection implementing no lifecycle atom: still unlocks, still
+  reports, does not throw
 
 ## Release
 
-`@mcp-abap-adt/interfaces` first, for prose **and one signature**:
-`abandonedWindows` is redocumented as a snapshot of what was open, since the wait
-it referred to no longer exists; `disconnect()` gains an optional `{ deadlineMs }`
-so the connection can bound its own transport release and still return a report it
-observed; and `ITeardownReport` gains `releaseTimedOut`, without which a pending
-release cannot be told apart from a slow one, plus `teardownRan`, without which a
-teardown that expired in the queue is indistinguishable from one that finished
-cleanly. The optional parameter is additive. **`releaseTimedOut` and `teardownRan` are
-not.** Both are required properties on a type other people construct — mocks, test
-doubles, any alternative implementation — and every object literal returning the
-old shape stops compiling. An earlier draft named only the first, which understates
-the break by exactly one field and would have let the second travel as
-housekeeping. Calling that "additive in shape", as an earlier draft did, is how a
-breaking change ships as a minor.
+`@mcp-abap-adt/interfaces` — **removals**: `ITeardownReport`, `ILockWindowAware`
+and `WindowToken` leave the contract, and `disconnect()` becomes `Promise<void>`
+with an optional `{ deadlineMs }`. Nothing outside the connector imports any of
+them, so the practical impact is nil and the formal one is a **major**. The
+alternative — deprecate now, remove in the next major — is available if the
+cascade is unwelcome; it costs a release either way.
 
-The alternative, an optional field, was rejected: `undefined` would have to mean
-"this implementation does not say", and `close()` would then be unable to set
-`timedOut` honestly for exactly the reports that most need it — reintroducing the
-ambiguity the field exists to remove. Better a breaking change that is named than
-a contract that hedges.
+`ADT_SESSION_ERROR` and `ISessionLifecycleAware` stay. They are the two additions
+from 11.5.0 that a consumer actually imports.
 
-So `interfaces` takes a **major**, and the cost is real: `adt-clients` and the
-connector both consume it, and the version is the user's call as always. A caller
-passing no options is not "unaffected" either — it now gets a bounded teardown,
-which is the point. Correcting an earlier draft of this spec, which
-claimed no `interfaces` change was needed — a field whose documentation describes
-a mechanism we removed is a contract that lies, and prose is part of the contract.
+Then `@mcp-abap-adt/connection`, one release carrying what is one change:
 
-Then `@mcp-abap-adt/connection`, one release carrying three things that are one
-change:
+1. `disconnect()` stops waiting and returns `void`;
+2. session-generation fencing, without which the first is a regression;
+3. the bounded, detachable transport release with its in-flight state;
+4. window machinery deleted from `SessionLifecycle` and the connection;
+5. `SessionLifecycle`'s own ceiling on a monotonic clock — easy to lose because it
+   reads like housekeeping, and it is not: leaving it on `Date.now()` puts an
+   honest bounded wait and a wind-backable one in the same file.
 
-1. `disconnect()` stops waiting;
-2. the **session generation** fencing that makes that safe — shipping the first
-   without it would be a regression;
-3. `SessionLifecycle`'s own ceiling moves to a **monotonic** clock. Required by the
-   body of this spec and easy to lose here, since it is not part of the teardown
-   change and reads like housekeeping. It is not: leaving it on `Date.now()` keeps
-   one bounded wait honest and the other subject to a clock that can be wound
-   back, in the same file, which is worse than having neither.
-Generation, not epoch: an earlier draft of this plan said epoch, which is the
-variant the body of this spec rejects for missing every internal teardown.
-
-Then `adt-clients`, with its close barrier.
+Then `adt-clients`, with the close barrier, intents, `ICloseReport` and the
+disposer.
 
 Versions are the user's call.
