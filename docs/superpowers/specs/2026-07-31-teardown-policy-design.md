@@ -820,10 +820,17 @@ So, mirroring the lock rule:
 If the budget is already exhausted when step 4 begins, `disconnect()` is still
 called — the session state must go down regardless — with a zero bound. An earlier
 draft added "so the release is started and detached at once", which contradicts
-the withdrawal rule below: with no budget the expiry wins the compare-and-set
-immediately, the body never runs, and nothing is started. What actually happens is
-the queue-expiry case: the intent applies, `teardownRan` is `false`, and the
-cleanup is owed.
+the withdrawal rule below: with no budget nothing is started. What happens is the
+queue-expiry case — the intent applies, `teardownRan` is `false`, and the cleanup
+is owed.
+
+**A zero budget is decided synchronously, not by a timer.** Saying "the expiry
+wins the compare-and-set" is not enough on its own: `setTimeout(..., 0)` is a
+macrotask and loses to a transition callback already sitting in the microtask
+queue, so the body could claim `running` first and the outcome would depend on
+event-loop scheduling — as would any test written against it. So a remaining
+budget of zero sets `expired` **at the call**, before anything is scheduled, and
+the body can never claim the transition.
 
 #### `connect()` while a release is still detached
 
@@ -844,7 +851,12 @@ So the two split by state, and the earlier rule is narrowed rather than replaced
 | release state | `connect()` |
 |---|---|
 | **in flight** (detached, unsettled) | rejects immediately with `ADT_SESSION_ERROR.RELEASE_PENDING` — code `ADT_RELEASE_PENDING`. It does not wait and does not start a second one |
-| **settled, failed** | retries the release first, as the earlier spec requires — **under `SAP_RELEASE_DEADLINE_MS`**, since a retry that never settles would hang `connect()` and undo the point of all of this. On success it proceeds; on failure or expiry it rejects with the same code, leaving the attempt detached and in flight, which puts the state back in the first row |
+| **settled, failed** | retries the release first, as the earlier spec requires — **under `SAP_RELEASE_DEADLINE_MS`**, since a retry that never settles would hang `connect()` and undo the point of all of this. It proceeds on success. On a **retry that fails** it rejects with the same code and the state stays *settled, failed* — retriable, this row again. Only on **expiry** is the attempt detached and in flight, moving the state to the first row |
+
+An earlier draft had both failure and expiry leave the attempt "detached and in
+flight". That is true only of expiry: a failure is already settled, and filing it
+as in-flight would send the next `connect()` to the first row, where it rejects
+immediately and forever over a release that is not running at all.
 | **settled, succeeded late** | nothing pending; proceeds normally |
 
 The earlier spec's test list needs the first row added; its existing case is the
@@ -984,7 +996,11 @@ Tests:
   proceeding
 - **`close()` reaching step 4 with no budget left** → `teardownRan: false`, no
   release started, and the debt recorded — not a release started and instantly
-  detached
+  detached. Deterministic, not scheduling-dependent: run it with a transition
+  callback already pending and the result must not change
+- **`connect()` retry fails (settled, not expired)** → the state stays retriable,
+  so a further `connect()` attempts the release again rather than rejecting
+  immediately over an operation that is not running
 - **the queue dequeues at the instant the bound fires** → exactly one of the two
   wins: either the teardown runs and is reported, or `teardownRan: false` is
   returned and it never runs. Never both
@@ -1298,10 +1314,12 @@ so the connection can bound its own transport release and still return a report 
 observed; and `ITeardownReport` gains `releaseTimedOut`, without which a pending
 release cannot be told apart from a slow one, plus `teardownRan`, without which a
 teardown that expired in the queue is indistinguishable from one that finished
-cleanly. The optional parameter is additive. **`releaseTimedOut` is not.** It is a required
-property on a type other people construct — mocks, test doubles, any alternative
-implementation — and every object literal returning the old shape stops
-compiling. Calling that "additive in shape", as an earlier draft did, is how a
+cleanly. The optional parameter is additive. **`releaseTimedOut` and `teardownRan` are
+not.** Both are required properties on a type other people construct — mocks, test
+doubles, any alternative implementation — and every object literal returning the
+old shape stops compiling. An earlier draft named only the first, which understates
+the break by exactly one field and would have let the second travel as
+housekeeping. Calling that "additive in shape", as an earlier draft did, is how a
 breaking change ships as a minor.
 
 The alternative, an optional field, was rejected: `undefined` would have to mean
