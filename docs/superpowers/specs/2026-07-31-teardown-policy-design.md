@@ -938,13 +938,25 @@ the budget and stopped being true when it moved in.
   `timedOut` is false and the intents are resolved. A caller who cannot wait keeps
   the combined call and accepts the trade knowingly.
 
-  A teardown counts as finished only when it **released**. `disconnect()` reports
-  `releasePending: true` when a transport or session resource did not close, and
-  its own contract says a repeat call retries that release. So while
-  `releasePending` is true, a later `close({ disconnect: true })` calls
-  `disconnect()` again. Treating one attempt as final would take a retry the
-  connection explicitly offers and make it unreachable through the wrapper — worst
-  on RFC, where the pending release is a real handle still held open.
+  A teardown counts as finished only when it both **ran** and **released**. So a
+  later `close({ disconnect: true })` calls `disconnect()` again while **either**
+  is outstanding:
+
+  | previous report | why it repeats |
+  |---|---|
+  | `releasePending: true` | a transport or session resource did not close, and `disconnect()`'s own contract says a repeat call retries that release |
+  | `teardownRan: false` | the deadline expired in the queue, so the body never ran: nothing was drained, cleared or released, and the cleanup is owed |
+
+  An earlier draft keyed only on `releasePending`, which leaves the second case
+  stranded — after a queue expiry it is `false`, because no release was ever
+  attempted. A caller doing exactly the right thing, calling
+  `close({ disconnect: true })` again to settle the debt, would have been told the
+  teardown was already done. `connect()` also settles the debt, but a caller who
+  never reconnects would carry it forever.
+
+  Treating one attempt as final would also take a retry the connection explicitly
+  offers and make it unreachable through the wrapper — worst on RFC, where a
+  pending release is a real handle still held open.
 - **Each call reports what that call did**, not a cached copy of the first. A
   second `close()` over a fully released registry returns empty arrays and
   `timedOut: false`, which is the truth about that call.
@@ -1027,6 +1039,9 @@ Tests:
 - `disconnect()` reports `releasePending: true` → a later
   `close({ disconnect: true })` retries the release rather than reporting the
   teardown as done
+- **`teardownRan: false` → a later `close({ disconnect: true })` runs the teardown**
+  rather than treating it as already performed; without this the cleanup debt
+  survives every subsequent close
 - `close({ disconnect: true })` that times out → the teardown still happens, the
   report shows `timedOut: true` with a `teardown` present, and a lock completing
   afterwards is **not** recoverable by a later `close()` — the documented cost,
