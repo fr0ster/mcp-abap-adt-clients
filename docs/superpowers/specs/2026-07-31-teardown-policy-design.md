@@ -716,6 +716,46 @@ cannot see.
 its full patience for *chains*; here the queue is inside the resource being
 bounded, so time spent in it is time the caller is waiting for this teardown.)
 
+#### Expiring while still queued
+
+Counting queue time only helps if the queue moves. It may not: a `connect()` or a
+recovery ahead can hang, and then the `disconnect()` callback never runs at all.
+So the bound is armed **outside** the serialized transition and can settle the
+public promise before the callback is ever reached — which raises three questions
+an earlier draft left open.
+
+**What is returned.** A report, since `disconnect()` resolves rather than throws.
+But a teardown that never started must not look like one that finished cleanly, so
+`ITeardownReport` carries whether it ran:
+
+```ts
+interface ITeardownReport {
+  /** False when the deadline expired before the teardown began — nothing was
+   *  torn down, nothing released, and the fields below describe only what was
+   *  observable from outside. */
+  teardownRan: boolean;
+  abandonedWindows: string[];
+  releasePending: boolean;
+  releaseTimedOut: boolean;
+}
+```
+
+`abandonedWindows` is still honest in that case: open windows are readable
+synchronously, without being inside the transition. `releasePending` is `false` —
+no release was attempted — and `releaseTimedOut` `false` with it, since what
+expired was the queue wait, not a release.
+
+**Whether the queued teardown still runs.** It does not. On expiry the transition
+is **withdrawn from the queue**. Leaving it would mean a teardown, requested for a
+session that may be long gone, firing later against whatever session exists by
+then — the same "an old operation tears down its successor" hazard the generation
+fencing exists to prevent, arriving through the queue instead of through a
+response.
+
+**How it cannot touch a newer state.** By not existing: a withdrawn transition has
+nothing to mutate. There is no window between expiry and withdrawal, because both
+happen in the same synchronous step when the bound fires.
+
 **Omitting `deadlineMs` does not mean "no bound".** It means the default —
 `SAP_RELEASE_DEADLINE_MS`, 600 000 ms — under the same rules as `close()`'s
 budget: finite, non-negative, representable against a **monotonic** clock, one
@@ -766,7 +806,7 @@ So the two split by state, and the earlier rule is narrowed rather than replaced
 | release state | `connect()` |
 |---|---|
 | **in flight** (detached, unsettled) | rejects immediately with `ADT_SESSION_ERROR.RELEASE_PENDING` — code `ADT_RELEASE_PENDING`. It does not wait and does not start a second one |
-| **settled, failed** | retries the release first, as the earlier spec requires; proceeds on success, rejects with the same code on failure |
+| **settled, failed** | retries the release first, as the earlier spec requires — **under `SAP_RELEASE_DEADLINE_MS`**, since a retry that never settles would hang `connect()` and undo the point of all of this. On success it proceeds; on failure or expiry it rejects with the same code, leaving the attempt detached and in flight, which puts the state back in the first row |
 | **settled, succeeded late** | nothing pending; proceeds normally |
 
 The earlier spec's test list needs the first row added; its existing case is the
@@ -893,8 +933,13 @@ Tests:
   starting no second release; a **late success** then lets the next `connect()`
   through, while after a **late failure** `connect()` retries the release itself,
   per the earlier spec's rule for a settled failure
-- **a nested `disconnect()` queued behind a recovery** → the time spent queueing
-  counts against the budget `close()` passed, so step 4 cannot escape it
+- **a nested `disconnect()` queued behind a recovery that never settles** → the
+  call still returns at its deadline, with `teardownRan: false`, and the queued
+  transition is withdrawn rather than firing later. A merely slow predecessor does
+  not test this; the head of the queue has to never settle
+- **`connect()` retrying a settled-failed release, and the retry never settles** →
+  `connect()` rejects at `SAP_RELEASE_DEADLINE_MS` with the release left detached,
+  not hanging
 - **release timeout → a second `close({ disconnect: true })` before the first
   release settles → the first settles late**: no second release is started, and a
   late success clears `releasePending` while a late failure leaves it set
@@ -1200,7 +1245,9 @@ assert the lock was released rather than stranded.
 it referred to no longer exists; `disconnect()` gains an optional `{ deadlineMs }`
 so the connection can bound its own transport release and still return a report it
 observed; and `ITeardownReport` gains `releaseTimedOut`, without which a pending
-release cannot be told apart from a slow one. The optional parameter is additive. **`releaseTimedOut` is not.** It is a required
+release cannot be told apart from a slow one, plus `teardownRan`, without which a
+teardown that expired in the queue is indistinguishable from one that finished
+cleanly. The optional parameter is additive. **`releaseTimedOut` is not.** It is a required
 property on a type other people construct — mocks, test doubles, any alternative
 implementation — and every object literal returning the old shape stops
 compiling. Calling that "additive in shape", as an earlier draft did, is how a
