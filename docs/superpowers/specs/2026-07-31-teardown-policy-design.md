@@ -852,12 +852,12 @@ So the two split by state, and the earlier rule is narrowed rather than replaced
 |---|---|
 | **in flight** (detached, unsettled) | rejects immediately with `ADT_SESSION_ERROR.RELEASE_PENDING` — code `ADT_RELEASE_PENDING`. It does not wait and does not start a second one |
 | **settled, failed** | retries the release first, as the earlier spec requires — **under `SAP_RELEASE_DEADLINE_MS`**, since a retry that never settles would hang `connect()` and undo the point of all of this. It proceeds on success. On a **retry that fails** it rejects with the same code and the state stays *settled, failed* — retriable, this row again. Only on **expiry** is the attempt detached and in flight, moving the state to the first row |
+| **settled, succeeded late** | nothing pending; proceeds normally |
 
 An earlier draft had both failure and expiry leave the attempt "detached and in
 flight". That is true only of expiry: a failure is already settled, and filing it
 as in-flight would send the next `connect()` to the first row, where it rejects
 immediately and forever over a release that is not running at all.
-| **settled, succeeded late** | nothing pending; proceeds normally |
 
 The earlier spec's test list needs the first row added; its existing case is the
 second row and stays as it is.
