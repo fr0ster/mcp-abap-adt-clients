@@ -698,6 +698,24 @@ with `releasePending: true` and `releaseTimedOut: true`. `close()` passes whatev
 budget remains and receives a report it actually observed. This is also the right
 layer: the release is the connection's resource, so bounding it is its job.
 
+**`deadlineMs` is measured from the call, not from when the transition starts.**
+The connection serializes transitions, so a `disconnect()` may sit behind a queued
+`connect()` or a recovery before it does anything. If the bound started when the
+transition began, that queue time would fall outside it — and a nested
+`disconnect()` given `close()`'s *remaining* budget could spend all of it waiting
+its turn and then begin a fresh, full release wait, putting step 4 outside the
+whole-close budget it was supposed to be inside.
+
+Counting from the call fixes both cases with one rule: `close()` passes the budget
+it has left at the moment it calls, and a standalone caller gets what it plainly
+asked for — a return within `deadlineMs` of asking, not of some internal event it
+cannot see.
+
+(This differs from `close()`'s own anchor, deliberately. There the queue is
+`AdtClient`'s own and a caller waiting behind another `close()` should still get
+its full patience for *chains*; here the queue is inside the resource being
+bounded, so time spent in it is time the caller is waiting for this teardown.)
+
 **Omitting `deadlineMs` does not mean "no bound".** It means the default —
 `SAP_RELEASE_DEADLINE_MS`, 600 000 ms — under the same rules as `close()`'s
 budget: finite, non-negative, representable against a **monotonic** clock, one
@@ -736,15 +754,23 @@ stops a `connect()` — and it must not proceed. Building a new client over a ha
 that is still closing risks a duplicate release, and waiting for the in-flight one
 would hand back the unbounded wait this whole document removes.
 
-`connect()` therefore **rejects immediately** with `ADT_RELEASE_PENDING`, which
-already exists in `ADT_SESSION_ERROR` for exactly this and has had no use until
-now. It does not wait and it does not start a second release.
+This **amends** `2026-07-27-session-lifecycle-design.md`, which says `connect()`
+with a pending release retries that release first and rejects only if the retry
+fails. That rule was written when a release could only be *settled and failed* —
+detaching one is new here — and it stays correct for that case. What it cannot
+cover is a release still running, where retrying means a duplicate and waiting
+means an unbounded wait.
 
-- a **late success** clears the pending state, and the next `connect()` proceeds
-  normally;
-- a **late failure** leaves it set, so `connect()` keeps rejecting and a further
-  `disconnect()` may retry the release — the same retryable state the lock rules
-  use.
+So the two split by state, and the earlier rule is narrowed rather than replaced:
+
+| release state | `connect()` |
+|---|---|
+| **in flight** (detached, unsettled) | rejects immediately with `ADT_SESSION_ERROR.RELEASE_PENDING` — code `ADT_RELEASE_PENDING`. It does not wait and does not start a second one |
+| **settled, failed** | retries the release first, as the earlier spec requires; proceeds on success, rejects with the same code on failure |
+| **settled, succeeded late** | nothing pending; proceeds normally |
+
+The earlier spec's test list needs the first row added; its existing case is the
+second row and stays as it is.
 
 #### `releaseTimedOut` invariants
 
@@ -863,9 +889,12 @@ Tests:
 - **a bare `disconnect()` whose release never settles** → returns at the default
   bound, no `AdtClient` involved
 - **`disconnect()` times out → `connect()` before the release settles** → rejects
-  with `ADT_RELEASE_PENDING` immediately, waiting for nothing and starting no
-  second release; then a **late success** lets the next `connect()` through, while
-  a **late failure** keeps it rejecting until a further `disconnect()` retries
+  with `ADT_SESSION_ERROR.RELEASE_PENDING` immediately, waiting for nothing and
+  starting no second release; a **late success** then lets the next `connect()`
+  through, while after a **late failure** `connect()` retries the release itself,
+  per the earlier spec's rule for a settled failure
+- **a nested `disconnect()` queued behind a recovery** → the time spent queueing
+  counts against the budget `close()` passed, so step 4 cannot escape it
 - **release timeout → a second `close({ disconnect: true })` before the first
   release settles → the first settles late**: no second release is started, and a
   late success clears `releasePending` while a late failure leaves it set
