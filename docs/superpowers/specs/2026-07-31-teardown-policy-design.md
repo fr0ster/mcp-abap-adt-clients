@@ -346,6 +346,27 @@ Rejected: a refcount on the connection so the last client out turns off the
 lights. It puts the library back in charge of a lifetime it was lent, and fails as
 soon as a consumer holds the connection without an `AdtClient` around it.
 
+### `timedOut` covers steps 2 and 3, not step 4
+
+`disconnect()` returns `void`, so `close()` cannot tell a teardown that expired —
+its release detached at the deadline, or its body expired in the queue — from one
+that finished cleanly. Both look like an ordinary resolution.
+
+It is **not** inferred from elapsed time: a release completing right at the
+boundary would be reported as a timeout or not depending on which side of a
+microsecond it landed, which is a race dressed as a fact.
+
+Nor is an internal channel opened between `AdtClient` and the concrete connection
+to carry that state privately. That is the thing this document has just finished
+removing, rebuilt behind a private door — worse for being invisible, and it would
+tie the wrapper to a concrete class rather than to the contract.
+
+So `timedOut` describes the work `close()` does itself: waiting for chains and
+unlocking. Step 4's outcome belongs to the connection, which owns its own debt and
+settles it on the next `disconnect()` or `connect()` without anyone having to
+report on it. A caller that wants the teardown confirmed calls `disconnect()`
+itself, where the bound is theirs to choose.
+
 ### The budget covers steps 2 to 4
 
 Bounding step 2 alone would move the defect rather than remove it. `unlockAll()`
@@ -400,7 +421,8 @@ interface ICloseReport {
   locksNotReleased: UnlockOutcome[];
   /** Declared before the LOCK went out, still unresolved when waiting stopped. */
   unresolvedIntents: string[];
-  /** Whether the shutdown budget was exhausted — in step 2, 3 or 4. */
+  /** Whether the shutdown budget was exhausted in step 2 or step 3 — the work
+   *  `close()` performs itself. Step 4 is deliberately not covered; see below. */
   timedOut: boolean;
 }
 
@@ -544,6 +566,9 @@ adt-clients:
   first settles late: no duplicate sent, a late success removes the lock
 - explicit `close()` → `Symbol.asyncDispose`: no throw, second report empty
 - default `close()` → `close({ disconnect: true })`: torn down on the second call
+- `close({ disconnect: true })` with a transport release that never settles:
+  `close()` still returns, bounded, and `timedOut` reflects steps 2 and 3 only —
+  the detached release does not set it, and the connection carries the debt
 - `close({ disconnect: true })` that times out: the teardown still happens and a
   lock completing afterwards is not recoverable — the documented cost
 - an unrepresentable `deadlineMs`: throws, and the client can still admit chains
