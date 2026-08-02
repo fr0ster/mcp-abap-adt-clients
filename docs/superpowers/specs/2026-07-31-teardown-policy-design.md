@@ -757,8 +757,19 @@ after a queue-expired `disconnect()`:
 - the transport is **not** cleaned: no drain, no `clearSessionState()`, no
   release. Whatever was held is still held, which is what `teardownRan: false`
   says;
-- a later `disconnect()` performs the cleanup that was skipped. It is the same
-  idempotent retry the rest of this document relies on.
+- the connection records that **cleanup is owed**. Without that state the
+  skipped work is merely hoped for: an earlier draft said "a later `disconnect()`
+  performs it", with nothing recording the debt and nothing stopping a `connect()`
+  from establishing a new session over a stale axios instance, stale cookies and
+  possibly a transport handle still held.
+
+`connect()` therefore settles the debt before it establishes anything. It performs
+the skipped cleanup — `clearSessionState()` and the release, under
+`SAP_RELEASE_DEADLINE_MS` — and then proceeds. If the release does not complete
+within that bound it is detached and `connect()` rejects with
+`ADT_SESSION_ERROR.RELEASE_PENDING`, which lands in the in-flight row of the table
+below and needs no separate rule. A later `disconnect()` may also settle the debt;
+whichever comes first clears it.
 
 The alternative — rolling the intent back on expiry — was rejected: it would leave
 a connection that accepted `disconnect()` and then kept serving requests, which
@@ -807,8 +818,12 @@ So, mirroring the lock rule:
 - a **late failure** leaves it set, so a later teardown may try afresh.
 
 If the budget is already exhausted when step 4 begins, `disconnect()` is still
-called — the session state must go down regardless — with a zero bound, so the
-release is started and detached at once.
+called — the session state must go down regardless — with a zero bound. An earlier
+draft added "so the release is started and detached at once", which contradicts
+the withdrawal rule below: with no budget the expiry wins the compare-and-set
+immediately, the body never runs, and nothing is started. What actually happens is
+the queue-expiry case: the intent applies, `teardownRan` is `false`, and the
+cleanup is owed.
 
 #### `connect()` while a release is still detached
 
@@ -961,8 +976,15 @@ Tests:
   body is withdrawn rather than firing later. A merely slow predecessor does not
   test this; the head of the queue has to never settle
 - **after that expiry the connection is unusable** — a request is refused and a
-  recovery cannot publish — while the transport is still uncleaned, and a later
-  `disconnect()` completes the cleanup
+  recovery cannot publish — while the transport is still uncleaned and the debt is
+  recorded
+- **`connect()` after a queue-expired `disconnect()`** → it clears the stale
+  transport and releases before establishing, and never builds a session over the
+  old one; if that release hangs it rejects with `RELEASE_PENDING` rather than
+  proceeding
+- **`close()` reaching step 4 with no budget left** → `teardownRan: false`, no
+  release started, and the debt recorded — not a release started and instantly
+  detached
 - **the queue dequeues at the instant the bound fires** → exactly one of the two
   wins: either the teardown runs and is reported, or `teardownRan: false` is
   returned and it never runs. Never both
