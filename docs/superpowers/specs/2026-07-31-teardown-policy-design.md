@@ -681,12 +681,35 @@ So the connection takes the deadline:
 
 ```ts
 disconnect(options?: { deadlineMs?: number }): Promise<ITeardownReport>;
+
+interface ITeardownReport {
+  abandonedWindows: string[];
+  releasePending: boolean;
+  /** Why it is pending: true when the deadline expired, false when the release
+   *  failed on its own. Without it a caller cannot tell a slow release from a
+   *  broken one — and `close()` cannot set `timedOut` honestly, since deriving it
+   *  from elapsed time in the wrapper would be racing its own clock. */
+  releaseTimedOut: boolean;
+}
 ```
 
 It awaits its own release under that bound and, on expiry, returns its own report
-with `releasePending: true`. `close()` passes whatever budget remains and receives
-a report that was actually observed. This is also the right layer: the release is
-the connection's resource, so bounding it is the connection's job.
+with `releasePending: true` and `releaseTimedOut: true`. `close()` passes whatever
+budget remains and receives a report it actually observed. This is also the right
+layer: the release is the connection's resource, so bounding it is its job.
+
+**Omitting `deadlineMs` does not mean "no bound".** It means the default —
+`SAP_RELEASE_DEADLINE_MS`, 600 000 ms — under the same rules as `close()`'s
+budget: finite, non-negative, representable against a **monotonic** clock, one
+snapshot serving both validation and expiry, invalid values rejected before
+anything happens.
+
+That matters more than it looks. An earlier draft reassured that "an existing
+caller passing nothing is unaffected", which is the wrong reassurance: the
+unchanged behaviour *is* the defect this document opens with. A direct
+`disconnect()`, with no `AdtClient` anywhere, must return — and bounding it only
+through the wrapper would fix the path that already had a budget while leaving the
+bare one hanging.
 
 **A detached release needs the same state machine as a detached `UNLOCK`.** On
 expiry the release is detached — not cancelled, since cancelling a half-closed
@@ -725,8 +748,10 @@ Duplicate `UNLOCK`s are worth avoiding beyond the bookkeeping: the second would 
 sent with a handle the first may already have consumed, and its refusal would say
 nothing about whether the lock is held.
 
-A queued caller therefore waits at most its predecessor's `deadlineMs`, plus that
-call's `disconnect()`, and then gets its own full budget.
+A queued caller therefore waits at most its predecessor's `deadlineMs` — the whole
+of it, teardown included — and then gets its own full budget. An earlier draft
+added "plus that call's `disconnect()`", which was true while step 4 sat outside
+the budget and stopped being true when it moved in.
 
 - **The barrier shuts once.** Step 1 has no meaning a second time — new work is
   already refused.
@@ -797,8 +822,13 @@ Tests:
   first settles late**: no duplicate `UNLOCK` is sent, and a late success removes
   the lock while a late failure leaves it for the next attempt
 - **a transport release that never settles** → `close()` still returns, with
-  `releasePending: true` **and `timedOut: true`**, and a queued `close()` is not
-  blocked behind it
+  `releasePending: true`, `releaseTimedOut: true` and `timedOut: true`, and a
+  queued `close()` is not blocked behind it
+- **a release that fails immediately** → `releasePending: true` with
+  `releaseTimedOut: false`, and `close()` reports `timedOut: false`; the two must
+  not be conflated
+- **a bare `disconnect()` whose release never settles** → returns at the default
+  bound, no `AdtClient` involved
 - **release timeout → a second `close({ disconnect: true })` before the first
   release settles → the first settles late**: no second release is started, and a
   late success clears `releasePending` while a late failure leaves it set
@@ -1101,11 +1131,13 @@ assert the lock was released rather than stranded.
 
 `@mcp-abap-adt/interfaces` first, for prose **and one signature**:
 `abandonedWindows` is redocumented as a snapshot of what was open, since the wait
-it referred to no longer exists, and `disconnect()` gains an optional
-`{ deadlineMs }` so the connection can bound its own transport release and still
-return a report it observed. Additive — an existing caller passing nothing is
-unaffected — but it is a type change, so an earlier claim in this section that
-there were none is corrected here. Correcting an earlier draft of this spec, which
+it referred to no longer exists; `disconnect()` gains an optional `{ deadlineMs }`
+so the connection can bound its own transport release and still return a report it
+observed; and `ITeardownReport` gains `releaseTimedOut`, without which a pending
+release cannot be told apart from a slow one. Additive in shape, but these are
+type changes, so an earlier claim in this section that there were none is
+corrected here. A caller passing no options is not "unaffected" either — it now
+gets a bounded teardown, which is the point. Correcting an earlier draft of this spec, which
 claimed no `interfaces` change was needed — a field whose documentation describes
 a mechanism we removed is a contract that lies, and prose is part of the contract.
 
