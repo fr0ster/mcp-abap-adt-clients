@@ -681,17 +681,10 @@ So the connection takes the deadline:
 
 ```ts
 disconnect(options?: { deadlineMs?: number }): Promise<ITeardownReport>;
-
-interface ITeardownReport {
-  abandonedWindows: string[];
-  releasePending: boolean;
-  /** Why it is pending: true when the deadline expired, false when the release
-   *  failed on its own. Without it a caller cannot tell a slow release from a
-   *  broken one — and `close()` cannot set `timedOut` honestly, since deriving it
-   *  from elapsed time in the wrapper would be racing its own clock. */
-  releaseTimedOut: boolean;
-}
 ```
+
+The report's full shape is given once, under *Expiring while still queued* below,
+since that is where its last field comes from.
 
 It awaits its own release under that bound and, on expiry, returns its own report
 with `releasePending: true` and `releaseTimedOut: true`. `close()` passes whatever
@@ -725,36 +718,66 @@ public promise before the callback is ever reached — which raises three questi
 an earlier draft left open.
 
 **What is returned.** A report, since `disconnect()` resolves rather than throws.
-But a teardown that never started must not look like one that finished cleanly, so
-`ITeardownReport` carries whether it ran:
+A teardown that never started must not look like one that finished cleanly, so the
+report carries whether it ran. This is the type's one definition:
 
 ```ts
 interface ITeardownReport {
-  /** False when the deadline expired before the teardown began — nothing was
-   *  torn down, nothing released, and the fields below describe only what was
-   *  observable from outside. */
+  /** False when the deadline expired before the teardown body began. The intent
+   *  still took effect — see below — but nothing was drained, cleared or
+   *  released. */
   teardownRan: boolean;
   abandonedWindows: string[];
   releasePending: boolean;
+  /** Why a release is pending: true when its deadline expired, false when it
+   *  failed on its own. Without it a caller cannot tell a slow release from a
+   *  broken one, and `close()` cannot set `timedOut` honestly — deriving it from
+   *  elapsed time in the wrapper would be racing its own clock. */
   releaseTimedOut: boolean;
 }
 ```
 
-`abandonedWindows` is still honest in that case: open windows are readable
-synchronously, without being inside the transition. `releasePending` is `false` —
-no release was attempted — and `releaseTimedOut` `false` with it, since what
-expired was the queue wait, not a release.
+`abandonedWindows` is honest even here: open windows are readable synchronously,
+without being inside the transition. `releasePending` and `releaseTimedOut` are
+both `false` — no release was attempted, and what expired was the queue wait.
 
-**Whether the queued teardown still runs.** It does not. On expiry the transition
-is **withdrawn from the queue**. Leaving it would mean a teardown, requested for a
-session that may be long gone, firing later against whatever session exists by
-then — the same "an old operation tears down its successor" hazard the generation
-fencing exists to prevent, arriving through the queue instead of through a
+**"Nothing was mutated" would be false, and an earlier draft said it.**
+`disconnect()` applies its intent **synchronously at the call**, before any
+queueing: `beginTeardown()` shuts admission, bumps the epoch and starts a new
+generation. That is required by `2026-07-27-session-lifecycle-design.md`, and it
+must stay — a caller who has asked to disconnect cannot have requests still going
+through while the transition waits its turn, and a recovery must not be able to
+publish a session over a teardown already requested.
+
+So the intent survives the expiry; only the **body** is withdrawn. Concretely,
+after a queue-expired `disconnect()`:
+
+- the connection is **unusable**: admission stays shut, and it is marked
+  disconnected — the caller asked to disconnect and got that much;
+- the transport is **not** cleaned: no drain, no `clearSessionState()`, no
+  release. Whatever was held is still held, which is what `teardownRan: false`
+  says;
+- a later `disconnect()` performs the cleanup that was skipped. It is the same
+  idempotent retry the rest of this document relies on.
+
+The alternative — rolling the intent back on expiry — was rejected: it would leave
+a connection that accepted `disconnect()` and then kept serving requests, which
+contradicts the published contract more seriously than an uncleaned transport.
+
+**Whether the queued body still runs.** It does not. Leaving it would fire a
+teardown, requested for a session that may be long gone, against whatever session
+exists by then — the same "an old operation tears down its successor" hazard the
+generation fencing prevents, arriving through the queue instead of through a
 response.
 
-**How it cannot touch a newer state.** By not existing: a withdrawn transition has
-nothing to mutate. There is no window between expiry and withdrawal, because both
-happen in the same synchronous step when the bound fires.
+**The race between expiring and starting.** Saying expiry and withdrawal happen in
+one synchronous step covers the timer and not the other side: the queue can dequeue
+this very transition at the same moment. So the call carries a state that is
+resolved by **compare-and-set** — `queued → running | expired` — and only the
+winner acts. The queue callback that finds `expired` does nothing; the timer that
+finds `running` lets the teardown proceed and reports on it normally. Without
+that, an implementation can return `teardownRan: false` and then run the teardown
+anyway.
 
 **Omitting `deadlineMs` does not mean "no bound".** It means the default —
 `SAP_RELEASE_DEADLINE_MS`, 600 000 ms — under the same rules as `close()`'s
@@ -935,8 +958,14 @@ Tests:
   per the earlier spec's rule for a settled failure
 - **a nested `disconnect()` queued behind a recovery that never settles** → the
   call still returns at its deadline, with `teardownRan: false`, and the queued
-  transition is withdrawn rather than firing later. A merely slow predecessor does
-  not test this; the head of the queue has to never settle
+  body is withdrawn rather than firing later. A merely slow predecessor does not
+  test this; the head of the queue has to never settle
+- **after that expiry the connection is unusable** — a request is refused and a
+  recovery cannot publish — while the transport is still uncleaned, and a later
+  `disconnect()` completes the cleanup
+- **the queue dequeues at the instant the bound fires** → exactly one of the two
+  wins: either the teardown runs and is reported, or `teardownRan: false` is
+  returned and it never runs. Never both
 - **`connect()` retrying a settled-failed release, and the retry never settles** →
   `connect()` rejects at `SAP_RELEASE_DEADLINE_MS` with the release left detached,
   not hanging
