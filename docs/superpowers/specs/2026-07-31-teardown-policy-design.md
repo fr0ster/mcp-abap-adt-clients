@@ -729,6 +729,39 @@ If the budget is already exhausted when step 4 begins, `disconnect()` is still
 called — the session state must go down regardless — with a zero bound, so the
 release is started and detached at once.
 
+#### `connect()` while a release is still detached
+
+The transition queue is free once the bounded `disconnect()` returns, so nothing
+stops a `connect()` — and it must not proceed. Building a new client over a handle
+that is still closing risks a duplicate release, and waiting for the in-flight one
+would hand back the unbounded wait this whole document removes.
+
+`connect()` therefore **rejects immediately** with `ADT_RELEASE_PENDING`, which
+already exists in `ADT_SESSION_ERROR` for exactly this and has had no use until
+now. It does not wait and it does not start a second release.
+
+- a **late success** clears the pending state, and the next `connect()` proceeds
+  normally;
+- a **late failure** leaves it set, so `connect()` keeps rejecting and a further
+  `disconnect()` may retry the release — the same retryable state the lock rules
+  use.
+
+#### `releaseTimedOut` invariants
+
+Two booleans can contradict each other, so the relationship is fixed rather than
+implied:
+
+- `releaseTimedOut: true` is permitted **only** with `releasePending: true`, and
+  only when the attempt described by *this* report exhausted its bound;
+- a report after a **late success** has both `false` — the release completed, so
+  neither the pending state nor the reason for it survives;
+- a release that failed on its own, inside the bound, is
+  `{ releasePending: true, releaseTimedOut: false }`;
+- nothing to release is `{ releasePending: false, releaseTimedOut: false }`.
+
+`{ releasePending: false, releaseTimedOut: true }` is unrepresentable by
+construction: there is no state it could describe.
+
 **A cleanup that stops being awaited is still running.** Bounding step 3 means
 `close()` returns while an `UNLOCK` may still be in flight — we stopped listening,
 we did not cancel it. The registry keeps that lock, so a later `close()` would
@@ -829,6 +862,10 @@ Tests:
   not be conflated
 - **a bare `disconnect()` whose release never settles** → returns at the default
   bound, no `AdtClient` involved
+- **`disconnect()` times out → `connect()` before the release settles** → rejects
+  with `ADT_RELEASE_PENDING` immediately, waiting for nothing and starting no
+  second release; then a **late success** lets the next `connect()` through, while
+  a **late failure** keeps it rejecting until a further `disconnect()` retries
 - **release timeout → a second `close({ disconnect: true })` before the first
   release settles → the first settles late**: no second release is started, and a
   late success clears `releasePending` while a late failure leaves it set
@@ -1134,10 +1171,22 @@ assert the lock was released rather than stranded.
 it referred to no longer exists; `disconnect()` gains an optional `{ deadlineMs }`
 so the connection can bound its own transport release and still return a report it
 observed; and `ITeardownReport` gains `releaseTimedOut`, without which a pending
-release cannot be told apart from a slow one. Additive in shape, but these are
-type changes, so an earlier claim in this section that there were none is
-corrected here. A caller passing no options is not "unaffected" either — it now
-gets a bounded teardown, which is the point. Correcting an earlier draft of this spec, which
+release cannot be told apart from a slow one. The optional parameter is additive. **`releaseTimedOut` is not.** It is a required
+property on a type other people construct — mocks, test doubles, any alternative
+implementation — and every object literal returning the old shape stops
+compiling. Calling that "additive in shape", as an earlier draft did, is how a
+breaking change ships as a minor.
+
+The alternative, an optional field, was rejected: `undefined` would have to mean
+"this implementation does not say", and `close()` would then be unable to set
+`timedOut` honestly for exactly the reports that most need it — reintroducing the
+ambiguity the field exists to remove. Better a breaking change that is named than
+a contract that hedges.
+
+So `interfaces` takes a **major**, and the cost is real: `adt-clients` and the
+connector both consume it, and the version is the user's call as always. A caller
+passing no options is not "unaffected" either — it now gets a bounded teardown,
+which is the point. Correcting an earlier draft of this spec, which
 claimed no `interfaces` change was needed — a field whose documentation describes
 a mechanism we removed is a contract that lies, and prose is part of the contract.
 
