@@ -44,75 +44,107 @@ describe('public API surface', () => {
 });
 
 /**
- * Names the README presents as runtime exports must actually be exported.
+ * The runtime surface, pinned exactly.
  *
- * The import-checking guard could not see these: both defects that reached
- * review — a promised `ENHANCEMENT_TYPE_CODES` that was never exported, and a
- * `SERVICE_BINDING_VARIANT_MAP` removed while still documented — live in prose,
- * in a bulleted list of values, not in an `import` statement.
+ * Two guards, and neither guesses. The first is this manifest: every value the
+ * package hands out, listed. A new export or a lost one fails here and has to
+ * be acknowledged by editing the list, which is the point — the surface is a
+ * decision, not a side effect.
  *
- * Telling a value from a type in prose is only tractable because of the naming
- * rule: an interface is `I` followed by a capital. Anything else backticked in
- * these sections is a value, and a value the README names must exist.
+ * The second holds the README to it. An earlier version of that check tried to
+ * recognise claims by their shape in prose, and kept missing some: a list
+ * wrapped onto a second line, two helpers separated by a slash, a whole section
+ * it was never pointed at. Heuristics over prose are not a guard, they are an
+ * illusion of one. The README now marks its claim lists explicitly and the test
+ * reads only what is marked.
  */
-describe('README runtime-export claims', () => {
-  const SECTIONS = [
-    'Handler classes exported directly',
-    'System-capability helpers',
-  ];
+const RUNTIME_EXPORTS = [
+  'AbapDebugger',
+  'AdtAbapGitClient',
+  'AdtAppendStructure',
+  'AdtClient',
+  'AdtClientBatch',
+  'AdtClientLegacy',
+  'AdtClientsWS',
+  'AdtContentTypesBase',
+  'AdtContentTypesModern',
+  'AdtExecutor',
+  'AdtMessageClass',
+  'AdtMessageClassMessage',
+  'AdtRuntimeClient',
+  'AdtRuntimeClientBatch',
+  'AdtRuntimeClientExperimental',
+  'AdtScalarFunction',
+  'AdtScalarFunctionImplementation',
+  'AdtService',
+  'AdtServiceBinding',
+  'AmdpDebugger',
+  'ApplicationLog',
+  'AtcLog',
+  'BatchRecordingConnection',
+  'CrossTrace',
+  'DdicActivation',
+  'Debugger',
+  'DebuggerSessionClient',
+  'FeedRepository',
+  'GatewayErrorLog',
+  'MemorySnapshots',
+  'Profiler',
+  'RuntimeDumps',
+  'St05Trace',
+  'SystemMessages',
+  'buildDumpIdPrefix',
+  'buildRuntimeDumpsUserQuery',
+  'createAdtClient',
+  'fetchDiscoveryEndpoints',
+  'getSystemInformation',
+  'isEndpointInDiscovery',
+  'isModernAdtSystem',
+  'parseSearchResults',
+  'resolveBindingVariant',
+  'resolveContentTypes',
+];
 
+describe('runtime export surface', () => {
+  const actual = Object.keys(rootExports).sort();
+
+  it('is exactly the manifest', () => {
+    expect(actual).toEqual([...RUNTIME_EXPORTS].sort());
+  });
+
+  it('does not hand out SERVICE_BINDING_VARIANT_MAP', () => {
+    // Removed in 9.0.0: it is defined in @mcp-abap-adt/interfaces.
+    expect(actual).not.toContain('SERVICE_BINDING_VARIANT_MAP');
+  });
+});
+
+describe('README export claims', () => {
   const readme = readFileSync(resolve(__dirname, '../../../README.md'), 'utf8');
   const runtime = new Set(Object.keys(rootExports));
 
-  /** Body of a `###` section, up to the next heading of any level. */
-  function section(title: string): string {
-    const start = readme.indexOf(`### ${title}`);
-    if (start === -1) throw new Error(`README section missing: ${title}`);
-    const rest = readme.slice(start + title.length + 4);
-    const end = rest.search(/^#{2,3} /m);
-    return end === -1 ? rest : rest.slice(0, end);
-  }
-
-  /**
-   * A name is a CLAIM only where the README is listing exports — leading a
-   * bullet, or on a line that is nothing but backticked names.
-   *
-   * Scanning every backticked word instead was the first attempt and it read
-   * prose as promises: `null` out of "the record, or `null`", and `getUtils`
-   * out of "rather than a method on `getUtils()`" — a method on the client,
-   * never a package export.
-   */
-  function claimedValues(body: string): string[] {
+  /** Every backticked name inside a `surface:begin`/`surface:end` fence. */
+  function claimedNames(): string[] {
     const names = new Set<string>();
-    for (const line of body.split('\n')) {
-      const bullet = line.match(
-        /^\s*-\s+`([A-Za-z_][A-Za-z0-9_]*)(?:\([^`]*\))?`/,
-      );
-      if (bullet) {
-        names.add(bullet[1]);
-        continue;
-      }
-      // A bare enumeration line: `A`, `B`, `C`. Nothing else on it.
-      if (/^`[^`]+`(,\s*`[^`]+`)*\.?$/.test(line.trim())) {
-        for (const m of line.matchAll(/`([A-Za-z_][A-Za-z0-9_]*)`/g))
-          names.add(m[1]);
+    const fences = readme.matchAll(
+      /<!--\s*surface:begin\s*-->([\s\S]*?)<!--\s*surface:end\s*-->/g,
+    );
+    let count = 0;
+    for (const fence of fences) {
+      count += 1;
+      for (const m of fence[1].matchAll(
+        /`([A-Za-z_][A-Za-z0-9_]*)(?:\([^`]*\))?`/g,
+      )) {
+        // An interface is `I` + capital by convention; the rest are values.
+        if (!/^I[A-Z]/.test(m[1])) names.add(m[1]);
       }
     }
-    // An interface is `I` + capital by convention; everything else here is a value.
-    return [...names].filter((n) => !/^I[A-Z]/.test(n));
+    if (count === 0) throw new Error('README has no surface fences to check');
+    return [...names];
   }
 
-  it.each(SECTIONS)('every value named under "%s" is exported', (title) => {
-    const missing = claimedValues(section(title)).filter(
-      (n) => !runtime.has(n),
-    );
+  it('names only values the package exports', () => {
+    const unexported = claimedNames().filter((n) => !runtime.has(n));
 
-    expect(missing).toEqual([]);
-  });
-
-  it('does not name SERVICE_BINDING_VARIANT_MAP as one of ours', () => {
-    // Removed in 9.0.0: it belongs to @mcp-abap-adt/interfaces. The README may
-    // mention it — it must not list it among this package's own values.
-    expect(runtime.has('SERVICE_BINDING_VARIANT_MAP')).toBe(false);
+    expect(unexported).toEqual([]);
   });
 });

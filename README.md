@@ -513,10 +513,17 @@ which wires the connection, logger and system context for you. The classes are
 also exported for the rarer case of constructing one against a connection you
 hold yourself:
 
+<!-- surface:begin -->
 `AdtAppendStructure`, `AdtMessageClass`, `AdtMessageClassMessage`,
 `AdtScalarFunction`, `AdtScalarFunctionImplementation`, `AdtService`.
+<!-- surface:end -->
 
 ### System-capability helpers
+
+<!-- surface:begin -->
+`getSystemInformation`, `isModernAdtSystem`, `resolveContentTypes`,
+`fetchDiscoveryEndpoints`, `isEndpointInDiscovery`, `parseSearchResults`
+<!-- surface:end -->
 
 - `getSystemInformation(connection)` — the ADT system record, or `null`.
 - `isModernAdtSystem(connection)` — whether `/sap/bc/adt/core/discovery` is
@@ -572,7 +579,10 @@ Since **9.0.0** no accessor returns the wide type. `getUnitTest()` and `getCdsUn
 
 Two categories deliberately remain local, because they describe *this client* rather than the wire contract:
 
-- Runtime (value) exports: `resolveBindingVariant`.
+- Runtime (value) exports:
+  <!-- surface:begin -->
+  `resolveBindingVariant`
+  <!-- surface:end -->
   `SERVICE_BINDING_VARIANT_MAP` is **not** among them since 9.0.0 — it is defined in
   `@mcp-abap-adt/interfaces` and is imported from there, like every other type and constant that package owns.
   `ENHANCEMENT_TYPE_CODES` and the enhancement URL helpers (`getEnhancementBaseUrl`, `getEnhancementUri`,
