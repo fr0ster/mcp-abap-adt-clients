@@ -11,9 +11,9 @@ import type {
   IAdtObject,
   IAdtOperationOptions,
   ILogger,
+  IPackageHierarchyNode,
 } from '@mcp-abap-adt/interfaces';
 import type { AdtClient } from '../../../clients/AdtClient';
-import type { PackageHierarchyNode } from '../../../index';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import { BaseTester } from '../../helpers/BaseTester';
 import { createTestAdtClient, getConfig } from '../../helpers/sessionConfig';
@@ -45,7 +45,7 @@ const libraryLogger: ILogger = createLibraryLogger();
 const testsLogger: ILogger = createTestsLogger();
 
 class PackageHierarchyObject
-  implements IAdtObject<IPackageHierarchyParams, PackageHierarchyNode>
+  implements IAdtObject<IPackageHierarchyParams, IPackageHierarchyNode>
 {
   private client: AdtClient;
 
@@ -82,7 +82,7 @@ class PackageHierarchyObject
     config: Partial<IPackageHierarchyParams>,
     _version?: 'active' | 'inactive',
     _options?: { withLongPolling?: boolean },
-  ): Promise<PackageHierarchyNode | undefined> {
+  ): Promise<IPackageHierarchyNode | undefined> {
     if (!config.package_name) {
       return Promise.reject(new Error('package_name required'));
     }
@@ -143,7 +143,7 @@ describe('Shared - getPackageHierarchy', () => {
   let hasConfig = false;
   let isLegacy = false;
   let isCloudSystem = false;
-  let tester: BaseTester<IPackageHierarchyParams, PackageHierarchyNode>;
+  let tester: BaseTester<IPackageHierarchyParams, IPackageHierarchyNode>;
 
   beforeAll(async () => {
     try {

@@ -84,8 +84,8 @@ export async function runClass(
 
 // Re-export interfaces from interfaces package
 export type {
-  IClassUnitTestDefinition as ClassUnitTestDefinition,
-  IClassUnitTestRunOptions as ClassUnitTestRunOptions,
+  IClassUnitTestDefinition,
+  IClassUnitTestRunOptions,
 } from '../unitTest/types';
 
 function boolAttr(value: boolean | undefined, fallback: boolean) {

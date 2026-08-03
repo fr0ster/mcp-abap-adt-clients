@@ -58,10 +58,10 @@ export type {
 } from './core/behaviorImplementation';
 export type {
   AdtClassType,
-  ClassUnitTestDefinition,
-  ClassUnitTestRunOptions,
   IClassConfig,
   IClassState,
+  IClassUnitTestDefinition,
+  IClassUnitTestRunOptions,
   ILocalDefinitionsConfig,
   ILocalMacrosConfig,
   ILocalTestClassConfig,
@@ -193,25 +193,7 @@ export type {
   IServiceDefinitionConfig,
   IServiceDefinitionState,
 } from './core/serviceDefinition';
-export type {
-  AdtObjectType,
-  AdtSourceObjectType,
-  GetPackageHierarchyOptions,
-  GetSqlQueryParams,
-  GetTableContentsParams,
-  GetVirtualFoldersContentsParams,
-  GetWhereUsedListParams,
-  GetWhereUsedParams,
-  InactiveObjectsResponse,
-  ObjectReference,
-  PackageHierarchyCodeFormat,
-  PackageHierarchyNode,
-  PackageHierarchySupportedType,
-  ReadOptions,
-  SearchObjectsParams,
-  WhereUsedListResult,
-  WhereUsedReference,
-} from './core/shared';
+
 export { parseSearchResults } from './core/shared';
 export type { IAdtContentTypes, IAdtHeaders } from './core/shared/contentTypes';
 export {

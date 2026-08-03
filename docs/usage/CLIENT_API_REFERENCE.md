@@ -283,7 +283,7 @@ await client.getClass().read({ className: 'ZCL_TEST' }, undefined);
 `AdtUtils.readObjectMetadata` and `AdtUtils.readObjectSource` enforce strict object types to prevent invalid inputs like `view:ZOBJ`.
 
 ```typescript
-import type { AdtObjectType, AdtSourceObjectType } from '@mcp-abap-adt/adt-clients';
+import type { AdtObjectType, AdtSourceObjectType } from '@mcp-abap-adt/interfaces';
 
 const utils = client.getUtils();
 const metadataType: AdtObjectType = 'DDLS/DF';

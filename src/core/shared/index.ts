@@ -23,27 +23,3 @@ export {
  */
 export { parseSearchResults } from './search';
 export { getTransaction } from './transaction';
-export type {
-  AdtObjectType,
-  AdtSourceObjectType,
-  IGetDiscoveryParams as GetDiscoveryParams,
-  IGetPackageContentsListOptions as GetPackageContentsListOptions,
-  IGetPackageHierarchyOptions as GetPackageHierarchyOptions,
-  IGetSqlQueryParams as GetSqlQueryParams,
-  IGetTableContentsParams as GetTableContentsParams,
-  IGetVirtualFoldersContentsParams as GetVirtualFoldersContentsParams,
-  IGetWhereUsedListParams as GetWhereUsedListParams,
-  IGetWhereUsedParams as GetWhereUsedParams,
-  IGetWhereUsedScopeParams as GetWhereUsedScopeParams,
-  IInactiveObjectsResponse as InactiveObjectsResponse,
-  IObjectReference as ObjectReference,
-  IPackageContentItem as PackageContentItem,
-  IPackageHierarchyNode as PackageHierarchyNode,
-  IReadOptions as ReadOptions,
-  ISearchObjectsParams as SearchObjectsParams,
-  IVirtualFoldersPreselection as VirtualFoldersPreselection,
-  IWhereUsedListResult as WhereUsedListResult,
-  IWhereUsedReference as WhereUsedReference,
-  PackageHierarchyCodeFormat,
-  PackageHierarchySupportedType,
-} from './types';

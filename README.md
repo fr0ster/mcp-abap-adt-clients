@@ -301,7 +301,7 @@ console.log(runWithProfilingResult.traceId);
 `readObjectMetadata` and `readObjectSource` accept strict object type unions to prevent invalid inputs like `view:ZOBJ`.
 
 ```typescript
-import type { AdtObjectType, AdtSourceObjectType } from '@mcp-abap-adt/adt-clients';
+import type { AdtObjectType, AdtSourceObjectType } from '@mcp-abap-adt/interfaces';
 
 await utils.readObjectMetadata('DDLS/DF' satisfies AdtObjectType, 'ZOK_I_CDS_TEST');
 await utils.readObjectSource('view' satisfies AdtSourceObjectType, 'ZOK_I_CDS_TEST');
@@ -506,13 +506,32 @@ Notes:
 - Disabled by default.
 - Correction retries once and caches the supported `Accept` per endpoint.
 
-### Specialized Clients
+### Handler classes exported directly
 
-- **ManagementClient**: batch activation + check operations
-- **LockClient**: explicit lock/unlock with `.locks` registry integration
-- **ValidationClient**: name validation mirroring ADT validation endpoint
+The documented route to a handler is a factory — `client.getScalarFunction()` —
+which wires the connection, logger and system context for you. The classes are
+also exported for the rarer case of constructing one against a connection you
+hold yourself:
 
-Refer to the TypeScript typings (`src/index.ts`) for the full API surface.
+`AdtAppendStructure`, `AdtMessageClass`, `AdtMessageClassMessage`,
+`AdtScalarFunction`, `AdtScalarFunctionImplementation`, `AdtService`.
+
+### System-capability helpers
+
+- `getSystemInformation(connection)` — the ADT system record, or `null`.
+- `isModernAdtSystem(connection)` — whether `/sap/bc/adt/core/discovery` is
+  served. S/4 HANA and BTP expose it; BASIS 7.40 and below only have
+  `/sap/bc/adt/discovery`.
+- `resolveContentTypes(connection)` — picks `AdtContentTypesModern` (v2+
+  headers) or `AdtContentTypesBase` (v1, universal) from that answer.
+- `fetchDiscoveryEndpoints(connection)` / `isEndpointInDiscovery(...)` — the
+  discovery document and a membership test over it.
+- `parseSearchResults(xml)` — turn a quickSearch payload you already hold into
+  `ISearchResult[]`. Needs no connection, which is why it is a plain export
+  rather than a method on `getUtils()`.
+
+`src/index.ts` is the full surface; everything reachable from it is public and
+everything else is not.
 
 ## Type System
 
