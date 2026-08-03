@@ -301,7 +301,7 @@ console.log(runWithProfilingResult.traceId);
 `readObjectMetadata` and `readObjectSource` accept strict object type unions to prevent invalid inputs like `view:ZOBJ`.
 
 ```typescript
-import type { AdtObjectType, AdtSourceObjectType } from '@mcp-abap-adt/adt-clients';
+import type { AdtObjectType, AdtSourceObjectType } from '@mcp-abap-adt/interfaces';
 
 await utils.readObjectMetadata('DDLS/DF' satisfies AdtObjectType, 'ZOK_I_CDS_TEST');
 await utils.readObjectSource('view' satisfies AdtSourceObjectType, 'ZOK_I_CDS_TEST');
