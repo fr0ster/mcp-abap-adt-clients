@@ -572,7 +572,9 @@ Since **9.0.0** no accessor returns the wide type. `getUnitTest()` and `getCdsUn
 
 Two categories deliberately remain local, because they describe *this client* rather than the wire contract:
 
-- Runtime (value) exports: `ENHANCEMENT_TYPE_CODES` and the enhancement URL helpers, `resolveBindingVariant` / `SERVICE_BINDING_VARIANT_MAP`.
+- Runtime (value) exports: `ENHANCEMENT_TYPE_CODES` and the enhancement URL helpers, and `resolveBindingVariant`.
+  `SERVICE_BINDING_VARIANT_MAP` is **not** among them since 9.0.0 — it is defined in
+  `@mcp-abap-adt/interfaces` and is imported from there, like every other type and constant that package owns.
 - `IAdtClientOptions` — constructor options for `AdtClient` itself.
 
 > **Version pairing.** Because the types are now sourced rather than copied, `@mcp-abap-adt/interfaces` is a hard peer of this package's public API. A major bump there implies a bump here; keep the two in step rather than letting a resolver pick a mismatched pair.
