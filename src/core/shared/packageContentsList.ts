@@ -178,8 +178,8 @@ const parseNodesToItems = (
 
     items.push({
       name: String(objectName).trim(),
-      adtType: objectType,
-      type: mapAdtTypeToSupported(objectType),
+      type: objectType,
+      kind: mapAdtTypeToSupported(objectType),
       description:
         includeDescriptions && description
           ? String(description).trim()

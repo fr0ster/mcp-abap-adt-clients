@@ -5,7 +5,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [9.0.0] - 2026-08-03
+
+### Changed — BREAKING
+- **Requires `@mcp-abap-adt/interfaces` ^13.1.0**, and the field renames it carries surface here. Anything reading a package hierarchy node or a package contents item must move:
+
+  | before | after |
+  |---|---|
+  | `node.adtType` | `node.type` |
+  | `node.type` (the `PackageHierarchySupportedType` enum) | `node.kind` |
+  | `node.is_package` | `node.isPackage` |
+
+  The ADT type code now lives under `type` in every "located object" shape — search hits, where-used references, object references, package contents, hierarchy nodes — because they all extend the new `IAdtObjectHit`. Previously it was `type` in three of them and `adtType` in the other two, and "is this a package" was `is_package` in one and `isPackage` in its sibling.
+
+- **`getUnitTest()` and `getCdsUnitTest()` return their honest capability set** — `IAdtCreatable & IAdtReadable & IAdtValidatable` — instead of the fat `IAdtObject`. They were the last two accessors on the wide type. ADT exposes no update, delete, activate, check, lock or version resource for a test run, so the old type promised thirteen methods of which nine threw at runtime. Calling one of those nine is now a compile error.
+
+  `AdtUnitTest` declares the same three atoms. The refusing methods remain on the class so an existing caller still gets a clear error rather than `undefined is not a function`, but they are no longer part of the contract.
+
+  Both accessors also hand out `IAdtTestRunnable` (`IAdtCdsTestRunnable` for CDS) — starting a run and collecting its outcome, which is the reason the handler exists. No contract described it before `interfaces` 13.1.0, so callers cast past the declared type to reach it; `UnitTest.test.ts` did `client.getUnitTest() as any`. That cast is gone, and its removal is the check that the capability actually reaches a consumer rather than merely existing on the class.
+
+- The dev-time connector moves to **^3.0.0**.
+
+### Fixed
+- **The session stub modelled a SAP behaviour that does not exist.** Its CSRF endpoint minted a new `SAP_SESSIONID` on every fetch, ignoring the cookie the client presented. Real SAP returns a fresh token for the *same* session when one is presented — which is the only reason a 403 mid-lock is survivable at all. Once connector 3.0.0 began treating a changed session identity as fatal (correctly: a changed identity means the lock is gone), an ordinary token refresh started reading as a replacement and the mid-lock recovery test failed. The stub now keeps a presented session and still opens a distinct one when none is presented, so a silent re-establishment stays visible.
+
 ### Added
+- **A test of the public API surface** (`publicApiSurface.test.ts`), importing from the package entry point the way a consumer does. It exists because a claim here outran the code: `parseSearchResults` was described as exported while the symbol never reached the public barrel — it had `export` in its own module, the module was not re-exported, and only a deep import into `dist/` could reach it, which is a consumer stepping past the package boundary rather than an API. A `src/`-relative import would have passed with the barrel unwired and proved nothing.
+- **A conformance test that pins the handed-out capabilities** (`unitTestContractConformance.test.ts`). Written from the consumer's side deliberately: a class's `implements` clause is already checked by the compiler, so repeating it would prove nothing. What nothing pinned is the other half — that `AdtClient.getXxx()` passes the capability outwards. Narrow a getter back and every `implements` clause still compiles while the consumer silently loses the capability, which is precisely how `run()` came to be unreachable. The test also asserts the narrowing bites: `update`, `delete`, `activate`, `lock` and `getVersions` must stay *out* of the handed-out type. Verified to fail when the contract is regressed, not just to pass.
+- **`AdtUtils.search()`** — the `IAdtSearchable` capability, returning `ISearchResult[]`. `searchObjects()` still returns the raw response and is not going anywhere: one answers "what came back over the wire", the other "which objects matched", and both are legitimate questions. `parseSearchResults()` is exported **from the package root** for callers that already hold the XML — it needs no connection, so `getUtils()` is not a route to it.
+
+  The parser accepts the objectReference attributes with or without the `adtcore:` prefix. That is not defensive padding: the payload is not consistent about it across releases, and pinning one spelling would return silently empty hits on a system that uses the other.
+
 - **`AdtClient` refuses a handler over a connection nobody connected.** Every `getXxx()` factory checks first, and throws with `code: ADT_NOT_CONNECTED`. Connecting stays the **consumer's** job — this library does not own the connection and must not connect on anyone's behalf — but a connector injected without `connect()` used to surface deep inside an operation chain: the handlers collect failures into `state.errors` rather than stopping, so the result was a state object full of `ADT_NOT_CONNECTED` after the chain had walked its whole length. It now fails before anything happens.
 
   Only asked of a connection that **answers the question** — `isConnected()` lives on `ISessionLifecycleAware`, not on `IAbapConnection`. An RFC connection has no HTTP session and no such method, and a transport that cannot answer is not blocked on its silence. That is a real limit rather than an oversight: a transport with no session has no "not connected" state to catch, so the guarantee is narrower than "every `IAbapConnection`".
@@ -13,7 +43,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   The check looks for `isConnected` alone, which is the only method it calls. Deliberately *not* the whole atom: a type **predicate** narrows to the whole interface and so must verify all of it, but this asks one question, and demanding the other two would only make it step aside for a connection that could have answered.
 
 ### Changed
-- Requires `@mcp-abap-adt/interfaces` **^11.5.0** (connection capability atoms), and the dev-time connector moves to **^2.0.0**.
 - **Unit tests run without SAP, with the plain command.** `globalSetup`'s connectivity preflight now skips a unit-only run, and is bounded by a timeout (`SAP_PREFLIGHT_TIMEOUT_MS`, default 10s) when it does run. Before, `npx jest src/__tests__/unit` demanded a reachable SAP: with a stale `.env` it aborted the whole suite, and against a host that accepts a socket then says nothing it simply waited — and since `testTimeout` is 15 minutes, that was indistinguishable from a hung test, with the blame landing on whichever test was next. Running unit tests needed an undocumented `MCP_ENV_PATH=/tmp/nonexistent-env` to sidestep it; that trick is no longer necessary.
 - **Test contract updated to the 2.0.0 lifecycle.** `connectorSessionContract.test.ts` had a test documenting the old defect — a request on a never-connected connector opened a session on the fly, and `reset()` was followed by a silent new session under the same conversation id. It now pins the fix from the other side: the request is refused, and **nothing reaches the server**, which is the part that matters — a refusal after the LOCK landed would still have left a lock behind.
 

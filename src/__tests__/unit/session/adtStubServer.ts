@@ -67,18 +67,32 @@ export async function startAdtStub(logger?: ILogger): Promise<AdtStub> {
       return;
     }
 
-    // Discovery doubles as the CSRF endpoint and opens a session. Each fetch
-    // opens a DISTINCT one, the way SAP does — that is what makes a silent
-    // re-establishment visible instead of looking like session continuity.
+    // Discovery doubles as the CSRF endpoint. A fetch that presents NO session
+    // cookie opens a DISTINCT session, which is what makes a silent
+    // re-establishment visible instead of looking like continuity.
+    //
+    // A fetch that DOES present one keeps it, because that is what SAP does: a
+    // token refresh inside a held session returns a fresh token for the same
+    // session, which is exactly how a 403 mid-lock is survivable at all. The
+    // stub used to mint a new session id regardless, and once the connector
+    // began treating a changed identity as fatal — correctly, since a changed
+    // identity means the lock is gone — that made an ordinary token refresh
+    // look like the session had been replaced underneath us.
     if (
       url.includes('/sap/bc/adt/core/discovery') ||
       url.includes('/sap/bc/adt/discovery')
     ) {
-      sessionsOpened += 1;
+      const presented = /SAP_SESSIONID_STUB_100=(STUB-SESSION-\d+)/.exec(
+        req.headers.cookie ?? '',
+      )?.[1];
+      if (!presented) {
+        sessionsOpened += 1;
+      }
+      const session = presented ?? `STUB-SESSION-${sessionsOpened}`;
       res.writeHead(200, {
         'content-type': 'application/atomsvc+xml',
         'x-csrf-token': `STUB-CSRF-TOKEN-${sessionsOpened}`,
-        'set-cookie': `SAP_SESSIONID_STUB_100=STUB-SESSION-${sessionsOpened}; Path=/`,
+        'set-cookie': `SAP_SESSIONID_STUB_100=${session}; Path=/`,
       });
       res.end('<service/>');
       return;

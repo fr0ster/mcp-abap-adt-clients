@@ -23,8 +23,11 @@ import type {
   IAdtResponse as AxiosResponse,
   HttpError,
   IAbapConnection,
-  IAdtObject,
+  IAdtCreatable,
   IAdtOperationOptions,
+  IAdtReadable,
+  IAdtTestRunnable,
+  IAdtValidatable,
   ILogger,
   IObjectVersion,
 } from '@mcp-abap-adt/interfaces';
@@ -42,8 +45,19 @@ import type {
   IUnitTestConfig,
   IUnitTestState,
 } from './types';
+/**
+ * A test run is created, read and validated — never edited. ADT exposes no
+ * update, delete, activate, check, lock or version resource for one, so the
+ * class declares only the capabilities it honours. The refusing methods below
+ * are kept so an existing caller still gets a clear runtime error rather than
+ * `undefined is not a function`, but they are no longer part of the contract.
+ */
 export class AdtUnitTest
-  implements IAdtObject<IUnitTestConfig, IUnitTestState>
+  implements
+    IAdtCreatable<IUnitTestConfig, IUnitTestState>,
+    IAdtReadable<IUnitTestConfig, IUnitTestState>,
+    IAdtValidatable<IUnitTestConfig, IUnitTestState>,
+    IAdtTestRunnable
 {
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;

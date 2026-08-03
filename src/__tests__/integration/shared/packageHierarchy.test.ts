@@ -243,7 +243,7 @@ describe('Shared - getPackageHierarchy', () => {
         });
         expect(result?.name).toBeDefined();
         expect(result?.name).toBe(config.package_name.toUpperCase());
-        expect(result?.adtType).toBeDefined();
+        expect(result?.type).toBeDefined();
         logTestSuccess(testsLogger, testName);
       } catch (error: any) {
         if (error?.response?.status === 406) {

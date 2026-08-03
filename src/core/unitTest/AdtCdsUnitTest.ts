@@ -12,6 +12,7 @@
 
 import type {
   IAbapConnection,
+  IAdtCdsTestRunnable,
   ICdsUnitTestConfig,
   ICdsUnitTestState,
   ILogger,
@@ -40,7 +41,7 @@ export type {
  *
  * Combines AdtClass for test class lifecycle and AdtUnitTest for test execution
  */
-export class AdtCdsUnitTest extends AdtUnitTest {
+export class AdtCdsUnitTest extends AdtUnitTest implements IAdtCdsTestRunnable {
   protected adtView: AdtDdl;
   private cdsViewName?: string;
   private className?: string;

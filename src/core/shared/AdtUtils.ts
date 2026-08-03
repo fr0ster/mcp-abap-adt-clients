@@ -31,7 +31,9 @@
 import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
+  IAdtSearchable,
   ILogger,
+  ISearchResult,
 } from '@mcp-abap-adt/interfaces';
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
 import { encodeSapObjectName } from '../../utils/internalUtils';
@@ -54,7 +56,7 @@ import { getObjectStructure as getObjectStructureUtil } from './objectStructure'
 import { getPackageContentsList } from './packageContentsList';
 import { getPackageHierarchy } from './packageHierarchy';
 // Import utility functions
-import { searchObjects } from './search';
+import { searchObjects, searchObjectsTyped } from './search';
 import { getSqlQuery } from './sqlQuery';
 import { getTableContents } from './tableContents';
 import { getTransaction } from './transaction';
@@ -109,7 +111,9 @@ import type {
   IWhereUsedListResult,
 } from './types';
 
-export class AdtUtils {
+export class AdtUtils
+  implements IAdtSearchable<ISearchObjectsParams, ISearchResult>
+{
   protected connection: IAbapConnection;
   private logger: ILogger;
 
@@ -126,6 +130,18 @@ export class AdtUtils {
    */
   async searchObjects(params: ISearchObjectsParams): Promise<AxiosResponse> {
     return searchObjects(this.connection, params);
+  }
+
+  /**
+   * Locate objects by name pattern — the IAdtSearchable capability.
+   *
+   * `searchObjects` above returns the raw response and stays; this returns the
+   * hits themselves. Both are kept because they answer different questions:
+   * one for a caller that needs status and headers, one for a caller that
+   * wants the objects.
+   */
+  async search(criteria: ISearchObjectsParams): Promise<ISearchResult[]> {
+    return searchObjectsTyped(this.connection, criteria);
   }
 
   /**
