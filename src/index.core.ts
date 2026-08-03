@@ -25,9 +25,6 @@ export type { AdtDataElementType } from './core/dataElement';
 export type { AdtDdlType } from './core/ddl';
 export type { AdtDomainType } from './core/domain';
 export type { AdtEnhancement as AdtEnhancementType } from './core/enhancement';
-// Ours, and documented as reachable — it was neither exported nor caught,
-// because a value mentioned in prose is not an import the doc test can check.
-export { ENHANCEMENT_TYPE_CODES } from './core/enhancement';
 
 export type { AdtFunctionGroupType } from './core/functionGroup';
 
