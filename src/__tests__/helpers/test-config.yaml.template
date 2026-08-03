@@ -176,6 +176,7 @@ shared_dependencies:
       source: |
         @EndUserText.label : 'Shared root view for BehaviorDefinition'
         @AccessControl.authorizationCheck : #NOT_REQUIRED
+        @Metadata.allowExtensions : true
         define root view entity ZAC_SHR_BDEF_DDLS
           as select from zac_shr_btabl
         {
