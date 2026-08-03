@@ -17,10 +17,12 @@ import type {
   IAbapConnection,
   IAdtActivatable,
   IAdtCheckable,
+  IAdtCreatable,
   IAdtCrud,
   IAdtLockable,
   IAdtNonVersionedObject,
   IAdtObject,
+  IAdtReadable,
   IAdtSourceObject,
   IAdtTransportAware,
   IAdtValidatable,
@@ -799,19 +801,28 @@ export class AdtClient {
   }
 
   /**
-   * Get high-level operations for UnitTest objects
-   * @returns IAdtObject instance for UnitTest operations
+   * Get high-level operations for UnitTest objects.
+   *
+   * A test run is created and read, never edited: ADT exposes no update,
+   * delete, activate, check, lock or version resource for one. The declared
+   * type says so rather than promising thirteen methods of which nine throw.
    */
-  getUnitTest(): IAdtObject<IUnitTestConfig, IUnitTestState> {
+  getUnitTest(): IAdtCreatable<IUnitTestConfig, IUnitTestState> &
+    IAdtReadable<IUnitTestConfig, IUnitTestState> &
+    IAdtValidatable<IUnitTestConfig, IUnitTestState> {
     this.assertConnected();
     return new AdtUnitTest(this.connection, this.logger);
   }
 
   /**
-   * Get high-level operations for CDS UnitTest objects
-   * @returns IAdtObject instance for CDS UnitTest operations (extends AdtUnitTest with CDS-specific methods)
+   * Get high-level operations for CDS UnitTest objects.
+   *
+   * Same capability set as {@link getUnitTest}; the CDS-specific surface
+   * (`checkCdsTestDoubles`, `getCdsViewName`) is on the concrete class.
    */
-  getCdsUnitTest(): IAdtObject<ICdsUnitTestConfig, ICdsUnitTestState> {
+  getCdsUnitTest(): IAdtCreatable<ICdsUnitTestConfig, ICdsUnitTestState> &
+    IAdtReadable<ICdsUnitTestConfig, ICdsUnitTestState> &
+    IAdtValidatable<ICdsUnitTestConfig, ICdsUnitTestState> {
     this.assertConnected();
     return new AdtCdsUnitTest(this.connection, this.logger);
   }

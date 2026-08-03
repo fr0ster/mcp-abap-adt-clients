@@ -271,14 +271,14 @@ const buildTreeFromNodes = (
     const supportedType = mapAdtTypeToSupported(objectType);
     nodeMap.set(key, {
       name: String(objectName).trim(),
-      adtType: objectType,
-      type: supportedType,
+      type: objectType,
+      kind: supportedType,
       description: includeDescriptions
         ? description
           ? String(description).trim()
           : undefined
         : undefined,
-      is_package: isPackage,
+      isPackage,
       codeFormat: mapAdtTypeToCodeFormat(objectType),
       restoreStatus: isRestoreImplemented(supportedType)
         ? 'ok'
@@ -333,7 +333,7 @@ const buildTreeFromNodes = (
   if (debugEnabled) {
     logger?.debug?.(
       `Built flat list: ${result.length} nodes (packages: ${
-        result.filter((node) => node.is_package).length
+        result.filter((node) => node.isPackage).length
       })`,
     );
   }
@@ -346,9 +346,9 @@ const createPackageNode = (
   children: IPackageHierarchyNode[],
 ): IPackageHierarchyNode => ({
   name: packageName,
-  adtType: 'DEVC/K',
-  type: 'package',
-  is_package: true,
+  type: 'DEVC/K',
+  kind: 'package',
+  isPackage: true,
   codeFormat: mapAdtTypeToCodeFormat('DEVC/K'),
   restoreStatus: 'ok',
   children,
@@ -423,7 +423,7 @@ const fetchPackageTreeRecursive = async (
   const packageNode = createPackageNode(packageName, children);
 
   if (currentDepth < maxDepth && children.length > 0) {
-    const subpackages = children.filter((child) => child.is_package);
+    const subpackages = children.filter((child) => child.isPackage);
     if (subpackages.length > 0) {
       const subpackageMaxDepth = includeSubpackages
         ? maxDepth
@@ -446,7 +446,7 @@ const fetchPackageTreeRecursive = async (
       }
 
       packageNode.children = packageNode.children?.map((child) => {
-        if (!child.is_package) {
+        if (!child.isPackage) {
           return child;
         }
         const subpackageTree = subpackageTrees.find(
@@ -490,9 +490,9 @@ export async function getPackageHierarchy(
   );
 
   tree.name = packageNameUpper;
-  tree.adtType = 'DEVC/K';
-  tree.type = 'package';
-  tree.is_package = true;
+  tree.type = 'DEVC/K';
+  tree.kind = 'package';
+  tree.isPackage = true;
   tree.codeFormat = mapAdtTypeToCodeFormat('DEVC/K');
 
   return tree;
