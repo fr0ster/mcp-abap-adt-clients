@@ -212,6 +212,7 @@ export type {
   WhereUsedListResult,
   WhereUsedReference,
 } from './core/shared';
+export { parseSearchResults } from './core/shared';
 export type { IAdtContentTypes, IAdtHeaders } from './core/shared/contentTypes';
 export {
   AdtContentTypesBase,
