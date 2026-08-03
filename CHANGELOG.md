@@ -25,7 +25,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   Both accessors also hand out `IAdtTestRunnable` (`IAdtCdsTestRunnable` for CDS) — starting a run and collecting its outcome, which is the reason the handler exists. No contract described it before `interfaces` 13.1.0, so callers cast past the declared type to reach it; `UnitTest.test.ts` did `client.getUnitTest() as any`. That cast is gone, and its removal is the check that the capability actually reaches a consumer rather than merely existing on the class.
 
 - The dev-time connector moves to **^3.0.0**.
-- **This package no longer re-exports types owned by `@mcp-abap-adt/interfaces`.** Seventeen of them were republished from the root — thirteen under de-`I`-prefixed aliases (`IObjectReference` as `ObjectReference`, `IPackageHierarchyNode` as `PackageHierarchyNode`, and so on) plus four under their own names. Import them from `@mcp-abap-adt/interfaces` directly:
+- **This package no longer re-exports types owned by `@mcp-abap-adt/interfaces` — all 145 of them.** That was **more than half** of a 249-name public surface, which is now 108. A consumer could hold `IClassConfig`, `IPackageState` or even `IAbapConnection` believing it came from this client, and see a type appear to change whenever this client released, for reasons that had nothing to do with it. Import them from the package that owns them:
+
+  ```ts
+  // before
+  import type { IClassConfig, ILogger } from '@mcp-abap-adt/adt-clients';
+  // after
+  import type { IClassConfig, ILogger } from '@mcp-abap-adt/interfaces';
+  ```
+
+  The first pass removed seventeen and reported the job done. It was not: that scan looked at a single barrel, and types reached the root through several. The count came from asking the compiler for both packages' export sets and intersecting them, which is the only way to get it right.
+
+  Seventeen of them were republished from the root — thirteen under de-`I`-prefixed aliases (`IObjectReference` as `ObjectReference`, `IPackageHierarchyNode` as `PackageHierarchyNode`, and so on) plus four under their own names. Import them from `@mcp-abap-adt/interfaces` directly:
 
   ```ts
   // before

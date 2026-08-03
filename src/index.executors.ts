@@ -10,7 +10,6 @@ export type {
   IClassExecuteWithProfilingResult,
   IClassExecutionTarget,
   IClassExecutor,
-  IExecutor,
   IProgramExecuteWithProfilerOptions,
   IProgramExecuteWithProfilingOptions,
   IProgramExecuteWithProfilingResult,

@@ -205,7 +205,7 @@ await utils.getWhereUsed({ object_name: 'ZCL_TEST', object_type: 'class' });
 
 ```typescript
 import { AdtClientsWS } from '@mcp-abap-adt/adt-clients';
-import type { IWebSocketTransport } from '@mcp-abap-adt/adt-clients';
+import type { IWebSocketTransport } from '@mcp-abap-adt/interfaces';
 
 const transport: IWebSocketTransport = createYourTransport();
 const wsClient = new AdtClientsWS(transport, console, {
@@ -537,23 +537,21 @@ everything else is not.
 
 ### Single Definition Site: `@mcp-abap-adt/interfaces`
 
-Since **7.5.0**, every public type is **defined once**, in `@mcp-abap-adt/interfaces` (`^11.0.0`). This package no longer declares its own copies — the low-level `*Params` interfaces, every `IXxxConfig`/`IXxxState` pair, the option/result types, and the cross-cutting types in `src/core/shared/types.ts` are all re-exports.
+Since **7.5.0**, every public type is **defined once**, in `@mcp-abap-adt/interfaces` (`^13.1.0`). This package declares no copies of its own — the low-level `*Params` interfaces, every `IXxxConfig`/`IXxxState` pair, the option/result types and the cross-cutting shared types all live there.
 
-**Prefer importing types straight from the contract package:**
+**Import them from the package that owns them:**
 
 ```typescript
-// Recommended — import types from the contract package
 import type {
   IClassConfig,
   IClassState,
-  IProgramConfig
+  IProgramConfig,
 } from '@mcp-abap-adt/interfaces';
-
-// Still works — this package re-exports the same types unchanged
-import type { IClassConfig } from '@mcp-abap-adt/adt-clients';
 ```
 
-Both forms resolve to the identical type. The re-exports exist so that existing code keeps compiling; new code should depend on `@mcp-abap-adt/interfaces` directly, so that types travel independently of this client's release cycle.
+Since **9.0.0** this is the only route: the package no longer re-exports types it does not own. It used to republish 145 of them, which was more than half its public surface — so a consumer could hold `IClassConfig` believing it came from this client, and a type would appear to change whenever this client released, for reasons that had nothing to do with it. Types now travel on the contract package's release cycle, which is where they are actually decided.
+
+What this package exports is what it owns: the clients, the handler classes, the batch and runtime facades, and a few helpers.
 
 ### Honest capability types (since 8.0.0)
 
@@ -684,7 +682,7 @@ DEBUG_ADT_TESTS=true npm test
 All clients accept a unified `ILogger` interface:
 
 ```typescript
-import type { ILogger } from '@mcp-abap-adt/adt-clients';
+import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { AdtClient } from '@mcp-abap-adt/adt-clients';
 
 // Custom logger example

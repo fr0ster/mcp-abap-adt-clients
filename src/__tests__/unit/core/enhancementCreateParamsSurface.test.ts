@@ -1,13 +1,13 @@
 /**
- * Public API-surface guard: ICreateEnhancementParams is publicly exported
- * (src/index.core.ts -> src/index.ts). Its `source_code` field is a deprecated
- * no-op that is intentionally KEPT for backward compatibility (removing it would
- * break TS consumers). This test imports from the published barrel — not from
- * core/enhancement/types — so it guards the real exported surface, including the
- * barrel re-export. If the field or its export is removed, the type index below
- * stops compiling and this suite fails to build.
+ * Guard on a deprecated field this package still relies on.
+ *
+ * `ICreateEnhancementParams.source_code` is a no-op kept for backward
+ * compatibility: removing it would break TS consumers. The guard survives, but
+ * it now points at `@mcp-abap-adt/interfaces`, which owns the type — this
+ * package stopped re-exporting types it does not own, so importing it from the
+ * barrel would be asserting a contract that is no longer ours to make.
  */
-import type { ICreateEnhancementParams } from '../../../index';
+import type { ICreateEnhancementParams } from '@mcp-abap-adt/interfaces';
 
 // Compile-time guards (checked by ts-jest at build):
 // 1. The field still exists on the exported type.
