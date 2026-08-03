@@ -5,10 +5,7 @@
  * Uses ADT validation endpoint: /sap/bc/adt/ddic/ddlx/sources/validation
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { AxiosError } from 'axios';
 import { ACCEPT_VALIDATION } from '../../constants/contentTypes';
 import { getTimeout } from '../../utils/timeouts';
@@ -22,7 +19,7 @@ import type { IMetadataExtensionValidationParams } from './types';
  *
  * @param connection - ABAP connection instance
  * @param params - Validation parameters
- * @returns Raw AxiosResponse from ADT validation endpoint (returns error response if object already exists)
+ * @returns Raw IAdtResponse from ADT validation endpoint (returns error response if object already exists)
  *
  * Response format:
  * - Success: <CHECK_RESULT>X</CHECK_RESULT>
@@ -31,7 +28,7 @@ import type { IMetadataExtensionValidationParams } from './types';
 export async function validateMetadataExtension(
   connection: IAbapConnection,
   params: IMetadataExtensionValidationParams,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const url = `/sap/bc/adt/ddic/ddlx/sources/validation`;
   const queryParams = new URLSearchParams({
     objtype: 'ddlxex',

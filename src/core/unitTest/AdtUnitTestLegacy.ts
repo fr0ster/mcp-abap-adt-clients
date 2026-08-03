@@ -10,8 +10,8 @@
  */
 
 import type {
-  IAdtResponse as AxiosResponse,
   IAdtOperationOptions,
+  IAdtResponse,
 } from '@mcp-abap-adt/interfaces';
 import { safeErrorMessage } from '../../utils/internalUtils';
 import { AdtUnitTest } from './AdtUnitTest';
@@ -86,7 +86,7 @@ export class AdtUnitTestLegacy extends AdtUnitTest {
   override async getStatus(
     _runId: string,
     _withLongPolling: boolean = true,
-  ): Promise<AxiosResponse> {
+  ): Promise<IAdtResponse> {
     if (this.lastStatusResponse) {
       return this.lastStatusResponse;
     }
@@ -102,7 +102,7 @@ export class AdtUnitTestLegacy extends AdtUnitTest {
   override async getResult(
     _runId: string,
     _options?: { withNavigationUris?: boolean; format?: 'abapunit' | 'junit' },
-  ): Promise<AxiosResponse> {
+  ): Promise<IAdtResponse> {
     if (this.lastResultResponse) {
       return this.lastResultResponse;
     }

@@ -3,9 +3,9 @@
  */
 
 import type {
-  IAdtResponse as AxiosResponse,
   HttpError,
   IAbapConnection,
+  IAdtResponse,
 } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
 import { ACCEPT_TRANSPORT } from '../../constants/contentTypes';
@@ -77,7 +77,7 @@ function parseTransportResponse(xmlData: string): Record<string, unknown> {
 export async function createTransport(
   connection: IAbapConnection,
   params: ICreateTransportParams,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   if (!params.description) {
     throw new Error('Transport description is required');
   }
@@ -127,7 +127,7 @@ export async function createTransport(
       statusText: response.statusText,
       headers: response.headers,
       config: response.config,
-    } as AxiosResponse;
+    } as IAdtResponse;
   } catch (error: unknown) {
     const e = error as HttpError;
     const errorMessage = e.response?.data

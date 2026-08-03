@@ -1,6 +1,6 @@
 import type {
-  IAdtResponse as AxiosResponse,
   IAbapConnection,
+  IAdtResponse,
   ILogger,
   IProfiler,
   IProfilerListOptions,
@@ -35,24 +35,24 @@ export class Profiler implements IProfiler {
     private readonly logger: ILogger,
   ) {}
 
-  async list(options?: IProfilerListOptions): Promise<AxiosResponse> {
+  async list(options?: IProfilerListOptions): Promise<IAdtResponse> {
     return listTraceFiles(this.connection, options);
   }
 
   /** @deprecated Use list() instead */
-  async listTraceFiles(options?: IProfilerListOptions): Promise<AxiosResponse> {
+  async listTraceFiles(options?: IProfilerListOptions): Promise<IAdtResponse> {
     return this.list(options);
   }
 
-  async getParameters(): Promise<AxiosResponse> {
+  async getParameters(): Promise<IAdtResponse> {
     return getTraceParameters(this.connection);
   }
 
-  async getParametersForCallstack(): Promise<AxiosResponse> {
+  async getParametersForCallstack(): Promise<IAdtResponse> {
     return getTraceParametersForCallstack(this.connection);
   }
 
-  async getParametersForAmdp(): Promise<AxiosResponse> {
+  async getParametersForAmdp(): Promise<IAdtResponse> {
     return getTraceParametersForAmdp(this.connection);
   }
 
@@ -62,11 +62,11 @@ export class Profiler implements IProfiler {
 
   async createParameters(
     options?: IProfilerTraceParameters,
-  ): Promise<AxiosResponse> {
+  ): Promise<IAdtResponse> {
     return createTraceParameters(this.connection, options);
   }
 
-  extractIdFromResponse(response: AxiosResponse): string | undefined {
+  extractIdFromResponse(response: IAdtResponse): string | undefined {
     return extractProfilerIdFromResponse(response);
   }
 
@@ -77,37 +77,37 @@ export class Profiler implements IProfiler {
   async getHitList(
     traceIdOrUri: string,
     options?: IProfilerTraceHitListOptions,
-  ): Promise<AxiosResponse> {
+  ): Promise<IAdtResponse> {
     return getTraceHitList(this.connection, traceIdOrUri, options);
   }
 
   async getStatements(
     traceIdOrUri: string,
     options?: IProfilerTraceStatementsOptions,
-  ): Promise<AxiosResponse> {
+  ): Promise<IAdtResponse> {
     return getTraceStatements(this.connection, traceIdOrUri, options);
   }
 
   async getDbAccesses(
     traceIdOrUri: string,
     options?: IProfilerTraceDbAccessesOptions,
-  ): Promise<AxiosResponse> {
+  ): Promise<IAdtResponse> {
     return getTraceDbAccesses(this.connection, traceIdOrUri, options);
   }
 
-  async listRequests(): Promise<AxiosResponse> {
+  async listRequests(): Promise<IAdtResponse> {
     return listTraceRequests(this.connection);
   }
 
-  async getRequestsByUri(uri: string): Promise<AxiosResponse> {
+  async getRequestsByUri(uri: string): Promise<IAdtResponse> {
     return getTraceRequestsByUri(this.connection, uri);
   }
 
-  async listObjectTypes(): Promise<AxiosResponse> {
+  async listObjectTypes(): Promise<IAdtResponse> {
     return listObjectTypes(this.connection);
   }
 
-  async listProcessTypes(): Promise<AxiosResponse> {
+  async listProcessTypes(): Promise<IAdtResponse> {
     return listProcessTypes(this.connection);
   }
 }

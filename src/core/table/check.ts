@@ -2,10 +2,7 @@
  * Table check operations
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_CHECK_MESSAGES,
   CT_CHECK_OBJECTS,
@@ -66,7 +63,7 @@ export async function runTableCheckRun(
   tableName: string,
   sourceCode?: string,
   version: string = 'new',
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const payload = buildCheckRunPayload(tableName, sourceCode, version);
   const headers = {
     Accept: ACCEPT_CHECK_MESSAGES,

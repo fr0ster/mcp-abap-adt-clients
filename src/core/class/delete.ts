@@ -2,10 +2,7 @@
  * Class delete operations - Low-level functions
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_DELETION,
   ACCEPT_DELETION_CHECK,
@@ -22,7 +19,7 @@ import type { IDeleteClassParams } from './types';
 export async function checkDeletion(
   connection: IAbapConnection,
   params: IDeleteClassParams,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const { class_name } = params;
 
   if (!class_name) {
@@ -59,7 +56,7 @@ export async function checkDeletion(
 export async function deleteClass(
   connection: IAbapConnection,
   params: IDeleteClassParams,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const { class_name, transport_request } = params;
 
   if (!class_name) {
@@ -108,5 +105,5 @@ export async function deleteClass(
       transport_request: transport_request || 'local',
       message: `Class ${class_name} deleted successfully`,
     },
-  } as AxiosResponse;
+  } as IAdtResponse;
 }

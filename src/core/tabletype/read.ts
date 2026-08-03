@@ -3,9 +3,9 @@
  */
 
 import type {
-  IAdtResponse as AxiosResponse,
   HttpError,
   IAbapConnection,
+  IAdtResponse,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import {
@@ -26,7 +26,7 @@ export async function getTableTypeMetadata(
   tableTypeName: string,
   options?: IReadOptions,
   logger?: ILogger,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const encodedName = encodeSapObjectName(tableTypeName);
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
   const url = `/sap/bc/adt/ddic/tabletypes/${encodedName}${query}`;
@@ -79,7 +79,7 @@ export async function getTableTypeSource(
   version?: 'active' | 'inactive',
   options?: IReadOptions,
   logger?: ILogger,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const encodedName = encodeSapObjectName(tableTypeName);
   const versionParam = version ? `version=${version}` : '';
   const longPollingParam = options?.withLongPolling
@@ -114,7 +114,7 @@ export async function getTableTypeSource(
 export async function getTableType(
   connection: IAbapConnection,
   tableTypeName: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   return getTableTypeSource(connection, tableTypeName);
 }
 
@@ -128,7 +128,7 @@ export async function getTableTypeTransport(
   connection: IAbapConnection,
   tableTypeName: string,
   options?: IReadOptions,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const encodedName = encodeSapObjectName(tableTypeName);
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
   const url = `/sap/bc/adt/ddic/tabletypes/${encodedName}/transport${query}`;

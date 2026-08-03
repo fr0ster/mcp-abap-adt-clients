@@ -2,10 +2,7 @@
  * Class check operations
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_CHECK_MESSAGES,
   CT_CHECK_OBJECTS,
@@ -33,11 +30,11 @@ export async function checkClass(
   version: 'active' | 'inactive',
   sourceCode?: string,
   artifactContentType?: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const { runCheckRun, runCheckRunWithSource, parseCheckRunResponse } =
     await import('../../utils/checkRun');
 
-  let response: AxiosResponse;
+  let response: IAdtResponse;
 
   if (sourceCode) {
     // Validate hypothetical code (object doesn't need to exist)
@@ -90,7 +87,7 @@ export async function checkClassLocalTestClass(
   testClassSource: string,
   version: 'active' | 'inactive' = 'inactive',
   artifactContentType: string = 'text/plain; charset=utf-8',
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   return checkClassInclude(
     connection,
     className,
@@ -121,7 +118,7 @@ export async function checkClassLocalTypes(
   localTypesSource: string,
   version: 'active' | 'inactive' = 'inactive',
   artifactContentType: string = 'text/plain; charset=utf-8',
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   return checkClassInclude(
     connection,
     className,
@@ -152,7 +149,7 @@ export async function checkClassDefinitions(
   definitionsSource: string,
   version: 'active' | 'inactive' = 'inactive',
   artifactContentType: string = 'text/plain; charset=utf-8',
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   return checkClassInclude(
     connection,
     className,
@@ -183,7 +180,7 @@ export async function checkClassMacros(
   macrosSource: string,
   version: 'active' | 'inactive' = 'inactive',
   artifactContentType: string = 'text/plain; charset=utf-8',
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   return checkClassInclude(
     connection,
     className,
@@ -215,7 +212,7 @@ async function checkClassInclude(
   version: 'active' | 'inactive' = 'inactive',
   includeName: string,
   artifactContentType: string = 'text/plain; charset=utf-8',
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const { getTimeout } = await import('../../utils/timeouts');
   const { encodeSapObjectName } = await import('../../utils/internalUtils');
   const { parseCheckRunResponse } = await import('../../utils/checkRun');

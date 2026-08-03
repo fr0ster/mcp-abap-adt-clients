@@ -2,10 +2,7 @@
  * View read operations
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_TRANSPORT } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { noopLogger } from '../../utils/noopLogger';
@@ -24,7 +21,7 @@ export async function getDdlMetadata(
   connection: IAbapConnection,
   ddlName: string,
   options?: IReadOptions,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   return getUtils(connection).readObjectMetadata(
     'view',
     ddlName,
@@ -41,7 +38,7 @@ export async function getDdlSource(
   ddlName: string,
   version?: 'active' | 'inactive',
   options?: IReadOptions,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   return getUtils(connection).readObjectSource(
     'view',
     ddlName,
@@ -58,7 +55,7 @@ export async function getDdlSource(
 export async function getDdl(
   connection: IAbapConnection,
   ddlName: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   return getDdlSource(connection, ddlName);
 }
 
@@ -72,7 +69,7 @@ export async function getDdlTransport(
   connection: IAbapConnection,
   ddlName: string,
   options?: IReadOptions,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const encodedName = encodeSapObjectName(ddlName);
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
   const url = `/sap/bc/adt/ddic/ddl/sources/${encodedName}/transport${query}`;

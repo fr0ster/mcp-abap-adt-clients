@@ -2,10 +2,7 @@
  * Program read operations
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_TRANSPORT } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { noopLogger } from '../../utils/noopLogger';
@@ -24,7 +21,7 @@ export async function getProgramMetadata(
   connection: IAbapConnection,
   programName: string,
   options?: IReadOptions,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   return getUtils(connection).readObjectMetadata(
     'program',
     programName,
@@ -41,7 +38,7 @@ export async function getProgramSource(
   programName: string,
   version?: 'active' | 'inactive',
   options?: IReadOptions,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   return getUtils(connection).readObjectSource(
     'program',
     programName,
@@ -58,7 +55,7 @@ export async function getProgramSource(
 export async function getProgram(
   connection: IAbapConnection,
   programName: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   return getProgramSource(connection, programName);
 }
 
@@ -72,7 +69,7 @@ export async function getProgramTransport(
   connection: IAbapConnection,
   programName: string,
   options?: IReadOptions,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const encodedName = encodeSapObjectName(programName);
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
   const url = `/sap/bc/adt/programs/programs/${encodedName}/transport${query}`;

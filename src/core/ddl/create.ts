@@ -2,10 +2,7 @@
  * View create operations
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_VIEW, CT_VIEW } from '../../constants/contentTypes';
 import { limitDescription } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -17,7 +14,7 @@ import type { ICreateDdlParams } from './types';
 async function createDDLSObject(
   connection: IAbapConnection,
   args: ICreateDdlParams,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   // Description is limited to 60 characters in SAP ADT
   const description = limitDescription(args.description || args.ddl_name);
   // Check if transport_request is provided and not empty
@@ -62,7 +59,7 @@ async function createDDLSObject(
 export async function createDdl(
   connection: IAbapConnection,
   params: ICreateDdlParams,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   if (!params.ddl_name || !params.package_name) {
     throw new Error('Missing required parameters: ddl_name and package_name');
   }

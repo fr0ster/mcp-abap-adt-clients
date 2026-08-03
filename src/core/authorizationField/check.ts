@@ -2,10 +2,7 @@
  * AuthorizationField (SUSO / AUTH) check operations
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_CHECK_MESSAGES,
   CT_AUTHORIZATION_FIELD,
@@ -30,7 +27,7 @@ export async function checkAuthorizationField(
   name: string,
   version: 'active' | 'inactive',
   xmlContent?: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   if (!name) {
     throw new Error('Authorization field name is required');
   }

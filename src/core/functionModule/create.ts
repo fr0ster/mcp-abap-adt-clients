@@ -2,10 +2,7 @@
  * FunctionModule create operations
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { CT_FUNCTION_MODULE } from '../../constants/contentTypes';
 import {
   encodeSapObjectName,
@@ -21,7 +18,7 @@ import type { ICreateFunctionModuleParams } from './types';
 export async function create(
   connection: IAbapConnection,
   params: ICreateFunctionModuleParams,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const encodedGroupName = encodeSapObjectName(
     params.functionGroupName,
   ).toLowerCase();

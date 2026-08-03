@@ -5,10 +5,7 @@
  * ADT object properties endpoint.
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
@@ -36,7 +33,7 @@ import { getTimeout } from '../../utils/timeouts';
 export async function getTransaction(
   connection: IAbapConnection,
   transactionName: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   if (!transactionName) {
     throw new Error('Transaction name is required');
   }

@@ -3,10 +3,7 @@
  * NOTE: Caller should call connection.setSessionType("stateful") before creating
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { CT_SERVICE_DEFINITION } from '../../constants/contentTypes';
 import { limitDescription } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -19,7 +16,7 @@ import type { ICreateServiceDefinitionParams } from './types';
 export async function create(
   connection: IAbapConnection,
   args: ICreateServiceDefinitionParams,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const url = `/sap/bc/adt/ddic/srvd/sources${args.transport_request ? `?corrNr=${args.transport_request}` : ''}`;
 
   const username = args.responsible || '';

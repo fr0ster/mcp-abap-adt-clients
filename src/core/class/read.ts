@@ -3,8 +3,8 @@
  */
 
 import type {
-  IAdtResponse as AxiosResponse,
   IAbapConnection,
+  IAdtResponse,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_SOURCE, ACCEPT_TRANSPORT } from '../../constants/contentTypes';
@@ -28,7 +28,7 @@ export async function getClassMetadata(
   connection: IAbapConnection,
   className: string,
   options?: IReadOptions,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   return getUtils(connection).readObjectMetadata(
     'class',
     className,
@@ -48,7 +48,7 @@ export async function getClassSource(
   className: string,
   version?: 'active' | 'inactive',
   options?: IReadOptions,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   return getUtils(connection).readObjectSource(
     'class',
     className,
@@ -69,7 +69,7 @@ export async function getClass(
   connection: IAbapConnection,
   className: string,
   version: 'active' | 'inactive' = 'active',
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   return getClassSource(connection, className, version);
 }
 
@@ -83,7 +83,7 @@ export async function getClassTransport(
   connection: IAbapConnection,
   className: string,
   options?: IReadOptions,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const encodedName = encodeSapObjectName(className);
   let url = `/sap/bc/adt/oo/classes/${encodedName}/transport`;
   if (options?.withLongPolling) {
@@ -112,7 +112,7 @@ export async function getClassDefinitionsInclude(
   version: 'active' | 'inactive' = 'active',
   logger?: ILogger,
   options?: IReadOptions,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const encodedName = encodeSapObjectName(className);
   const versionParam = version === 'inactive' ? 'workingArea' : 'active';
   const url = `/sap/bc/adt/oo/classes/${encodedName}/includes/definitions?version=${versionParam}`;
@@ -143,7 +143,7 @@ export async function getClassMacrosInclude(
   version: 'active' | 'inactive' = 'active',
   logger?: ILogger,
   options?: IReadOptions,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const encodedName = encodeSapObjectName(className);
   const versionParam = version === 'inactive' ? 'workingArea' : 'active';
   const url = `/sap/bc/adt/oo/classes/${encodedName}/includes/macros?version=${versionParam}`;
@@ -174,7 +174,7 @@ export async function getClassTestClassesInclude(
   version: 'active' | 'inactive' = 'active',
   logger?: ILogger,
   options?: IReadOptions,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const encodedName = encodeSapObjectName(className);
   const versionParam = version === 'inactive' ? 'workingArea' : 'active';
   const url = `/sap/bc/adt/oo/classes/${encodedName}/includes/testclasses?version=${versionParam}`;
@@ -205,7 +205,7 @@ export async function getClassImplementationsInclude(
   version: 'active' | 'inactive' = 'active',
   logger?: ILogger,
   options?: IReadOptions,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const encodedName = encodeSapObjectName(className);
   const versionParam = version === 'inactive' ? 'workingArea' : 'active';
   const url = `/sap/bc/adt/oo/classes/${encodedName}/includes/implementations?version=${versionParam}`;

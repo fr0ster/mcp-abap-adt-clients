@@ -6,10 +6,7 @@
  * 2. Group activation: /sap/bc/adt/activation/runs (for multiple objects)
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
 import { CT_ACTIVATION } from '../constants/contentTypes';
 import { encodeSapObjectName } from './internalUtils';
@@ -244,7 +241,7 @@ export async function activateObjectInSession(
   objectUri: string,
   objectName: string,
   preaudit: boolean = true,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const url = `/sap/bc/adt/activation?method=activate&preauditRequested=${preaudit}`;
 
   const activationXml = `<?xml version="1.0" encoding="UTF-8"?>

@@ -1,7 +1,4 @@
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { parseCheckRunResponse, runCheckRun } from '../../utils/checkRun';
 
 export async function checkScalarFunctionImplementation(
@@ -9,7 +6,7 @@ export async function checkScalarFunctionImplementation(
   name: string,
   version: string = 'inactive',
   sourceCode?: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const response = await runCheckRun(
     connection,
     'scalar_function_implementation',

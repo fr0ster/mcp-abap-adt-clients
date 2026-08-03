@@ -7,9 +7,9 @@
  */
 
 import type {
-  IAdtResponse as AxiosResponse,
   HttpError,
   IAbapConnection,
+  IAdtResponse,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { CT_TABLE_TYPE } from '../../constants/contentTypes';
@@ -74,7 +74,7 @@ export async function updateTableType(
   params: IUpdateTableTypeParams,
   lockHandle: string,
   logger?: ILogger,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   if (!params.tabletype_name) {
     throw new Error('tabletype_name is required');
   }

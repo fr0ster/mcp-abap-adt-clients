@@ -1,7 +1,7 @@
 import type {
-  IAdtResponse as AxiosResponse,
   HttpError,
   IAbapConnection,
+  IAdtResponse,
 } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_VALIDATION } from '../../constants/contentTypes';
 import { getTimeout } from '../../utils/timeouts';
@@ -36,7 +36,7 @@ import type { IBehaviorDefinitionValidationParams } from './types';
 export async function validate(
   connection: IAbapConnection,
   params: IBehaviorDefinitionValidationParams,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   try {
     const queryParams = new URLSearchParams({
       objname: params.objname,

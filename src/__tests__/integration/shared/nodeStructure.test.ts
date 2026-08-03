@@ -7,10 +7,10 @@
 
 import { createAbapConnection } from '@mcp-abap-adt/connection';
 import type {
-  IAdtResponse as AxiosResponse,
   IAbapConnection,
   IAdtObject,
   IAdtOperationOptions,
+  IAdtResponse,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import type { AdtClient } from '../../../clients/AdtClient';
@@ -48,7 +48,7 @@ const libraryLogger: ILogger = createLibraryLogger();
 const testsLogger: ILogger = createTestsLogger();
 
 class NodeStructureObject
-  implements IAdtObject<INodeStructureParams, AxiosResponse>
+  implements IAdtObject<INodeStructureParams, IAdtResponse>
 {
   private client: AdtClient;
 
@@ -70,14 +70,14 @@ class NodeStructureObject
     return this.rejectUnsupported<never>('getVersionSource');
   }
 
-  validate(_config: Partial<INodeStructureParams>): Promise<AxiosResponse> {
+  validate(_config: Partial<INodeStructureParams>): Promise<IAdtResponse> {
     return this.rejectUnsupported('validate');
   }
 
   create(
     _config: INodeStructureParams,
     _options?: IAdtOperationOptions,
-  ): Promise<AxiosResponse> {
+  ): Promise<IAdtResponse> {
     return this.rejectUnsupported('create');
   }
 
@@ -85,7 +85,7 @@ class NodeStructureObject
     config: Partial<INodeStructureParams>,
     _version?: 'active' | 'inactive',
     _options?: { withLongPolling?: boolean },
-  ): Promise<AxiosResponse | undefined> {
+  ): Promise<IAdtResponse | undefined> {
     if (!config.parent_type || !config.parent_name) {
       return Promise.reject(new Error('parent_type and parent_name required'));
     }
@@ -102,36 +102,36 @@ class NodeStructureObject
   readMetadata(
     _config: Partial<INodeStructureParams>,
     _options?: { withLongPolling?: boolean },
-  ): Promise<AxiosResponse> {
+  ): Promise<IAdtResponse> {
     return this.rejectUnsupported('readMetadata');
   }
 
   update(
     _config: Partial<INodeStructureParams>,
     _options?: IAdtOperationOptions,
-  ): Promise<AxiosResponse> {
+  ): Promise<IAdtResponse> {
     return this.rejectUnsupported('update');
   }
 
-  delete(_config: Partial<INodeStructureParams>): Promise<AxiosResponse> {
+  delete(_config: Partial<INodeStructureParams>): Promise<IAdtResponse> {
     return this.rejectUnsupported('delete');
   }
 
-  activate(_config: Partial<INodeStructureParams>): Promise<AxiosResponse> {
+  activate(_config: Partial<INodeStructureParams>): Promise<IAdtResponse> {
     return this.rejectUnsupported('activate');
   }
 
   check(
     _config: Partial<INodeStructureParams>,
     _status?: string,
-  ): Promise<AxiosResponse> {
+  ): Promise<IAdtResponse> {
     return this.rejectUnsupported('check');
   }
 
   readTransport(
     _config: Partial<INodeStructureParams>,
     _options?: { withLongPolling?: boolean },
-  ): Promise<AxiosResponse> {
+  ): Promise<IAdtResponse> {
     return this.rejectUnsupported('readTransport');
   }
 
@@ -142,7 +142,7 @@ class NodeStructureObject
   unlock(
     _config: Partial<INodeStructureParams>,
     _lockHandle: string,
-  ): Promise<AxiosResponse> {
+  ): Promise<IAdtResponse> {
     return this.rejectUnsupported('unlock');
   }
 }
@@ -153,7 +153,7 @@ describe('Shared - fetchNodeStructure', () => {
   let hasConfig = false;
   let isLegacy = false;
   let isCloudSystem = false;
-  let tester: BaseTester<INodeStructureParams, AxiosResponse>;
+  let tester: BaseTester<INodeStructureParams, IAdtResponse>;
 
   beforeAll(async () => {
     try {

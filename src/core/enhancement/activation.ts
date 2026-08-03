@@ -2,10 +2,7 @@
  * Enhancement activation operations
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { activateObjectInSession } from '../../utils/activationUtils';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { type EnhancementType, getEnhancementUri } from './types';
@@ -25,7 +22,7 @@ export async function activateEnhancement(
   connection: IAbapConnection,
   enhancementType: EnhancementType,
   enhancementName: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const encodedName = encodeSapObjectName(enhancementName).toLowerCase();
   const objectUri = getEnhancementUri(enhancementType, encodedName);
 

@@ -1,6 +1,6 @@
 import type {
-  IAdtResponse as AxiosResponse,
   IAbapConnection,
+  IAdtResponse,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { parseCheckRunResponse, runCheckRun } from '../../utils/checkRun';
@@ -25,7 +25,7 @@ export async function checkAccessControl(
   version: string = 'inactive',
   sourceCode?: string,
   logger?: ILogger,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   for (let attempt = 0; attempt < 2; attempt++) {
     const response = await runCheckRun(
       connection,

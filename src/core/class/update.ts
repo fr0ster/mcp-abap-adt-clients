@@ -2,10 +2,7 @@
  * Class update operations
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -37,7 +34,7 @@ export async function updateClassWithCheck(
   lockHandle: string,
   transportRequest?: string,
   sourceContentType?: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   if (!sourceCode) {
     throw new Error('source_code is required');
   }
@@ -91,7 +88,7 @@ export async function updateClass(
   lockHandle: string,
   transportRequest?: string,
   sourceContentType?: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   if (!sourceCode) {
     throw new Error('source_code is required');
   }
@@ -134,7 +131,7 @@ export async function updateClassImplementations(
   lockHandle: string,
   transportRequest?: string,
   sourceContentType?: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   if (!implementationCode) {
     throw new Error('implementationCode is required');
   }

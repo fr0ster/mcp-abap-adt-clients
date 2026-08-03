@@ -2,10 +2,7 @@
  * Domain delete operations - Low-level functions
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_DELETION,
   ACCEPT_DELETION_CHECK,
@@ -22,7 +19,7 @@ import type { IDeleteDomainParams } from './types';
 export async function checkDeletion(
   connection: IAbapConnection,
   params: IDeleteDomainParams,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const { domain_name } = params;
 
   if (!domain_name) {
@@ -59,7 +56,7 @@ export async function checkDeletion(
 export async function deleteDomain(
   connection: IAbapConnection,
   params: IDeleteDomainParams,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const { domain_name, transport_request } = params;
 
   if (!domain_name) {
@@ -108,5 +105,5 @@ export async function deleteDomain(
       transport_request: transport_request || 'local',
       message: `Domain ${domain_name} deleted successfully`,
     },
-  } as AxiosResponse;
+  } as IAdtResponse;
 }

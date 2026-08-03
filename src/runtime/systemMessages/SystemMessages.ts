@@ -5,8 +5,8 @@
  */
 
 import type {
-  IAdtResponse as AxiosResponse,
   IAbapConnection,
+  IAdtResponse,
   IFeedQueryOptions,
   ILogger,
   ISystemMessages,
@@ -20,11 +20,11 @@ export class SystemMessages implements ISystemMessages {
     private readonly logger: ILogger,
   ) {}
 
-  async list(options?: IFeedQueryOptions): Promise<AxiosResponse> {
+  async list(options?: IFeedQueryOptions): Promise<IAdtResponse> {
     return listSystemMessages(this.connection, options);
   }
 
-  async getById(messageId: string): Promise<AxiosResponse> {
+  async getById(messageId: string): Promise<IAdtResponse> {
     return getSystemMessage(this.connection, messageId);
   }
 }

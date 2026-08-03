@@ -3,8 +3,8 @@
  */
 
 import type {
-  IAdtResponse as AxiosResponse,
   IAbapConnection,
+  IAdtResponse,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_SOURCE } from '../../constants/contentTypes';
@@ -27,7 +27,7 @@ export async function getBehaviorImplementationMetadata(
   className: string,
   options?: IReadOptions,
   logger?: ILogger,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   return getUtils(connection, logger).readObjectMetadata(
     'class',
     className,
@@ -48,7 +48,7 @@ export async function getBehaviorImplementationSource(
   version?: 'active' | 'inactive',
   options?: IReadOptions,
   logger?: ILogger,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   return getUtils(connection, logger).readObjectSource(
     'class',
     className,
@@ -70,7 +70,7 @@ export async function getBehaviorImplementationImplementations(
   version: 'active' | 'inactive' | 'workingArea' = 'active',
   options?: IReadOptions,
   logger?: ILogger,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const { encodeSapObjectName } = await import('../../utils/internalUtils');
   const { getTimeout } = await import('../../utils/timeouts');
 
@@ -101,7 +101,7 @@ export async function getBehaviorImplementationTransport(
   connection: IAbapConnection,
   className: string,
   options?: IReadOptions,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   // Behavior implementation is a class, so use class transport endpoint
   const { getClassTransport } = await import('../class/read');
   return getClassTransport(connection, className, options);

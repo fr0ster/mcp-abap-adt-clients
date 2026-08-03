@@ -1,6 +1,6 @@
 import type {
-  IAdtResponse as AxiosResponse,
   IAbapConnection,
+  IAdtResponse,
   IExecutor,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
@@ -26,7 +26,7 @@ export interface IProgramExecuteWithProfilingOptions {
 }
 
 export interface IProgramExecuteWithProfilingResult {
-  response: AxiosResponse;
+  response: IAdtResponse;
   profilerId: string;
   // traceId is NOT included — program execution is fire-and-forget.
   // Traces are written asynchronously by SAP after the program completes.
@@ -36,7 +36,7 @@ export interface IProgramExecuteWithProfilingResult {
 export interface IProgramExecutor
   extends IExecutor<
     IProgramExecutionTarget,
-    AxiosResponse,
+    IAdtResponse,
     IProgramExecuteWithProfilerOptions,
     IProgramExecuteWithProfilingOptions,
     IProgramExecuteWithProfilingResult
@@ -49,7 +49,7 @@ export class ProgramExecutor implements IProgramExecutor {
     this.connection = connection;
   }
 
-  async run(target: IProgramExecutionTarget): Promise<AxiosResponse> {
+  async run(target: IProgramExecutionTarget): Promise<IAdtResponse> {
     if (!target.programName) {
       throw new Error('Program name is required');
     }
@@ -59,7 +59,7 @@ export class ProgramExecutor implements IProgramExecutor {
   async runWithProfiler(
     target: IProgramExecutionTarget,
     options: IProgramExecuteWithProfilerOptions,
-  ): Promise<AxiosResponse> {
+  ): Promise<IAdtResponse> {
     if (!target.programName) {
       throw new Error('Program name is required');
     }
@@ -105,7 +105,7 @@ export class ProgramExecutor implements IProgramExecutor {
   private async runWithProfilerId(
     programName: string,
     profilerId: string,
-  ): Promise<AxiosResponse> {
+  ): Promise<IAdtResponse> {
     const normalizedProgramName =
       encodeSapObjectName(programName).toUpperCase();
     const encodedProfilerId = encodeURIComponent(profilerId);

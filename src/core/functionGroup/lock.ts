@@ -2,10 +2,7 @@
  * Lock Function Group operations
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
 import { ACCEPT_LOCK } from '../../constants/contentTypes';
 import { headerValueToString } from '../../utils/internalUtils';
@@ -65,14 +62,14 @@ export async function lockFunctionGroup(
  * @param functionGroupName - Name of the function group
  * @param lockHandle - Lock handle from lockFunctionGroup
  * @param sessionId - Optional session ID for tracking
- * @returns AxiosResponse from unlock request
+ * @returns IAdtResponse from unlock request
  */
 export async function unlockFunctionGroup(
   connection: IAbapConnection,
   functionGroupName: string,
   lockHandle: string,
   _sessionId: string = '',
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const url = `/sap/bc/adt/functions/groups/${functionGroupName.toLowerCase()}?_action=UNLOCK&lockHandle=${encodeURIComponent(lockHandle)}`;
 
   return connection.makeAdtRequest({

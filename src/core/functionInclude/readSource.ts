@@ -2,10 +2,7 @@
  * FunctionInclude (FUGR/I) source read operations
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_SOURCE } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -18,7 +15,7 @@ export async function readFunctionIncludeSource(
   groupName: string,
   includeName: string,
   version: 'active' | 'inactive' = 'active',
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   if (!groupName) {
     throw new Error('Function group name is required');
   }

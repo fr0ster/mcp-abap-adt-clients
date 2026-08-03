@@ -2,10 +2,7 @@
  * ServiceDefinition check operations
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { parseCheckRunResponse, runCheckRun } from '../../utils/checkRun';
 
 /**
@@ -16,7 +13,7 @@ export async function checkServiceDefinition(
   serviceDefinitionName: string,
   version: string = 'inactive',
   sourceCode?: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const response = await runCheckRun(
     connection,
     'service_definition',

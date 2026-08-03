@@ -1,7 +1,4 @@
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_SCALAR_FUNCTION_IMPL_SOURCE,
   CT_SCALAR_FUNCTION_IMPL_SOURCE,
@@ -14,7 +11,7 @@ export async function updateScalarFunctionImplementation(
   connection: IAbapConnection,
   args: IUpdateScalarFunctionImplementationParams,
   lockHandle: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const encoded = encodeSapObjectName(args.implementation_name.toLowerCase());
   const corrNrParam = args.transport_request
     ? `&corrNr=${encodeURIComponent(args.transport_request)}`

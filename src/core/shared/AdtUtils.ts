@@ -29,8 +29,8 @@
  */
 
 import type {
-  IAdtResponse as AxiosResponse,
   IAbapConnection,
+  IAdtResponse,
   IAdtSearchable,
   ILogger,
   ISearchResult,
@@ -128,7 +128,7 @@ export class AdtUtils
    * @param params - Search parameters
    * @returns Search results
    */
-  async searchObjects(params: ISearchObjectsParams): Promise<AxiosResponse> {
+  async searchObjects(params: ISearchObjectsParams): Promise<IAdtResponse> {
     return searchObjects(this.connection, params);
   }
 
@@ -152,7 +152,7 @@ export class AdtUtils
    */
   async getVirtualFoldersContents(
     params: IGetVirtualFoldersContentsParams,
-  ): Promise<AxiosResponse> {
+  ): Promise<IAdtResponse> {
     return getVirtualFoldersContents(this.connection, params);
   }
 
@@ -190,7 +190,7 @@ export class AdtUtils
    */
   async getWhereUsedScope(
     params: IGetWhereUsedScopeParams,
-  ): Promise<AxiosResponse> {
+  ): Promise<IAdtResponse> {
     return getWhereUsedScope(this.connection, params);
   }
 
@@ -269,7 +269,7 @@ export class AdtUtils
    *   searchInAllTypes: ['CLAS/OC', 'INTF/OI']
    * });
    */
-  async getWhereUsed(params: IGetWhereUsedParams): Promise<AxiosResponse> {
+  async getWhereUsed(params: IGetWhereUsedParams): Promise<IAdtResponse> {
     return getWhereUsed(this.connection, params);
   }
 
@@ -324,7 +324,7 @@ export class AdtUtils
   async activateObjectsGroup(
     objects: IObjectReference[],
     preauditRequested: boolean = false,
-  ): Promise<AxiosResponse> {
+  ): Promise<IAdtResponse> {
     return activateObjectsGroup(this.connection, objects, preauditRequested);
   }
 
@@ -334,9 +334,7 @@ export class AdtUtils
    * @param objects - Array of object references to check
    * @returns Check result
    */
-  async checkDeletionGroup(
-    objects: IObjectReference[],
-  ): Promise<AxiosResponse> {
+  async checkDeletionGroup(objects: IObjectReference[]): Promise<IAdtResponse> {
     return checkDeletionGroup(this.connection, objects);
   }
 
@@ -350,7 +348,7 @@ export class AdtUtils
   async deleteObjectsGroup(
     objects: IObjectReference[],
     transportRequest?: string,
-  ): Promise<AxiosResponse> {
+  ): Promise<IAdtResponse> {
     return deleteObjectsGroup(this.connection, objects, transportRequest);
   }
 
@@ -370,7 +368,7 @@ export class AdtUtils
     objectName: string,
     functionGroup?: string,
     options?: IReadOptions,
-  ): Promise<AxiosResponse> {
+  ): Promise<IAdtResponse> {
     let uri = getObjectMetadataUri(objectType, objectName, functionGroup);
     const params = [];
     if (options?.version) {
@@ -418,7 +416,7 @@ export class AdtUtils
     functionGroup?: string,
     version?: 'active' | 'inactive',
     options?: IReadOptions,
-  ): Promise<AxiosResponse> {
+  ): Promise<IAdtResponse> {
     if (!supportsSourceCode(objectType)) {
       throw new Error(
         `Object type ${objectType} does not support source code reading`,
@@ -488,7 +486,7 @@ export class AdtUtils
    * @param params - SQL query parameters
    * @returns Query result
    */
-  async getSqlQuery(params: IGetSqlQueryParams): Promise<AxiosResponse> {
+  async getSqlQuery(params: IGetSqlQueryParams): Promise<IAdtResponse> {
     return getSqlQuery(this.connection, params);
   }
 
@@ -501,7 +499,7 @@ export class AdtUtils
    */
   async getTableContents(
     params: IGetTableContentsParams,
-  ): Promise<AxiosResponse> {
+  ): Promise<IAdtResponse> {
     return getTableContents(this.connection, params);
   }
 
@@ -511,7 +509,7 @@ export class AdtUtils
    * @param params - Optional request/timeout options
    * @returns Axios response with discovery XML
    */
-  async discovery(params: IGetDiscoveryParams = {}): Promise<AxiosResponse> {
+  async discovery(params: IGetDiscoveryParams = {}): Promise<IAdtResponse> {
     return getDiscoveryUtil(this.connection, params);
   }
 
@@ -535,7 +533,7 @@ export class AdtUtils
    * // Response contains XML with transaction properties
    * ```
    */
-  async getTransaction(transactionName: string): Promise<AxiosResponse> {
+  async getTransaction(transactionName: string): Promise<IAdtResponse> {
     return getTransaction(this.connection, transactionName);
   }
 
@@ -558,7 +556,7 @@ export class AdtUtils
   async getBdef(
     bdefName: string,
     version: 'active' | 'inactive' = 'active',
-  ): Promise<AxiosResponse> {
+  ): Promise<IAdtResponse> {
     return readBehaviorDefinitionSource(this.connection, bdefName, version);
   }
 
@@ -583,7 +581,7 @@ export class AdtUtils
     parentName: string,
     nodeId?: string,
     withShortDescriptions: boolean = true,
-  ): Promise<AxiosResponse> {
+  ): Promise<IAdtResponse> {
     return fetchNodeStructureUtil(
       this.connection,
       parentType,
@@ -619,7 +617,7 @@ export class AdtUtils
     objectName: string,
     objectType: 'program' | 'include' | 'class',
     context?: string,
-  ): Promise<AxiosResponse> {
+  ): Promise<IAdtResponse> {
     return getEnhancements(this.connection, objectName, objectType, context);
   }
 
@@ -690,7 +688,7 @@ export class AdtUtils
    * // Response contains XML with objects in the package
    * ```
    */
-  async getPackageContents(packageName: string): Promise<AxiosResponse> {
+  async getPackageContents(packageName: string): Promise<IAdtResponse> {
     return fetchNodeStructureUtil(
       this.connection,
       'DEVC/K',
@@ -779,7 +777,7 @@ export class AdtUtils
   async getObjectStructure(
     objectType: string,
     objectName: string,
-  ): Promise<AxiosResponse> {
+  ): Promise<IAdtResponse> {
     return getObjectStructureUtil(this.connection, objectType, objectName);
   }
 
@@ -797,7 +795,7 @@ export class AdtUtils
    * const sourceCode = response.data; // Include source code
    * ```
    */
-  async getInclude(includeName: string): Promise<AxiosResponse> {
+  async getInclude(includeName: string): Promise<IAdtResponse> {
     return getIncludeUtil(this.connection, includeName);
   }
 
@@ -814,7 +812,7 @@ export class AdtUtils
    * const response = await utils.getTypeInfo('ZMY_TYPE');
    * ```
    */
-  async getTypeInfo(typeName: string): Promise<AxiosResponse> {
+  async getTypeInfo(typeName: string): Promise<IAdtResponse> {
     return getTypeInfoUtil(this.connection, typeName);
   }
 
@@ -836,7 +834,7 @@ export class AdtUtils
   async getEnhancementImpl(
     enhancementSpot: string,
     enhancementName: string,
-  ): Promise<AxiosResponse> {
+  ): Promise<IAdtResponse> {
     return getEnhancementImplUtil(
       this.connection,
       enhancementSpot,
@@ -858,7 +856,7 @@ export class AdtUtils
    * const response = await utils.getEnhancementSpot('enhoxhh');
    * ```
    */
-  async getEnhancementSpot(enhancementSpot: string): Promise<AxiosResponse> {
+  async getEnhancementSpot(enhancementSpot: string): Promise<IAdtResponse> {
     return getEnhancementMetadata(
       this.connection,
       'enhsxsb',
@@ -888,7 +886,7 @@ export class AdtUtils
     maxItemCount: number = 999,
     name: string = '*',
     data: string = 'usedByProvider',
-  ): Promise<AxiosResponse> {
+  ): Promise<IAdtResponse> {
     return getAllTypesUtil(this.connection, maxItemCount, name, data);
   }
 }

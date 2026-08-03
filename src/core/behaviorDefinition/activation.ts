@@ -2,10 +2,7 @@
  * Behavior Definition activation operations
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { activateObjectInSession } from '../../utils/activationUtils';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 
@@ -31,7 +28,7 @@ export async function activate(
   connection: IAbapConnection,
   name: string,
   preauditRequested: boolean = true,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const objectUri = `/sap/bc/adt/bo/behaviordefinitions/${encodeSapObjectName(name).toLowerCase()}`;
   return await activateObjectInSession(
     connection,

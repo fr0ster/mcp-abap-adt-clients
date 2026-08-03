@@ -2,10 +2,7 @@
  * FunctionInclude (FUGR/I) create operations - Low-level functions
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_FUNCTION_INCLUDE,
   CT_FUNCTION_INCLUDE,
@@ -22,7 +19,7 @@ import { buildFunctionIncludeXml } from './xmlBuilder';
 export async function create(
   connection: IAbapConnection,
   args: ICreateFunctionIncludeParams,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   if (!args.function_group_name) {
     throw new Error('function_group_name is required');
   }

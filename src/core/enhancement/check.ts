@@ -2,10 +2,7 @@
  * Enhancement check operations
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import {
@@ -25,7 +22,7 @@ import {
 export async function checkEnhancement(
   connection: IAbapConnection,
   params: ICheckEnhancementParams,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const {
     enhancement_name,
     enhancement_type,
@@ -105,7 +102,7 @@ export async function check(
   enhancementName: string,
   version: 'active' | 'inactive' = 'inactive',
   sourceCode?: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   return checkEnhancement(connection, {
     enhancement_name: enhancementName,
     enhancement_type: enhancementType,

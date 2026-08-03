@@ -1,6 +1,6 @@
 import type {
-  IAdtResponse as AxiosResponse,
   IAbapConnection,
+  IAdtResponse,
   IDdicActivation,
   IGetActivationGraphOptions,
   ILogger,
@@ -15,7 +15,7 @@ export class DdicActivation implements IDdicActivation {
     private readonly logger: ILogger,
   ) {}
 
-  async getGraph(options?: IGetActivationGraphOptions): Promise<AxiosResponse> {
+  async getGraph(options?: IGetActivationGraphOptions): Promise<IAdtResponse> {
     return getActivationGraph(this.connection, options);
   }
 }

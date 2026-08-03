@@ -1,7 +1,4 @@
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_DELETION,
   ACCEPT_DELETION_CHECK,
@@ -19,7 +16,7 @@ function objectUri(name: string): string {
 export async function checkDeletion(
   connection: IAbapConnection,
   params: IDeleteScalarFunctionImplementationParams,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   if (!params.implementation_name)
     throw new Error('implementation_name is required');
   const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
@@ -41,7 +38,7 @@ export async function checkDeletion(
 export async function deleteScalarFunctionImplementation(
   connection: IAbapConnection,
   params: IDeleteScalarFunctionImplementationParams,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   if (!params.implementation_name)
     throw new Error('implementation_name is required');
   const transportNumberTag = params.transport_request?.trim()
@@ -69,5 +66,5 @@ export async function deleteScalarFunctionImplementation(
       transport_request: params.transport_request || 'local',
       message: `Scalar function implementation ${params.implementation_name} deleted successfully`,
     },
-  } as AxiosResponse;
+  } as IAdtResponse;
 }

@@ -2,10 +2,7 @@
  * Structure read operations
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_TRANSPORT } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { noopLogger } from '../../utils/noopLogger';
@@ -24,7 +21,7 @@ export async function getStructureMetadata(
   connection: IAbapConnection,
   structureName: string,
   options?: IReadOptions,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   return getUtils(connection).readObjectMetadata(
     'structure',
     structureName,
@@ -41,7 +38,7 @@ export async function getStructureSource(
   structureName: string,
   version?: 'active' | 'inactive',
   options?: IReadOptions,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   return getUtils(connection).readObjectSource(
     'structure',
     structureName,
@@ -58,7 +55,7 @@ export async function getStructureSource(
 export async function getStructure(
   connection: IAbapConnection,
   structureName: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   return getStructureSource(connection, structureName);
 }
 
@@ -72,7 +69,7 @@ export async function getStructureTransport(
   connection: IAbapConnection,
   structureName: string,
   options?: IReadOptions,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const encodedName = encodeSapObjectName(structureName);
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
   const url = `/sap/bc/adt/ddic/structures/${encodedName}/transport${query}`;

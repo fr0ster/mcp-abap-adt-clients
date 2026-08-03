@@ -6,10 +6,7 @@
  * This function works only for on-premise systems with basic authentication.
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_DATA_PREVIEW, CT_SOURCE } from '../../constants/contentTypes';
 import { getTimeout } from '../../utils/timeouts';
 import type { IGetSqlQueryParams } from './types';
@@ -24,7 +21,7 @@ import type { IGetSqlQueryParams } from './types';
 export async function getSqlQuery(
   connection: IAbapConnection,
   params: IGetSqlQueryParams,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   if (!params.sql_query) {
     throw new Error('SQL query is required');
   }

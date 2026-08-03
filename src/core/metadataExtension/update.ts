@@ -4,10 +4,7 @@
  * Endpoint: PUT /sap/bc/adt/ddic/ddlx/sources/{name}/source/main?lockHandle={lockHandle}
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
 import { getTimeout } from '../../utils/timeouts';
 
@@ -40,7 +37,7 @@ export async function updateMetadataExtension(
   sourceCode: string,
   lockHandle: string,
   transportRequest?: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const lowerName = name.toLowerCase();
   const corrNrParam = transportRequest ? `&corrNr=${transportRequest}` : '';
   const url = `/sap/bc/adt/ddic/ddlx/sources/${lowerName}/source/main?lockHandle=${encodeURIComponent(lockHandle)}${corrNrParam}`;

@@ -1,7 +1,4 @@
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_DELETION,
   ACCEPT_DELETION_CHECK,
@@ -18,7 +15,7 @@ import type { IDeleteTransformationParams } from './types';
 export async function checkDeletion(
   connection: IAbapConnection,
   params: IDeleteTransformationParams,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const { transformation_name } = params;
 
   if (!transformation_name) {
@@ -55,7 +52,7 @@ export async function checkDeletion(
 export async function deleteTransformation(
   connection: IAbapConnection,
   params: IDeleteTransformationParams,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const { transformation_name, transport_request } = params;
 
   if (!transformation_name) {
@@ -104,5 +101,5 @@ export async function deleteTransformation(
       transport_request: transport_request || 'local',
       message: `Transformation ${transformation_name} deleted successfully`,
     },
-  } as AxiosResponse;
+  } as IAdtResponse;
 }

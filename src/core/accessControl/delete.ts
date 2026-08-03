@@ -1,7 +1,4 @@
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_DELETION,
   ACCEPT_DELETION_CHECK,
@@ -18,7 +15,7 @@ import type { IDeleteAccessControlParams } from './types';
 export async function checkDeletion(
   connection: IAbapConnection,
   params: IDeleteAccessControlParams,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const { access_control_name } = params;
 
   if (!access_control_name) {
@@ -55,7 +52,7 @@ export async function checkDeletion(
 export async function deleteAccessControl(
   connection: IAbapConnection,
   params: IDeleteAccessControlParams,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const { access_control_name, transport_request } = params;
 
   if (!access_control_name) {
@@ -104,5 +101,5 @@ export async function deleteAccessControl(
       transport_request: transport_request || 'local',
       message: `Access control ${access_control_name} deleted successfully`,
     },
-  } as AxiosResponse;
+  } as IAdtResponse;
 }

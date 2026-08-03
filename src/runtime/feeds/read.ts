@@ -7,8 +7,8 @@
  */
 
 import type {
-  IAdtResponse as AxiosResponse,
   IAbapConnection,
+  IAdtResponse,
   IFeedQueryOptions,
 } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
@@ -21,7 +21,7 @@ import { getTimeout } from '../../utils/timeouts';
  */
 export async function getFeeds(
   connection: IAbapConnection,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const url = `/sap/bc/adt/feeds`;
 
   return connection.makeAdtRequest({
@@ -42,7 +42,7 @@ export async function getFeeds(
  */
 export async function getFeedVariants(
   connection: IAbapConnection,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const url = `/sap/bc/adt/feeds/variants`;
 
   return connection.makeAdtRequest({
@@ -96,7 +96,7 @@ export async function fetchFeed(
   feedUrl: string,
   options?: IFeedQueryOptions,
   userAttribute?: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const url = `${feedUrl}${buildFeedQueryParams(options, userAttribute)}`;
 
   return connection.makeAdtRequest({

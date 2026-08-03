@@ -5,10 +5,7 @@
  * This preserves all SAP-managed fields that would be lost if XML were built from scratch.
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_DOMAIN } from '../../constants/contentTypes';
 import {
   encodeSapObjectName,
@@ -102,7 +99,7 @@ export async function updateDomain(
   connection: IAbapConnection,
   args: IUpdateDomainParams,
   lockHandle: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const domainNameEncoded = encodeSapObjectName(args.domain_name.toLowerCase());
 
   // 1. GET current XML

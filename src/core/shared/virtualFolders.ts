@@ -4,10 +4,7 @@
  * Retrieves hierarchical virtual folder contents from ADT information system.
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_VIRTUAL_FOLDERS,
   CT_VIRTUAL_FOLDERS,
@@ -72,7 +69,7 @@ const buildVirtualFoldersRequestXml = (
 export async function getVirtualFoldersContents(
   connection: IAbapConnection,
   params: IGetVirtualFoldersContentsParams,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const url = `/sap/bc/adt/repository/informationsystem/virtualfolders/contents`;
 
   const queryParams: Record<string, string> = {};

@@ -3,10 +3,7 @@
  * Uses ADT validation endpoint: /sap/bc/adt/ddic/tabletypes/validation
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_VALIDATION } from '../../constants/contentTypes';
 import { getTimeout } from '../../utils/timeouts';
 
@@ -24,7 +21,7 @@ export async function validateTableTypeName(
   connection: IAbapConnection,
   tableTypeName: string,
   description?: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const url = `/sap/bc/adt/ddic/tabletypes/validation`;
   const queryParams = new URLSearchParams({
     objtype: 'ttypda',

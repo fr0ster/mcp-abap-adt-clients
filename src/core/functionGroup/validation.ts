@@ -4,10 +4,7 @@
  * Matches Eclipse ADT behavior for on-premise and cloud systems
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_VALIDATION } from '../../constants/contentTypes';
 import { limitDescription } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -28,7 +25,7 @@ export async function validateFunctionGroupName(
   functionGroupName: string,
   packageName?: string,
   description?: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const url = `/sap/bc/adt/functions/validation`;
   const queryParams = new URLSearchParams({
     objtype: 'FUGR/F',

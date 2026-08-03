@@ -6,10 +6,7 @@
  * the server re-reads the persisted version by URI.
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_CHECK_MESSAGES,
   CT_CHECK_OBJECTS,
@@ -28,7 +25,7 @@ export async function checkFunctionInclude(
   version: 'active' | 'inactive',
   xmlContent?: string,
   sourceContentType?: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   if (!groupName) {
     throw new Error('Function group name is required');
   }

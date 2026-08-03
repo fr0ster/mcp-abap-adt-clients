@@ -1,6 +1,6 @@
 import type {
-  IAdtResponse as AxiosResponse,
   IAbapConnection,
+  IAdtResponse,
   ILogger,
   ISt05Trace,
 } from '@mcp-abap-adt/interfaces';
@@ -14,11 +14,11 @@ export class St05Trace implements ISt05Trace {
     private readonly logger: ILogger,
   ) {}
 
-  async getState(): Promise<AxiosResponse> {
+  async getState(): Promise<IAdtResponse> {
     return getSt05TraceState(this.connection);
   }
 
-  async getDirectory(): Promise<AxiosResponse> {
+  async getDirectory(): Promise<IAdtResponse> {
     return getSt05TraceDirectory(this.connection);
   }
 }

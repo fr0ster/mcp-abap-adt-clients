@@ -3,8 +3,8 @@
  */
 
 import type {
-  IAdtResponse as AxiosResponse,
   IAbapConnection,
+  IAdtResponse,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import {
@@ -32,8 +32,8 @@ export async function checkDomainSyntax(
   version: 'active' | 'inactive',
   xmlContent?: string,
   _logger?: ILogger,
-): Promise<AxiosResponse> {
-  let response: AxiosResponse;
+): Promise<IAdtResponse> {
+  let response: IAdtResponse;
 
   if (xmlContent) {
     // Check with XML content (for unsaved changes or new content validation)

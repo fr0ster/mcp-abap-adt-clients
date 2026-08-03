@@ -2,10 +2,7 @@
  * Program create operations - Low-level functions
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_SOURCE,
   CT_PROGRAM,
@@ -84,7 +81,7 @@ export async function create(
   connection: IAbapConnection,
   args: ICreateProgramParams,
   contentTypes?: IAdtContentTypes,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   // Description is limited to 60 characters in SAP ADT
   const description = limitDescription(args.description || args.programName);
   const programType = convertProgramType(args.programType);
@@ -129,7 +126,7 @@ async function _uploadProgramSource(
   lockHandle: string,
   _sessionId: string,
   transportRequest?: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const queryParams = `lockHandle=${encodeURIComponent(lockHandle)}${transportRequest ? `&corrNr=${transportRequest}` : ''}`;
   const url = `/sap/bc/adt/programs/programs/${encodeSapObjectName(programName).toLowerCase()}/source/main?${queryParams}`;
 

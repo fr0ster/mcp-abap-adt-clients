@@ -1,7 +1,4 @@
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_FEATURE_TOGGLE_METADATA } from '../../constants/contentTypes';
 import { getTimeout } from '../../utils/timeouts';
 
@@ -10,7 +7,7 @@ export async function validateFeatureToggleName(
   name: string,
   _packageName?: string,
   _description?: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   if (!name) {
     throw new Error('Feature toggle name is required');
   }

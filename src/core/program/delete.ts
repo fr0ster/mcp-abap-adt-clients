@@ -2,10 +2,7 @@
  * Program delete operations - Low-level functions
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_DELETION,
   ACCEPT_DELETION_CHECK,
@@ -22,7 +19,7 @@ import type { IDeleteProgramParams } from './types';
 export async function checkDeletion(
   connection: IAbapConnection,
   params: IDeleteProgramParams,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const { programName: program_name } = params;
 
   if (!program_name) {
@@ -59,7 +56,7 @@ export async function checkDeletion(
 export async function deleteProgram(
   connection: IAbapConnection,
   params: IDeleteProgramParams,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const { programName: program_name, transportRequest: transport_request } =
     params;
 
@@ -108,5 +105,5 @@ export async function deleteProgram(
       transport_request: transport_request || 'local',
       message: `Program ${program_name} deleted successfully`,
     },
-  } as AxiosResponse;
+  } as IAdtResponse;
 }

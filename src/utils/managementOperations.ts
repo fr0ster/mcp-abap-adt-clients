@@ -3,10 +3,7 @@
  * All activation and check methods are implemented here once and reused by clients
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from './timeouts';
 
 /**
@@ -20,7 +17,7 @@ async function makeAdtRequest(
   data?: unknown,
   params?: unknown,
   headers?: Record<string, string>,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const timeoutValue = getTimeout(timeout);
   return connection.makeAdtRequest({
     url,
@@ -44,7 +41,7 @@ export async function activateObjectsGroup(
   connection: IAbapConnection,
   objects: Array<{ uri: string; name: string }>,
   preaudit: boolean = true,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const url = `/sap/bc/adt/activation/runs?method=activate&preauditRequested=${preaudit}`;
 
   const objectReferences = objects
@@ -170,7 +167,7 @@ export async function checkObject(
   name: string,
   type: string,
   version?: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const { runCheckRun } = await import('../utils/checkRun');
   return runCheckRun(
     connection,

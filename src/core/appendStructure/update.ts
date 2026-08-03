@@ -1,7 +1,4 @@
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -11,7 +8,7 @@ export async function updateAppendStructure(
   connection: IAbapConnection,
   args: IUpdateAppendStructureParams,
   lockHandle: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const encoded = encodeSapObjectName(args.append_structure_name.toLowerCase());
   const corrNrParam = args.transport_request
     ? `&corrNr=${encodeURIComponent(args.transport_request)}`

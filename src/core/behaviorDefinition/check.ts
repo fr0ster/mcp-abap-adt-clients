@@ -2,10 +2,7 @@
  * Behavior Definition check operations
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_CHECK_MESSAGES,
   CT_CHECK_OBJECTS,
@@ -43,7 +40,7 @@ export async function check(
   _sessionId: string,
   version: string = 'inactive',
   sourceCode?: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   let xmlBody: string;
 
   if (sourceCode) {
@@ -109,7 +106,7 @@ export async function checkImplementation(
   sessionId: string,
   version: string = 'inactive',
   sourceCode?: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   return check(
     connection,
     name,
@@ -147,7 +144,7 @@ export async function checkAbap(
   sessionId: string,
   version: string = 'inactive',
   sourceCode?: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   return check(
     connection,
     name,

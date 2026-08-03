@@ -2,10 +2,7 @@
  * Structure update operations
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { CT_SOURCE } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -20,7 +17,7 @@ export async function upload(
   connection: IAbapConnection,
   params: IUpdateStructureParams,
   lockHandle: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const structureNameEncoded = encodeSapObjectName(params.structureName);
   const url = `/sap/bc/adt/ddic/structures/${structureNameEncoded}/source/main?lockHandle=${encodeURIComponent(lockHandle)}${params.transportRequest ? `&corrNr=${params.transportRequest}` : ''}`;
 
@@ -44,6 +41,6 @@ export async function upload(
 export async function updateStructure(
   connection: IAbapConnection,
   params: IUpdateStructureParams & { lockHandle: string },
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   return upload(connection, params, params.lockHandle);
 }

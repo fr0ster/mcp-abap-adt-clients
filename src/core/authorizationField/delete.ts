@@ -2,10 +2,7 @@
  * AuthorizationField (SUSO / AUTH) delete operations - Low-level functions
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_DELETION,
   ACCEPT_DELETION_CHECK,
@@ -30,7 +27,7 @@ function objectUri(name: string): string {
 export async function checkDeletion(
   connection: IAbapConnection,
   params: IDeleteAuthorizationFieldParams,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   if (!params.authorization_field_name) {
     throw new Error('authorization_field_name is required');
   }
@@ -60,7 +57,7 @@ export async function checkDeletion(
 export async function deleteAuthorizationField(
   connection: IAbapConnection,
   params: IDeleteAuthorizationFieldParams,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   if (!params.authorization_field_name) {
     throw new Error('authorization_field_name is required');
   }
@@ -97,5 +94,5 @@ export async function deleteAuthorizationField(
       transport_request: params.transport_request || 'local',
       message: `Authorization field ${params.authorization_field_name} deleted successfully`,
     },
-  } as AxiosResponse;
+  } as IAdtResponse;
 }

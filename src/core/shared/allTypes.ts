@@ -4,10 +4,7 @@
  * Retrieves all valid ADT object types from the repository.
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -32,7 +29,7 @@ export async function getAllTypes(
   maxItemCount: number = 999,
   name: string = '*',
   data: string = 'usedByProvider',
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const params = new URLSearchParams({
     maxItemCount: String(maxItemCount),
     name: name,

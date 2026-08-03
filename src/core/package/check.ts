@@ -2,10 +2,7 @@
  * Package check operations
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_CHECK_MESSAGES,
   CT_CHECK_OBJECTS,
@@ -29,7 +26,7 @@ export async function checkPackage(
   packageName: string,
   version: 'active' | 'inactive' = 'active',
   xmlContent?: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const url = `/sap/bc/adt/checkruns`;
   const objectUri = `/sap/bc/adt/packages/${encodeSapObjectName(packageName).toLowerCase()}`;
 

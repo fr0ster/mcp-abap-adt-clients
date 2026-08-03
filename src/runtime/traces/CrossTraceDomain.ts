@@ -1,6 +1,6 @@
 import type {
-  IAdtResponse as AxiosResponse,
   IAbapConnection,
+  IAdtResponse,
   ICrossTrace,
   IListCrossTracesOptions,
   ILogger,
@@ -20,29 +20,29 @@ export class CrossTrace implements ICrossTrace {
     private readonly logger: ILogger,
   ) {}
 
-  async list(options?: IListCrossTracesOptions): Promise<AxiosResponse> {
+  async list(options?: IListCrossTracesOptions): Promise<IAdtResponse> {
     return listCrossTraces(this.connection, options);
   }
 
   async getById(
     traceId: string,
     includeSensitiveData?: boolean,
-  ): Promise<AxiosResponse> {
+  ): Promise<IAdtResponse> {
     return getCrossTrace(this.connection, traceId, includeSensitiveData);
   }
 
-  async getRecords(traceId: string): Promise<AxiosResponse> {
+  async getRecords(traceId: string): Promise<IAdtResponse> {
     return getCrossTraceRecords(this.connection, traceId);
   }
 
   async getRecordContent(
     traceId: string,
     recordNumber: number,
-  ): Promise<AxiosResponse> {
+  ): Promise<IAdtResponse> {
     return getCrossTraceRecordContent(this.connection, traceId, recordNumber);
   }
 
-  async getActivations(): Promise<AxiosResponse> {
+  async getActivations(): Promise<IAdtResponse> {
     return getCrossTraceActivations(this.connection);
   }
 }
