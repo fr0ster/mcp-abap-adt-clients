@@ -89,6 +89,10 @@ describe('Shared - searchObjects', () => {
     // evidence that the payload was unprefixed, which it is not.
     const hits = parseSearchResults(String(result.data ?? ''));
     testsLogger.info?.(`🎯 Found ${hits.length} objects`);
+    // Assert the count FIRST. Asserting only inside the loop is how the old
+    // regex failed: on an empty result no assertion runs and the test passes,
+    // so a wrong namespace or a broken parser reads as success.
+    expect(hits.length).toBeGreaterThan(0);
     for (const hit of hits) {
       expect(hit.name).toBeTruthy();
       expect(hit.type).toBeTruthy();
@@ -127,6 +131,10 @@ describe('Shared - searchObjects', () => {
     // evidence that the payload was unprefixed, which it is not.
     const hits = parseSearchResults(String(result.data ?? ''));
     testsLogger.info?.(`🎯 Found ${hits.length} tables`);
+    // Assert the count FIRST. Asserting only inside the loop is how the old
+    // regex failed: on an empty result no assertion runs and the test passes,
+    // so a wrong namespace or a broken parser reads as success.
+    expect(hits.length).toBeGreaterThan(0);
     for (const hit of hits) {
       expect(hit.name).toBeTruthy();
       expect(hit.type).toBeTruthy();

@@ -10,7 +10,7 @@ import { parseSearchResults } from '../../core/shared/search';
 
 // Captured verbatim from an SAP BTP trial system (quickSearch, query Z*), so
 // the shape here is observed rather than imagined. Every attribute carries the
-// `adtcore:` prefix, and the third entry has no description at all — which is
+// `adtcore:` prefix, and the second entry has no description at all — which is
 // why `description` is normalised to '' rather than left undefined.
 const prefixed = `<?xml version="1.0" encoding="utf-8"?><adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core"><adtcore:objectReference adtcore:uri="/sap/bc/adt/packages/z" adtcore:type="DEVC/K" adtcore:name="Z" adtcore:packageName="Z" adtcore:description="gcek development"/><adtcore:objectReference adtcore:uri="/sap/bc/adt/vit/wb/object_type/sicftyp/object_name/ZX" adtcore:type="SICF/TYP" adtcore:name="ZX" adtcore:packageName="Z_RAG_PRO1"/></adtcore:objectReferences>`;
 
