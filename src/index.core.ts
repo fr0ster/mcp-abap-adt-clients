@@ -58,10 +58,10 @@ export type {
 } from './core/behaviorImplementation';
 export type {
   AdtClassType,
-  ClassUnitTestDefinition,
-  ClassUnitTestRunOptions,
   IClassConfig,
   IClassState,
+  IClassUnitTestDefinition,
+  IClassUnitTestRunOptions,
   ILocalDefinitionsConfig,
   ILocalMacrosConfig,
   ILocalTestClassConfig,

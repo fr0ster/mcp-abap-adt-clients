@@ -21,10 +21,10 @@ export {
 } from './AdtLocalTestClass';
 export { AdtLocalTypes, type ILocalTypesConfig } from './AdtLocalTypes';
 export {
-  ClassUnitTestDefinition,
-  ClassUnitTestRunOptions,
   getClassUnitTestResult,
   getClassUnitTestStatus,
+  IClassUnitTestDefinition,
+  IClassUnitTestRunOptions,
   startClassUnitTestRun,
   startClassUnitTestRunByObject,
 } from './run';

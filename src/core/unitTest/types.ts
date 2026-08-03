@@ -4,8 +4,6 @@
 
 // Types defined in @mcp-abap-adt/interfaces
 export type {
-  ClassUnitTestDefinition,
-  ClassUnitTestRunOptions,
   IClassUnitTestDefinition,
   IClassUnitTestRunOptions,
   IUnitTestConfig,

@@ -10,10 +10,10 @@ import * as path from 'node:path';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
 import type {
   IAdtResponse as AxiosResponse,
-  IGetVirtualFoldersContentsParams as GetVirtualFoldersContentsParams,
   IAbapConnection,
   IAdtObject,
   IAdtOperationOptions,
+  IGetVirtualFoldersContentsParams,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
@@ -48,7 +48,7 @@ const libraryLogger: ILogger = createLibraryLogger();
 const testsLogger: ILogger = createTestsLogger();
 
 class VirtualFoldersContentsObject
-  implements IAdtObject<GetVirtualFoldersContentsParams, AxiosResponse>
+  implements IAdtObject<IGetVirtualFoldersContentsParams, AxiosResponse>
 {
   private client: AdtClient;
 
@@ -73,74 +73,74 @@ class VirtualFoldersContentsObject
   }
 
   validate(
-    _config: Partial<GetVirtualFoldersContentsParams>,
+    _config: Partial<IGetVirtualFoldersContentsParams>,
   ): Promise<AxiosResponse> {
     return this.rejectUnsupported('validate');
   }
 
   create(
-    _config: GetVirtualFoldersContentsParams,
+    _config: IGetVirtualFoldersContentsParams,
     _options?: IAdtOperationOptions,
   ): Promise<AxiosResponse> {
     return this.rejectUnsupported('create');
   }
 
   read(
-    config: Partial<GetVirtualFoldersContentsParams>,
+    config: Partial<IGetVirtualFoldersContentsParams>,
     _version?: 'active' | 'inactive',
     _options?: { withLongPolling?: boolean },
   ): Promise<AxiosResponse | undefined> {
     return this.client
       .getUtils()
-      .getVirtualFoldersContents(config as GetVirtualFoldersContentsParams);
+      .getVirtualFoldersContents(config as IGetVirtualFoldersContentsParams);
   }
 
   readMetadata(
-    _config: Partial<GetVirtualFoldersContentsParams>,
+    _config: Partial<IGetVirtualFoldersContentsParams>,
     _options?: { withLongPolling?: boolean },
   ): Promise<AxiosResponse> {
     return this.rejectUnsupported('readMetadata');
   }
 
   update(
-    _config: Partial<GetVirtualFoldersContentsParams>,
+    _config: Partial<IGetVirtualFoldersContentsParams>,
     _options?: IAdtOperationOptions,
   ): Promise<AxiosResponse> {
     return this.rejectUnsupported('update');
   }
 
   delete(
-    _config: Partial<GetVirtualFoldersContentsParams>,
+    _config: Partial<IGetVirtualFoldersContentsParams>,
   ): Promise<AxiosResponse> {
     return this.rejectUnsupported('delete');
   }
 
   activate(
-    _config: Partial<GetVirtualFoldersContentsParams>,
+    _config: Partial<IGetVirtualFoldersContentsParams>,
   ): Promise<AxiosResponse> {
     return this.rejectUnsupported('activate');
   }
 
   check(
-    _config: Partial<GetVirtualFoldersContentsParams>,
+    _config: Partial<IGetVirtualFoldersContentsParams>,
     _status?: string,
   ): Promise<AxiosResponse> {
     return this.rejectUnsupported('check');
   }
 
   readTransport(
-    _config: Partial<GetVirtualFoldersContentsParams>,
+    _config: Partial<IGetVirtualFoldersContentsParams>,
     _options?: { withLongPolling?: boolean },
   ): Promise<AxiosResponse> {
     return this.rejectUnsupported('readTransport');
   }
 
-  lock(_config: Partial<GetVirtualFoldersContentsParams>): Promise<string> {
+  lock(_config: Partial<IGetVirtualFoldersContentsParams>): Promise<string> {
     return this.rejectUnsupported('lock');
   }
 
   unlock(
-    _config: Partial<GetVirtualFoldersContentsParams>,
+    _config: Partial<IGetVirtualFoldersContentsParams>,
     _lockHandle: string,
   ): Promise<AxiosResponse> {
     return this.rejectUnsupported('unlock');
@@ -153,7 +153,7 @@ describe('Shared - getVirtualFoldersContents', () => {
   let hasConfig = false;
   let isLegacy = false;
   let isCloudSystem = false;
-  let tester: BaseTester<GetVirtualFoldersContentsParams, AxiosResponse>;
+  let tester: BaseTester<IGetVirtualFoldersContentsParams, AxiosResponse>;
 
   beforeAll(async () => {
     try {
