@@ -2,10 +2,7 @@
  * TableType delete operations - Low-level functions
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_DELETION,
   ACCEPT_DELETION_CHECK,
@@ -22,7 +19,7 @@ import type { IDeleteTableTypeParams } from './types';
 export async function checkDeletion(
   connection: IAbapConnection,
   params: IDeleteTableTypeParams,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const { tabletype_name } = params;
 
   if (!tabletype_name) {
@@ -59,7 +56,7 @@ export async function checkDeletion(
 export async function deleteTableType(
   connection: IAbapConnection,
   params: IDeleteTableTypeParams,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const { tabletype_name, transport_request } = params;
 
   if (!tabletype_name) {
@@ -108,5 +105,5 @@ export async function deleteTableType(
       transport_request: transport_request || 'local',
       message: `Table type ${tabletype_name} deleted successfully`,
     },
-  } as AxiosResponse;
+  } as IAdtResponse;
 }

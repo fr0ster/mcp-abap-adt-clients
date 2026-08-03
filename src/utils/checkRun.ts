@@ -2,10 +2,7 @@
  * Shared check run utilities
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
 import {
   ACCEPT_CHECK_MESSAGES,
@@ -152,7 +149,7 @@ export function buildCheckRunXmlWithSource(
 /**
  * Parse check run response
  */
-export function parseCheckRunResponse(response: AxiosResponse): {
+export function parseCheckRunResponse(response: IAdtResponse): {
   success: boolean;
   status: string;
   message: string;
@@ -329,7 +326,7 @@ export async function runCheckRun(
   reporter: string = 'abapCheckRun',
   sourceCode?: string,
   artifactContentType: string = 'text/plain; charset=utf-8',
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const objectUri = getObjectUri(objectType, objectName);
   const xmlBody = sourceCode
     ? buildCheckRunXmlWithSource(
@@ -369,7 +366,7 @@ export async function runCheckRun(
  * @param version - Version to validate against ('active' or 'inactive')
  * @param reporter - Reporter type for check results
  * @param sessionId - Optional session ID for session-based requests
- * @returns Promise resolving to AxiosResponse with check results
+ * @returns Promise resolving to IAdtResponse with check results
  */
 export async function runCheckRunWithSource(
   connection: IAbapConnection,
@@ -379,7 +376,7 @@ export async function runCheckRunWithSource(
   version: string = 'active',
   reporter: string = 'abapCheckRun',
   artifactContentType: string = 'text/plain; charset=utf-8',
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const objectUri = await getObjectUri(objectType, objectName);
   const xmlBody = buildCheckRunXmlWithSource(
     objectUri,

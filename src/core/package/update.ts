@@ -7,8 +7,8 @@
  */
 
 import type {
-  IAdtResponse as AxiosResponse,
   IAbapConnection,
+  IAdtResponse,
   IUpdatePackageParams,
 } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_PACKAGE, CT_PACKAGE } from '../../constants/contentTypes';
@@ -95,7 +95,7 @@ export async function updatePackage(
   connection: IAbapConnection,
   params: IUpdatePackageParams,
   lockHandle: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   if (!params.package_name) {
     throw new Error('package_name is required');
   }
@@ -147,7 +147,7 @@ export async function updatePackageDescription(
   description: string,
   lockHandle: string,
   superPackage?: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   if (!packageName) {
     throw new Error('package_name is required');
   }

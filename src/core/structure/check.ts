@@ -3,8 +3,8 @@
  */
 
 import type {
-  IAdtResponse as AxiosResponse,
   IAbapConnection,
+  IAdtResponse,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { parseCheckRunResponse, runCheckRun } from '../../utils/checkRun';
@@ -20,7 +20,7 @@ export async function checkStructure(
   version: string = 'active',
   sourceCode?: string,
   logger?: ILogger,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const response = await runCheckRun(
     connection,
     'structure',

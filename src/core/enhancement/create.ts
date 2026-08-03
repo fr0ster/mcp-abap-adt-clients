@@ -3,9 +3,9 @@
  */
 
 import type {
-  IAdtResponse as AxiosResponse,
   HttpError,
   IAbapConnection,
+  IAdtResponse,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import {
@@ -81,7 +81,7 @@ export async function create(
   connection: IAbapConnection,
   args: ICreateEnhancementParams,
   logger?: ILogger,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   if (!args.enhancement_name) {
     throw new Error('enhancement_name is required');
   }

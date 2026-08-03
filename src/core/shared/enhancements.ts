@@ -4,10 +4,7 @@
  * Retrieves enhancement implementations for programs, includes, and classes.
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
@@ -42,7 +39,7 @@ export async function getEnhancements(
   objectName: string,
   objectType: 'program' | 'include' | 'class',
   context?: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   if (!objectName) {
     throw new Error('Object name is required');
   }

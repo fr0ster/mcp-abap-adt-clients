@@ -2,10 +2,7 @@
  * Structure delete operations - Low-level functions
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_DELETION,
   ACCEPT_DELETION_CHECK,
@@ -26,7 +23,7 @@ export interface DeleteStructureParams {
 export async function checkDeletion(
   connection: IAbapConnection,
   params: DeleteStructureParams,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const { structure_name } = params;
 
   if (!structure_name) {
@@ -64,7 +61,7 @@ export async function checkDeletion(
 export async function deleteStructure(
   connection: IAbapConnection,
   params: DeleteStructureParams,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const { structure_name, transport_request } = params;
 
   if (!structure_name) {
@@ -113,5 +110,5 @@ export async function deleteStructure(
       transport_request: transport_request || 'local',
       message: `Structure ${structure_name} deleted successfully`,
     },
-  } as AxiosResponse;
+  } as IAdtResponse;
 }

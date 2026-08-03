@@ -2,10 +2,7 @@
  * FunctionModule read operations
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_TRANSPORT } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { noopLogger } from '../../utils/noopLogger';
@@ -25,7 +22,7 @@ export async function getFunctionMetadata(
   functionName: string,
   functionGroup: string,
   options?: IReadOptions,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   return getUtils(connection).readObjectMetadata(
     'functionmodule',
     functionName,
@@ -47,7 +44,7 @@ export async function getFunctionSource(
   functionGroup: string,
   version?: 'active' | 'inactive',
   options?: IReadOptions,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   return getUtils(connection).readObjectSource(
     'functionmodule',
     functionName,
@@ -66,7 +63,7 @@ export async function getFunction(
   functionName: string,
   functionGroup: string,
   version: 'active' | 'inactive' = 'active',
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   return getFunctionSource(connection, functionName, functionGroup, version);
 }
 
@@ -82,7 +79,7 @@ export async function getFunctionModuleTransport(
   functionName: string,
   functionGroup: string,
   options?: IReadOptions,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const encodedGroup = encodeSapObjectName(functionGroup);
   const encodedName = encodeSapObjectName(functionName);
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';

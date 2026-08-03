@@ -7,10 +7,7 @@
  * (cl_cds_test_environment).
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
@@ -36,7 +33,7 @@ import { getTimeout } from '../../utils/timeouts';
 export async function checkCdsTestDoublesAvailability(
   connection: IAbapConnection,
   ddlName: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const url = `/sap/bc/adt/aunit/dbtestdoubles/cds/validation`;
   const encodedName = encodeSapObjectName(ddlName);
 

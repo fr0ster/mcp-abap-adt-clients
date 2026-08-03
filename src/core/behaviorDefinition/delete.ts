@@ -2,10 +2,7 @@
  * Behavior Definition delete operations
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_DELETION,
   ACCEPT_DELETION_CHECK,
@@ -35,7 +32,7 @@ import { getTimeout } from '../../utils/timeouts';
 export async function checkDeletion(
   connection: IAbapConnection,
   name: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const objectUri = `/sap/bc/adt/bo/behaviordefinitions/${encodeSapObjectName(name).toLowerCase()}`;
 
   const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?><del:checkRequest xmlns:del="http://www.sap.com/adt/deletion" xmlns:adtcore="http://www.sap.com/adt/core">
@@ -82,7 +79,7 @@ export async function deleteBehaviorDefinition(
   connection: IAbapConnection,
   name: string,
   transportRequest?: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const objectUri = `/sap/bc/adt/bo/behaviordefinitions/${encodeSapObjectName(name).toLowerCase()}`;
 
   const transportXml = transportRequest

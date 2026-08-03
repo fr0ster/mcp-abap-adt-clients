@@ -2,10 +2,7 @@
  * ServiceDefinition activation operations
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -23,7 +20,7 @@ function buildActivationXml(serviceDefinitionName: string): string {
 /**
  * Parse activation response
  */
-function parseActivationResponse(response: AxiosResponse): {
+function parseActivationResponse(response: IAdtResponse): {
   success: boolean;
   message: string;
 } {
@@ -68,7 +65,7 @@ function parseActivationResponse(response: AxiosResponse): {
 export async function activateServiceDefinition(
   connection: IAbapConnection,
   serviceDefinitionName: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const url = `/sap/bc/adt/activation?method=activate&preauditRequested=true`;
   const xmlBody = buildActivationXml(serviceDefinitionName);
 

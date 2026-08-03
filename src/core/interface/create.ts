@@ -5,9 +5,9 @@
  */
 
 import type {
-  IAdtResponse as AxiosResponse,
   HttpError,
   IAbapConnection,
+  IAdtResponse,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { CT_INTERFACE } from '../../constants/contentTypes';
@@ -41,7 +41,7 @@ export async function create(
   connection: IAbapConnection,
   params: ICreateInterfaceParams,
   logger?: ILogger,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const finalMasterSystem = params.masterSystem || '';
   const finalResponsible = params.responsible || '';
 

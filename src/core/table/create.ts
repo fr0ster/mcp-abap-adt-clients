@@ -3,9 +3,9 @@
  */
 
 import type {
-  IAdtResponse as AxiosResponse,
   HttpError,
   IAbapConnection,
+  IAdtResponse,
 } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_TABLE, CT_TABLE } from '../../constants/contentTypes';
 import { limitDescription, safeStringify } from '../../utils/internalUtils';
@@ -20,7 +20,7 @@ import type { ICreateTableParams } from './types';
 export async function createTable(
   connection: IAbapConnection,
   params: ICreateTableParams,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   if (!params.table_name) {
     throw new Error('Table name is required');
   }

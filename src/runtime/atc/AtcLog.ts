@@ -1,6 +1,6 @@
 import type {
-  IAdtResponse as AxiosResponse,
   IAbapConnection,
+  IAdtResponse,
   IAtcLog,
   IGetCheckFailureLogsOptions,
   ILogger,
@@ -17,11 +17,11 @@ export class AtcLog implements IAtcLog {
 
   async getCheckFailureLogs(
     options?: IGetCheckFailureLogsOptions,
-  ): Promise<AxiosResponse> {
+  ): Promise<IAdtResponse> {
     return getCheckFailureLogs(this.connection, options);
   }
 
-  async getExecutionLog(executionId: string): Promise<AxiosResponse> {
+  async getExecutionLog(executionId: string): Promise<IAdtResponse> {
     return getExecutionLog(this.connection, executionId);
   }
 }

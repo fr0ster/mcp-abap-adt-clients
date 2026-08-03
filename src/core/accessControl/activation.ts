@@ -1,7 +1,4 @@
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -19,7 +16,7 @@ function buildActivationXml(accessControlName: string): string {
 /**
  * Parse activation response
  */
-function parseActivationResponse(response: AxiosResponse): {
+function parseActivationResponse(response: IAdtResponse): {
   success: boolean;
   message: string;
 } {
@@ -63,7 +60,7 @@ function parseActivationResponse(response: AxiosResponse): {
 export async function activateAccessControl(
   connection: IAbapConnection,
   accessControlName: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const url = '/sap/bc/adt/activation?method=activate&preauditRequested=true';
   const xmlBody = buildActivationXml(accessControlName);
 

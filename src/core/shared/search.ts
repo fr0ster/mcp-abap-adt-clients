@@ -3,8 +3,8 @@
  */
 
 import type {
-  IAdtResponse as AxiosResponse,
   IAbapConnection,
+  IAdtResponse,
   ISearchResult,
 } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
@@ -22,7 +22,7 @@ import type { ISearchObjectsParams } from './types';
 export async function searchObjects(
   connection: IAbapConnection,
   params: ISearchObjectsParams,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const encodedQuery = encodeSapObjectName(params.query);
   const maxResults = params.maxResults || 100;
 

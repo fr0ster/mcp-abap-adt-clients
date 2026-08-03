@@ -3,10 +3,7 @@
  * NOTE: Caller should call connection.setSessionType("stateless") after unlocking
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
@@ -18,7 +15,7 @@ export async function unlockStructure(
   connection: IAbapConnection,
   structureName: string,
   lockHandle: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const url = `/sap/bc/adt/ddic/structures/${encodeSapObjectName(structureName).toLowerCase()}?_action=UNLOCK&lockHandle=${encodeURIComponent(lockHandle)}`;
 
   return connection.makeAdtRequest({

@@ -4,10 +4,7 @@
  * when the caller intends to keep the lock on the object for further updates.
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_AUTHORIZATION_FIELD,
   CT_AUTHORIZATION_FIELD,
@@ -22,7 +19,7 @@ import { buildAuthorizationFieldXml } from './xmlBuilder';
 export async function create(
   connection: IAbapConnection,
   args: ICreateAuthorizationFieldParams,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   if (!args.authorization_field_name) {
     throw new Error('authorization_field_name is required');
   }

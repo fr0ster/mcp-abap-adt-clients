@@ -4,10 +4,7 @@
  * Endpoint: POST /sap/bc/adt/activation?method=activate&preauditRequested=true
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { activateObjectInSession } from '../../utils/activationUtils';
 
 /**
@@ -28,7 +25,7 @@ export async function activateMetadataExtension(
   connection: IAbapConnection,
   name: string,
   preaudit: boolean = true,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const lowerName = name.toLowerCase();
   const objectUri = `/sap/bc/adt/ddic/ddlx/sources/${lowerName}`;
 

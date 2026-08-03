@@ -6,7 +6,7 @@
  * Warnings (type "W") are considered acceptable.
  */
 
-import type { IAdtResponse as AxiosResponse } from '@mcp-abap-adt/interfaces';
+import type { IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { parseCheckRunResponse } from '../../utils/checkRun';
 
 /**
@@ -48,15 +48,15 @@ export function hasCheckErrors(
 }
 
 /**
- * Validates check result from AxiosResponse.
+ * Validates check result from IAdtResponse.
  * Parses response and checks for type "E" messages.
  *
- * @param response - AxiosResponse from check operation
+ * @param response - IAdtResponse from check operation
  * @param ignoreMessages - Optional array of message patterns to ignore (case-insensitive)
  * @returns true if check passed (no type E errors), false if has errors
  */
 export function hasCheckErrorsFromResponse(
-  response: AxiosResponse | undefined,
+  response: IAdtResponse | undefined,
   ignoreMessages: string[] = [],
 ): boolean {
   if (!response) {

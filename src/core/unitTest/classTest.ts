@@ -2,10 +2,7 @@
  * Class test include operations
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
 import {
   ACCEPT_LOCK,
@@ -63,7 +60,7 @@ export async function updateClassTestInclude(
   testClassSource: string,
   lockHandle: string,
   transportRequest?: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   if (!lockHandle) {
     throw new Error('lockHandle is required to update test classes');
   }
@@ -95,7 +92,7 @@ export async function unlockClassTestClasses(
   connection: IAbapConnection,
   className: string,
   lockHandle: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   if (!lockHandle) {
     throw new Error('lockHandle is required to unlock test classes');
   }
@@ -123,7 +120,7 @@ export async function activateClassTestClasses(
   connection: IAbapConnection,
   className: string,
   testClassName: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const encodedClass = encodeSapObjectName(className).toLowerCase();
   const encodedTest = encodeSapObjectName(testClassName).toUpperCase();
   const objectUri = `/sap/bc/adt/oo/classes/${encodedClass}#testclass=${encodedTest}`;

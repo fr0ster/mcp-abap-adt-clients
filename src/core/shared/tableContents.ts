@@ -9,10 +9,7 @@
  * This function works only for on-premise systems with basic authentication.
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_DATA_PREVIEW } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -65,7 +62,7 @@ async function getColumnNames(
 export async function getTableContents(
   connection: IAbapConnection,
   params: IGetTableContentsParams,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   if (!params.table_name) {
     throw new Error('Table name is required');
   }

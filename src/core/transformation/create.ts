@@ -1,7 +1,4 @@
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { CT_TRANSFORMATION } from '../../constants/contentTypes';
 import { limitDescription } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -14,7 +11,7 @@ import type { ICreateTransformationParams } from './types';
 export async function create(
   connection: IAbapConnection,
   args: ICreateTransformationParams,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const url = `/sap/bc/adt/xslt/transformations${args.transport_request ? `?corrNr=${args.transport_request}` : ''}`;
 
   const username = args.responsible || '';

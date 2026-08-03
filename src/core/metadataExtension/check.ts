@@ -4,10 +4,7 @@
  * Uses standard ABAP check run endpoint
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { runCheckRun } from '../../utils/checkRun';
 
 /**
@@ -30,7 +27,7 @@ export async function checkMetadataExtension(
   name: string,
   version: 'active' | 'inactive' = 'inactive',
   sourceCode?: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const objectType = 'DDLX/EX';
   // Pass just the name, getObjectUri will build the full URI
   const objectName = name;

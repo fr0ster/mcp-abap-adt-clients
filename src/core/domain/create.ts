@@ -2,10 +2,7 @@
  * Domain create operations
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_DOMAIN, CT_DOMAIN } from '../../constants/contentTypes';
 import { limitDescription } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -20,7 +17,7 @@ import type { ICreateDomainParams } from './types';
 export async function create(
   connection: IAbapConnection,
   args: ICreateDomainParams,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const corrNrParam = args.transport_request
     ? `?corrNr=${args.transport_request}`
     : '';

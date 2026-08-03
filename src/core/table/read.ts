@@ -2,10 +2,7 @@
  * Table read operations
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_TRANSPORT } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { noopLogger } from '../../utils/noopLogger';
@@ -24,7 +21,7 @@ export async function getTableMetadata(
   connection: IAbapConnection,
   tableName: string,
   options?: IReadOptions,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   return getUtils(connection).readObjectMetadata(
     'table',
     tableName,
@@ -41,7 +38,7 @@ export async function getTableSource(
   tableName: string,
   version?: 'active' | 'inactive',
   options?: IReadOptions,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   return getUtils(connection).readObjectSource(
     'table',
     tableName,
@@ -58,7 +55,7 @@ export async function getTableSource(
 export async function getTable(
   connection: IAbapConnection,
   tableName: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   return getTableSource(connection, tableName);
 }
 
@@ -72,7 +69,7 @@ export async function getTableTransport(
   connection: IAbapConnection,
   tableName: string,
   options?: IReadOptions,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const encodedName = encodeSapObjectName(tableName);
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
   const url = `/sap/bc/adt/ddic/tables/${encodedName}/transport${query}`;

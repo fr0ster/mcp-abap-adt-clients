@@ -6,9 +6,9 @@
  */
 
 import type {
-  IAdtResponse as AxiosResponse,
   HttpError,
   IAbapConnection,
+  IAdtResponse,
 } from '@mcp-abap-adt/interfaces';
 import { CT_FUNCTION_GROUP } from '../../constants/contentTypes';
 import {
@@ -34,7 +34,7 @@ async function updateFunctionGroupMetadata(
   lockHandle: string,
   transportRequest?: string,
   contentTypes?: IAdtContentTypes,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const encodedName = encodeSapObjectName(functionGroupName);
 
   const url = `/sap/bc/adt/functions/groups/${encodedName}${lockHandle ? `?lockHandle=${encodeURIComponent(lockHandle)}` : ''}${transportRequest ? `${lockHandle ? '&' : '?'}corrNr=${transportRequest}` : ''}`;
@@ -71,7 +71,7 @@ export async function updateFunctionGroup(
   connection: IAbapConnection,
   params: IUpdateFunctionGroupParams,
   contentTypes?: IAdtContentTypes,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   if (!params.function_group_name) {
     throw new Error('function_group_name is required');
   }

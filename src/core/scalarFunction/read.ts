@@ -1,6 +1,6 @@
 import type {
-  IAdtResponse as AxiosResponse,
   IAbapConnection,
+  IAdtResponse,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import {
@@ -26,7 +26,7 @@ export async function getScalarFunction(
   version: 'active' | 'inactive' = 'inactive',
   options?: IReadOptions,
   logger?: ILogger,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const url = `/sap/bc/adt/ddic/dsfd/sources/${encodeSapObjectName(name.toLowerCase())}${buildQuery(version, options)}`;
   return makeAdtRequestWithAcceptNegotiation(
     connection,
@@ -46,7 +46,7 @@ export async function getScalarFunctionSource(
   version: 'active' | 'inactive' = 'inactive',
   options?: IReadOptions,
   logger?: ILogger,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const url = `/sap/bc/adt/ddic/dsfd/sources/${encodeSapObjectName(name.toLowerCase())}/source/main${buildQuery(version, options)}`;
   return makeAdtRequestWithAcceptNegotiation(
     connection,
@@ -64,7 +64,7 @@ export async function getScalarFunctionTransport(
   connection: IAbapConnection,
   name: string,
   options?: IReadOptions,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
   const url = `/sap/bc/adt/ddic/dsfd/sources/${encodeSapObjectName(name.toLowerCase())}/transport${query}`;
   return connection.makeAdtRequest({

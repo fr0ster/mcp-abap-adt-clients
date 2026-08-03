@@ -2,10 +2,7 @@
  * FunctionModule check operations
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_CHECK_MESSAGES,
   CT_CHECK_OBJECTS,
@@ -73,7 +70,7 @@ export async function checkFunctionModule(
   version: 'active' | 'inactive',
   sourceCode?: string,
   contentTypes?: IAdtContentTypes,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const xmlBody = buildCheckRunXml(
     functionGroupName,
     functionModuleName,

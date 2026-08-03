@@ -2,10 +2,7 @@
  * Domain read operations
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_DOMAIN, ACCEPT_TRANSPORT } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -23,7 +20,7 @@ export async function getDomain(
   connection: IAbapConnection,
   domainName: string,
   options?: IReadOptions,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const encodedName = encodeSapObjectName(domainName);
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
   const url = `/sap/bc/adt/ddic/domains/${encodedName}${query}`;
@@ -51,7 +48,7 @@ export async function getDomainTransport(
   connection: IAbapConnection,
   domainName: string,
   options?: IReadOptions,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const encodedName = encodeSapObjectName(domainName);
   let url = `/sap/bc/adt/ddic/domains/${encodedName}/transport`;
   if (options?.withLongPolling) {

@@ -1,6 +1,6 @@
 import type {
-  IAdtResponse as AxiosResponse,
   IAbapConnection,
+  IAdtResponse,
   IApplicationLog,
   IGetApplicationLogObjectOptions,
   IGetApplicationLogSourceOptions,
@@ -23,18 +23,18 @@ export class ApplicationLog implements IApplicationLog {
   async getObject(
     objectName: string,
     options?: IGetApplicationLogObjectOptions,
-  ): Promise<AxiosResponse> {
+  ): Promise<IAdtResponse> {
     return getApplicationLogObject(this.connection, objectName, options);
   }
 
   async getSource(
     objectName: string,
     options?: IGetApplicationLogSourceOptions,
-  ): Promise<AxiosResponse> {
+  ): Promise<IAdtResponse> {
     return getApplicationLogSource(this.connection, objectName, options);
   }
 
-  async validateName(objectName: string): Promise<AxiosResponse> {
+  async validateName(objectName: string): Promise<IAdtResponse> {
     return validateApplicationLogName(this.connection, objectName);
   }
 }

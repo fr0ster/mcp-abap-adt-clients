@@ -2,10 +2,7 @@
  * Table update operations
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -18,7 +15,7 @@ export async function updateTable(
   connection: IAbapConnection,
   params: IUpdateTableParams,
   lockHandle: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   if (!params.table_name) {
     throw new Error('table_name is required');
   }

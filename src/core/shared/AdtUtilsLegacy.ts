@@ -8,7 +8,7 @@
  * - activateObjectsGroup → /sap/bc/adt/activation/runs (not available, uses /sap/bc/adt/activation)
  */
 
-import type { IAdtResponse as AxiosResponse } from '@mcp-abap-adt/interfaces';
+import type { IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { buildObjectUri } from '../../utils/activationUtils';
 import { getTimeout } from '../../utils/timeouts';
 import { AdtUtils } from './AdtUtils';
@@ -32,7 +32,7 @@ export class AdtUtilsLegacy extends AdtUtils {
   override async activateObjectsGroup(
     objects: IObjectReference[],
     preauditRequested: boolean = false,
-  ): Promise<AxiosResponse> {
+  ): Promise<IAdtResponse> {
     const url = `/sap/bc/adt/activation?method=activate&preauditRequested=${preauditRequested}`;
 
     const objectReferences = objects

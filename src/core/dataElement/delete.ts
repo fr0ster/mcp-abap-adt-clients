@@ -2,10 +2,7 @@
  * DataElement delete operations - Low-level functions
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_DELETION,
   ACCEPT_DELETION_CHECK,
@@ -22,7 +19,7 @@ import type { IDeleteDataElementParams } from './types';
 export async function checkDeletion(
   connection: IAbapConnection,
   params: IDeleteDataElementParams,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const { data_element_name } = params;
 
   if (!data_element_name) {
@@ -59,7 +56,7 @@ export async function checkDeletion(
 export async function deleteDataElement(
   connection: IAbapConnection,
   params: IDeleteDataElementParams,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const { data_element_name, transport_request } = params;
 
   if (!data_element_name) {
@@ -108,5 +105,5 @@ export async function deleteDataElement(
       transport_request: transport_request || 'local',
       message: `Data element ${data_element_name} deleted successfully`,
     },
-  } as AxiosResponse;
+  } as IAdtResponse;
 }

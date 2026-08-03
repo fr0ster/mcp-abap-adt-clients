@@ -4,10 +4,7 @@
  * Endpoint: DELETE /sap/bc/adt/ddic/ddlx/sources/{name}
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -28,7 +25,7 @@ export async function deleteMetadataExtension(
   connection: IAbapConnection,
   name: string,
   transportRequest: string | undefined,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const lowerName = name.toLowerCase();
   const url = `/sap/bc/adt/ddic/ddlx/sources/${lowerName}${transportRequest ? `?corrNr=${transportRequest}` : ''}`;
 

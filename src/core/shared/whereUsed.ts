@@ -2,10 +2,7 @@
  * Where-used operations for ABAP objects
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
 import {
   ACCEPT_WHERE_USED_RESULT,
@@ -220,7 +217,7 @@ function isScopeResourceUnavailable(error: unknown): boolean {
 export async function getWhereUsedScope(
   connection: IAbapConnection,
   params: IGetWhereUsedScopeParams,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   if (!params.object_name) {
     throw new Error('Object name is required');
   }
@@ -262,7 +259,7 @@ export async function getWhereUsedScope(
 export async function getWhereUsed(
   connection: IAbapConnection,
   params: IGetWhereUsedParams,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   if (!params.object_name) {
     throw new Error('Object name is required');
   }

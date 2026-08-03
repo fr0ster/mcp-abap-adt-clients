@@ -5,8 +5,8 @@
  */
 
 import type {
-  IAdtResponse as AxiosResponse,
   IAbapConnection,
+  IAdtResponse,
   IFeedQueryOptions,
   IGatewayErrorLog,
   ILogger,
@@ -20,11 +20,11 @@ export class GatewayErrorLog implements IGatewayErrorLog {
     private readonly logger: ILogger,
   ) {}
 
-  async list(options?: IFeedQueryOptions): Promise<AxiosResponse> {
+  async list(options?: IFeedQueryOptions): Promise<IAdtResponse> {
     return listGatewayErrors(this.connection, options);
   }
 
-  async getById(errorType: string, errorId: string): Promise<AxiosResponse> {
+  async getById(errorType: string, errorId: string): Promise<IAdtResponse> {
     return getGatewayError(this.connection, errorType, errorId);
   }
 }

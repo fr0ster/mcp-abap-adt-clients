@@ -2,10 +2,7 @@
  * Domain activation operations
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { activateObjectInSession } from '../../utils/activationUtils';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 
@@ -18,7 +15,7 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
 export async function activateDomain(
   connection: IAbapConnection,
   domainName: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const objectUri = `/sap/bc/adt/ddic/domains/${encodeSapObjectName(domainName.toLowerCase())}`;
   return await activateObjectInSession(
     connection,

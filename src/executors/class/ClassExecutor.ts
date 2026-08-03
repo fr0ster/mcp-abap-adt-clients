@@ -1,6 +1,6 @@
 import type {
-  IAdtResponse as AxiosResponse,
   IAbapConnection,
+  IAdtResponse,
   IExecutor,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
@@ -36,16 +36,16 @@ export interface IClassExecuteWithProfilingOptions {
 }
 
 export interface IClassExecuteWithProfilingResult {
-  response: AxiosResponse;
+  response: IAdtResponse;
   profilerId: string;
   traceId: string;
-  traceRequestsResponse: AxiosResponse;
+  traceRequestsResponse: IAdtResponse;
 }
 
 export interface IClassExecutor
   extends IExecutor<
     IClassExecutionTarget,
-    AxiosResponse,
+    IAdtResponse,
     IClassExecuteWithProfilerOptions,
     IClassExecuteWithProfilingOptions,
     IClassExecuteWithProfilingResult
@@ -63,7 +63,7 @@ export class ClassExecutor implements IClassExecutor {
     this.logger = logger;
   }
 
-  async run(target: IClassExecutionTarget): Promise<AxiosResponse> {
+  async run(target: IClassExecutionTarget): Promise<IAdtResponse> {
     if (!target.className) {
       throw new Error('Class name is required');
     }
@@ -73,7 +73,7 @@ export class ClassExecutor implements IClassExecutor {
   async runWithProfiler(
     target: IClassExecutionTarget,
     options: IClassExecuteWithProfilerOptions,
-  ): Promise<AxiosResponse> {
+  ): Promise<IAdtResponse> {
     if (!target.className) {
       throw new Error('Class name is required');
     }
@@ -161,10 +161,10 @@ export class ClassExecutor implements IClassExecutor {
   private async tryResolveTrace(
     lookupUris: string[],
     profilerId: string,
-    runResponse: AxiosResponse,
+    runResponse: IAdtResponse,
     userName?: string,
   ): Promise<IClassExecuteWithProfilingResult | undefined> {
-    let traceRequestsResponse: AxiosResponse | undefined;
+    let traceRequestsResponse: IAdtResponse | undefined;
 
     // 1. Primary: list trace files filtered by user
     try {
@@ -236,7 +236,7 @@ export class ClassExecutor implements IClassExecutor {
   private async runWithProfilerId(
     className: string,
     profilerId: string,
-  ): Promise<AxiosResponse> {
+  ): Promise<IAdtResponse> {
     const encodedProfilerId = encodeURIComponent(profilerId);
     return this.connection.makeAdtRequest({
       url: `/sap/bc/adt/oo/classrun/${className}?profilerId=${encodedProfilerId}`,

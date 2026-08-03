@@ -2,10 +2,7 @@
  * Enhancement lock operations
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
 import { ACCEPT_LOCK } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
@@ -75,7 +72,7 @@ export async function lockEnhancementForUpdate(
   connection: IAbapConnection,
   enhancementType: EnhancementType,
   enhancementName: string,
-): Promise<{ response: AxiosResponse; lockHandle: string; corrNr?: string }> {
+): Promise<{ response: IAdtResponse; lockHandle: string; corrNr?: string }> {
   const encodedName = encodeSapObjectName(enhancementName).toLowerCase();
   const url = `${getEnhancementUri(enhancementType, encodedName)}?_action=LOCK&accessMode=MODIFY`;
 

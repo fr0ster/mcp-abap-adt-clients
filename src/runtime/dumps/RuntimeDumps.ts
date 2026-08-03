@@ -1,6 +1,6 @@
 import type {
-  IAdtResponse as AxiosResponse,
   IAbapConnection,
+  IAdtResponse,
   ILogger,
   IRuntimeDumpReadOptions,
   IRuntimeDumps,
@@ -21,21 +21,21 @@ export class RuntimeDumps implements IRuntimeDumps {
     private readonly logger: ILogger,
   ) {}
 
-  async list(options?: IRuntimeDumpsListOptions): Promise<AxiosResponse> {
+  async list(options?: IRuntimeDumpsListOptions): Promise<IAdtResponse> {
     return listRuntimeDumps(this.connection, options ?? {});
   }
 
   async listByUser(
     user?: string,
     options?: Omit<IRuntimeDumpsListOptions, 'query'>,
-  ): Promise<AxiosResponse> {
+  ): Promise<IAdtResponse> {
     return listRuntimeDumpsByUser(this.connection, user, options);
   }
 
   async getById(
     dumpId: string,
     options?: IRuntimeDumpReadOptions,
-  ): Promise<AxiosResponse> {
+  ): Promise<IAdtResponse> {
     return getRuntimeDumpById(this.connection, dumpId, options);
   }
 

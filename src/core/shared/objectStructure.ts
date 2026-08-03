@@ -4,10 +4,7 @@
  * Retrieves ADT object structure as compact JSON tree.
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
@@ -31,7 +28,7 @@ export async function getObjectStructure(
   connection: IAbapConnection,
   objectType: string,
   objectName: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   if (!objectType) {
     throw new Error('Object type is required');
   }

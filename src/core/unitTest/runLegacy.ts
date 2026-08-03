@@ -6,10 +6,7 @@
  * - application/xml for Content-Type and Accept (not versioned vnd.sap.adt.api.abapunit.* types)
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type {
@@ -34,7 +31,7 @@ export async function startClassUnitTestRunLegacy(
   connection: IAbapConnection,
   tests: IClassUnitTestDefinition[],
   _options?: IClassUnitTestRunOptions,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   if (!tests.length) {
     throw new Error('At least one test definition is required');
   }
@@ -75,7 +72,7 @@ export async function getClassUnitTestStatusLegacy(
   connection: IAbapConnection,
   runId: string,
   withLongPolling: boolean = true,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   if (!runId) {
     throw new Error('runId is required');
   }
@@ -94,7 +91,7 @@ export async function getClassUnitTestResultLegacy(
   connection: IAbapConnection,
   runId: string,
   options?: { withNavigationUris?: boolean },
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   if (!runId) {
     throw new Error('runId is required');
   }

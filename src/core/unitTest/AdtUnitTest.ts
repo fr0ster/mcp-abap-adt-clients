@@ -20,12 +20,12 @@
  */
 
 import type {
-  IAdtResponse as AxiosResponse,
   HttpError,
   IAbapConnection,
   IAdtCreatable,
   IAdtOperationOptions,
   IAdtReadable,
+  IAdtResponse,
   IAdtTestRunnable,
   IAdtValidatable,
   ILogger,
@@ -65,8 +65,8 @@ export class AdtUnitTest
 
   // Internal state for convenience methods
   protected lastRunId?: string;
-  protected lastStatusResponse?: AxiosResponse;
-  protected lastResultResponse?: AxiosResponse;
+  protected lastStatusResponse?: IAdtResponse;
+  protected lastResultResponse?: IAdtResponse;
   protected state: IUnitTestState = { errors: [] };
 
   // AdtClass and AdtLocalTestClass for working with test classes
@@ -182,7 +182,7 @@ export class AdtUnitTest
       );
 
       // Read result if available
-      let resultResponse: AxiosResponse | undefined;
+      let resultResponse: IAdtResponse | undefined;
       try {
         resultResponse = await getClassUnitTestResult(
           this.connection,
@@ -303,7 +303,7 @@ export class AdtUnitTest
   async getStatus(
     runId: string,
     withLongPolling: boolean = true,
-  ): Promise<AxiosResponse> {
+  ): Promise<IAdtResponse> {
     const response = await getClassUnitTestStatus(
       this.connection,
       runId,
@@ -316,7 +316,7 @@ export class AdtUnitTest
   /**
    * Get status response from last getStatus call
    */
-  getStatusResponse(): AxiosResponse | undefined {
+  getStatusResponse(): IAdtResponse | undefined {
     return this.lastStatusResponse;
   }
 
@@ -326,7 +326,7 @@ export class AdtUnitTest
   async getResult(
     runId: string,
     options?: { withNavigationUris?: boolean; format?: 'abapunit' | 'junit' },
-  ): Promise<AxiosResponse> {
+  ): Promise<IAdtResponse> {
     const response = await getClassUnitTestResult(
       this.connection,
       runId,
@@ -339,14 +339,14 @@ export class AdtUnitTest
   /**
    * Get result response from last getResult call
    */
-  getResultResponse(): AxiosResponse | undefined {
+  getResultResponse(): IAdtResponse | undefined {
     return this.lastResultResponse;
   }
 
   /**
    * Extract run ID from unit test run response
    */
-  protected extractRunId(response: AxiosResponse): string | undefined {
+  protected extractRunId(response: IAdtResponse): string | undefined {
     // First, try to extract from response headers (most reliable)
     const locationHeader =
       headerValueToString(response.headers?.location) ||

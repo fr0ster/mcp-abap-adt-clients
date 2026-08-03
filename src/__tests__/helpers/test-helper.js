@@ -552,7 +552,7 @@ function getOperationDelay(operation = 'default', testCase = null) {
 /**
  * Extract meaningful error message from validation response
  * Parses XML to extract localized message or exception type
- * @param {Object} response - AxiosResponse from validation endpoint
+ * @param {Object} response - ADT response from the validation endpoint
  * @returns {string} Extracted error message or fallback to raw data
  */
 function extractValidationErrorMessage(response) {
@@ -804,7 +804,7 @@ function extractValidationErrorMessage(response) {
 /**
  * Parse validation response from ADT
  * Checks for CHECK_RESULT=X (success) or SEVERITY=ERROR with message
- * @param {Object} response - AxiosResponse from validation endpoint
+ * @param {Object} response - ADT response from the validation endpoint
  * @returns {Object} Parsed validation result with valid, severity, message, exists fields
  */
 function parseValidationResponse(response) {
@@ -898,7 +898,7 @@ function parseValidationResponse(response) {
 /**
  * Check validation result and throw error if validation failed
  * Simple check: if status is not 200, throw error with raw message
- * @param {Object} validationResponse - AxiosResponse from validation
+ * @param {Object} validationResponse - ADT response from validation
  * @param {string} objectName - Name of the object being validated
  * @param {string} objectType - Type of object (e.g., 'Interface', 'Class', 'Table')
  * @throws {Error} If validation failed (status !== 200)
@@ -935,7 +935,7 @@ function checkValidationResult(validationResponse, _objectName, objectType) {
  * @param {number} [options.delay=1000] - Delay between retries in milliseconds
  * @param {Object} [options.logger] - Optional logger for debug messages
  * @param {string} [options.objectName] - Optional object name for log messages
- * @returns {Promise<Object>} Check result (AxiosResponse)
+ * @returns {Promise<Object>} Check result (ADT response)
  * @throws {Error} If all retry attempts failed
  */
 async function retryCheckAfterActivate(checkFunction, options = {}) {

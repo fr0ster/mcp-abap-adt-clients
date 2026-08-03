@@ -2,10 +2,7 @@
  * Feature Toggle activation operations
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -19,7 +16,7 @@ function buildActivationXml(name: string): string {
 </adtcore:objectReferences>`;
 }
 
-function parseActivationResponse(response: AxiosResponse): {
+function parseActivationResponse(response: IAdtResponse): {
   success: boolean;
   message: string;
 } {
@@ -64,7 +61,7 @@ function parseActivationResponse(response: AxiosResponse): {
 export async function activateFeatureToggle(
   connection: IAbapConnection,
   name: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   if (!name) {
     throw new Error('Feature toggle name is required');
   }

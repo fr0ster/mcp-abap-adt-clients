@@ -2,10 +2,7 @@
  * Interface read operations
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_TRANSPORT } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { noopLogger } from '../../utils/noopLogger';
@@ -24,7 +21,7 @@ export async function getInterfaceMetadata(
   connection: IAbapConnection,
   interfaceName: string,
   options?: IReadOptions,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   return getUtils(connection).readObjectMetadata(
     'interface',
     interfaceName,
@@ -42,7 +39,7 @@ export async function getInterfaceSource(
   interfaceName: string,
   version?: 'active' | 'inactive',
   options?: IReadOptions,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   return getUtils(connection).readObjectSource(
     'interface',
     interfaceName,
@@ -59,7 +56,7 @@ export async function getInterfaceSource(
 export async function getInterface(
   connection: IAbapConnection,
   interfaceName: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   return getInterfaceSource(connection, interfaceName);
 }
 
@@ -73,7 +70,7 @@ export async function getInterfaceTransport(
   connection: IAbapConnection,
   interfaceName: string,
   options?: IReadOptions,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const encodedName = encodeSapObjectName(interfaceName);
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
   const url = `/sap/bc/adt/oo/interfaces/${encodedName}/transport${query}`;

@@ -5,10 +5,7 @@
  * - Get activation graph
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -30,7 +27,7 @@ export interface IGetActivationGraphOptions {
 export async function getActivationGraph(
   connection: IAbapConnection,
   options?: IGetActivationGraphOptions,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const url = `/sap/bc/adt/ddic/logs/activationgraph`;
   const params: Record<string, string | number | boolean> = {};
 

@@ -8,10 +8,7 @@
  * fetches the full list and filters client-side.
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -24,7 +21,7 @@ import { getTimeout } from '../../utils/timeouts';
 export async function getTransportLegacy(
   connection: IAbapConnection,
   transportNumber: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const url = '/sap/bc/cts/transportrequests';
 
   const response = await connection.makeAdtRequest({
@@ -56,7 +53,7 @@ export async function getTransportLegacy(
  */
 export async function listTransportsLegacy(
   connection: IAbapConnection,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   return connection.makeAdtRequest({
     url: '/sap/bc/cts/transportrequests',
     method: 'GET',

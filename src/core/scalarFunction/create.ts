@@ -2,10 +2,7 @@
  * ScalarFunction create operations - Low-level functions
  * Metadata-only POST (no source upload). Use AdtScalarFunction.update() for source.
  */
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_SCALAR_FUNCTION,
   CT_SCALAR_FUNCTION,
@@ -18,7 +15,7 @@ import type { ICreateScalarFunctionParams } from './types';
 export async function create(
   connection: IAbapConnection,
   args: ICreateScalarFunctionParams,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   if (!args.scalar_function_name || !args.package_name) {
     throw new Error(
       'Missing required parameters: scalar_function_name and package_name',

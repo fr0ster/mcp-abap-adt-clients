@@ -6,8 +6,8 @@
  */
 
 import type {
-  IAdtResponse as AxiosResponse,
   IAbapConnection,
+  IAdtResponse,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import {
@@ -36,7 +36,7 @@ export async function readMetadataExtension(
   name: string,
   options?: IReadOptions,
   logger?: ILogger,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const lowerName = name.toLowerCase();
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
   const url = `/sap/bc/adt/ddic/ddlx/sources/${lowerName}${query}`;
@@ -77,7 +77,7 @@ export async function readMetadataExtensionSource(
   version: 'active' | 'inactive' = 'active',
   options?: IReadOptions,
   logger?: ILogger,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const lowerName = name.toLowerCase();
   const versionQuery = version === 'inactive' ? '?version=inactive' : '';
   const longPollingQuery = options?.withLongPolling
@@ -113,7 +113,7 @@ export async function getMetadataExtensionTransport(
   connection: IAbapConnection,
   name: string,
   options?: IReadOptions,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const lowerName = name.toLowerCase();
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
   const url = `/sap/bc/adt/ddic/ddlx/sources/${lowerName}/transport${query}`;

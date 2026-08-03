@@ -4,10 +4,7 @@
  * Retrieves type information (domain, data element, table type) with fallback chain.
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_SOURCE_XML_FALLBACK } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -34,7 +31,7 @@ import { getTimeout } from '../../utils/timeouts';
 export async function getTypeInfo(
   connection: IAbapConnection,
   typeName: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   if (!typeName) {
     throw new Error('Type name is required');
   }

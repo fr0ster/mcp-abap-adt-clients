@@ -2,10 +2,7 @@
  * FunctionModule update operations - low-level functions for AdtFunctionModule
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -21,7 +18,7 @@ export async function update(
   connection: IAbapConnection,
   params: IUpdateFunctionModuleParams,
   contentTypes?: IAdtContentTypes,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const encodedGroupName = encodeSapObjectName(
     params.functionGroupName,
   ).toLowerCase();

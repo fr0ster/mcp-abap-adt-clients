@@ -2,10 +2,7 @@
  * Table activation operations
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { activateObjectInSession } from '../../utils/activationUtils';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 
@@ -15,7 +12,7 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
 export async function activateTable(
   connection: IAbapConnection,
   tableName: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const objectUri = `/sap/bc/adt/ddic/tables/${encodeSapObjectName(tableName)}`;
   return await activateObjectInSession(connection, objectUri, tableName, true);
 }

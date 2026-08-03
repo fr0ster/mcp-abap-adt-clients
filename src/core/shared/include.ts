@@ -4,10 +4,7 @@
  * Retrieves source code of specific ABAP include files.
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_SOURCE } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -30,7 +27,7 @@ import { getTimeout } from '../../utils/timeouts';
 export async function getInclude(
   connection: IAbapConnection,
   includeName: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   if (!includeName) {
     throw new Error('Include name is required');
   }

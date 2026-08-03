@@ -7,8 +7,8 @@
  */
 
 import type {
-  IAdtResponse as AxiosResponse,
   IAbapConnection,
+  IAdtResponse,
   IFeedQueryOptions,
 } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
@@ -24,7 +24,7 @@ import { buildFeedQueryParams } from '../feeds/read';
 export async function listGatewayErrors(
   connection: IAbapConnection,
   options?: IFeedQueryOptions,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const url = `/sap/bc/adt/gw/errorlog${buildFeedQueryParams(options, 'username')}`;
 
   return connection.makeAdtRequest({
@@ -49,7 +49,7 @@ export async function getGatewayError(
   connection: IAbapConnection,
   errorType: string,
   errorId: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const url = `/sap/bc/adt/gw/errorlog/${encodeURIComponent(errorType)}/${errorId}`;
 
   return connection.makeAdtRequest({

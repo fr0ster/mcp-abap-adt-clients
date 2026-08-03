@@ -2,10 +2,7 @@
  * Transport read operations
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
@@ -15,7 +12,7 @@ import { getTimeout } from '../../utils/timeouts';
 export async function getTransport(
   connection: IAbapConnection,
   transportNumber: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const encodedName = encodeSapObjectName(transportNumber);
   const url = `/sap/bc/adt/cts/transportrequests/${encodedName}`;
 

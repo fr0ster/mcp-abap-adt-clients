@@ -20,10 +20,10 @@
 import {
   AdtObjectErrorCodes,
   AdtOperationError,
-  type IAdtResponse as AxiosResponse,
   type HttpError,
   type IAbapConnection,
   type IAdtOperationOptions,
+  type IAdtResponse,
   type IAdtSourceObject,
   type ILogger,
   type IObjectVersion,
@@ -792,7 +792,7 @@ export class AdtClass implements IAdtSourceObject<IClassConfig, IClassState> {
   async unlockTestClasses(
     config: Partial<IClassConfig>,
     lockHandle: string,
-  ): Promise<AxiosResponse> {
+  ): Promise<IAdtResponse> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
@@ -812,7 +812,7 @@ export class AdtClass implements IAdtSourceObject<IClassConfig, IClassState> {
   async checkTestClass(
     config: Partial<IClassConfig> & { testClassCode: string },
     version: 'active' | 'inactive' = 'inactive',
-  ): Promise<AxiosResponse> {
+  ): Promise<IAdtResponse> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
@@ -834,7 +834,7 @@ export class AdtClass implements IAdtSourceObject<IClassConfig, IClassState> {
    */
   async updateTestClasses(
     config: Partial<IClassConfig> & { testClassCode: string },
-  ): Promise<AxiosResponse> {
+  ): Promise<IAdtResponse> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
@@ -898,7 +898,7 @@ export class AdtClass implements IAdtSourceObject<IClassConfig, IClassState> {
    */
   async activateTestClasses(
     config: Partial<IClassConfig> & { testClassName: string },
-  ): Promise<AxiosResponse> {
+  ): Promise<IAdtResponse> {
     if (!config.className) {
       throw new Error('Class name is required');
     }

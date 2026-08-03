@@ -3,8 +3,8 @@
  */
 
 import type {
-  IAdtResponse as AxiosResponse,
   IAbapConnection,
+  IAdtResponse,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import {
@@ -26,7 +26,7 @@ export async function getServiceDefinition(
   version: 'active' | 'inactive' | 'workingArea' = 'inactive',
   options?: IReadOptions,
   logger?: ILogger,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const encodedName = encodeSapObjectName(serviceDefinitionName.toLowerCase());
   const queryParams: string[] = [];
   if (version) {
@@ -61,7 +61,7 @@ export async function getServiceDefinitionSource(
   version: 'active' | 'inactive' | 'workingArea' = 'inactive',
   options?: IReadOptions,
   logger?: ILogger,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const encodedName = encodeSapObjectName(serviceDefinitionName.toLowerCase());
   const queryParams: string[] = [];
   if (version) {
@@ -97,7 +97,7 @@ export async function getServiceDefinitionTransport(
   connection: IAbapConnection,
   serviceDefinitionName: string,
   options?: IReadOptions,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const encodedName = encodeSapObjectName(serviceDefinitionName.toLowerCase());
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
   const url = `/sap/bc/adt/ddic/srvd/sources/${encodedName}/transport${query}`;

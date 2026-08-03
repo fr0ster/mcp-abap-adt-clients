@@ -6,8 +6,8 @@
  */
 
 import type {
-  IAdtResponse as AxiosResponse,
   IAbapConnection,
+  IAdtResponse,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import {
@@ -213,7 +213,7 @@ export async function updateDataElement(
   params: IUpdateDataElementParams,
   lockHandle: string,
   logger?: ILogger,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   if (!params.data_element_name) {
     throw new Error('Data element name is required');
   }
@@ -291,6 +291,6 @@ export async function updateDataElementInternal(
   _username: string,
   _domainInfo: { dataType: string; length: number; decimals: number },
   logger?: ILogger,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   return updateDataElement(connection, args, lockHandle, logger);
 }

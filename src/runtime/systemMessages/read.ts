@@ -7,8 +7,8 @@
  */
 
 import type {
-  IAdtResponse as AxiosResponse,
   IAbapConnection,
+  IAdtResponse,
   IFeedQueryOptions,
 } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
@@ -24,7 +24,7 @@ import { buildFeedQueryParams } from '../feeds/read';
 export async function listSystemMessages(
   connection: IAbapConnection,
   options?: IFeedQueryOptions,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const url = `/sap/bc/adt/runtime/systemmessages${buildFeedQueryParams(options)}`;
 
   return connection.makeAdtRequest({
@@ -47,7 +47,7 @@ export async function listSystemMessages(
 export async function getSystemMessage(
   connection: IAbapConnection,
   messageId: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const url = `/sap/bc/adt/runtime/systemmessages/${messageId}`;
 
   return connection.makeAdtRequest({

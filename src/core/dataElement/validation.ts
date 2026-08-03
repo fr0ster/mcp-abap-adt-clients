@@ -3,10 +3,7 @@
  * Uses ADT validation endpoint: /sap/bc/adt/ddic/dataelements/validation
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_VALIDATION } from '../../constants/contentTypes';
 import { getTimeout } from '../../utils/timeouts';
 
@@ -25,7 +22,7 @@ export async function validateDataElementName(
   dataElementName: string,
   packageName?: string,
   description?: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   const url = `/sap/bc/adt/ddic/dataelements/validation`;
   const queryParams = new URLSearchParams({
     objtype: 'dtel',

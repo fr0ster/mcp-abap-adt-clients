@@ -4,10 +4,7 @@
  * Same endpoint as class validation, but with objtype=INTF/OI
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_VALIDATION_CLASS_NAME } from '../../constants/contentTypes';
 import { getTimeout } from '../../utils/timeouts';
 
@@ -26,7 +23,7 @@ export async function validateInterfaceName(
   interfaceName: string,
   packageName?: string,
   description?: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   // Build query parameters for interface validation (same format as class validation)
   const params = new URLSearchParams({
     objname: interfaceName,

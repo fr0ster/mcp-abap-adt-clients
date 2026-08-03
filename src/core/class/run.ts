@@ -2,10 +2,7 @@
  * Class run operations - execute ABAP classes that implement if_oo_adt_classrun
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
@@ -57,7 +54,7 @@ export async function runClass(
   className: string,
   runnable: boolean = true,
   _sessionId?: string,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   if (!runnable) {
     throw new Error(
       `Class ${className} is not marked as runnable (does not implement if_oo_adt_classrun)`,
@@ -108,7 +105,7 @@ export async function startClassUnitTestRun(
   connection: IAbapConnection,
   tests: IClassUnitTestDefinition[],
   options?: IClassUnitTestRunOptions,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   if (!tests.length) {
     throw new Error('At least one test definition is required');
   }
@@ -162,7 +159,7 @@ export async function getClassUnitTestStatus(
   connection: IAbapConnection,
   runId: string,
   withLongPolling: boolean = true,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   if (!runId) {
     throw new Error('runId is required');
   }
@@ -181,7 +178,7 @@ export async function getClassUnitTestResult(
   connection: IAbapConnection,
   runId: string,
   options?: { withNavigationUris?: boolean; format?: 'abapunit' | 'junit' },
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   if (!runId) {
     throw new Error('runId is required');
   }
@@ -212,7 +209,7 @@ export async function startClassUnitTestRunByObject(
   connection: IAbapConnection,
   className: string,
   options?: IClassUnitTestRunOptions,
-): Promise<AxiosResponse> {
+): Promise<IAdtResponse> {
   if (!className) {
     throw new Error('className is required');
   }
