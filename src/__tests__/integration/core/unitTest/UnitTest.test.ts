@@ -273,7 +273,9 @@ describe('AdtUnitTest (using AdtClient)', () => {
 
           // Step 7: Run unit test (start test execution)
           logTestStep('run (unit test)', testsLogger);
-          const unitTest = client.getUnitTest() as any;
+          // No cast: since interfaces 13.1.0 the run surface is part of the
+          // declared type, so reaching it no longer means escaping the type.
+          const unitTest = client.getUnitTest();
           const runId = await unitTest.run(
             unitTestConfig.tests!,
             unitTestConfig.options,

@@ -538,7 +538,7 @@ Both forms resolve to the identical type. The re-exports exist so that existing 
 
 ### Honest capability types (since 8.0.0)
 
-`@mcp-abap-adt/interfaces` (`^13.0.0`) splits the fat `IAdtObject` contract into **capability atoms** — `IAdtCreatable`, `IAdtReadable`, `IAdtModifiable` (and `IAdtCrud`, their composite), `IAdtValidatable`, `IAdtCheckable`, `IAdtActivatable`, `IAdtLockable`, `IAdtVersionable`, `IAdtTransportAware`, `IAdtSearchable` — each covering one slice of the lifecycle, plus two named composites: `IAdtSourceObject` and `IAdtNonVersionedObject` (all but versions). Since interfaces 13.0.0 `IAdtObject` is itself assembled from the atoms, so the atoms are the definitions and the composite cannot drift from them.
+`@mcp-abap-adt/interfaces` (`^13.1.0`) splits the fat `IAdtObject` contract into **capability atoms** — `IAdtCreatable`, `IAdtReadable`, `IAdtModifiable` (and `IAdtCrud`, their composite), `IAdtValidatable`, `IAdtCheckable`, `IAdtActivatable`, `IAdtLockable`, `IAdtVersionable`, `IAdtTransportAware`, `IAdtSearchable` — each covering one slice of the lifecycle, plus two named composites: `IAdtSourceObject` and `IAdtNonVersionedObject` (all but versions). Since interfaces 13.0.0 `IAdtObject` is itself assembled from the atoms, so the atoms are the definitions and the composite cannot drift from them.
 
 Since **8.0.0**, each handler `implements` only the atoms it genuinely supports, and `AdtClient.getXxx()` (and `AdtClientBatch.getXxx()`) return types are narrowed to match:
 
@@ -551,7 +551,7 @@ Previously the second call compiled and threw `ADT_UNSUPPORTED_OPERATION` at run
 
 `IAdtObject` remains available but is **`@deprecated`** — it is the full-capability composite, structurally identical to `IAdtSourceObject`, kept for backward compatibility and removed in a later major.
 
-Since **9.0.0** no accessor returns the wide type. `getUnitTest()` and `getCdsUnitTest()` were the last, and now return `IAdtCreatable & IAdtReadable & IAdtValidatable`: ADT exposes no update, delete, activate, check, lock or version resource for a test run, so the previous type promised thirteen methods of which nine threw. `getRequest()`, `getFeatureToggle()` and `getServiceBinding()` return their concrete handler types.
+Since **9.0.0** no accessor returns the wide type. `getUnitTest()` and `getCdsUnitTest()` were the last, and now return `IAdtCreatable & IAdtReadable & IAdtValidatable & IAdtTestRunnable` (`IAdtCdsTestRunnable` for CDS): ADT exposes no update, delete, activate, check, lock or version resource for a test run, so the previous type promised thirteen methods of which nine threw — while omitting `run()`, the one thing the handler is for. `getRequest()`, `getFeatureToggle()` and `getServiceBinding()` return their concrete handler types.
 
 Two categories deliberately remain local, because they describe *this client* rather than the wire contract:
 

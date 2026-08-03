@@ -16,6 +16,7 @@
 import type {
   IAbapConnection,
   IAdtActivatable,
+  IAdtCdsTestRunnable,
   IAdtCheckable,
   IAdtCreatable,
   IAdtCrud,
@@ -24,6 +25,7 @@ import type {
   IAdtObject,
   IAdtReadable,
   IAdtSourceObject,
+  IAdtTestRunnable,
   IAdtTransportAware,
   IAdtValidatable,
   IAdtVersionable,
@@ -806,10 +808,15 @@ export class AdtClient {
    * A test run is created and read, never edited: ADT exposes no update,
    * delete, activate, check, lock or version resource for one. The declared
    * type says so rather than promising thirteen methods of which nine throw.
+   *
+   * It also carries {@link IAdtTestRunnable} — starting a run and collecting
+   * its outcome is the reason this handler exists, and until interfaces 13.1.0
+   * no contract described it, so callers cast past the type to reach it.
    */
   getUnitTest(): IAdtCreatable<IUnitTestConfig, IUnitTestState> &
     IAdtReadable<IUnitTestConfig, IUnitTestState> &
-    IAdtValidatable<IUnitTestConfig, IUnitTestState> {
+    IAdtValidatable<IUnitTestConfig, IUnitTestState> &
+    IAdtTestRunnable {
     this.assertConnected();
     return new AdtUnitTest(this.connection, this.logger);
   }
@@ -822,7 +829,8 @@ export class AdtClient {
    */
   getCdsUnitTest(): IAdtCreatable<ICdsUnitTestConfig, ICdsUnitTestState> &
     IAdtReadable<ICdsUnitTestConfig, ICdsUnitTestState> &
-    IAdtValidatable<ICdsUnitTestConfig, ICdsUnitTestState> {
+    IAdtValidatable<ICdsUnitTestConfig, ICdsUnitTestState> &
+    IAdtCdsTestRunnable {
     this.assertConnected();
     return new AdtCdsUnitTest(this.connection, this.logger);
   }

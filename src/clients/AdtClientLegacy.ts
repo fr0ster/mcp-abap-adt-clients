@@ -16,11 +16,14 @@
 import type {
   IAbapConnection,
   IAdtCheckable,
+  IAdtCreatable,
   IAdtCrud,
   IAdtLockable,
   IAdtNonVersionedObject,
   IAdtObject,
+  IAdtReadable,
   IAdtSourceObject,
+  IAdtTestRunnable,
   IAdtTransportAware,
   IAdtValidatable,
   ILogger,
@@ -151,7 +154,10 @@ export class AdtClientLegacy extends AdtClient {
 
   // --- Unit tests with legacy endpoints ---
 
-  override getUnitTest(): IAdtObject<IUnitTestConfig, IUnitTestState> {
+  override getUnitTest(): IAdtCreatable<IUnitTestConfig, IUnitTestState> &
+    IAdtReadable<IUnitTestConfig, IUnitTestState> &
+    IAdtValidatable<IUnitTestConfig, IUnitTestState> &
+    IAdtTestRunnable {
     return new AdtUnitTestLegacy(this.connection, this.logger);
   }
 

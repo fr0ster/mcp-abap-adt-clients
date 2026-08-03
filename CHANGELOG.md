@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 ## [9.0.0] - 2026-08-03
 
 ### Changed — BREAKING
-- **Requires `@mcp-abap-adt/interfaces` ^13.0.0**, and the field renames it carries surface here. Anything reading a package hierarchy node or a package contents item must move:
+- **Requires `@mcp-abap-adt/interfaces` ^13.1.0**, and the field renames it carries surface here. Anything reading a package hierarchy node or a package contents item must move:
 
   | before | after |
   |---|---|
@@ -22,7 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
   `AdtUnitTest` declares the same three atoms. The refusing methods remain on the class so an existing caller still gets a clear error rather than `undefined is not a function`, but they are no longer part of the contract.
 
-  Not fixed here, and worth knowing: the run surface (`run`, `getRunId`, `getStatus`, `getResult`) is still absent from the declared type, because no interface describes it — which is why the integration test reaches for it through `as any`. Narrowing does not make that worse, but it does not fix it either; closing it needs a new atom in `interfaces`.
+  Both accessors also hand out `IAdtTestRunnable` (`IAdtCdsTestRunnable` for CDS) — starting a run and collecting its outcome, which is the reason the handler exists. No contract described it before `interfaces` 13.1.0, so callers cast past the declared type to reach it; `UnitTest.test.ts` did `client.getUnitTest() as any`. That cast is gone, and its removal is the check that the capability actually reaches a consumer rather than merely existing on the class.
 
 - The dev-time connector moves to **^3.0.0**.
 
@@ -30,6 +30,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 - **The session stub modelled a SAP behaviour that does not exist.** Its CSRF endpoint minted a new `SAP_SESSIONID` on every fetch, ignoring the cookie the client presented. Real SAP returns a fresh token for the *same* session when one is presented — which is the only reason a 403 mid-lock is survivable at all. Once connector 3.0.0 began treating a changed session identity as fatal (correctly: a changed identity means the lock is gone), an ordinary token refresh started reading as a replacement and the mid-lock recovery test failed. The stub now keeps a presented session and still opens a distinct one when none is presented, so a silent re-establishment stays visible.
 
 ### Added
+- **A conformance test that pins the handed-out capabilities** (`unitTestContractConformance.test.ts`). Written from the consumer's side deliberately: a class's `implements` clause is already checked by the compiler, so repeating it would prove nothing. What nothing pinned is the other half — that `AdtClient.getXxx()` passes the capability outwards. Narrow a getter back and every `implements` clause still compiles while the consumer silently loses the capability, which is precisely how `run()` came to be unreachable. The test also asserts the narrowing bites: `update`, `delete`, `activate`, `lock` and `getVersions` must stay *out* of the handed-out type. Verified to fail when the contract is regressed, not just to pass.
 - **`AdtUtils.search()`** — the `IAdtSearchable` capability, returning `ISearchResult[]`. `searchObjects()` still returns the raw response and is not going anywhere: one answers "what came back over the wire", the other "which objects matched", and both are legitimate questions. `parseSearchResults()` is exported alongside for callers that already hold the XML.
 
   The parser accepts the objectReference attributes with or without the `adtcore:` prefix. That is not defensive padding: the payload is not consistent about it across releases, and pinning one spelling would return silently empty hits on a system that uses the other.

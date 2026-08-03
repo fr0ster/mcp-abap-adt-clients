@@ -26,6 +26,7 @@ import type {
   IAdtCreatable,
   IAdtOperationOptions,
   IAdtReadable,
+  IAdtTestRunnable,
   IAdtValidatable,
   ILogger,
   IObjectVersion,
@@ -55,7 +56,8 @@ export class AdtUnitTest
   implements
     IAdtCreatable<IUnitTestConfig, IUnitTestState>,
     IAdtReadable<IUnitTestConfig, IUnitTestState>,
-    IAdtValidatable<IUnitTestConfig, IUnitTestState>
+    IAdtValidatable<IUnitTestConfig, IUnitTestState>,
+    IAdtTestRunnable
 {
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
