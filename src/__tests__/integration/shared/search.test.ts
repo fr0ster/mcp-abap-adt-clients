@@ -11,7 +11,8 @@ import { createAbapConnection, type SapConfig } from '@mcp-abap-adt/connection';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
-import { createTestAdtClient } from '../../helpers/sessionConfig';
+import { parseSearchResults } from '../../../core/shared/search';
+import { createTestAdtClient, getConfig } from '../../helpers/sessionConfig';
 import { createTestsLogger } from '../../helpers/testLogger';
 import { logTestStep } from '../../helpers/testProgressLogger';
 
@@ -25,64 +26,6 @@ if (fs.existsSync(envPath)) {
 
 const testsLogger: ILogger = createTestsLogger();
 
-function getConfig(): SapConfig {
-  const rawUrl = process.env.SAP_URL;
-  const url = rawUrl ? rawUrl.split('#')[0].trim() : rawUrl;
-  const rawClient = process.env.SAP_CLIENT;
-  const client = rawClient ? rawClient.split('#')[0].trim() : rawClient;
-  const rawAuthType = process.env.SAP_AUTH_TYPE || 'basic';
-  const authType = rawAuthType.split('#')[0].trim();
-
-  if (!url || !/^https?:\/\//.test(url)) {
-    throw new Error(`Missing or invalid SAP_URL: ${url}`);
-  }
-
-  const config: SapConfig = {
-    url,
-    authType: authType === 'xsuaa' ? 'jwt' : (authType as 'basic' | 'jwt'),
-  };
-
-  if (client) {
-    config.client = client;
-  }
-
-  if (authType === 'jwt' || authType === 'xsuaa') {
-    const jwtToken = process.env.SAP_JWT_TOKEN;
-    if (!jwtToken) {
-      throw new Error('Missing SAP_JWT_TOKEN for JWT authentication');
-    }
-    config.jwtToken = jwtToken;
-
-    // Add refresh credentials for auto-refresh (if available)
-    const refreshToken = process.env.SAP_REFRESH_TOKEN;
-    if (refreshToken) {
-      config.refreshToken = refreshToken;
-    }
-
-    const uaaUrl = process.env.SAP_UAA_URL || process.env.UAA_URL;
-    const uaaClientId =
-      process.env.SAP_UAA_CLIENT_ID || process.env.UAA_CLIENT_ID;
-    const uaaClientSecret =
-      process.env.SAP_UAA_CLIENT_SECRET || process.env.UAA_CLIENT_SECRET;
-
-    if (uaaUrl) config.uaaUrl = uaaUrl;
-    if (uaaClientId) config.uaaClientId = uaaClientId;
-    if (uaaClientSecret) config.uaaClientSecret = uaaClientSecret;
-  } else {
-    const username = process.env.SAP_USERNAME;
-    const password = process.env.SAP_PASSWORD;
-    if (!username || !password) {
-      throw new Error(
-        'Missing SAP_USERNAME or SAP_PASSWORD for basic authentication',
-      );
-    }
-    config.username = username;
-    config.password = password;
-  }
-
-  return config;
-}
-
 describe('Shared - searchObjects', () => {
   let connection: IAbapConnection;
   let client: AdtClient;
@@ -93,6 +36,9 @@ describe('Shared - searchObjects', () => {
     try {
       const config = getConfig();
       connection = createAbapConnection(config, testsLogger);
+      // The connector refuses work on a connection nobody opened; these files
+      // predate that contract and never noticed, because they were skipping.
+      await (connection as any).connect();
       const { client: resolvedClient, isLegacy: legacy } =
         await createTestAdtClient(connection, testsLogger);
       client = resolvedClient;
@@ -136,10 +82,16 @@ describe('Shared - searchObjects', () => {
     testsLogger.info?.('✅ Search completed');
     testsLogger.info?.(`📊 Response size: ${result.data?.length || 0} bytes`);
 
-    // Parse and log number of results
-    const matches = result.data?.match(/<objectReference/g);
-    if (matches) {
-      testsLogger.info?.(`🎯 Found ${matches.length} objects`);
+    // Parse with the shipped parser rather than a regex. The regex here used to
+    // be /<objectReference/, which never matches: SAP prefixes the element,
+    // `<adtcore:objectReference`. The count was only logged, never asserted, so
+    // it silently found nothing for as long as it existed — and read as
+    // evidence that the payload was unprefixed, which it is not.
+    const hits = parseSearchResults(String(result.data ?? ''));
+    testsLogger.info?.(`🎯 Found ${hits.length} objects`);
+    for (const hit of hits) {
+      expect(hit.name).toBeTruthy();
+      expect(hit.type).toBeTruthy();
     }
   }, 15000);
 
@@ -168,10 +120,16 @@ describe('Shared - searchObjects', () => {
     testsLogger.info?.('✅ Search completed');
     testsLogger.info?.(`📊 Response size: ${result.data?.length || 0} bytes`);
 
-    // Parse and log number of results
-    const matches = result.data?.match(/<objectReference/g);
-    if (matches) {
-      testsLogger.info?.(`🎯 Found ${matches.length} tables`);
+    // Parse with the shipped parser rather than a regex. The regex here used to
+    // be /<objectReference/, which never matches: SAP prefixes the element,
+    // `<adtcore:objectReference`. The count was only logged, never asserted, so
+    // it silently found nothing for as long as it existed — and read as
+    // evidence that the payload was unprefixed, which it is not.
+    const hits = parseSearchResults(String(result.data ?? ''));
+    testsLogger.info?.(`🎯 Found ${hits.length} tables`);
+    for (const hit of hits) {
+      expect(hit.name).toBeTruthy();
+      expect(hit.type).toBeTruthy();
     }
   }, 15000);
 
