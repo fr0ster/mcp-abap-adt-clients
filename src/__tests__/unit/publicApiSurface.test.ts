@@ -12,6 +12,9 @@
  * `src/`-relative import would still pass with the barrel unwired and prove
  * nothing.
  */
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import * as rootExports from '../../index';
 import { parseSearchResults } from '../../index';
 
 describe('public API surface', () => {
@@ -37,5 +40,111 @@ describe('public API surface', () => {
         uri: undefined,
       },
     ]);
+  });
+});
+
+/**
+ * The runtime surface, pinned exactly.
+ *
+ * Two guards, and neither guesses. The first is this manifest: every value the
+ * package hands out, listed. A new export or a lost one fails here and has to
+ * be acknowledged by editing the list, which is the point — the surface is a
+ * decision, not a side effect.
+ *
+ * The second holds the README to it. An earlier version of that check tried to
+ * recognise claims by their shape in prose, and kept missing some: a list
+ * wrapped onto a second line, two helpers separated by a slash, a whole section
+ * it was never pointed at. Heuristics over prose are not a guard, they are an
+ * illusion of one. The README now marks its claim lists explicitly and the test
+ * reads only what is marked.
+ */
+const RUNTIME_EXPORTS = [
+  'AbapDebugger',
+  'AdtAbapGitClient',
+  'AdtAppendStructure',
+  'AdtClient',
+  'AdtClientBatch',
+  'AdtClientLegacy',
+  'AdtClientsWS',
+  'AdtContentTypesBase',
+  'AdtContentTypesModern',
+  'AdtExecutor',
+  'AdtMessageClass',
+  'AdtMessageClassMessage',
+  'AdtRuntimeClient',
+  'AdtRuntimeClientBatch',
+  'AdtRuntimeClientExperimental',
+  'AdtScalarFunction',
+  'AdtScalarFunctionImplementation',
+  'AdtService',
+  'AdtServiceBinding',
+  'AmdpDebugger',
+  'ApplicationLog',
+  'AtcLog',
+  'BatchRecordingConnection',
+  'CrossTrace',
+  'DdicActivation',
+  'Debugger',
+  'DebuggerSessionClient',
+  'FeedRepository',
+  'GatewayErrorLog',
+  'MemorySnapshots',
+  'Profiler',
+  'RuntimeDumps',
+  'St05Trace',
+  'SystemMessages',
+  'buildDumpIdPrefix',
+  'buildRuntimeDumpsUserQuery',
+  'createAdtClient',
+  'fetchDiscoveryEndpoints',
+  'getSystemInformation',
+  'isEndpointInDiscovery',
+  'isModernAdtSystem',
+  'parseSearchResults',
+  'resolveBindingVariant',
+  'resolveContentTypes',
+];
+
+describe('runtime export surface', () => {
+  const actual = Object.keys(rootExports).sort();
+
+  it('is exactly the manifest', () => {
+    expect(actual).toEqual([...RUNTIME_EXPORTS].sort());
+  });
+
+  it('does not hand out SERVICE_BINDING_VARIANT_MAP', () => {
+    // Removed in 9.0.0: it is defined in @mcp-abap-adt/interfaces.
+    expect(actual).not.toContain('SERVICE_BINDING_VARIANT_MAP');
+  });
+});
+
+describe('README export claims', () => {
+  const readme = readFileSync(resolve(__dirname, '../../../README.md'), 'utf8');
+  const runtime = new Set(Object.keys(rootExports));
+
+  /** Every backticked name inside a `surface:begin`/`surface:end` fence. */
+  function claimedNames(): string[] {
+    const names = new Set<string>();
+    const fences = readme.matchAll(
+      /<!--\s*surface:begin\s*-->([\s\S]*?)<!--\s*surface:end\s*-->/g,
+    );
+    let count = 0;
+    for (const fence of fences) {
+      count += 1;
+      for (const m of fence[1].matchAll(
+        /`([A-Za-z_][A-Za-z0-9_]*)(?:\([^`]*\))?`/g,
+      )) {
+        // An interface is `I` + capital by convention; the rest are values.
+        if (!/^I[A-Z]/.test(m[1])) names.add(m[1]);
+      }
+    }
+    if (count === 0) throw new Error('README has no surface fences to check');
+    return [...names];
+  }
+
+  it('names only values the package exports', () => {
+    const unexported = claimedNames().filter((n) => !runtime.has(n));
+
+    expect(unexported).toEqual([]);
   });
 });

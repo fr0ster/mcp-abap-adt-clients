@@ -15,35 +15,18 @@ export { Debugger } from './runtime/debugger/Debugger';
 export {
   buildDumpIdPrefix,
   buildRuntimeDumpsUserQuery,
-  type IRuntimeDumpReadOptions,
-  type IRuntimeDumpReadView,
-  type IRuntimeDumpsListOptions,
 } from './runtime/dumps';
 export { RuntimeDumps } from './runtime/dumps/RuntimeDumps';
 export { FeedRepository } from './runtime/feeds/FeedRepository';
-export type {
-  IFeedEntry,
-  IFeedQueryOptions,
-  IFeedRepository,
-} from './runtime/feeds/types';
+
 export { GatewayErrorLog } from './runtime/gatewayErrorLog/GatewayErrorLog';
-export type {
-  ICallStackEntry,
-  IGatewayErrorDetail,
-  IGatewayErrorEntry,
-  IGatewayException,
-  ISourceCodeLine,
-} from './runtime/gatewayErrorLog/types';
+
 // MemorySnapshots is now accessed via getDebugger().getMemorySnapshots()
 // The class is still exported for backward compatibility
 export { MemorySnapshots } from './runtime/memory/MemorySnapshots';
 export { SystemMessages } from './runtime/systemMessages/SystemMessages';
-export type { ISystemMessageEntry } from './runtime/systemMessages/types';
+
 export { CrossTrace } from './runtime/traces/CrossTraceDomain';
 // Domain objects
 export { Profiler } from './runtime/traces/ProfilerDomain';
 export { St05Trace } from './runtime/traces/St05Trace';
-export type {
-  IListableRuntimeObject,
-  IRuntimeAnalysisObject,
-} from './runtime/types';

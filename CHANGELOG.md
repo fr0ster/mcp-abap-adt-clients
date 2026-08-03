@@ -25,7 +25,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   Both accessors also hand out `IAdtTestRunnable` (`IAdtCdsTestRunnable` for CDS) — starting a run and collecting its outcome, which is the reason the handler exists. No contract described it before `interfaces` 13.1.0, so callers cast past the declared type to reach it; `UnitTest.test.ts` did `client.getUnitTest() as any`. That cast is gone, and its removal is the check that the capability actually reaches a consumer rather than merely existing on the class.
 
 - The dev-time connector moves to **^3.0.0**.
-- **This package no longer re-exports types owned by `@mcp-abap-adt/interfaces`.** Seventeen of them were republished from the root — thirteen under de-`I`-prefixed aliases (`IObjectReference` as `ObjectReference`, `IPackageHierarchyNode` as `PackageHierarchyNode`, and so on) plus four under their own names. Import them from `@mcp-abap-adt/interfaces` directly:
+- **This package no longer re-exports types owned by `@mcp-abap-adt/interfaces` — all 145 of them.** That was **more than half** of a 249-name public surface, which is now 108. A consumer could hold `IClassConfig`, `IPackageState` or even `IAbapConnection` believing it came from this client, and see a type appear to change whenever this client released, for reasons that had nothing to do with it. Import them from the package that owns them:
+
+  ```ts
+  // before
+  import type { IClassConfig, ILogger } from '@mcp-abap-adt/adt-clients';
+  // after
+  import type { IClassConfig, ILogger } from '@mcp-abap-adt/interfaces';
+  ```
+
+  Runtime exports go from 45 to **44**, and the one that leaves is the reason to say so plainly.
+
+  **One of the 145 is a runtime value, not a type: `SERVICE_BINDING_VARIANT_MAP`.** It is defined in `@mcp-abap-adt/interfaces` and was republished from here, so it goes with the rest — but unlike the types, a `import { SERVICE_BINDING_VARIANT_MAP } from '@mcp-abap-adt/adt-clients'` fails at runtime, not just at compile time. Import it from `@mcp-abap-adt/interfaces`. `resolveBindingVariant` beside it is genuinely this package's own and stays.
+
+  The first pass removed seventeen and reported the job done. It was not: that scan looked at a single barrel, and types reached the root through several. The count came from asking the compiler for both packages' export sets and intersecting them, which is the only way to get it right.
+
+  Seventeen of them were republished from the root — thirteen under de-`I`-prefixed aliases (`IObjectReference` as `ObjectReference`, `IPackageHierarchyNode` as `PackageHierarchyNode`, and so on) plus four under their own names. Import them from `@mcp-abap-adt/interfaces` directly:
 
   ```ts
   // before
@@ -41,6 +56,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ### Added
 - **The documented API now matches the exported one, in both directions.** Two examples — in `README.md` and `docs/usage/CLIENT_API_REFERENCE.md` — imported `AdtObjectType` and `AdtSourceObjectType` from this package; they now come from `@mcp-abap-adt/interfaces`, which owns them. The README described three clients — `ManagementClient`, `LockClient`, `ValidationClient` — that exist nowhere in the codebase and never did in this package; a reader would have gone looking for them. Meanwhile eight real exports were documented nowhere: six handler classes and the `isModernAdtSystem` / `resolveContentTypes` helpers. Both sides are now written down.
+- **The README no longer promises enhancement exports the package does not make.** It listed `ENHANCEMENT_TYPE_CODES` and the URL helpers (`getEnhancementBaseUrl`, `getEnhancementUri`, `supportsSourceCode`, `isImplementationType`, `isSpotType`) among this package's runtime exports. None of them ever reached the root — they are internal to `core/enhancement` and stay internal. Exporting them to make the sentence true would have been backwards: the API is decided deliberately and the documentation describes it, not the other way round, and an export is a promise to keep.
+- **The runtime surface is pinned by an explicit manifest.** `publicApiSurface.test.ts` lists every value the package hands out and asserts the set matches exactly. Adding or losing an export fails the suite and has to be acknowledged by editing the list — which is the point: the surface is a decision, not a side effect of a barrel edit.
+
+  The README's claim lists are marked with `surface:begin`/`surface:end` and checked against that surface. An earlier attempt recognised claims by their shape in prose and kept missing them — a list wrapped onto a second line, two helpers separated by a slash, a section it was never pointed at, and it read `null` out of "the record, or `null`" as a promise. Heuristics over prose are not a guard but the appearance of one; the fences say what is a claim instead of leaving it to be guessed.
 - **A test that every documented import resolves** (`docsImportsResolve.test.ts`), across `README.md` and all of `docs/`. It exists because the manual version failed three times, the last one instructively: the check was run *before* a batch of exports was removed, passed, and was then reported afterwards as though it still held. A snapshot of a moving surface is not a check. `CHANGELOG.md` is deliberately excluded — a migration note showing the old import is correct precisely because it no longer resolves.
 - **A test of the public API surface** (`publicApiSurface.test.ts`), importing from the package entry point the way a consumer does. It exists because a claim here outran the code: `parseSearchResults` was described as exported while the symbol never reached the public barrel — it had `export` in its own module, the module was not re-exported, and only a deep import into `dist/` could reach it, which is a consumer stepping past the package boundary rather than an API. A `src/`-relative import would have passed with the barrel unwired and proved nothing.
 - **A conformance test that pins the handed-out capabilities** (`unitTestContractConformance.test.ts`). Written from the consumer's side deliberately: a class's `implements` clause is already checked by the compiler, so repeating it would prove nothing. What nothing pinned is the other half — that `AdtClient.getXxx()` passes the capability outwards. Narrow a getter back and every `implements` clause still compiles while the consumer silently loses the capability, which is precisely how `run()` came to be unreachable. The test also asserts the narrowing bites: `update`, `delete`, `activate`, `lock` and `getVersions` must stay *out* of the handed-out type. Verified to fail when the contract is regressed, not just to pass.
