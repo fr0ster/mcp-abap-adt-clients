@@ -11,9 +11,9 @@ import type {
   IAdtObject,
   IAdtOperationOptions,
   ILogger,
+  IPackageHierarchyNode as PackageHierarchyNode,
 } from '@mcp-abap-adt/interfaces';
 import type { AdtClient } from '../../../clients/AdtClient';
-import type { PackageHierarchyNode } from '../../../index';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import { BaseTester } from '../../helpers/BaseTester';
 import { createTestAdtClient, getConfig } from '../../helpers/sessionConfig';

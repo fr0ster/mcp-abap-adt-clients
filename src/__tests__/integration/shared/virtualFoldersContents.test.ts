@@ -10,6 +10,7 @@ import * as path from 'node:path';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
 import type {
   IAdtResponse as AxiosResponse,
+  IGetVirtualFoldersContentsParams as GetVirtualFoldersContentsParams,
   IAbapConnection,
   IAdtObject,
   IAdtOperationOptions,
@@ -17,7 +18,6 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
-import type { GetVirtualFoldersContentsParams } from '../../../index';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import { BaseTester } from '../../helpers/BaseTester';
 import { createTestAdtClient, getConfig } from '../../helpers/sessionConfig';
