@@ -5,6 +5,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+### Fixed
+- **`AdtMessageClass` declared `withLongPolling` and dropped it.** `readMetadata` accepted `options?: { withLongPolling?: boolean }` and passed none of it on — it called `this.read(config)`, and `read()` took no options at all. The only occurrence of the word in the whole module was that parameter. The signature is now the contract's `(config, version, options)` shape and the flag reaches the URL, as in the other 26 handlers. This is about the handler matching what it claims, **not** about fixing readiness — see below.
+
+### Changed
+- **The README no longer presents `withLongPolling` as a readiness guarantee.** Measured against an SAP BTP trial, the parameter changes nothing on an object read: creating a message class and reading it immediately returned `404` in ~650ms **with** the flag, the same latency as without, and the server did not hold the request. That system's discovery document declares `withLongPolling` for exactly **one** resource out of 601 templates — `/sap/bc/adt/activation/runs/{run_id}`, background activation runs — while this package appends it to object reads in 27 files.
+
+  The option is kept and still passed: another system may honour it more widely, and removing it would take away a choice that costs nothing. What is removed is the claim that it *waits*. The underlying rule is blunter: **no ADT operation that changes system state guarantees when the change becomes visible.** Where readiness matters, poll with a bound.
+
+  The interface contract in `@mcp-abap-adt/interfaces` is deliberately untouched.
+- **The MessageClass integration test polls instead of asking once.** It now waits for the class to be readable, and retries the message create — the class endpoint can already read the object while the messages endpoint still answers `Resource MSAG ... does not exist`. The two do not agree on when the class exists.
+
 ## [9.0.0] - 2026-08-03
 
 ### Changed — BREAKING
