@@ -148,6 +148,8 @@ export class AdtMessageClass
    */
   async read(
     config: Partial<IMessageClassConfig>,
+    _version?: 'active' | 'inactive',
+    options?: { withLongPolling?: boolean },
   ): Promise<IMessageClassState | undefined> {
     if (!config.name) {
       throw new Error('Message class name is required');
@@ -157,6 +159,7 @@ export class AdtMessageClass
       const readResult = await getMessageClassSource(
         this.connection,
         config.name,
+        options,
       );
       const messageClass = parseMessageClass(String(readResult.data));
       return { readResult, messageClass, errors: [] };
@@ -279,7 +282,9 @@ export class AdtMessageClass
     if (!config.name) {
       throw new Error('Message class name is required');
     }
-    const state = await this.read(config);
+    const state = await this.read(config, options?.version, {
+      withLongPolling: options?.withLongPolling,
+    });
     if (!state) {
       throw new Error(`Message class '${config.name}' not found`);
     }

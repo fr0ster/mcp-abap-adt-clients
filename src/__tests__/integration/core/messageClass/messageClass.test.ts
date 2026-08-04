@@ -234,7 +234,29 @@ describe('MessageClass (using AdtClient)', () => {
 
           // ── Step 2: Read message class ─────────────────────────────────────
           logTestStep('read message class', testsLogger);
-          const readState = await mcHandler.read({ name: msgClassName });
+          // No ADT operation that changes system state guarantees when the
+          // change becomes visible, and for MSAG the server answers 404 right
+          // after a create rather than holding the request — `withLongPolling`
+          // is passed but does not cover this resource. So poll until the
+          // object appears, bounded, instead of asking once and calling the
+          // absence a failure.
+          let readState = await mcHandler.read(
+            { name: msgClassName },
+            undefined,
+            {
+              withLongPolling: true,
+            },
+          );
+          for (let attempt = 0; !readState && attempt < 10; attempt++) {
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+            readState = await mcHandler.read(
+              { name: msgClassName },
+              undefined,
+              {
+                withLongPolling: true,
+              },
+            );
+          }
           expect(readState).toBeDefined();
           if (!readState)
             throw new Error('mcHandler.read() returned undefined');
