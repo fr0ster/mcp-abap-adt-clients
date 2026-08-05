@@ -5,6 +5,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [10.0.0] - 2026-08-05
+
+### Migration
+
+Three of the changes below alter behaviour a caller can depend on:
+
+| before | after |
+|---|---|
+| `delete()` resolved even when ADT refused | throws `DeletionNotPermittedError` on `isDeletable="false"` or a type-`E` message |
+| `update()` refused to write when its own pre-check found something | writes; checking the source first is the caller's decision, via `check()` or `waitForCleanCheckRun()` |
+| `chkrun:version` accepted any `string` | `CheckRunVersion` = `active \| inactive \| new` |
+
+A caller that treated a resolved `delete()` as proof the object was gone was being misled and needs no change; one that relied on `update()` vetoing a write must now run the check itself.
+
 ### Fixed
 - **The LOCK…UNLOCK window is a critical section.** The connector has offered `beginCriticalSection()` since 1.9.0 — it raises the effective timeout for exactly this span — and this package never called it. Every request between LOCK and UNLOCK went out with the caller's plain 45s.
 
