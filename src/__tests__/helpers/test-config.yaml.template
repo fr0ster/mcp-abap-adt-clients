@@ -104,6 +104,17 @@ shared_dependencies:
   software_component: ""                     # e.g., HOME (leave empty for cloud)
   transport_layer: ""                        # e.g., ZE19 (leave empty for cloud)
 
+  structures:
+    - name: "ZAC_SHR_STRU"
+      description: "Shared structure used as a table type's row type"
+      source: |
+        @EndUserText.label: 'Shared structure for TableType row type'
+        @AbapCatalog.enhancement.category: #NOT_EXTENSIBLE
+        define structure ZAC_SHR_STRU {
+          mandt  : abap.clnt;
+          field1 : abap.int1;
+        }
+
   tables:
     - name: "ZAC_SHR_VTABL"
       description: "Shared table for View and CDS Unit Test"
@@ -962,7 +973,7 @@ create_tabletype:
         # package_name: "ZAC_PKG01"
         # transport_request: ""
         # XML format parameters (for update - rowType added after create)
-        row_type_name: "ZAC_STRU01"  # Structure name (must exist)
+        row_type_name: "ZAC_SHR_STRU"  # → shared_dependencies.structures
         row_type_kind: "dictionaryType"   # Type kind: dictionaryType, predefinedAbapType, etc.
         access_type: "standard"           # standard, sorted, hashed, index
         primary_key_definition: "standard"  # standard, rowType, keyComponents, empty
