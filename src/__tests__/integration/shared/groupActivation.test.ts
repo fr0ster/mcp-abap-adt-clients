@@ -303,8 +303,21 @@ describe('Group Activation (Shared)', () => {
         try {
           await deleteFn();
           testsLogger.info?.(`Pre-cleanup: deleted leftover ${label}`);
-        } catch (_e) {
-          // Expected — object doesn't exist
+        } catch (error) {
+          // Usually "does not exist", which is the expected case — but not
+          // always. A refused deletion is swallowed here too, and then shows up
+          // three steps later as `409 Conflict` on the create, which says
+          // nothing about why. Say why.
+          //
+          // Order matters and is not interchangeable: the structure references
+          // the data element, which references the domain, so they come apart
+          // in exactly this sequence. Removing the data element first leaves a
+          // dangling reference and the delete is refused.
+          testsLogger.info?.(
+            `Pre-cleanup: ${label} not removed — ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
         }
       }
 
