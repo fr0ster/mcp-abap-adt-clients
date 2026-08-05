@@ -1,3 +1,4 @@
+import { beginCriticalSection } from '../../utils/criticalSection';
 /**
  * AdtPackage - High-level CRUD operations for Package objects
  *
@@ -398,6 +399,12 @@ export class AdtPackage
     let lockHandle: string | undefined;
     let lockCorrNr: string | undefined;
 
+    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
+
+    // the lock but leaves the work half-done.
+
+    const endCriticalSection = beginCriticalSection(this.connection);
+
     try {
       // 1. Lock — stateful mode stays active until after unlock
       this.logger?.info?.('Step 1: Locking package');
@@ -528,6 +535,8 @@ export class AdtPackage
 
       this.logger?.error('Update failed:', safeErrorMessage(error));
       throw error;
+    } finally {
+      endCriticalSection();
     }
   }
 

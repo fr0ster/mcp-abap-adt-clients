@@ -1,5 +1,9 @@
 import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
-import { parseCheckRunResponse, runCheckRun } from '../../utils/checkRun';
+import {
+  type CheckRunVersion,
+  parseCheckRunResponse,
+  runCheckRun,
+} from '../../utils/checkRun';
 
 /**
  * Check transformation syntax
@@ -7,7 +11,7 @@ import { parseCheckRunResponse, runCheckRun } from '../../utils/checkRun';
 export async function checkTransformation(
   connection: IAbapConnection,
   transformationName: string,
-  version: string = 'inactive',
+  version: CheckRunVersion = 'inactive',
   sourceCode?: string,
 ): Promise<IAdtResponse> {
   const response = await runCheckRun(

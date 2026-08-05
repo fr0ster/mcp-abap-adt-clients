@@ -1,3 +1,4 @@
+import { beginCriticalSection } from '../../utils/criticalSection';
 /**
  * AdtClassLegacy - Class handler for legacy SAP systems (BASIS < 7.50)
  *
@@ -48,6 +49,12 @@ export class AdtClassLegacy extends AdtClass {
 
     let lockHandle: string | undefined;
     const state: IClassState = { errors: [] };
+
+    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
+
+    // the lock but leaves the work half-done.
+
+    const endCriticalSection = beginCriticalSection(this.connection);
 
     try {
       // Enter stateful session for the entire lock→update→unlock chain
@@ -115,6 +122,8 @@ export class AdtClassLegacy extends AdtClass {
     } finally {
       // Always return to stateless after the chain
       this.connection.setSessionType('stateless');
+
+      endCriticalSection();
     }
 
     // Post-lock operations (stateless is fine)
@@ -169,6 +178,12 @@ export class AdtClassLegacy extends AdtClass {
     const state: IClassState = { errors: [] };
     let lockHandle: string | undefined;
 
+    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
+
+    // the lock but leaves the work half-done.
+
+    const endCriticalSection = beginCriticalSection(this.connection);
+
     try {
       this.logger?.info?.('Locking class for deletion');
       this.connection.setSessionType('stateful');
@@ -206,6 +221,8 @@ export class AdtClassLegacy extends AdtClass {
       throw error;
     } finally {
       this.connection.setSessionType('stateless');
+
+      endCriticalSection();
     }
   }
 }

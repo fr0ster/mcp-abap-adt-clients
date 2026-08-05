@@ -1,3 +1,5 @@
+import { beginCriticalSection } from '../../utils/criticalSection';
+import { assertDeletable } from '../../utils/deletionCheck';
 /**
  * AdtAuthorizationField - High-level CRUD operations for SUSO / AUTH objects
  *
@@ -322,6 +324,12 @@ export class AdtAuthorizationField
     let lockHandle: string | undefined;
     const state: IAuthorizationFieldState = { errors: [] };
 
+    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
+
+    // the lock but leaves the work half-done.
+
+    const endCriticalSection = beginCriticalSection(this.connection);
+
     try {
       // 1. Lock
       this.logger?.info?.('Step 1: Locking authorization field');
@@ -342,13 +350,13 @@ export class AdtAuthorizationField
         this.logger?.info?.(
           'Step 2: Checking inactive version with update content',
         );
-        const checkResponse = await checkAuthorizationField(
+        const deletionCheck = await checkAuthorizationField(
           this.connection,
           fullConfig.authorizationFieldName,
           'inactive',
           xmlToCheck,
         );
-        state.checkResult = checkResponse;
+        state.checkResult = deletionCheck;
         this.logger?.info?.('Check inactive with update content passed');
       }
 
@@ -486,6 +494,8 @@ export class AdtAuthorizationField
 
       this.logger?.error('Update failed:', safeErrorMessage(error));
       throw error;
+    } finally {
+      endCriticalSection();
     }
   }
 
@@ -503,11 +513,16 @@ export class AdtAuthorizationField
 
     try {
       this.logger?.info?.('Checking authorization field for deletion');
-      const checkResponse = await checkDeletion(
+      const deletionCheck = await checkDeletion(
         this.connection,
         this.buildDeleteParams(config),
       );
-      state.checkResult = checkResponse;
+      // ADT already said whether this may be deleted; refusing to read that
+      // answer is how a delete came to report success while the object
+      // stayed. Throws on isDeletable=false or a message of type E; a W
+      // is a warning and passes.
+      assertDeletable(deletionCheck.data);
+      state.checkResult = deletionCheck;
       this.logger?.info?.('Deletion check passed');
 
       this.logger?.info?.('Deleting authorization field');
@@ -564,13 +579,13 @@ export class AdtAuthorizationField
     const version: 'active' | 'inactive' =
       status === 'active' ? 'active' : 'inactive';
 
-    const checkResponse = await checkAuthorizationField(
+    const deletionCheck = await checkAuthorizationField(
       this.connection,
       config.authorizationFieldName,
       version,
     );
     return {
-      checkResult: checkResponse,
+      checkResult: deletionCheck,
       errors: [],
     };
   }

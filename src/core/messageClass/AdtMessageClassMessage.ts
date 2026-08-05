@@ -1,3 +1,4 @@
+import { beginCriticalSection } from '../../utils/criticalSection';
 /**
  * AdtMessageClassMessage — read-modify-write operations for a single message
  * within a Message Class (MSAG/N).
@@ -176,6 +177,12 @@ export class AdtMessageClassMessage
     let messageLockHandle: string | undefined;
     let classLockHandle: string | undefined;
 
+    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
+
+    // the lock but leaves the work half-done.
+
+    const endCriticalSection = beginCriticalSection(this.connection);
+
     try {
       this.logger?.info?.('upsertMessage: stateful');
       this.connection.setSessionType('stateful');
@@ -247,6 +254,8 @@ export class AdtMessageClassMessage
       this.connection.setSessionType('stateless');
       this.logger?.error('upsertMessage failed:', safeErrorMessage(error));
       throw error;
+    } finally {
+      endCriticalSection();
     }
   }
 
@@ -281,6 +290,12 @@ export class AdtMessageClassMessage
 
     let messageLockHandle: string | undefined;
     let classLockHandle: string | undefined;
+
+    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
+
+    // the lock but leaves the work half-done.
+
+    const endCriticalSection = beginCriticalSection(this.connection);
 
     try {
       this.logger?.info?.('deleteMessage: stateful');
@@ -351,6 +366,8 @@ export class AdtMessageClassMessage
       this.connection.setSessionType('stateless');
       this.logger?.error('deleteMessage failed:', safeErrorMessage(error));
       throw error;
+    } finally {
+      endCriticalSection();
     }
   }
 

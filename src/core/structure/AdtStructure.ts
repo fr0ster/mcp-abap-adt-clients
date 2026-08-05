@@ -1,3 +1,5 @@
+import { beginCriticalSection } from '../../utils/criticalSection';
+import { assertDeletable } from '../../utils/deletionCheck';
 /**
  * AdtStructure - High-level CRUD operations for Structure objects
  *
@@ -315,6 +317,12 @@ export class AdtStructure
 
     let lockHandle: string | undefined;
 
+    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
+
+    // the lock but leaves the work half-done.
+
+    const endCriticalSection = beginCriticalSection(this.connection);
+
     try {
       // 1. Lock (update always starts with lock, stateful ONLY before lock)
       this.logger?.info?.('Step 1: Locking structure');
@@ -489,6 +497,8 @@ export class AdtStructure
 
       this.logger?.error('Update failed:', safeErrorMessage(error));
       throw error;
+    } finally {
+      endCriticalSection();
     }
   }
 
@@ -503,10 +513,15 @@ export class AdtStructure
     try {
       // Check for deletion (no stateful needed)
       this.logger?.info?.('Checking structure for deletion');
-      await checkDeletion(this.connection, {
+      const deletionCheck = await checkDeletion(this.connection, {
         structure_name: config.structureName,
         transport_request: config.transportRequest,
       });
+      // ADT already said whether this may be deleted; refusing to read that
+      // answer is how a delete came to report success while the object
+      // stayed. Throws on isDeletable=false or a message of type E; a W
+      // is a warning and passes.
+      assertDeletable(deletionCheck.data);
       this.logger?.info?.('Deletion check passed');
 
       // Delete (no stateful needed - no lock/unlock)

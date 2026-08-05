@@ -1,3 +1,4 @@
+import type { CheckRunVersion } from '../../utils/checkRun';
 /**
  * Table check operations
  */
@@ -19,7 +20,7 @@ import { getTimeout } from '../../utils/timeouts';
 function buildCheckRunPayload(
   tableName: string,
   sourceCode?: string,
-  version: string = 'new',
+  version: CheckRunVersion = 'new',
 ): string {
   const uriName = encodeSapObjectName(tableName).toLowerCase();
   const objectUri = `/sap/bc/adt/ddic/tables/${uriName}`;
@@ -62,7 +63,7 @@ export async function runTableCheckRun(
   reporter: 'tableStatusCheck' | 'abapCheckRun',
   tableName: string,
   sourceCode?: string,
-  version: string = 'new',
+  version: CheckRunVersion = 'new',
 ): Promise<IAdtResponse> {
   const payload = buildCheckRunPayload(tableName, sourceCode, version);
   const headers = {

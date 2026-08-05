@@ -299,6 +299,64 @@ describe('Admin: Teardown shared dependencies', () => {
         results.push({ type: 'tables', name: item.name, status });
       }
 
+      // 3b. Structures — after tables, since a table may include one.
+      const structures = sharedConfig.structures || [];
+      for (const item of structures) {
+        if (shouldSkip(item, 'structure')) {
+          results.push({
+            type: 'structures',
+            name: item.name,
+            status: 'skipped',
+          });
+          continue;
+        }
+        const status = await safeDelete(
+          `structure ${item.name}`,
+          async () => {
+            await client.getStructure().delete({
+              structureName: item.name,
+              transportRequest,
+            });
+          },
+          testsLogger,
+        );
+        results.push({ type: 'structures', name: item.name, status });
+      }
+
+      // 3c. Data elements, then domains — reverse of creation: a data element
+      // references a domain, so the domain cannot go first.
+      for (const [kind, key, del] of [
+        [
+          'data_elements',
+          'data_element',
+          (name: string) =>
+            client
+              .getDataElement()
+              .delete({ dataElementName: name, transportRequest }),
+        ],
+        [
+          'domains',
+          'domain',
+          (name: string) =>
+            client.getDomain().delete({ domainName: name, transportRequest }),
+        ],
+      ] as const) {
+        for (const item of sharedConfig[kind] || []) {
+          if (shouldSkip(item, key)) {
+            results.push({ type: kind, name: item.name, status: 'skipped' });
+            continue;
+          }
+          const status = await safeDelete(
+            `${key} ${item.name}`,
+            async () => {
+              await del(item.name);
+            },
+            testsLogger,
+          );
+          results.push({ type: kind, name: item.name, status });
+        }
+      }
+
       // 4. Function groups
       const functionGroups = sharedConfig.function_groups || [];
       for (const item of functionGroups) {

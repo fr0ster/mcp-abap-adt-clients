@@ -2170,10 +2170,29 @@ async function ensureSharedDependency(client, type, name, logger) {
     sharedConfig?.transport_request,
   );
 
+  // Types whose configuration lives in fields rather than a `source` block.
+  // For them "it reads back" is not "it is correct": create() writes only a
+  // shell — a domain with no data type at all — and the update that fills it in
+  // is a separate call. A setup interrupted between the two leaves exactly that
+  // shell, and a later run would accept it as a working dependency. So these are
+  // always brought to configuration and activated, existing or not.
+  const ALWAYS_RECONCILE = new Set(['domains', 'data_elements']);
+
   // Check if the object already exists
   let exists = false;
   try {
-    if (type === 'tables') {
+    if (type === 'domains') {
+      const result = await client.getDomain().read({ domainName: name });
+      exists = result !== undefined;
+    } else if (type === 'data_elements') {
+      const result = await client
+        .getDataElement()
+        .read({ dataElementName: name });
+      exists = result !== undefined;
+    } else if (type === 'structures') {
+      const result = await client.getStructure().read({ structureName: name });
+      exists = result !== undefined;
+    } else if (type === 'tables') {
       const result = await client.getTable().read({ tableName: name });
       // Table read returns { readResult: undefined } on 404 (quirk)
       exists = result?.readResult !== undefined;
@@ -2241,6 +2260,47 @@ async function ensureSharedDependency(client, type, name, logger) {
           `Shared ${type} ${name} exists but update/activate failed: ${updateErr.message}`,
         );
       }
+    } else if (ALWAYS_RECONCILE.has(type)) {
+      // No `source` block, so the branch above cannot help — yet these are the
+      // types whose create() writes only a shell. Bring the existing object to
+      // the configured state and activate it, rather than trusting that it
+      // reads back.
+      try {
+        if (type === 'domains') {
+          await client.getDomain().update(
+            {
+              domainName: name,
+              packageName,
+              description: depConfig.description || 'Shared test domain',
+              datatype: depConfig.datatype || 'CHAR',
+              length: depConfig.length || 10,
+              transportRequest,
+            },
+            { activateOnUpdate: true },
+          );
+        } else {
+          await client.getDataElement().update(
+            {
+              dataElementName: name,
+              packageName,
+              description: depConfig.description || 'Shared test data element',
+              typeKind: depConfig.type_kind || 'domain',
+              typeName: depConfig.domain_name,
+              transportRequest,
+            },
+            { activateOnUpdate: true },
+          );
+        }
+        logger?.info?.(`Shared ${type} ${name} reconciled to configuration`);
+      } catch (reconcileErr) {
+        // Rethrow: the lines below would otherwise cache this as verified and
+        // return { existed: true }, so setup would report success over a domain
+        // that is still an empty inactive shell — the exact false green this
+        // reconciliation exists to prevent.
+        throw new Error(
+          `Shared ${type} ${name} exists but could not be reconciled to configuration: ${reconcileErr.message}`,
+        );
+      }
     } else {
       logger?.info?.(`Shared ${type} ${name} already exists`);
     }
@@ -2251,7 +2311,68 @@ async function ensureSharedDependency(client, type, name, logger) {
   // Create the object (high-level create does full chain: validate → create → lock → update → unlock → activate)
   logger?.info?.(`Creating shared ${type} ${name}...`);
   try {
-    if (type === 'tables') {
+    if (type === 'domains') {
+      await client.getDomain().create({
+        domainName: name,
+        packageName,
+        description: depConfig.description || 'Shared test domain',
+        datatype: depConfig.datatype || 'CHAR',
+        length: depConfig.length || 10,
+        transportRequest,
+      });
+      // A domain carries no source: create only makes the shell, update fills
+      // in the type, and without that step it stays an empty object with no
+      // data type at all.
+      await client.getDomain().update(
+        {
+          domainName: name,
+          description: depConfig.description || 'Shared test domain',
+          datatype: depConfig.datatype || 'CHAR',
+          length: depConfig.length || 10,
+          transportRequest,
+        },
+        { activateOnUpdate: true },
+      );
+    } else if (type === 'data_elements') {
+      await client.getDataElement().create({
+        dataElementName: name,
+        packageName,
+        description: depConfig.description || 'Shared test data element',
+        typeKind: depConfig.type_kind || 'domain',
+        typeName: depConfig.domain_name,
+        transportRequest,
+      });
+      await client.getDataElement().update(
+        {
+          dataElementName: name,
+          description: depConfig.description || 'Shared test data element',
+          typeKind: depConfig.type_kind || 'domain',
+          typeName: depConfig.domain_name,
+          transportRequest,
+        },
+        { activateOnUpdate: true },
+      );
+    } else if (type === 'structures') {
+      await client.getStructure().create({
+        structureName: name,
+        packageName,
+        description: depConfig.description || 'Shared test structure',
+        ddlCode: depConfig.source,
+        transportRequest,
+      });
+      if (depConfig.source) {
+        logger?.info?.(`Activating shared structure ${name}...`);
+        await client.getStructure().update(
+          {
+            structureName: name,
+            ddlCode: depConfig.source,
+            transportRequest,
+          },
+          { activateOnUpdate: true, sourceCode: depConfig.source },
+        );
+        logger?.info?.(`Shared structure ${name} activated`);
+      }
+    } else if (type === 'tables') {
       await client.getTable().create({
         tableName: name,
         packageName,

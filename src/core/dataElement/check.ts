@@ -7,7 +7,11 @@ import {
   ACCEPT_CHECK_MESSAGES,
   CT_CHECK_OBJECTS,
 } from '../../constants/contentTypes';
-import { parseCheckRunResponse, runCheckRun } from '../../utils/checkRun';
+import {
+  type CheckRunVersion,
+  parseCheckRunResponse,
+  runCheckRun,
+} from '../../utils/checkRun';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
@@ -27,7 +31,7 @@ import { getTimeout } from '../../utils/timeouts';
 export async function checkDataElement(
   connection: IAbapConnection,
   dataElementName: string,
-  version: string = 'active',
+  version: CheckRunVersion = 'active',
   xmlContent?: string,
 ): Promise<IAdtResponse> {
   let response: IAdtResponse;

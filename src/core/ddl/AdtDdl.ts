@@ -1,3 +1,5 @@
+import { beginCriticalSection } from '../../utils/criticalSection';
+import { assertDeletable } from '../../utils/deletionCheck';
 /**
  * Generic client for ABAP DDL source objects (`/sap/bc/adt/ddic/ddl/sources/`):
  * CDS views, AMDP table functions, and other DDL sources. Classic DDIC structures
@@ -316,6 +318,12 @@ export class AdtDdl implements IAdtSourceObject<IDdlConfig, IDdlState> {
 
     let lockHandle: string | undefined;
 
+    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
+
+    // the lock but leaves the work half-done.
+
+    const endCriticalSection = beginCriticalSection(this.connection);
+
     try {
       // 1. Lock (update always starts with lock, stateful ONLY before lock)
       this.logger?.info?.('Step 1: Locking view');
@@ -481,6 +489,8 @@ export class AdtDdl implements IAdtSourceObject<IDdlConfig, IDdlState> {
 
       this.logger?.error('Update failed:', safeErrorMessage(error));
       throw error;
+    } finally {
+      endCriticalSection();
     }
   }
 
@@ -495,10 +505,15 @@ export class AdtDdl implements IAdtSourceObject<IDdlConfig, IDdlState> {
     try {
       // Check for deletion (no stateful needed)
       this.logger?.info?.('Checking view for deletion');
-      await checkDeletion(this.connection, {
+      const deletionCheck = await checkDeletion(this.connection, {
         ddl_name: config.ddlName,
         transport_request: config.transportRequest,
       });
+      // ADT already said whether this may be deleted; refusing to read that
+      // answer is how a delete came to report success while the object
+      // stayed. Throws on isDeletable=false or a message of type E; a W
+      // is a warning and passes.
+      assertDeletable(deletionCheck.data);
       this.logger?.info?.('Deletion check passed');
 
       // Delete (no stateful needed - no lock/unlock)

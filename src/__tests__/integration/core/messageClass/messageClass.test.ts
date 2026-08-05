@@ -234,7 +234,17 @@ describe('MessageClass (using AdtClient)', () => {
 
           // ── Step 2: Read message class ─────────────────────────────────────
           logTestStep('read message class', testsLogger);
-          const readState = await mcHandler.read({ name: msgClassName });
+          // No ADT operation that changes system state guarantees when the
+          // change becomes visible, and for MSAG the server answers 404 right
+          // after a create rather than holding the request — `withLongPolling`
+          // is passed but does not cover this resource. So poll until the
+          // object appears, bounded, instead of asking once and calling the
+          // absence a failure.
+          let readState = await mcHandler.read({ name: msgClassName });
+          for (let attempt = 0; !readState && attempt < 15; attempt++) {
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+            readState = await mcHandler.read({ name: msgClassName });
+          }
           expect(readState).toBeDefined();
           if (!readState)
             throw new Error('mcHandler.read() returned undefined');
@@ -243,12 +253,28 @@ describe('MessageClass (using AdtClient)', () => {
 
           // ── Step 3: Create message ─────────────────────────────────────────
           logTestStep(`create message ${msgNo}`, testsLogger);
-          const msgCreateState = await msgHandler.create({
-            className: msgClassName,
-            msgno: msgNo,
-            msgtext: msgTextInitial,
-            transportRequest: config.transportRequest,
-          });
+          // Reading the class already succeeds here, yet the messages endpoint
+          // can still answer "Resource MSAG ... does not exist": the two do not
+          // agree on when the class is there. Retry rather than treat the first
+          // answer as final.
+          const createMessage = () =>
+            msgHandler.create({
+              className: msgClassName,
+              msgno: msgNo,
+              msgtext: msgTextInitial,
+              transportRequest: config.transportRequest,
+            });
+          let created = await createMessage().catch((e: unknown) => e as Error);
+          for (
+            let attempt = 0;
+            created instanceof Error && attempt < 15;
+            attempt++
+          ) {
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+            created = await createMessage().catch((e: unknown) => e as Error);
+          }
+          if (created instanceof Error) throw created;
+          const msgCreateState = created;
           expect(msgCreateState.errors).toHaveLength(0);
 
           // ── Step 4: Read message ───────────────────────────────────────────

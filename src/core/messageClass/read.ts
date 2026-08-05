@@ -19,10 +19,16 @@ const ACCEPT_MESSAGE_CLASS =
 export async function getMessageClassSource(
   connection: IAbapConnection,
   name: string,
+  options?: { withLongPolling?: boolean },
 ): Promise<IAdtResponse> {
   const encoded = encodeSapObjectName(name.toLowerCase());
+  // No ADT operation that changes system state guarantees when the change
+  // becomes visible, so a read straight after a create can legitimately find
+  // nothing. `withLongPolling=true` is how ADT is asked to wait for the object
+  // instead of answering from whatever is there right now.
+  const query = options?.withLongPolling ? '?withLongPolling=true' : '';
   return connection.makeAdtRequest({
-    url: `${BASE}/${encoded}`,
+    url: `${BASE}/${encoded}${query}`,
     method: 'GET',
     timeout: getTimeout('default'),
     headers: { Accept: ACCEPT_MESSAGE_CLASS },

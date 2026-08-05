@@ -1,3 +1,4 @@
+import { beginCriticalSection } from '../../utils/criticalSection';
 /**
  * AdtClass - High-level CRUD operations for Class objects
  *
@@ -396,6 +397,12 @@ export class AdtClass implements IAdtSourceObject<IClassConfig, IClassState> {
       errors: [],
     };
 
+    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
+
+    // the lock but leaves the work half-done.
+
+    const endCriticalSection = beginCriticalSection(this.connection);
+
     try {
       // 1. Lock — stay stateful for the whole lock→check→update→unlock chain.
       // On older BASIS (#106) the lock handle is only valid inside stateful
@@ -549,6 +556,8 @@ export class AdtClass implements IAdtSourceObject<IClassConfig, IClassState> {
 
       this.logger?.error('Update failed:', safeErrorMessage(error));
       throw error;
+    } finally {
+      endCriticalSection();
     }
   }
 
@@ -844,6 +853,12 @@ export class AdtClass implements IAdtSourceObject<IClassConfig, IClassState> {
 
     let lockHandle: string | undefined;
 
+    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
+
+    // the lock but leaves the work half-done.
+
+    const endCriticalSection = beginCriticalSection(this.connection);
+
     try {
       // 1. Lock parent class (stateful only for lock)
       // Lock handle from parent class is sufficient for updating testclasses include
@@ -890,6 +905,8 @@ export class AdtClass implements IAdtSourceObject<IClassConfig, IClassState> {
         }
       }
       throw error;
+    } finally {
+      endCriticalSection();
     }
   }
 

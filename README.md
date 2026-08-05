@@ -316,7 +316,19 @@ await utils.readObjectSource('view' satisfies AdtSourceObjectType, 'ZOK_I_CDS_TE
 
 ### Using Long Polling for Object Readiness
 
-The `withLongPolling` parameter allows you to wait for objects to become available after create/update/activate operations, replacing fixed timeouts with server-driven waiting:
+The `withLongPolling` parameter asks ADT to hold a read until the object is
+available, instead of answering from whatever is there right now:
+
+> **Measured caveat — do not rely on it for readiness.** On an SAP BTP trial the
+> parameter changes nothing on an object read. Reading a message class straight
+> after creating it returned `404` in ~650ms **with** the flag — the same
+> latency as without it — and the server did not hold the request. The system's
+> own discovery document declares `withLongPolling` for exactly one resource out
+> of 601 templates: `/sap/bc/adt/activation/runs/{run_id}`, background activation
+> runs. Other systems may honour it more widely; this one does not, so treat it
+> as a hint and not a guarantee. **No ADT operation that changes system state
+> guarantees when the change becomes visible** — where readiness matters, poll
+> with a bound.
 
 ```typescript
 import { AdtClient } from '@mcp-abap-adt/adt-clients';
@@ -344,11 +356,13 @@ await client.getClass().update({
 }, { sourceCode: updatedCode });
 ```
 
-**Benefits of Long Polling:**
-- ✅ **No arbitrary timeouts** - waits for actual object readiness
-- ✅ **Faster tests** - no unnecessary delays when object is ready quickly
-- ✅ **More reliable** - server-driven waiting ensures object is actually available
-- ✅ **Automatic in create/update** - `AdtObject` implementations use long polling internally
+**What it is intended to do**, where a system honours it: avoid an arbitrary
+timeout by letting the server decide when the object is ready. `AdtObject`
+implementations pass it internally on reads after create/update.
+
+**What it does not do:** guarantee the object is there when the call returns.
+See the caveat above — on the system measured, the flag had no effect on object
+reads at all.
 
 **Note:** Long polling is automatically used in `create()` and `update()` methods of all `AdtObject` implementations to ensure objects are ready before proceeding with subsequent operations.
 
@@ -432,7 +446,7 @@ See [Tools Documentation](tools/README.md) for complete details and options.
 
 ### AdtObject Methods (with Long Polling Support)
 
-All `AdtObject` implementations support the `withLongPolling` parameter for read operations:
+All `AdtObject` implementations accept the `withLongPolling` parameter on read operations (whether the server acts on it is another matter — see the caveat above):
 
 ```typescript
 // Read with long polling - waits for object to be ready
@@ -629,7 +643,10 @@ See [Architecture Documentation](docs/architecture/ARCHITECTURE.md#type-system-a
 
 **Migration from fixed timeouts to long polling:**
 
-The package now uses long polling (`?withLongPolling=true`) instead of fixed timeouts for waiting object readiness. This provides better reliability and faster execution.
+The package passes long polling (`?withLongPolling=true`) instead of fixed
+timeouts when reading after a create or update. It is the better default — a
+fixed sleep is guesswork either way — but it is **not** a readiness guarantee:
+see the measured caveat above before depending on it.
 
 ```typescript
 // ❌ Before - Using fixed timeouts

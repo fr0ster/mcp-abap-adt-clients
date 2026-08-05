@@ -82,9 +82,14 @@ describe('Session lock registry (using AdtClient)', () => {
       );
       client = resolvedClient;
 
+      // Its OWN objects, not adt_domain's. Sharing the names meant this file
+      // created ZAC_DOM01/ZAC_DTEL01 and never removed them, so Domain's and
+      // DataElement's full workflows saw "already exists" and skipped — every
+      // run, on every system. Two flows that never executed and still reported
+      // green.
       const domainResolver = new TestConfigResolver({
         handlerName: 'create_domain',
-        testCaseName: 'adt_domain',
+        testCaseName: 'lock_registry_domain',
         isCloud: isCloudSystem,
         logger: testsLogger,
       });
@@ -104,7 +109,7 @@ describe('Session lock registry (using AdtClient)', () => {
 
       const deResolver = new TestConfigResolver({
         handlerName: 'create_data_element',
-        testCaseName: 'adt_data_element',
+        testCaseName: 'lock_registry_data_element',
         isCloud: isCloudSystem,
         logger: testsLogger,
       });
@@ -190,4 +195,41 @@ describe('Session lock registry (using AdtClient)', () => {
       logTestEnd(testsLogger, TEST_NAME);
     }
   }, 900000);
+
+  // This test needs two lockable objects and nothing more — it never activates
+  // them, so what it creates is an inactive shell with no data type. Leaving
+  // those behind put invalid objects in the system and, while the names were
+  // shared with Domain's and DataElement's own tests, made those skip as
+  // "already exists" on every run. Create-only is fine here; not cleaning up
+  // was not.
+  afterAll(async () => {
+    if (!client) return;
+    // Data element first: it may reference the domain.
+    const deName = dataElementConfig?.dataElementName;
+    if (deName) {
+      await client
+        .getDataElement()
+        .delete({ dataElementName: deName })
+        .catch((error: unknown) =>
+          testsLogger.warn?.(
+            `cleanup: ${deName} not removed: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          ),
+        );
+    }
+    const domName = domainConfig?.domainName;
+    if (domName) {
+      await client
+        .getDomain()
+        .delete({ domainName: domName })
+        .catch((error: unknown) =>
+          testsLogger.warn?.(
+            `cleanup: ${domName} not removed: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          ),
+        );
+    }
+  }, 300000);
 });

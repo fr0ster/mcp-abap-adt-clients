@@ -2,7 +2,11 @@
  * Shared check run utilities
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtResponse,
+  ILogger,
+} from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
 import {
   ACCEPT_CHECK_MESSAGES,
@@ -105,9 +109,26 @@ export function getObjectUri(objectType: string, objectName: string): string {
  *
  * SAP reads the code from system itself.
  */
+/**
+ * Which stored version of an object a check run should look at.
+ *
+ * - `active`   — the activated version.
+ * - `inactive` — saved but not yet activated.
+ * - `new`      — created and never activated, so no inactive version exists
+ *                either. This is what ADT itself sends while an object is
+ *                still being written: the trace of an Eclipse session creating
+ *                an append structure shows `chkrun:version="new"` on every
+ *                as-you-type check.
+ *
+ * Previously this was a bare `string` defaulting to `'active'`, and only the
+ * first two were documented — so `new` was reachable but unnamed, which is a
+ * poor way to offer a choice.
+ */
+export type CheckRunVersion = 'active' | 'inactive' | 'new';
+
 export function buildCheckRunXml(
   objectUri: string,
-  version: string = 'active',
+  version: CheckRunVersion = 'active',
 ): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <chkrun:checkObjectList xmlns:chkrun="http://www.sap.com/adt/checkrun" xmlns:adtcore="http://www.sap.com/adt/core">
@@ -128,7 +149,7 @@ export function buildCheckRunXml(
 export function buildCheckRunXmlWithSource(
   objectUri: string,
   sourceCode: string,
-  version: string = 'active',
+  version: CheckRunVersion = 'active',
   artifactContentType: string = 'text/plain; charset=utf-8',
 ): string {
   // Encode source code to base64
@@ -322,7 +343,7 @@ export async function runCheckRun(
   connection: IAbapConnection,
   objectType: string,
   objectName: string,
-  version: string = 'active',
+  version: CheckRunVersion = 'active',
   reporter: string = 'abapCheckRun',
   sourceCode?: string,
   artifactContentType: string = 'text/plain; charset=utf-8',
@@ -373,7 +394,7 @@ export async function runCheckRunWithSource(
   objectType: string,
   objectName: string,
   sourceCode: string,
-  version: string = 'active',
+  version: CheckRunVersion = 'active',
   reporter: string = 'abapCheckRun',
   artifactContentType: string = 'text/plain; charset=utf-8',
 ): Promise<IAdtResponse> {
@@ -399,4 +420,69 @@ export async function runCheckRunWithSource(
     data: xmlBody,
     headers,
   });
+}
+
+/**
+ * Run a check repeatedly until the report comes back with no messages at all.
+ *
+ * This is what ADT itself does. A trace of an Eclipse session writing an append
+ * structure shows six `POST /checkruns` in a row while the source is being
+ * completed — each answering ~1.2 KB of messages — and then one final answer of
+ * 0.3 KB carrying an empty report:
+ *
+ * ```xml
+ * <chkrun:checkReport chkrun:reporter="abapCheckRun" chkrun:status="processed"
+ *   chkrun:statusText="Object ZADT_S_APPEND_S has been checked"/>
+ * ```
+ *
+ * Only then does Eclipse send the PUT. Two earlier readings of that trace were
+ * wrong and are worth naming: it does **not** ignore check errors and write
+ * anyway, and the repetition is not idle chatter — a clean report is the
+ * precondition for writing.
+ *
+ * Waiting matters because no ADT operation that changes system state guarantees
+ * when the change becomes visible: a base object activated moments earlier can
+ * still be reported as unextendable until DDIC catches up.
+ *
+ * @throws the last set of messages if the report never comes back clean.
+ */
+export async function waitForCleanCheckRun(
+  connection: IAbapConnection,
+  objectType: string,
+  objectName: string,
+  version: CheckRunVersion,
+  sourceCode: string | undefined,
+  options?: { attempts?: number; delayMs?: number; logger?: ILogger },
+): Promise<IAdtResponse> {
+  const attempts = options?.attempts ?? 10;
+  const delayMs = options?.delayMs ?? 2000;
+  let lastMessages = '';
+
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    const response = await runCheckRun(
+      connection,
+      objectType,
+      objectName,
+      version,
+      'abapCheckRun',
+      sourceCode,
+    );
+    const parsed = parseCheckRunResponse(response);
+    if (parsed.total_messages === 0) {
+      return response;
+    }
+    lastMessages = [...parsed.errors, ...parsed.warnings, ...parsed.info]
+      .map((m) => m.text)
+      .join('; ');
+    options?.logger?.debug?.(
+      `check on ${objectName} still reports findings (attempt ${attempt}/${attempts}): ${lastMessages}`,
+    );
+    if (attempt < attempts) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+
+  throw new Error(
+    `Check on ${objectName} never came back clean after ${attempts} attempts: ${lastMessages}`,
+  );
 }

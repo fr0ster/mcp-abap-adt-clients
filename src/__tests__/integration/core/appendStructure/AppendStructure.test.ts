@@ -235,24 +235,47 @@ describe('AppendStructure (TABL/DS) integration', () => {
 
           try {
             // ── 3) Update source + activate ──
-            const source =
-              `@EndUserText.label : 'ADT integration test append structure'\n` +
-              `@AbapCatalog.enhancement.category : #NOT_EXTENSIBLE\n` +
-              `extend type ${baseObject} with ${appendStructureName} {\n` +
-              `  zz_append : abap.char( 10 );\n` +
-              `}`;
+            // The ABAP lives in test-config.yaml, not here. Which field name
+            // and which type are allowed is a DDIC rule — only zz_* may be
+            // appended, and the type must match the base's #EXTENSIBLE_*
+            // category — so it is configuration, not a literal to bury in a
+            // test file where nobody looks for it.
+            const template: string | undefined = testCase?.params?.source_code;
+            if (!template) {
+              throw new Error(
+                'create_append_structure.params.source_code is not configured',
+              );
+            }
+            const source = template
+              .replaceAll('{base}', baseObject)
+              .replaceAll('{append}', appendStructureName);
 
             await as.update(
               { appendStructureName, transportRequest, sourceCode: source },
               { activateOnUpdate: true },
             );
 
-            // ── 4) Read back ──
+            // ── 4) Read back — the CONTENT, not the status ──
+            // This system answers 200 with an empty body for an object that was
+            // created but never filled, so asserting the status alone cannot
+            // tell a written append from an empty shell. It did not, and the
+            // consequence was a test that passed while leaving this behind:
+            //
+            //   extend type zac_shr_appstru with zadt_s_append_s {
+            //   }
+            //
+            // Assert the field actually arrived.
             const readState = await as.read({ appendStructureName }, 'active');
             expect(readState).toBeDefined();
             expect(readState?.readResult).toBeDefined();
-            // HTTP status 200 is expected from the read operation
             expect((readState?.readResult as any)?.status).toBe(200);
+
+            const writtenSource = String(
+              (readState?.readResult as { data?: unknown })?.data ?? '',
+            );
+            const fieldName = /^\s*(zz_\w+)\s*:/m.exec(source)?.[1];
+            expect(fieldName).toBeDefined();
+            expect(writtenSource).toContain(fieldName as string);
 
             // ── 5) Delete ──
             const deleteState = await as.delete({

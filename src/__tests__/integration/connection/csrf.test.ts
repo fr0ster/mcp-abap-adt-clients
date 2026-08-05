@@ -40,6 +40,11 @@ describe('CSRF Token diagnostics', () => {
     try {
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
+      // The connector refuses work on a connection nobody opened. Without this
+      // every endpoint below answered ADT_NOT_CONNECTED, and the diagnostic
+      // reported "NO CSRF token from any endpoint" — a connection defect
+      // dressed up as a server one.
+      await (connection as unknown as { connect(): Promise<void> }).connect();
       hasConfig = true;
     } catch (_error) {
       testsLogger.warn(

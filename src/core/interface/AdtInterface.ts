@@ -1,3 +1,5 @@
+import { beginCriticalSection } from '../../utils/criticalSection';
+import { assertDeletable } from '../../utils/deletionCheck';
 /**
  * AdtInterface - High-level CRUD operations for Interface objects
  *
@@ -283,6 +285,12 @@ export class AdtInterface
       errors: [],
     };
 
+    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
+
+    // the lock but leaves the work half-done.
+
+    const endCriticalSection = beginCriticalSection(this.connection);
+
     try {
       // 1. Lock (update always starts with lock, stateful only for lock)
       this.logger?.info?.('Step 1: Locking interface');
@@ -302,14 +310,14 @@ export class AdtInterface
         this.logger?.info?.(
           'Step 2: Checking inactive version with update content',
         );
-        const checkResponse = await checkInterface(
+        const deletionCheck = await checkInterface(
           this.connection,
           config.interfaceName,
           'inactive',
           codeToCheck,
           this.contentTypes?.sourceArtifactContentType(),
         );
-        state.checkResult = checkResponse;
+        state.checkResult = deletionCheck;
         this.logger?.info?.('Check inactive with update content passed');
       }
 
@@ -458,6 +466,8 @@ export class AdtInterface
 
       this.logger?.error('Update failed:', safeErrorMessage(error));
       throw error;
+    } finally {
+      endCriticalSection();
     }
   }
 
@@ -476,11 +486,16 @@ export class AdtInterface
     try {
       // Check for deletion (no stateful needed)
       this.logger?.info?.('Checking interface for deletion');
-      const checkResponse = await checkDeletion(this.connection, {
+      const deletionCheck = await checkDeletion(this.connection, {
         interface_name: config.interfaceName,
         transport_request: config.transportRequest,
       });
-      state.checkResult = checkResponse;
+      // ADT already said whether this may be deleted; refusing to read that
+      // answer is how a delete came to report success while the object
+      // stayed. Throws on isDeletable=false or a message of type E; a W
+      // is a warning and passes.
+      assertDeletable(deletionCheck.data);
+      state.checkResult = deletionCheck;
       this.logger?.info?.('Deletion check passed');
 
       // Delete (requires stateful, but no lock)
@@ -546,14 +561,14 @@ export class AdtInterface
     // Map status to version
     const version: 'active' | 'inactive' =
       status === 'active' ? 'active' : 'inactive';
-    const checkResponse = await checkInterface(
+    const deletionCheck = await checkInterface(
       this.connection,
       config.interfaceName,
       version,
       config.sourceCode,
       this.contentTypes?.sourceArtifactContentType(),
     );
-    state.checkResult = checkResponse;
+    state.checkResult = deletionCheck;
     return state;
   }
 

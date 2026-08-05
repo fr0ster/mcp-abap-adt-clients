@@ -10,6 +10,8 @@ import type {
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
+import { beginCriticalSection } from '../../utils/criticalSection';
+import { assertDeletable } from '../../utils/deletionCheck';
 import { safeErrorMessage } from '../../utils/internalUtils';
 import {
   createLockTracker,
@@ -218,6 +220,9 @@ export class AdtScalarFunctionImplementation
     }
 
     let lockHandle: string | undefined;
+    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
+    // the lock but leaves the work half-done.
+    const endCriticalSection = beginCriticalSection(this.connection);
     try {
       this.connection.setSessionType('stateful');
       lockHandle = await lockScalarFunctionImplementation(
@@ -262,6 +267,8 @@ export class AdtScalarFunctionImplementation
       throw error;
     } finally {
       this.connection.setSessionType('stateless');
+
+      endCriticalSection();
     }
   }
 
@@ -294,6 +301,9 @@ export class AdtScalarFunctionImplementation
     }
 
     let lockHandle: string | undefined;
+    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
+    // the lock but leaves the work half-done.
+    const endCriticalSection = beginCriticalSection(this.connection);
     try {
       this.connection.setSessionType('stateful');
       lockHandle = await lockScalarFunctionImplementation(
@@ -338,6 +348,8 @@ export class AdtScalarFunctionImplementation
       throw error;
     } finally {
       this.connection.setSessionType('stateless');
+
+      endCriticalSection();
     }
   }
 
@@ -347,10 +359,15 @@ export class AdtScalarFunctionImplementation
     if (!config.implementationName)
       throw new Error('Implementation name is required');
     try {
-      await checkDeletion(this.connection, {
+      const deletionCheck = await checkDeletion(this.connection, {
         implementation_name: config.implementationName,
         transport_request: config.transportRequest,
       });
+      // ADT already said whether this may be deleted; refusing to read that
+      // answer is how a delete came to report success while the object
+      // stayed. Throws on isDeletable=false or a message of type E; a W
+      // is a warning and passes.
+      assertDeletable(deletionCheck.data);
       const deleteResult = await deleteScalarFunctionImplementation(
         this.connection,
         {

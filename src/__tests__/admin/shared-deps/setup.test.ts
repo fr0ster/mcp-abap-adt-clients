@@ -96,6 +96,14 @@ describe('Admin: Setup shared dependencies', () => {
 
       // Dependency order: tables → views → access_controls → behavior_definitions → service_definitions → service_bindings → classes → interfaces → function_groups → function_modules → programs
       const typeOrder: Array<{ type: string; label: string }> = [
+        // Structures first: a table may include one, and nothing else here
+        // depends on a table existing before a structure does.
+        // Domains first, then data elements that reference them, then anything
+        // built on top: the chain is created in dependency order and torn down
+        // in reverse.
+        { type: 'domains', label: 'Domains' },
+        { type: 'data_elements', label: 'Data elements' },
+        { type: 'structures', label: 'Structures' },
         { type: 'tables', label: 'Tables' },
         { type: 'views', label: 'Views' },
         { type: 'access_controls', label: 'Access controls' },

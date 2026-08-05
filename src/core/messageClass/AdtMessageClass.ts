@@ -1,3 +1,5 @@
+import { beginCriticalSection } from '../../utils/criticalSection';
+import { assertDeletable } from '../../utils/deletionCheck';
 /**
  * AdtMessageClass — High-level CRUD operations for Message Class (MSAG/N) objects.
  *
@@ -148,6 +150,8 @@ export class AdtMessageClass
    */
   async read(
     config: Partial<IMessageClassConfig>,
+    _version?: 'active' | 'inactive',
+    options?: { withLongPolling?: boolean },
   ): Promise<IMessageClassState | undefined> {
     if (!config.name) {
       throw new Error('Message class name is required');
@@ -157,6 +161,7 @@ export class AdtMessageClass
       const readResult = await getMessageClassSource(
         this.connection,
         config.name,
+        options,
       );
       const messageClass = parseMessageClass(String(readResult.data));
       return { readResult, messageClass, errors: [] };
@@ -184,6 +189,12 @@ export class AdtMessageClass
     }
 
     let lockHandle: string | undefined;
+
+    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
+
+    // the lock but leaves the work half-done.
+
+    const endCriticalSection = beginCriticalSection(this.connection);
 
     try {
       this.logger?.info?.('lock');
@@ -231,6 +242,8 @@ export class AdtMessageClass
       this.connection.setSessionType('stateless');
       this.logger?.error('Update failed:', safeErrorMessage(error));
       throw error;
+    } finally {
+      endCriticalSection();
     }
   }
 
@@ -251,7 +264,12 @@ export class AdtMessageClass
       // lock + direct DELETE leaves a lingering message-editing enqueue that
       // blocks a same-name re-create, so it is not used. See delete.ts.
       this.logger?.info?.('delete: check');
-      await checkDeletion(this.connection, config.name);
+      const deletionCheck = await checkDeletion(this.connection, config.name);
+      // ADT already said whether this may be deleted; refusing to read that
+      // answer is how a delete came to report success while the object
+      // stayed. Throws on isDeletable=false or a message of type E; a W
+      // is a warning and passes.
+      assertDeletable(deletionCheck.data);
 
       this.logger?.info?.('delete: delete');
       const deleteResult = await deleteMessageClass(
@@ -279,7 +297,9 @@ export class AdtMessageClass
     if (!config.name) {
       throw new Error('Message class name is required');
     }
-    const state = await this.read(config);
+    const state = await this.read(config, options?.version, {
+      withLongPolling: options?.withLongPolling,
+    });
     if (!state) {
       throw new Error(`Message class '${config.name}' not found`);
     }

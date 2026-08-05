@@ -1,3 +1,6 @@
+import type { CheckRunVersion } from '../../utils/checkRun';
+import { beginCriticalSection } from '../../utils/criticalSection';
+import { assertDeletable } from '../../utils/deletionCheck';
 /**
  * AdtServiceDefinition - High-level CRUD operations for Service Definition (SRVD/SRV) objects
  *
@@ -373,6 +376,12 @@ export class AdtServiceDefinition
 
     let lockHandle: string | undefined;
 
+    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
+
+    // the lock but leaves the work half-done.
+
+    const endCriticalSection = beginCriticalSection(this.connection);
+
     try {
       // 1. Lock (update always starts with lock, stateful ONLY before lock)
       this.logger?.info?.('Step 1: Locking service definition');
@@ -549,6 +558,8 @@ export class AdtServiceDefinition
 
       this.logger?.error('Update failed:', safeErrorMessage(error));
       throw error;
+    } finally {
+      endCriticalSection();
     }
   }
 
@@ -568,10 +579,15 @@ export class AdtServiceDefinition
     try {
       // Check for deletion (no stateful needed)
       this.logger?.info?.('Checking service definition for deletion');
-      await checkDeletion(this.connection, {
+      const deletionCheck = await checkDeletion(this.connection, {
         service_definition_name: config.serviceDefinitionName,
         transport_request: config.transportRequest,
       });
+      // ADT already said whether this may be deleted; refusing to read that
+      // answer is how a delete came to report success while the object
+      // stayed. Throws on isDeletable=false or a message of type E; a W
+      // is a warning and passes.
+      assertDeletable(deletionCheck.data);
       this.logger?.info?.('Deletion check passed');
 
       // Delete (no stateful needed - no lock/unlock)
@@ -634,7 +650,8 @@ export class AdtServiceDefinition
     }
 
     // Map status to version
-    const version: string = status === 'active' ? 'active' : 'inactive';
+    const version: CheckRunVersion =
+      status === 'active' ? 'active' : 'inactive';
     state.checkResult = await checkServiceDefinition(
       this.connection,
       config.serviceDefinitionName,

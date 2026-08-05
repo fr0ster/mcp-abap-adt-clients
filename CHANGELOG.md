@@ -5,6 +5,51 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+### Fixed
+- **The LOCK…UNLOCK window is a critical section.** The connector has offered `beginCriticalSection()` since 1.9.0 — it raises the effective timeout for exactly this span — and this package never called it. Every request between LOCK and UNLOCK went out with the caller's plain 45s.
+
+  Only half of the resulting problem had been solved. A timeout mid-window unlocked and rethrew, so the lock was released; but the update never happened, and the object was left as `create()` made it. That is how an append structure came to sit in a package as an empty shell:
+
+  ```
+  extend type zac_shr_appstru with zadt_s_append_s {
+  }
+  ```
+
+  Applied to **38 lock windows** — every `try` that actually acquires a lock, and nothing else. Two earlier attempts got this wrong in opposite directions and are worth recording, because the mistake was the same both times: trusting a script's output instead of checking what it had done.
+
+  The first pass wrapped one window per file and skipped six handlers on the reasoning that their lock chain "already ends in a `finally`" — but a `finally` restoring stateless has nothing to do with a critical section. The second pass claimed "49 of 49" from a count of occurrences per file, and in fact had attached **24 of them to methods with no lock at all** — `activate`, `check`, `readTransport`, and a `delete` whose own comment says "No lock". Wrapping those raises the caller's timeout for ordinary stateless requests and, on a shared connection, extends the protection across concurrent work. Meanwhile `AdtTable`, `AdtInterface` and `AdtDdicTableType` had no protection at all, because they acquire locks through `acquireTableLockHandle`-style helpers that the pattern never matched.
+
+  The count is now verified by mapping each section back to its enclosing method: 38 in methods that lock, 0 elsewhere, and no lock-holding file left without one.
+
+  The disposer runs **last** in every `finally`, so cleanup that still needs the window — an unlock, say — is covered rather than orphaned by an early close.
+
+- **`delete()` reads the verdict ADT returns instead of discarding it.** Twenty-seven modules posted to `/sap/bc/adt/deletion/check`, ignored the answer, and sent the DELETE regardless. When SAP refused, the object survived, the call reported `errors: []`, and the caller was told the deletion had happened. Now 22 handlers assert on it: `isDeletable="false"` or a message of type `E` throws `DeletionNotPermittedError`, carrying the reference counts and SAP's own wording. A `W` is a warning and passes — blocking on one would invent a prohibition the server did not state.
+- **`AdtMessageClass` declared `withLongPolling` and dropped it.** `readMetadata` accepted the option and never passed it on; `read()` took no options at all. Now the contract's `(config, version, options)` shape, with the flag reaching the URL.
+
+### Changed
+- **`CheckRunVersion` replaces a bare `string`** for `chkrun:version`: `active | inactive | new`. `new` is what ADT sends for an object created and never activated — it has neither an active nor an inactive version — and it was reachable but unnamed. Twelve call sites were passing an arbitrary string.
+- **Handlers no longer check on the caller's behalf before writing.** Verifying the source about to be written is the consumer's decision: only they know whether the object is new or merely inactive, and what a finding should mean for their flow. `check()` and the new `waitForCleanCheckRun()` are available for it.
+- **`waitForCleanCheckRun()`** repeats a check until the report comes back with no messages, the way ADT does — a trace of an Eclipse session shows six checkruns, each answering ~1.2 KB of findings, then one 0.3 KB empty report, and only then the PUT.
+
+### Tests
+- **Three tests shared `ZAC_DOM01` and `ZAC_DTEL01`.** Two of them are lock-registry tests that create the objects as lock targets and never removed them, so `Domain`'s and `DataElement`'s full workflows saw "already exists" and skipped — every run, on every system. Two flows that never executed and still reported green. Each test now owns its objects and cleans up after itself.
+- **The append-structure test asserted `status === 200` and not the content.** This system answers 200 with an empty body for an object created but never filled, so the assertion could not tell a written append from an empty shell — and did not, leaving one behind on every "passing" run. It now asserts the field arrived.
+- **The ABAP source of the append structure moved into `test-config.yaml`.** Which field name and which type are permitted is a DDIC rule — only `zz_*`, and the type must match the base's `#EXTENSIBLE_*` category — so it is configuration, not a literal buried in a test file.
+- **`structures` is a managed shared-dependency type.** It was declared in the config and ignored by every one of the four places that decide what gets created, torn down and verified — `typeOrder`, the teardown sequence, `ALL_SECTIONS`, and the type dispatch in `ensureSharedDependency`. The whole section was dead. Two extensible bases (`ZAC_SHR_APPSTRU`, `ZAC_SHR_APPTABL`) were added for the append tests, which previously pointed at unmanaged objects nobody creates or owns.
+- **Test objects no longer live in shared-object packages**, and the `ZMCP_` prefix — which belongs to the `mcp-abap-adt` server project — is gone from this package.
+- **`csrf.test.ts` never called `connect()`**, so every endpoint answered `ADT_NOT_CONNECTED` and the diagnostic reported "NO CSRF token from any endpoint" — a connection defect dressed up as a server one.
+
+### Fixed
+- **`AdtMessageClass` declared `withLongPolling` and dropped it.** `readMetadata` accepted `options?: { withLongPolling?: boolean }` and passed none of it on — it called `this.read(config)`, and `read()` took no options at all. The only occurrence of the word in the whole module was that parameter. The signature is now the contract's `(config, version, options)` shape and the flag reaches the URL, as in the other 26 handlers. This is about the handler matching what it claims, **not** about fixing readiness — see below.
+
+### Changed
+- **The README no longer presents `withLongPolling` as a readiness guarantee.** Measured against an SAP BTP trial, the parameter changes nothing on an object read: creating a message class and reading it immediately returned `404` in ~650ms **with** the flag, the same latency as without, and the server did not hold the request. That system's discovery document declares `withLongPolling` for exactly **one** resource out of 601 templates — `/sap/bc/adt/activation/runs/{run_id}`, background activation runs — while this package appends it to object reads in 27 files.
+
+  The option is kept and still passed: another system may honour it more widely, and removing it would take away a choice that costs nothing. What is removed is the claim that it *waits*. The underlying rule is blunter: **no ADT operation that changes system state guarantees when the change becomes visible.** Where readiness matters, poll with a bound.
+
+  The interface contract in `@mcp-abap-adt/interfaces` is deliberately untouched.
+- **The MessageClass integration test polls instead of asking once.** It now waits for the class to be readable, and retries the message create — the class endpoint can already read the object while the messages endpoint still answers `Resource MSAG ... does not exist`. The two do not agree on when the class exists.
+
 ## [9.0.0] - 2026-08-03
 
 ### Changed — BREAKING

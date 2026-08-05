@@ -1,3 +1,6 @@
+import type { CheckRunVersion } from '../../utils/checkRun';
+import { beginCriticalSection } from '../../utils/criticalSection';
+import { assertDeletable } from '../../utils/deletionCheck';
 /**
  * AdtTableType - High-level CRUD operations for Table Type objects
  *
@@ -306,6 +309,12 @@ export class AdtDdicTableType
 
     let lockHandle: string | undefined;
 
+    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
+
+    // the lock but leaves the work half-done.
+
+    const endCriticalSection = beginCriticalSection(this.connection);
+
     try {
       // 1. Lock (update always starts with lock, stateful ONLY before lock)
       this.logger?.info?.('Step 1: Locking table type');
@@ -504,6 +513,8 @@ export class AdtDdicTableType
 
       this.logger?.error('Update failed:', safeErrorMessage(error));
       throw error;
+    } finally {
+      endCriticalSection();
     }
   }
 
@@ -518,10 +529,15 @@ export class AdtDdicTableType
     try {
       // Check for deletion (no stateful needed)
       this.logger?.info?.('Checking table type for deletion');
-      await checkDeletion(this.connection, {
+      const deletionCheck = await checkDeletion(this.connection, {
         tabletype_name: config.tableTypeName,
         transport_request: config.transportRequest,
       });
+      // ADT already said whether this may be deleted; refusing to read that
+      // answer is how a delete came to report success while the object
+      // stayed. Throws on isDeletable=false or a message of type E; a W
+      // is a warning and passes.
+      assertDeletable(deletionCheck.data);
       this.logger?.info?.('Deletion check passed');
 
       // Delete (no stateful needed - no lock/unlock)
@@ -572,7 +588,8 @@ export class AdtDdicTableType
     }
 
     // Map status to version
-    const version: string = status === 'active' ? 'active' : 'inactive';
+    const version: CheckRunVersion =
+      status === 'active' ? 'active' : 'inactive';
     return {
       checkResult: await runTableTypeCheckRun(
         this.connection,

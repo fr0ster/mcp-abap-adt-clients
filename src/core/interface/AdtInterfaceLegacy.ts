@@ -1,3 +1,4 @@
+import { beginCriticalSection } from '../../utils/criticalSection';
 /**
  * AdtInterfaceLegacy - Interface handler for legacy SAP systems (BASIS < 7.50)
  *
@@ -24,6 +25,12 @@ export class AdtInterfaceLegacy extends AdtInterface {
 
     const state: IInterfaceState = { errors: [] };
     let lockHandle: string | undefined;
+
+    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
+
+    // the lock but leaves the work half-done.
+
+    const endCriticalSection = beginCriticalSection(this.connection);
 
     try {
       this.logger?.info?.('Locking interface for deletion');
@@ -64,6 +71,8 @@ export class AdtInterfaceLegacy extends AdtInterface {
       throw error;
     } finally {
       this.connection.setSessionType('stateless');
+
+      endCriticalSection();
     }
   }
 }

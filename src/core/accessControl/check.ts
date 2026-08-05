@@ -3,7 +3,11 @@ import type {
   IAdtResponse,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
-import { parseCheckRunResponse, runCheckRun } from '../../utils/checkRun';
+import {
+  type CheckRunVersion,
+  parseCheckRunResponse,
+  runCheckRun,
+} from '../../utils/checkRun';
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -22,7 +26,7 @@ function delay(ms: number): Promise<void> {
 export async function checkAccessControl(
   connection: IAbapConnection,
   accessControlName: string,
-  version: string = 'inactive',
+  version: CheckRunVersion = 'inactive',
   sourceCode?: string,
   logger?: ILogger,
 ): Promise<IAdtResponse> {

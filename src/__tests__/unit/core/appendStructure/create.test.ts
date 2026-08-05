@@ -30,9 +30,9 @@ describe('appendStructure create', () => {
       headers?: Record<string, string>;
     } = {};
     await create(mockConn(cap), {
-      append_structure_name: 'zok_s_append',
-      base_object: 'zmcp_shr_stru',
-      package_name: 'zmcp_shr_pkg',
+      append_structure_name: 'zac_s_append',
+      base_object: 'zac_shr_appstru',
+      package_name: 'zac_shr_pkg',
       description: 'Test',
       masterSystem: 'TRL',
       responsible: 'CB9980008038',
@@ -42,25 +42,25 @@ describe('appendStructure create', () => {
       'application/vnd.sap.adt.structures.v2+xml',
     );
     expect(cap.data).toContain('adtcore:type="TABL/DS"');
-    expect(cap.data).toContain('adtcore:name="ZOK_S_APPEND"');
+    expect(cap.data).toContain('adtcore:name="ZAC_S_APPEND"');
     expect(cap.data).toContain(
-      '<adtcore:adtProperty adtcore:key="base_structure">ZMCP_SHR_STRU</adtcore:adtProperty>',
+      '<adtcore:adtProperty adtcore:key="base_structure">ZAC_SHR_APPSTRU</adtcore:adtProperty>',
     );
     expect(cap.data).toContain(
-      '<adtcore:packageRef adtcore:name="ZMCP_SHR_PKG"/>',
+      '<adtcore:packageRef adtcore:name="ZAC_SHR_PKG"/>',
     );
   });
 
   it('works identically for a table base (same base_structure key)', async () => {
     const cap: { data?: string } = {};
     await create(mockConn(cap as any), {
-      append_structure_name: 'zok_s_append_t',
-      base_object: 'zmcp_view_tbl02',
-      package_name: 'zmcp_shr_pkg',
+      append_structure_name: 'zac_s_append_t',
+      base_object: 'zac_shr_apptabl',
+      package_name: 'zac_shr_pkg',
       description: 'Test',
     });
     expect(cap.data).toContain(
-      '<adtcore:adtProperty adtcore:key="base_structure">ZMCP_VIEW_TBL02</adtcore:adtProperty>',
+      '<adtcore:adtProperty adtcore:key="base_structure">ZAC_SHR_APPTABL</adtcore:adtProperty>',
     );
   });
 });

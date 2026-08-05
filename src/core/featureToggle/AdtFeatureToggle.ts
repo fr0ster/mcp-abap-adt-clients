@@ -1,3 +1,5 @@
+import { beginCriticalSection } from '../../utils/criticalSection';
+import { assertDeletable } from '../../utils/deletionCheck';
 /**
  * AdtFeatureToggle - High-level CRUD + lifecycle + runtime operations for
  * Feature Toggle (FTG2/FT) objects.
@@ -154,6 +156,12 @@ export class AdtFeatureToggle implements IFeatureToggleObject {
     const state: IFeatureToggleState = { errors: [] };
     const params = this.buildCreateParams(config);
 
+    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
+
+    // the lock but leaves the work half-done.
+
+    const endCriticalSection = beginCriticalSection(this.connection);
+
     try {
       this.logger?.info?.('Creating feature toggle');
       const createResponse = await createFeatureToggle(this.connection, params);
@@ -253,6 +261,8 @@ export class AdtFeatureToggle implements IFeatureToggleObject {
 
       this.logger?.error('Create failed:', safeErrorMessage(error));
       throw error;
+    } finally {
+      endCriticalSection();
     }
   }
 
@@ -392,6 +402,12 @@ export class AdtFeatureToggle implements IFeatureToggleObject {
     let lockHandle: string | undefined;
     const state: IFeatureToggleState = { errors: [] };
 
+    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
+
+    // the lock but leaves the work half-done.
+
+    const endCriticalSection = beginCriticalSection(this.connection);
+
     try {
       // 1. Lock
       this.logger?.info?.('Step 1: Locking feature toggle');
@@ -412,13 +428,13 @@ export class AdtFeatureToggle implements IFeatureToggleObject {
         this.logger?.info?.(
           'Step 2: Checking inactive version with update content',
         );
-        const checkResponse = await checkFeatureToggle(
+        const deletionCheck = await checkFeatureToggle(
           this.connection,
           fullConfig.featureToggleName,
           'inactive',
           xmlToCheck,
         );
-        state.checkResult = checkResponse;
+        state.checkResult = deletionCheck;
         this.logger?.info?.('Check inactive with update content passed');
       }
 
@@ -559,6 +575,8 @@ export class AdtFeatureToggle implements IFeatureToggleObject {
 
       this.logger?.error('Update failed:', safeErrorMessage(error));
       throw error;
+    } finally {
+      endCriticalSection();
     }
   }
 
@@ -576,11 +594,16 @@ export class AdtFeatureToggle implements IFeatureToggleObject {
 
     try {
       this.logger?.info?.('Checking feature toggle for deletion');
-      const checkResponse = await checkDeletion(
+      const deletionCheck = await checkDeletion(
         this.connection,
         this.buildDeleteParams(config),
       );
-      state.checkResult = checkResponse;
+      // ADT already said whether this may be deleted; refusing to read that
+      // answer is how a delete came to report success while the object
+      // stayed. Throws on isDeletable=false or a message of type E; a W
+      // is a warning and passes.
+      assertDeletable(deletionCheck.data);
+      state.checkResult = deletionCheck;
       this.logger?.info?.('Deletion check passed');
 
       this.logger?.info?.('Deleting feature toggle');
@@ -637,13 +660,13 @@ export class AdtFeatureToggle implements IFeatureToggleObject {
     const version: 'active' | 'inactive' =
       status === 'active' ? 'active' : 'inactive';
 
-    const checkResponse = await checkFeatureToggle(
+    const deletionCheck = await checkFeatureToggle(
       this.connection,
       config.featureToggleName,
       version,
     );
     return {
-      checkResult: checkResponse,
+      checkResult: deletionCheck,
       errors: [],
     };
   }
