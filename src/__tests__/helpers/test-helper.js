@@ -2170,6 +2170,14 @@ async function ensureSharedDependency(client, type, name, logger) {
     sharedConfig?.transport_request,
   );
 
+  // Types whose configuration lives in fields rather than a `source` block.
+  // For them "it reads back" is not "it is correct": create() writes only a
+  // shell — a domain with no data type at all — and the update that fills it in
+  // is a separate call. A setup interrupted between the two leaves exactly that
+  // shell, and a later run would accept it as a working dependency. So these are
+  // always brought to configuration and activated, existing or not.
+  const ALWAYS_RECONCILE = new Set(['domains', 'data_elements']);
+
   // Check if the object already exists
   let exists = false;
   try {
@@ -2250,6 +2258,41 @@ async function ensureSharedDependency(client, type, name, logger) {
       } catch (updateErr) {
         logger?.warn?.(
           `Shared ${type} ${name} exists but update/activate failed: ${updateErr.message}`,
+        );
+      }
+    } else if (ALWAYS_RECONCILE.has(type)) {
+      // No `source` block, so the branch above cannot help — yet these are the
+      // types whose create() writes only a shell. Bring the existing object to
+      // the configured state and activate it, rather than trusting that it
+      // reads back.
+      try {
+        if (type === 'domains') {
+          await client.getDomain().update(
+            {
+              domainName: name,
+              description: depConfig.description || 'Shared test domain',
+              datatype: depConfig.datatype || 'CHAR',
+              length: depConfig.length || 10,
+              transportRequest,
+            },
+            { activateOnUpdate: true },
+          );
+        } else {
+          await client.getDataElement().update(
+            {
+              dataElementName: name,
+              description: depConfig.description || 'Shared test data element',
+              typeKind: depConfig.type_kind || 'domain',
+              typeName: depConfig.domain_name,
+              transportRequest,
+            },
+            { activateOnUpdate: true },
+          );
+        }
+        logger?.info?.(`Shared ${type} ${name} reconciled to configuration`);
+      } catch (reconcileErr) {
+        logger?.warn?.(
+          `Shared ${type} ${name} exists but could not be reconciled: ${reconcileErr.message}`,
         );
       }
     } else {
