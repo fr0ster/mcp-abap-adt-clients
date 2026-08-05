@@ -557,6 +557,9 @@ export class AdtAccessControl
       throw error;
     }
 
+    // LOCK…UNLOCK as one uninterruptible window: a timeout in the middle
+    // releases the lock but leaves the work half-done.
+    const endCriticalSection = beginCriticalSection(this.connection);
     try {
       const result = await activateAccessControl(
         this.connection,
@@ -567,6 +570,8 @@ export class AdtAccessControl
     } catch (error: unknown) {
       this.logger?.error('Activate failed:', safeErrorMessage(error));
       throw error;
+    } finally {
+      endCriticalSection();
     }
   }
 

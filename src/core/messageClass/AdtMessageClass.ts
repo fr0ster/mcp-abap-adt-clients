@@ -257,6 +257,9 @@ export class AdtMessageClass
       throw new Error('Message class name is required');
     }
 
+    // LOCK…UNLOCK as one uninterruptible window: a timeout in the middle
+    // releases the lock but leaves the work half-done.
+    const endCriticalSection = beginCriticalSection(this.connection);
     try {
       // Stateless deletion service (check → delete) — no lock. A stateful
       // lock + direct DELETE leaves a lingering message-editing enqueue that
@@ -281,6 +284,8 @@ export class AdtMessageClass
     } catch (error: unknown) {
       this.logger?.error('Delete failed:', safeErrorMessage(error));
       throw error;
+    } finally {
+      endCriticalSection();
     }
   }
 

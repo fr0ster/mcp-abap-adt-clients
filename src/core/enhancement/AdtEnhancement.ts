@@ -794,6 +794,9 @@ export class AdtEnhancement
       throw error;
     }
 
+    // LOCK…UNLOCK as one uninterruptible window: a timeout in the middle
+    // releases the lock but leaves the work half-done.
+    const endCriticalSection = beginCriticalSection(this.connection);
     try {
       const version: 'active' | 'inactive' =
         status === 'active' ? 'active' : 'inactive';
@@ -810,6 +813,8 @@ export class AdtEnhancement
       state.errors.push({ method: 'check', error: err, timestamp: new Date() });
       this.logger?.error('Check failed:', safeErrorMessage(err));
       throw err;
+    } finally {
+      endCriticalSection();
     }
   }
 

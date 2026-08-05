@@ -400,6 +400,9 @@ export class AdtFeatureToggle implements IFeatureToggleObject {
     let lockHandle: string | undefined;
     const state: IFeatureToggleState = { errors: [] };
 
+    // LOCK…UNLOCK as one uninterruptible window: a timeout in the middle
+    // releases the lock but leaves the work half-done.
+    const endCriticalSection = beginCriticalSection(this.connection);
     try {
       // 1. Lock
       this.logger?.info?.('Step 1: Locking feature toggle');
@@ -567,6 +570,8 @@ export class AdtFeatureToggle implements IFeatureToggleObject {
 
       this.logger?.error('Update failed:', safeErrorMessage(error));
       throw error;
+    } finally {
+      endCriticalSection();
     }
   }
 
@@ -623,6 +628,9 @@ export class AdtFeatureToggle implements IFeatureToggleObject {
 
     const state: IFeatureToggleState = { errors: [] };
 
+    // LOCK…UNLOCK as one uninterruptible window: a timeout in the middle
+    // releases the lock but leaves the work half-done.
+    const endCriticalSection = beginCriticalSection(this.connection);
     try {
       const activateResponse = await activateFeatureToggle(
         this.connection,
@@ -633,6 +641,8 @@ export class AdtFeatureToggle implements IFeatureToggleObject {
     } catch (error: unknown) {
       this.logger?.error('Activate failed:', safeErrorMessage(error));
       throw error;
+    } finally {
+      endCriticalSection();
     }
   }
 

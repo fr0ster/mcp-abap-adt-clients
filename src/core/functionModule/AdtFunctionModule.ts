@@ -636,6 +636,9 @@ export class AdtFunctionModule
       throw new Error('Function group name is required');
     }
 
+    // LOCK…UNLOCK as one uninterruptible window: a timeout in the middle
+    // releases the lock but leaves the work half-done.
+    const endCriticalSection = beginCriticalSection(this.connection);
     try {
       const result = await activateFunctionModule(
         this.connection,
@@ -646,6 +649,8 @@ export class AdtFunctionModule
     } catch (error: unknown) {
       this.logger?.error('Activate failed:', safeErrorMessage(error));
       throw error;
+    } finally {
+      endCriticalSection();
     }
   }
 

@@ -10,6 +10,7 @@ import type {
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
+import { beginCriticalSection } from '../../utils/criticalSection';
 import { assertDeletable } from '../../utils/deletionCheck';
 import { safeErrorMessage } from '../../utils/internalUtils';
 import {
@@ -219,6 +220,9 @@ export class AdtScalarFunctionImplementation
     }
 
     let lockHandle: string | undefined;
+    // LOCK…UNLOCK as one uninterruptible window: a timeout in the middle
+    // releases the lock but leaves the work half-done.
+    const endCriticalSection = beginCriticalSection(this.connection);
     try {
       this.connection.setSessionType('stateful');
       lockHandle = await lockScalarFunctionImplementation(
@@ -263,6 +267,7 @@ export class AdtScalarFunctionImplementation
       throw error;
     } finally {
       this.connection.setSessionType('stateless');
+      endCriticalSection();
     }
   }
 
@@ -295,6 +300,9 @@ export class AdtScalarFunctionImplementation
     }
 
     let lockHandle: string | undefined;
+    // LOCK…UNLOCK as one uninterruptible window: a timeout in the middle
+    // releases the lock but leaves the work half-done.
+    const endCriticalSection = beginCriticalSection(this.connection);
     try {
       this.connection.setSessionType('stateful');
       lockHandle = await lockScalarFunctionImplementation(
@@ -339,6 +347,7 @@ export class AdtScalarFunctionImplementation
       throw error;
     } finally {
       this.connection.setSessionType('stateless');
+      endCriticalSection();
     }
   }
 
@@ -347,6 +356,9 @@ export class AdtScalarFunctionImplementation
   ): Promise<IScalarFunctionImplementationState> {
     if (!config.implementationName)
       throw new Error('Implementation name is required');
+    // LOCK…UNLOCK as one uninterruptible window: a timeout in the middle
+    // releases the lock but leaves the work half-done.
+    const endCriticalSection = beginCriticalSection(this.connection);
     try {
       const deletionCheck = await checkDeletion(this.connection, {
         implementation_name: config.implementationName,
@@ -368,6 +380,8 @@ export class AdtScalarFunctionImplementation
     } catch (error) {
       this.logger?.error('Delete failed:', safeErrorMessage(error));
       throw error;
+    } finally {
+      endCriticalSection();
     }
   }
 

@@ -541,6 +541,9 @@ export class AdtDdl implements IAdtSourceObject<IDdlConfig, IDdlState> {
       throw new Error('View name is required');
     }
 
+    // LOCK…UNLOCK as one uninterruptible window: a timeout in the middle
+    // releases the lock but leaves the work half-done.
+    const endCriticalSection = beginCriticalSection(this.connection);
     try {
       const result = await activateDDLS(this.connection, config.ddlName);
       return {
@@ -550,6 +553,8 @@ export class AdtDdl implements IAdtSourceObject<IDdlConfig, IDdlState> {
     } catch (error: unknown) {
       this.logger?.error('Activate failed:', safeErrorMessage(error));
       throw error;
+    } finally {
+      endCriticalSection();
     }
   }
 

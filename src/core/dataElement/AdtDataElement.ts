@@ -644,6 +644,9 @@ export class AdtDataElement
       throw error;
     }
 
+    // LOCK…UNLOCK as one uninterruptible window: a timeout in the middle
+    // releases the lock but leaves the work half-done.
+    const endCriticalSection = beginCriticalSection(this.connection);
     try {
       const response = await getDataElementTransport(
         this.connection,
@@ -664,6 +667,8 @@ export class AdtDataElement
       });
       this.logger?.error('readTransport', safeErrorMessage(err));
       throw err;
+    } finally {
+      endCriticalSection();
     }
   }
 

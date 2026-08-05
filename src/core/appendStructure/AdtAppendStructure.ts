@@ -342,6 +342,9 @@ export class AdtAppendStructure
   ): Promise<IAppendStructureState> {
     if (!config.appendStructureName)
       throw new Error('Append structure name is required');
+    // LOCK…UNLOCK as one uninterruptible window: a timeout in the middle
+    // releases the lock but leaves the work half-done.
+    const endCriticalSection = beginCriticalSection(this.connection);
     try {
       const deletionCheck = await checkDeletion(this.connection, {
         append_structure_name: config.appendStructureName,
@@ -360,6 +363,8 @@ export class AdtAppendStructure
     } catch (error) {
       this.logger?.error('Delete failed:', safeErrorMessage(error));
       throw error;
+    } finally {
+      endCriticalSection();
     }
   }
 

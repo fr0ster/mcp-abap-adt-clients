@@ -1,3 +1,4 @@
+import { beginCriticalSection } from '../../utils/criticalSection';
 /**
  * AdtFunctionGroupLegacy - FunctionGroup handler for legacy SAP systems (BASIS < 7.50)
  *
@@ -22,6 +23,9 @@ export class AdtFunctionGroupLegacy extends AdtFunctionGroup {
     const state: IFunctionGroupState = { errors: [] };
     let lockHandle: string | undefined;
 
+    // LOCK…UNLOCK as one uninterruptible window: a timeout in the middle
+    // releases the lock but leaves the work half-done.
+    const endCriticalSection = beginCriticalSection(this.connection);
     try {
       this.logger?.info?.('Locking function group for deletion');
       this.connection.setSessionType('stateful');
@@ -60,6 +64,7 @@ export class AdtFunctionGroupLegacy extends AdtFunctionGroup {
       throw error;
     } finally {
       this.connection.setSessionType('stateless');
+      endCriticalSection();
     }
   }
 }

@@ -639,6 +639,9 @@ export class AdtBehaviorDefinition
       throw error;
     }
 
+    // LOCK…UNLOCK as one uninterruptible window: a timeout in the middle
+    // releases the lock but leaves the work half-done.
+    const endCriticalSection = beginCriticalSection(this.connection);
     try {
       // Map status to version
       const version: CheckRunVersion =
@@ -657,6 +660,8 @@ export class AdtBehaviorDefinition
       state.errors.push({ method: 'check', error: err, timestamp: new Date() });
       this.logger?.error('Check failed:', safeErrorMessage(err));
       throw err;
+    } finally {
+      endCriticalSection();
     }
   }
 

@@ -617,6 +617,9 @@ export class AdtProgram
       throw error;
     }
 
+    // LOCK…UNLOCK as one uninterruptible window: a timeout in the middle
+    // releases the lock but leaves the work half-done.
+    const endCriticalSection = beginCriticalSection(this.connection);
     try {
       const response = await getProgramTransport(
         this.connection,
@@ -637,6 +640,8 @@ export class AdtProgram
       });
       this.logger?.error('readTransport', safeErrorMessage(err));
       throw err;
+    } finally {
+      endCriticalSection();
     }
   }
 

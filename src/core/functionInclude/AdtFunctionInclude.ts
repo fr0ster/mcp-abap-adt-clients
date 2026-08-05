@@ -520,6 +520,9 @@ export class AdtFunctionInclude
     let lockHandle: string | undefined;
     const state: IFunctionIncludeState = { errors: [] };
 
+    // LOCK…UNLOCK as one uninterruptible window: a timeout in the middle
+    // releases the lock but leaves the work half-done.
+    const endCriticalSection = beginCriticalSection(this.connection);
     try {
       // 1. Lock
       this.logger?.info?.('Step 1: Locking function include');
@@ -709,6 +712,8 @@ export class AdtFunctionInclude
 
       this.logger?.error('Update failed:', safeErrorMessage(error));
       throw error;
+    } finally {
+      endCriticalSection();
     }
   }
 
@@ -770,6 +775,9 @@ export class AdtFunctionInclude
     }
 
     const state: IFunctionIncludeState = { errors: [] };
+    // LOCK…UNLOCK as one uninterruptible window: a timeout in the middle
+    // releases the lock but leaves the work half-done.
+    const endCriticalSection = beginCriticalSection(this.connection);
     try {
       const activateResponse = await activateFunctionInclude(
         this.connection,
@@ -781,6 +789,8 @@ export class AdtFunctionInclude
     } catch (error: unknown) {
       this.logger?.error('Activate failed:', safeErrorMessage(error));
       throw error;
+    } finally {
+      endCriticalSection();
     }
   }
 

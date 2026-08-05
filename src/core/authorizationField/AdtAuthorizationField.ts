@@ -550,6 +550,9 @@ export class AdtAuthorizationField
 
     const state: IAuthorizationFieldState = { errors: [] };
 
+    // LOCK…UNLOCK as one uninterruptible window: a timeout in the middle
+    // releases the lock but leaves the work half-done.
+    const endCriticalSection = beginCriticalSection(this.connection);
     try {
       const activateResponse = await activateAuthorizationField(
         this.connection,
@@ -560,6 +563,8 @@ export class AdtAuthorizationField
     } catch (error: unknown) {
       this.logger?.error('Activate failed:', safeErrorMessage(error));
       throw error;
+    } finally {
+      endCriticalSection();
     }
   }
 

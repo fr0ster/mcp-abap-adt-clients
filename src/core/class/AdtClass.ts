@@ -851,6 +851,9 @@ export class AdtClass implements IAdtSourceObject<IClassConfig, IClassState> {
 
     let lockHandle: string | undefined;
 
+    // LOCK…UNLOCK as one uninterruptible window: a timeout in the middle
+    // releases the lock but leaves the work half-done.
+    const endCriticalSection = beginCriticalSection(this.connection);
     try {
       // 1. Lock parent class (stateful only for lock)
       // Lock handle from parent class is sufficient for updating testclasses include
@@ -897,6 +900,8 @@ export class AdtClass implements IAdtSourceObject<IClassConfig, IClassState> {
         }
       }
       throw error;
+    } finally {
+      endCriticalSection();
     }
   }
 

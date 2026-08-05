@@ -546,6 +546,9 @@ export class AdtMetadataExtension
       throw error;
     }
 
+    // LOCK…UNLOCK as one uninterruptible window: a timeout in the middle
+    // releases the lock but leaves the work half-done.
+    const endCriticalSection = beginCriticalSection(this.connection);
     try {
       const result = await activateMetadataExtension(
         this.connection,
@@ -564,6 +567,8 @@ export class AdtMetadataExtension
       });
       this.logger?.error('Activate', safeErrorMessage(err));
       throw err;
+    } finally {
+      endCriticalSection();
     }
   }
 
