@@ -1,3 +1,5 @@
+import { beginCriticalSection } from '../../utils/criticalSection';
+import { assertDeletable } from '../../utils/deletionCheck';
 /**
  * AdtMessageClass — High-level CRUD operations for Message Class (MSAG/N) objects.
  *
@@ -188,6 +190,10 @@ export class AdtMessageClass
 
     let lockHandle: string | undefined;
 
+    // LOCK…UNLOCK as one uninterruptible window: a 45s timeout in the
+    // middle used to release the lock and rethrow, leaving the object in
+    // whatever state create() left it.
+    const endCriticalSection = beginCriticalSection(this.connection);
     try {
       this.logger?.info?.('lock');
       this.connection.setSessionType('stateful');
@@ -234,6 +240,8 @@ export class AdtMessageClass
       this.connection.setSessionType('stateless');
       this.logger?.error('Update failed:', safeErrorMessage(error));
       throw error;
+    } finally {
+      endCriticalSection();
     }
   }
 
@@ -254,7 +262,12 @@ export class AdtMessageClass
       // lock + direct DELETE leaves a lingering message-editing enqueue that
       // blocks a same-name re-create, so it is not used. See delete.ts.
       this.logger?.info?.('delete: check');
-      await checkDeletion(this.connection, config.name);
+      const deletionCheck = await checkDeletion(this.connection, config.name);
+      // ADT already said whether this may be deleted; refusing to read that
+      // answer is how a delete came to report success while the object
+      // stayed. Throws on isDeletable=false or a message of type E; a W
+      // is a warning and passes.
+      assertDeletable(deletionCheck.data);
 
       this.logger?.info?.('delete: delete');
       const deleteResult = await deleteMessageClass(

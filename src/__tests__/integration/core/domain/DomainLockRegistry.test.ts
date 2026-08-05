@@ -86,7 +86,11 @@ describe('Domain lock registry (using AdtClient)', () => {
       // Resolve domain params from test-config.yaml (no hardcoding).
       const resolver = new TestConfigResolver({
         handlerName: 'create_domain',
-        testCaseName: 'adt_domain',
+        // Its own object: sharing adt_domain's name made Domain's full
+        // workflow skip as "already exists" on every run.
+        // One owner per object. Sharing a name with another test is what made
+        // Domain's full workflow skip as "already exists" on every run.
+        testCaseName: 'domain_lock_registry',
         isCloud: isCloudSystem,
         logger: testsLogger,
       });
@@ -157,4 +161,22 @@ describe('Domain lock registry (using AdtClient)', () => {
     },
     getTimeout('test'),
   );
+
+  // Created for a lock target and never activated, so it is an inactive shell.
+  // Leaving it behind puts an invalid object in the system and makes the next
+  // run's Domain workflow see "already exists".
+  afterAll(async () => {
+    const name = config?.domainName;
+    if (!client || !name) return;
+    await client
+      .getDomain()
+      .delete({ domainName: name })
+      .catch((error: unknown) =>
+        testsLogger.warn?.(
+          `cleanup: ${name} not removed: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        ),
+      );
+  }, 300000);
 });

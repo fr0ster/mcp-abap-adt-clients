@@ -1,3 +1,4 @@
+import { beginCriticalSection } from '../../utils/criticalSection';
 /**
  * AdtMetadataExtension - High-level CRUD operations for Metadata Extension (DDLX) objects
  *
@@ -324,6 +325,10 @@ export class AdtMetadataExtension
 
     let lockHandle: string | undefined;
 
+    // LOCK…UNLOCK as one uninterruptible window: a 45s timeout in the
+    // middle used to release the lock and rethrow, leaving the object in
+    // whatever state create() left it.
+    const endCriticalSection = beginCriticalSection(this.connection);
     try {
       // 1. Lock (update always starts with lock, stateful ONLY before lock)
       this.logger?.info?.('Step 1: Locking metadata extension');
@@ -483,6 +488,8 @@ export class AdtMetadataExtension
 
       this.logger?.error('Update failed:', safeErrorMessage(error));
       throw error;
+    } finally {
+      endCriticalSection();
     }
   }
 

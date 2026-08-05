@@ -10,6 +10,8 @@ import type {
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
+import { beginCriticalSection } from '../../utils/criticalSection';
+import { assertDeletable } from '../../utils/deletionCheck';
 import { safeErrorMessage } from '../../utils/internalUtils';
 import {
   createLockTracker,
@@ -199,6 +201,10 @@ export class AdtScalarFunction
     }
 
     let lockHandle: string | undefined;
+    // LOCK…UNLOCK as one uninterruptible window: a 45s timeout in the
+    // middle used to release the lock and rethrow, leaving the object as
+    // create() made it.
+    const endCriticalSection = beginCriticalSection(this.connection);
     try {
       this.connection.setSessionType('stateful');
       lockHandle = await lockScalarFunction(
@@ -320,6 +326,8 @@ export class AdtScalarFunction
       }
       this.logger?.error('Update failed:', safeErrorMessage(error));
       throw error;
+    } finally {
+      endCriticalSection();
     }
   }
 
@@ -329,10 +337,15 @@ export class AdtScalarFunction
     if (!config.scalarFunctionName)
       throw new Error('Scalar function name is required');
     try {
-      await checkDeletion(this.connection, {
+      const deletionCheck = await checkDeletion(this.connection, {
         scalar_function_name: config.scalarFunctionName,
         transport_request: config.transportRequest,
       });
+      // ADT already said whether this may be deleted; refusing to read that
+      // answer is how a delete came to report success while the object
+      // stayed. Throws on isDeletable=false or a message of type E; a W
+      // is a warning and passes.
+      assertDeletable(deletionCheck.data);
       const deleteResult = await deleteScalarFunction(this.connection, {
         scalar_function_name: config.scalarFunctionName,
         transport_request: config.transportRequest,

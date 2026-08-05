@@ -6,6 +6,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 ## [Unreleased]
 
 ### Fixed
+- **The LOCK…UNLOCK window is a critical section.** The connector has offered `beginCriticalSection()` since 1.9.0 — it raises the effective timeout for exactly this span — and this package never called it. Every request between LOCK and UNLOCK went out with the caller's plain 45s.
+
+  Only half of the resulting problem had been solved. A timeout mid-window unlocked and rethrew, so the lock was released; but the update never happened, and the object was left as `create()` made it. That is how an append structure came to sit in a package as an empty shell:
+
+  ```
+  extend type zac_shr_appstru with zadt_s_append_s {
+  }
+  ```
+
+  Applied to 20 handlers. Six were left alone because their lock chain already ends in a `finally`. `beginCriticalSection` is deliberately **not** part of `IAbapConnection`: how a transport protects a window is its own concern, and an RFC or batch connection has no reason to offer one — so the helper asks the connection whether it can, and proceeds either way.
+- **`delete()` reads the verdict ADT returns instead of discarding it.** Twenty-seven modules posted to `/sap/bc/adt/deletion/check`, ignored the answer, and sent the DELETE regardless. When SAP refused, the object survived, the call reported `errors: []`, and the caller was told the deletion had happened. Now 22 handlers assert on it: `isDeletable="false"` or a message of type `E` throws `DeletionNotPermittedError`, carrying the reference counts and SAP's own wording. A `W` is a warning and passes — blocking on one would invent a prohibition the server did not state.
+- **`AdtMessageClass` declared `withLongPolling` and dropped it.** `readMetadata` accepted the option and never passed it on; `read()` took no options at all. Now the contract's `(config, version, options)` shape, with the flag reaching the URL.
+
+### Changed
+- **`CheckRunVersion` replaces a bare `string`** for `chkrun:version`: `active | inactive | new`. `new` is what ADT sends for an object created and never activated — it has neither an active nor an inactive version — and it was reachable but unnamed. Twelve call sites were passing an arbitrary string.
+- **Handlers no longer check on the caller's behalf before writing.** Verifying the source about to be written is the consumer's decision: only they know whether the object is new or merely inactive, and what a finding should mean for their flow. `check()` and the new `waitForCleanCheckRun()` are available for it.
+- **`waitForCleanCheckRun()`** repeats a check until the report comes back with no messages, the way ADT does — a trace of an Eclipse session shows six checkruns, each answering ~1.2 KB of findings, then one 0.3 KB empty report, and only then the PUT.
+
+### Tests
+- **Three tests shared `ZAC_DOM01` and `ZAC_DTEL01`.** Two of them are lock-registry tests that create the objects as lock targets and never removed them, so `Domain`'s and `DataElement`'s full workflows saw "already exists" and skipped — every run, on every system. Two flows that never executed and still reported green. Each test now owns its objects and cleans up after itself.
+- **The append-structure test asserted `status === 200` and not the content.** This system answers 200 with an empty body for an object created but never filled, so the assertion could not tell a written append from an empty shell — and did not, leaving one behind on every "passing" run. It now asserts the field arrived.
+- **The ABAP source of the append structure moved into `test-config.yaml`.** Which field name and which type are permitted is a DDIC rule — only `zz_*`, and the type must match the base's `#EXTENSIBLE_*` category — so it is configuration, not a literal buried in a test file.
+- **`structures` is a managed shared-dependency type.** It was declared in the config and ignored by every one of the four places that decide what gets created, torn down and verified — `typeOrder`, the teardown sequence, `ALL_SECTIONS`, and the type dispatch in `ensureSharedDependency`. The whole section was dead. Two extensible bases (`ZAC_SHR_APPSTRU`, `ZAC_SHR_APPTABL`) were added for the append tests, which previously pointed at unmanaged objects nobody creates or owns.
+- **Test objects no longer live in shared-object packages**, and the `ZMCP_` prefix — which belongs to the `mcp-abap-adt` server project — is gone from this package.
+- **`csrf.test.ts` never called `connect()`**, so every endpoint answered `ADT_NOT_CONNECTED` and the diagnostic reported "NO CSRF token from any endpoint" — a connection defect dressed up as a server one.
+
+### Fixed
 - **`AdtMessageClass` declared `withLongPolling` and dropped it.** `readMetadata` accepted `options?: { withLongPolling?: boolean }` and passed none of it on — it called `this.read(config)`, and `read()` took no options at all. The only occurrence of the word in the whole module was that parameter. The signature is now the contract's `(config, version, options)` shape and the flag reaches the URL, as in the other 26 handlers. This is about the handler matching what it claims, **not** about fixing readiness — see below.
 
 ### Changed

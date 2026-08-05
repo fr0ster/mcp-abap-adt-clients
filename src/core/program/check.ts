@@ -3,7 +3,11 @@
  */
 
 import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
-import { parseCheckRunResponse, runCheckRun } from '../../utils/checkRun';
+import {
+  type CheckRunVersion,
+  parseCheckRunResponse,
+  runCheckRun,
+} from '../../utils/checkRun';
 
 /**
  * Check program syntax
@@ -11,7 +15,7 @@ import { parseCheckRunResponse, runCheckRun } from '../../utils/checkRun';
 export async function checkProgram(
   connection: IAbapConnection,
   programName: string,
-  version: string = 'active',
+  version: CheckRunVersion = 'active',
   sourceCode?: string,
   artifactContentType?: string,
 ): Promise<IAdtResponse> {

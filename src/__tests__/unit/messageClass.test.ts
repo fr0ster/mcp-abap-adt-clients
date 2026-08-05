@@ -39,6 +39,20 @@ function conn(handler: (o: any) => Promise<IAdtResponse>): IAbapConnection {
   } as unknown as IAbapConnection;
 }
 
+/**
+ * A deletion-check answer shaped like the real one.
+ *
+ * `data: ''` used to be enough because the verdict was discarded. Now that it
+ * is read, an empty body means "the server did not approve", which is the
+ * correct reading — so the mock has to answer the way ADT does.
+ */
+const deletionApproved = (name = 'ZT') =>
+  `<?xml version="1.0" encoding="UTF-8"?><del:checkResponse xmlns:del="http://www.sap.com/adt/deletion">` +
+  `<del:object xmlns:adtcore="http://www.sap.com/adt/core" del:externalStrongReferences="0" ` +
+  `del:externalWeakReferences="0" del:isDeletable="true" adtcore:name="${name}" adtcore:type="MSAG/N">` +
+  `<del:message del:priority="0" del:type="S"><del:text/></del:message>` +
+  `</del:object></del:checkResponse>`;
+
 // ---------- tests ----------
 
 describe('AdtMessageClass', () => {
@@ -81,7 +95,13 @@ describe('AdtMessageClass', () => {
 
   it('delete emits <del:transportNumber> with the transportRequest', async () => {
     const { conn: c, calls } = recorder(
-      async () => ({ data: '', status: 200, headers: {} }) as IAdtResponse,
+      async (rec) =>
+        ({
+          data:
+            rec.url === '/sap/bc/adt/deletion/check' ? deletionApproved() : '',
+          status: 200,
+          headers: {},
+        }) as IAdtResponse,
     );
     await new AdtMessageClass(c, noopLogger).delete({
       name: 'ZT',
@@ -265,7 +285,13 @@ describe('AdtMessageClass', () => {
 
   it('delete: stateless deletion service (check → delete), no lock/DELETE', async () => {
     const { conn: c, calls } = recorder(
-      async () => ({ data: '', status: 200, headers: {} }) as IAdtResponse,
+      async (rec) =>
+        ({
+          data:
+            rec.url === '/sap/bc/adt/deletion/check' ? deletionApproved() : '',
+          status: 200,
+          headers: {},
+        }) as IAdtResponse,
     );
 
     const mc = new AdtMessageClass(c, noopLogger);

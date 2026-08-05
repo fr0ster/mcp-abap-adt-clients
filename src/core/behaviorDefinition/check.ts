@@ -1,3 +1,4 @@
+import type { CheckRunVersion } from '../../utils/checkRun';
 /**
  * Behavior Definition check operations
  */
@@ -38,7 +39,7 @@ export async function check(
   name: string,
   reporter: CheckReporter,
   _sessionId: string,
-  version: string = 'inactive',
+  version: CheckRunVersion = 'inactive',
   sourceCode?: string,
 ): Promise<IAdtResponse> {
   let xmlBody: string;
@@ -104,7 +105,7 @@ export async function checkImplementation(
   connection: IAbapConnection,
   name: string,
   sessionId: string,
-  version: string = 'inactive',
+  version: CheckRunVersion = 'inactive',
   sourceCode?: string,
 ): Promise<IAdtResponse> {
   return check(
@@ -142,7 +143,7 @@ export async function checkAbap(
   connection: IAbapConnection,
   name: string,
   sessionId: string,
-  version: string = 'inactive',
+  version: CheckRunVersion = 'inactive',
   sourceCode?: string,
 ): Promise<IAdtResponse> {
   return check(

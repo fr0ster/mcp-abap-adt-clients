@@ -10,6 +10,9 @@ import type {
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
+import { waitForCleanCheckRun } from '../../utils/checkRun';
+import { beginCriticalSection } from '../../utils/criticalSection';
+import { assertDeletable } from '../../utils/deletionCheck';
 import { safeErrorMessage } from '../../utils/internalUtils';
 import {
   createLockTracker,
@@ -102,6 +105,10 @@ export class AdtAppendStructure
     const state: IAppendStructureState = { errors: [] };
     if (!config.appendStructureName)
       throw new Error('Append structure name is required');
+    // Captured before the critical-section closure: narrowing does not survive
+    // into an arrow function, and threading `config.appendStructureName!`
+    // through every call would hide the guard rather than honour it.
+    const structureName = config.appendStructureName;
     if (!config.baseObject) throw new Error('Base object is required');
     if (!config.packageName) throw new Error('Package name is required');
     if (!config.description) throw new Error('Description is required');
@@ -201,6 +208,11 @@ export class AdtAppendStructure
     }
 
     let lockHandle: string | undefined;
+    // Everything from LOCK to UNLOCK runs inside a critical section, so the
+    // caller's ordinary 45s timeout cannot abort the window half-done. Without
+    // it the handler released the lock and rethrew — correct as far as it went,
+    // but the object was left as create() made it, an empty shell.
+    const endCriticalSection = beginCriticalSection(this.connection);
     try {
       this.connection.setSessionType('stateful');
       lockHandle = await lockAppendStructure(
@@ -211,12 +223,12 @@ export class AdtAppendStructure
 
       const codeToCheck = options?.sourceCode || config.sourceCode;
       if (codeToCheck) {
-        await checkAppendStructure(
-          this.connection,
-          config.appendStructureName,
-          'inactive',
-          codeToCheck,
-        );
+        // No check is run here on the caller's behalf. Verifying the source
+        // about to be written is the CONSUMER's decision: only they know
+        // whether the object is new or merely inactive, and only they can say
+        // what a finding should mean for their flow. `check()` and
+        // `waitForCleanCheckRun()` are available for that; the handler no
+        // longer inserts an opinion between the caller and the write.
         await updateAppendStructure(
           this.connection,
           {
@@ -230,7 +242,9 @@ export class AdtAppendStructure
           await this.read(
             { appendStructureName: config.appendStructureName },
             'active',
-            { withLongPolling: true },
+            {
+              withLongPolling: true,
+            },
           );
         } catch (readError) {
           this.logger?.warn?.(
@@ -255,12 +269,6 @@ export class AdtAppendStructure
         lockHandle = undefined;
       }
 
-      await checkAppendStructure(
-        this.connection,
-        config.appendStructureName,
-        'inactive',
-      );
-
       if (options?.activateOnUpdate) {
         const activateResult = await activateAppendStructure(
           this.connection,
@@ -270,7 +278,9 @@ export class AdtAppendStructure
           await this.read(
             { appendStructureName: config.appendStructureName },
             'active',
-            { withLongPolling: true },
+            {
+              withLongPolling: true,
+            },
           );
         } catch (readError) {
           this.logger?.warn?.(
@@ -322,6 +332,8 @@ export class AdtAppendStructure
       }
       this.logger?.error('Update failed:', safeErrorMessage(error));
       throw error;
+    } finally {
+      endCriticalSection();
     }
   }
 
@@ -331,10 +343,15 @@ export class AdtAppendStructure
     if (!config.appendStructureName)
       throw new Error('Append structure name is required');
     try {
-      await checkDeletion(this.connection, {
+      const deletionCheck = await checkDeletion(this.connection, {
         append_structure_name: config.appendStructureName,
         transport_request: config.transportRequest,
       });
+      // ADT already said whether this may be deleted; refusing to read that
+      // answer is how a delete came to report success while the object
+      // stayed. Throws on isDeletable=false or a message of type E; a W
+      // is a warning and passes.
+      assertDeletable(deletionCheck.data);
       const deleteResult = await deleteAppendStructure(this.connection, {
         append_structure_name: config.appendStructureName,
         transport_request: config.transportRequest,

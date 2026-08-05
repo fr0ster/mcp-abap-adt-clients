@@ -1,3 +1,5 @@
+import { beginCriticalSection } from '../../utils/criticalSection';
+import { assertDeletable } from '../../utils/deletionCheck';
 /**
  * AdtDomain - High-level CRUD operations for Domain objects
  *
@@ -330,6 +332,10 @@ export class AdtDomain
       errors: [],
     };
 
+    // LOCK…UNLOCK as one uninterruptible window: a 45s timeout in the
+    // middle used to release the lock and rethrow, leaving the object in
+    // whatever state create() left it.
+    const endCriticalSection = beginCriticalSection(this.connection);
     try {
       // 1. Lock (update always starts with lock, stateful ONLY before lock)
       this.logger?.info?.('lock');
@@ -343,14 +349,14 @@ export class AdtDomain
       const xmlToCheck = options?.xmlContent;
       if (xmlToCheck) {
         this.logger?.info?.('check(inactive)');
-        const checkResponse = await checkDomainSyntax(
+        const deletionCheck = await checkDomainSyntax(
           this.connection,
           config.domainName,
           'inactive',
           xmlToCheck,
           this.logger,
         );
-        state.checkResult = checkResponse;
+        state.checkResult = deletionCheck;
         this.logger?.info?.('checked(inactive)');
       }
 
@@ -503,6 +509,8 @@ export class AdtDomain
 
       this.logger?.error('Update failed:', safeErrorMessage(error));
       throw error;
+    } finally {
+      endCriticalSection();
     }
   }
 
@@ -521,11 +529,16 @@ export class AdtDomain
     try {
       // Check for deletion (no stateful needed)
       this.logger?.info?.('Checking domain for deletion');
-      const checkResponse = await checkDeletion(this.connection, {
+      const deletionCheck = await checkDeletion(this.connection, {
         domain_name: config.domainName,
         transport_request: config.transportRequest,
       });
-      state.checkResult = checkResponse;
+      // ADT already said whether this may be deleted; refusing to read that
+      // answer is how a delete came to report success while the object
+      // stayed. Throws on isDeletable=false or a message of type E; a W
+      // is a warning and passes.
+      assertDeletable(deletionCheck.data);
+      state.checkResult = deletionCheck;
       this.logger?.info?.('Deletion check passed');
 
       // Delete (no stateful needed - no lock/unlock)
@@ -588,14 +601,14 @@ export class AdtDomain
     // Map status to version
     const version: 'active' | 'inactive' =
       status === 'active' ? 'active' : 'inactive';
-    const checkResponse = await checkDomainSyntax(
+    const deletionCheck = await checkDomainSyntax(
       this.connection,
       config.domainName,
       version,
       undefined,
       this.logger,
     );
-    state.checkResult = checkResponse;
+    state.checkResult = deletionCheck;
     return state;
   }
 

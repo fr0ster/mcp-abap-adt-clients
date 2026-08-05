@@ -299,6 +299,30 @@ describe('Admin: Teardown shared dependencies', () => {
         results.push({ type: 'tables', name: item.name, status });
       }
 
+      // 3b. Structures — after tables, since a table may include one.
+      const structures = sharedConfig.structures || [];
+      for (const item of structures) {
+        if (shouldSkip(item, 'structure')) {
+          results.push({
+            type: 'structures',
+            name: item.name,
+            status: 'skipped',
+          });
+          continue;
+        }
+        const status = await safeDelete(
+          `structure ${item.name}`,
+          async () => {
+            await client.getStructure().delete({
+              structureName: item.name,
+              transportRequest,
+            });
+          },
+          testsLogger,
+        );
+        results.push({ type: 'structures', name: item.name, status });
+      }
+
       // 4. Function groups
       const functionGroups = sharedConfig.function_groups || [];
       for (const item of functionGroups) {

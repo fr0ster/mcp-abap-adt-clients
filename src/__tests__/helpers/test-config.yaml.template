@@ -104,6 +104,17 @@ shared_dependencies:
   software_component: ""                     # e.g., HOME (leave empty for cloud)
   transport_layer: ""                        # e.g., ZE19 (leave empty for cloud)
 
+  structures:
+    - name: "ZAC_SHR_APPSTRU"
+      description: "Extensible structure — append-structure base"
+      source: |
+        @EndUserText.label: 'Extensible structure for AppendStructure tests'
+        @AbapCatalog.enhancement.category: #EXTENSIBLE_CHARACTER_NUMERIC
+        define structure ZAC_SHR_APPSTRU {
+          mandt  : abap.clnt;
+          field1 : abap.char(10);
+        }
+
   tables:
     - name: "ZAC_SHR_VTABL"
       description: "Shared table for View and CDS Unit Test"
@@ -149,6 +160,20 @@ shared_dependencies:
         @AbapCatalog.deliveryClass : #A
         @AbapCatalog.dataMaintenance : #RESTRICTED
         define table zac_shr_itabl {
+          key client : abap.clnt not null;
+          key fld1   : abap.char(10) not null;
+          fld2       : abap.char(50);
+        }
+
+    - name: "ZAC_SHR_APPTABL"
+      description: "Extensible table — append-structure base"
+      source: |
+        @EndUserText.label : 'Extensible table for AppendStructure tests'
+        @AbapCatalog.enhancement.category : #EXTENSIBLE_CHARACTER_NUMERIC
+        @AbapCatalog.tableCategory : #TRANSPARENT
+        @AbapCatalog.deliveryClass : #A
+        @AbapCatalog.dataMaintenance : #RESTRICTED
+        define table zac_shr_apptabl {
           key client : abap.clnt not null;
           key fld1   : abap.char(10) not null;
           fld2       : abap.char(50);
@@ -825,6 +850,30 @@ create_domain:
         lowercase: false
         sign_exists: false
 
+    - name: "lock_registry_domain"
+      enabled: true
+      description: "Domain owned by SessionLockRegistry — MUST NOT share a name with adt_domain"
+      params:
+        domain_name: "ZAC_LOCKREG_DOM"
+        description: "SessionLockRegistry lock target"
+        datatype: "CHAR"
+        length: 5
+        decimals: 0
+        lowercase: false
+        sign_exists: false
+
+    - name: "domain_lock_registry"
+      enabled: true
+      description: "Domain owned by DomainLockRegistry — one owner per object, never shared"
+      params:
+        domain_name: "ZAC_DOMLOCK_DOM"
+        description: "DomainLockRegistry lock target"
+        datatype: "CHAR"
+        length: 5
+        decimals: 0
+        lowercase: false
+        sign_exists: false
+
 # Create Data Element
 create_data_element:
   test_cases:
@@ -851,6 +900,21 @@ create_data_element:
         medium_label: "Adt Data"
         long_label: "Adt Data Element"
         heading_label: "Adt Data Element"
+
+    - name: "lock_registry_data_element"
+      enabled: true
+      description: "Data element owned by SessionLockRegistry — MUST NOT share a name with adt_data_element"
+      params:
+        data_element_name: "ZAC_LOCKREG_DTEL"
+        description: "SessionLockRegistry lock target"
+        type_kind: "predefinedAbapType"
+        data_type: "CHAR"
+        length: 10
+        decimals: 0
+        short_label: "LockReg"
+        medium_label: "LockReg Elem"
+        long_label: "LockRegistry Element"
+        heading_label: "LockRegistry Element"
 
 # Create Authorization Field
 # Authorization fields (SUSO/AUTH, endpoint /sap/bc/adt/aps/iam/auth/{name}) are
@@ -1118,10 +1182,30 @@ create_append_structure:
       description: "Append structure reserved for AdtAppendStructure tests"
       params:
         append_structure_name: "ZADT_S_APPEND"  # ← CHANGE if needed (suffixed _S/_T per variant)
-        base_structure: "ZADT_BASE_STRU"        # ← CHANGE: existing DDIC structure to extend
-        base_table: "ZADT_BASE_TABLE"           # ← CHANGE: existing transparent table to extend
+        # Managed shared objects, created by `npm run shared:setup`. They exist for
+        # this test and declare #EXTENSIBLE_CHARACTER_NUMERIC — an ordinary DDIC
+        # object is #NOT_EXTENSIBLE by default and SAP refuses the append with
+        # "The extension of ... is not permitted".
+        base_structure: "ZAC_SHR_APPSTRU"
+        base_table: "ZAC_SHR_APPTABL"
         description: "AdtAppendStructure integration test"
-        # package_name: "ZAC_PKG01"  # Uses environment.default_package if omitted
+        # ABAP source used to fill the append. Kept HERE, not in the test file:
+        # the field name and its type are subject to DDIC rules — only zz_* may be
+        # added, and the type must match the base's #EXTENSIBLE_* category — so it
+        # is configuration, not a detail to bury in TypeScript.
+        # {base} and {append} are substituted per variant (structure / table base).
+        source_code: |
+          @EndUserText.label : 'ADT integration test append structure'
+          @AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
+          extend type {base} with {append} {
+
+            zz_test : abap.char(10) not null;
+
+          }
+        # The append itself is a per-run artifact and belongs in the ordinary test
+        # package. Only its BASES are shared objects; putting the append in
+        # ZAC_SHR_PKG would leave test litter in the package meant to persist.
+        # package_name omitted → environment.default_package
         # transport_request: ""  # Uses environment.default_transport if omitted
 
 # Create Access Control

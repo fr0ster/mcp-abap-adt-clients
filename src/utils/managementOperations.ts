@@ -1,3 +1,4 @@
+import type { CheckRunVersion } from './checkRun';
 /**
  * Core management operations - private implementations
  * All activation and check methods are implemented here once and reused by clients
@@ -166,7 +167,7 @@ export async function checkObject(
   connection: IAbapConnection,
   name: string,
   type: string,
-  version?: string,
+  version?: CheckRunVersion,
 ): Promise<IAdtResponse> {
   const { runCheckRun } = await import('../utils/checkRun');
   return runCheckRun(

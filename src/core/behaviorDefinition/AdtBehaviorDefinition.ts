@@ -1,3 +1,6 @@
+import type { CheckRunVersion } from '../../utils/checkRun';
+import { beginCriticalSection } from '../../utils/criticalSection';
+import { assertDeletable } from '../../utils/deletionCheck';
 /**
  * AdtBehaviorDefinition - High-level CRUD operations for Behavior Definition objects
  *
@@ -372,6 +375,10 @@ export class AdtBehaviorDefinition
 
     let lockHandle: string | undefined;
 
+    // LOCK…UNLOCK as one uninterruptible window: a 45s timeout in the
+    // middle used to release the lock and rethrow, leaving the object in
+    // whatever state create() left it.
+    const endCriticalSection = beginCriticalSection(this.connection);
     try {
       // 1. Lock (update always starts with lock, stateful ONLY before lock)
       this.logger?.info?.('Step 1: Locking behavior definition');
@@ -536,6 +543,8 @@ export class AdtBehaviorDefinition
 
       this.logger?.error('Update failed:', safeErrorMessage(error));
       throw error;
+    } finally {
+      endCriticalSection();
     }
   }
 
@@ -555,7 +564,12 @@ export class AdtBehaviorDefinition
     try {
       // Check for deletion (no stateful needed)
       this.logger?.info?.('Checking behavior definition for deletion');
-      await checkDeletion(this.connection, config.name);
+      const deletionCheck = await checkDeletion(this.connection, config.name);
+      // ADT already said whether this may be deleted; refusing to read that
+      // answer is how a delete came to report success while the object
+      // stayed. Throws on isDeletable=false or a message of type E; a W
+      // is a warning and passes.
+      assertDeletable(deletionCheck.data);
       this.logger?.info?.('Deletion check passed');
 
       // Delete (no stateful needed - no lock/unlock)
@@ -627,7 +641,8 @@ export class AdtBehaviorDefinition
 
     try {
       // Map status to version
-      const version: string = status === 'active' ? 'active' : 'inactive';
+      const version: CheckRunVersion =
+        status === 'active' ? 'active' : 'inactive';
       const response = await checkBehaviorDefinition(
         this.connection,
         config.name,

@@ -1,3 +1,5 @@
+import { beginCriticalSection } from '../../utils/criticalSection';
+import { assertDeletable } from '../../utils/deletionCheck';
 /**
  * AdtProgram - High-level CRUD operations for Program objects
  *
@@ -309,6 +311,10 @@ export class AdtProgram
       errors: [],
     };
 
+    // LOCK…UNLOCK as one uninterruptible window: a 45s timeout in the
+    // middle used to release the lock and rethrow, leaving the object in
+    // whatever state create() left it.
+    const endCriticalSection = beginCriticalSection(this.connection);
     try {
       // 1. Lock (update always starts with lock, stateful only for lock)
       this.logger?.info?.('Step 1: Locking program');
@@ -324,14 +330,14 @@ export class AdtProgram
         this.logger?.info?.(
           'Step 2: Checking inactive version with update content',
         );
-        const checkResponse = await checkProgram(
+        const deletionCheck = await checkProgram(
           this.connection,
           config.programName,
           'inactive',
           codeToCheck,
           this.contentTypes?.sourceArtifactContentType(),
         );
-        state.checkResult = checkResponse;
+        state.checkResult = deletionCheck;
         this.logger?.info?.('Check inactive with update content passed');
       }
 
@@ -466,6 +472,8 @@ export class AdtProgram
 
       this.logger?.error('Update failed:', safeErrorMessage(error));
       throw error;
+    } finally {
+      endCriticalSection();
     }
   }
 
@@ -484,11 +492,16 @@ export class AdtProgram
     try {
       // Check for deletion (no stateful needed)
       this.logger?.info?.('Checking program for deletion');
-      const checkResponse = await checkDeletion(this.connection, {
+      const deletionCheck = await checkDeletion(this.connection, {
         programName: config.programName,
         transportRequest: config.transportRequest,
       });
-      state.checkResult = checkResponse;
+      // ADT already said whether this may be deleted; refusing to read that
+      // answer is how a delete came to report success while the object
+      // stayed. Throws on isDeletable=false or a message of type E; a W
+      // is a warning and passes.
+      assertDeletable(deletionCheck.data);
+      state.checkResult = deletionCheck;
       this.logger?.info?.('Deletion check passed');
 
       // Delete (requires stateful, but no lock)
@@ -568,14 +581,14 @@ export class AdtProgram
       // Map status to version
       const version: 'active' | 'inactive' =
         status === 'active' ? 'active' : 'inactive';
-      const checkResponse = await checkProgram(
+      const deletionCheck = await checkProgram(
         this.connection,
         config.programName,
         version,
         config.sourceCode,
         this.contentTypes?.sourceArtifactContentType(),
       );
-      state.checkResult = checkResponse;
+      state.checkResult = deletionCheck;
       return state;
     } catch (error: unknown) {
       this.logger?.error('Check failed:', safeErrorMessage(error));

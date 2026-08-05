@@ -7,7 +7,11 @@ import type {
   IAdtResponse,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
-import { parseCheckRunResponse, runCheckRun } from '../../utils/checkRun';
+import {
+  type CheckRunVersion,
+  parseCheckRunResponse,
+  runCheckRun,
+} from '../../utils/checkRun';
 
 /**
  * Check structure syntax
@@ -17,7 +21,7 @@ import { parseCheckRunResponse, runCheckRun } from '../../utils/checkRun';
 export async function checkStructure(
   connection: IAbapConnection,
   structureName: string,
-  version: string = 'active',
+  version: CheckRunVersion = 'active',
   sourceCode?: string,
   logger?: ILogger,
 ): Promise<IAdtResponse> {

@@ -7,7 +7,10 @@ import {
   ACCEPT_CHECK_MESSAGES,
   CT_CHECK_OBJECTS,
 } from '../../constants/contentTypes';
-import { parseCheckRunResponse } from '../../utils/checkRun';
+import {
+  type CheckRunVersion,
+  parseCheckRunResponse,
+} from '../../utils/checkRun';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { IAdtContentTypes } from '../shared/contentTypes';
@@ -18,7 +21,7 @@ import type { IAdtContentTypes } from '../shared/contentTypes';
 function buildCheckRunXml(
   functionGroupName: string,
   functionModuleName: string,
-  version: string,
+  version: CheckRunVersion,
   sourceCode?: string,
   sourceContentType?: string,
 ): string {

@@ -7,7 +7,11 @@ import type {
   IAdtResponse,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
-import { parseCheckRunResponse, runCheckRun } from '../../utils/checkRun';
+import {
+  type CheckRunVersion,
+  parseCheckRunResponse,
+  runCheckRun,
+} from '../../utils/checkRun';
 
 /**
  * Check view (DDLS) syntax
@@ -32,7 +36,7 @@ function delay(ms: number): Promise<void> {
 export async function checkDdl(
   connection: IAbapConnection,
   ddlName: string,
-  version: string = 'active',
+  version: CheckRunVersion = 'active',
   sourceCode?: string,
   logger?: ILogger,
 ): Promise<IAdtResponse> {

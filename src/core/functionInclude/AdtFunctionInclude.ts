@@ -1,3 +1,5 @@
+import { beginCriticalSection } from '../../utils/criticalSection';
+import { assertDeletable } from '../../utils/deletionCheck';
 /**
  * AdtFunctionInclude - High-level CRUD operations for Function Include (FUGR/I).
  *
@@ -199,6 +201,10 @@ export class AdtFunctionInclude
     let lockHandle: string | undefined;
     const state: IFunctionIncludeState = { errors: [] };
 
+    // LOCK…UNLOCK as one uninterruptible window: a 45s timeout in the
+    // middle used to release the lock and rethrow, leaving the object in
+    // whatever state create() left it.
+    const endCriticalSection = beginCriticalSection(this.connection);
     try {
       // 0. Validate parent group existence
       this.logger?.info?.('Validating parent function group');
@@ -315,6 +321,8 @@ export class AdtFunctionInclude
 
       this.logger?.error('Create failed:', safeErrorMessage(error));
       throw error;
+    } finally {
+      endCriticalSection();
     }
   }
 
@@ -537,7 +545,7 @@ export class AdtFunctionInclude
         this.logger?.info?.(
           'Step 2: Checking inactive version with update content',
         );
-        const checkResponse = await checkFunctionInclude(
+        const deletionCheck = await checkFunctionInclude(
           this.connection,
           fullConfig.functionGroupName,
           fullConfig.includeName,
@@ -545,7 +553,7 @@ export class AdtFunctionInclude
           codeToCheck,
           this.sourceArtifactContentType(),
         );
-        state.checkResult = checkResponse;
+        state.checkResult = deletionCheck;
         this.logger?.info?.('Check inactive with update content passed');
       }
 
@@ -721,11 +729,16 @@ export class AdtFunctionInclude
 
     try {
       this.logger?.info?.('Checking function include for deletion');
-      const checkResponse = await checkDeletion(
+      const deletionCheck = await checkDeletion(
         this.connection,
         this.buildDeleteParams(config),
       );
-      state.checkResult = checkResponse;
+      // ADT already said whether this may be deleted; refusing to read that
+      // answer is how a delete came to report success while the object
+      // stayed. Throws on isDeletable=false or a message of type E; a W
+      // is a warning and passes.
+      assertDeletable(deletionCheck.data);
+      state.checkResult = deletionCheck;
       this.logger?.info?.('Deletion check passed');
 
       this.logger?.info?.('Deleting function include');
@@ -787,7 +800,7 @@ export class AdtFunctionInclude
 
     const version: 'active' | 'inactive' =
       status === 'active' ? 'active' : 'inactive';
-    const checkResponse = await checkFunctionInclude(
+    const deletionCheck = await checkFunctionInclude(
       this.connection,
       config.functionGroupName,
       config.includeName,
@@ -795,7 +808,7 @@ export class AdtFunctionInclude
       config.sourceCode,
       this.sourceArtifactContentType(),
     );
-    return { checkResult: checkResponse, errors: [] };
+    return { checkResult: deletionCheck, errors: [] };
   }
 
   /**
