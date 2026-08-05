@@ -397,10 +397,12 @@ export class AdtClass implements IAdtSourceObject<IClassConfig, IClassState> {
       errors: [],
     };
 
-    // LOCK…UNLOCK as one uninterruptible window: a 45s timeout in the
-    // middle used to release the lock and rethrow, leaving the object in
-    // whatever state create() left it.
+    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
+
+    // the lock but leaves the work half-done.
+
     const endCriticalSection = beginCriticalSection(this.connection);
+
     try {
       // 1. Lock — stay stateful for the whole lock→check→update→unlock chain.
       // On older BASIS (#106) the lock handle is only valid inside stateful
@@ -851,9 +853,12 @@ export class AdtClass implements IAdtSourceObject<IClassConfig, IClassState> {
 
     let lockHandle: string | undefined;
 
-    // LOCK…UNLOCK as one uninterruptible window: a timeout in the middle
-    // releases the lock but leaves the work half-done.
+    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
+
+    // the lock but leaves the work half-done.
+
     const endCriticalSection = beginCriticalSection(this.connection);
+
     try {
       // 1. Lock parent class (stateful only for lock)
       // Lock handle from parent class is sufficient for updating testclasses include

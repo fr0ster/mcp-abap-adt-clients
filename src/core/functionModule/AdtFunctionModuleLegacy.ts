@@ -29,9 +29,12 @@ export class AdtFunctionModuleLegacy extends AdtFunctionModule {
     const state: IFunctionModuleState = { errors: [] };
     let lockHandle: string | undefined;
 
-    // LOCK…UNLOCK as one uninterruptible window: a timeout in the middle
-    // releases the lock but leaves the work half-done.
+    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
+
+    // the lock but leaves the work half-done.
+
     const endCriticalSection = beginCriticalSection(this.connection);
+
     try {
       this.logger?.info?.('Locking function module for deletion');
       this.connection.setSessionType('stateful');
@@ -78,6 +81,7 @@ export class AdtFunctionModuleLegacy extends AdtFunctionModule {
       throw error;
     } finally {
       this.connection.setSessionType('stateless');
+
       endCriticalSection();
     }
   }

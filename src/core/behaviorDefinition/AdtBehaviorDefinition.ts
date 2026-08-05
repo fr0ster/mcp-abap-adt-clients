@@ -375,10 +375,12 @@ export class AdtBehaviorDefinition
 
     let lockHandle: string | undefined;
 
-    // LOCK…UNLOCK as one uninterruptible window: a 45s timeout in the
-    // middle used to release the lock and rethrow, leaving the object in
-    // whatever state create() left it.
+    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
+
+    // the lock but leaves the work half-done.
+
     const endCriticalSection = beginCriticalSection(this.connection);
+
     try {
       // 1. Lock (update always starts with lock, stateful ONLY before lock)
       this.logger?.info?.('Step 1: Locking behavior definition');
@@ -639,9 +641,6 @@ export class AdtBehaviorDefinition
       throw error;
     }
 
-    // LOCK…UNLOCK as one uninterruptible window: a timeout in the middle
-    // releases the lock but leaves the work half-done.
-    const endCriticalSection = beginCriticalSection(this.connection);
     try {
       // Map status to version
       const version: CheckRunVersion =
@@ -660,8 +659,6 @@ export class AdtBehaviorDefinition
       state.errors.push({ method: 'check', error: err, timestamp: new Date() });
       this.logger?.error('Check failed:', safeErrorMessage(err));
       throw err;
-    } finally {
-      endCriticalSection();
     }
   }
 

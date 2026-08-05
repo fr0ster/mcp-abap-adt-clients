@@ -26,9 +26,12 @@ export class AdtProgramLegacy extends AdtProgram {
     const state: IProgramState = { errors: [] };
     let lockHandle: string | undefined;
 
-    // LOCK…UNLOCK as one uninterruptible window: a timeout in the middle
-    // releases the lock but leaves the work half-done.
+    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
+
+    // the lock but leaves the work half-done.
+
     const endCriticalSection = beginCriticalSection(this.connection);
+
     try {
       this.logger?.info?.('Locking program for deletion');
       this.connection.setSessionType('stateful');
@@ -60,6 +63,7 @@ export class AdtProgramLegacy extends AdtProgram {
       throw error;
     } finally {
       this.connection.setSessionType('stateless');
+
       endCriticalSection();
     }
   }

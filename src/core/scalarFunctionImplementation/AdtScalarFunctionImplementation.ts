@@ -220,8 +220,8 @@ export class AdtScalarFunctionImplementation
     }
 
     let lockHandle: string | undefined;
-    // LOCK…UNLOCK as one uninterruptible window: a timeout in the middle
-    // releases the lock but leaves the work half-done.
+    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
+    // the lock but leaves the work half-done.
     const endCriticalSection = beginCriticalSection(this.connection);
     try {
       this.connection.setSessionType('stateful');
@@ -267,6 +267,7 @@ export class AdtScalarFunctionImplementation
       throw error;
     } finally {
       this.connection.setSessionType('stateless');
+
       endCriticalSection();
     }
   }
@@ -300,8 +301,8 @@ export class AdtScalarFunctionImplementation
     }
 
     let lockHandle: string | undefined;
-    // LOCK…UNLOCK as one uninterruptible window: a timeout in the middle
-    // releases the lock but leaves the work half-done.
+    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
+    // the lock but leaves the work half-done.
     const endCriticalSection = beginCriticalSection(this.connection);
     try {
       this.connection.setSessionType('stateful');
@@ -347,6 +348,7 @@ export class AdtScalarFunctionImplementation
       throw error;
     } finally {
       this.connection.setSessionType('stateless');
+
       endCriticalSection();
     }
   }
@@ -356,9 +358,6 @@ export class AdtScalarFunctionImplementation
   ): Promise<IScalarFunctionImplementationState> {
     if (!config.implementationName)
       throw new Error('Implementation name is required');
-    // LOCK…UNLOCK as one uninterruptible window: a timeout in the middle
-    // releases the lock but leaves the work half-done.
-    const endCriticalSection = beginCriticalSection(this.connection);
     try {
       const deletionCheck = await checkDeletion(this.connection, {
         implementation_name: config.implementationName,
@@ -380,8 +379,6 @@ export class AdtScalarFunctionImplementation
     } catch (error) {
       this.logger?.error('Delete failed:', safeErrorMessage(error));
       throw error;
-    } finally {
-      endCriticalSection();
     }
   }
 

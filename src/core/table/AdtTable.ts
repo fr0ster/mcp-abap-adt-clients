@@ -1,4 +1,5 @@
 import type { CheckRunVersion } from '../../utils/checkRun';
+import { beginCriticalSection } from '../../utils/criticalSection';
 import { assertDeletable } from '../../utils/deletionCheck';
 /**
  * AdtTable - High-level CRUD operations for Table objects
@@ -295,6 +296,12 @@ export class AdtTable implements IAdtSourceObject<ITableConfig, ITableState> {
 
     let lockHandle: string | undefined;
 
+    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
+
+    // the lock but leaves the work half-done.
+
+    const endCriticalSection = beginCriticalSection(this.connection);
+
     try {
       // 1. Lock (update always starts with lock, stateful ONLY before lock)
       this.logger?.info?.('Step 1: Locking table');
@@ -463,6 +470,8 @@ export class AdtTable implements IAdtSourceObject<ITableConfig, ITableState> {
 
       this.logger?.error('Update failed:', safeErrorMessage(error));
       throw error;
+    } finally {
+      endCriticalSection();
     }
   }
 

@@ -1,3 +1,4 @@
+import { beginCriticalSection } from '../../utils/criticalSection';
 import { assertDeletable } from '../../utils/deletionCheck';
 /**
  * AdtInterface - High-level CRUD operations for Interface objects
@@ -284,6 +285,12 @@ export class AdtInterface
       errors: [],
     };
 
+    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
+
+    // the lock but leaves the work half-done.
+
+    const endCriticalSection = beginCriticalSection(this.connection);
+
     try {
       // 1. Lock (update always starts with lock, stateful only for lock)
       this.logger?.info?.('Step 1: Locking interface');
@@ -459,6 +466,8 @@ export class AdtInterface
 
       this.logger?.error('Update failed:', safeErrorMessage(error));
       throw error;
+    } finally {
+      endCriticalSection();
     }
   }
 

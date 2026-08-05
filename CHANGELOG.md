@@ -15,9 +15,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   }
   ```
 
-  Applied to **all 49 lock windows**. The first attempt covered 20 — one per file — and skipped six handlers on the reasoning that their lock chain "already ends in a `finally`". That was wrong twice over: a `finally` restoring stateless has nothing to do with a critical section, and files with more than one lock window had only the first protected. `AdtScalarFunctionImplementation`, `AdtTable`, `AdtInterface` and `AdtDdicTableType` were among those left exposed to the exact failure this change exists to prevent.
+  Applied to **38 lock windows** — every `try` that actually acquires a lock, and nothing else. Two earlier attempts got this wrong in opposite directions and are worth recording, because the mistake was the same both times: trusting a script's output instead of checking what it had done.
 
-  The disposer runs **last** in every `finally`, so cleanup that still needs the window — an unlock, say — is covered rather than orphaned by an early close. `beginCriticalSection` is deliberately **not** part of `IAbapConnection`: how a transport protects a window is its own concern, and an RFC or batch connection has no reason to offer one — so the helper asks the connection whether it can, and proceeds either way.
+  The first pass wrapped one window per file and skipped six handlers on the reasoning that their lock chain "already ends in a `finally`" — but a `finally` restoring stateless has nothing to do with a critical section. The second pass claimed "49 of 49" from a count of occurrences per file, and in fact had attached **24 of them to methods with no lock at all** — `activate`, `check`, `readTransport`, and a `delete` whose own comment says "No lock". Wrapping those raises the caller's timeout for ordinary stateless requests and, on a shared connection, extends the protection across concurrent work. Meanwhile `AdtTable`, `AdtInterface` and `AdtDdicTableType` had no protection at all, because they acquire locks through `acquireTableLockHandle`-style helpers that the pattern never matched.
+
+  The count is now verified by mapping each section back to its enclosing method: 38 in methods that lock, 0 elsewhere, and no lock-holding file left without one.
+
+  The disposer runs **last** in every `finally`, so cleanup that still needs the window — an unlock, say — is covered rather than orphaned by an early close.
+
 - **`delete()` reads the verdict ADT returns instead of discarding it.** Twenty-seven modules posted to `/sap/bc/adt/deletion/check`, ignored the answer, and sent the DELETE regardless. When SAP refused, the object survived, the call reported `errors: []`, and the caller was told the deletion had happened. Now 22 handlers assert on it: `isDeletable="false"` or a message of type `E` throws `DeletionNotPermittedError`, carrying the reference counts and SAP's own wording. A `W` is a warning and passes — blocking on one would invent a prohibition the server did not state.
 - **`AdtMessageClass` declared `withLongPolling` and dropped it.** `readMetadata` accepted the option and never passed it on; `read()` took no options at all. Now the contract's `(config, version, options)` shape, with the flag reaching the URL.
 

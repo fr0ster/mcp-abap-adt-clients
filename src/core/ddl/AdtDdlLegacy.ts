@@ -24,9 +24,12 @@ export class AdtDdlLegacy extends AdtDdl {
     const state: IDdlState = { errors: [] };
     let lockHandle: string | undefined;
 
-    // LOCK…UNLOCK as one uninterruptible window: a timeout in the middle
-    // releases the lock but leaves the work half-done.
+    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
+
+    // the lock but leaves the work half-done.
+
     const endCriticalSection = beginCriticalSection(this.connection);
+
     try {
       this.logger?.info?.('Locking view for deletion');
       this.connection.setSessionType('stateful');
@@ -58,6 +61,7 @@ export class AdtDdlLegacy extends AdtDdl {
       throw error;
     } finally {
       this.connection.setSessionType('stateless');
+
       endCriticalSection();
     }
   }

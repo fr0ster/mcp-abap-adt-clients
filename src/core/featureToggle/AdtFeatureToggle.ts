@@ -156,10 +156,12 @@ export class AdtFeatureToggle implements IFeatureToggleObject {
     const state: IFeatureToggleState = { errors: [] };
     const params = this.buildCreateParams(config);
 
-    // LOCK…UNLOCK as one uninterruptible window: a 45s timeout in the
-    // middle used to release the lock and rethrow, leaving the object in
-    // whatever state create() left it.
+    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
+
+    // the lock but leaves the work half-done.
+
     const endCriticalSection = beginCriticalSection(this.connection);
+
     try {
       this.logger?.info?.('Creating feature toggle');
       const createResponse = await createFeatureToggle(this.connection, params);
@@ -400,9 +402,12 @@ export class AdtFeatureToggle implements IFeatureToggleObject {
     let lockHandle: string | undefined;
     const state: IFeatureToggleState = { errors: [] };
 
-    // LOCK…UNLOCK as one uninterruptible window: a timeout in the middle
-    // releases the lock but leaves the work half-done.
+    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
+
+    // the lock but leaves the work half-done.
+
     const endCriticalSection = beginCriticalSection(this.connection);
+
     try {
       // 1. Lock
       this.logger?.info?.('Step 1: Locking feature toggle');
@@ -628,9 +633,6 @@ export class AdtFeatureToggle implements IFeatureToggleObject {
 
     const state: IFeatureToggleState = { errors: [] };
 
-    // LOCK…UNLOCK as one uninterruptible window: a timeout in the middle
-    // releases the lock but leaves the work half-done.
-    const endCriticalSection = beginCriticalSection(this.connection);
     try {
       const activateResponse = await activateFeatureToggle(
         this.connection,
@@ -641,8 +643,6 @@ export class AdtFeatureToggle implements IFeatureToggleObject {
     } catch (error: unknown) {
       this.logger?.error('Activate failed:', safeErrorMessage(error));
       throw error;
-    } finally {
-      endCriticalSection();
     }
   }
 

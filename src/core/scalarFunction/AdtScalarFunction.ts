@@ -201,9 +201,8 @@ export class AdtScalarFunction
     }
 
     let lockHandle: string | undefined;
-    // LOCK…UNLOCK as one uninterruptible window: a 45s timeout in the
-    // middle used to release the lock and rethrow, leaving the object as
-    // create() made it.
+    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
+    // the lock but leaves the work half-done.
     const endCriticalSection = beginCriticalSection(this.connection);
     try {
       this.connection.setSessionType('stateful');
@@ -336,9 +335,6 @@ export class AdtScalarFunction
   ): Promise<IScalarFunctionState> {
     if (!config.scalarFunctionName)
       throw new Error('Scalar function name is required');
-    // LOCK…UNLOCK as one uninterruptible window: a timeout in the middle
-    // releases the lock but leaves the work half-done.
-    const endCriticalSection = beginCriticalSection(this.connection);
     try {
       const deletionCheck = await checkDeletion(this.connection, {
         scalar_function_name: config.scalarFunctionName,
@@ -357,8 +353,6 @@ export class AdtScalarFunction
     } catch (error) {
       this.logger?.error('Delete failed:', safeErrorMessage(error));
       throw error;
-    } finally {
-      endCriticalSection();
     }
   }
 

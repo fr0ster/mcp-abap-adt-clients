@@ -208,10 +208,8 @@ export class AdtAppendStructure
     }
 
     let lockHandle: string | undefined;
-    // Everything from LOCK to UNLOCK runs inside a critical section, so the
-    // caller's ordinary 45s timeout cannot abort the window half-done. Without
-    // it the handler released the lock and rethrew — correct as far as it went,
-    // but the object was left as create() made it, an empty shell.
+    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
+    // the lock but leaves the work half-done.
     const endCriticalSection = beginCriticalSection(this.connection);
     try {
       this.connection.setSessionType('stateful');
@@ -342,9 +340,6 @@ export class AdtAppendStructure
   ): Promise<IAppendStructureState> {
     if (!config.appendStructureName)
       throw new Error('Append structure name is required');
-    // LOCK…UNLOCK as one uninterruptible window: a timeout in the middle
-    // releases the lock but leaves the work half-done.
-    const endCriticalSection = beginCriticalSection(this.connection);
     try {
       const deletionCheck = await checkDeletion(this.connection, {
         append_structure_name: config.appendStructureName,
@@ -363,8 +358,6 @@ export class AdtAppendStructure
     } catch (error) {
       this.logger?.error('Delete failed:', safeErrorMessage(error));
       throw error;
-    } finally {
-      endCriticalSection();
     }
   }
 

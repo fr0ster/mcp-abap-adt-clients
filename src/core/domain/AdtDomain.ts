@@ -332,10 +332,12 @@ export class AdtDomain
       errors: [],
     };
 
-    // LOCK…UNLOCK as one uninterruptible window: a 45s timeout in the
-    // middle used to release the lock and rethrow, leaving the object in
-    // whatever state create() left it.
+    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
+
+    // the lock but leaves the work half-done.
+
     const endCriticalSection = beginCriticalSection(this.connection);
+
     try {
       // 1. Lock (update always starts with lock, stateful ONLY before lock)
       this.logger?.info?.('lock');

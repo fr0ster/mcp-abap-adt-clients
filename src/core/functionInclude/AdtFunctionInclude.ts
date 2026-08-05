@@ -201,10 +201,12 @@ export class AdtFunctionInclude
     let lockHandle: string | undefined;
     const state: IFunctionIncludeState = { errors: [] };
 
-    // LOCK…UNLOCK as one uninterruptible window: a 45s timeout in the
-    // middle used to release the lock and rethrow, leaving the object in
-    // whatever state create() left it.
+    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
+
+    // the lock but leaves the work half-done.
+
     const endCriticalSection = beginCriticalSection(this.connection);
+
     try {
       // 0. Validate parent group existence
       this.logger?.info?.('Validating parent function group');
@@ -520,9 +522,12 @@ export class AdtFunctionInclude
     let lockHandle: string | undefined;
     const state: IFunctionIncludeState = { errors: [] };
 
-    // LOCK…UNLOCK as one uninterruptible window: a timeout in the middle
-    // releases the lock but leaves the work half-done.
+    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
+
+    // the lock but leaves the work half-done.
+
     const endCriticalSection = beginCriticalSection(this.connection);
+
     try {
       // 1. Lock
       this.logger?.info?.('Step 1: Locking function include');
@@ -775,9 +780,6 @@ export class AdtFunctionInclude
     }
 
     const state: IFunctionIncludeState = { errors: [] };
-    // LOCK…UNLOCK as one uninterruptible window: a timeout in the middle
-    // releases the lock but leaves the work half-done.
-    const endCriticalSection = beginCriticalSection(this.connection);
     try {
       const activateResponse = await activateFunctionInclude(
         this.connection,
@@ -789,8 +791,6 @@ export class AdtFunctionInclude
     } catch (error: unknown) {
       this.logger?.error('Activate failed:', safeErrorMessage(error));
       throw error;
-    } finally {
-      endCriticalSection();
     }
   }
 
