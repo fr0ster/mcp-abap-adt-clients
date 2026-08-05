@@ -10,6 +10,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 ### Fixed
 - **The scalar-function test exercises the definition instead of skipping past it.** `create_scalar_function` had no `source_code`, so the branch that updates and activates never ran: the test did `create → read → delete` and left an empty definition behind whenever the delete did not take. A scalar function **definition** activates without an AMDP class — that requirement belongs to the separate implementation object (DSFI), which has its own test — so there was nothing standing in the way.
 
+  The object name in the DDL is `{name}`, substituted from `scalar_function_name`, so renaming the object cannot leave the source declaring a different one — the config invites the rename, and a hardcoded name would create one object and try to fill another.
+
   The DDL is configured without a leading annotation, because the parser refuses one: `Unexpected token "@". Expected was "DEFINE"`. A definition starts with the statement itself.
 
   The full chain `create → update → activate → read active → delete` now runs, and the object is gone afterwards rather than left as a shell.

@@ -1146,11 +1146,14 @@ create_scalar_function:
         # activate. The AMDP method belongs to the separate DSFI object, which
         # has its own test case. Without this the test only ever did
         # create → read → delete and left the definition empty.
+        # {name} is substituted with scalar_function_name above, so renaming the
+        # object cannot leave the DDL declaring a different one.
+        #
         # No leading annotation: the parser answers
         # 'Unexpected token "@". Expected was "DEFINE"' — a scalar function
         # definition starts with the statement itself.
         source_code: |
-          define scalar function ZADT_SCALAR_FUNC
+          define scalar function {name}
             with parameters
               p_portion : abap.int4,
               p_total   : abap.int4
