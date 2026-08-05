@@ -1141,6 +1141,20 @@ create_scalar_function:
       params:
         scalar_function_name: "ZADT_SCALAR_FUNC"  # ← CHANGE if needed
         description: "AdtScalarFunction integration test"
+        # DDL of the scalar function DEFINITION — parameters and a return type.
+        # A definition is not an implementation: it needs no AMDP class to
+        # activate. The AMDP method belongs to the separate DSFI object, which
+        # has its own test case. Without this the test only ever did
+        # create → read → delete and left the definition empty.
+        # No leading annotation: the parser answers
+        # 'Unexpected token "@". Expected was "DEFINE"' — a scalar function
+        # definition starts with the statement itself.
+        source_code: |
+          define scalar function ZADT_SCALAR_FUNC
+            with parameters
+              p_portion : abap.int4,
+              p_total   : abap.int4
+            returns abap.decfloat34;
         # package_name: "ZAC_PKG01"  # Uses environment.default_package if omitted
         # transport_request: ""  # Uses environment.default_transport if omitted
         # source_code (OPTIONAL): when set, the suite runs the FULL update→activate
