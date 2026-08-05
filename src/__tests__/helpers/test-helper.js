@@ -2270,6 +2270,7 @@ async function ensureSharedDependency(client, type, name, logger) {
           await client.getDomain().update(
             {
               domainName: name,
+              packageName,
               description: depConfig.description || 'Shared test domain',
               datatype: depConfig.datatype || 'CHAR',
               length: depConfig.length || 10,
@@ -2281,6 +2282,7 @@ async function ensureSharedDependency(client, type, name, logger) {
           await client.getDataElement().update(
             {
               dataElementName: name,
+              packageName,
               description: depConfig.description || 'Shared test data element',
               typeKind: depConfig.type_kind || 'domain',
               typeName: depConfig.domain_name,
@@ -2291,8 +2293,12 @@ async function ensureSharedDependency(client, type, name, logger) {
         }
         logger?.info?.(`Shared ${type} ${name} reconciled to configuration`);
       } catch (reconcileErr) {
-        logger?.warn?.(
-          `Shared ${type} ${name} exists but could not be reconciled: ${reconcileErr.message}`,
+        // Rethrow: the lines below would otherwise cache this as verified and
+        // return { existed: true }, so setup would report success over a domain
+        // that is still an empty inactive shell — the exact false green this
+        // reconciliation exists to prevent.
+        throw new Error(
+          `Shared ${type} ${name} exists but could not be reconciled to configuration: ${reconcileErr.message}`,
         );
       }
     } else {
