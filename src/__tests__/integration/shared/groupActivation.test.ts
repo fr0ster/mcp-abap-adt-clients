@@ -277,6 +277,12 @@ describe('Group Activation (Shared)', () => {
       let currentStep = '';
 
       // Pre-cleanup: delete leftover objects from failed previous runs
+      // Shared objects are not this test's to remove.
+      const isSharedName = (label: string) =>
+        (label === 'data element' ? dataElementName : domainName)?.startsWith(
+          'ZAC_SHR_',
+        ) ?? false;
+
       for (const [label, deleteFn] of [
         [
           'structure',
@@ -301,6 +307,9 @@ describe('Group Activation (Shared)', () => {
         ],
       ] as const) {
         try {
+          if (label !== 'structure' && isSharedName(label)) {
+            continue;
+          }
           await deleteFn();
           testsLogger.info?.(`Pre-cleanup: deleted leftover ${label}`);
         } catch (error) {
@@ -320,6 +329,13 @@ describe('Group Activation (Shared)', () => {
           );
         }
       }
+
+      // Objects taken from shared_dependencies are created once by
+      // `npm run shared:setup` and owned by it. This test neither creates nor
+      // deletes them — it only builds the structure on top. Rebuilding the whole
+      // chain every run is what left a structure pointing at a data element a
+      // failed run had already removed.
+      const isShared = (name: string | null) => !!name?.startsWith('ZAC_SHR_');
 
       try {
         // Step 0: Validate domain
@@ -347,101 +363,114 @@ describe('Group Activation (Shared)', () => {
           testsLogger.warn?.(`⚠️ Domain validation warning: ${error.message}`);
         }
 
-        // Step 1: Create domain
+        // Step 1: Create domain — unless it is a shared object
         currentStep = 'create domain';
-        logTestStep(currentStep, testsLogger);
-        await client.getDomain().create(
-          {
-            domainName: domainName,
-            packageName: packageName,
-            description:
-              testCase.params.description || `Test domain for group activation`,
-            datatype: testCase.params.domain_datatype || 'CHAR',
-            length: testCase.params.domain_length || 10,
-            decimals: testCase.params.domain_decimals || 0,
-            transportRequest: transportRequest,
-          },
-          { activateOnCreate: false },
-        );
-        domainCreated = true;
-        await new Promise((resolve) =>
-          setTimeout(resolve, getOperationDelay('create', testCase)),
-        );
-
-        // Step 1.5: Validate data element
-        currentStep = 'validate data element';
-        logTestStep(currentStep, testsLogger);
-        try {
-          await client.getDataElement().validate({
-            dataElementName: dataElementName,
-            packageName: packageName,
-            description:
-              testCase.params.description ||
-              `Test data element for group activation`,
-          });
-        } catch (error: any) {
-          // If validation fails with "already exists", skip test
-          if (
-            error.message?.includes('already exists') ||
-            error.message?.includes('does already exist')
-          ) {
-            testsLogger.warn?.(
-              `⚠️ Data element ${dataElementName} already exists, skipping test`,
-            );
-            return;
-          }
-          // Otherwise, log warning but continue
-          testsLogger.warn?.(
-            `⚠️ Data element validation warning: ${error.message}`,
+        if (isShared(domainName)) {
+          testsLogger.info?.(
+            `Using shared domain ${domainName} — not creating`,
           );
+        } else {
+          logTestStep(currentStep, testsLogger);
+          await client.getDomain().create(
+            {
+              domainName: domainName,
+              packageName: packageName,
+              description:
+                testCase.params.description ||
+                `Test domain for group activation`,
+              datatype: testCase.params.domain_datatype || 'CHAR',
+              length: testCase.params.domain_length || 10,
+              decimals: testCase.params.domain_decimals || 0,
+              transportRequest: transportRequest,
+            },
+            { activateOnCreate: false },
+          );
+          domainCreated = true;
+          await new Promise((resolve) =>
+            setTimeout(resolve, getOperationDelay('create', testCase)),
+          );
+
+          // Step 1.5: Validate data element
+          currentStep = 'validate data element';
+          logTestStep(currentStep, testsLogger);
+          try {
+            await client.getDataElement().validate({
+              dataElementName: dataElementName,
+              packageName: packageName,
+              description:
+                testCase.params.description ||
+                `Test data element for group activation`,
+            });
+          } catch (error: any) {
+            // If validation fails with "already exists", skip test
+            if (
+              error.message?.includes('already exists') ||
+              error.message?.includes('does already exist')
+            ) {
+              testsLogger.warn?.(
+                `⚠️ Data element ${dataElementName} already exists, skipping test`,
+              );
+              return;
+            }
+            // Otherwise, log warning but continue
+            testsLogger.warn?.(
+              `⚠️ Data element validation warning: ${error.message}`,
+            );
+          }
         }
 
-        // Step 2: Create data element based on domain
+        // Step 2: Create data element — unless it is a shared object
         currentStep = 'create data element';
-        logTestStep(currentStep, testsLogger);
-        await client.getDataElement().create(
-          {
-            dataElementName: dataElementName,
-            packageName: packageName,
-            description:
-              testCase.params.description ||
-              `Test data element for group activation`,
-            typeKind: testCase.params.data_element_type_kind || 'domain',
-            typeName: domainName, // Reference to domain
-            transportRequest: transportRequest,
-          },
-          { activateOnCreate: false },
-        );
-        dataElementCreated = true;
-        await new Promise((resolve) =>
-          setTimeout(resolve, getOperationDelay('create', testCase)),
-        );
-
-        // Step 2.5: Validate structure
-        currentStep = 'validate structure';
-        logTestStep(currentStep, testsLogger);
-        try {
-          await client.getStructure().validate({
-            structureName: structureName,
-            description:
-              testCase.params.description ||
-              `Test structure for group activation`,
-          });
-        } catch (error: any) {
-          // If validation fails with "already exists", skip test
-          if (
-            error.message?.includes('already exists') ||
-            error.message?.includes('does already exist')
-          ) {
-            testsLogger.warn?.(
-              `⚠️ Structure ${structureName} already exists, skipping test`,
-            );
-            return;
-          }
-          // Otherwise, log warning but continue
-          testsLogger.warn?.(
-            `⚠️ Structure validation warning: ${error.message}`,
+        if (isShared(dataElementName)) {
+          testsLogger.info?.(
+            `Using shared data element ${dataElementName} — not creating`,
           );
+        } else {
+          logTestStep(currentStep, testsLogger);
+          await client.getDataElement().create(
+            {
+              dataElementName: dataElementName,
+              packageName: packageName,
+              description:
+                testCase.params.description ||
+                `Test data element for group activation`,
+              typeKind: testCase.params.data_element_type_kind || 'domain',
+              typeName: domainName, // Reference to domain
+              transportRequest: transportRequest,
+            },
+            { activateOnCreate: false },
+          );
+          dataElementCreated = true;
+          await new Promise((resolve) =>
+            setTimeout(resolve, getOperationDelay('create', testCase)),
+          );
+
+          // Step 2.5: Validate structure
+          currentStep = 'validate structure';
+          logTestStep(currentStep, testsLogger);
+          try {
+            await client.getStructure().validate({
+              structureName: structureName,
+              description:
+                testCase.params.description ||
+                `Test structure for group activation`,
+            });
+          } catch (error: any) {
+            // If validation fails with "already exists", skip test
+            if (
+              error.message?.includes('already exists') ||
+              error.message?.includes('does already exist')
+            ) {
+              testsLogger.warn?.(
+                `⚠️ Structure ${structureName} already exists, skipping test`,
+              );
+              return;
+            }
+            // Otherwise, log warning but continue
+            testsLogger.warn?.(
+              `⚠️ Structure validation warning: ${error.message}`,
+            );
+          }
         }
 
         // Step 3: Create structure based on data element

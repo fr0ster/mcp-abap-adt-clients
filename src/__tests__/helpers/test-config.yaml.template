@@ -104,6 +104,18 @@ shared_dependencies:
   software_component: ""                     # e.g., HOME (leave empty for cloud)
   transport_layer: ""                        # e.g., ZE19 (leave empty for cloud)
 
+  domains:
+    - name: "ZAC_SHR_GA_DOM"
+      description: "Shared domain — base of the group-activation chain"
+      datatype: "CHAR"
+      length: 10
+
+  data_elements:
+    - name: "ZAC_SHR_GA_DTEL"
+      description: "Shared data element — references ZAC_SHR_GA_DOM"
+      type_kind: "domain"
+      domain_name: "ZAC_SHR_GA_DOM"
+
   structures:
     - name: "ZAC_SHR_APPSTRU"
       description: "Extensible structure — append-structure base"
@@ -1646,9 +1658,18 @@ group_activation:
       available_in: ["onprem", "cloud"]
       description: "Group activation test - domain, data element, structure"
       params:
-        domain_name: "ZAC_DOM_GA01"
-        data_element_name: "ZAC_DTEL_GA01"
-        structure_name: "ZAC_STRU_GA01"
+        # The domain and the data element come from shared_dependencies: created
+        # once by `npm run shared:setup`, activated, and left alone. Only the
+        # structure is built and torn down per run.
+        #
+        # Building all three each time is what produced the wreckage this test
+        # kept tripping over — a structure referencing a data element that a
+        # failed run had already removed, which could then be neither created
+        # over (409) nor deleted cleanly. A two-link chain whose lower link is
+        # somebody else's responsibility cannot be left half-torn.
+        domain_name: "ZAC_SHR_GA_DOM"          # shared_dependencies.domains
+        data_element_name: "ZAC_SHR_GA_DTEL"   # shared_dependencies.data_elements
+        structure_name: "ZAC_STRU_GA01"        # created and deleted by this test
         description: "Group activation test objects"
         # package_name: "ZAC_PKG03"  # Uses environment.default_package if omitted
         # transport_request: ""  # Uses environment.default_transport if omitted
@@ -1661,7 +1682,7 @@ group_activation:
           @AbapCatalog.enhancement.category: #NOT_EXTENSIBLE
           define structure zac_stru_ga01 {
             mandt   : abap.clnt;
-            ga_field : zac_dtel_ga01;
+            ga_field : zac_shr_ga_dtel;
           }
 
 # ============================================================================

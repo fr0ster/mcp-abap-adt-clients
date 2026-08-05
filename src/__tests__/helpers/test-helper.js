@@ -2173,7 +2173,15 @@ async function ensureSharedDependency(client, type, name, logger) {
   // Check if the object already exists
   let exists = false;
   try {
-    if (type === 'structures') {
+    if (type === 'domains') {
+      const result = await client.getDomain().read({ domainName: name });
+      exists = result !== undefined;
+    } else if (type === 'data_elements') {
+      const result = await client
+        .getDataElement()
+        .read({ dataElementName: name });
+      exists = result !== undefined;
+    } else if (type === 'structures') {
       const result = await client.getStructure().read({ structureName: name });
       exists = result !== undefined;
     } else if (type === 'tables') {
@@ -2254,7 +2262,48 @@ async function ensureSharedDependency(client, type, name, logger) {
   // Create the object (high-level create does full chain: validate → create → lock → update → unlock → activate)
   logger?.info?.(`Creating shared ${type} ${name}...`);
   try {
-    if (type === 'structures') {
+    if (type === 'domains') {
+      await client.getDomain().create({
+        domainName: name,
+        packageName,
+        description: depConfig.description || 'Shared test domain',
+        datatype: depConfig.datatype || 'CHAR',
+        length: depConfig.length || 10,
+        transportRequest,
+      });
+      // A domain carries no source: create only makes the shell, update fills
+      // in the type, and without that step it stays an empty object with no
+      // data type at all.
+      await client.getDomain().update(
+        {
+          domainName: name,
+          description: depConfig.description || 'Shared test domain',
+          datatype: depConfig.datatype || 'CHAR',
+          length: depConfig.length || 10,
+          transportRequest,
+        },
+        { activateOnUpdate: true },
+      );
+    } else if (type === 'data_elements') {
+      await client.getDataElement().create({
+        dataElementName: name,
+        packageName,
+        description: depConfig.description || 'Shared test data element',
+        typeKind: depConfig.type_kind || 'domain',
+        typeName: depConfig.domain_name,
+        transportRequest,
+      });
+      await client.getDataElement().update(
+        {
+          dataElementName: name,
+          description: depConfig.description || 'Shared test data element',
+          typeKind: depConfig.type_kind || 'domain',
+          typeName: depConfig.domain_name,
+          transportRequest,
+        },
+        { activateOnUpdate: true },
+      );
+    } else if (type === 'structures') {
       await client.getStructure().create({
         structureName: name,
         packageName,
