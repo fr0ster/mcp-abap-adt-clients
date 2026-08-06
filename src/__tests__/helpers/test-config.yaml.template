@@ -111,6 +111,16 @@ shared_dependencies:
       length: 10
 
   structures:
+    - name: "ZAC_SHR_STRU"
+      description: "Shared structure used as a table type's row type"
+      source: |
+        @EndUserText.label: 'Shared structure for TableType row type'
+        @AbapCatalog.enhancement.category: #NOT_EXTENSIBLE
+        define structure ZAC_SHR_STRU {
+          mandt  : abap.clnt;
+          field1 : abap.int1;
+        }
+
     - name: "ZAC_SHR_APPSTRU"
       description: "Extensible structure — append-structure base"
       source: |
@@ -1032,7 +1042,7 @@ create_tabletype:
         # package_name: "ZAC_PKG01"
         # transport_request: ""
         # XML format parameters (for update - rowType added after create)
-        row_type_name: "ZAC_STRU01"  # Structure name (must exist)
+        row_type_name: "ZAC_SHR_STRU"  # shared_dependencies.structures — not another test's object
         row_type_kind: "dictionaryType"   # Type kind: dictionaryType, predefinedAbapType, etc.
         access_type: "standard"           # standard, sorted, hashed, index
         primary_key_definition: "standard"  # standard, rowType, keyComponents, empty
@@ -1093,7 +1103,7 @@ read_ddl_table_function:
       params:
         # Pre-existing AMDP table function on the target system (adt-clients
         # cannot create extend/AMDP-backed objects). Leave empty to skip.
-        ddl_name: "ZTOK_TF_ORD_TOTALS"
+        ddl_name: ""  # ← CHANGE to a table function that exists on your system
 
 # Create Service Definition
 create_service_definition:
