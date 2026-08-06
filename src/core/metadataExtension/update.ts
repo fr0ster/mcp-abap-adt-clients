@@ -20,7 +20,7 @@ import { getTimeout } from '../../utils/timeouts';
  * @example
  * ```typescript
  * const sourceCode = `@Metadata.layer: #CUSTOMER
- * annotate entity ZDEMO_C_CDS_MDE
+ * annotate entity ZDEMO_C_CDS_VIEW
  *   with
  * {
  *     @EndUserText.label: 'Field 1 Label'

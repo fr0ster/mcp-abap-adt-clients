@@ -125,7 +125,7 @@ async function getActivationResults(
  *   },
  *   {
  *     type: 'DDLS/DF',
- *     name: 'ZDEMO_C_CDS_MDE'
+ *     name: 'ZDEMO_C_CDS_VIEW'
  *   }
  * ];
  *
