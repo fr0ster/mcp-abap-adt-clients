@@ -155,27 +155,40 @@ describe('Shared - read Accept headers', () => {
    *
    * Every guard below used to print one sentence naming all three causes joined
    * by "or", so a skip told you only that one of them applied. That is how a
-   * config drift stays hidden: the message implicates the parameters that are
+   * config drift stays hidden: the message implicates the requirements that are
    * present alongside the one that is not.
    *
-   * The caller keeps its own `if` — moving the condition in here would read
-   * better and cost more than it is worth, because TypeScript stops narrowing
-   * the `string | null` names once the test lives behind a function call.
+   * Requirements are passed as named entries rather than positionally, because
+   * the first version of this helper took values and reported only the label —
+   * which reproduced the same ambiguity for the two guards that check more than
+   * one thing: an absent `function_group_name` was reported as "function module
+   * not configured".
+   *
+   * Where a value has one config key, the key is the name. Where it may come
+   * from either `standard_objects` or `params`, the name is the object in
+   * prose — naming one of the two sources would be a different half-truth.
+   *
+   * The caller keeps its own `if` — moving the condition in here reads better
+   * and costs more than it is worth, because TypeScript stops narrowing the
+   * `string | null` names once the test lives behind a function call.
    */
   const skipReason = (
-    label: string,
-    ...names: (string | null | undefined)[]
+    requirements: Record<string, string | null | undefined>,
   ): string => {
     if (!hasConfig) return 'no SAP configuration';
     if (!hasTestCase) return 'read_accept not configured in test-config.yaml';
-    if (names.some((name) => !name)) return `${label} not configured`;
-    return 'unknown reason';
+    const missing = Object.keys(requirements).filter(
+      (name) => !requirements[name],
+    );
+    return missing.length > 0
+      ? `missing configuration: ${missing.join(', ')}`
+      : 'unknown reason';
   };
 
   it('should read class source', async () => {
     if (!hasConfig || !hasTestCase || !standardClassName) {
       testsLogger.warn?.(
-        `⚠️ Skipping test: ${skipReason('standard class', standardClassName)}`,
+        `⚠️ Skipping test: ${skipReason({ 'standard class': standardClassName })}`,
       );
       return;
     }
@@ -197,7 +210,7 @@ describe('Shared - read Accept headers', () => {
   it('should read local definitions include', async () => {
     if (!hasConfig || !hasTestCase || !standardClassName) {
       testsLogger.warn?.(
-        `⚠️ Skipping test: ${skipReason('standard class', standardClassName)}`,
+        `⚠️ Skipping test: ${skipReason({ 'standard class': standardClassName })}`,
       );
       return;
     }
@@ -227,7 +240,7 @@ describe('Shared - read Accept headers', () => {
   it('should read local types include', async () => {
     if (!hasConfig || !hasTestCase || !standardClassName) {
       testsLogger.warn?.(
-        `⚠️ Skipping test: ${skipReason('standard class', standardClassName)}`,
+        `⚠️ Skipping test: ${skipReason({ 'standard class': standardClassName })}`,
       );
       return;
     }
@@ -253,7 +266,7 @@ describe('Shared - read Accept headers', () => {
   it('should read local test classes include', async () => {
     if (!hasConfig || !hasTestCase || !standardClassName) {
       testsLogger.warn?.(
-        `⚠️ Skipping test: ${skipReason('standard class', standardClassName)}`,
+        `⚠️ Skipping test: ${skipReason({ 'standard class': standardClassName })}`,
       );
       return;
     }
@@ -287,7 +300,7 @@ describe('Shared - read Accept headers', () => {
   it('should read local macros include (on-prem only)', async () => {
     if (!hasConfig || !hasTestCase || !standardClassName) {
       testsLogger.warn?.(
-        `⚠️ Skipping test: ${skipReason('standard class', standardClassName)}`,
+        `⚠️ Skipping test: ${skipReason({ 'standard class': standardClassName })}`,
       );
       return;
     }
@@ -323,7 +336,7 @@ describe('Shared - read Accept headers', () => {
   it('should read interface source', async () => {
     if (!hasConfig || !hasTestCase || !standardInterfaceName) {
       testsLogger.warn?.(
-        `⚠️ Skipping test: ${skipReason('standard interface', standardInterfaceName)}`,
+        `⚠️ Skipping test: ${skipReason({ 'standard interface': standardInterfaceName })}`,
       );
       return;
     }
@@ -357,7 +370,7 @@ describe('Shared - read Accept headers', () => {
       null;
     if (!hasConfig || !hasTestCase || !programName) {
       testsLogger.warn?.(
-        `⚠️ Skipping test: ${skipReason('program', programName)}`,
+        `⚠️ Skipping test: ${skipReason({ program: programName })}`,
       );
       return;
     }
@@ -383,7 +396,7 @@ describe('Shared - read Accept headers', () => {
       null;
     if (!hasConfig || !hasTestCase || !domainName) {
       testsLogger.warn?.(
-        `⚠️ Skipping test: ${skipReason('domain', domainName)}`,
+        `⚠️ Skipping test: ${skipReason({ domain: domainName })}`,
       );
       return;
     }
@@ -409,7 +422,7 @@ describe('Shared - read Accept headers', () => {
       null;
     if (!hasConfig || !hasTestCase || !dataElementName) {
       testsLogger.warn?.(
-        `⚠️ Skipping test: ${skipReason('data element', dataElementName)}`,
+        `⚠️ Skipping test: ${skipReason({ 'data element': dataElementName })}`,
       );
       return;
     }
@@ -439,7 +452,7 @@ describe('Shared - read Accept headers', () => {
       null;
     if (!hasConfig || !hasTestCase || !structureName) {
       testsLogger.warn?.(
-        `⚠️ Skipping test: ${skipReason('structure', structureName)}`,
+        `⚠️ Skipping test: ${skipReason({ structure: structureName })}`,
       );
       return;
     }
@@ -464,7 +477,9 @@ describe('Shared - read Accept headers', () => {
       testCase?.params?.table_name ||
       null;
     if (!hasConfig || !hasTestCase || !tableName) {
-      testsLogger.warn?.(`⚠️ Skipping test: ${skipReason('table', tableName)}`);
+      testsLogger.warn?.(
+        `⚠️ Skipping test: ${skipReason({ table: tableName })}`,
+      );
       return;
     }
 
@@ -489,7 +504,7 @@ describe('Shared - read Accept headers', () => {
       null;
     if (!hasConfig || !hasTestCase || !tableTypeName) {
       testsLogger.warn?.(
-        `⚠️ Skipping test: ${skipReason('table type', tableTypeName)}`,
+        `⚠️ Skipping test: ${skipReason({ 'table type': tableTypeName })}`,
       );
       return;
     }
@@ -514,7 +529,7 @@ describe('Shared - read Accept headers', () => {
       testCase?.params?.ddl_name ||
       null;
     if (!hasConfig || !hasTestCase || !ddlName) {
-      testsLogger.warn?.(`⚠️ Skipping test: ${skipReason('view', ddlName)}`);
+      testsLogger.warn?.(`⚠️ Skipping test: ${skipReason({ view: ddlName })}`);
       return;
     }
 
@@ -539,7 +554,7 @@ describe('Shared - read Accept headers', () => {
       null;
     if (!hasConfig || !hasTestCase || !functionGroupName) {
       testsLogger.warn?.(
-        `⚠️ Skipping test: ${skipReason('function group', functionGroupName)}`,
+        `⚠️ Skipping test: ${skipReason({ 'function group': functionGroupName })}`,
       );
       return;
     }
@@ -576,7 +591,7 @@ describe('Shared - read Accept headers', () => {
       !functionGroupName
     ) {
       testsLogger.warn?.(
-        `⚠️ Skipping test: ${skipReason('function module', functionModuleName, functionGroupName)}`,
+        `⚠️ Skipping test: ${skipReason({ function_module_name: functionModuleName, function_group_name: functionGroupName })}`,
       );
       return;
     }
@@ -611,7 +626,7 @@ describe('Shared - read Accept headers', () => {
       null;
     if (!hasConfig || !hasTestCase || !packageName) {
       testsLogger.warn?.(
-        `⚠️ Skipping test: ${skipReason('package', packageName)}`,
+        `⚠️ Skipping test: ${skipReason({ package: packageName })}`,
       );
       return;
     }
@@ -638,7 +653,7 @@ describe('Shared - read Accept headers', () => {
       null;
     if (!hasConfig || !hasTestCase || !serviceDefinitionName) {
       testsLogger.warn?.(
-        `⚠️ Skipping test: ${skipReason('service definition', serviceDefinitionName)}`,
+        `⚠️ Skipping test: ${skipReason({ 'service definition': serviceDefinitionName })}`,
       );
       return;
     }
@@ -668,7 +683,7 @@ describe('Shared - read Accept headers', () => {
       null;
     if (!hasConfig || !hasTestCase || !behaviorDefinitionName) {
       testsLogger.warn?.(
-        `⚠️ Skipping test: ${skipReason('behavior definition', behaviorDefinitionName)}`,
+        `⚠️ Skipping test: ${skipReason({ 'behavior definition': behaviorDefinitionName })}`,
       );
       return;
     }
@@ -700,7 +715,7 @@ describe('Shared - read Accept headers', () => {
       testCase?.params?.behavior_implementation_class_name || null;
     if (!hasConfig || !hasTestCase || !behaviorImplementationClassName) {
       testsLogger.warn?.(
-        `⚠️ Skipping test: ${skipReason('behavior implementation', behaviorImplementationClassName)}`,
+        `⚠️ Skipping test: ${skipReason({ 'behavior implementation': behaviorImplementationClassName })}`,
       );
       return;
     }
@@ -736,7 +751,7 @@ describe('Shared - read Accept headers', () => {
       testCase?.params?.metadata_extension_name || null;
     if (!hasConfig || !hasTestCase || !metadataExtensionName) {
       testsLogger.warn?.(
-        `⚠️ Skipping test: ${skipReason('metadata extension', metadataExtensionName)}`,
+        `⚠️ Skipping test: ${skipReason({ 'metadata extension': metadataExtensionName })}`,
       );
       return;
     }
@@ -768,7 +783,7 @@ describe('Shared - read Accept headers', () => {
     const enhancementType = testCase?.params?.enhancement_type || null;
     if (!hasConfig || !hasTestCase || !enhancementName || !enhancementType) {
       testsLogger.warn?.(
-        `⚠️ Skipping test: ${skipReason('enhancement', enhancementName, enhancementType)}`,
+        `⚠️ Skipping test: ${skipReason({ enhancement_name: enhancementName, enhancement_type: enhancementType })}`,
       );
       return;
     }
