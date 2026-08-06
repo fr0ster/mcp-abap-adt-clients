@@ -13,13 +13,13 @@ import { getTimeout } from '../../utils/timeouts';
  * Unlock a metadata extension after editing
  *
  * @param connection - ABAP connection instance
- * @param name - Metadata extension name (e.g., 'ZOK_C_CDS_TEST_0001')
+ * @param name - Metadata extension name (e.g., 'ZDEMO_C_CDS_MDE')
  * @param lockHandle - Lock handle obtained from lockMetadataExtension
  * @returns Axios response
  *
  * @example
  * ```typescript
- * await unlockMetadataExtension(connection, 'ZOK_C_CDS_TEST_0001', lockHandle);
+ * await unlockMetadataExtension(connection, 'ZDEMO_C_CDS_MDE', lockHandle);
  * connection.setSessionType("stateless");
  * ```
  */

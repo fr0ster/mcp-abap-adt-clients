@@ -121,11 +121,11 @@ async function getActivationResults(
  * const objects = [
  *   {
  *     type: 'BDEF/BDO',
- *     name: 'ZOK_I_CDS_TEST'
+ *     name: 'ZDEMO_I_CDS_VIEW'
  *   },
  *   {
  *     type: 'DDLS/DF',
- *     name: 'ZOK_C_CDS_TEST'
+ *     name: 'ZDEMO_C_CDS_VIEW'
  *   }
  * ];
  *

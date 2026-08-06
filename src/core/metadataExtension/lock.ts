@@ -13,13 +13,13 @@ import { getTimeout } from '../../utils/timeouts';
  * Lock a metadata extension for modification
  *
  * @param connection - ABAP connection instance
- * @param name - Metadata extension name (e.g., 'ZOK_C_CDS_TEST_0001')
+ * @param name - Metadata extension name (e.g., 'ZDEMO_C_CDS_MDE')
  * @param sessionId - Session ID for request tracking
  * @returns Lock handle string
  *
  * @example
  * ```typescript
- * const lockHandle = await lockMetadataExtension(connection, 'ZOK_C_CDS_TEST_0001', sessionId);
+ * const lockHandle = await lockMetadataExtension(connection, 'ZDEMO_C_CDS_MDE', sessionId);
  * ```
  */
 export async function lockMetadataExtension(
