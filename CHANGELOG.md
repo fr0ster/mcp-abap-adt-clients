@@ -5,6 +5,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [10.0.2] - 2026-08-06
+
+### Fixed
+- **Activation no longer refuses objects that were already active.** `activationExecuted="false"` was treated as a failure signal in its own right, so `AdtClient` threw `Activation of ZAC_… failed: activationExecuted=false` over objects that were active and complete. Probed against a trial system, the flag does not mean what the code assumed:
+
+  | scenario | HTTP | `activationExecuted` | `msg` |
+  |---|---|---|---|
+  | class already active | 200 | `false` | none |
+  | DDIC table already active | 200 | `true` | none |
+  | class does not exist | 200 | `false` | `E` |
+  | locked by another session | **403** | — | — |
+
+  An object needing no activation answers `false` with an empty message list — by the flag alone, indistinguishable from an object that does not exist. The flag reports whether ADT did any work, not whether the work succeeded; only the messages carry the verdict. **Failure is now an error-severity `<msg>` alone.**
+
+  This corrects two claims made for the 7.5.1 fix below. A lock is answered with HTTP 403 and never reaches the body parser, so the flag clause never covered that case; and a syntax error emits `<msg type="E">`, which the other half of the condition already matched. The clause added no coverage and produced false refusals, contradicting the helper's own documented promise to fail *"only on an explicit failure signal"*.
+
+- **The nine object types that parsed their own activation response now share the one rule.** `accessControl`, `appendStructure`, `authorizationField`, `dataElement`, `featureToggle`, `scalarFunction`, `scalarFunctionImplementation`, `serviceDefinition` and `transformation` each carried a byte-identical private `parseActivationResponse`, so the same SAP answer meant "activated" through the shared helper and "failed" through any of them. (The 7.5.1 entry called these nine "unaffected"; they were affected in the opposite direction — they never received the fix.) They were wrong twice over: `success: activated && checked` refused a valid response, and the `<msg>` list was never read at all, so a genuine failure lost SAP's own wording — `Class ZAC_… does not have a TMDIR entry` — to the fixed string `Activation failed`. All nine now call a shared `assertActivationSucceeded`, keeping their own message prefix, which was the only type-specific part. A unit guard fails the build if any `core/*/activation.ts` starts deciding activation success on its own again.
+
+  Internal change only: `activationUtils` is not part of the public surface, and no exported name was added, removed or changed.
+
+  Verified against the trial system rather than by types alone — `scalarFunction` (2 suites), `accessControl`, `appendStructure`, `dataElement`, `transformation`, `serviceDefinition` pass; `authorizationField` and `featureToggle` are on-prem-only and skip on cloud. The `CdsUnitTest` integration test, which this bug had blocked outright, now runs its full chain.
+
 ## [10.0.1] - 2026-08-05
 
 ### Fixed
