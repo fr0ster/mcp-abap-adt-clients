@@ -250,6 +250,37 @@ await abapGit.unlink({ package: 'ZMY_PKG' });
 
 **Content-type version.** Defaults to `v3` for sapcli compatibility. Cloud MDD advertises `v4`; consumers can opt in via `new AdtAbapGitClient(conn, logger, { contentTypeVersion: 'v4' })`.
 
+### What `activate()` treats as a failure
+
+`/sap/bc/adt/activation` answers **HTTP 200 even when activation fails**, so the verdict
+has to be read out of the body. The rule the client applies:
+
+> An activation failed if, and only if, the response carries an error-severity
+> `<msg type="E">`. The thrown message quotes SAP's own text.
+
+`activationExecuted="false"` is **not** a failure signal, despite how it reads. Probed
+against a live system:
+
+| scenario | HTTP | `activationExecuted` | `msg` |
+|---|---|---|---|
+| object already active (class) | 200 | `false` | none |
+| object already active (DDIC table) | 200 | `true` | none |
+| object does not exist | 200 | `false` | `E` |
+| locked by another session | **403** | — | — |
+
+An object that needs no activation reports `false` with an empty message list — by the
+flag alone, indistinguishable from an object that does not exist. The flag says whether
+ADT did any work, not whether the work succeeded. Note also that the two DDIC rows differ
+on identical semantics: a table re-activates unconditionally, a class does not. Any
+consumer reading these responses directly should branch on the messages, not the flags.
+
+A lock held by another session is an HTTP 403 (`User … is currently editing …`) and
+surfaces as a rejected request, never as a body to inspect.
+
+Empty, unparseable, or unrecognized bodies are treated as success — object types differ
+in the shape of their success body, and inferring failure from an unfamiliar one would
+turn working calls into errors.
+
 ### Accept Negotiation
 
 The client can optionally auto-correct `Accept` headers after a 406 response:

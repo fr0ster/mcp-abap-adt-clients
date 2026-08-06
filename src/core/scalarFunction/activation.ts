@@ -1,5 +1,5 @@
 import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
-import { XMLParser } from 'fast-xml-parser';
+import { assertActivationSucceeded } from '../../utils/activationUtils';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
@@ -8,40 +8,6 @@ function buildActivationXml(name: string): string {
 <adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core">
   <adtcore:objectReference adtcore:uri="/sap/bc/adt/ddic/dsfd/sources/${encodeSapObjectName(name.toLowerCase())}" adtcore:name="${name.toUpperCase()}"/>
 </adtcore:objectReferences>`;
-}
-
-function parseActivationResponse(response: IAdtResponse): {
-  success: boolean;
-  message: string;
-} {
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: '',
-  });
-  try {
-    const result = parser.parse(response.data);
-    const properties = result['chkl:messages']?.['chkl:properties'];
-    if (properties) {
-      const activated =
-        properties.activationExecuted === 'true' ||
-        properties.activationExecuted === true;
-      const checked =
-        properties.checkExecuted === 'true' ||
-        properties.checkExecuted === true;
-      return {
-        success: activated && checked,
-        message: activated
-          ? 'Scalar function activated successfully'
-          : 'Activation failed',
-      };
-    }
-    return { success: false, message: 'Unknown activation status' };
-  } catch (error) {
-    return {
-      success: false,
-      message: `Failed to parse activation response: ${error}`,
-    };
-  }
 }
 
 export async function activateScalarFunction(
@@ -56,11 +22,6 @@ export async function activateScalarFunction(
     data: buildActivationXml(name),
     headers: { Accept: 'application/xml', 'Content-Type': 'application/xml' },
   });
-  const activationResult = parseActivationResponse(response);
-  if (!activationResult.success) {
-    throw new Error(
-      `Scalar function activation failed: ${activationResult.message}`,
-    );
-  }
+  assertActivationSucceeded('Scalar function', response.data);
   return response;
 }

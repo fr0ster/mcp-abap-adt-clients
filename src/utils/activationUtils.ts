@@ -39,10 +39,26 @@ function extractActivationMsgText(msg: {
  * Inspect an ADT activation response body for an **explicit failure signal**.
  *
  * ADT's `/sap/bc/adt/activation` endpoint returns HTTP 200 even when activation
- * fails (object locked by another session, syntax errors), carrying a
- * `<chkl:messages>` body with `chkl:properties activationExecuted="false"` and/or
+ * fails on a syntax error, carrying a `<chkl:messages>` body with
  * `<msg type="E">` entries. Treating "no HTTP error" as success masks these
  * failures (issue #78).
+ *
+ * **The failure signal is an `E` message, not `activationExecuted="false"`.**
+ * This originally treated the flag alone as a failure, which is wrong — probed
+ * against a trial system:
+ *
+ * | scenario                       | HTTP | activationExecuted | `msg` |
+ * |--------------------------------|------|--------------------|-------|
+ * | class already active           | 200  | `false`            | none  |
+ * | DDIC table already active      | 200  | `true`             | none  |
+ * | class does not exist           | 200  | `false`            | `E`   |
+ * | locked by another session      | 403  | —                  | —     |
+ *
+ * A class that needs no activation reports `false` with an empty message list —
+ * indistinguishable, by the flag alone, from a class that does not exist. So the
+ * flag says whether ADT did any work, not whether the work succeeded, and only
+ * the messages carry the verdict. The lock case the old wording named is a 403
+ * and never reached this function at all.
  *
  * Conservative by design: returns a failure detail string ONLY on a positive
  * error signal. Empty, unparseable, or unrecognized bodies return `null`
@@ -69,17 +85,12 @@ function detectActivationFailure(responseData: unknown): string | null {
 
   const messages = parsed?.['chkl:messages'] as
     | {
-        'chkl:properties'?: { activationExecuted?: unknown };
         msg?: unknown;
       }
     | undefined;
   if (!messages) {
     return null;
   }
-
-  const activationExecuted = messages['chkl:properties']?.activationExecuted;
-  const executedFalse =
-    activationExecuted === 'false' || activationExecuted === false;
 
   const rawMsg = messages.msg;
   const msgList = Array.isArray(rawMsg) ? rawMsg : rawMsg ? [rawMsg] : [];
@@ -96,13 +107,37 @@ function detectActivationFailure(responseData: unknown): string | null {
       ),
     );
 
-  if (executedFalse || errorTexts.length > 0) {
-    return errorTexts.length > 0
-      ? errorTexts.join('; ')
-      : 'activationExecuted=false';
-  }
+  return errorTexts.length > 0 ? errorTexts.join('; ') : null;
+}
 
-  return null;
+/**
+ * Throw unless an activation response is free of error messages.
+ *
+ * Nine object types each carried a private copy of this check, all written the
+ * same way — `activationExecuted && checkExecuted`, with the `<msg>` list never
+ * read at all. That shape is wrong twice over:
+ *
+ * - It refuses a valid response. An object that needs no activation answers
+ *   `activationExecuted="false"`, so `AdtClient` threw over objects that were
+ *   already active. See `detectActivationFailure` above for the probed table.
+ * - It discards what SAP said. A genuine failure carries the reason in
+ *   `<msg type="E">` — "Class ZAC_… does not have a TMDIR entry" — and every
+ *   copy replaced it with the fixed string "Activation failed".
+ *
+ * One rule in one place, so the nine cannot drift apart again. Callers keep
+ * their own prefix, which is the only part that was ever type-specific.
+ *
+ * @param objectLabel prefix for the thrown message, e.g. `'Scalar function'`
+ * @throws when the response carries at least one error-severity message
+ */
+export function assertActivationSucceeded(
+  objectLabel: string,
+  responseData: unknown,
+): void {
+  const failure = detectActivationFailure(responseData);
+  if (failure) {
+    throw new Error(`${objectLabel} activation failed: ${failure}`);
+  }
 }
 
 /**

@@ -1,5 +1,5 @@
 import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
-import { XMLParser } from 'fast-xml-parser';
+import { assertActivationSucceeded } from '../../utils/activationUtils';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
@@ -16,43 +16,6 @@ function buildActivationXml(accessControlName: string): string {
 /**
  * Parse activation response
  */
-function parseActivationResponse(response: IAdtResponse): {
-  success: boolean;
-  message: string;
-} {
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: '',
-  });
-
-  try {
-    const result = parser.parse(response.data);
-    const properties = result['chkl:messages']?.['chkl:properties'];
-
-    if (properties) {
-      const activated =
-        properties.activationExecuted === 'true' ||
-        properties.activationExecuted === true;
-      const checked =
-        properties.checkExecuted === 'true' ||
-        properties.checkExecuted === true;
-
-      return {
-        success: activated && checked,
-        message: activated
-          ? 'Access control activated successfully'
-          : 'Activation failed',
-      };
-    }
-
-    return { success: false, message: 'Unknown activation status' };
-  } catch (error) {
-    return {
-      success: false,
-      message: `Failed to parse activation response: ${error}`,
-    };
-  }
-}
 
 /**
  * Activate access control
@@ -77,12 +40,7 @@ export async function activateAccessControl(
     headers,
   });
 
-  const activationResult = parseActivationResponse(response);
-  if (!activationResult.success) {
-    throw new Error(
-      `Access control activation failed: ${activationResult.message}`,
-    );
-  }
+  assertActivationSucceeded('Access control', response.data);
 
   return response;
 }
