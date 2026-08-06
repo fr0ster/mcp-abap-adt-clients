@@ -992,45 +992,49 @@ async function retryCheckAfterActivate(checkFunction, options = {}) {
 
 /**
  * Check if package exists using searchObjects
+ *
+ * Throws when the check itself could not run. It previously answered `false` for
+ * that case, which is a different statement: "the package is not there" rather
+ * than "I could not look". The `require` below pointed at
+ * `src/__tests__/src/core/...` — a path that has never existed — so every call
+ * threw `MODULE_NOT_FOUND`, was caught here, and reported the root package
+ * missing. `Ddl.test.ts` is the only integration test that calls
+ * `checkDefaultTestEnvironment`, so it alone skipped every test it owns and
+ * still reported PASS, while the tests around it created objects in the very
+ * package this claimed was absent.
+ *
+ * Parsing goes through `searchObjectsTyped` rather than a local XML reader.
+ * ADT is not consistent across releases about namespacing quickSearch hits —
+ * `<adtcore:objectReference adtcore:name>` on some, `<objectReference name>` on
+ * others — and `parseSearchResults` already accepts both, with tests. The copy
+ * that used to live here required the literal `<adtcore:objectReference` and
+ * read only the prefixed attribute, so on a system emitting the unprefixed
+ * form the lookup would succeed and this would still answer "missing" — the
+ * same silent skip as above, reached by a different route.
+ *
  * @param {Object} connection - ABAP connection
  * @param {string} packageName - Package name to check
- * @returns {Promise<boolean>} True if package exists, false otherwise
+ * @returns {Promise<boolean>} True if package exists, false if it does not
+ * @throws when the existence check could not be performed
  */
 async function checkPackageExists(connection, packageName) {
   try {
-    // Dynamically require searchObjects to avoid circular dependencies
-    const { searchObjects } = require('../src/core/shared/search');
+    // Dynamically required to avoid circular dependencies
+    const { searchObjectsTyped } = require('../../core/shared/search');
 
-    const response = await searchObjects(connection, {
+    const hits = await searchObjectsTyped(connection, {
       query: `${packageName}*`,
       objectType: 'DEVC',
       maxResults: 101,
     });
 
-    if (response.status !== 200) {
-      return false;
-    }
-
-    const xmlData = typeof response.data === 'string' ? response.data : '';
-    if (!xmlData || !xmlData.includes('<adtcore:objectReference')) {
-      return false;
-    }
-
-    const parser = new XMLParser({
-      ignoreAttributes: false,
-      attributeNamePrefix: '@_',
-    });
-    const parsed = parser.parse(xmlData);
-    const refs =
-      parsed['adtcore:objectReferences']?.['adtcore:objectReference'];
-    const objects = refs ? (Array.isArray(refs) ? refs : [refs]) : [];
-
-    return objects.some(
-      (obj) =>
-        obj['@_adtcore:name']?.toUpperCase() === packageName.toUpperCase(),
+    return hits.some(
+      (hit) => hit.name?.toUpperCase() === packageName.toUpperCase(),
     );
   } catch (error) {
-    return false;
+    throw new Error(
+      `Could not check whether package ${packageName} exists: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 }
 
