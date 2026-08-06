@@ -150,10 +150,32 @@ describe('Shared - read Accept headers', () => {
     }
   });
 
+  /**
+   * Say which precondition is actually absent.
+   *
+   * Every guard below used to print one sentence naming all three causes joined
+   * by "or", so a skip told you only that one of them applied. That is how a
+   * config drift stays hidden: the message implicates the parameters that are
+   * present alongside the one that is not.
+   *
+   * The caller keeps its own `if` — moving the condition in here would read
+   * better and cost more than it is worth, because TypeScript stops narrowing
+   * the `string | null` names once the test lives behind a function call.
+   */
+  const skipReason = (
+    label: string,
+    ...names: (string | null | undefined)[]
+  ): string => {
+    if (!hasConfig) return 'no SAP configuration';
+    if (!hasTestCase) return 'read_accept not configured in test-config.yaml';
+    if (names.some((name) => !name)) return `${label} not configured`;
+    return 'unknown reason';
+  };
+
   it('should read class source', async () => {
     if (!hasConfig || !hasTestCase || !standardClassName) {
       testsLogger.warn?.(
-        '⚠️ Skipping test: No SAP configuration, read_accept not configured, or standard class not found',
+        `⚠️ Skipping test: ${skipReason('standard class', standardClassName)}`,
       );
       return;
     }
@@ -175,7 +197,7 @@ describe('Shared - read Accept headers', () => {
   it('should read local definitions include', async () => {
     if (!hasConfig || !hasTestCase || !standardClassName) {
       testsLogger.warn?.(
-        '⚠️ Skipping test: No SAP configuration, read_accept not configured, or standard class not found',
+        `⚠️ Skipping test: ${skipReason('standard class', standardClassName)}`,
       );
       return;
     }
@@ -205,7 +227,7 @@ describe('Shared - read Accept headers', () => {
   it('should read local types include', async () => {
     if (!hasConfig || !hasTestCase || !standardClassName) {
       testsLogger.warn?.(
-        '⚠️ Skipping test: No SAP configuration, read_accept not configured, or standard class not found',
+        `⚠️ Skipping test: ${skipReason('standard class', standardClassName)}`,
       );
       return;
     }
@@ -231,7 +253,7 @@ describe('Shared - read Accept headers', () => {
   it('should read local test classes include', async () => {
     if (!hasConfig || !hasTestCase || !standardClassName) {
       testsLogger.warn?.(
-        '⚠️ Skipping test: No SAP configuration, read_accept not configured, or standard class not found',
+        `⚠️ Skipping test: ${skipReason('standard class', standardClassName)}`,
       );
       return;
     }
@@ -265,7 +287,7 @@ describe('Shared - read Accept headers', () => {
   it('should read local macros include (on-prem only)', async () => {
     if (!hasConfig || !hasTestCase || !standardClassName) {
       testsLogger.warn?.(
-        '⚠️ Skipping test: No SAP configuration, read_accept not configured, or standard class not found',
+        `⚠️ Skipping test: ${skipReason('standard class', standardClassName)}`,
       );
       return;
     }
@@ -301,7 +323,7 @@ describe('Shared - read Accept headers', () => {
   it('should read interface source', async () => {
     if (!hasConfig || !hasTestCase || !standardInterfaceName) {
       testsLogger.warn?.(
-        '⚠️ Skipping test: No SAP configuration, read_accept not configured, or standard interface not found',
+        `⚠️ Skipping test: ${skipReason('standard interface', standardInterfaceName)}`,
       );
       return;
     }
@@ -335,7 +357,7 @@ describe('Shared - read Accept headers', () => {
       null;
     if (!hasConfig || !hasTestCase || !programName) {
       testsLogger.warn?.(
-        '⚠️ Skipping test: No SAP configuration, read_accept not configured, or program not configured',
+        `⚠️ Skipping test: ${skipReason('program', programName)}`,
       );
       return;
     }
@@ -361,7 +383,7 @@ describe('Shared - read Accept headers', () => {
       null;
     if (!hasConfig || !hasTestCase || !domainName) {
       testsLogger.warn?.(
-        '⚠️ Skipping test: No SAP configuration, read_accept not configured, or domain not configured',
+        `⚠️ Skipping test: ${skipReason('domain', domainName)}`,
       );
       return;
     }
@@ -387,7 +409,7 @@ describe('Shared - read Accept headers', () => {
       null;
     if (!hasConfig || !hasTestCase || !dataElementName) {
       testsLogger.warn?.(
-        '⚠️ Skipping test: No SAP configuration, read_accept not configured, or data element not configured',
+        `⚠️ Skipping test: ${skipReason('data element', dataElementName)}`,
       );
       return;
     }
@@ -417,7 +439,7 @@ describe('Shared - read Accept headers', () => {
       null;
     if (!hasConfig || !hasTestCase || !structureName) {
       testsLogger.warn?.(
-        '⚠️ Skipping test: No SAP configuration, read_accept not configured, or structure not configured',
+        `⚠️ Skipping test: ${skipReason('structure', structureName)}`,
       );
       return;
     }
@@ -442,9 +464,7 @@ describe('Shared - read Accept headers', () => {
       testCase?.params?.table_name ||
       null;
     if (!hasConfig || !hasTestCase || !tableName) {
-      testsLogger.warn?.(
-        '⚠️ Skipping test: No SAP configuration, read_accept not configured, or table not configured',
-      );
+      testsLogger.warn?.(`⚠️ Skipping test: ${skipReason('table', tableName)}`);
       return;
     }
 
@@ -469,7 +489,7 @@ describe('Shared - read Accept headers', () => {
       null;
     if (!hasConfig || !hasTestCase || !tableTypeName) {
       testsLogger.warn?.(
-        '⚠️ Skipping test: No SAP configuration, read_accept not configured, or table type not configured',
+        `⚠️ Skipping test: ${skipReason('table type', tableTypeName)}`,
       );
       return;
     }
@@ -494,9 +514,7 @@ describe('Shared - read Accept headers', () => {
       testCase?.params?.ddl_name ||
       null;
     if (!hasConfig || !hasTestCase || !ddlName) {
-      testsLogger.warn?.(
-        '⚠️ Skipping test: No SAP configuration, read_accept not configured, or view not configured',
-      );
+      testsLogger.warn?.(`⚠️ Skipping test: ${skipReason('view', ddlName)}`);
       return;
     }
 
@@ -521,7 +539,7 @@ describe('Shared - read Accept headers', () => {
       null;
     if (!hasConfig || !hasTestCase || !functionGroupName) {
       testsLogger.warn?.(
-        '⚠️ Skipping test: No SAP configuration, read_accept not configured, or function group not configured',
+        `⚠️ Skipping test: ${skipReason('function group', functionGroupName)}`,
       );
       return;
     }
@@ -558,7 +576,7 @@ describe('Shared - read Accept headers', () => {
       !functionGroupName
     ) {
       testsLogger.warn?.(
-        '⚠️ Skipping test: No SAP configuration, read_accept not configured, or function module not configured',
+        `⚠️ Skipping test: ${skipReason('function module', functionModuleName, functionGroupName)}`,
       );
       return;
     }
@@ -593,7 +611,7 @@ describe('Shared - read Accept headers', () => {
       null;
     if (!hasConfig || !hasTestCase || !packageName) {
       testsLogger.warn?.(
-        '⚠️ Skipping test: No SAP configuration, read_accept not configured, or package not configured',
+        `⚠️ Skipping test: ${skipReason('package', packageName)}`,
       );
       return;
     }
@@ -620,7 +638,7 @@ describe('Shared - read Accept headers', () => {
       null;
     if (!hasConfig || !hasTestCase || !serviceDefinitionName) {
       testsLogger.warn?.(
-        '⚠️ Skipping test: No SAP configuration, read_accept not configured, or service definition not configured',
+        `⚠️ Skipping test: ${skipReason('service definition', serviceDefinitionName)}`,
       );
       return;
     }
@@ -650,7 +668,7 @@ describe('Shared - read Accept headers', () => {
       null;
     if (!hasConfig || !hasTestCase || !behaviorDefinitionName) {
       testsLogger.warn?.(
-        '⚠️ Skipping test: No SAP configuration, read_accept not configured, or behavior definition not configured',
+        `⚠️ Skipping test: ${skipReason('behavior definition', behaviorDefinitionName)}`,
       );
       return;
     }
@@ -682,7 +700,7 @@ describe('Shared - read Accept headers', () => {
       testCase?.params?.behavior_implementation_class_name || null;
     if (!hasConfig || !hasTestCase || !behaviorImplementationClassName) {
       testsLogger.warn?.(
-        '⚠️ Skipping test: No SAP configuration, read_accept not configured, or behavior implementation not configured',
+        `⚠️ Skipping test: ${skipReason('behavior implementation', behaviorImplementationClassName)}`,
       );
       return;
     }
@@ -718,7 +736,7 @@ describe('Shared - read Accept headers', () => {
       testCase?.params?.metadata_extension_name || null;
     if (!hasConfig || !hasTestCase || !metadataExtensionName) {
       testsLogger.warn?.(
-        '⚠️ Skipping test: No SAP configuration, read_accept not configured, or metadata extension not configured',
+        `⚠️ Skipping test: ${skipReason('metadata extension', metadataExtensionName)}`,
       );
       return;
     }
@@ -750,7 +768,7 @@ describe('Shared - read Accept headers', () => {
     const enhancementType = testCase?.params?.enhancement_type || null;
     if (!hasConfig || !hasTestCase || !enhancementName || !enhancementType) {
       testsLogger.warn?.(
-        '⚠️ Skipping test: No SAP configuration, read_accept not configured, or enhancement not configured',
+        `⚠️ Skipping test: ${skipReason('enhancement', enhancementName, enhancementType)}`,
       );
       return;
     }
