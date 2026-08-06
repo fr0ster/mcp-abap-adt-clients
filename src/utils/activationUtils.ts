@@ -85,7 +85,6 @@ function detectActivationFailure(responseData: unknown): string | null {
 
   const messages = parsed?.['chkl:messages'] as
     | {
-        'chkl:properties'?: { activationExecuted?: unknown };
         msg?: unknown;
       }
     | undefined;
@@ -109,6 +108,36 @@ function detectActivationFailure(responseData: unknown): string | null {
     );
 
   return errorTexts.length > 0 ? errorTexts.join('; ') : null;
+}
+
+/**
+ * Throw unless an activation response is free of error messages.
+ *
+ * Nine object types each carried a private copy of this check, all written the
+ * same way — `activationExecuted && checkExecuted`, with the `<msg>` list never
+ * read at all. That shape is wrong twice over:
+ *
+ * - It refuses a valid response. An object that needs no activation answers
+ *   `activationExecuted="false"`, so `AdtClient` threw over objects that were
+ *   already active. See `detectActivationFailure` above for the probed table.
+ * - It discards what SAP said. A genuine failure carries the reason in
+ *   `<msg type="E">` — "Class ZAC_… does not have a TMDIR entry" — and every
+ *   copy replaced it with the fixed string "Activation failed".
+ *
+ * One rule in one place, so the nine cannot drift apart again. Callers keep
+ * their own prefix, which is the only part that was ever type-specific.
+ *
+ * @param objectLabel prefix for the thrown message, e.g. `'Scalar function'`
+ * @throws when the response carries at least one error-severity message
+ */
+export function assertActivationSucceeded(
+  objectLabel: string,
+  responseData: unknown,
+): void {
+  const failure = detectActivationFailure(responseData);
+  if (failure) {
+    throw new Error(`${objectLabel} activation failed: ${failure}`);
+  }
 }
 
 /**
