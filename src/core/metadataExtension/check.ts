@@ -11,7 +11,7 @@ import { runCheckRun } from '../../utils/checkRun';
  * Check metadata extension syntax
  *
  * @param connection - ABAP connection instance
- * @param name - Metadata extension name (e.g., 'ZOK_C_CDS_TEST_0001')
+ * @param name - Metadata extension name (e.g., 'ZDEMO_C_CDS_MDE')
  * @param sessionId - Session ID for request tracking
  * @param version - Version to check ('active' or 'inactive', default 'inactive')
  * @param sourceCode - Optional source code to validate before saving
@@ -19,7 +19,7 @@ import { runCheckRun } from '../../utils/checkRun';
  *
  * @example
  * ```typescript
- * const checkResult = await checkMetadataExtension(connection, 'ZOK_C_CDS_TEST_0001', sessionId);
+ * const checkResult = await checkMetadataExtension(connection, 'ZDEMO_C_CDS_MDE', sessionId);
  * ```
  */
 export async function checkMetadataExtension(

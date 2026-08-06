@@ -12,7 +12,7 @@ import { getTimeout } from '../../utils/timeouts';
  * Update metadata extension source code
  *
  * @param connection - ABAP connection instance
- * @param name - Metadata extension name (e.g., 'ZOK_C_CDS_TEST_0001')
+ * @param name - Metadata extension name (e.g., 'ZDEMO_C_CDS_MDE')
  * @param sourceCode - Metadata extension annotation source code
  * @param lockHandle - Lock handle from lockMetadataExtension
  * @returns Axios response
@@ -20,7 +20,7 @@ import { getTimeout } from '../../utils/timeouts';
  * @example
  * ```typescript
  * const sourceCode = `@Metadata.layer: #CUSTOMER
- * annotate entity ZOK_C_CDS_TEST
+ * annotate entity ZDEMO_C_CDS_MDE
  *   with
  * {
  *     @EndUserText.label: 'Field 1 Label'
@@ -28,7 +28,7 @@ import { getTimeout } from '../../utils/timeouts';
  *     Fld1;
  * }`;
  *
- * await updateMetadataExtension(connection, 'ZOK_C_CDS_TEST_0001', sourceCode, lockHandle);
+ * await updateMetadataExtension(connection, 'ZDEMO_C_CDS_MDE', sourceCode, lockHandle);
  * ```
  */
 export async function updateMetadataExtension(

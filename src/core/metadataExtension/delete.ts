@@ -11,14 +11,14 @@ import { getTimeout } from '../../utils/timeouts';
  * Delete a metadata extension
  *
  * @param connection - ABAP connection instance
- * @param name - Metadata extension name (e.g., 'ZOK_C_CDS_TEST_0001')
+ * @param name - Metadata extension name (e.g., 'ZDEMO_C_CDS_MDE')
  * @param transportRequest - Transport request number (optional for local objects)
  * @param sessionId - Session ID for request tracking
  * @returns Axios response
  *
  * @example
  * ```typescript
- * await deleteMetadataExtension(connection, 'ZOK_C_CDS_TEST_0001', 'TRLK900123', sessionId);
+ * await deleteMetadataExtension(connection, 'ZDEMO_C_CDS_MDE', 'TRLK900123', sessionId);
  * ```
  */
 export async function deleteMetadataExtension(

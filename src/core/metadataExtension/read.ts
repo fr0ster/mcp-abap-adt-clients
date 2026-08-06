@@ -23,12 +23,12 @@ import type { IReadOptions } from '../shared/types';
  * Read metadata extension metadata
  *
  * @param connection - ABAP connection instance
- * @param name - Metadata extension name (e.g., 'ZOK_C_CDS_TEST_0001')
+ * @param name - Metadata extension name (e.g., 'ZDEMO_C_CDS_MDE')
  * @returns Axios response with metadata extension metadata
  *
  * @example
  * ```typescript
- * const metadata = await readMetadataExtension(connection, 'ZOK_C_CDS_TEST_0001');
+ * const metadata = await readMetadataExtension(connection, 'ZDEMO_C_CDS_MDE');
  * ```
  */
 export async function readMetadataExtension(
@@ -61,13 +61,13 @@ export async function readMetadataExtension(
  * Read metadata extension source code
  *
  * @param connection - ABAP connection instance
- * @param name - Metadata extension name (e.g., 'ZOK_C_CDS_TEST_0001')
+ * @param name - Metadata extension name (e.g., 'ZDEMO_C_CDS_MDE')
  * @param version - Version to read ('active' or 'inactive', default 'active')
  * @returns Axios response with source code as string
  *
  * @example
  * ```typescript
- * const response = await readMetadataExtensionSource(connection, 'ZOK_C_CDS_TEST_0001');
+ * const response = await readMetadataExtensionSource(connection, 'ZDEMO_C_CDS_MDE');
  * const sourceCode = response.data;
  * ```
  */

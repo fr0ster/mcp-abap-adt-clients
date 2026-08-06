@@ -11,14 +11,14 @@ import { activateObjectInSession } from '../../utils/activationUtils';
  * Activate a metadata extension
  *
  * @param connection - ABAP connection instance
- * @param name - Metadata extension name (e.g., 'ZOK_C_CDS_TEST_0001')
+ * @param name - Metadata extension name (e.g., 'ZDEMO_C_CDS_MDE')
  * @param sessionId - Session ID for request tracking
  * @param preaudit - Request pre-audit before activation (default: true)
  * @returns Axios response with activation result
  *
  * @example
  * ```typescript
- * await activateMetadataExtension(connection, 'ZOK_C_CDS_TEST_0001', sessionId);
+ * await activateMetadataExtension(connection, 'ZDEMO_C_CDS_MDE', sessionId);
  * ```
  */
 export async function activateMetadataExtension(

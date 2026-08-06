@@ -21,9 +21,9 @@ import type { IMetadataExtensionCreateParams } from './types';
  * @example
  * ```typescript
  * const response = await createMetadataExtension(connection, {
- *   name: 'ZOK_C_CDS_TEST_0001',
+ *   name: 'ZDEMO_C_CDS_MDE',
  *   description: 'First metadata extension',
- *   packageName: 'ZOK_TEST_000222',
+ *   packageName: 'ZDEMO_PKG',
  *   transportRequest: 'TRLK900123'
  * }, sessionId);
  * ```
