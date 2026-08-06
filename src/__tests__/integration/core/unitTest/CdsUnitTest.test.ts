@@ -152,13 +152,22 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
             testCase.params.transport_request,
         );
 
-        if (
-          !className ||
-          !testClassName ||
-          !ddlName ||
-          !classTemplate ||
-          !testClassSource
-        ) {
+        // Name the parameter that is actually absent. Listing all five joined
+        // by "or" says only that one of them is missing, which sent me looking
+        // in the wrong place twice: `ddl_name` alone was gone (the config had
+        // drifted to `view_name`), while the message implicated the four that
+        // were present.
+        const missingParams = Object.entries({
+          'cds_unit_test.class_name': className,
+          'cds_unit_test.test_class_name': testClassName,
+          ddl_name: ddlName,
+          'cds_unit_test.template_xml': classTemplate,
+          'cds_unit_test.test_class_source': testClassSource,
+        })
+          .filter(([, value]) => !value)
+          .map(([key]) => key);
+
+        if (missingParams.length > 0) {
           logTestStart(
             testsLogger,
             'CdsUnitTest - create CDS unit test class',
@@ -170,7 +179,7 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
           logTestSkip(
             testsLogger,
             'CdsUnitTest - create CDS unit test class',
-            'Required parameters missing: class_name, test_class_name, ddl_name, template_xml, or test_class_source',
+            `Missing in test-config.yaml under create_cds_unit_test: ${missingParams.join(', ')}`,
           );
           return;
         }
