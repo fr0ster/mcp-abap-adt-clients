@@ -1003,6 +1003,15 @@ async function retryCheckAfterActivate(checkFunction, options = {}) {
  * still reported PASS, while the tests around it created objects in the very
  * package this claimed was absent.
  *
+ * Parsing goes through `searchObjectsTyped` rather than a local XML reader.
+ * ADT is not consistent across releases about namespacing quickSearch hits —
+ * `<adtcore:objectReference adtcore:name>` on some, `<objectReference name>` on
+ * others — and `parseSearchResults` already accepts both, with tests. The copy
+ * that used to live here required the literal `<adtcore:objectReference` and
+ * read only the prefixed attribute, so on a system emitting the unprefixed
+ * form the lookup would succeed and this would still answer "missing" — the
+ * same silent skip as above, reached by a different route.
+ *
  * @param {Object} connection - ABAP connection
  * @param {string} packageName - Package name to check
  * @returns {Promise<boolean>} True if package exists, false if it does not
@@ -1010,36 +1019,17 @@ async function retryCheckAfterActivate(checkFunction, options = {}) {
  */
 async function checkPackageExists(connection, packageName) {
   try {
-    // Dynamically require searchObjects to avoid circular dependencies
-    const { searchObjects } = require('../../core/shared/search');
+    // Dynamically required to avoid circular dependencies
+    const { searchObjectsTyped } = require('../../core/shared/search');
 
-    const response = await searchObjects(connection, {
+    const hits = await searchObjectsTyped(connection, {
       query: `${packageName}*`,
       objectType: 'DEVC',
       maxResults: 101,
     });
 
-    if (response.status !== 200) {
-      return false;
-    }
-
-    const xmlData = typeof response.data === 'string' ? response.data : '';
-    if (!xmlData || !xmlData.includes('<adtcore:objectReference')) {
-      return false;
-    }
-
-    const parser = new XMLParser({
-      ignoreAttributes: false,
-      attributeNamePrefix: '@_',
-    });
-    const parsed = parser.parse(xmlData);
-    const refs =
-      parsed['adtcore:objectReferences']?.['adtcore:objectReference'];
-    const objects = refs ? (Array.isArray(refs) ? refs : [refs]) : [];
-
-    return objects.some(
-      (obj) =>
-        obj['@_adtcore:name']?.toUpperCase() === packageName.toUpperCase(),
+    return hits.some(
+      (hit) => hit.name?.toUpperCase() === packageName.toUpperCase(),
     );
   } catch (error) {
     throw new Error(
