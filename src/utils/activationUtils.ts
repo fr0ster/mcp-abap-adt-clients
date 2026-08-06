@@ -39,10 +39,26 @@ function extractActivationMsgText(msg: {
  * Inspect an ADT activation response body for an **explicit failure signal**.
  *
  * ADT's `/sap/bc/adt/activation` endpoint returns HTTP 200 even when activation
- * fails (object locked by another session, syntax errors), carrying a
- * `<chkl:messages>` body with `chkl:properties activationExecuted="false"` and/or
+ * fails on a syntax error, carrying a `<chkl:messages>` body with
  * `<msg type="E">` entries. Treating "no HTTP error" as success masks these
  * failures (issue #78).
+ *
+ * **The failure signal is an `E` message, not `activationExecuted="false"`.**
+ * This originally treated the flag alone as a failure, which is wrong — probed
+ * against a trial system:
+ *
+ * | scenario                       | HTTP | activationExecuted | `msg` |
+ * |--------------------------------|------|--------------------|-------|
+ * | class already active           | 200  | `false`            | none  |
+ * | DDIC table already active      | 200  | `true`             | none  |
+ * | class does not exist           | 200  | `false`            | `E`   |
+ * | locked by another session      | 403  | —                  | —     |
+ *
+ * A class that needs no activation reports `false` with an empty message list —
+ * indistinguishable, by the flag alone, from a class that does not exist. So the
+ * flag says whether ADT did any work, not whether the work succeeded, and only
+ * the messages carry the verdict. The lock case the old wording named is a 403
+ * and never reached this function at all.
  *
  * Conservative by design: returns a failure detail string ONLY on a positive
  * error signal. Empty, unparseable, or unrecognized bodies return `null`
@@ -77,10 +93,6 @@ function detectActivationFailure(responseData: unknown): string | null {
     return null;
   }
 
-  const activationExecuted = messages['chkl:properties']?.activationExecuted;
-  const executedFalse =
-    activationExecuted === 'false' || activationExecuted === false;
-
   const rawMsg = messages.msg;
   const msgList = Array.isArray(rawMsg) ? rawMsg : rawMsg ? [rawMsg] : [];
   const errorTexts = msgList
@@ -96,13 +108,7 @@ function detectActivationFailure(responseData: unknown): string | null {
       ),
     );
 
-  if (executedFalse || errorTexts.length > 0) {
-    return errorTexts.length > 0
-      ? errorTexts.join('; ')
-      : 'activationExecuted=false';
-  }
-
-  return null;
+  return errorTexts.length > 0 ? errorTexts.join('; ') : null;
 }
 
 /**
