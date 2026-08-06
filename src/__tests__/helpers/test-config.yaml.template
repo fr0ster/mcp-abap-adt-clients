@@ -1141,16 +1141,35 @@ create_scalar_function:
       params:
         scalar_function_name: "ZADT_SCALAR_FUNC"  # ← CHANGE if needed
         description: "AdtScalarFunction integration test"
+        # DDL of the scalar function DEFINITION — parameters and a return type.
+        # A definition is not an implementation: it needs no AMDP class to
+        # activate. The AMDP method belongs to the separate DSFI object, which
+        # has its own test case. Without this the test only ever did
+        # create → read → delete and left the definition empty.
+        # {name} is substituted with scalar_function_name above, so renaming the
+        # object cannot leave the DDL declaring a different one.
+        #
+        # No leading annotation: the parser answers
+        # 'Unexpected token "@". Expected was "DEFINE"' — a scalar function
+        # definition starts with the statement itself.
+        source_code: |
+          define scalar function {name}
+            with parameters
+              p_portion : abap.int4,
+              p_total   : abap.int4
+            returns abap.decfloat34;
         # package_name: "ZAC_PKG01"  # Uses environment.default_package if omitted
         # transport_request: ""  # Uses environment.default_transport if omitted
         # source_code (OPTIONAL): when set, the suite runs the FULL update→activate
         # flow. A CDS scalar function only activates when implemented by an AMDP method
         # that already exists on the target system:
-        #   CLASS-METHODS m FOR SCALAR FUNCTION zadt_scalar_func.
+        #   CLASS-METHODS m FOR SCALAR FUNCTION {name}.
         #   METHOD m BY DATABASE FUNCTION FOR HDB LANGUAGE SQLSCRIPT OPTIONS READ-ONLY. ...
-        # Without source_code the suite validates create → read → delete only.
+        # A definition backed by an AMDP method would look like this — note
+        # {name} here too, for the same reason as above: a worked example that
+        # spells the object name out is the thing a reader copies.
         # source_code: |
-        #   define scalar function ZADT_SCALAR_FUNC
+        #   define scalar function {name}
         #     with parameters p_input : abap.int4
         #     returns abap.int4
         #     implemented by method zcl_your_amdp=>m;

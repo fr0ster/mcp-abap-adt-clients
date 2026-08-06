@@ -181,8 +181,13 @@ describe('ScalarFunction (DSFD/SCF) integration', () => {
           // create_scalar_function.params.source_code (and the companion AMDP class
           // is deployed). Otherwise we validate the DSFD wire contract via
           // create → read → delete, which needs no AMDP fixture.
-          const configuredSource: string | undefined =
-            testCase?.params?.source_code;
+          // {name} is substituted here so the DDL can never declare an object
+          // other than the one the test created — the config invites renaming
+          // scalar_function_name, and a hardcoded name in the source would then
+          // create one object and try to fill another.
+          const configuredSource: string | undefined = (
+            testCase?.params?.source_code as string | undefined
+          )?.replaceAll('{name}', scalarFunctionName);
 
           if (configuredSource) {
             // ── 3a) Full flow: update source + activate ──
