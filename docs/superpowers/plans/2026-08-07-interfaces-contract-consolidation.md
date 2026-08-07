@@ -1133,17 +1133,15 @@ fix and this consolidation. Its CHANGELOG gains:
   import type { IAdtClientOptions } from '@mcp-abap-adt/interfaces';
   ```
 
-- The 26 handler aliases are deleted: `AdtClassType`, `AdtRequestType`,
-  `AdtDomainType` and the rest. Each was `IAdtObject<IXxxConfig, IXxxState>`
-  and nothing more.
+- The 26 handler aliases are deleted (Task 1, already done): `AdtClassType`,
+  `AdtRequestType`, `AdtDomainType` and the rest. Each was
+  `IAdtObject<IXxxConfig, IXxxState>` and nothing more, and none of them
+  resolves against the package any more.
 
   **Migration:** write the composition, with both halves from
-  `@mcp-abap-adt/interfaces`:
+  `@mcp-abap-adt/interfaces` — for the former `AdtClassType`:
 
   ```ts
-  // before
-  import type { AdtClassType } from '@mcp-abap-adt/adt-clients';
-  // after
   import type { IAdtSourceObject, IClassConfig, IClassState } from '@mcp-abap-adt/interfaces';
   type AdtClassType = IAdtSourceObject<IClassConfig, IClassState>;
   ```
