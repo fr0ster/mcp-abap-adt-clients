@@ -250,6 +250,44 @@ await abapGit.unlink({ package: 'ZMY_PKG' });
 
 **Content-type version.** Defaults to `v3` for sapcli compatibility. Cloud MDD advertises `v4`; consumers can opt in via `new AdtAbapGitClient(conn, logger, { contentTypeVersion: 'v4' })`.
 
+### What `update()` refuses to write
+
+Five object types — `domain`, `dataElement`, `package`, `tabletype`,
+`functionGroup` — update by **read-modify-write**: GET the current XML, patch the
+changed fields into it, PUT it back. Building the XML from scratch would drop
+fields the client does not model (`abapLanguageVersion` and friends), so the
+server's own body is the base.
+
+That makes the read a hard dependency, and ADT answers a read of a not-yet-ready
+object with **HTTP 200 and an empty body** — never a 404. Since **10.1.0** such a
+read fails instead of being patched and sent:
+
+```
+XmlPatchError: Cannot update domain ZAC_DOM01: the read returned an empty body.
+```
+
+Before, the patch found nothing to replace, returned the body unchanged
+silently, and the PUT went out without the field — which the server rejected
+with a message pointing nowhere near the cause (`The description is missing`).
+A slow system now surfaces as a read error naming the object.
+
+**A patch that cannot find its target throws.** A caller reaches a patch only
+when it intends the change, so "no match" means the PUT would not carry what was
+asked for.
+
+**One deliberate exception.** Setting an attribute on an element that is present
+without it *adds* the attribute rather than failing, because ADT emits exactly
+that for an unset reference:
+
+| ADT returns | meaning |
+|---|---|
+| `<doma:valueTableRef/>` | domain with no value table |
+| `<pak:superPackage/>` | package with no parent |
+
+So `value_table` and `super_package` now take effect when set for the first
+time; they were silently ignored before. If your code passes `super_package` on
+a root package and relied on it doing nothing, it now moves the package.
+
 ### What `activate()` treats as a failure
 
 `/sap/bc/adt/activation` answers **HTTP 200 even when activation fails**, so the verdict
