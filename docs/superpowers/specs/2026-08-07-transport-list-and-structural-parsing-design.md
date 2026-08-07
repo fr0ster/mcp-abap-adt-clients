@@ -145,9 +145,11 @@ of its 35 methods) comes after transports, which is the only one with a proven d
 
 ## Tests
 
-- **Unit, from the captured payload.** `/tmp/final.txt` holds 137 KB with 16 requests;
-  a trimmed fixture goes into the repo. Asserts: nesting is read correctly, container
-  status is attached, attributes survive verbatim.
+- **Unit, from a captured payload.** The response measured 137 KB with 16 requests, but
+  the probe wrote only its first 1 800 characters to disk — enough to confirm the nesting
+  and the attribute names quoted above, not enough for a fixture. **Re-capture in full
+  before writing these tests**, then trim into the repo. Asserts: nesting is read
+  correctly, container status is attached, attributes survive verbatim.
 - **Unit, unrecognised body** — throws rather than returning `[]`.
 - **Unit, empty root** — returns `[]`, does not throw, emits no warning.
 - **Integration** — asserts *content*, and states which case it verified. On a system with
