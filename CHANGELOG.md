@@ -5,6 +5,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [10.1.0] - 2026-08-07
+
+### Fixed
+- **A read-modify-write update no longer writes what it could not patch.** A full run failed with `update FAILED (HTTP 400): The description is missing for ZAC_DOM01` on a domain whose description was in the configuration throughout. Between the slow read and the rejected write sat two silent steps:
+
+  | step | what happened |
+  |---|---|
+  | `GET /ddic/domains/zac_dom01` | slow, or the object not yet ready |
+  | `extractXmlString(...)` | no check at all |
+  | `patchXmlAttribute('adtcore:description')` | no match → returned the body unchanged, silently |
+  | `PUT` | 400: the description is missing |
+
+  ADT answers a read of a not-yet-ready object with **HTTP 200 and an empty body**, never a 404, so no status revealed it; and `patchXmlAttribute`, being `String.replace`, found nothing to replace and said nothing. The varying response time of the ABAP system is the trigger and cannot be fixed here — what changes is the conversion. A slow read now surfaces as a read error naming the object (`Cannot update domain ZAC_DOM01: the read returned an empty body`) instead of a malformed write blamed on the server.
+
+  `extractXmlString` rejects a body that cannot be patched — empty, non-string (it used to `JSON.stringify` an object and pass it on as XML), or not XML. This covers all five read-modify-write modules at once — `domain`, `dataElement`, `package`, `tabletype`, `functionGroup`, the last of which carried its own inline copy of the same fallback. The four patch helpers throw `XmlPatchError` rather than passing the XML through untouched: a caller only reaches a patch when it intends the change, since `patchIf` skips the call for an absent value.
+
+### Changed
+- **Setting a reference that was not set before now takes effect.** `patchXmlElementAttribute` adds the attribute when the element is present without it, instead of silently doing nothing. Probed on a live system, ADT emits `<doma:valueTableRef/>` for a domain with no value table and `<pak:superPackage/>` for a package with no parent — so the previous behaviour ignored `value_table` and `super_package` in exactly the case where a caller would set them for the first time. Only a missing *element* is an error now.
+
+  This is the one behavioural change to a path that previously "succeeded": an update passing `super_package` for a root package used to change nothing and report success, and now moves the package. `patchXmlElement` needed no such split — ADT always emits the element, self-closing when empty (`<doma:conversionExit/>`), which its regex already matched.
+
+  No public export was added, removed or changed; `xmlPatch` is internal.
+
 ## [10.0.2] - 2026-08-06
 
 ### Fixed

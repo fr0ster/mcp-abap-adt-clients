@@ -232,7 +232,10 @@ export async function updateDataElement(
     timeout: getTimeout('default'),
     headers: { Accept: ACCEPT_DATA_ELEMENT },
   });
-  const currentXml = extractXmlString(currentResponse.data);
+  const currentXml = extractXmlString(
+    currentResponse.data,
+    `data element ${params.data_element_name}`,
+  );
 
   // 2. Patch only changed fields
   const updatedXml = patchDataElementXml(currentXml, params);

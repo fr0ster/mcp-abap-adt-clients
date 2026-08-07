@@ -95,7 +95,10 @@ export async function updateTableType(
     undefined,
     logger,
   );
-  const currentXml = extractXmlString(currentResponse.data);
+  const currentXml = extractXmlString(
+    currentResponse.data,
+    `table type ${params.tabletype_name}`,
+  );
 
   // 2. Patch only changed fields
   const updatedXml = patchTableTypeXml(currentXml, params);

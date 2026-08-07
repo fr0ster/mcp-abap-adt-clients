@@ -41,6 +41,27 @@ const lockXml = (handle: string): string =>
 const CHECKRUN_OK =
   '<chkrun:checkRunReports xmlns:chkrun="http://www.sap.com/adt/checkrun"/>';
 
+/**
+ * A body a read-modify-write update can patch.
+ *
+ * Reads used to answer with an empty string. That is what ADT returns for an
+ * object which is not ready yet, and since `extractXmlString` started refusing
+ * such a body, a recorder that hands one out is asserting the wrong thing:
+ * these tests are about the *order* of requests in the lock window, not about
+ * what a not-ready object does.
+ */
+const OBJECT_XML =
+  '<?xml version="1.0" encoding="UTF-8"?>' +
+  '<doma:wbobject xmlns:doma="http://www.sap.com/dictionary/domain" ' +
+  'xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="before">' +
+  '<doma:typeInformation><doma:datatype>CHAR</doma:datatype>' +
+  '<doma:length>5</doma:length><doma:decimals>0</doma:decimals>' +
+  '<doma:outputLength>5</doma:outputLength><doma:conversionExit/>' +
+  '<doma:signExists>false</doma:signExists>' +
+  '<doma:lowercase>false</doma:lowercase></doma:typeInformation>' +
+  '<doma:valueTableRef/>' +
+  '</doma:wbobject>';
+
 const ok = (data: unknown): IAdtResponse =>
   ({ data, status: 200, statusText: 'OK', headers: {} }) as IAdtResponse;
 
@@ -84,6 +105,9 @@ export function createSessionRecorder(
       }
       if (url.includes('/checkruns')) {
         return ok(CHECKRUN_OK);
+      }
+      if (method === 'GET') {
+        return ok(OBJECT_XML);
       }
       return ok('');
     },

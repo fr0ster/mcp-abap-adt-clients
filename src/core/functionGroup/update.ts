@@ -16,7 +16,7 @@ import {
   limitDescription,
 } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
-import { patchXmlAttribute } from '../../utils/xmlPatch';
+import { extractXmlString, patchXmlAttribute } from '../../utils/xmlPatch';
 import type { IAdtContentTypes } from '../shared/contentTypes';
 import { lockFunctionGroup } from './lock';
 import { getFunctionGroup } from './read';
@@ -103,10 +103,10 @@ export async function updateFunctionGroup(
       params.function_group_name,
       undefined,
     );
-    const currentXml =
-      typeof currentResponse.data === 'string'
-        ? currentResponse.data
-        : JSON.stringify(currentResponse.data);
+    const currentXml = extractXmlString(
+      currentResponse.data,
+      `function group ${params.function_group_name}`,
+    );
 
     // Update metadata
     const updateResponse = await updateFunctionGroupMetadata(

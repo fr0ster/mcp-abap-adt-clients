@@ -364,7 +364,23 @@ implementations pass it internally on reads after create/update.
 See the caveat above — on the system measured, the flag had no effect on object
 reads at all.
 
-**Note:** Long polling is automatically used in `create()` and `update()` methods of all `AdtObject` implementations to ensure objects are ready before proceeding with subsequent operations.
+**Note:** `create()` and `update()` request long polling on their follow-up reads
+where the handler supports it. Read that as "asked for", not "ensured" — the
+caveat above stands, and nothing in this library can make the system answer
+sooner than it does.
+
+What the library does guarantee is that a read which came back empty is not
+written back. ADT answers a read of a not-yet-ready object with **HTTP 200 and
+an empty body**, never a 404, so a read-modify-write update used to patch that
+empty body — changing nothing, because there was nothing to change — and PUT the
+result. Since 10.1.0 that read fails with `XmlPatchError`, naming the object:
+
+```
+Cannot update domain ZAC_DOM01: the read returned an empty body.
+```
+
+A slow system therefore surfaces as a read error, not as a write the server
+rejects for a reason that points nowhere near the cause.
 
 ### Creating Behavior Implementation Classes
 

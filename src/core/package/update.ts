@@ -111,7 +111,10 @@ export async function updatePackage(
     timeout: getTimeout('default'),
     headers: { Accept: ACCEPT_PACKAGE },
   });
-  const currentXml = extractXmlString(currentResponse.data);
+  const currentXml = extractXmlString(
+    currentResponse.data,
+    `package ${params.package_name}`,
+  );
 
   // 2. Patch only changed fields
   const updatedXml = patchPackageXml(currentXml, params);
