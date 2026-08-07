@@ -428,12 +428,26 @@ the interfaces release its types come from.
   — which is exactly how the first draft of the resolution order was wrong.
 - **[B] Unit, low-level purity** — `listTransports` issues exactly one request and never
   touches the configurations endpoint, whatever it is given.
-- **[B] Integration** — asserts *content*, and states which case it verified. On a system with
-  no requests it must assert "shape recognised, zero requests" rather than skip or fail.
-  Today's test asserts only `listResult).toBeDefined()`, which passes over an empty tree —
-  which is why this went unnoticed since 2026-07-20. The same test file also creates
-  transport requests and never deletes them (11 have accumulated since 2026-07-20); it
-  should reuse a shared one.
+
+The integration test splits across the two releases, because after B there is no parser and
+therefore nothing that can recognise a shape — only a response body.
+
+- **[B] Integration, over the raw response.** Asserts on `listResult.data` itself: the body
+  is a `tm:root` document, and — on a system holding requests — it contains at least one
+  `tm:request`. That is a string-level assertion, and it is deliberately crude; it is also
+  enough to have caught this defect, because the call returned 309 bytes with no
+  `tm:request` for two weeks. Today's test asserts only `listResult).toBeDefined()`, which
+  an empty tree passes, which is why nothing was noticed since 2026-07-20.
+  On a system with no requests it asserts the empty root and **says so in the test name**,
+  rather than skipping — a system with nothing to list is a verified case, not an absent one.
+- **[E] Integration, over the parsed tree.** Now that recognition exists, asserts what B
+  could not: the shape is recognised, and the request count matches what the raw body
+  contains. On an empty system that becomes "recognised, zero requests" — the assertion the
+  earlier draft demanded at B, where it was unimplementable.
+
+Both share one housekeeping fix, landing with B: `Transport.test.ts` creates transport
+requests and never deletes them (11 have accumulated since 2026-07-20). It should take one
+from `shared_dependencies` instead of creating its own.
 
 ## Evidence status
 
