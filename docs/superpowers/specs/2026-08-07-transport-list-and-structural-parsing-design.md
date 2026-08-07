@@ -125,10 +125,21 @@ export.
 
 ### What it becomes
 
+Two levels, and the boundary between them is where resolution happens. **The low level never
+resolves anything and never makes a call the caller did not ask for.** `configUri` is
+therefore *required* there, and optional only one level up.
+
 ```ts
 // @mcp-abap-adt/interfaces — published first
+
+/** Low level. configUri is required: this layer does not resolve, it requests. */
 export interface IListTransportsParams {
-  /** href of a saved search configuration. See the resolution rule below. */
+  /** href of a saved search configuration, verbatim from getTransportSearchConfigurations. */
+  configUri: string;
+}
+
+/** High level. Omitting configUri opts into the resolution rule below. */
+export interface IListTransportsOptions {
   configUri?: string;
 }
 
@@ -141,10 +152,10 @@ export type TransportTreeParser = (data: unknown) => ITransportTree;
 ```
 
 ```ts
-// src/core/transport/list.ts — low level, one request each, no hidden calls
+// src/core/transport/list.ts — low level. Exactly one request per function, always.
 export async function listTransports(
   connection: IAbapConnection,
-  params?: IListTransportsParams,
+  params: IListTransportsParams,          // configUri required
 ): Promise<IAdtResponse>;
 
 export async function getTransportSearchConfigurations(
@@ -156,15 +167,23 @@ export const parseTransportTree: TransportTreeParser;
 ```
 
 ```ts
-// src/core/transport/AdtRequest.ts
-async list(params?: IListTransportsParams): Promise<ITransportState>;
-async listNodes(params?: IListTransportsParams): Promise<ITransportTree>;
+// src/core/transport/AdtRequest.ts — high level. Resolves, then delegates.
+async list(options?: IListTransportsOptions): Promise<ITransportState>;
+async listNodes(options?: IListTransportsOptions): Promise<ITransportTree>;
 ```
 
-`listNodes()` is `list()` plus `parseTransportTree` applied to `listResult.data` — the same
-single HTTP request, not a second one. `ITransportState` gains **no** `nodes` field: a
-parsed tree is not an operation result, and putting it there would make the state type
-claim something it does not always hold.
+### How many requests
+
+| call | requests |
+|---|---|
+| `list({ configUri })` / `listNodes({ configUri })` | **1** — the list |
+| `list()` / `listNodes()` | **2** — configurations, then the list |
+| `listTransports(conn, { configUri })` | **1**, always — it has no other mode |
+
+`listNodes()` adds **no** request to `list()`: it is `list()` plus `parseTransportTree`
+applied to `listResult.data`. `ITransportState` gains **no** `nodes` field — a parsed tree is
+not an operation result, and putting it there would make the state type claim something it
+does not always hold.
 
 The parser is injected through the existing options object and threaded down:
 
@@ -184,13 +203,55 @@ one that came back from a batch.
 ### Batch
 
 `AdtClientBatch.getRequest()` returns the same `AdtRequest` over `BatchRecordingConnection`,
-whose `makeAdtRequest` resolves only after `execute()`. So `list()` records one part and
-`listNodes()` parses it once the batch resolves — both work unchanged.
+whose `makeAdtRequest` resolves only after `execute()`. With an explicit `configUri` both
+methods work unchanged: `list()` records one part, and `listNodes()` parses it once the batch
+resolves.
 
-**But automatic `configUri` resolution cannot work in a batch**: it must read the
-configurations response before it can build the second URL, and during recording that
-response has not arrived. Contract: **inside a batch, `configUri` is required**. Omitting it
-throws immediately with that sentence, rather than deadlocking.
+**Automatic resolution cannot work there.** It must read the configurations response before
+it can build the list URL, and during recording that response has not arrived — so the
+`await` inside resolution never returns, and the consumer never reaches `execute()` to make
+it return. A deadlock, not an error.
+
+This affects **`list()` and `listNodes()` equally** — both resolve, so both hang. The guard
+belongs in the shared resolution step, not in either method.
+
+#### The mechanism
+
+Deferral is a property of the connection, not of how the client was configured, so the
+connection declares it. This follows the connection capability atoms already in
+`@mcp-abap-adt/interfaces`:
+
+```ts
+// @mcp-abap-adt/interfaces
+export interface IDeferredResponseConnection {
+  /** Responses resolve only after a later flush; awaiting one mid-recording deadlocks. */
+  readonly responsesAreDeferred: true;
+}
+
+export function hasDeferredResponses(
+  connection: IAbapConnection,
+): connection is IAbapConnection & IDeferredResponseConnection;
+```
+
+`BatchRecordingConnection` implements it with one field. `AdtRequest` calls
+`hasDeferredResponses(this.connection)` before resolving and throws:
+
+> `configUri is required on a batch client: resolving a search configuration needs a
+> response that a batch cannot deliver until execute().`
+
+Three reasons this beats a `batchMode` constructor option:
+
+- it is true of the connection whatever built the handler — including a consumer who wraps
+  `BatchRecordingConnection` themselves, without going through `AdtClientBatch`;
+- `AdtClientBatch` forwards the caller's `IAdtClientOptions` verbatim to the inner
+  `AdtClient`, so an option-based flag would have to be injected into someone else's object;
+- a consumer cannot set it wrong on a normal connection without lying about their own
+  transport.
+
+**What it does not cover:** a third-party connection that defers responses without declaring
+it still deadlocks. The marker makes the known case honest; it is not a proof of absence. If
+that becomes real, the fallback is a timeout on resolution — deliberately not designed now,
+because no such connection exists.
 
 ### Legacy
 
@@ -223,8 +284,10 @@ parsing rule: selecting which requests matter is the consumer's decision.
 
 ### Resolving `configUri` when the caller omits it
 
-Deterministic, or it throws. Never "the first one".
+**This lives entirely in `AdtRequest`.** The low-level `listTransports` requires `configUri`
+and never runs any of it. Deterministic, or it throws. Never "the first one".
 
+0. Connection declares `responsesAreDeferred` → throw before anything else (see Batch above).
 1. `configUri` given → used verbatim, no configurations request at all.
 2. Omitted → `getTransportSearchConfigurations()`:
    - **exactly one** → use it.
@@ -291,11 +354,16 @@ both identically. That difference is not invented into the type.
    configuration document itself, and the facets, each written whole to disk. Answers the
    table above. **Blocks everything else.** A probe script exists
    (`scratchpad/capture-tree.js`); it needs a live token.
-1. **Fix `list.ts`** — `configUri`, the resolution rule, `getTransportSearchConfigurations`.
-   Independent of the type; can proceed on step 0's tree alone.
-2. **Type + parser** — derived from the fixture. Type into `@mcp-abap-adt/interfaces`,
-   published **before** adt-clients consumes it. Parser stays here.
-3. **Wire it** — `listNodes()`, the injected parser, the legacy override, the batch guard.
+1. **Fix `list.ts`** — required `configUri`, `getTransportSearchConfigurations`, and the
+   resolution rule in `AdtRequest`. Independent of the type; can proceed on step 0's tree
+   alone.
+2. **Interfaces release** — one publish carrying everything this design puts there:
+   `IListTransportsParams` (narrowed to a required `configUri`),
+   `IListTransportsOptions`, `ITransportSearchConfiguration`, `ITransportTree` derived from
+   the fixture, `TransportTreeParser`, `IDeferredResponseConnection` + `hasDeferredResponses`.
+   Published to npm **before** adt-clients consumes it — no local `file:` bridge.
+3. **Wire it** — `listNodes()`, the injected parser, the legacy override, the batch guard,
+   and `responsesAreDeferred` on `BatchRecordingConnection`.
 4. **Tests** — see below.
 5. **Rewrite issue #105** — its "What it cost" section states a cause that the evidence
    contradicts.
@@ -316,8 +384,12 @@ of its 35 methods) comes after transports, which is the only one with a proven d
   default; several without → throws naming the URIs; none → throws naming the endpoint.
 - **Unit, injected parser** — a stub parser is called instead of the default, and its
   return value reaches the caller unchanged.
-- **Unit, batch guard** — `listNodes()` without `configUri` on a batch client throws
-  instead of hanging.
+- **Unit, batch guard** — over a connection declaring `responsesAreDeferred`, **both**
+  `list()` and `listNodes()` without `configUri` throw instead of hanging, and **both**
+  succeed with one recorded part when `configUri` is given. The test must assert the throw
+  is fast, not merely that it happens: a deadlock would otherwise pass as a timeout.
+- **Unit, low-level purity** — `listTransports` issues exactly one request and never
+  touches the configurations endpoint, whatever it is given.
 - **Integration** — asserts *content*, and states which case it verified. On a system with
   no requests it must assert "shape recognised, zero requests" rather than skip or fail.
   Today's test asserts only `listResult).toBeDefined()`, which passes over an empty tree —
