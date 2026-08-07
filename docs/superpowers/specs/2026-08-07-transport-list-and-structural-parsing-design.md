@@ -1,7 +1,7 @@
 # Transport list, and where parsing stops
 
-**Status:** design, approved in outline; the `list` fix is a prerequisite for the rest.
-**Date:** 2026-08-07
+**Status:** design, revised after review. Blocked on the step-0 capture before any code.
+**Date:** 2026-08-07 (revised same day)
 
 ## Why this exists
 
@@ -54,10 +54,11 @@ GET /sap/bc/adt/cts/transportrequests?configUri=<href of a saved configuration>
   → 137 181 bytes, 16 × <tm:request>
 ```
 
-### Captured shape
+### Captured shape — the first 1 800 characters of it
 
-With `configUri`, the response is exactly the tree #105 reconstructed — that part of the
-issue is correct and is now **captured, not inferred**:
+With `configUri`, the opening of the response is exactly the tree #105 reconstructed — that
+part of the issue is correct and is **captured, not inferred**. What follows is the whole of
+what was kept; the remaining ~135 KB was not saved, and no claim below rests on it:
 
 ```xml
 <tm:root adtcore:name="CB9980008038" …>
@@ -74,8 +75,11 @@ issue is correct and is now **captured, not inferred**:
         <atom:link rel="…/releasejobs"      href="…/TRLK900494/releasejobs"/>
 ```
 
-`tm:workbench` repeats per target, and status lives on the container
-(`tm:modifiable`, `tm:released`), not on the request node.
+Status lives on the container, not only on the request node — `tm:status="Modifiable"` sits
+on `tm:modifiable` while the request carries its own `tm:status="D"`. That much is visible
+above. That `tm:workbench` repeats per target, and that a `tm:released` sibling container
+exists, is **inference from one excerpt** — it is in the step-0 question table, not in the
+evidence table.
 
 ## Where parsing stops
 
@@ -88,30 +92,181 @@ So the library parses **exactly enough to form a structural type**: it knows tha
 `tm:request` sits under a status container inside a category container — ADT knowledge a
 consumer should not need — and it hands back the nodes as they are.
 
+The shape of that type is **not fixed by this document**. It is derived from the captured
+fixture; see "The type is derived, not declared" below.
+
+## The API, exactly
+
+### What exists today
+
 ```ts
-list()      -> IAdtResponse          // unchanged; for callers wanting status and headers
-listNodes() -> {
-  requests: Array<{
-    attributes: Record<string, string>;   // tm:number, tm:desc, tm:owner … verbatim
-    container: { category: string; status: string; target?: string };
-    tasks: Array<{ attributes: Record<string, string> }>;
-  }>;
+// src/core/transport/list.ts
+export async function listTransports(
+  connection: IAbapConnection,
+  params: IListTransportsParams,          // { user, status?, date_range?, target_system?, request_type? }
+): Promise<IAdtResponse>;
+
+// src/core/transport/AdtRequest.ts — reached via AdtClient.getRequest()
+async list(params: {
+  user: string; status?: string; dateRange?: string;
+  targetSystem?: string; requestType?: string;
+}): Promise<ITransportState>;             // ITransportState.listResult?: IAdtResponse
+
+// @mcp-abap-adt/interfaces
+interface ITransportState extends IAdtObjectState {
+  transportNumber?: string; taskNumber?: string; listResult?: IAdtResponse;
 }
 ```
 
-`container` exists because flattening the tree loses the status and the target: they
-belong to the request but are carried by its parents. No renaming, no field selection, no
-camelCase.
+Four call sites reach it: `AdtClient.getRequest()`, `AdtClientLegacy.getRequest()` (returns
+`AdtRequestLegacy`, which does **not** override `list`), `AdtClientBatch.getRequest()`
+(delegates to the same `AdtRequest` over `BatchRecordingConnection`), and the low-level
+export.
 
-### The parser is replaceable
+### What it becomes
+
+```ts
+// @mcp-abap-adt/interfaces — published first
+export interface IListTransportsParams {
+  /** href of a saved search configuration. See the resolution rule below. */
+  configUri?: string;
+}
+
+export interface ITransportSearchConfiguration {
+  uri: string;                            // href, verbatim — pass back as configUri
+  attributes: Record<string, string>;     // adtcore:name, and whatever else the payload carries
+}
+
+export type TransportTreeParser = (data: unknown) => ITransportTree;
+```
+
+```ts
+// src/core/transport/list.ts — low level, one request each, no hidden calls
+export async function listTransports(
+  connection: IAbapConnection,
+  params?: IListTransportsParams,
+): Promise<IAdtResponse>;
+
+export async function getTransportSearchConfigurations(
+  connection: IAbapConnection,
+): Promise<ITransportSearchConfiguration[]>;
+
+// src/core/transport/parseTransportTree.ts — pure, no connection, exported from the root
+export const parseTransportTree: TransportTreeParser;
+```
+
+```ts
+// src/core/transport/AdtRequest.ts
+async list(params?: IListTransportsParams): Promise<ITransportState>;
+async listNodes(params?: IListTransportsParams): Promise<ITransportTree>;
+```
+
+`listNodes()` is `list()` plus `parseTransportTree` applied to `listResult.data` — the same
+single HTTP request, not a second one. `ITransportState` gains **no** `nodes` field: a
+parsed tree is not an operation result, and putting it there would make the state type
+claim something it does not always hold.
+
+The parser is injected through the existing options object and threaded down:
 
 ```ts
 new AdtClient(conn, logger, { transportListParser: myParser })
+// → IAdtClientOptions.transportListParser?: TransportTreeParser
+// → AdtRequest constructor gains an optional 4th argument
+// → AdtRequestLegacy passes it through super()
 ```
 
 The default parser is *typical*, not authoritative. A consumer on a system whose payload
 differs substitutes its own instead of waiting for a release. This follows the existing
-`IAdtClientOptions.enableAcceptCorrection` precedent.
+`IAdtClientOptions.enableAcceptCorrection` precedent. Because `parseTransportTree` is also
+exported standalone, a consumer can parse a response it obtained any other way — including
+one that came back from a batch.
+
+### Batch
+
+`AdtClientBatch.getRequest()` returns the same `AdtRequest` over `BatchRecordingConnection`,
+whose `makeAdtRequest` resolves only after `execute()`. So `list()` records one part and
+`listNodes()` parses it once the batch resolves — both work unchanged.
+
+**But automatic `configUri` resolution cannot work in a batch**: it must read the
+configurations response before it can build the second URL, and during recording that
+response has not arrived. Contract: **inside a batch, `configUri` is required**. Omitting it
+throws immediately with that sentence, rather than deadlocking.
+
+### Legacy
+
+`AdtRequestLegacy` inherits `list()` today and therefore calls the ADT path on a system that
+does not have it, while `listTransportsLegacy()` — pointing at `/sap/bc/cts/transportrequests`
+— sits unused since it was written. `AdtRequestLegacy` overrides `list()` to use it.
+
+`listNodes()` on legacy **throws**: the legacy endpoint's payload has never been captured, and
+guessing that `parseTransportTree` fits it would be exactly the failure this design exists to
+stop. It becomes supported when someone captures a legacy payload.
+
+## Compatibility
+
+The five filter parameters have never had an effect. Probed 2026-08-07: the endpoint returns
+the same empty root for `?user=`, for `?status=`, for the server's own property spellings, and
+for no parameters at all. They are not "currently ignored" — they were never read.
+
+So they are **removed**, not deprecated. Keeping a parameter that shapes nothing is the same
+class of lie as `{"success": true, "count": 0}`. This is a **breaking change → major version**,
+and the migration note is:
+
+| before | after |
+|---|---|
+| `list({ user: 'ME', status: 'D' })` | `list({ configUri })`, then filter the returned nodes |
+| relied on server-side filtering | there was none; the call returned nothing at all |
+
+Filtering is a property of the saved search configuration, which is created in Eclipse and
+referenced by href. The library will not filter the returned nodes — same boundary as the
+parsing rule: selecting which requests matter is the consumer's decision.
+
+### Resolving `configUri` when the caller omits it
+
+Deterministic, or it throws. Never "the first one".
+
+1. `configUri` given → used verbatim, no configurations request at all.
+2. Omitted → `getTransportSearchConfigurations()`:
+   - **exactly one** → use it.
+   - **several, one marked default** → use the marked one.
+   - **several, none marked** → throw, listing the URIs and requiring an explicit `configUri`.
+   - **none** → throw `TransportSearchConfigurationMissing`, naming the endpoint.
+
+Whether the payload marks a default is **unverified** — the capture must answer it. If it
+does not, the "several" case collapses into "always throw unless explicit", which is still
+deterministic; the rule does not change, only how often the error fires.
+
+Cases 3 and 4 mean `list()` can fail where it previously returned an empty tree. That is the
+point: it previously returned an empty tree *always*.
+
+## The type is derived, not declared
+
+An earlier draft of this document wrote `ITransportTree` out in full — with `tasks`, with
+`container.target` — on the strength of a 1 800-character excerpt of a 137 KB payload. That
+is the same mistake the design is about: asserting a shape nobody looked at.
+
+So `ITransportTree` is **not defined here**. It is defined from the fixture, and the capture
+must answer these before anyone writes it:
+
+| question | why it changes the type |
+|---|---|
+| Is there a `tm:task` element under `tm:request`? | decides whether `tasks` exists at all |
+| Does `tm:target` appear on the container, the request, or both? | decides where `target` lives, or whether it is only a request attribute |
+| Which category containers occur — `tm:workbench` only, or also customizing? | decides whether `category` is a union or an open string |
+| Which status containers occur — `tm:modifiable`, `tm:released`, others? | same, for `status` |
+| Do containers carry attributes beyond category/status? | decides whether `container` needs its own `attributes` bag |
+| Do `tm:request` elements ever appear outside a status container? | decides whether `container` is optional |
+| Does the configurations document mark a default? | decides the resolution rule above |
+
+What *is* fixed, and needs no capture:
+
+- attributes are handed back **verbatim** — `tm:number`, not `number`; no renaming, no
+  selection, no camelCase;
+- the container's own values are attached to each request, because flattening the tree
+  otherwise loses information the consumer cannot recover;
+- nothing is invented that the payload does not carry.
+
+The capture is step 1 of the work order below for this reason.
 
 ### Absent is not unrecognised
 
@@ -132,12 +287,17 @@ both identically. That difference is not invented into the type.
 
 ## Order of work
 
-1. **Fix `list.ts`** — resolve a search configuration and pass `configUri`. Until this
-   lands there is nothing to type.
-2. **Structural type + parser** — in `@mcp-abap-adt/interfaces`, published **before**
-   adt-clients consumes it.
-3. **Tests** — see below.
-4. **Rewrite issue #105** — its "What it cost" section states a cause that the evidence
+0. **Capture the payload in full** — the tree, the configurations document, the
+   configuration document itself, and the facets, each written whole to disk. Answers the
+   table above. **Blocks everything else.** A probe script exists
+   (`scratchpad/capture-tree.js`); it needs a live token.
+1. **Fix `list.ts`** — `configUri`, the resolution rule, `getTransportSearchConfigurations`.
+   Independent of the type; can proceed on step 0's tree alone.
+2. **Type + parser** — derived from the fixture. Type into `@mcp-abap-adt/interfaces`,
+   published **before** adt-clients consumes it. Parser stays here.
+3. **Wire it** — `listNodes()`, the injected parser, the legacy override, the batch guard.
+4. **Tests** — see below.
+5. **Rewrite issue #105** — its "What it cost" section states a cause that the evidence
    contradicts.
 
 Applying the same rule to the other raw methods (`AdtUtils` returns `IAdtResponse` from 23
@@ -145,17 +305,25 @@ of its 35 methods) comes after transports, which is the only one with a proven d
 
 ## Tests
 
-- **Unit, from a captured payload.** The response measured 137 KB with 16 requests, but
+- **Unit, from the captured payload.** The response measured 137 KB with 16 requests, but
   the probe wrote only its first 1 800 characters to disk — enough to confirm the nesting
-  and the attribute names quoted above, not enough for a fixture. **Re-capture in full
-  before writing these tests**, then trim into the repo. Asserts: nesting is read
-  correctly, container status is attached, attributes survive verbatim.
+  and the attribute names quoted above, not enough for a fixture. Step 0 re-captures it in
+  full; trim into the repo with the request numbers and owner GUID replaced. Asserts:
+  nesting is read correctly, container values are attached, attributes survive verbatim.
 - **Unit, unrecognised body** — throws rather than returning `[]`.
 - **Unit, empty root** — returns `[]`, does not throw, emits no warning.
+- **Unit, resolution rule** — one configuration → used; several with a default → the
+  default; several without → throws naming the URIs; none → throws naming the endpoint.
+- **Unit, injected parser** — a stub parser is called instead of the default, and its
+  return value reaches the caller unchanged.
+- **Unit, batch guard** — `listNodes()` without `configUri` on a batch client throws
+  instead of hanging.
 - **Integration** — asserts *content*, and states which case it verified. On a system with
   no requests it must assert "shape recognised, zero requests" rather than skip or fail.
   Today's test asserts only `listResult).toBeDefined()`, which passes over an empty tree —
-  which is why this went unnoticed since 2026-07-20.
+  which is why this went unnoticed since 2026-07-20. The same test file also creates
+  transport requests and never deletes them (11 have accumulated since 2026-07-20); it
+  should reuse a shared one.
 
 ## Evidence status
 
@@ -166,18 +334,24 @@ of its 35 methods) comes after transports, which is the only one with a proven d
 | empty root for no matches | captured |
 | `transportorganizertree` is the only type `/cts/transportrequests` accepts | captured (406 body) |
 | `transportorganizer.v1+xml` is the *item* type, not the collection's | captured |
+| the five filter parameters were never read by the server | captured — empty root with them and without them |
+| the full tree's element inventory (tasks, containers, container attributes) | **not captured** — only the first 1 800 chars were kept; step 0 |
+| whether the configurations document marks a default | **not captured** — step 0 |
 | where the configuration comes from when none is saved | **unknown** — every probe here found one already present |
 | whether on-prem behaves the same | **unverified** — no on-prem system is reachable from this machine |
+| the legacy `/sap/bc/cts/transportrequests` payload shape | **never captured** — hence `listNodes()` throws on legacy |
 
 ## Open questions
 
 1. **If no saved configuration exists**, must the client create one (POST), and with what
-   body? Every trial probe found one already there. This decides whether `list()` can be a
-   single call or needs a create-then-search sequence.
+   body? Every trial probe found one already there. The contract above throws in that case,
+   which is honest but may be improvable once the configuration document is captured and we
+   know whether it is POST-able. Answering it can only *relax* the rule, never change the
+   shape of the API — so it does not block implementation.
 2. **Does `configUri` exist on older on-prem releases?** `e77` discovery has no transport
-   organizer collection at all.
-3. Should `list()` accept an explicit `configUri`, so a consumer can drive its own saved
-   search? Likely yes, defaulting to the first available configuration.
+   organizer collection at all. Only the user's on-prem machine can answer this.
+3. **Is `tm:` the only namespace in play, and is `tm:root` guaranteed as the root element?**
+   Recognition is structural, so this decides what "unrecognised" means in practice. Step 0.
 
 ## Related
 
