@@ -291,13 +291,21 @@ parsing rule: selecting which requests matter is the consumer's decision.
 **This lives entirely in `AdtRequest`.** The low-level `listTransports` requires `configUri`
 and never runs any of it. Deterministic, or it throws. Never "the first one".
 
-0. Connection declares `responsesAreDeferred` → throw before anything else (see Batch above).
-1. `configUri` given → used verbatim, no configurations request at all.
-2. Omitted → `getTransportSearchConfigurations()`:
-   - **exactly one** → use it.
-   - **several, one marked default** → use the marked one.
-   - **several, none marked** → throw, listing the URIs and requiring an explicit `configUri`.
-   - **none** → throw `TransportSearchConfigurationMissing`, naming the endpoint.
+1. `configUri` given → used verbatim. No configurations request, and **no capability check**:
+   nothing here needs a response, so a deferred connection is irrelevant.
+2. Omitted → resolution is required, and only now does deferral matter:
+   1. connection declares `responsesAreDeferred` → throw (see Batch above);
+   2. otherwise `getTransportSearchConfigurations()`:
+      - **exactly one** → use it.
+      - **several, one marked default** → use the marked one.
+      - **several, none marked** → throw, listing the URIs and requiring an explicit `configUri`.
+      - **none** → throw `TransportSearchConfigurationMissing`, naming the endpoint.
+
+**The order matters and an earlier draft had it wrong.** Checking the capability first would
+have rejected every batch call, including `list({ configUri })`, which the Batch section
+declares supported — a guard against a deadlock that cannot occur, forbidding the one batch
+usage that works. The guard belongs *inside* the omitted branch, because that branch is the
+only thing that awaits a response mid-recording.
 
 Whether the payload marks a default is **unverified** — the capture must answer it. If it
 does not, the "several" case collapses into "always throw unless explicit", which is still
@@ -400,10 +408,14 @@ of its 35 methods) comes after transports, which is the only one with a proven d
   default; several without → throws naming the URIs; none → throws naming the endpoint.
 - **Unit, injected parser** — a stub parser is called instead of the default, and its
   return value reaches the caller unchanged.
-- **Unit, batch guard** — over a connection declaring `responsesAreDeferred`, **both**
-  `list()` and `listNodes()` without `configUri` throw instead of hanging, and **both**
-  succeed with one recorded part when `configUri` is given. The test must assert the throw
-  is fast, not merely that it happens: a deadlock would otherwise pass as a timeout.
+- **Unit, batch guard — the throwing side.** Over a connection declaring
+  `responsesAreDeferred`, `list()` and `listNodes()` *without* `configUri` both throw. The
+  test must assert the throw is **fast**, not merely that it happens: a deadlock would
+  otherwise pass as a timeout.
+- **Unit, batch guard — the working side.** Over the same connection, `list({ configUri })`
+  and `listNodes({ configUri })` both record **one** part and do not throw. Without this
+  test the guard can be tightened into rejecting all batch calls and everything stays green
+  — which is exactly how the first draft of the resolution order was wrong.
 - **Unit, low-level purity** — `listTransports` issues exactly one request and never
   touches the configurations endpoint, whatever it is given.
 - **Integration** — asserts *content*, and states which case it verified. On a system with
