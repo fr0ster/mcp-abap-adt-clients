@@ -35,8 +35,8 @@ library belongs in the contract package. Likewise step E adds `transportListPars
 - **Publish the dependency first.** `@mcp-abap-adt/interfaces` must be on npm before
   adt-clients imports anything new from it. No `file:`, no tarball, no `"link": true` in
   `package-lock.json` — verify after every `npm install`.
-- **Never change `package.json` version without asking.** Each release task asks the user
-  which version to use before bumping. After bumping, run `npm install --package-lock-only`
+- **Versions are decided** — interfaces 14.0.0, adt-clients 11.0.0, both major, ruled
+  2026-08-07. Do not re-ask; do not change them without a new instruction. After bumping, run `npm install --package-lock-only`
   and include the lockfile in the same commit.
 - Claude opens PRs, merges **reviewed** PRs, tags, and creates GitHub releases. `npm publish`
   is the user's — always stop and hand over.
@@ -386,136 +386,41 @@ the caller narrows what it already holds."
 
 ---
 
-### Task 3: Release interfaces
+### Task 3: Release interfaces — FOLDED INTO THE COMPANION PLAN
 
-**Files:**
-- Modify: `../mcp-abap-adt-interfaces/package.json` (version)
-- Modify: `../mcp-abap-adt-interfaces/package-lock.json`
-- Modify: `../mcp-abap-adt-interfaces/CHANGELOG.md`
-- Modify: `../mcp-abap-adt-interfaces/README.md` and anything under `docs/` that documents
-  transport parameters or connection capabilities
+**Do not cut a release here.** Tasks 1 and 2 above are committed onto the *same* branch as the
+consolidation work — `feat/contract-consolidation` in the interfaces repo — and released by
+`2026-08-07-interfaces-contract-consolidation.md`, **Task 8**, which also carries the 34
+promoted contract types.
 
-- [ ] **Step 1: Ask the user which version**
+Two symbols this plan originally declared in adt-clients go into that release too, because a
+consumer imports both to use the library:
 
-Do not guess. State the assessment and ask:
+```ts
+// @mcp-abap-adt/interfaces — src/adt/IAdtTransport.ts
+export const TRANSPORT_SEARCH_CONFIGURATIONS_URL =
+  '/sap/bc/adt/cts/transportrequests/searchconfiguration/configurations';
 
-> `IListTransportsParams` loses five fields and gains a required one — existing callers stop
-> compiling. By semver that is a major: 13.1.0 → **14.0.0**. Confirm, or name the version.
+export class TransportSearchConfigurationMissing extends Error { /* see Task 4 Step 5 */ }
+```
 
-Wait for the answer before touching `package.json`.
+An earlier revision of this plan had its own release task here. That was wrong twice over: it
+would have cut a second interfaces release for the same branch, and it asked the version
+question separately from the consolidation, which changes the answer — the moves are additive
+while `IListTransportsParams` narrowing is breaking, and only the combined release can be
+versioned honestly.
 
-- [ ] **Step 2: Find every document that describes the old contract**
+- [ ] **Step 1: Confirm Tasks 1–2 are on `feat/contract-consolidation`, not a branch of their own**
 
 ```bash
 cd /home/okyslytsia/prj/mcp-abap-adt-interfaces
-grep -rn "IListTransportsParams\|date_range\|target_system" README.md docs/ 2>/dev/null
+git branch --show-current   # expected: feat/contract-consolidation
+git log --oneline main..HEAD
 ```
 
-Update each hit. A changelog entry is for someone already watching; the docs are what
-everyone else reads, and a doc still describing the removed fields is worse than none.
+- [ ] **Step 2: Go to the companion plan's Task 8 and release from there.**
 
-- [ ] **Step 3: Write the CHANGELOG entry**
-
-Under a new version heading, with a migration note:
-
-```markdown
-### Breaking
-
-- `IListTransportsParams` now takes a single required `configUri` and no longer
-  carries `user`, `status`, `date_range`, `target_system` or `request_type`.
-  The endpoint never read them: probed on the trial 2026-08-07,
-  `/sap/bc/adt/cts/transportrequests` answers with the same 309-byte empty root
-  with them, without them, and with the configuration's own property spellings,
-  while 15 requests existed on the system.
-
-  **Migration:** obtain an href from
-  `/sap/bc/adt/cts/transportrequests/searchconfiguration/configurations` and pass
-  it as `configUri`. Filtering is a property of the saved configuration, which is
-  created in Eclipse. There was no server-side filtering to lose.
-
-### Added
-
-- `IListTransportsOptions` — the same field, optional, for the level that resolves.
-- `ITransportSearchConfiguration` — one saved search: `uri`, optional `etag`, and
-  its attributes verbatim.
-- `IDeferredResponseConnection` and `hasDeferredResponses()` — a connection whose
-  responses settle only at a later flush, so a caller can refuse to await one.
-```
-
-- [ ] **Step 4: Bump the version and the lockfile**
-
-```bash
-cd /home/okyslytsia/prj/mcp-abap-adt-interfaces
-npm version <agreed version> --no-git-tag-version
-npm install --package-lock-only
-grep -n '"link": true' package-lock.json || echo "no local links — good"
-```
-
-- [ ] **Step 5: Build and verify**
-
-```bash
-cd /home/okyslytsia/prj/mcp-abap-adt-interfaces && npm run build 2>&1 | tee build.log
-```
-
-Read `build.log`. Expected: clean.
-
-- [ ] **Step 6: Commit, push, open the PR**
-
-```bash
-cd /home/okyslytsia/prj/mcp-abap-adt-interfaces
-git add -A
-git commit -m "release(<version>): transport configUri contract + deferred-response atom"
-git push -u origin feat/transport-search-configuration
-gh pr create --title "release(<version>): transport configUri contract + deferred-response atom" \
-             --body "$(cat <<'BODY'
-## What changes
-
-`IListTransportsParams` takes a required `configUri` and loses `user`,
-`status`, `date_range`, `target_system`, `request_type`.
-
-Adds `IListTransportsOptions`, `ITransportSearchConfiguration`,
-`IDeferredResponseConnection` and `hasDeferredResponses()`.
-
-## Why
-
-The five filter fields were never read by the server. Probed on the trial
-2026-08-07: `/sap/bc/adt/cts/transportrequests` answered with the same
-309-byte empty root for `?user=`, `?status=`, the configuration's own
-property spellings, and no parameters at all — while 15 requests existed
-and `read` returned them one by one. `?configUri=<href>` returned 137 181
-bytes and 16 requests from the same system in the same minute.
-
-## Migration
-
-Obtain an href from
-`/sap/bc/adt/cts/transportrequests/searchconfiguration/configurations` and
-pass it as `configUri`. Filtering is a property of the saved configuration,
-created in Eclipse. There was no server-side filtering to lose.
-
-Design: `mcp-abap-adt-clients/docs/superpowers/specs/2026-08-07-transport-list-and-structural-parsing-design.md`
-BODY
-)"
-```
-
-- [ ] **Step 7: Wait for the user's review, then merge and tag**
-
-Merge only after the user reviews. Then:
-
-```bash
-cd /home/okyslytsia/prj/mcp-abap-adt-interfaces
-gh pr merge <N> --squash --delete-branch
-git checkout main && git pull --ff-only
-git tag -a v<version> -m "transport configUri contract + deferred-response atom
-
-BREAKING: IListTransportsParams takes a required configUri and loses the
-five filter fields the server never read." && git push --tags
-```
-
-- [ ] **Step 8: Hand over the publish — STOP HERE**
-
-Tell the user: `cd /home/okyslytsia/prj/mcp-abap-adt-interfaces && npm publish`.
-
-**Do not start Task 4 until the user confirms the version is on npm.** Verify:
+**Do not start Task 4 below until the user confirms the version is on npm:**
 
 ```bash
 npm view @mcp-abap-adt/interfaces version
@@ -523,7 +428,7 @@ npm view @mcp-abap-adt/interfaces version
 
 ---
 
-## Phase B — adt-clients, the call fix (unblocked once Task 3 is published)
+## Phase B — adt-clients, the call fix (unblocked once the shared interfaces release is on npm)
 
 ### Task 4: Low-level `listTransports` and `getTransportSearchConfigurations`
 
@@ -553,7 +458,7 @@ cd /home/okyslytsia/prj/mcp-abap-adt-clients
 git checkout main && git pull --ff-only
 git checkout -b fix/transport-list-configuri
 rm -rf node_modules/@mcp-abap-adt/interfaces
-npm install @mcp-abap-adt/interfaces@<version> --save-dev
+npm install @mcp-abap-adt/interfaces@14.0.0 --save-dev
 grep '"version"' node_modules/@mcp-abap-adt/interfaces/package.json
 grep -n '"link": true' package-lock.json || echo "no local links — good"
 ```
@@ -1651,12 +1556,13 @@ Read `docs-hits.log` and update every hit. A release updates **all** the documen
 change touches, not only the changelog: a doc still describing the removed parameters is
 worse than no doc, because it is believed.
 
-- [ ] **Step 2: Ask the user which version**
+- [ ] **Step 2: Version — decided: 11.0.0**
 
-> `list()` and `listTransports()` change shape and old calls stop compiling — a major by
-> semver: 10.1.0 → **11.0.0**. Confirm, or name the version.
+Ruled by the user 2026-08-07: **major**. `10.1.0 → 11.0.0`.
 
-Wait for the answer.
+This release carries two breaking changes at once — `list()` changing shape, and adt-clients
+no longer exporting contract types at all (companion plan, Phase 3). Either alone forces a
+major.
 
 - [ ] **Step 3: Write the CHANGELOG entry with a migration note**
 
@@ -1696,7 +1602,7 @@ Wait for the answer.
 - [ ] **Step 4: Bump, relock, build, full unit suite**
 
 ```bash
-npm version <agreed version> --no-git-tag-version
+npm version 11.0.0 --no-git-tag-version
 npm install --package-lock-only
 grep -n '"link": true' package-lock.json || echo "no local links — good"
 npm run build 2>&1 | tee build.log
@@ -1709,9 +1615,9 @@ Read both logs.
 
 ```bash
 git add -A
-git commit -m "release(<version>): transport list by configUri (BREAKING)"
+git commit -m "release(11.0.0): transport list by configUri (BREAKING)"
 git push -u origin fix/transport-list-configuri
-gh pr create --title "release(<version>): transport list by configUri (BREAKING)" \
+gh pr create --title "release(11.0.0): transport list by configUri (BREAKING)" \
              --body "$(cat <<'BODY'
 ## The defect
 
@@ -1759,7 +1665,7 @@ BODY
 ```bash
 gh pr merge <N> --squash --delete-branch
 git checkout main && git pull --ff-only
-git tag -a v<version> -m "transport list by configUri (BREAKING)
+git tag -a v11.0.0 -m "transport list by configUri (BREAKING)
 
 list() had never returned a transport request. The endpoint is a
 saved-configuration search; the five filter parameters were never read." \

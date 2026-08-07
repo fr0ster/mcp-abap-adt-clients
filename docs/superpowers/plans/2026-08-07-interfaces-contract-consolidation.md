@@ -24,8 +24,8 @@ substitute at. This ships in the **same interfaces release** as the transport ty
 - All repository artifacts in **English**.
 - `@mcp-abap-adt/interfaces` publishes to npm **before** adt-clients consumes it. No `file:`,
   no tarball, no `"link": true` in `package-lock.json` — verify after every `npm install`.
-- **Never change `package.json` version without asking.** Ask, then bump, then
-  `npm install --package-lock-only` in the same commit.
+- **Versions are decided** — interfaces 14.0.0, adt-clients 11.0.0, both major, ruled
+  2026-08-07. Bump, then `npm install --package-lock-only` in the same commit.
 - Claude opens PRs, merges **reviewed** PRs, tags. `npm publish` is the user's.
 - Biome: single quotes, semicolons, 2-space indent. `npm run lint` before every commit.
 - Unit tests: `MCP_ENV_PATH=/tmp/nonexistent-env npx jest src/__tests__/unit`.
@@ -639,15 +639,13 @@ git log --oneline main..feat/contract-consolidation
 
 Expected: the six commits from Tasks 2–7 plus the two transport commits.
 
-- [ ] **Step 2: Ask the user which version**
+- [ ] **Step 2: Version — decided: 14.0.0**
 
-> This release moves 34 contract types into the package and adds the transport contract.
-> Nothing is removed from `interfaces` and nothing changes shape, so it is **additive** —
-> `13.1.0 → 13.2.0`, except that `IListTransportsParams` is narrowed to a required
-> `configUri`, which is breaking on its own and forces **14.0.0**. Confirm, or name the
-> version.
+Ruled by the user 2026-08-07: **major**. `13.1.0 → 14.0.0`.
 
-Wait for the answer.
+The moves themselves are additive — nothing leaves `interfaces` and no shape changes — but
+`IListTransportsParams` is narrowed to a required `configUri`, which breaks every existing
+caller on its own. A minor would have been a lie about a type that stops compiling.
 
 - [ ] **Step 3: Update the documentation**
 
@@ -663,7 +661,7 @@ that decided every move in this plan.
 - [ ] **Step 4: CHANGELOG, bump, lock, build**
 
 ```bash
-npm version <agreed version> --no-git-tag-version
+npm version 14.0.0 --no-git-tag-version
 npm install --package-lock-only
 grep -n '"link": true' package-lock.json || echo "no local links — good"
 npm run build 2>&1 | tee build.log
@@ -673,9 +671,9 @@ npm run build 2>&1 | tee build.log
 
 ```bash
 git add -A
-git commit -m "release(<version>): consolidate the contract into one package"
+git commit -m "release(14.0.0): consolidate the contract into one package"
 git push -u origin feat/contract-consolidation
-gh pr create --title "release(<version>): consolidate the contract into one package" \
+gh pr create --title "release(14.0.0): consolidate the contract into one package" \
              --body "$(cat <<'BODY'
 ## Why
 
@@ -714,7 +712,7 @@ After the user's review:
 ```bash
 gh pr merge <N> --squash --delete-branch
 git checkout main && git pull --ff-only
-git tag -a v<version> -m "consolidate the contract into one package" && git push --tags
+git tag -a v14.0.0 -m "consolidate the contract into one package" && git push --tags
 ```
 
 Then **stop** and tell the user: `cd /home/okyslytsia/prj/mcp-abap-adt-interfaces && npm publish`.
@@ -735,30 +733,372 @@ All of Phase 3 is one branch and one release, together with the transport plan's
 cd /home/okyslytsia/prj/mcp-abap-adt-clients
 git checkout -b refactor/import-contract-from-interfaces
 rm -rf node_modules/@mcp-abap-adt/interfaces
-npm install @mcp-abap-adt/interfaces@<version> --save-dev
+npm install @mcp-abap-adt/interfaces@14.0.0 --save-dev
 grep '"version"' node_modules/@mcp-abap-adt/interfaces/package.json
 ```
 
 The `grep` on `node_modules` is the check that counts: `npm view` reports the registry, not
 what got installed.
 
-Tasks 9–14 are the mirror of Tasks 2–7 and share one procedure:
+Tasks 9–14 are the mirror of Tasks 2–7: the declaration is now in `interfaces`, so the local
+copy goes and every user of it imports across the package boundary instead. Each is one
+commit and is independently reviewable — a reviewer can reject the abapGit move while
+approving batch.
 
-1. Delete the local declarations from the source file.
-2. Import the same names from `@mcp-abap-adt/interfaces` wherever the file used them.
-3. Delete the matching `export type { … }` line from the group barrel — adt-clients no longer
-   hands out contract types; a consumer imports them from `interfaces`.
-4. `npm run build` and the unit suite; read both logs.
-5. Commit.
+### Task 9: adt-clients imports the abapGit contract
 
-| task | source file | barrel | symbols |
-|---|---|---|---|
-| 9 | `src/clients/abapGit/types.ts` | `src/index.abapgit.ts` | the 12 from Task 2 |
-| 10 | `src/executors/types.ts` | `src/index.executors.ts` | the 10 from Task 3 |
-| 11 | `src/clients/DebuggerSessionClient.ts` | `src/index.ws.ts` | the 5 from Task 4 |
-| 12 | `src/batch/types.ts` | `src/index.batch.ts` | the 3 from Task 5 |
-| 13 | `src/core/shared/contentTypes.ts` | `src/index.core.ts` | the 4 from Task 6 |
-| 14 | `src/clients/AdtClient.ts:181-197` | `src/index.core.ts` | the 2 from Task 7 |
+**Files:**
+- Modify: `src/clients/abapGit/types.ts` — delete the declarations
+- Modify: `src/index.abapgit.ts` — delete the matching `export type { … }` line
+- Modify: every file that used them — see below
+
+**Interfaces:**
+- Consumes from `@mcp-abap-adt/interfaces@14.0.0`: `AbapGitStatus`, `IAbapGitErrorLogEntry`, `IAbapGitExternalRepoBranch`, `IAbapGitExternalRepoCredentials`, `IAbapGitExternalRepoInfo`, `IAbapGitLinkArgs`, `IAbapGitPullArgs`, `IAbapGitPullResult`, `IAbapGitRepoStatus`, `IAbapGitUnlinkArgs`, `IAdtAbapGitClient`, `IAdtAbapGitClientOptions` (moved there by Task 2).
+- Produces: nothing. adt-clients stops exporting these names.
+
+Users to repoint: `AdtAbapGitClient` in `src/clients/AdtAbapGitClient.ts` and everything under `src/clients/abapGit/`.
+
+- [ ] **Step 1: Find every use before deleting anything**
+
+```bash
+cd /home/okyslytsia/prj/mcp-abap-adt-clients
+grep -rn "IAdtClientOptions\|IAdtSystemContext" src | grep -v node_modules   # adjust the names per task
+```
+
+Replace the names in that command with this task's symbols. Read the whole output — a
+declaration used in a place you did not expect is the signal that it is not purely contract.
+
+- [ ] **Step 2: Delete the local declarations from `src/clients/abapGit/types.ts`**
+
+Delete only the type declarations. Classes, functions and constants in the same file stay
+unless this task names them.
+
+- [ ] **Step 3: Import the same names from `@mcp-abap-adt/interfaces` at every use site**
+
+The names and shapes are identical — this is a path change, nothing else. If a shape needs
+adjusting to compile, the move in Task 2 was not verbatim; fix it there, not here.
+
+- [ ] **Step 4: Delete the barrel line in `src/index.abapgit.ts`**
+
+adt-clients no longer hands out contract types. A consumer imports them from `interfaces`,
+which is the entire point of the release.
+
+- [ ] **Step 5: Build and run the unit suite**
+
+```bash
+npm run build 2>&1 | tee build.log
+MCP_ENV_PATH=/tmp/nonexistent-env npx jest src/__tests__/unit 2>&1 | tee unit-run.log
+```
+
+Read both logs. Expected: clean.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add -A
+git commit -m "refactor!: import the abapGit contract from interfaces
+
+BREAKING CHANGE: adt-clients no longer exports these types. Same names,
+same shapes, different package — import from @mcp-abap-adt/interfaces."
+```
+
+---
+
+### Task 10: adt-clients imports the executor contract
+
+**Files:**
+- Modify: `src/executors/types.ts` — delete the declarations
+- Modify: `src/index.executors.ts` — delete the matching `export type { … }` line
+- Modify: every file that used them — see below
+
+**Interfaces:**
+- Consumes from `@mcp-abap-adt/interfaces@14.0.0`: `IClassExecuteWithProfilerOptions`, `IClassExecuteWithProfilingOptions`, `IClassExecuteWithProfilingResult`, `IClassExecutionTarget`, `IClassExecutor`, `IProgramExecuteWithProfilerOptions`, `IProgramExecuteWithProfilingOptions`, `IProgramExecuteWithProfilingResult`, `IProgramExecutionTarget`, `IProgramExecutor` (moved there by Task 3).
+- Produces: nothing. adt-clients stops exporting these names.
+
+Users to repoint: `AdtExecutor` in `src/clients/AdtExecutor.ts` and everything under `src/executors/`.
+
+- [ ] **Step 1: Find every use before deleting anything**
+
+```bash
+cd /home/okyslytsia/prj/mcp-abap-adt-clients
+grep -rn "IAdtClientOptions\|IAdtSystemContext" src | grep -v node_modules   # adjust the names per task
+```
+
+Replace the names in that command with this task's symbols. Read the whole output — a
+declaration used in a place you did not expect is the signal that it is not purely contract.
+
+- [ ] **Step 2: Delete the local declarations from `src/executors/types.ts`**
+
+Delete only the type declarations. Classes, functions and constants in the same file stay
+unless this task names them.
+
+- [ ] **Step 3: Import the same names from `@mcp-abap-adt/interfaces` at every use site**
+
+The names and shapes are identical — this is a path change, nothing else. If a shape needs
+adjusting to compile, the move in Task 3 was not verbatim; fix it there, not here.
+
+- [ ] **Step 4: Delete the barrel line in `src/index.executors.ts`**
+
+adt-clients no longer hands out contract types. A consumer imports them from `interfaces`,
+which is the entire point of the release.
+
+- [ ] **Step 5: Build and run the unit suite**
+
+```bash
+npm run build 2>&1 | tee build.log
+MCP_ENV_PATH=/tmp/nonexistent-env npx jest src/__tests__/unit 2>&1 | tee unit-run.log
+```
+
+Read both logs. Expected: clean.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add -A
+git commit -m "refactor!: import the executor contract from interfaces
+
+BREAKING CHANGE: adt-clients no longer exports these types. Same names,
+same shapes, different package — import from @mcp-abap-adt/interfaces."
+```
+
+---
+
+### Task 11: adt-clients imports the debugger contract
+
+**Files:**
+- Modify: `src/clients/DebuggerSessionClient.ts` — delete the declarations
+- Modify: `src/index.ws.ts` — delete the matching `export type { … }` line
+- Modify: every file that used them — see below
+
+**Interfaces:**
+- Consumes from `@mcp-abap-adt/interfaces@14.0.0`: `DebuggerStepAction`, `IDebuggerAttachParams`, `IDebuggerGetVariablesParams`, `IDebuggerListenParams`, `IDebuggerStepParams` (moved there by Task 4).
+- Produces: nothing. adt-clients stops exporting these names.
+
+Users to repoint: `DebuggerSessionClient` itself — the declarations sit in the same file as the class, so delete only the `export type`/`export interface` blocks and leave the class.
+
+- [ ] **Step 1: Find every use before deleting anything**
+
+```bash
+cd /home/okyslytsia/prj/mcp-abap-adt-clients
+grep -rn "IAdtClientOptions\|IAdtSystemContext" src | grep -v node_modules   # adjust the names per task
+```
+
+Replace the names in that command with this task's symbols. Read the whole output — a
+declaration used in a place you did not expect is the signal that it is not purely contract.
+
+- [ ] **Step 2: Delete the local declarations from `src/clients/DebuggerSessionClient.ts`**
+
+Delete only the type declarations. Classes, functions and constants in the same file stay
+unless this task names them.
+
+- [ ] **Step 3: Import the same names from `@mcp-abap-adt/interfaces` at every use site**
+
+The names and shapes are identical — this is a path change, nothing else. If a shape needs
+adjusting to compile, the move in Task 4 was not verbatim; fix it there, not here.
+
+- [ ] **Step 4: Delete the barrel line in `src/index.ws.ts`**
+
+adt-clients no longer hands out contract types. A consumer imports them from `interfaces`,
+which is the entire point of the release.
+
+- [ ] **Step 5: Build and run the unit suite**
+
+```bash
+npm run build 2>&1 | tee build.log
+MCP_ENV_PATH=/tmp/nonexistent-env npx jest src/__tests__/unit 2>&1 | tee unit-run.log
+```
+
+Read both logs. Expected: clean.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add -A
+git commit -m "refactor!: import the debugger contract from interfaces
+
+BREAKING CHANGE: adt-clients no longer exports these types. Same names,
+same shapes, different package — import from @mcp-abap-adt/interfaces."
+```
+
+---
+
+### Task 12: adt-clients imports the batch contract
+
+**Files:**
+- Modify: `src/batch/types.ts` — delete the declarations
+- Modify: `src/index.batch.ts` — delete the matching `export type { … }` line
+- Modify: every file that used them — see below
+
+**Interfaces:**
+- Consumes from `@mcp-abap-adt/interfaces@14.0.0`: `IBatchPayload`, `IBatchRequestPart`, `IBatchResponsePart` (moved there by Task 5).
+- Produces: nothing. adt-clients stops exporting these names.
+
+Users to repoint: `buildBatchPayload.ts`, `parseBatchResponse.ts`, `BatchRecordingConnection.ts`.
+
+- [ ] **Step 1: Find every use before deleting anything**
+
+```bash
+cd /home/okyslytsia/prj/mcp-abap-adt-clients
+grep -rn "IAdtClientOptions\|IAdtSystemContext" src | grep -v node_modules   # adjust the names per task
+```
+
+Replace the names in that command with this task's symbols. Read the whole output — a
+declaration used in a place you did not expect is the signal that it is not purely contract.
+
+- [ ] **Step 2: Delete the local declarations from `src/batch/types.ts`**
+
+Delete only the type declarations. Classes, functions and constants in the same file stay
+unless this task names them.
+
+- [ ] **Step 3: Import the same names from `@mcp-abap-adt/interfaces` at every use site**
+
+The names and shapes are identical — this is a path change, nothing else. If a shape needs
+adjusting to compile, the move in Task 5 was not verbatim; fix it there, not here.
+
+- [ ] **Step 4: Delete the barrel line in `src/index.batch.ts`**
+
+adt-clients no longer hands out contract types. A consumer imports them from `interfaces`,
+which is the entire point of the release.
+
+- [ ] **Step 5: Build and run the unit suite**
+
+```bash
+npm run build 2>&1 | tee build.log
+MCP_ENV_PATH=/tmp/nonexistent-env npx jest src/__tests__/unit 2>&1 | tee unit-run.log
+```
+
+Read both logs. Expected: clean.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add -A
+git commit -m "refactor!: import the batch contract from interfaces
+
+BREAKING CHANGE: adt-clients no longer exports these types. Same names,
+same shapes, different package — import from @mcp-abap-adt/interfaces."
+```
+
+---
+
+### Task 13: adt-clients imports the content-type contract
+
+**Files:**
+- Modify: `src/core/shared/contentTypes.ts` — delete the declarations
+- Modify: `src/index.core.ts` — delete the matching `export type { … }` line
+- Modify: every file that used them — see below
+
+**Interfaces:**
+- Consumes from `@mcp-abap-adt/interfaces@14.0.0`: types `IAdtContentTypes`, `IAdtHeaders` and constants `AdtContentTypesBase`, `AdtContentTypesModern` (moved there by Task 6).
+- Produces: nothing. adt-clients stops exporting these names.
+
+Users to repoint: `resolveContentTypes()` in `src/utils/systemInfo.ts`, which STAYS here — it inspects a system to choose between the two constant sets, which is behaviour, not contract.
+
+- [ ] **Step 1: Find every use before deleting anything**
+
+```bash
+cd /home/okyslytsia/prj/mcp-abap-adt-clients
+grep -rn "IAdtClientOptions\|IAdtSystemContext" src | grep -v node_modules   # adjust the names per task
+```
+
+Replace the names in that command with this task's symbols. Read the whole output — a
+declaration used in a place you did not expect is the signal that it is not purely contract.
+
+- [ ] **Step 2: Delete the local declarations from `src/core/shared/contentTypes.ts`**
+
+Delete only the type declarations. Classes, functions and constants in the same file stay
+unless this task names them.
+
+- [ ] **Step 3: Import the same names from `@mcp-abap-adt/interfaces` at every use site**
+
+The names and shapes are identical — this is a path change, nothing else. If a shape needs
+adjusting to compile, the move in Task 6 was not verbatim; fix it there, not here.
+
+- [ ] **Step 4: Delete the barrel line in `src/index.core.ts`**
+
+adt-clients no longer hands out contract types. A consumer imports them from `interfaces`,
+which is the entire point of the release.
+
+- [ ] **Step 5: Build and run the unit suite**
+
+```bash
+npm run build 2>&1 | tee build.log
+MCP_ENV_PATH=/tmp/nonexistent-env npx jest src/__tests__/unit 2>&1 | tee unit-run.log
+```
+
+Read both logs. Expected: clean.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add -A
+git commit -m "refactor!: import the content-type contract from interfaces
+
+BREAKING CHANGE: adt-clients no longer exports these types. Same names,
+same shapes, different package — import from @mcp-abap-adt/interfaces."
+```
+
+---
+
+### Task 14: adt-clients imports the client-configuration contract
+
+**Files:**
+- Modify: `src/clients/AdtClient.ts` — delete the declarations
+- Modify: `src/index.core.ts` — delete the matching `export type { … }` line
+- Modify: every file that used them — see below
+
+**Interfaces:**
+- Consumes from `@mcp-abap-adt/interfaces@14.0.0`: `IAdtClientOptions`, `IAdtSystemContext` (moved there by Task 7).
+- Produces: nothing. adt-clients stops exporting these names.
+
+Users to repoint: `AdtClient`, `AdtClientLegacy`, `AdtClientBatch`, `AdtRuntimeClient`, `AdtExecutor`, `createAdtClient` — every constructor that takes options, plus every `import type { IAdtSystemContext } from '../../clients/AdtClient'` in `src/core/*/Adt*.ts`.
+
+- [ ] **Step 1: Find every use before deleting anything**
+
+```bash
+cd /home/okyslytsia/prj/mcp-abap-adt-clients
+grep -rn "IAdtClientOptions\|IAdtSystemContext" src | grep -v node_modules   # adjust the names per task
+```
+
+Replace the names in that command with this task's symbols. Read the whole output — a
+declaration used in a place you did not expect is the signal that it is not purely contract.
+
+- [ ] **Step 2: Delete the local declarations from `src/clients/AdtClient.ts`**
+
+Delete only the type declarations. Classes, functions and constants in the same file stay
+unless this task names them.
+
+- [ ] **Step 3: Import the same names from `@mcp-abap-adt/interfaces` at every use site**
+
+The names and shapes are identical — this is a path change, nothing else. If a shape needs
+adjusting to compile, the move in Task 7 was not verbatim; fix it there, not here.
+
+- [ ] **Step 4: Delete the barrel line in `src/index.core.ts`**
+
+adt-clients no longer hands out contract types. A consumer imports them from `interfaces`,
+which is the entire point of the release.
+
+- [ ] **Step 5: Build and run the unit suite**
+
+```bash
+npm run build 2>&1 | tee build.log
+MCP_ENV_PATH=/tmp/nonexistent-env npx jest src/__tests__/unit 2>&1 | tee unit-run.log
+```
+
+Read both logs. Expected: clean.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add -A
+git commit -m "refactor!: import the client-configuration contract from interfaces
+
+BREAKING CHANGE: adt-clients no longer exports these types. Same names,
+same shapes, different package — import from @mcp-abap-adt/interfaces."
+```
+
+---
+
 
 ### Task 15: Release adt-clients
 
