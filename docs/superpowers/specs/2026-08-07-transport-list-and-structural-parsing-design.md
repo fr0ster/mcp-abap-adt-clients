@@ -144,8 +144,12 @@ export interface IListTransportsOptions {
 }
 
 export interface ITransportSearchConfiguration {
-  uri: string;                            // href, verbatim — pass back as configUri
-  attributes: Record<string, string>;     // adtcore:name, and whatever else the payload carries
+  /** href from the atom:link child, verbatim — pass back as configUri. */
+  uri: string;
+  /** etag from the same link, when present. */
+  etag?: string;
+  /** createdBy, createdAt, changedBy, changedAt, client — verbatim, no renaming. */
+  attributes: Record<string, string>;
 }
 
 export type TransportTreeParser = (data: unknown) => ITransportTree;
@@ -311,15 +315,25 @@ is the same mistake the design is about: asserting a shape nobody looked at.
 So `ITransportTree` is **not defined here**. It is defined from the fixture, and the capture
 must answer these before anyone writes it:
 
-| question | why it changes the type |
-|---|---|
-| Is there a `tm:task` element under `tm:request`? | decides whether `tasks` exists at all |
-| Does `tm:target` appear on the container, the request, or both? | decides where `target` lives, or whether it is only a request attribute |
-| Which category containers occur — `tm:workbench` only, or also customizing? | decides whether `category` is a union or an open string |
-| Which status containers occur — `tm:modifiable`, `tm:released`, others? | same, for `status` |
-| Do containers carry attributes beyond category/status? | decides whether `container` needs its own `attributes` bag |
-| Do `tm:request` elements ever appear outside a status container? | decides whether `container` is optional |
-| Does the configurations document mark a default? | decides the resolution rule above |
+| question | why it changes the type | status |
+|---|---|---|
+| Is there a `tm:task` element under `tm:request`? | decides whether `tasks` exists at all | **open** — no artifact contains the string `tm:task` |
+| Which category containers occur — `tm:workbench` only, or also customizing? | decides whether `category` is a union or an open string | **open** — the configuration sets `CustomizingRequests=true`, so a second container is likely and unseen |
+| Which status containers occur — `tm:modifiable`, `tm:released`, others? | same, for `status` | **open** — `Released=true` in the configuration, `tm:released` never observed |
+| Do `tm:request` elements ever appear outside a status container? | decides whether `container` is optional | **open** |
+| Does `tm:target` appear on the container, the request, or both? | decides where `target` lives | **answered** — a request attribute (`tm:target`, `tm:target_desc`); the container carries only its category |
+| Do containers carry attributes beyond category/status? | decides whether `container` needs its own bag | **answered so far** — `tm:workbench` has only `tm:category`, `tm:modifiable` only `tm:status` |
+| Does the configurations document mark a default? | decides the resolution rule above | **unanswerable here** — this system has exactly one configuration, and its element has no name or default attribute |
+
+All four open rows need the same thing: **the tree body past its first request**. Every probe
+printed a prefix, so 16 requests were counted but only one was ever seen. One request cannot
+show a second container, a sibling status, or a nested task.
+
+A closed question worth recording, because it contradicts an earlier draft: **status appears
+in two places, differently.** In the tree the request carries `tm:status="D"` and the
+container carries `tm:status="Modifiable"`; in the item resource the request itself carries
+both `tm:status="D"` and `tm:status_text="Modifiable"`. So the container is not the only
+carrier of that information in general — it is the only carrier *in the tree*.
 
 What *is* fixed, and needs no capture:
 
@@ -350,10 +364,12 @@ both identically. That difference is not invented into the type.
 
 ## Order of work
 
-0. **Capture the payload in full** — the tree, the configurations document, the
-   configuration document itself, and the facets, each written whole to disk. Answers the
-   table above. **Blocks everything else.** A probe script exists
-   (`scratchpad/capture-tree.js`); it needs a live token.
+0. **Capture the tree body in full.** Everything else on that list — configurations,
+   configuration document, metadata template, facets, discovery, the item resource — is
+   already captured and quoted above. What is missing is narrow and specific: the tree past
+   its first request, which is the only thing that can answer the four open rows. A probe
+   script exists (`scratchpad/capture-tree.js`, writes whole bodies with `fs.writeFileSync`);
+   it needs a live token. **Blocks step 2, not step 1.**
 1. **Fix `list.ts`** — required `configUri`, `getTransportSearchConfigurations`, and the
    resolution rule in `AdtRequest`. Independent of the type; can proceed on step 0's tree
    alone.
@@ -407,19 +423,68 @@ of its 35 methods) comes after transports, which is the only one with a proven d
 | `transportorganizertree` is the only type `/cts/transportrequests` accepts | captured (406 body) |
 | `transportorganizer.v1+xml` is the *item* type, not the collection's | captured |
 | the five filter parameters were never read by the server | captured — empty root with them and without them |
-| the full tree's element inventory (tasks, containers, container attributes) | **not captured** — only the first 1 800 chars were kept; step 0 |
-| whether the configurations document marks a default | **not captured** — step 0 |
-| where the configuration comes from when none is saved | **unknown** — every probe here found one already present |
+| the configurations document | captured **in full** — see below |
+| the configuration document (10 properties) | captured **in full** |
+| `searchconfiguration/metadata` returns the same properties as a template | captured **in full** |
+| the facets document (5 facets) | captured **in full** |
+| discovery lists all four CTS resources | captured — `discovery.xml`, 440 KB, 2026-08-04 |
+| the item resource carries `tm:status_text`, the tree does not | captured — both bodies |
+| the full tree past its **first request** | **not captured** — the probes printed a prefix; step 0 |
+| whether several configurations mark one as default | **not answerable here** — this system has exactly one |
 | whether on-prem behaves the same | **unverified** — no on-prem system is reachable from this machine |
 | the legacy `/sap/bc/cts/transportrequests` payload shape | **never captured** — hence `listNodes()` throws on legacy |
 
+### What discovery says
+
+`/sap/bc/adt/discovery` declares four CTS resources, which is how the search endpoints were
+found in the first place:
+
+```
+/sap/bc/adt/cts/transportrequests                                  "Transport Management"
+    accept: application/vnd.sap.adt.transportorganizer.v1+xml      ← wrong for the collection
+/sap/bc/adt/cts/transportrequests/searchconfiguration/configurations
+/sap/bc/adt/cts/transportrequests/searchconfiguration/metadata
+/sap/bc/adt/cts/transportrequests/facets
+```
+
+Two things follow. Discovery **does** name the search-configuration machinery, so nothing
+about this design is undocumented guesswork. And discovery's single `accept` for the
+collection is the **item** type — sending it to the collection returns 406, whose body names
+`transportorganizertree.v1+xml` instead. Discovery is authoritative about *what exists*, not
+about *what a resource accepts*; compare [[reference_adt_no_versions_endpoint]].
+
+### The configurations document, verbatim
+
+```xml
+<configurations:configurations>
+  <configuration:configuration createdBy="…" createdAt="…" changedBy="…" changedAt="…" client="100">
+    <atom:link href="…/searchconfiguration/configurations/7E5B0B99…" rel="…/configurations"
+               type="application/vnd.sap.adt.configuration.v1+xml" etag="20260807095048"/>
+  </configuration:configuration>
+</configurations:configurations>
+```
+
+There is **no name and no default marker** — the href lives on an `atom:link` child, and the
+element carries only authorship, client and etag. An earlier draft of this document put
+`adtcore:name` in `ITransportSearchConfiguration`; the payload has no such attribute.
+
 ## Open questions
 
-1. **If no saved configuration exists**, must the client create one (POST), and with what
-   body? Every trial probe found one already there. The contract above throws in that case,
-   which is honest but may be improvable once the configuration document is captured and we
-   know whether it is POST-able. Answering it can only *relax* the rule, never change the
-   shape of the API — so it does not block implementation.
+1. **If no saved configuration exists**, must the client create one, and with what body?
+   Partly answered: discovery declares
+   `/cts/transportrequests/searchconfiguration/metadata`, and it returns exactly the ten
+   properties of a configuration with an `isMandatory` flag on each — a template, which is
+   what a POST body would be built from:
+
+   ```
+   WorkbenchRequests, CustomizingRequests, TransportOfCopiesCreationSupported,
+   Modifiable, Released, User, DateFilter, FromDate, ToDate,
+   com.sap.adt.tm.facets.order
+   ```
+
+   What is **not** proven is that the collection accepts a POST. Until someone tries it on a
+   system with no configuration, the contract stays "throw". Answering this can only *relax*
+   the rule, never change the API shape, so it does not block implementation.
 2. **Does `configUri` exist on older on-prem releases?** `e77` discovery has no transport
    organizer collection at all. Only the user's on-prem machine can answer this.
 3. **Is `tm:` the only namespace in play, and is `tm:root` guaranteed as the root element?**
