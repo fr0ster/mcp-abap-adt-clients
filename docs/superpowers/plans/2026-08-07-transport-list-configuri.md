@@ -19,6 +19,14 @@ packages — `@mcp-abap-adt/interfaces` (types) and `@mcp-abap-adt/adt-clients` 
 (approved 2026-08-07). Work order steps A, B, C, G. **Steps D and E are deliberately not in
 this plan** — see "What this plan does not contain" at the end.
 
+**Companion plan:** `2026-08-07-interfaces-contract-consolidation.md`. Interfaces release A is
+**shared** — that plan's Task 8 cuts one release carrying both its 34 promoted types and this
+plan's Tasks 1–2. Do not cut two releases. Two symbols this plan first put in adt-clients —
+`TransportSearchConfigurationMissing` and `TRANSPORT_SEARCH_CONFIGURATIONS_URL` — live in
+`interfaces` by the ruling recorded there: anything a consumer imports in order to *use* the
+library belongs in the contract package. Likewise step E adds `transportListParser` to
+`IAdtClientOptions` **in interfaces**, where that type now lives.
+
 ## Global Constraints
 
 - All repository artifacts — code, comments, commit messages, docs — in **English**.
@@ -522,7 +530,6 @@ npm view @mcp-abap-adt/interfaces version
 **Files:**
 - Modify: `src/core/transport/list.ts` (rewrite)
 - Create: `src/core/transport/parseSearchConfigurations.ts`
-- Create: `src/core/transport/errors.ts`
 - Modify: `src/constants/contentTypes.ts:45-52`
 - Modify: `src/core/transport/types.ts:6-11`
 - Test: `src/__tests__/unit/core/transport/listTransports.test.ts` (create)
@@ -830,11 +837,21 @@ export function parseSearchConfigurations(
 }
 ```
 
-- [ ] **Step 5: Write the error type**
+- [ ] **Step 5: Nothing to write — the error type lives in interfaces**
 
-Create `src/core/transport/errors.ts`:
+`TransportSearchConfigurationMissing` and `TRANSPORT_SEARCH_CONFIGURATIONS_URL` are declared
+in `@mcp-abap-adt/interfaces`, not here: a consumer catches the error and may want the URL to
+fetch a `configUri` itself, and anything a consumer imports to use the library belongs in the
+contract package. They ship in the same interfaces release as Tasks 1–2 — see
+`2026-08-07-interfaces-contract-consolidation.md`, Task 8 Step 1.
+
+Their declarations, for reference while writing the interfaces side:
 
 ```ts
+// @mcp-abap-adt/interfaces — src/adt/IAdtTransport.ts
+export const TRANSPORT_SEARCH_CONFIGURATIONS_URL =
+  '/sap/bc/adt/cts/transportrequests/searchconfiguration/configurations';
+
 /**
  * A system with no saved transport search has nothing for `list()` to run.
  *
@@ -879,13 +896,10 @@ import {
   ACCEPT_TRANSPORT_LIST,
 } from '../../constants/contentTypes';
 import { getTimeout } from '../../utils/timeouts';
+import { TRANSPORT_SEARCH_CONFIGURATIONS_URL } from '@mcp-abap-adt/interfaces';
 import { parseSearchConfigurations } from './parseSearchConfigurations';
 
 export { parseSearchConfigurations };
-
-/** Where saved transport searches live. Named so an error message can quote it. */
-export const TRANSPORT_SEARCH_CONFIGURATIONS_URL =
-  '/sap/bc/adt/cts/transportrequests/searchconfiguration/configurations';
 
 /**
  * List ABAP transport requests for a saved search.
@@ -949,7 +963,6 @@ Expected: PASS, 9 tests.
 
 ```bash
 git add src/core/transport/list.ts src/core/transport/parseSearchConfigurations.ts \
-        src/core/transport/errors.ts src/core/transport/types.ts \
         src/constants/contentTypes.ts \
         src/__tests__/unit/core/transport/listTransports.test.ts
 git commit -m "fix(transport)!: list by configUri, the only form that returns requests
@@ -1236,6 +1249,8 @@ Replace the import block at the top of `src/core/transport/AdtRequest.ts`:
 ```ts
 import {
   hasDeferredResponses,
+  TRANSPORT_SEARCH_CONFIGURATIONS_URL,
+  TransportSearchConfigurationMissing,
   type HttpError,
   type IAbapConnection,
   type IAdtObject,
@@ -1248,12 +1263,7 @@ import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { safeErrorMessage } from '../../utils/internalUtils';
 import { throwUnsupportedVersions } from '../shared/versions';
 import { createTransport } from './create';
-import { TransportSearchConfigurationMissing } from './errors';
-import {
-  getTransportSearchConfigurations,
-  listTransports,
-  TRANSPORT_SEARCH_CONFIGURATIONS_URL,
-} from './list';
+import { getTransportSearchConfigurations, listTransports } from './list';
 import { getTransport } from './read';
 import type { ITransportConfig, ITransportState } from './types';
 ```
