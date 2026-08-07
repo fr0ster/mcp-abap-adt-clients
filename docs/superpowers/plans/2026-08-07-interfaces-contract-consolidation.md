@@ -75,6 +75,15 @@ A consumer that wants the type writes the composition, with both halves imported
 `interfaces`. Moving them would carry sugar across a package boundary; keeping them "for
 compatibility" through a major is how the junk survives every major.
 
+**One adt-clients branch carries everything that ships in 11.0.0** — this task, Phase 3, and
+the transport plan's Phase B. Create it here, check it out everywhere else.
+
+```bash
+cd /home/okyslytsia/prj/mcp-abap-adt-clients
+git checkout main && git pull --ff-only
+git checkout -b feat/11.0.0-contract-and-transport
+```
+
 - [ ] **Step 1: Confirm they are still unused before removing anything**
 
 ```bash
@@ -166,7 +175,8 @@ the release, because that is the direction the dependency runs.
 
 ```bash
 cd /home/okyslytsia/prj/mcp-abap-adt-interfaces
-git checkout main && git pull --ff-only
+# NB: this repo's default branch is master, not main.
+git checkout master && git pull --ff-only
 git checkout -b feat/contract-consolidation
 ```
 
@@ -711,7 +721,7 @@ After the user's review:
 
 ```bash
 gh pr merge <N> --squash --delete-branch
-git checkout main && git pull --ff-only
+git checkout master && git pull --ff-only
 git tag -a v14.0.0 -m "consolidate the contract into one package" && git push --tags
 ```
 
@@ -731,7 +741,7 @@ All of Phase 3 is one branch and one release, together with the transport plan's
 
 ```bash
 cd /home/okyslytsia/prj/mcp-abap-adt-clients
-git checkout -b refactor/import-contract-from-interfaces
+git checkout feat/11.0.0-contract-and-transport          # created in Task 1 — do not branch again
 rm -rf node_modules/@mcp-abap-adt/interfaces
 npm install @mcp-abap-adt/interfaces@14.0.0 --save-dev
 grep '"version"' node_modules/@mcp-abap-adt/interfaces/package.json

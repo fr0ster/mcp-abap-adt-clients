@@ -39,3 +39,6 @@ cookies.txt
 
 # Credential/config files (not for repo)
 mdd-*.json
+
+# Subagent-driven development scratch (ledger, briefs, review packages)
+.superpowers/

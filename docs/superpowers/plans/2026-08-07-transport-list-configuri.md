@@ -80,8 +80,11 @@ library belongs in the contract package. Likewise step E adds `transportListPars
 
 ```bash
 cd /home/okyslytsia/prj/mcp-abap-adt-interfaces
-git checkout main && git pull --ff-only
-git checkout -b feat/transport-search-configuration
+# NB: this repo's default branch is master, not main.
+# Tasks 1-2 share ONE branch with the consolidation plan's Tasks 2-7 — one
+# release, one branch. Create it only if it does not exist yet.
+git checkout master && git pull --ff-only
+git checkout -b feat/contract-consolidation 2>/dev/null || git checkout feat/contract-consolidation
 ```
 
 - [ ] **Step 1: Write the compile-only assertion**
@@ -455,8 +458,7 @@ npm view @mcp-abap-adt/interfaces version
 
 ```bash
 cd /home/okyslytsia/prj/mcp-abap-adt-clients
-git checkout main && git pull --ff-only
-git checkout -b fix/transport-list-configuri
+git checkout feat/11.0.0-contract-and-transport          # created by the consolidation plan's Task 1
 rm -rf node_modules/@mcp-abap-adt/interfaces
 npm install @mcp-abap-adt/interfaces@14.0.0 --save-dev
 grep '"version"' node_modules/@mcp-abap-adt/interfaces/package.json
@@ -1616,7 +1618,7 @@ Read both logs.
 ```bash
 git add -A
 git commit -m "release(11.0.0): transport list by configUri (BREAKING)"
-git push -u origin fix/transport-list-configuri
+git push -u origin feat/11.0.0-contract-and-transport
 gh pr create --title "release(11.0.0): transport list by configUri (BREAKING)" \
              --body "$(cat <<'BODY'
 ## The defect
