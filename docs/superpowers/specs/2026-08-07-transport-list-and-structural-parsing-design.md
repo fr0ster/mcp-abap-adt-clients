@@ -1,6 +1,7 @@
 # Transport list, and where parsing stops
 
-**Status:** design, revised after review. Blocked on the step-0 capture before any code.
+**Status:** design, revised after review. Steps A and B are unblocked; the capture (C) blocks
+only the parsing half, D and E.
 **Date:** 2026-08-07 (revised same day)
 
 ## Why this exists
@@ -78,7 +79,7 @@ what was kept; the remaining ~135 KB was not saved, and no claim below rests on 
 Status lives on the container, not only on the request node — `tm:status="Modifiable"` sits
 on `tm:modifiable` while the request carries its own `tm:status="D"`. That much is visible
 above. That `tm:workbench` repeats per target, and that a `tm:released` sibling container
-exists, is **inference from one excerpt** — it is in the step-0 question table, not in the
+exists, is **inference from one excerpt** — it is in the capture question table, not in the
 evidence table.
 
 ## Where parsing stops
@@ -130,7 +131,9 @@ resolves anything and never makes a call the caller did not ask for.** `configUr
 therefore *required* there, and optional only one level up.
 
 ```ts
-// @mcp-abap-adt/interfaces — published first
+// @mcp-abap-adt/interfaces — on npm before adt-clients imports any of it.
+// The first four ship in release A, TransportTreeParser in release B: it
+// returns ITransportTree, which the capture defines. See "Order of work".
 
 /** Low level. configUri is required: this layer does not resolve, it requests. */
 export interface IListTransportsParams {
@@ -351,7 +354,7 @@ What *is* fixed, and needs no capture:
   otherwise loses information the consumer cannot recover;
 - nothing is invented that the payload does not carry.
 
-The capture is step 1 of the work order below for this reason.
+The capture is step C of the work order below for this reason.
 
 ### Absent is not unrecognised
 
@@ -372,53 +375,60 @@ both identically. That difference is not invented into the type.
 
 ## Order of work
 
-0. **Capture the tree body in full.** Everything else on that list — configurations,
-   configuration document, metadata template, facets, discovery, the item resource — is
-   already captured and quoted above. What is missing is narrow and specific: the tree past
-   its first request, which is the only thing that can answer the four open rows. A probe
-   script exists (`scratchpad/capture-tree.js`, writes whole bodies with `fs.writeFileSync`);
-   it needs a live token. **Blocks step 2, not step 1.**
-1. **Fix `list.ts`** — required `configUri`, `getTransportSearchConfigurations`, and the
-   resolution rule in `AdtRequest`. Independent of the type; can proceed on step 0's tree
-   alone.
-2. **Interfaces release** — one publish carrying everything this design puts there:
-   `IListTransportsParams` (narrowed to a required `configUri`),
-   `IListTransportsOptions`, `ITransportSearchConfiguration`, `ITransportTree` derived from
-   the fixture, `TransportTreeParser`, `IDeferredResponseConnection` + `hasDeferredResponses`.
-   Published to npm **before** adt-clients consumes it — no local `file:` bridge.
-3. **Wire it** — `listNodes()`, the injected parser, the legacy override, the batch guard,
-   and `responsesAreDeferred` on `BatchRecordingConnection`.
-4. **Tests** — see below.
-5. **Rewrite issue #105** — its "What it cost" section states a cause that the evidence
-   contradicts.
+The types this design adds split cleanly into two groups: those the capture cannot change,
+and those it defines. That split, not the call-fix / parse-fix split, is what orders the work
+— because **every interfaces type must be on npm before adt-clients imports it**, and half of
+them are ready now.
+
+**Two interfaces releases, therefore two publishes by the user.** That is the honest cost of
+the rule; the alternative is one publish that waits for a token nobody in this repo controls,
+stalling the defect fix behind a fixture it does not need.
+
+| | step | needs the capture? |
+|---|---|---|
+| A | **Interfaces release A** — `IListTransportsParams` (narrowed to a required `configUri`), `IListTransportsOptions`, `ITransportSearchConfiguration`, `IDeferredResponseConnection` + `hasDeferredResponses`. All four are fixed by the *request* contract and by `BatchRecordingConnection`, neither of which the tree body can change. Publish to npm. | no |
+| B | **Fix the call** — `listTransports` with a required `configUri`, `getTransportSearchConfigurations`, the resolution rule in `AdtRequest`, the legacy `list()` override, `responsesAreDeferred` on `BatchRecordingConnection`, and the batch guard. Consumes release A. This is the step that makes `list()` return data at all. | no |
+| C | **Capture the tree body in full.** Everything else — configurations, configuration document, metadata template, facets, discovery, the item resource — is already captured and quoted above. Missing is only the tree past its first request, the one thing that answers the four open rows. Probe script: `scratchpad/capture-tree.js`, whole bodies via `fs.writeFileSync`; needs a live token. | — |
+| D | **Interfaces release B** — `ITransportTree` derived from the fixture, and `TransportTreeParser`, which is `(data: unknown) => ITransportTree` and so cannot precede it. Publish to npm. | yes |
+| E | **Parse** — `parseTransportTree`, `listNodes()`, `transportListParser` injection. Consumes release B. `listNodes()` on legacy throws. | yes |
+| F | **Tests** — see below. Those covering the call contract land with B; those over the fixture with E. | partly |
+| G | **Rewrite issue #105** — its "What it cost" section states a cause that the evidence contradicts. Can happen any time; it depends on the finding, not the code. | no |
+
+A and B can start today. C is the only thing waiting, and it now blocks D and E alone. No
+local `file:` bridge or tarball at either publish — the consumer waits for npm.
 
 Applying the same rule to the other raw methods (`AdtUtils` returns `IAdtResponse` from 23
 of its 35 methods) comes after transports, which is the only one with a proven defect.
 
 ## Tests
 
-- **Unit, from the captured payload.** The response measured 137 KB with 16 requests, but
+Each test is tagged with the work-order step it lands in. A test cannot precede
+the interfaces release its types come from.
+
+- **[E] Unit, from the captured payload.** The response measured 137 KB with 16 requests, but
   the probe wrote only its first 1 800 characters to disk — enough to confirm the nesting
-  and the attribute names quoted above, not enough for a fixture. Step 0 re-captures it in
+  and the attribute names quoted above, not enough for a fixture. Step C re-captures it in
   full; trim into the repo with the request numbers and owner GUID replaced. Asserts:
   nesting is read correctly, container values are attached, attributes survive verbatim.
-- **Unit, unrecognised body** — throws rather than returning `[]`.
-- **Unit, empty root** — returns `[]`, does not throw, emits no warning.
-- **Unit, resolution rule** — one configuration → used; several with a default → the
+- **[E] Unit, unrecognised body** — throws rather than returning `[]`.
+- **[E] Unit, empty root** — returns `[]`, does not throw, emits no warning.
+- **[B] Unit, resolution rule** — one configuration → used; several with a default → the
   default; several without → throws naming the URIs; none → throws naming the endpoint.
-- **Unit, injected parser** — a stub parser is called instead of the default, and its
+- **[E] Unit, injected parser** — a stub parser is called instead of the default, and its
   return value reaches the caller unchanged.
-- **Unit, batch guard — the throwing side.** Over a connection declaring
-  `responsesAreDeferred`, `list()` and `listNodes()` *without* `configUri` both throw. The
+- **[B] Unit, batch guard — the throwing side.** Over a connection declaring
+  `responsesAreDeferred`, `list()` *without* `configUri` throws — and `listNodes()` too,
+  once it exists in E. The
   test must assert the throw is **fast**, not merely that it happens: a deadlock would
   otherwise pass as a timeout.
-- **Unit, batch guard — the working side.** Over the same connection, `list({ configUri })`
-  and `listNodes({ configUri })` both record **one** part and do not throw. Without this
+- **[B] Unit, batch guard — the working side.** Over the same connection,
+  `list({ configUri })` records **one** part and does not throw — and `listNodes({ configUri })`
+  the same, once it exists in E. Without this
   test the guard can be tightened into rejecting all batch calls and everything stays green
   — which is exactly how the first draft of the resolution order was wrong.
-- **Unit, low-level purity** — `listTransports` issues exactly one request and never
+- **[B] Unit, low-level purity** — `listTransports` issues exactly one request and never
   touches the configurations endpoint, whatever it is given.
-- **Integration** — asserts *content*, and states which case it verified. On a system with
+- **[B] Integration** — asserts *content*, and states which case it verified. On a system with
   no requests it must assert "shape recognised, zero requests" rather than skip or fail.
   Today's test asserts only `listResult).toBeDefined()`, which passes over an empty tree —
   which is why this went unnoticed since 2026-07-20. The same test file also creates
@@ -441,7 +451,7 @@ of its 35 methods) comes after transports, which is the only one with a proven d
 | the facets document (5 facets) | captured **in full** |
 | discovery lists all four CTS resources | captured — `discovery.xml`, 440 KB, 2026-08-04 |
 | the item resource carries `tm:status_text`, the tree does not | captured — both bodies |
-| the full tree past its **first request** | **not captured** — the probes printed a prefix; step 0 |
+| the full tree past its **first request** | **not captured** — the probes printed a prefix; step C |
 | whether several configurations mark one as default | **not answerable here** — this system has exactly one |
 | whether on-prem behaves the same | **unverified** — no on-prem system is reachable from this machine |
 | the legacy `/sap/bc/cts/transportrequests` payload shape | **never captured** — hence `listNodes()` throws on legacy |
@@ -500,7 +510,7 @@ element carries only authorship, client and etag. An earlier draft of this docum
 2. **Does `configUri` exist on older on-prem releases?** `e77` discovery has no transport
    organizer collection at all. Only the user's on-prem machine can answer this.
 3. **Is `tm:` the only namespace in play, and is `tm:root` guaranteed as the root element?**
-   Recognition is structural, so this decides what "unrecognised" means in practice. Step 0.
+   Recognition is structural, so this decides what "unrecognised" means in practice. Step C.
 
 ## Related
 
