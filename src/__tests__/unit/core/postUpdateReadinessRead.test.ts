@@ -48,7 +48,28 @@ interface ICall {
   params?: Record<string, unknown>;
 }
 
-/** Answers LOCK with a handle; everything else 200/empty. */
+/**
+ * A body every read-modify-write update can actually patch.
+ *
+ * This stub used to answer every non-LOCK request with an empty body. That is
+ * what ADT returns for an object which is not ready yet — and since the patch
+ * helpers started refusing to write a body they could not patch, asserting the
+ * update proceeds from one is asserting the wrong thing.
+ */
+const OBJECT_XML =
+  '<?xml version="1.0" encoding="UTF-8"?>' +
+  '<adtcore:wbObject xmlns:adtcore="http://www.sap.com/adt/core" ' +
+  `adtcore:name="${OBJ}" adtcore:description="before" ` +
+  'adtcore:responsible="TESTER" adtcore:masterSystem="TRL">' +
+  // The package handler patches these; ADT emits them empty when unset, which
+  // is what a root package really returns.
+  '<pak:attributes pak:packageType=""/>' +
+  '<pak:superPackage/>' +
+  '<pak:softwareComponent pak:name=""/>' +
+  '<pak:transportLayer pak:name=""/>' +
+  '</adtcore:wbObject>';
+
+/** Answers LOCK with a handle; everything else 200 with a patchable body. */
 function fakeConnection(): { conn: IAbapConnection; calls: ICall[] } {
   const calls: ICall[] = [];
   const makeAdtRequest = jest.fn(async (req: any) => {
@@ -59,7 +80,7 @@ function fakeConnection(): { conn: IAbapConnection; calls: ICall[] } {
     ) {
       return { status: 200, data: LOCK_XML };
     }
-    return { status: 200, data: '' };
+    return { status: 200, data: OBJECT_XML };
   });
   return {
     conn: {

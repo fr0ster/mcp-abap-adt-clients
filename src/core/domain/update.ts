@@ -109,7 +109,10 @@ export async function updateDomain(
     timeout: getTimeout('default'),
     headers: { Accept: ACCEPT_DOMAIN },
   });
-  const currentXml = extractXmlString(currentResponse.data);
+  const currentXml = extractXmlString(
+    currentResponse.data,
+    `domain ${args.domain_name}`,
+  );
 
   // 2. Patch only changed fields
   const updatedXml = patchDomainXml(currentXml, args);
