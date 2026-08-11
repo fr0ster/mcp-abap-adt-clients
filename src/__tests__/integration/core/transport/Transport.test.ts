@@ -241,7 +241,7 @@ describe('AdtRequest', () => {
 
   describe('List transports', () => {
     it(
-      'should list transport requests for current user',
+      'should list transport requests through a saved search configuration',
       async () => {
         logTestStart(testsLogger, 'AdtRequest - list transports', {
           name: 'list_transports',
@@ -258,15 +258,74 @@ describe('AdtRequest', () => {
         }
 
         try {
-          logTestStep('list', testsLogger);
-          const listState = await client.getRequest().list({
-            user: process.env.SAP_USERNAME || '*',
-            status: 'D',
-          });
+          // A body that merely "exists" is not a detector: the historical
+          // defect (HTTP 200, a self-closing `<tm:root/>`, zero requests) is
+          // itself a well-formed, non-empty body. Checking shape alone stays
+          // green on exactly the payload this test exists to catch.
+          //
+          // The discriminator is a transport request we create ourselves, the
+          // same way and from the same config source as the "Full workflow"
+          // block (`create_transport` / `builder_transport`). Once it exists,
+          // list() MUST surface its number — if list() regresses to an empty
+          // root, this fails, because we independently know the request is
+          // there.
+          let knownTransportNumber: string | null = null;
+          const definition = getTestDefinition();
+          const testCase = definition
+            ? getEnabledTestCase('create_transport', 'builder_transport')
+            : null;
 
-          expect(listState).toBeDefined();
-          expect(listState.listResult).toBeDefined();
+          if (testCase) {
+            try {
+              logTestStep('create (discriminator transport)', testsLogger);
+              const createState = await client
+                .getRequest()
+                .create(buildConfig(testCase) as any);
+              knownTransportNumber = createState.transportNumber || null;
+            } catch (createError: any) {
+              testsLogger.warn?.(
+                'Could not create a discriminator transport for the list ' +
+                  'test; falling back to a shape-only assertion:',
+                createError,
+              );
+            }
+          }
+
+          logTestStep('list', testsLogger);
+          const listState = await client.getRequest().list();
+
           expect(listState.errors.length).toBe(0);
+          expect(listState.listResult).toBeDefined();
+
+          const body = String(listState.listResult?.data ?? '');
+          expect(body).toContain('tm:root');
+
+          const requestCount = (body.match(/<tm:request /g) ?? []).length;
+          logTestStep(`requests returned: ${requestCount}`, testsLogger);
+
+          if (knownTransportNumber) {
+            // Known-request case: the real detector. We created this request
+            // moments ago, so its number must appear in the list body.
+            logTestStep(
+              `known-request case: expecting ${knownTransportNumber} in the list body`,
+              testsLogger,
+            );
+            expect(body).toContain(knownTransportNumber);
+          } else {
+            // Fallback case: no discriminator was available (no test case
+            // configured/enabled, or creation itself failed on this system —
+            // e.g. legacy systems without the configured user). This branch
+            // only confirms the response is a well-formed tm:root document;
+            // it does NOT treat zero requests as suspicious. A system that
+            // genuinely holds no transport requests must be able to report
+            // zero without being flagged as broken.
+            logTestStep(
+              'fallback case: no discriminator transport available, ' +
+                `asserting response shape only (requests returned: ${requestCount})`,
+              testsLogger,
+            );
+            expect(body).toMatch(/<tm:root[^>]*\/>|<\/tm:root>/);
+          }
 
           logTestSuccess(testsLogger, 'AdtRequest - list transports');
         } catch (error: any) {
