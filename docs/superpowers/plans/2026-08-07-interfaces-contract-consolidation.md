@@ -43,9 +43,9 @@ The `interfaces` barrel exports 372 symbols. adt-clients exports 104 from its ow
 | executor types | 10 | move — Task 3 |
 | debugger types | 5 | move — Task 4 |
 | batch types | 3 | move — Task 5 |
-| content-type types + 2 constants | 4 | move — Task 6 |
+| content-type types | 2 | move — Task 6 |
 | client configuration | 2 | move — Task 7 |
-| classes and functions | 42 | **stay** — implementation |
+| classes and functions | 44 | **stay** — implementation |
 
 ---
 
@@ -292,7 +292,8 @@ git commit -m "feat(abapgit): the abapGit contract belongs in the contract packa
 - Create: `../mcp-abap-adt-interfaces/src/execution/IAdtExecutors.ts`
 - Modify: `../mcp-abap-adt-interfaces/src/index.ts`
 - Test: `../mcp-abap-adt-interfaces/src/__typechecks__/executors.ts` (create)
-- Read from: `src/executors/types.ts`
+- Read from: `src/executors/class/ClassExecutor.ts` and `src/executors/program/ProgramExecutor.ts`
+  (there is no `src/executors/types.ts` — the declarations sit beside their classes)
 
 **Interfaces:**
 - Produces, all 10: `IClassExecuteWithProfilerOptions`, `IClassExecuteWithProfilingOptions`,
@@ -303,7 +304,7 @@ git commit -m "feat(abapgit): the abapGit contract belongs in the contract packa
 
 `interfaces` already has a `src/execution/` directory — put it there, not under `adt/`.
 
-- [ ] **Step 1: Copy the declarations verbatim from `src/executors/types.ts`**
+- [ ] **Step 1: Copy the declarations verbatim from `src/executors/class/ClassExecutor.ts` and `src/executors/program/ProgramExecutor.ts`**
 
 Same rule as Task 2: names, fields and comments unchanged. If a declaration references a
 profiler type from adt-clients that is not yet in this package, stop and move that first.
@@ -459,7 +460,7 @@ git commit -m "feat(batch): batch payload shapes move to the contract package"
 
 ---
 
-### Task 6: Content types and their two constants → interfaces
+### Task 6: The content-type contract → interfaces
 
 **Files:**
 - Create: `../mcp-abap-adt-interfaces/src/adt/IAdtContentTypes.ts`
@@ -468,42 +469,52 @@ git commit -m "feat(batch): batch payload shapes move to the contract package"
 - Read from: `src/core/shared/contentTypes.ts` (no imports)
 
 **Interfaces:**
-- Produces: types `IAdtContentTypes`, `IAdtHeaders`; **values** `AdtContentTypesBase`,
-  `AdtContentTypesModern`. Phase 3 Task 13 imports all four.
+- Produces: `IAdtContentTypes` and `IAdtHeaders` — types only. Phase 3 Task 13 imports both.
 
-The two constants move with the types they populate. `interfaces` already ships runtime
-values — `ADT_SESSION_ERROR`, `AdtObjectErrorCodes`, `SERVICE_BINDING_VARIANT_MAP` — so this
-adds no new kind of thing to the package.
+**`AdtContentTypesBase` and `AdtContentTypesModern` STAY in adt-clients.** An earlier revision
+of this plan called them constants and moved them — they are classes of 354 lines
+implementing 38 methods, with `Modern` extending `Base` and overriding. That is
+implementation by the same rule that sends the interfaces across, and a consumer that wants
+its own header set implements `IAdtContentTypes` rather than importing a shipped class.
+Ruled by the user 2026-08-11 after the implementer surfaced the misclassification.
 
-`resolveContentTypes()` is a **function** and stays in adt-clients: it picks between the two
-constants by inspecting a system, which is behaviour, not contract.
+`resolveContentTypes()` stays too: it inspects a system to choose between the two classes,
+which is behaviour, not contract.
 
-- [ ] **Step 1: Copy the two interfaces and the two constants verbatim.**
+- [ ] **Step 1: Copy the two interfaces verbatim. Copy neither class.**
 
 - [ ] **Step 2: Write the compile-only assertion**
 
 ```ts
 // Compile-only assertions. If these stop compiling, the types regressed.
 
-import {
-  AdtContentTypesBase,
-  AdtContentTypesModern,
-  type IAdtContentTypes,
+import type {
+  IAdtContentTypes,
+  IAdtHeaders,
 } from '../adt/IAdtContentTypes';
 
-// Both shipped sets satisfy the shape a consumer may override.
-const _base: IAdtContentTypes = AdtContentTypesBase;
-const _modern: IAdtContentTypes = AdtContentTypesModern;
-void _base;
-void _modern;
+// A consumer's own header set satisfies the contract — the reason this is
+// published. Stub enough methods to prove the shape is implementable here,
+// without importing the shipped classes, which stay in adt-clients.
+const headers: IAdtHeaders = {} as IAdtHeaders;
+const _own: Pick<IAdtContentTypes, 'programCreate' | 'sourceArtifactContentType'> = {
+  programCreate: (): IAdtHeaders => headers,
+  sourceArtifactContentType: (): string => 'text/plain',
+};
+void _own;
 
-// And a consumer's own set does too — the reason this is published.
-const _custom: IAdtContentTypes = { ...AdtContentTypesBase };
-void _custom;
+// @ts-expect-error sourceArtifactContentType returns a string, not headers.
+const _wrongReturn: Pick<IAdtContentTypes, 'sourceArtifactContentType'> = {
+  sourceArtifactContentType: (): IAdtHeaders => headers,
+};
+void _wrongReturn;
 ```
 
-- [ ] **Step 3: Export from the barrel** — the two types with `export type`, the two
-  constants with a plain `export {}`.
+Read the real `IAdtHeaders` and give `headers` a real object literal rather than the cast
+shown — the cast is a placeholder for a shape you must read from the source.
+
+- [ ] **Step 3: Export both types from the barrel** with `export type`. There are no values
+  to export from this module.
 
 - [ ] **Step 4: Verify**
 
@@ -515,7 +526,10 @@ cd /home/okyslytsia/prj/mcp-abap-adt-interfaces && npm run test:check && npm run
 
 ```bash
 git add src/adt/IAdtContentTypes.ts src/index.ts src/__typechecks__/contentTypes.ts
-git commit -m "feat(adt): content-type contract and its two shipped sets move to interfaces"
+git commit -m "feat(adt): the content-type contract moves to interfaces
+
+The two shipped sets stay behind: they are 354-line classes implementing 38
+methods, which is implementation, not contract."
 ```
 
 ---
@@ -529,8 +543,8 @@ git commit -m "feat(adt): content-type contract and its two shipped sets move to
 - Read from: `src/clients/AdtClient.ts:181-197`
 
 **Interfaces:**
-- Consumes: `IAdtContentTypes` from Task 6 — `IAdtClientOptions.contentTypes` is typed by it,
-  so **Task 6 must land first**.
+- Consumes: `IAdtContentTypes` from Task 6 (the TYPE only — the shipped classes stay in
+  adt-clients), so **Task 6 must land first**.
 - Produces: `IAdtClientOptions`, `IAdtSystemContext`. Phase 3 Task 14 imports them, and the
   transport plan's step E adds `transportListParser` to `IAdtClientOptions` here rather than
   in adt-clients.
@@ -698,15 +712,15 @@ duplication, so nothing had drifted.
 
 ## What moves in
 
-abapGit (12), executors (10), debugger (5), batch (3), content types and
-their two shipped constant sets (4), client options and system context (2),
+abapGit (12), executors (10), debugger (5), batch (3), the content-type contract (2),
+client options and system context (2),
 plus the transport contract and the deferred-response atom.
 
 ## What does not
 
 Classes, parsers and request builders stay in adt-clients — that is
-implementation. `resolveContentTypes()` stays too: it inspects a system to
-pick between the two constant sets, which is behaviour.
+implementation. `AdtContentTypesBase`/`AdtContentTypesModern` and
+`resolveContentTypes()` stay too — 354 lines of behaviour, not contract.
 
 ## Deleted, separately, in adt-clients
 
@@ -817,7 +831,7 @@ same shapes, different package — import from @mcp-abap-adt/interfaces."
 ### Task 10: adt-clients imports the executor contract
 
 **Files:**
-- Modify: `src/executors/types.ts` — delete the declarations
+- Modify: `src/executors/class/ClassExecutor.ts` and `src/executors/program/ProgramExecutor.ts` — delete the declarations, keep the classes
 - Modify: `src/index.executors.ts` — delete the matching `export type { … }` line
 - Modify: every file that used them — see below
 
@@ -837,7 +851,7 @@ grep -rn "IAdtClientOptions\|IAdtSystemContext" src | grep -v node_modules   # a
 Replace the names in that command with this task's symbols. Read the whole output — a
 declaration used in a place you did not expect is the signal that it is not purely contract.
 
-- [ ] **Step 2: Delete the local declarations from `src/executors/types.ts`**
+- [ ] **Step 2: Delete the local declarations from `src/executors/class/ClassExecutor.ts` and `src/executors/program/ProgramExecutor.ts`**
 
 Delete only the type declarations. Classes, functions and constants in the same file stay
 unless this task names them.
@@ -994,15 +1008,20 @@ same shapes, different package — import from @mcp-abap-adt/interfaces."
 ### Task 13: adt-clients imports the content-type contract
 
 **Files:**
-- Modify: `src/core/shared/contentTypes.ts` — delete the declarations
-- Modify: `src/index.core.ts` — delete the matching `export type { … }` line
+- Modify: `src/core/shared/contentTypes.ts` — delete the two INTERFACE declarations only; the
+  classes `AdtContentTypesBase` and `AdtContentTypesModern` stay and now import the interfaces
+- Modify: `src/index.core.ts` — delete `IAdtContentTypes` and `IAdtHeaders` from the type
+  export line; **keep** the two class exports
 - Modify: every file that used them — see below
 
 **Interfaces:**
-- Consumes from `@mcp-abap-adt/interfaces@14.0.0`: types `IAdtContentTypes`, `IAdtHeaders` and constants `AdtContentTypesBase`, `AdtContentTypesModern` (moved there by Task 6).
-- Produces: nothing. adt-clients stops exporting these names.
+- Consumes from `@mcp-abap-adt/interfaces@14.0.0`: `IAdtContentTypes`, `IAdtHeaders` (moved
+  there by Task 6). The two shipped classes were NOT moved and stay exported from here.
+- Produces: nothing. adt-clients stops exporting the two interface names.
 
-Users to repoint: `resolveContentTypes()` in `src/utils/systemInfo.ts`, which STAYS here — it inspects a system to choose between the two constant sets, which is behaviour, not contract.
+Users to repoint: `AdtContentTypesBase`/`AdtContentTypesModern` themselves (they `implements
+IAdtContentTypes`), and `resolveContentTypes()` in `src/utils/systemInfo.ts`, which STAYS —
+it inspects a system to choose between the two classes, which is behaviour, not contract.
 
 - [ ] **Step 1: Find every use before deleting anything**
 
