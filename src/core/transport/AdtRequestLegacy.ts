@@ -5,6 +5,7 @@
  *
  * Supported operations:
  * - read: GET /sap/bc/cts/transportrequests (returns full list, filtered client-side)
+ * - list: GET /sap/bc/cts/transportrequests (no saved-configuration search; configUri rejected)
  *
  * Unsupported operations:
  * - create: Legacy CTS REST API does not support creating transport requests.
@@ -16,11 +17,12 @@ import type {
   HttpError,
   IAbapConnection,
   IAdtOperationOptions,
+  IListTransportsOptions,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { AdtRequest } from './AdtRequest';
-import { getTransportLegacy } from './readLegacy';
+import { getTransportLegacy, listTransportsLegacy } from './readLegacy';
 import type { ITransportConfig, ITransportState } from './types';
 
 export class AdtRequestLegacy extends AdtRequest {
@@ -85,5 +87,27 @@ export class AdtRequestLegacy extends AdtRequest {
       }
       throw error;
     }
+  }
+
+  /**
+   * List transport requests (legacy path).
+   *
+   * `/sap/bc/cts/transportrequests` returns the full list for the current user.
+   * It is not a saved-configuration search, so there is no configUri to pass —
+   * and accepting one silently would report a filter that never applied.
+   */
+  override async list(
+    options?: IListTransportsOptions,
+  ): Promise<ITransportState> {
+    if (options?.configUri) {
+      throw new Error(
+        'configUri is not supported on legacy SAP systems: ' +
+          '/sap/bc/cts/transportrequests is not a saved-configuration search and ' +
+          'always returns the full list for the current user.',
+      );
+    }
+
+    const response = await listTransportsLegacy(this.conn);
+    return { listResult: response, errors: [] };
   }
 }
