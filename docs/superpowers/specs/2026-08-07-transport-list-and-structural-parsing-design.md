@@ -1,7 +1,8 @@
 # Transport list, and where parsing stops
 
-**Status:** design, revised after review. Steps A and B are unblocked; the capture (C) blocks
-only the parsing half, D and E.
+**Status:** steps A, B and C are DONE and shipped in adt-clients 11.0.0 — the call is fixed and
+verified against a live system. **D and E remain**, and the parser design below was partly
+invalidated by the evidence in C; read "What the two captures settle" before implementing.
 **Date:** 2026-08-07 (revised same day)
 
 ## Why this exists
@@ -339,6 +340,32 @@ must answer these before anyone writes it:
 | Does `tm:target` appear on the container, the request, or both? | decides where `target` lives | **answered** — a request attribute (`tm:target`, `tm:target_desc`); the container carries only its category |
 | Do containers carry attributes beyond category/status? | decides whether `container` needs its own bag | **answered so far** — `tm:workbench` has only `tm:category`, `tm:modifiable` only `tm:status` |
 | Does the configurations document mark a default? | decides the resolution rule above | **unanswerable here** — this system has exactly one configuration, and its element has no name or default attribute |
+
+## What the two captures settle — 2026-08-12
+
+Both captures now come from the **same trial** (`bb8534dd`), so "two different systems" is no
+longer an alternative explanation.
+
+| | our call, no `targets` | Eclipse, `?targets=true` |
+|---|---|---|
+| chain | `tm:workbench > tm:modifiable > tm:request` | `tm:workbench > tm:target > tm:modifiable > tm:request` |
+| `tm:task` | present | present |
+| measured | 60 162 bytes, 7 requests, 7 tasks | 9 014 bytes, 1 request, 1 task |
+
+**The container chain is variable, and the parameter is what varies it.** So:
+
+- `container: { category, status, target? }` as a fixed triple is **wrong** — delete it from
+  the design below;
+- the parser must reach `tm:request` **by element name**, not by path, and collect whatever
+  ancestor containers it passed through;
+- `tasks` is real and belongs in the type.
+
+Also settled: `list()` returns exactly what the saved configuration describes. The one on this
+trial carries `User=CB9980006582`, `WorkbenchRequests=true`, `CustomizingRequests=true`,
+`Modifiable=true`, `Released=true` — so "all transports on the system" is not what a caller
+gets, and an empty result stays a legitimate answer.
+
+Live capture: `/tmp/list-live.xml` (60 KB) — copy into a fixture before it is lost.
 
 ## What Eclipse actually does — captured 2026-08-11
 
