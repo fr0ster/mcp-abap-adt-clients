@@ -76,7 +76,7 @@ important thing these two files exist to catch.
 
 ## Phase D — interfaces
 
-### Task 1: The four tree types
+### Task 1: The five tree types
 
 **Files:**
 - Modify: `../mcp-abap-adt-interfaces/src/adt/IAdtTransport.ts` (append)
@@ -332,7 +332,14 @@ A `14.1.0` section, Added only:
 ### Added
 
 - `ITransportTree`, `ITransportTreeRequest`, `ITransportTreeTask`,
-  `ITransportTreeNode` — the parsed shape of the CTS transport tree.
+  `ITransportTreeNode`, `ITransportTreeLink` — the parsed shape of the CTS
+  transport tree.
+
+  Nothing on the root, a request or a task is dropped: the root's own attributes
+  (`adtcore:name` is the user the saved search ran for), every `atom:link` —
+  those carry the operation URIs, so a caller releasing a transport does not
+  rebuild them by convention — and `tm:long_desc`, with `undefined` for an absent
+  element and `''` for a present empty one.
 
   Containers are an ordered list rather than named fields because the chain is
   not fixed: captured on one trial 2026-08-12, `?configUri=` alone returns
@@ -509,7 +516,19 @@ describe('parseTransportTree reads both captured shapes', () => {
       '<?xml version="1.0"?><tm:root xmlns:tm="http://www.sap.com/cts/adt/tm"/>',
     );
 
+    // A shape, not a bare list: attributes is always there, empty here because
+    // this root carries nothing but its namespace.
+    expect(tree).toEqual({ attributes: {}, requests: [] });
+  });
+
+  it('still says whose list it is when the list is empty', () => {
+    const tree = parseTransportTree(
+      '<?xml version="1.0"?><tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" ' +
+        'xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="CB9900000000"/>',
+    );
+
     expect(tree.requests).toEqual([]);
+    expect(tree.attributes['adtcore:name']).toBe('CB9900000000');
   });
 
   it('throws on a body it does not recognise, carrying the payload', () => {
@@ -555,7 +574,8 @@ Requirements the tests pin, and the reasons:
   silent flattening as dropping the containers.
 - **Recognition is structural.** Root must be `tm:root` (or `root`). If it is not, throw an
   error naming what was found and quoting the first 200 characters of the payload. An empty
-  `tm:root` returns `{ requests: [] }` and must never warn: a system holding no transport
+  `tm:root` returns `{ attributes: {}, requests: [] }` — the root's attributes when it has any,
+  an empty object when it is bare — and must never warn: a system holding no transport
   requests answers exactly that, permanently and correctly.
 
 - [ ] **Step 4: Export it from the barrel**
@@ -771,9 +791,9 @@ it **rejects**. A signature is read as a guarantee, so the guarantee must be sta
 is read — in the method's own doc comment, not only here:
 
 > Resolves with the parsed tree, or **rejects** if the response is not a `tm:root` document.
-> An empty `tm:root` is not an error: it resolves with `requests: []`, which is the permanent
-> and correct answer on a system holding no transport requests, or when the saved search
-> configuration matches none.
+> An empty `tm:root` is not an error: it resolves with `requests: []` — and with whatever
+> attributes that root carried — which is the permanent and correct answer on a system holding
+> no transport requests, or when the saved search configuration matches none.
 
 Both halves matter, and they pull in opposite directions:
 
@@ -781,7 +801,8 @@ Both halves matter, and they pull in opposite directions:
   that answered `{ requests: [] }` to anything it could not read would reproduce
   `{"success": true, "count": 0}` over 55 real requests — the downstream failure this design
   began with.
-- **Resolving on an empty root** is what stops the opposite lie. A system with no transport
+- **Resolving on an empty root** is what stops the opposite lie. Note it resolves with a
+  populated `attributes` when the root has them: an empty list still says whose list it is. A system with no transport
   requests must be able to say so without being reported as broken. No heuristic may treat
   emptiness as suspicious.
 
