@@ -614,7 +614,8 @@ leave only two bad options: unwire the barrel, or declare the test wrong.
 
 ```bash
 git add src/core/transport/parseTransportTree.ts src/index.core.ts \
-        src/__tests__/unit/core/transport/parseTransportTree.test.ts
+        src/__tests__/unit/core/transport/parseTransportTree.test.ts \
+        src/__tests__/unit/publicApiSurface.test.ts
 git commit -m "feat(transport): parse the transport tree, by element name not by path
 
 Both captured shapes go through the same code: the chain is two levels
