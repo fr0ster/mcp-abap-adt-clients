@@ -405,6 +405,9 @@ in `dist/` carry a real `require()` of it.
 **Files:**
 - Create: `src/core/transport/parseTransportTree.ts`
 - Modify: `src/index.core.ts` (export it, beside `parseSearchResults`)
+- Modify: `src/__tests__/unit/publicApiSurface.test.ts` — add `parseTransportTree` to
+  `RUNTIME_EXPORTS` (line 61) and exercise it through the root import, the way that file
+  already does for `parseSearchResults`
 - Test: `src/__tests__/unit/core/transport/parseTransportTree.test.ts` (create)
 
 **Interfaces:**
@@ -594,8 +597,18 @@ npx tsc -p tsconfig.json
 npm run lint
 ```
 
-Expected: PASS, 86 suites / 471 tests (7 new). `publicApiSurface.test.ts` must still pass —
-if it fails, the barrel is unwired; fix the barrel, not the test.
+Expected: PASS, **86 suites / 474 tests** — 10 new in the parser file.
+
+`publicApiSurface.test.ts` **will fail until you update it, and that is correct.** Line 112
+compares the package's runtime exports against `RUNTIME_EXPORTS` with `toEqual`: it is a
+deliberate manifest of the public surface, not a smoke test. A new export is exactly what it
+is built to notice, so the fix is to add `parseTransportTree` to the manifest and add an
+assertion that calls it through the root import — the file already does both for
+`parseSearchResults`.
+
+The usual rule "fix the barrel, not the test" does **not** apply here. It is for a test that
+caught a real break. This one is recording an intended change, and refusing to touch it would
+leave only two bad options: unwire the barrel, or declare the test wrong.
 
 - [ ] **Step 6: Commit**
 
