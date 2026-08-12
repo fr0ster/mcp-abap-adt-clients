@@ -16,10 +16,12 @@
  */
 
 import { createAbapConnection } from '@mcp-abap-adt/connection';
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtAbapGitClient,
+} from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import { AdtAbapGitClient } from '../../../../clients/AdtAbapGitClient';
-import type { IAdtAbapGitClient } from '../../../../clients/abapGit';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { getConfig } from '../../../helpers/sessionConfig';
 import {

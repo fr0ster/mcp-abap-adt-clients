@@ -1,10 +1,12 @@
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAbapGitLinkArgs,
+} from '@mcp-abap-adt/interfaces';
 import {
   CT_ABAPGIT_REPO_V3,
   CT_ABAPGIT_REPO_V4,
 } from '../../constants/contentTypes';
 import { getTimeout } from '../../utils/timeouts';
-import type { IAbapGitLinkArgs } from './types';
 import { buildLinkBody } from './xmlBuilder';
 
 export async function linkRepo(

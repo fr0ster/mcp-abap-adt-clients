@@ -1,7 +1,9 @@
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAbapGitUnlinkArgs,
+} from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 import { listRepos } from './listRepos';
-import type { IAbapGitUnlinkArgs } from './types';
 
 export async function unlinkRepo(
   connection: IAbapConnection,

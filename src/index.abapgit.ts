@@ -1,20 +1,7 @@
 /**
  * ADT Clients — abapGit barrel
- * Covers: AdtAbapGitClient and all ./clients/abapGit/** types.
+ * Covers: AdtAbapGitClient. Contract types (IAdtAbapGitClient and friends)
+ * come from @mcp-abap-adt/interfaces — that is the one place to import them.
  */
 
 export { AdtAbapGitClient } from './clients/AdtAbapGitClient';
-export type {
-  AbapGitStatus,
-  IAbapGitErrorLogEntry,
-  IAbapGitExternalRepoBranch,
-  IAbapGitExternalRepoCredentials,
-  IAbapGitExternalRepoInfo,
-  IAbapGitLinkArgs,
-  IAbapGitPullArgs,
-  IAbapGitPullResult,
-  IAbapGitRepoStatus,
-  IAbapGitUnlinkArgs,
-  IAdtAbapGitClient,
-  IAdtAbapGitClientOptions,
-} from './clients/abapGit/index';

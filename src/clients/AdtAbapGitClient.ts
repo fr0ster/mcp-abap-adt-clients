@@ -11,13 +11,8 @@
  * by implementing the specialized interface.
  */
 
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
-import { checkExternalRepo } from './abapGit/checkExternalRepo';
-import { getErrorLog } from './abapGit/getErrorLog';
-import { linkRepo } from './abapGit/link';
-import { listRepos as listReposLowLevel } from './abapGit/listRepos';
-import { pullRepo } from './abapGit/pull';
 import type {
+  IAbapConnection,
   IAbapGitErrorLogEntry,
   IAbapGitExternalRepoCredentials,
   IAbapGitExternalRepoInfo,
@@ -28,7 +23,13 @@ import type {
   IAbapGitUnlinkArgs,
   IAdtAbapGitClient,
   IAdtAbapGitClientOptions,
-} from './abapGit/types';
+  ILogger,
+} from '@mcp-abap-adt/interfaces';
+import { checkExternalRepo } from './abapGit/checkExternalRepo';
+import { getErrorLog } from './abapGit/getErrorLog';
+import { linkRepo } from './abapGit/link';
+import { listRepos as listReposLowLevel } from './abapGit/listRepos';
+import { pullRepo } from './abapGit/pull';
 import { unlinkRepo } from './abapGit/unlink';
 
 function toPublicRepoStatus(r: {

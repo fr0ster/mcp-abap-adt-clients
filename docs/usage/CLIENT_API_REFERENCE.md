@@ -187,7 +187,7 @@ await toggle.update(
 ```typescript
 import { createAbapConnection } from '@mcp-abap-adt/connection';
 import { AdtAbapGitClient } from '@mcp-abap-adt/adt-clients';
-import type { IAdtAbapGitClient } from '@mcp-abap-adt/adt-clients';
+import type { IAdtAbapGitClient } from '@mcp-abap-adt/interfaces';
 
 const connection = createAbapConnection({ /* ... */ });
 const abapGit: IAdtAbapGitClient = new AdtAbapGitClient(connection);

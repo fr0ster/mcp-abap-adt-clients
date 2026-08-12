@@ -1,8 +1,10 @@
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAbapGitErrorLogEntry,
+} from '@mcp-abap-adt/interfaces';
 import { CT_ABAPGIT_REPO_OBJECT_V2 } from '../../constants/contentTypes';
 import { getTimeout } from '../../utils/timeouts';
 import { listRepos } from './listRepos';
-import type { IAbapGitErrorLogEntry } from './types';
 import { parseErrorLog } from './xmlParser';
 
 export async function getErrorLog(
