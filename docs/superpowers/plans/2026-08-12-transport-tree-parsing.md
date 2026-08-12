@@ -15,9 +15,17 @@ typecheck in Task 1:
 
 - `containers` and `tasks` are **required**, not optional — the parser always builds them, an
   empty list when there is nothing, so a `?` would describe a state that cannot occur.
-- `attributes` is a bare `Record<string, string>` with no named field. Declaring `tm:number`
-  as a required property would promise something the parser cannot guarantee on a shape we
-  have not seen. `Record` is honest precisely because it promises nothing.
+- `attributes` is `Record<string, string | undefined>` with no named field. Declaring
+  `tm:number` as a required property would promise something the parser cannot guarantee on a
+  shape we have not seen. The `| undefined` is not decoration: `noUncheckedIndexedAccess` is
+  **not** set in either repo, so a plain `Record<string, string>` types every missing key as
+  `string` — a lie the compiler would help tell.
+- **Nothing in the payload is dropped.** Not `atom:link`, not `tm:long_desc`. An earlier draft
+  skipped both as noise; the fixtures hold **233 links and 16 long_desc**, and the links carry
+  the operation URIs — `release`, `newreleasejobs`, `addobject`, `changeowner`, `merge`,
+  `protectrequest`, `newtask`, `reassign`, `consistencycheck`. A consumer that wants to
+  release a transport would otherwise have to rebuild those URLs by convention, which is
+  exactly the ADT knowledge this library exists to hold.
 - With a caller's parser, `listNodes(myParse)` returns `T` as inferred from `myParse` —
   unwrapped, unvalidated, uncoerced. What that parser built is what the caller gets; our part
   ends at handing it the raw body.
@@ -107,8 +115,25 @@ const request: ITransportTreeRequest = {
     { element: 'workbench', attributes: { 'tm:category': 'Workbench' } },
     { element: 'modifiable', attributes: { 'tm:status': 'Modifiable' } },
   ],
-  tasks: [{ attributes: { 'tm:number': 'TRLK900455' } }],
+  // The operation URIs. A consumer releasing a transport needs these hrefs;
+  // rebuilding them by convention is the ADT knowledge we are here to hold.
+  links: [
+    {
+      attributes: {
+        href: '/sap/bc/adt/cts/transportrequests/TRLK900454/releasejobs',
+        rel: 'http://www.sap.com/cts/relations/releasejobs',
+      },
+    },
+  ],
+  longDesc: '',
+  tasks: [{ attributes: { 'tm:number': 'TRLK900455' }, links: [], longDesc: '' }],
 };
+
+// A missing key reads as `string | undefined`, so a caller must handle absence.
+// Without the `| undefined` the compiler would hand back `string` for a key that
+// was never in the payload — noUncheckedIndexedAccess is not set in this repo.
+const missing: string | undefined = request.attributes['tm:no_such_attribute'];
+void missing;
 
 const tree: ITransportTree = { requests: [request] };
 void tree;
@@ -126,12 +151,22 @@ const withTarget: ITransportTreeRequest = {
 void withTarget;
 
 // @ts-expect-error containers is required — a request that forgot where it came from
-const _noContainers: ITransportTreeRequest = { attributes: {}, tasks: [] };
+const _noContainers: ITransportTreeRequest = {
+  attributes: {}, tasks: [], links: [], longDesc: '',
+};
 void _noContainers;
 
 // @ts-expect-error tasks is required — absent tasks are [], never undefined
-const _noTasks: ITransportTreeRequest = { attributes: {}, containers: [] };
+const _noTasks: ITransportTreeRequest = {
+  attributes: {}, containers: [], links: [], longDesc: '',
+};
 void _noTasks;
+
+// @ts-expect-error links is required — the payload always has them, so the type says so
+const _noLinks: ITransportTreeRequest = {
+  attributes: {}, containers: [], tasks: [], longDesc: '',
+};
+void _noLinks;
 ```
 
 - [ ] **Step 2: Run the typecheck to verify it fails**
@@ -159,13 +194,26 @@ export interface ITransportTreeNode {
   /** Element name without its prefix: "workbench", "target", "modifiable" … */
   element: string;
   /** The container's own attributes, verbatim. */
-  attributes: Record<string, string>;
+  attributes: Record<string, string | undefined>;
 }
 
 /** A task under a request. Carries the same attribute set the request does. */
+export interface ITransportTreeLink {
+  /** href, rel, type, title — verbatim, unprefixed of the parser's own marker. */
+  attributes: Record<string, string | undefined>;
+}
+
 export interface ITransportTreeTask {
   /** tm:number, tm:parent, tm:owner, tm:desc, tm:type, tm:status … verbatim. */
-  attributes: Record<string, string>;
+  attributes: Record<string, string | undefined>;
+  /**
+   * Every `atom:link`, in document order. These carry the operation URIs —
+   * release, reassign, addobject, consistencycheck — so dropping them would
+   * force a consumer to rebuild ADT URLs by convention.
+   */
+  links: ITransportTreeLink[];
+  /** `tm:long_desc` text, `''` when the element is present and empty. */
+  longDesc: string;
 }
 
 /**
@@ -178,9 +226,13 @@ export interface ITransportTreeTask {
  */
 export interface ITransportTreeRequest {
   /** Attributes verbatim — `tm:number`, not `number`. No renaming, no selection. */
-  attributes: Record<string, string>;
+  attributes: Record<string, string | undefined>;
   /** Ancestors, outermost first. Empty only if the server nested it under nothing. */
   containers: ITransportTreeNode[];
+  /** Every `atom:link` on the request, in document order. */
+  links: ITransportTreeLink[];
+  /** `tm:long_desc` text, `''` when the element is present and empty. */
+  longDesc: string;
   /** Empty when the request has no tasks — never undefined. */
   tasks: ITransportTreeTask[];
 }
@@ -203,8 +255,12 @@ cd /home/okyslytsia/prj/mcp-abap-adt-interfaces && npm run test:check && npm run
 ```
 
 Both clean. Then prove the typecheck is load-bearing: make `containers` optional, re-run
-`test:check`, confirm the `@ts-expect-error` reports TS2578, revert exactly, re-run clean,
-and confirm `git status --porcelain` is empty.
+`test:check`, confirm the `@ts-expect-error` reports TS2578, then revert **that one edit**
+exactly and re-run clean.
+
+Do **not** expect `git status --porcelain` to be empty here — this task's three files are new
+or modified and not yet committed. What must be true is narrower: `git diff` on
+`src/adt/IAdtTransport.ts` shows the mutation gone. Check that, not a clean tree.
 
 - [ ] **Step 6: Commit**
 
@@ -379,6 +435,21 @@ describe('parseTransportTree reads both captured shapes', () => {
     }
   });
 
+  it('keeps every link and long_desc, because they are not ours to drop', () => {
+    const tree = parseTransportTree(fixture('transportTree.noTargets.xml'));
+    const links = tree.requests.flatMap((r) => [
+      ...r.links,
+      ...r.tasks.flatMap((t) => t.links),
+    ]);
+
+    // 231 in the fixture; an earlier draft skipped atom:link as noise.
+    expect(links).toHaveLength(231);
+    expect(links.some((l) => String(l.attributes.rel).endsWith('/releasejobs'))).toBe(true);
+
+    // Present and empty on this trial — captured as '', not dropped.
+    expect(tree.requests[0].longDesc).toBe('');
+  });
+
   it('hands attributes back verbatim, prefix and all', () => {
     const tree = parseTransportTree(fixture('transportTree.noTargets.xml'));
     const keys = Object.keys(tree.requests[0].attributes);
@@ -424,9 +495,12 @@ Requirements the tests pin, and the reasons:
 - **Descend by element name.** Recurse from `tm:root`, and whenever a node's key ends in
   `:request` (or is `request`), that is a request — whatever nesting got you there. Collect the
   containers walked through, outermost first. Do NOT hardcode `workbench`/`modifiable`.
-- A container is any element on the way to a request that is not `request`, `task`,
-  `long_desc` or `link`. Its `element` is the key with the namespace prefix stripped.
+- A container is any element on the way to a request that is not `request` or `task`. Its
+  `element` is the key with the namespace prefix stripped.
 - Tasks are the `tm:task` children of a request; `tasks` is `[]` when there are none.
+- **`atom:link` and `tm:long_desc` are captured, not skipped**, on both requests and tasks —
+  231 links and 14 long_desc in the `noTargets` fixture alone. Assert the counts, or the next
+  draft quietly drops them again.
 - Attributes keep their prefix: strip only the parser's own `@_`, so `@_tm:number` becomes
   `tm:number`. Skip `xmlns` declarations — they describe the document, not the request.
 - **Recognition is structural.** Root must be `tm:root` (or `root`). If it is not, throw an
