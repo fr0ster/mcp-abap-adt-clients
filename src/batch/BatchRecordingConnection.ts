@@ -2,9 +2,10 @@ import type {
   IAbapConnection,
   IAbapRequestOptions,
   IAdtResponse,
+  IBatchRequestPart,
+  IBatchResponsePart,
   IDeferredResponseConnection,
 } from '@mcp-abap-adt/interfaces';
-import type { IBatchRequestPart, IBatchResponsePart } from './types';
 
 interface IDeferredResponse {
   resolve: (value: IAdtResponse) => void;
