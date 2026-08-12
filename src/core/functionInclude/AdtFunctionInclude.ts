@@ -26,11 +26,11 @@ import type {
   IAdtCrud,
   IAdtLockable,
   IAdtOperationOptions,
+  IAdtSystemContext,
   IAdtValidatable,
   IAdtVersionable,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
-import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { safeErrorMessage } from '../../utils/internalUtils';
 import type { LockRegistry } from '../shared/LockRegistry';
 import { activateFunctionInclude } from './activation';

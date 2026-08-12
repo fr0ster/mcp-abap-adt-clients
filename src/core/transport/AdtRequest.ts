@@ -19,6 +19,7 @@
  * - Check: not supported (transport requests don't have check operation)
  */
 
+import type { IAdtSystemContext } from '@mcp-abap-adt/interfaces';
 import {
   type HttpError,
   hasDeferredResponses,
@@ -31,7 +32,6 @@ import {
   TRANSPORT_SEARCH_CONFIGURATIONS_URL,
   TransportSearchConfigurationMissing,
 } from '@mcp-abap-adt/interfaces';
-import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { safeErrorMessage } from '../../utils/internalUtils';
 import { throwUnsupportedVersions } from '../shared/versions';
 import { createTransport } from './create';

@@ -16,6 +16,7 @@
 import type {
   IAbapConnection,
   IAdtCheckable,
+  IAdtClientOptions,
   IAdtCreatable,
   IAdtCrud,
   IAdtLockable,
@@ -55,7 +56,7 @@ import type { AdtRequest } from '../core/transport';
 import { AdtRequestLegacy } from '../core/transport/AdtRequestLegacy';
 import type { IUnitTestConfig, IUnitTestState } from '../core/unitTest';
 import { AdtUnitTestLegacy } from '../core/unitTest/AdtUnitTestLegacy';
-import { AdtClient, type IAdtClientOptions } from './AdtClient';
+import { AdtClient } from './AdtClient';
 
 /**
  * Error message for unsupported object types on legacy systems.

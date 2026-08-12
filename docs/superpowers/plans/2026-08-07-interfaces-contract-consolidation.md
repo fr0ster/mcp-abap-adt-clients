@@ -1143,12 +1143,10 @@ fix and this consolidation. Its CHANGELOG gains:
   executor types and the five debugger types now come from
   `@mcp-abap-adt/interfaces`.
 
-  **Migration:** change the import path. The names and shapes are unchanged.
+  **Migration:** change the import path. The names and shapes are unchanged — only the
+  source package changes, from this one to `@mcp-abap-adt/interfaces`:
 
   ```ts
-  // before
-  import type { IAdtClientOptions } from '@mcp-abap-adt/adt-clients';
-  // after
   import type { IAdtClientOptions } from '@mcp-abap-adt/interfaces';
   ```
 

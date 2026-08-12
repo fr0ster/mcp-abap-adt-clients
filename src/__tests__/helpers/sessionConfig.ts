@@ -4,8 +4,12 @@
  */
 
 import type { SapConfig } from '@mcp-abap-adt/connection';
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
-import type { AdtClient, IAdtClientOptions } from '../../clients/AdtClient';
+import type {
+  IAbapConnection,
+  IAdtClientOptions,
+  ILogger,
+} from '@mcp-abap-adt/interfaces';
+import type { AdtClient } from '../../clients/AdtClient';
 import { AdtClientLegacy } from '../../clients/AdtClientLegacy';
 import { createAdtClient } from '../../clients/createAdtClient';
 import { getSystemInformation } from '../../utils/systemInfo';

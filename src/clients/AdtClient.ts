@@ -18,6 +18,8 @@ import type {
   IAdtActivatable,
   IAdtCdsTestRunnable,
   IAdtCheckable,
+  IAdtClientOptions,
+  IAdtContentTypes,
   IAdtCreatable,
   IAdtCrud,
   IAdtLockable,
@@ -25,6 +27,7 @@ import type {
   IAdtObject,
   IAdtReadable,
   IAdtSourceObject,
+  IAdtSystemContext,
   IAdtTestRunnable,
   IAdtTransportAware,
   IAdtValidatable,
@@ -178,29 +181,11 @@ import {
   type IUnitTestState,
 } from '../core/unitTest';
 
-export interface IAdtSystemContext {
-  masterSystem?: string;
-  responsible?: string;
-  /** Master/original language for newly created objects (adtcore:masterLanguage). Sourced from SAP_LANGUAGE; defaults to EN when unset. */
-  masterLanguage?: string;
-}
-
-export interface IAdtClientOptions {
-  enableAcceptCorrection?: boolean;
-  masterSystem?: string;
-  responsible?: string;
-  /** Master/original language for newly created objects. Falls back to EN when unset. */
-  masterLanguage?: string;
-  contentTypes?: import('@mcp-abap-adt/interfaces').IAdtContentTypes;
-  /** Whether the SAP system uses Unicode encoding. Affects Content-Type headers for source code operations. */
-  unicode?: boolean;
-}
-
 export class AdtClient {
   protected connection: IAbapConnection;
   protected logger: ILogger;
   protected systemContext: IAdtSystemContext;
-  protected contentTypes?: import('@mcp-abap-adt/interfaces').IAdtContentTypes;
+  protected contentTypes?: IAdtContentTypes;
   /**
    * Session-scoped registry of locks held by handlers created from this client.
    * All handlers share one stateful session, so all their locks belong here.

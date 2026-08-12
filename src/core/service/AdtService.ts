@@ -2,11 +2,11 @@ import type {
   IAbapConnection,
   IAdtOperationOptions,
   IAdtResponse,
+  IAdtSystemContext,
   ILogger,
   IObjectVersion,
 } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
-import type { IAdtSystemContext } from '../../clients/AdtClient';
 import {
   ACCEPT_CHECK_MESSAGES,
   ACCEPT_DELETION,

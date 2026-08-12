@@ -17,10 +17,10 @@ import type {
   HttpError,
   IAbapConnection,
   IAdtOperationOptions,
+  IAdtSystemContext,
   IListTransportsOptions,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
-import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { AdtRequest } from './AdtRequest';
 import { getTransportLegacy, listTransportsLegacy } from './readLegacy';
 import type { ITransportConfig, ITransportState } from './types';

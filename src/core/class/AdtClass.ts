@@ -1,4 +1,5 @@
 import { beginCriticalSection } from '../../utils/criticalSection';
+
 /**
  * AdtClass - High-level CRUD operations for Class objects
  *
@@ -18,6 +19,7 @@ import { beginCriticalSection } from '../../utils/criticalSection';
  * - Delete: check(deletion) → delete
  */
 
+import type { IAdtSystemContext } from '@mcp-abap-adt/interfaces';
 import {
   AdtObjectErrorCodes,
   AdtOperationError,
@@ -30,7 +32,6 @@ import {
   type ILogger,
   type IObjectVersion,
 } from '@mcp-abap-adt/interfaces';
-import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { safeErrorMessage, safeStringify } from '../../utils/internalUtils';
 import {
   type ICapabilityContext,

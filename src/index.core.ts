@@ -5,12 +5,9 @@
  * Ambiguous utils (discoveryEndpoints, systemInfo) are placed here per the "ambiguous → core" rule.
  */
 
-// Export supporting types needed by client APIs
+// Contract types for client APIs (IAdtClientOptions, IAdtSystemContext) come
+// from @mcp-abap-adt/interfaces — that is the one place to import them.
 
-export type {
-  IAdtClientOptions,
-  IAdtSystemContext,
-} from './clients/AdtClient';
 export { AdtClient } from './clients/AdtClient';
 export { AdtClientLegacy } from './clients/AdtClientLegacy';
 export { createAdtClient } from './clients/createAdtClient';
