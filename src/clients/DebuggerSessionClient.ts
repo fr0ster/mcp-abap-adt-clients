@@ -1,29 +1,10 @@
+import type {
+  IDebuggerAttachParams,
+  IDebuggerGetVariablesParams,
+  IDebuggerListenParams,
+  IDebuggerStepParams,
+} from '@mcp-abap-adt/interfaces';
 import type { AdtClientsWS } from './AdtClientsWS';
-
-export type DebuggerStepAction =
-  | 'step_over'
-  | 'step_into'
-  | 'step_return'
-  | 'continue';
-
-export interface IDebuggerListenParams {
-  timeoutSeconds?: number;
-  user?: string;
-}
-
-export interface IDebuggerAttachParams {
-  sessionId: string;
-}
-
-export interface IDebuggerStepParams {
-  action: DebuggerStepAction;
-  value?: string;
-}
-
-export interface IDebuggerGetVariablesParams {
-  frameId?: string;
-  filter?: string;
-}
 
 /**
  * Thin high-level facade for debugger session lifecycle over AdtClientsWS.
