@@ -20,7 +20,10 @@ typecheck in Task 1:
   shape we have not seen. The `| undefined` is not decoration: `noUncheckedIndexedAccess` is
   **not** set in either repo, so a plain `Record<string, string>` types every missing key as
   `string` — a lie the compiler would help tell.
-- **Nothing in the payload is dropped.** Not `atom:link`, not `tm:long_desc`. An earlier draft
+- **Nothing on the root, a request or a task is dropped** — the root's own attributes, every
+  `atom:link`, every `tm:long_desc`. That is the guarantee, stated at the scope it actually
+  holds: the parser walks root → containers → requests → tasks, so an element outside that
+  walk is out of scope, not silently discarded. An earlier draft
   skipped both as noise; the fixtures hold **233 links and 16 long_desc**, and the links carry
   the operation URIs — `release`, `newreleasejobs`, `addobject`, `changeowner`, `merge`,
   `protectrequest`, `newtask`, `reassign`, `consistencycheck`. A consumer that wants to
@@ -82,8 +85,8 @@ important thing these two files exist to catch.
 
 **Interfaces:**
 - Consumes: nothing.
-- Produces: `ITransportTreeNode`, `ITransportTreeTask`, `ITransportTreeRequest`,
-  `ITransportTree`. Tasks 3 and 4 import them.
+- Produces **five** types: `ITransportTreeLink`, `ITransportTreeNode`, `ITransportTreeTask`,
+  `ITransportTreeRequest`, `ITransportTree`. Tasks 3 and 4 import them.
 
 **Note there is no `TransportTreeParser` type.** The parser is a call-site generic
 (`(data: unknown) => T`), so nothing about it belongs in the contract.
@@ -135,8 +138,16 @@ const request: ITransportTreeRequest = {
 const missing: string | undefined = request.attributes['tm:no_such_attribute'];
 void missing;
 
-const tree: ITransportTree = { requests: [request] };
+const tree: ITransportTree = {
+  // Whose list this is — the root carries it and nothing else does.
+  attributes: { 'adtcore:name': 'CB9900000000', 'adtcore:changedAt': '2026-08-12T13:15:12Z' },
+  requests: [request],
+};
 void tree;
+
+// Absent and present-but-empty are different states, and the type keeps them apart.
+const absent: string | undefined = request.longDesc;
+void absent;
 
 // Containers are an ordered LIST, not a fixed triple: the chain is two levels
 // without ?targets=true and three with it.
@@ -175,7 +186,7 @@ void _noLinks;
 cd /home/okyslytsia/prj/mcp-abap-adt-interfaces && npm run test:check
 ```
 
-Expected: FAIL — the four types are not exported from `./adt/IAdtTransport`.
+Expected: FAIL — the five types are not exported from `./adt/IAdtTransport`.
 
 - [ ] **Step 3: Append the declarations**
 
@@ -212,8 +223,10 @@ export interface ITransportTreeTask {
    * force a consumer to rebuild ADT URLs by convention.
    */
   links: ITransportTreeLink[];
-  /** `tm:long_desc` text, `''` when the element is present and empty. */
-  longDesc: string;
+  /**
+   * `tm:long_desc` text. `''` when present and empty, `undefined` when absent.
+   */
+  longDesc: string | undefined;
 }
 
 /**
@@ -231,22 +244,45 @@ export interface ITransportTreeRequest {
   containers: ITransportTreeNode[];
   /** Every `atom:link` on the request, in document order. */
   links: ITransportTreeLink[];
-  /** `tm:long_desc` text, `''` when the element is present and empty. */
-  longDesc: string;
+  /**
+   * `tm:long_desc` text. `''` when the element is present and empty;
+   * `undefined` when the element is absent. The two are not the same thing and
+   * the type does not pretend they are.
+   */
+  longDesc: string | undefined;
   /** Empty when the request has no tasks — never undefined. */
   tasks: ITransportTreeTask[];
 }
 
-/** The parsed transport tree. Empty `requests` is a legitimate answer, not a failure. */
+/**
+ * The parsed transport tree. Empty `requests` is a legitimate answer, not a failure.
+ *
+ * `attributes` are the root's own — `adtcore:name` is the user the saved search
+ * ran for, plus the four created/changed stamps. They are the only record of
+ * *whose* list this is, so dropping them would leave a caller unable to tell two
+ * lists apart.
+ */
 export interface ITransportTree {
+  attributes: Record<string, string | undefined>;
   requests: ITransportTreeRequest[];
 }
 ```
 
 - [ ] **Step 4: Export from the barrel**
 
-Add the four names to the existing `export type { … } from './adt/IAdtTransport';` block in
-`src/index.ts`, alphabetically.
+Add **all five** names to the existing `export type { … } from './adt/IAdtTransport';` block in
+`src/index.ts`, alphabetically:
+
+```ts
+  ITransportTree,
+  ITransportTreeLink,
+  ITransportTreeNode,
+  ITransportTreeRequest,
+  ITransportTreeTask,
+```
+
+`ITransportTreeLink` appears in the public shape of both request and task, so leaving it
+unexported would hand a consumer a type it cannot name.
 
 - [ ] **Step 5: Verify**
 
@@ -365,7 +401,7 @@ in `dist/` carry a real `require()` of it.
 - Test: `src/__tests__/unit/core/transport/parseTransportTree.test.ts` (create)
 
 **Interfaces:**
-- Consumes: the four types from Task 1.
+- Consumes: the five types from Task 1.
 - Produces: `parseTransportTree(data: unknown): ITransportTree`. Task 4 calls it.
 
 - [ ] **Step 1: Write the failing test**
@@ -435,6 +471,14 @@ describe('parseTransportTree reads both captured shapes', () => {
     }
   });
 
+  it('keeps the root attributes — the only record of whose list this is', () => {
+    const tree = parseTransportTree(fixture('transportTree.noTargets.xml'));
+
+    expect(tree.attributes['adtcore:name']).toBe('CB9900000000');
+    expect(tree.attributes['adtcore:changedAt']).toBeDefined();
+    expect(Object.keys(tree.attributes).some((k) => k.startsWith('xmlns'))).toBe(false);
+  });
+
   it('keeps every link and long_desc, because they are not ours to drop', () => {
     const tree = parseTransportTree(fixture('transportTree.noTargets.xml'));
     const links = tree.requests.flatMap((r) => [
@@ -446,7 +490,8 @@ describe('parseTransportTree reads both captured shapes', () => {
     expect(links).toHaveLength(231);
     expect(links.some((l) => String(l.attributes.rel).endsWith('/releasejobs'))).toBe(true);
 
-    // Present and empty on this trial — captured as '', not dropped.
+    // Present and empty on this trial — captured as '', not dropped, and not
+    // flattened into undefined, which would mean "no element at all".
     expect(tree.requests[0].longDesc).toBe('');
   });
 
@@ -503,6 +548,11 @@ Requirements the tests pin, and the reasons:
   draft quietly drops them again.
 - Attributes keep their prefix: strip only the parser's own `@_`, so `@_tm:number` becomes
   `tm:number`. Skip `xmlns` declarations — they describe the document, not the request.
+- **The root's own attributes go into `tree.attributes`**, verbatim, `xmlns` skipped.
+  `adtcore:name` is the user the saved search ran for.
+- **`longDesc` distinguishes absent from empty.** `<tm:long_desc/>` yields `''`; no element at
+  all yields `undefined`. Do not normalise one into the other — that is the same class of
+  silent flattening as dropping the containers.
 - **Recognition is structural.** Root must be `tm:root` (or `root`). If it is not, throw an
   error naming what was found and quoting the first 200 characters of the payload. An empty
   `tm:root` returns `{ requests: [] }` and must never warn: a system holding no transport
