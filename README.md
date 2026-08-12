@@ -68,7 +68,7 @@ This package is responsible for:
 
 This package interacts with external packages **ONLY through interfaces**:
 
-- **`@mcp-abap-adt/interfaces`** (`^11.0.0`): The contract package — the single definition site for every public type this package exposes (see [Type System](#type-system)). This is the one runtime dependency whose *types* are part of this package's public API.
+- **`@mcp-abap-adt/interfaces`** (`^14.0.0`): The contract package — the single definition site for every public type this package exposes (see [Type System](#type-system)). This is the one runtime dependency whose *types* are part of this package's public API.
 - **`@mcp-abap-adt/connection`**: Uses the `IAbapConnection` interface for HTTP requests — does not know about the concrete connection implementation. It is a **dev** dependency; consumers supply their own implementation.
 - **No other direct package dependencies**: all remaining interactions happen through well-defined interfaces
 
@@ -574,7 +574,7 @@ everything else is not.
 
 ### Single Definition Site: `@mcp-abap-adt/interfaces`
 
-Since **7.5.0**, every public type is **defined once**, in `@mcp-abap-adt/interfaces` (`^13.1.0`). This package declares no copies of its own — the low-level `*Params` interfaces, every `IXxxConfig`/`IXxxState` pair, the option/result types and the cross-cutting shared types all live there.
+Since **7.5.0**, every public type is **defined once**, in `@mcp-abap-adt/interfaces` (`^14.0.0`). This package declares no copies of its own — the low-level `*Params` interfaces, every `IXxxConfig`/`IXxxState` pair, the option/result types and the cross-cutting shared types all live there.
 
 **Import them from the package that owns them:**
 
@@ -592,7 +592,7 @@ What this package exports is what it owns: the clients, the handler classes, the
 
 ### Honest capability types (since 8.0.0)
 
-`@mcp-abap-adt/interfaces` (`^13.1.0`) splits the fat `IAdtObject` contract into **capability atoms** — `IAdtCreatable`, `IAdtReadable`, `IAdtModifiable` (and `IAdtCrud`, their composite), `IAdtValidatable`, `IAdtCheckable`, `IAdtActivatable`, `IAdtLockable`, `IAdtVersionable`, `IAdtTransportAware`, `IAdtSearchable` — each covering one slice of the lifecycle, plus two named composites: `IAdtSourceObject` and `IAdtNonVersionedObject` (all but versions). Since interfaces 13.0.0 `IAdtObject` is itself assembled from the atoms, so the atoms are the definitions and the composite cannot drift from them.
+`@mcp-abap-adt/interfaces` (`^14.0.0`) splits the fat `IAdtObject` contract into **capability atoms** — `IAdtCreatable`, `IAdtReadable`, `IAdtModifiable` (and `IAdtCrud`, their composite), `IAdtValidatable`, `IAdtCheckable`, `IAdtActivatable`, `IAdtLockable`, `IAdtVersionable`, `IAdtTransportAware`, `IAdtSearchable` — each covering one slice of the lifecycle, plus two named composites: `IAdtSourceObject` and `IAdtNonVersionedObject` (all but versions). Since interfaces 13.0.0 `IAdtObject` is itself assembled from the atoms, so the atoms are the definitions and the composite cannot drift from them.
 
 Since **8.0.0**, each handler `implements` only the atoms it genuinely supports, and `AdtClient.getXxx()` (and `AdtClientBatch.getXxx()`) return types are narrowed to match:
 
@@ -763,7 +763,6 @@ See [docs/DEBUG.md](docs/DEBUG.md) for detailed debugging guide.
 ## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md) for package-specific release notes.
-Latest (0.3.14): added `getWhereUsedList()` for parsed where-used results.
 
 ## Tests
 

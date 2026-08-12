@@ -13,7 +13,7 @@ This document lists content types used by update operations in core modules.
 | Function Module | `src/core/functionModule/update.ts` | `text/plain; charset=utf-8` |
 | Table (DDL) | `src/core/table/update.ts` | `text/plain; charset=utf-8` |
 | Structure (DDL) | `src/core/structure/update.ts` | `text/plain; charset=utf-8` |
-| View (DDLS) | `src/core/view/update.ts` | `text/plain; charset=utf-8` |
+| DDL Source (DDLS) | `src/core/ddl/update.ts` | `text/plain; charset=utf-8` |
 | Service Definition | `src/core/serviceDefinition/update.ts` | `text/plain; charset=utf-8` |
 | Metadata Extension | `src/core/metadataExtension/update.ts` | `text/plain; charset=utf-8` |
 | Behavior Definition | `src/core/behaviorDefinition/update.ts` | `text/plain; charset=utf-8` |

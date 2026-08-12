@@ -185,7 +185,7 @@ Common behaviors in implementations:
 
 ## Type System and Exports
 
-**Types are defined once, in `@mcp-abap-adt/interfaces` (`^11.0.0`).** As of 7.5.0 this package declares no type it shares with the contract package. Each `src/core/<object>/types.ts` is a re-export surface:
+**Types are defined once, in `@mcp-abap-adt/interfaces` (`^14.0.0`).** As of 7.5.0 this package declares no type it shares with the contract package. Each `src/core/<object>/types.ts` is a re-export surface:
 
 ```ts
 export type {

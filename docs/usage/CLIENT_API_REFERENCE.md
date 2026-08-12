@@ -250,6 +250,51 @@ await abapGit.unlink({ package: 'ZMY_PKG' });
 
 **Content-type version.** Defaults to `v3` for sapcli compatibility. Cloud MDD advertises `v4`; consumers can opt in via `new AdtAbapGitClient(conn, logger, { contentTypeVersion: 'v4' })`.
 
+### Transport Requests (getRequest())
+
+`client.getRequest()` returns `AdtRequest`. `create()` and `read()` behave as any
+other handler; `list()` is the one method worth reading closely, because the
+endpoint it calls is a **saved-configuration search**, not a filtered query —
+sending `user`/`status`/`dateRange`/`targetSystem` as query parameters has
+never worked, on any system this was probed against, and the endpoint answers
+that shape with the same 309-byte empty root every time.
+
+```typescript
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
+
+const client = new AdtClient(connection);
+
+// No configUri: resolves the one saved transport search this system exposes.
+// Throws if there are zero configurations (nothing to run) or more than one
+// (which one is ambiguous — there is no "default" flag in the payload).
+const listState = await client.getRequest().list();
+console.log(listState.listResult?.data);
+
+// Pass configUri explicitly to pick a specific saved search, or to skip
+// resolution altogether (required on a batch client — see below).
+// getTransportSearchConfigurations() itself is internal to list()'s
+// resolution step and is not part of the public surface — discover the
+// available searches in Eclipse (Project Explorer → transport view) and copy
+// the configuration's href, or catch the "N transport search configurations"
+// error thrown by list() with no argument, which names every available href.
+await client.getRequest().list({
+  configUri: '/sap/bc/adt/cts/transportrequests/searchconfigurations/<id>',
+});
+```
+
+**On a batch client**, `configUri` is required. Resolving "no argument" needs
+a response from `getTransportSearchConfigurations()`, and a batch connection
+cannot deliver one until `batchExecute()` runs — so `batch.getRequest().list()`
+throws immediately, while `batch.getRequest().list({ configUri })` records
+normally and resolves after `batchExecute()`.
+
+**Migration from filter parameters.** There is no server-side filtering to
+lose — the five parameters (`user`, `status`, `date_range`, `target_system`,
+`request_type`) were never read by the endpoint. Call `list()` with no
+argument to run the saved search Eclipse already uses, or pass `configUri` to
+pick a specific one. See [CHANGELOG.md](../../CHANGELOG.md) (11.0.0 entry) for
+the before/after low-level signature.
+
 ### What `update()` refuses to write
 
 Five object types — `domain`, `dataElement`, `package`, `tabletype`,
