@@ -448,6 +448,112 @@ root element and nesting — never by counting results. Counting is exactly what
 We cannot distinguish "this user owns none" from "this system has none". The trial answers
 both identically. That difference is not invented into the type.
 
+## The tree type — derived from the fixtures, 2026-08-12
+
+Both captures are now in the repository as fixtures, so this is read off real payloads rather
+than proposed:
+
+`src/__tests__/fixtures/transport/transportTree.noTargets.xml` (60 KB, 7 requests, 7 tasks)
+`src/__tests__/fixtures/transport/transportTree.withTargets.xml` (Eclipse, `?targets=true`)
+
+### Lose nothing
+
+`tm:request` and `tm:task` carry the **same twelve attributes** — `number`, `parent`, `owner`,
+`desc`, `type`, `status`, `target`, `target_desc`, `cts_project`, `cts_project_desc`,
+`lastchanged_timestamp`, `uri`. The containers add grouping and, in the `targets` form, a
+human name for the target that appears nowhere else:
+
+| container | carries | on the request? |
+|---|---|---|
+| `tm:workbench` | `category="Workbench"` | as `type="K"` |
+| `tm:modifiable` | `status="Modifiable"` | as `status="D"` — code, not text |
+| `tm:target` | `name="Local Change Requests"`, `desc` | **no** — the request has `target=""` |
+
+An earlier draft dropped the containers as redundant. That was **the library deciding what a
+consumer needs**, which is the boundary this design exists to hold — and the table shows it
+would have lost real information. So they stay, as an ordered list rather than a fixed triple,
+because the chain is variable:
+
+```ts
+export interface ITransportTreeNode {
+  /** Element name without its prefix: "workbench", "target", "modifiable" … */
+  element: string;
+  /** tm:* attributes of that container, verbatim. */
+  attributes: Record<string, string>;
+}
+
+export interface ITransportTreeTask {
+  /** tm:number, tm:parent, tm:owner, tm:desc, tm:type, tm:status … verbatim. */
+  attributes: Record<string, string>;
+}
+
+export interface ITransportTreeRequest {
+  attributes: Record<string, string>;
+  /** Ancestors, outermost first — whatever the server actually nested it under. */
+  containers: ITransportTreeNode[];
+  tasks: ITransportTreeTask[];
+}
+
+export interface ITransportTree {
+  requests: ITransportTreeRequest[];
+}
+```
+
+No renaming, no field selection, no camelCase. `tm:number`, not `number`.
+
+### Reach requests by name, never by path
+
+The chain has two levels without `targets=true` and three with it. A parser that walks a fixed
+path finds nothing on the other form. Descend to any `tm:request` by element name and record
+the containers passed on the way; the same code then handles both shapes, and a shape we have
+not seen yet does not silently return zero.
+
+## The parser is replaceable — at the call site
+
+A consumer whose system answers in a shape our parser does not fit must still get **a type**.
+Telling them to fall back on raw `list()` is telling them to go untyped, which is precisely the
+complaint in #105 that this whole design answers.
+
+```ts
+listNodes(): Promise<ITransportTree>;
+listNodes<T>(parse: (data: unknown) => T): Promise<T>;
+```
+
+The parser is passed **per call**, not through `IAdtClientOptions`:
+
+- the type follows the parser. In client options the parser is fixed once, yet `listNodes()`
+  would still have to promise `ITransportTree` or `unknown`; in the signature, `T` is inferred
+  and the caller gets its own type with no cast.
+- `IAdtClientOptions` has just moved into `@mcp-abap-adt/interfaces`; adding a field to it in
+  the same release is a change nobody asked for.
+- the generic appears only where it is used — the plain call stays `Promise<ITransportTree>`.
+
+`parseTransportTree` is also exported standalone, so a consumer holding a response from
+anywhere can parse it.
+
+### What each entry point gives back
+
+| call | result |
+|---|---|
+| `listNodes()` | `ITransportTree` — requests, tasks, containers, nothing dropped |
+| `listNodes(myParse)` | the consumer's own type, typed, our parser bypassed |
+| `list()` | raw `IAdtResponse` — still there, no longer the only escape |
+
+### Legacy
+
+`listNodes()` on `AdtRequestLegacy` **throws**. `/sap/bc/cts/transportrequests` has never been
+captured, and assuming `parseTransportTree` fits it is the failure this design exists to stop.
+It becomes supported when someone captures a legacy payload.
+
+## Open decision — `targets=true`
+
+Eclipse sends `?targets=true&configUri=…`; we send `configUri` alone. It does not affect the
+type, since containers are a list. It does affect what the server returns: with it, a
+`tm:target` container carries a human name (`"Local Change Requests"`) that exists nowhere
+else — the request itself has `target=""`.
+
+Always send it, never, or expose a flag on `listNodes()`. **Undecided; the maintainer's call.**
+
 ## Order of work
 
 The types this design adds split cleanly into two groups: those the capture cannot change,
