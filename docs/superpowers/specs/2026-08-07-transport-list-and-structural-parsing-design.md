@@ -326,6 +326,10 @@ is the same mistake the design is about: asserting a shape nobody looked at.
 So `ITransportTree` is **not defined here**. It is defined from the fixture, and the capture
 must answer these before anyone writes it:
 
+> **ANSWERED 2026-08-11 by an Eclipse trace the user captured.** The four open rows below are
+> closed, and two of them are closed differently than this document assumed. See
+> "What Eclipse actually does" immediately after this table.
+
 | question | why it changes the type | status |
 |---|---|---|
 | Is there a `tm:task` element under `tm:request`? | decides whether `tasks` exists at all | **open** — no artifact contains the string `tm:task` |
@@ -335,6 +339,50 @@ must answer these before anyone writes it:
 | Does `tm:target` appear on the container, the request, or both? | decides where `target` lives | **answered** — a request attribute (`tm:target`, `tm:target_desc`); the container carries only its category |
 | Do containers carry attributes beyond category/status? | decides whether `container` needs its own bag | **answered so far** — `tm:workbench` has only `tm:category`, `tm:modifiable` only `tm:status` |
 | Does the configurations document mark a default? | decides the resolution rule above | **unanswerable here** — this system has exactly one configuration, and its element has no name or default attribute |
+
+## What Eclipse actually does — captured 2026-08-11
+
+The user pulled the real request/response trace out of Eclipse ADT 3.60.0. It closes every
+open row above, and it contradicts two things this document treated as settled.
+
+**1. The container chain is not fixed.** Eclipse's tree carries a `tm:target` level this
+document never had:
+
+```
+tm:root
+  tm:workbench tm:category="Workbench"
+    tm:target tm:name="Local Change Requests" tm:desc="No Target # Release locally only"
+      tm:modifiable tm:status="Modifiable"
+        tm:request …
+          tm:long_desc, ~17 × atom:link
+          tm:task tm:number tm:parent tm:owner tm:desc tm:type="Unclassified" tm:status …
+```
+
+My own probe, sending only `configUri`, got `tm:workbench > tm:modifiable > tm:request` with
+**no `tm:target`**. Eclipse sends `?targets=true`. So the level is produced by the parameter,
+not by the data — **a parser that hardcodes the chain breaks on the other form.** Walk to
+`tm:request` by element name, not by path. `container` cannot be a fixed triple.
+
+**2. `tm:task` exists**, nested inside `tm:request`, with the same attribute set plus
+`tm:parent` naming its request.
+
+**3. Our request differs from Eclipse's in two ways:**
+
+| | ours | Eclipse |
+|---|---|---|
+| query | `?configUri=<href>` | `?targets=true&configUri=<href>` |
+| Accept | `transportorganizertree.v1+xml` | `transportorganizer.v1+xml, transportorganizertree.v1+xml` |
+
+Both return `content-type: transportorganizertree.v1+xml`. Ours works — the 137 KB / 16-request
+probe used it — but it returns the flatter shape. Whether `targets=true` should be sent, always
+or optionally, is now a real design question rather than an unknown.
+
+**4. Eclipse reads the configuration document itself** between listing the configurations and
+running the search, then passes only the URI. We skip that read. Nothing so far shows it is
+required.
+
+Raw capture: `.superpowers/sdd/2026-08-07-transport-list-configuri/capture/` (git-ignored —
+copy into a fixture before that directory is deleted).
 
 All four open rows need the same thing: **the tree body past its first request**. Every probe
 printed a prefix, so 16 requests were counted but only one was ever seen. One request cannot
