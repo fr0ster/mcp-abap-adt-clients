@@ -191,7 +191,7 @@ export interface IAdtClientOptions {
   responsible?: string;
   /** Master/original language for newly created objects. Falls back to EN when unset. */
   masterLanguage?: string;
-  contentTypes?: import('../core/shared/contentTypes').IAdtContentTypes;
+  contentTypes?: import('@mcp-abap-adt/interfaces').IAdtContentTypes;
   /** Whether the SAP system uses Unicode encoding. Affects Content-Type headers for source code operations. */
   unicode?: boolean;
 }
@@ -200,7 +200,7 @@ export class AdtClient {
   protected connection: IAbapConnection;
   protected logger: ILogger;
   protected systemContext: IAdtSystemContext;
-  protected contentTypes?: import('../core/shared/contentTypes').IAdtContentTypes;
+  protected contentTypes?: import('@mcp-abap-adt/interfaces').IAdtContentTypes;
   /**
    * Session-scoped registry of locks held by handlers created from this client.
    * All handlers share one stateful session, so all their locks belong here.

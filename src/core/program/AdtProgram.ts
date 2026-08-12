@@ -23,13 +23,13 @@ import { assertDeletable } from '../../utils/deletionCheck';
 import type {
   HttpError,
   IAbapConnection,
+  IAdtContentTypes,
   IAdtOperationOptions,
   IAdtSourceObject,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { safeErrorMessage, safeStringify } from '../../utils/internalUtils';
-import type { IAdtContentTypes } from '../shared/contentTypes';
 import {
   createLockTracker,
   type LockRegistry,

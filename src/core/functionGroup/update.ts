@@ -8,6 +8,7 @@
 import type {
   HttpError,
   IAbapConnection,
+  IAdtContentTypes,
   IAdtResponse,
 } from '@mcp-abap-adt/interfaces';
 import { CT_FUNCTION_GROUP } from '../../constants/contentTypes';
@@ -17,7 +18,6 @@ import {
 } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import { extractXmlString, patchXmlAttribute } from '../../utils/xmlPatch';
-import type { IAdtContentTypes } from '../shared/contentTypes';
 import { lockFunctionGroup } from './lock';
 import { getFunctionGroup } from './read';
 import type { IUpdateFunctionGroupParams } from './types';

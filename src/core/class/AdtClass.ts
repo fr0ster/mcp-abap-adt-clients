@@ -23,6 +23,7 @@ import {
   AdtOperationError,
   type HttpError,
   type IAbapConnection,
+  type IAdtContentTypes,
   type IAdtOperationOptions,
   type IAdtResponse,
   type IAdtSourceObject,
@@ -36,7 +37,6 @@ import {
   LockCapability,
   VersionsCapability,
 } from '../shared/capabilities';
-import type { IAdtContentTypes } from '../shared/contentTypes';
 import {
   createLockTracker,
   type LockRegistry,

@@ -2,11 +2,13 @@
  * Shared system information utilities
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtContentTypes,
+} from '@mcp-abap-adt/interfaces';
 import {
   AdtContentTypesBase,
   AdtContentTypesModern,
-  type IAdtContentTypes,
 } from '../core/shared/contentTypes';
 import { getTimeout } from './timeouts';
 

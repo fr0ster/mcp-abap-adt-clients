@@ -2,7 +2,11 @@
  * FunctionModule check operations
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtContentTypes,
+  IAdtResponse,
+} from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_CHECK_MESSAGES,
   CT_CHECK_OBJECTS,
@@ -13,7 +17,6 @@ import {
 } from '../../utils/checkRun';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
-import type { IAdtContentTypes } from '../shared/contentTypes';
 
 /**
  * Build check run XML payload for function module

@@ -6,55 +6,13 @@
  *
  * Each method returns { accept, contentType } for a specific operation.
  * Accept can contain multiple values (comma-separated), Content-Type is always single.
+ *
+ * IAdtContentTypes and IAdtHeaders — the contract these classes implement —
+ * live in @mcp-abap-adt/interfaces. The two classes below stay here: they
+ * are implementation (354 lines, 38 methods), not contract.
  */
 
-export interface IAdtHeaders {
-  accept: string;
-  contentType: string;
-}
-
-export interface IAdtContentTypes {
-  // Program
-  programCreate(): IAdtHeaders;
-  programRead(): IAdtHeaders;
-
-  // Class
-  classCreate(): IAdtHeaders;
-  classRead(): IAdtHeaders;
-
-  // Interface
-  interfaceCreate(): IAdtHeaders;
-
-  // Domain
-  domainCreate(): IAdtHeaders;
-  domainRead(): IAdtHeaders;
-  domainUpdate(): IAdtHeaders;
-
-  // Data Element
-  dataElementCreate(): IAdtHeaders;
-  dataElementRead(): IAdtHeaders;
-  dataElementUpdate(): IAdtHeaders;
-
-  // Structure
-  structureCreate(): IAdtHeaders;
-
-  // Table
-  tableCreate(): IAdtHeaders;
-
-  // Package
-  packageCreate(): IAdtHeaders;
-  packageRead(): IAdtHeaders;
-  packageUpdate(): IAdtHeaders;
-
-  // Function Group
-  functionGroupCreate(): IAdtHeaders;
-  functionGroupUpdate(): IAdtHeaders;
-
-  // Source code artifact content type (used in checkRun XML payload)
-  // Unicode systems: 'text/plain; charset=utf-8'
-  // Non-unicode legacy systems: 'text/plain'
-  sourceArtifactContentType(): string;
-}
+import type { IAdtContentTypes, IAdtHeaders } from '@mcp-abap-adt/interfaces';
 
 /**
  * Base content types — v1 headers, works on all SAP systems including older BASIS

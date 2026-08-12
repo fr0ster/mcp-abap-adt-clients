@@ -26,6 +26,7 @@ import { assertDeletable } from '../../utils/deletionCheck';
 import type {
   HttpError,
   IAbapConnection,
+  IAdtContentTypes,
   IAdtNonVersionedObject,
   IAdtOperationOptions,
   ILogger,
@@ -33,7 +34,6 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { safeErrorMessage } from '../../utils/internalUtils';
-import type { IAdtContentTypes } from '../shared/contentTypes';
 import {
   createLockTracker,
   type LockRegistry,
