@@ -9,6 +9,19 @@ the containers they were nested under — without the library deciding which fie
 `listNodes()` with an optional call-site parser so a consumer whose payload differs still gets
 a type rather than raw XML.
 
+**The governing rule — what the implementation does is what the consumer gets.** The type
+declares exactly what the parser produces, never more. Concretely, and enforced by the
+typecheck in Task 1:
+
+- `containers` and `tasks` are **required**, not optional — the parser always builds them, an
+  empty list when there is nothing, so a `?` would describe a state that cannot occur.
+- `attributes` is a bare `Record<string, string>` with no named field. Declaring `tm:number`
+  as a required property would promise something the parser cannot guarantee on a shape we
+  have not seen. `Record` is honest precisely because it promises nothing.
+- With a caller's parser, `listNodes(myParse)` returns `T` as inferred from `myParse` —
+  unwrapped, unvalidated, uncoerced. What that parser built is what the caller gets; our part
+  ends at handing it the raw body.
+
 **Tech Stack:** TypeScript (strict, CommonJS), Jest, Biome, `fast-xml-parser`.
 
 **Spec:** `docs/superpowers/specs/2026-08-07-transport-list-and-structural-parsing-design.md`
@@ -506,6 +519,10 @@ To `AdtRequest`:
    * exists to remove.
    */
   async listNodes(options?: IListTransportsOptions): Promise<ITransportTree>;
+  // NB: the doc comment above MUST state that this rejects on an unrecognised
+  // body. The signature promises ITransportTree, and a reader takes a signature
+  // for a guarantee — so say plainly that the guarantee is "this shape or an
+  // error", never a silently empty tree. See "Honesty of the signature" below.
   async listNodes<T>(
     parse: (data: unknown) => T,
     options?: IListTransportsOptions,
@@ -622,6 +639,29 @@ The maintainer reviews, then Claude merges, tags `v11.0.0`, creates the GitHub r
 the user publishes.
 
 ---
+
+## Honesty of the signature
+
+`listNodes()` is typed `Promise<ITransportTree>`, but on a body the parser does not recognise
+it **rejects**. A signature is read as a guarantee, so the guarantee must be stated where it
+is read — in the method's own doc comment, not only here:
+
+> Resolves with the parsed tree, or **rejects** if the response is not a `tm:root` document.
+> An empty `tm:root` is not an error: it resolves with `requests: []`, which is the permanent
+> and correct answer on a system holding no transport requests, or when the saved search
+> configuration matches none.
+
+Both halves matter, and they pull in opposite directions:
+
+- **Rejecting on an unrecognised body** is what stops the original defect returning. A parser
+  that answered `{ requests: [] }` to anything it could not read would reproduce
+  `{"success": true, "count": 0}` over 55 real requests — the downstream failure this design
+  began with.
+- **Resolving on an empty root** is what stops the opposite lie. A system with no transport
+  requests must be able to say so without being reported as broken. No heuristic may treat
+  emptiness as suspicious.
+
+The distinction is structural — the root element and the nesting — and never a count.
 
 ## What this plan does not do
 
