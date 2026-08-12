@@ -1,7 +1,11 @@
 import type {
   IAbapConnection,
   IAdtResponse,
-  IExecutor,
+  IClassExecuteWithProfilerOptions,
+  IClassExecuteWithProfilingOptions,
+  IClassExecuteWithProfilingResult,
+  IClassExecutionTarget,
+  IClassExecutor,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { runClass } from '../../core/class/run';
@@ -10,46 +14,12 @@ import {
   extractProfilerIdFromResponse,
   extractTraceIdFromTraceRequestsResponse,
   getTraceRequestsByUri,
-  type IProfilerTraceParameters,
   listTraceFiles,
   listTraceRequests,
 } from '../../runtime/traces/profiler';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getSystemInformation } from '../../utils/systemInfo';
 import { getTimeout } from '../../utils/timeouts';
-
-export interface IClassExecutionTarget {
-  className: string;
-}
-
-export interface IClassExecuteWithProfilerOptions {
-  profilerId: string;
-}
-
-export interface IClassExecuteWithProfilingOptions {
-  profilerParameters?: IProfilerTraceParameters;
-  traceLookupUris?: string[];
-  /** Maximum number of polling attempts to find the trace (default: 5) */
-  maxTraceAttempts?: number;
-  /** Delay in ms between polling attempts (default: 2000) */
-  traceRetryDelayMs?: number;
-}
-
-export interface IClassExecuteWithProfilingResult {
-  response: IAdtResponse;
-  profilerId: string;
-  traceId: string;
-  traceRequestsResponse: IAdtResponse;
-}
-
-export interface IClassExecutor
-  extends IExecutor<
-    IClassExecutionTarget,
-    IAdtResponse,
-    IClassExecuteWithProfilerOptions,
-    IClassExecuteWithProfilingOptions,
-    IClassExecuteWithProfilingResult
-  > {}
 
 const delay = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
