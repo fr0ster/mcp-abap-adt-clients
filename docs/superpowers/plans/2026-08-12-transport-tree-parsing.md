@@ -209,6 +209,13 @@ export interface ITransportTreeNode {
 }
 
 /** A task under a request. Carries the same attribute set the request does. */
+/**
+ * One `atom:link` on a request or a task.
+ *
+ * These are how ADT names its own operations — `release`, `addobject`,
+ * `changeowner`, `merge`, `newtask` — so a caller follows an href rather than
+ * assembling a URL by convention.
+ */
 export interface ITransportTreeLink {
   /** href, rel, type, title — verbatim, unprefixed of the parser's own marker. */
   attributes: Record<string, string | undefined>;
