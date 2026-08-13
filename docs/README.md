@@ -27,9 +27,6 @@ Complete documentation for the `@mcp-abap-adt/adt-clients` package.
 - [**UPDATE_CONTENT_TYPES.md**](development/UPDATE_CONTENT_TYPES.md) - Content types for update operations (text/plain vs XML)
 - [**RFC_TESTING.md**](development/RFC_TESTING.md) - RFC testing setup and environment variables
 
-### Roadmaps
-- [**BATCH_REQUEST_SUPPORT.md**](development/roadmaps/BATCH_REQUEST_SUPPORT.md) - ADT batch request support (multipart/mixed)
-
 ## Documentation Structure
 
 ```

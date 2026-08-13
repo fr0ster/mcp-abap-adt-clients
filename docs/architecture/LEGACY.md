@@ -95,7 +95,7 @@ These types throw an error with the exact missing endpoint when the getter is ca
 |-------------|--------|------|
 | CDS Unit Test | `getCdsUnitTest()` | `/sap/bc/adt/abapunit/testruns` IS present on legacy — not blocked |
 | Unit Test | `getUnitTest()` | Same endpoint — works |
-| Transport Request | `getRequest()` | Uses `/sap/bc/cts/` — works |
+| Transport Request | `getRequest()` | Uses `/sap/bc/cts/` — `create()`/`read()`/`list()` work; `listNodes()` throws (the `/sap/bc/cts/transportrequests` payload has never been captured) |
 
 ## Shared Utilities (AdtUtils) Support
 

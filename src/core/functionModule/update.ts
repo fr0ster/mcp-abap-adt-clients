@@ -2,11 +2,14 @@
  * FunctionModule update operations - low-level functions for AdtFunctionModule
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtContentTypes,
+  IAdtResponse,
+} from '@mcp-abap-adt/interfaces';
 import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
-import type { IAdtContentTypes } from '../shared/contentTypes';
 import type { IUpdateFunctionModuleParams } from './types';
 
 /**

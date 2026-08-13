@@ -185,7 +185,7 @@ Common behaviors in implementations:
 
 ## Type System and Exports
 
-**Types are defined once, in `@mcp-abap-adt/interfaces` (`^11.0.0`).** As of 7.5.0 this package declares no type it shares with the contract package. Each `src/core/<object>/types.ts` is a re-export surface:
+**Types are defined once, in `@mcp-abap-adt/interfaces` (`^14.1.0`).** As of 7.5.0 this package declares no type it shares with the contract package. Each `src/core/<object>/types.ts` is a re-export surface:
 
 ```ts
 export type {
@@ -208,9 +208,9 @@ Package root (`src/index.ts`) exports:
 
 What stays declared locally, and why:
 - **Runtime (value) exports** — these are code, not contract: `ENHANCEMENT_TYPE_CODES` and the enhancement URL helpers (`src/core/enhancement/types.ts`), `resolveBindingVariant` / `SERVICE_BINDING_VARIANT_MAP` (`src/core/service/types.ts`).
-- **`IAdtClientOptions`** — describes this client's constructor, not the wire contract.
+- **`AdtContentTypesBase` / `AdtContentTypesModern`** — the two shipped header-set implementations (354 lines, 38 methods). They `implements IAdtContentTypes` from `@mcp-abap-adt/interfaces`; the interface itself is not declared here.
 
-Internal low-level helpers are intentionally not part of root API.
+**Contract consolidation (11.0.0).** As of 11.0.0 adt-clients declares no contract type at all, not even the ones a consumer needs only to configure or call this package's own clients: `IAdtClientOptions`, `IAdtSystemContext`, `IAdtContentTypes`, `IAdtHeaders`, the three `IBatch*` shapes, the twelve abapGit types, the ten executor types, and the five debugger types all moved to `@mcp-abap-adt/interfaces`. Import them from there; the names and shapes are unchanged. Internal low-level helpers are intentionally not part of root API.
 
 ## Testing Architecture
 

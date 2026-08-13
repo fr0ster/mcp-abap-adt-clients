@@ -1,4 +1,4 @@
-import type { IBatchResponsePart } from './types';
+import type { IBatchResponsePart } from '@mcp-abap-adt/interfaces';
 
 export function extractBoundary(contentType: string): string {
   const match = contentType.match(/boundary=([^;]+)/);

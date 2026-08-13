@@ -2,15 +2,26 @@ import type {
   IAbapConnection,
   IAbapRequestOptions,
   IAdtResponse,
+  IBatchRequestPart,
+  IBatchResponsePart,
+  IDeferredResponseConnection,
 } from '@mcp-abap-adt/interfaces';
-import type { IBatchRequestPart, IBatchResponsePart } from './types';
 
 interface IDeferredResponse {
   resolve: (value: IAdtResponse) => void;
   reject: (reason: Error) => void;
 }
 
-export class BatchRecordingConnection implements IAbapConnection {
+export class BatchRecordingConnection
+  implements IAbapConnection, IDeferredResponseConnection
+{
+  /**
+   * Responses here settle only when `execute()` flushes the batch. Anything
+   * that awaits one mid-recording deadlocks — the caller is blocked inside the
+   * code that would have reached `execute()`.
+   */
+  readonly responsesAreDeferred = true as const;
+
   private realConnection: IAbapConnection;
   private parts: IBatchRequestPart[] = [];
   private deferred: IDeferredResponse[] = [];

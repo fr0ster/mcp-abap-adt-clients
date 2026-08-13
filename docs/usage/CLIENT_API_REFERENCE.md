@@ -187,7 +187,7 @@ await toggle.update(
 ```typescript
 import { createAbapConnection } from '@mcp-abap-adt/connection';
 import { AdtAbapGitClient } from '@mcp-abap-adt/adt-clients';
-import type { IAdtAbapGitClient } from '@mcp-abap-adt/adt-clients';
+import type { IAdtAbapGitClient } from '@mcp-abap-adt/interfaces';
 
 const connection = createAbapConnection({ /* ... */ });
 const abapGit: IAdtAbapGitClient = new AdtAbapGitClient(connection);
@@ -249,6 +249,130 @@ await abapGit.unlink({ package: 'ZMY_PKG' });
 **Async pull contract.** The server-side pull continues independently of the client-side wait. If you abort or hit `maxPollDurationMs`, the thrown `AbortError` / `TimeoutError` carries `lastKnownStatus` (when the last `listRepos` succeeded before the client gave up). The client **must** poll `getRepo(package)` until `status !== 'R'` before re-issuing `pull` or `unlink`. Retrying `pull` while the previous server-side job is still `R` is unsupported and fails fast.
 
 **Content-type version.** Defaults to `v3` for sapcli compatibility. Cloud MDD advertises `v4`; consumers can opt in via `new AdtAbapGitClient(conn, logger, { contentTypeVersion: 'v4' })`.
+
+### Transport Requests (getRequest())
+
+`client.getRequest()` returns `AdtRequest`. `create()` and `read()` behave as any
+other handler; `list()` is the one method worth reading closely, because the
+endpoint it calls is a **saved-configuration search**, not a filtered query —
+sending `user`/`status`/`dateRange`/`targetSystem` as query parameters has
+never worked, on any system this was probed against, and the endpoint answers
+that shape with the same 309-byte empty root every time.
+
+```typescript
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
+
+const client = new AdtClient(connection);
+
+// No configUri: resolves the one saved transport search this system exposes.
+// Throws if there are zero configurations (nothing to run) or more than one
+// (which one is ambiguous — there is no "default" flag in the payload).
+const listState = await client.getRequest().list();
+console.log(listState.listResult?.data);
+
+// Pass configUri explicitly to pick a specific saved search, or to skip
+// resolution altogether (required on a batch client — see below).
+// getTransportSearchConfigurations() itself is internal to list()'s
+// resolution step and is not part of the public surface — discover the
+// available searches in Eclipse (Project Explorer → transport view) and copy
+// the configuration's href, or catch the "N transport search configurations"
+// error thrown by list() with no argument, which names every available href.
+await client.getRequest().list({
+  configUri: '/sap/bc/adt/cts/transportrequests/searchconfigurations/<id>',
+});
+```
+
+**On a batch client**, `configUri` is required. Resolving "no argument" needs
+a response from `getTransportSearchConfigurations()`, and a batch connection
+cannot deliver one until `batchExecute()` runs — so `batch.getRequest().list()`
+throws immediately, while `batch.getRequest().list({ configUri })` records
+normally and resolves after `batchExecute()`.
+
+**Migration from filter parameters.** There is no server-side filtering to
+lose — the five parameters (`user`, `status`, `date_range`, `target_system`,
+`request_type`) were never read by the endpoint. Call `list()` with no
+argument to run the saved search Eclipse already uses, or pass `configUri` to
+pick a specific one. See [CHANGELOG.md](../../CHANGELOG.md) (11.0.0 entry) for
+the before/after low-level signature.
+
+#### `listNodes()` — the transport tree, parsed
+
+`list()` hands back the raw ADT response; `listNodes()` parses the same body
+into requests, their tasks, and the containers each request was nested under.
+
+```typescript
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import type { ITransportTree } from '@mcp-abap-adt/interfaces';
+
+const client = new AdtClient(connection);
+
+const tree: ITransportTree = await client.getRequest().listNodes();
+
+for (const request of tree.requests) {
+  request.attributes['tm:number']; // verbatim — never renamed to "number"
+  request.containers;              // outermost first
+  request.tasks;                   // each task's own attributes, links, long_desc
+}
+```
+
+**Containers are a list because the nesting is not fixed.** `?configUri=`
+alone answers `tm:workbench > tm:modifiable > tm:request`; `?targets=true`
+inserts a `tm:target` level in between, and that level carries a human name
+(`"Local Change Requests"`) the request itself does not have — `tm:target`
+alone. A parser that assumed one fixed chain would silently return zero
+requests against the other shape, which is why `containers` walks by element
+name rather than by a path observed on one system.
+
+**Attributes are handed back verbatim.** `request.attributes['tm:number']`,
+not `request.attributes.number` — naming a field is the consumer's decision,
+not this library's.
+
+**It adds no request of its own.** With `configUri` it is one HTTP call;
+without one it is two (the saved-search configuration, then the list) —
+exactly what `list()` does alone. `listNodes()` is `list()` plus parsing, not
+an extra round-trip.
+
+**Pass your own parser and the return type follows it** — no cast:
+
+```typescript
+const mine = await client.getRequest().listNodes(myParse);
+```
+
+That exists for a system whose payload differs from the two captured shapes:
+`myParse` still yields a typed result instead of forcing a caller to fall back
+on raw XML.
+
+**It rejects on a body the parser does not recognise** — that is what stops
+`list()`'s original defect (an empty root read as success) from recurring one
+layer up. An empty `tm:root` is different: that is **not** an error, and
+`listNodes()` resolves with `requests: []` and whatever attributes the root
+itself carried. A system with no transport requests must be able to say so
+without being reported as broken — the distinction is the root element and the
+nesting, never a count.
+
+**Not supported on legacy systems.** `AdtRequestLegacy.listNodes()` throws:
+the `/sap/bc/cts/transportrequests` payload has never been captured, so no
+parser can honestly claim to read it. Use `list()` and parse the response
+yourself on those systems.
+
+**Known limitation — `?targets=true` is not sent.** This library requests
+`?configUri=` alone; Eclipse requests `?targets=true&configUri=`. With
+`targets=true` the server inserts an extra `tm:target` container carrying a
+human name (`"Local Change Requests"`) that the request itself does not
+have — its own `tm:target` attribute is `""`. Not sending it costs nothing in
+the type: `containers` is already an ordered list, so `tm:target` can be
+added later without a breaking change. Whether to send it — always, never, or
+behind a flag on `listNodes()` — is an open decision, not an oversight.
+
+**`parseTransportTree()`** is also exported from the package root, for a
+transport-tree response obtained some other way (a batch result, a fixture,
+anything already held as a string):
+
+```typescript
+import { parseTransportTree } from '@mcp-abap-adt/adt-clients';
+
+const tree = parseTransportTree(xmlAlreadyInHand);
+```
 
 ### What `update()` refuses to write
 

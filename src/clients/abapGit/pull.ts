@@ -1,4 +1,9 @@
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAbapGitPullArgs,
+  IAbapGitPullResult,
+  IAbapGitRepoStatus,
+} from '@mcp-abap-adt/interfaces';
 import {
   CT_ABAPGIT_REPO_V3,
   CT_ABAPGIT_REPO_V4,
@@ -7,11 +12,6 @@ import { getTimeout } from '../../utils/timeouts';
 import { getErrorLog } from './getErrorLog';
 import { listRepos } from './listRepos';
 import { pollUntilTerminal } from './poll';
-import type {
-  IAbapGitPullArgs,
-  IAbapGitPullResult,
-  IAbapGitRepoStatus,
-} from './types';
 import { buildPullBody } from './xmlBuilder';
 
 export async function pullRepo(

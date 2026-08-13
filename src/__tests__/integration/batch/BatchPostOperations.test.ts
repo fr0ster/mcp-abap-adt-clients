@@ -16,11 +16,14 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IBatchRequestPart,
+  ILogger,
+} from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import { buildBatchPayload } from '../../../batch/buildBatchPayload';
 import { parseBatchResponse } from '../../../batch/parseBatchResponse';
-import type { IBatchRequestPart } from '../../../batch/types';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import { createTestAdtClient, getConfig } from '../../helpers/sessionConfig';
 import { TestConfigResolver } from '../../helpers/TestConfigResolver';

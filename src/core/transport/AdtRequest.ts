@@ -20,18 +20,26 @@
  */
 
 import type {
-  HttpError,
-  IAbapConnection,
-  IAdtObject,
-  IAdtOperationOptions,
-  ILogger,
-  IObjectVersion,
+  IAdtSystemContext,
+  ITransportTree,
 } from '@mcp-abap-adt/interfaces';
-import type { IAdtSystemContext } from '../../clients/AdtClient';
+import {
+  type HttpError,
+  hasDeferredResponses,
+  type IAbapConnection,
+  type IAdtObject,
+  type IAdtOperationOptions,
+  type IListTransportsOptions,
+  type ILogger,
+  type IObjectVersion,
+  TRANSPORT_SEARCH_CONFIGURATIONS_URL,
+  TransportSearchConfigurationMissing,
+} from '@mcp-abap-adt/interfaces';
 import { safeErrorMessage } from '../../utils/internalUtils';
 import { throwUnsupportedVersions } from '../shared/versions';
 import { createTransport } from './create';
-import { listTransports } from './list';
+import { getTransportSearchConfigurations, listTransports } from './list';
+import { parseTransportTree } from './parseTransportTree';
 import { getTransport } from './read';
 import type { ITransportConfig, ITransportState } from './types';
 export class AdtRequest
@@ -148,24 +156,100 @@ export class AdtRequest
   }
 
   /**
-   * List transport requests
+   * List transport requests.
+   *
+   * With `configUri`: one request. Without: two — the configurations, then the
+   * list. The five filter parameters this used to take were never read by the
+   * server; filtering is a property of the saved configuration.
    */
-  async list(params: {
-    user: string;
-    status?: string;
-    dateRange?: string;
-    targetSystem?: string;
-    requestType?: string;
-  }): Promise<ITransportState> {
-    this.logger?.info?.('Listing transport requests for user:', params.user);
-    const response = await listTransports(this.connection, {
-      user: params.user,
-      status: params.status,
-      date_range: params.dateRange,
-      target_system: params.targetSystem,
-      request_type: params.requestType,
-    });
+  async list(options?: IListTransportsOptions): Promise<ITransportState> {
+    const configUri =
+      options?.configUri ?? (await this.resolveSearchConfiguration());
+
+    this.logger?.info?.('Listing transport requests', { configUri });
+    const response = await listTransports(this.connection, { configUri });
+
     return { listResult: response, errors: [] };
+  }
+
+  /**
+   * The transport tree, parsed.
+   *
+   * Adds no request to `list()` — with a `configUri` that is one call, without
+   * one it is two, exactly as `list()` alone.
+   *
+   * Rejects on a body the parser does not recognise: the signature promises
+   * `ITransportTree`, and a reader takes a signature for a guarantee, so the
+   * guarantee here is "this shape or an error" — never a silently empty tree.
+   * An empty `tm:root` is not that failure: it resolves with `requests: []`,
+   * the permanent correct answer on a system holding no transport requests.
+   *
+   * A consumer whose system answers in a shape the default parser does not fit
+   * passes its own and keeps a type; telling it to fall back on the raw
+   * response would be telling it to go untyped, which is the defect this
+   * exists to remove.
+   */
+  async listNodes(options?: IListTransportsOptions): Promise<ITransportTree>;
+  async listNodes<T>(
+    parse: (data: unknown) => T,
+    options?: IListTransportsOptions,
+  ): Promise<T>;
+  async listNodes<T>(
+    first?: IListTransportsOptions | ((data: unknown) => T),
+    second?: IListTransportsOptions,
+  ): Promise<ITransportTree | T> {
+    const parse = typeof first === 'function' ? first : undefined;
+    const options = typeof first === 'function' ? second : first;
+
+    const state = await this.list(options);
+    const data = state.listResult?.data;
+
+    return parse ? parse(data) : parseTransportTree(data);
+  }
+
+  /**
+   * Which saved search to run when the caller named none.
+   *
+   * Deterministic or it throws — never "the first one", which would silently
+   * run somebody else's filters.
+   *
+   * The deferred-connection check lives HERE and not in `list()`: an explicit
+   * `configUri` waits for nothing, so a batch call that supplies one is
+   * legitimate. Guarding earlier would reject it.
+   */
+  protected async resolveSearchConfiguration(): Promise<string> {
+    if (hasDeferredResponses(this.connection)) {
+      throw new Error(
+        'configUri is required on a batch client: resolving a search ' +
+          'configuration needs a response that a batch cannot deliver until ' +
+          'execute().',
+      );
+    }
+
+    const configurations = await getTransportSearchConfigurations(
+      this.connection,
+    );
+
+    if (configurations.length === 0) {
+      throw new TransportSearchConfigurationMissing(
+        TRANSPORT_SEARCH_CONFIGURATIONS_URL,
+      );
+    }
+
+    if (configurations.length === 1) {
+      return configurations[0].uri;
+    }
+
+    // Several. Picking one would mean guessing which attribute marks a default,
+    // and the payload on the only system we have carries no such marker — one
+    // configuration cannot show what several would look like. So: say so, and
+    // let the caller choose. This branch gets a rule when a system with several
+    // configurations has actually been read.
+    throw new Error(
+      `This system has ${configurations.length} transport search configurations ` +
+        'and none can be shown to be the default; pass configUri explicitly. ' +
+        `Available: ${configurations.map((c) => c.uri).join(', ')}`,
+    );
   }
 
   /**

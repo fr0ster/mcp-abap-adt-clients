@@ -11,7 +11,7 @@ import type {
   IAbapGitExternalRepoCredentials,
   IAbapGitLinkArgs,
   IAbapGitPullArgs,
-} from './types';
+} from '@mcp-abap-adt/interfaces';
 
 const NS_ABAPGITREPO = 'http://www.sap.com/adt/abapgit/repositories';
 const NS_ABAPGIT_EXTERNAL_REPO = 'http://www.sap.com/adt/abapgit/externalRepo';

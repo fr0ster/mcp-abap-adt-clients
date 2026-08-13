@@ -46,6 +46,8 @@ export const ACCEPT_TRANSPORT =
   'application/vnd.sap.adt.transportorganizer.v1+xml';
 export const ACCEPT_TRANSPORT_LIST =
   'application/vnd.sap.adt.transportorganizertree.v1+xml';
+export const ACCEPT_TRANSPORT_CONFIGURATIONS =
+  'application/vnd.sap.adt.configurations.v1+xml';
 export const ACCEPT_TRANSPORT_CHECK =
   'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.transport.service.checkData';
 export const CT_TRANSPORT_CHECK =

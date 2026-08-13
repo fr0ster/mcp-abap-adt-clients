@@ -22,16 +22,16 @@ import type {
   IAbapConnection,
   IAdtActivatable,
   IAdtCheckable,
+  IAdtContentTypes,
   IAdtCrud,
   IAdtLockable,
   IAdtOperationOptions,
+  IAdtSystemContext,
   IAdtValidatable,
   IAdtVersionable,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
-import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { safeErrorMessage } from '../../utils/internalUtils';
-import type { IAdtContentTypes } from '../shared/contentTypes';
 import type { LockRegistry } from '../shared/LockRegistry';
 import { activateFunctionInclude } from './activation';
 import { checkFunctionInclude } from './check';

@@ -5,6 +5,97 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [11.0.0] - 2026-08-12
+
+### Breaking
+
+- **`getRequest().list()` no longer takes filter parameters — it takes `configUri`.** `/sap/bc/adt/cts/transportrequests` is a saved-configuration search, not a filtered query. Probed live on 2026-08-07: `?user=`, `?status=`, the search configuration's own property spellings, and no parameters at all each answered with the same 309-byte empty `<tm:root/>` — while the system held 15 transport requests. `?configUri=<href>` against the same system in the same minute returned 137 181 bytes, 16 requests. There was no server-side filtering by `user`/`status`/`dateRange`/`targetSystem`/`requestType` to lose, because those fields were never read.
+
+  | before | after |
+  |---|---|
+  | `listTransports(conn, { user, status?, date_range?, target_system?, request_type? })` | `listTransports(conn, { configUri })` — `configUri` is required |
+  | `client.getRequest().list({ user: 'CB99', status: 'R' })` did one request and returned nothing | `client.getRequest().list()` resolves the saved configuration and returns matches; `client.getRequest().list({ configUri })` skips resolution |
+  | `getTransportSearchConfigurations()` did not exist | new: the saved searches this system holds, one request, parsed |
+
+  **Migration:** call `list()` with no argument — it resolves the one saved search a system exposes, or throws naming every href if there is more than one, or throws `TransportSearchConfigurationMissing` if there are none. Pass `configUri` to pin a specific saved search or skip resolution.
+
+  ```typescript
+  // Before (11.0.0 and earlier — never returned a transport request; see Fixed below)
+  await client.getRequest().list({ user: 'CB99', status: 'R' });
+
+  // After
+  await client.getRequest().list();
+  // or, pinning a specific saved search / on a batch client:
+  await client.getRequest().list({ configUri: '/sap/bc/adt/cts/transportrequests/searchconfiguration/configurations/<id>' });
+  ```
+
+  On `AdtClientBatch`, `configUri` is **required**: resolving "no argument" needs a response the recording connection cannot deliver until `batchExecute()` runs, so `batch.getRequest().list()` throws immediately rather than deadlocking, while `batch.getRequest().list({ configUri })` records and resolves normally.
+
+  `AdtRequestLegacy.list()` is unaffected — it already used `/sap/bc/cts/transportrequests` (no `configUri` concept on legacy systems) and `listTransportsLegacy()` continues to work as before; it had simply never been wired to anything before this release either.
+
+- **adt-clients no longer declares or exports any contract type.** 34 types moved to `@mcp-abap-adt/interfaces@14.0.0`, now a **runtime dependency** (`dependencies`, not `devDependencies`): the client-configuration contract (`IAdtClientOptions`, `IAdtSystemContext` — 2), the header-provider contract (`IAdtContentTypes`, `IAdtHeaders` — 2; the two shipped implementations, `AdtContentTypesBase` and `AdtContentTypesModern`, stay in this package), the three `IBatch*` shapes, the twelve abapGit types, the ten executor types, and the five debugger types. Names and shapes are unchanged — this is a path change only:
+
+  ```typescript
+  // Before
+  import type { IAdtClientOptions, IAdtSystemContext } from '@mcp-abap-adt/adt-clients';
+  import type { IBatchRequestPart, IBatchResponsePart, IBatchPayload } from '@mcp-abap-adt/adt-clients';
+  import type { IClassExecutor, IProgramExecutor } from '@mcp-abap-adt/adt-clients';
+  import type { DebuggerStepAction, IDebuggerAttachParams } from '@mcp-abap-adt/adt-clients';
+  import type { IAbapGitLinkArgs, IAbapGitPullResult } from '@mcp-abap-adt/adt-clients';
+  import type { IAdtContentTypes, IAdtHeaders } from '@mcp-abap-adt/adt-clients';
+
+  // After
+  import type { IAdtClientOptions, IAdtSystemContext } from '@mcp-abap-adt/interfaces';
+  import type { IBatchRequestPart, IBatchResponsePart, IBatchPayload } from '@mcp-abap-adt/interfaces';
+  import type { IClassExecutor, IProgramExecutor } from '@mcp-abap-adt/interfaces';
+  import type { DebuggerStepAction, IDebuggerAttachParams } from '@mcp-abap-adt/interfaces';
+  import type { IAbapGitLinkArgs, IAbapGitPullResult } from '@mcp-abap-adt/interfaces';
+  import type { IAdtContentTypes, IAdtHeaders } from '@mcp-abap-adt/interfaces';
+  ```
+
+  **Version pairing.** Because these types are now sourced rather than copied, `@mcp-abap-adt/interfaces` is a hard peer of this package's public API: a major bump there implies a bump here.
+
+- **The 26 handler-type aliases are deleted**: `AdtClassType`, `AdtRequestType`, `AdtDomainType`, and 23 others (`AdtAccessControlType`, `AdtAppendStructureType`, `AdtBehaviorDefinitionType`, `AdtBehaviorImplementationType`, `AdtDataElementType`, `AdtDdlType`, `AdtEnhancementType`, `AdtFunctionGroupType`, `AdtFunctionModuleType`, `AdtInterfaceType`, `AdtMessageClassType`, `AdtMessageClassMessageType`, `AdtMetadataExtensionType`, `AdtPackageType`, `AdtProgramType`, `AdtScalarFunctionType`, `AdtScalarFunctionImplementationType`, `AdtServiceDefinitionType`, `AdtStructureType`, `AdtTableType`, `AdtDdicTableTypeAlias`, `AdtTransformationType`, `AdtUnitTestType`). Each was a bare alias — `IAdtObject<IXxxConfig, IXxxState>` (or the narrower `IAdtSourceObject`/`IAdtNonVersionedObject`) — with both halves already available from `@mcp-abap-adt/interfaces`, and none was referenced anywhere in this codebase or, as far as usage could be found, downstream.
+
+  ```typescript
+  // Before
+  import type { AdtClassType } from '@mcp-abap-adt/adt-clients';
+
+  // After — reassemble from the atoms interfaces already exposes
+  import type { IAdtSourceObject } from '@mcp-abap-adt/interfaces';
+  import type { IClassConfig, IClassState } from '@mcp-abap-adt/interfaces';
+  type AdtClassType = IAdtSourceObject<IClassConfig, IClassState>;
+  ```
+
+### Added
+
+- `getTransportSearchConfigurations(connection)` — the saved transport searches this system holds, one request, parsed into `ITransportSearchConfiguration[]` (used internally by `list()`'s resolution step).
+- `getRequest().listNodes()` — the transport tree, parsed: requests, their tasks,
+  and the containers they were nested under. Adds no request to `list()`.
+
+  ```ts
+  const tree = await client.getRequest().listNodes();
+  tree.requests[0].attributes['tm:number'];   // verbatim, never renamed
+  tree.requests[0].tasks;
+  tree.requests[0].containers;                // outermost first
+  ```
+
+  Pass your own parser when the default does not fit your system — the return
+  type follows it:
+
+  ```ts
+  const mine = await client.getRequest().listNodes(myParse);
+  ```
+
+  Not supported on legacy systems: the `/sap/bc/cts/transportrequests` payload
+  has never been captured.
+
+- `parseTransportTree()` — exported standalone, for a response obtained elsewhere.
+
+### Fixed
+
+- **`getRequest().list()` had never returned a transport request since #7 added it.** `Transport.test.ts` stayed green throughout because it asserted only `expect(listState.listResult).toBeDefined()` — a check an empty root satisfies as readily as a populated one. Verified fixed against a live system 2026-08-12: `list()` now returns 60 162 bytes, 7 requests, 7 tasks, from the same endpoint that returned an empty root under the old filter-parameter contract.
+
 ## [10.1.0] - 2026-08-07
 
 ### Fixed

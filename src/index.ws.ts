@@ -1,14 +1,9 @@
 /**
  * ADT Clients — WebSocket barrel
- * Covers: AdtClientsWS and DebuggerSessionClient.
+ * Covers: AdtClientsWS and DebuggerSessionClient. Contract types
+ * (DebuggerStepAction and the debugger params) come from
+ * @mcp-abap-adt/interfaces — that is the one place to import them.
  */
 
 export { AdtClientsWS } from './clients/AdtClientsWS';
-export type {
-  DebuggerStepAction,
-  IDebuggerAttachParams,
-  IDebuggerGetVariablesParams,
-  IDebuggerListenParams,
-  IDebuggerStepParams,
-} from './clients/DebuggerSessionClient';
 export { DebuggerSessionClient } from './clients/DebuggerSessionClient';

@@ -2,14 +2,7 @@
  * Class operations - exports
  */
 
-import type { IAdtSourceObject } from '@mcp-abap-adt/interfaces';
-import type { IClassConfig, IClassState } from './types';
-
 export { AdtClass } from './AdtClass';
-export * from './types';
-
-// Type alias for AdtClass
-export type AdtClassType = IAdtSourceObject<IClassConfig, IClassState>;
 export {
   AdtLocalDefinitions,
   type ILocalDefinitionsConfig,
@@ -28,3 +21,4 @@ export {
   startClassUnitTestRun,
   startClassUnitTestRunByObject,
 } from './run';
+export * from './types';

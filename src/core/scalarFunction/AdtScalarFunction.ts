@@ -7,9 +7,9 @@ import type {
   IAbapConnection,
   IAdtOperationOptions,
   IAdtSourceObject,
+  IAdtSystemContext,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
-import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { beginCriticalSection } from '../../utils/criticalSection';
 import { assertDeletable } from '../../utils/deletionCheck';
 import { safeErrorMessage } from '../../utils/internalUtils';

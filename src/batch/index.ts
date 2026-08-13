@@ -9,8 +9,3 @@ export {
   serializeParams,
 } from './buildBatchPayload';
 export { extractBoundary, parseBatchResponse } from './parseBatchResponse';
-export type {
-  IBatchPayload,
-  IBatchRequestPart,
-  IBatchResponsePart,
-} from './types';

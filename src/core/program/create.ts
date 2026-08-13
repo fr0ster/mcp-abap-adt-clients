@@ -2,7 +2,11 @@
  * Program create operations - Low-level functions
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtContentTypes,
+  IAdtResponse,
+} from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_SOURCE,
   CT_PROGRAM,
@@ -13,7 +17,6 @@ import {
   limitDescription,
 } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
-import type { IAdtContentTypes } from '../shared/contentTypes';
 import type { ICreateProgramParams } from './types';
 
 /**

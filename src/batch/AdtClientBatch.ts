@@ -1,9 +1,9 @@
 import type {
   IAbapConnection,
+  IAdtClientOptions,
   IAdtResponse,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
-import type { IAdtClientOptions } from '../clients/AdtClient';
 import { AdtClient } from '../clients/AdtClient';
 import { BatchRecordingConnection } from './BatchRecordingConnection';
 import { buildBatchPayload } from './buildBatchPayload';

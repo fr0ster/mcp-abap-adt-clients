@@ -1,4 +1,7 @@
-import type { IBatchPayload, IBatchRequestPart } from './types';
+import type {
+  IBatchPayload,
+  IBatchRequestPart,
+} from '@mcp-abap-adt/interfaces';
 
 export function createBatchBoundary(): string {
   const randomPart =

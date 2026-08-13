@@ -1,46 +1,20 @@
 import type {
   IAbapConnection,
   IAdtResponse,
-  IExecutor,
   ILogger,
+  IProgramExecuteWithProfilerOptions,
+  IProgramExecuteWithProfilingOptions,
+  IProgramExecuteWithProfilingResult,
+  IProgramExecutionTarget,
+  IProgramExecutor,
 } from '@mcp-abap-adt/interfaces';
 import { runProgram } from '../../core/program/run';
 import {
   createTraceParameters,
   extractProfilerIdFromResponse,
-  type IProfilerTraceParameters,
 } from '../../runtime/traces/profiler';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
-
-export interface IProgramExecutionTarget {
-  programName: string;
-}
-
-export interface IProgramExecuteWithProfilerOptions {
-  profilerId: string;
-}
-
-export interface IProgramExecuteWithProfilingOptions {
-  profilerParameters?: IProfilerTraceParameters;
-}
-
-export interface IProgramExecuteWithProfilingResult {
-  response: IAdtResponse;
-  profilerId: string;
-  // traceId is NOT included — program execution is fire-and-forget.
-  // Traces are written asynchronously by SAP after the program completes.
-  // Use RuntimeListProfilerTraceFiles to poll for the trace after execution.
-}
-
-export interface IProgramExecutor
-  extends IExecutor<
-    IProgramExecutionTarget,
-    IAdtResponse,
-    IProgramExecuteWithProfilerOptions,
-    IProgramExecuteWithProfilingOptions,
-    IProgramExecuteWithProfilingResult
-  > {}
 
 export class ProgramExecutor implements IProgramExecutor {
   private readonly connection: IAbapConnection;

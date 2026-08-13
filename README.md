@@ -68,7 +68,7 @@ This package is responsible for:
 
 This package interacts with external packages **ONLY through interfaces**:
 
-- **`@mcp-abap-adt/interfaces`** (`^11.0.0`): The contract package — the single definition site for every public type this package exposes (see [Type System](#type-system)). This is the one runtime dependency whose *types* are part of this package's public API.
+- **`@mcp-abap-adt/interfaces`** (`^14.1.0`): The contract package — the single definition site for every public type this package exposes (see [Type System](#type-system)). This is the one runtime dependency whose *types* are part of this package's public API.
 - **`@mcp-abap-adt/connection`**: Uses the `IAbapConnection` interface for HTTP requests — does not know about the concrete connection implementation. It is a **dev** dependency; consumers supply their own implementation.
 - **No other direct package dependencies**: all remaining interactions happen through well-defined interfaces
 
@@ -552,7 +552,8 @@ hold yourself:
 
 <!-- surface:begin -->
 `getSystemInformation`, `isModernAdtSystem`, `resolveContentTypes`,
-`fetchDiscoveryEndpoints`, `isEndpointInDiscovery`, `parseSearchResults`
+`fetchDiscoveryEndpoints`, `isEndpointInDiscovery`, `parseSearchResults`,
+`parseTransportTree`
 <!-- surface:end -->
 
 - `getSystemInformation(connection)` — the ADT system record, or `null`.
@@ -566,6 +567,14 @@ hold yourself:
 - `parseSearchResults(xml)` — turn a quickSearch payload you already hold into
   `ISearchResult[]`. Needs no connection, which is why it is a plain export
   rather than a method on `getUtils()`.
+- `parseTransportTree(xml)` — turn a transport-tree response you already hold
+  into `ITransportTree`: requests, their tasks, and the containers each was
+  nested under, attributes verbatim. `client.getRequest().listNodes()` calls
+  this for you against a live connection; use the standalone export for a
+  response obtained elsewhere (batch result, fixture, capture). See the
+  "Transport Requests" section of
+  [docs/usage/CLIENT_API_REFERENCE.md](docs/usage/CLIENT_API_REFERENCE.md)
+  for `listNodes()`.
 
 `src/index.ts` is the full surface; everything reachable from it is public and
 everything else is not.
@@ -574,7 +583,7 @@ everything else is not.
 
 ### Single Definition Site: `@mcp-abap-adt/interfaces`
 
-Since **7.5.0**, every public type is **defined once**, in `@mcp-abap-adt/interfaces` (`^13.1.0`). This package declares no copies of its own — the low-level `*Params` interfaces, every `IXxxConfig`/`IXxxState` pair, the option/result types and the cross-cutting shared types all live there.
+Since **7.5.0**, every public type is **defined once**, in `@mcp-abap-adt/interfaces` (`^14.1.0`). This package declares no copies of its own — the low-level `*Params` interfaces, every `IXxxConfig`/`IXxxState` pair, the option/result types and the cross-cutting shared types all live there.
 
 **Import them from the package that owns them:**
 
@@ -592,7 +601,7 @@ What this package exports is what it owns: the clients, the handler classes, the
 
 ### Honest capability types (since 8.0.0)
 
-`@mcp-abap-adt/interfaces` (`^13.1.0`) splits the fat `IAdtObject` contract into **capability atoms** — `IAdtCreatable`, `IAdtReadable`, `IAdtModifiable` (and `IAdtCrud`, their composite), `IAdtValidatable`, `IAdtCheckable`, `IAdtActivatable`, `IAdtLockable`, `IAdtVersionable`, `IAdtTransportAware`, `IAdtSearchable` — each covering one slice of the lifecycle, plus two named composites: `IAdtSourceObject` and `IAdtNonVersionedObject` (all but versions). Since interfaces 13.0.0 `IAdtObject` is itself assembled from the atoms, so the atoms are the definitions and the composite cannot drift from them.
+`@mcp-abap-adt/interfaces` (`^14.1.0`) splits the fat `IAdtObject` contract into **capability atoms** — `IAdtCreatable`, `IAdtReadable`, `IAdtModifiable` (and `IAdtCrud`, their composite), `IAdtValidatable`, `IAdtCheckable`, `IAdtActivatable`, `IAdtLockable`, `IAdtVersionable`, `IAdtTransportAware`, `IAdtSearchable` — each covering one slice of the lifecycle, plus two named composites: `IAdtSourceObject` and `IAdtNonVersionedObject` (all but versions). Since interfaces 13.0.0 `IAdtObject` is itself assembled from the atoms, so the atoms are the definitions and the composite cannot drift from them.
 
 Since **8.0.0**, each handler `implements` only the atoms it genuinely supports, and `AdtClient.getXxx()` (and `AdtClientBatch.getXxx()`) return types are narrowed to match:
 
@@ -607,7 +616,7 @@ Previously the second call compiled and threw `ADT_UNSUPPORTED_OPERATION` at run
 
 Since **9.0.0** no accessor returns the wide type. `getUnitTest()` and `getCdsUnitTest()` were the last, and now return `IAdtCreatable & IAdtReadable & IAdtValidatable & IAdtTestRunnable` (`IAdtCdsTestRunnable` for CDS): ADT exposes no update, delete, activate, check, lock or version resource for a test run, so the previous type promised thirteen methods of which nine threw — while omitting `run()`, the one thing the handler is for. `getRequest()`, `getFeatureToggle()` and `getServiceBinding()` return their concrete handler types.
 
-Two categories deliberately remain local, because they describe *this client* rather than the wire contract:
+One category deliberately remains local, because it is code, not contract:
 
 - Runtime (value) exports:
   <!-- surface:begin -->
@@ -619,7 +628,18 @@ Two categories deliberately remain local, because they describe *this client* ra
   `supportsSourceCode`, `isImplementationType`, `isSpotType`) were listed here but never exported; they are
   internal to `core/enhancement` and stay that way. Nothing outside this package asked for them, and an export
   is a promise to keep.
-- `IAdtClientOptions` — constructor options for `AdtClient` itself.
+
+**Contract consolidation (since 11.0.0).** `IAdtClientOptions` and `IAdtSystemContext` —
+this client's constructor options and system context — used to be declared here on the
+theory that they describe *this client* rather than the wire contract. That reasoning did
+not survive contact with the package's own purpose: a consumer must import them to
+configure the client at all, so they belong with everything else a consumer imports to use
+the library. They now live in `@mcp-abap-adt/interfaces`, alongside `IAdtContentTypes` /
+`IAdtHeaders` (the header-provider contract — `AdtContentTypesBase` and
+`AdtContentTypesModern`, the two shipped implementations, stay here), the three `IBatch*`
+shapes, the twelve abapGit types, the ten executor types, and the five debugger types. This
+package no longer declares or exports any contract type — every `import type` name it hands
+out is sourced from `@mcp-abap-adt/interfaces`.
 
 > **Version pairing.** Because the types are now sourced rather than copied, `@mcp-abap-adt/interfaces` is a hard peer of this package's public API. A major bump there implies a bump here; keep the two in step rather than letting a resolver pick a mismatched pair.
 
@@ -752,7 +772,6 @@ See [docs/DEBUG.md](docs/DEBUG.md) for detailed debugging guide.
 ## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md) for package-specific release notes.
-Latest (0.3.14): added `getWhereUsedList()` for parsed where-used results.
 
 ## Tests
 

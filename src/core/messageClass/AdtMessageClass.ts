@@ -22,11 +22,11 @@ import type {
   IAdtCrud,
   IAdtLockable,
   IAdtOperationOptions,
+  IAdtSystemContext,
   IAdtValidatable,
   ILogger,
   IObjectVersion,
 } from '@mcp-abap-adt/interfaces';
-import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { safeErrorMessage } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import {

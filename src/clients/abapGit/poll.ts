@@ -1,6 +1,8 @@
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAbapGitRepoStatus,
+} from '@mcp-abap-adt/interfaces';
 import { listRepos } from './listRepos';
-import type { IAbapGitRepoStatus } from './types';
 
 const DEFAULT_POLL_INTERVAL_MS = 1000;
 const DEFAULT_MAX_DURATION_MS = 10 * 60 * 1000;

@@ -1,10 +1,10 @@
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
-import {
-  ClassExecutor,
-  type IClassExecutor,
-  type IProgramExecutor,
-  ProgramExecutor,
-} from '../executors';
+import type {
+  IAbapConnection,
+  IClassExecutor,
+  ILogger,
+  IProgramExecutor,
+} from '@mcp-abap-adt/interfaces';
+import { ClassExecutor, ProgramExecutor } from '../executors';
 
 export class AdtExecutor {
   private readonly connection: IAbapConnection;

@@ -5,13 +5,13 @@
 import type {
   HttpError,
   IAbapConnection,
+  IAdtContentTypes,
   IAdtResponse,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { CT_FUNCTION_GROUP } from '../../constants/contentTypes';
 import { limitDescription, safeStringify } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
-import type { IAdtContentTypes } from '../shared/contentTypes';
 import type { ICreateFunctionGroupParams } from './types';
 
 const debugEnabled = process.env.DEBUG_ADT_LIBS === 'true';
