@@ -3,6 +3,7 @@
  */
 
 import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import { assertActivationSucceeded } from '../../utils/activationUtils';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 
 /**
@@ -22,7 +23,7 @@ export async function activateFunctionGroup(
 
   const url = `/sap/bc/adt/activation?method=activate&preauditRequested=true`;
 
-  return connection.makeAdtRequest({
+  const response = await connection.makeAdtRequest({
     url,
     method: 'POST',
     timeout: 30000, // 30 seconds for activation
@@ -32,4 +33,6 @@ export async function activateFunctionGroup(
       Accept: 'application/xml',
     },
   });
+  assertActivationSucceeded('Function group', response.data);
+  return response;
 }
