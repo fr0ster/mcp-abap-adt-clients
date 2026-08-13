@@ -19,17 +19,19 @@
  * - Check: not supported (test runs don't have check operation)
  */
 
-import type {
-  HttpError,
-  IAbapConnection,
-  IAdtCreatable,
-  IAdtOperationOptions,
-  IAdtReadable,
-  IAdtResponse,
-  IAdtTestRunnable,
-  IAdtValidatable,
-  ILogger,
-  IObjectVersion,
+import {
+  AdtObjectErrorCodes,
+  AdtOperationError,
+  type HttpError,
+  type IAbapConnection,
+  type IAdtCreatable,
+  type IAdtOperationOptions,
+  type IAdtReadable,
+  type IAdtResponse,
+  type IAdtTestRunnable,
+  type IAdtValidatable,
+  type ILogger,
+  type IObjectVersion,
 } from '@mcp-abap-adt/interfaces';
 import {
   headerValueToString,
@@ -81,8 +83,20 @@ export class AdtUnitTest
   }
 
   /**
-   * Validate unit test configuration before creation
-   * Note: ADT doesn't provide validation endpoint for unit tests
+   * Validate unit test configuration before running.
+   *
+   * A test run does not create the container class — it already exists, so
+   * `validateClassName` (a name check for an object that does not exist yet)
+   * would be meaningless against it. Instead this confirms the container is
+   * actually there, the same way a caller would find out by trying to read
+   * it: `config.tests[0].containerClass` is the real ADT object (CLAS/OC);
+   * `tests[].testClass` is only the *name* of the local test class nested
+   * inside it, not its code.
+   *
+   * `IUnitTestConfig` carries no field for that local test class's source,
+   * so `checkClassLocalTestClass` (available via `this.adtLocalTestClass`,
+   * same as `AdtLocalTestClass.validate()` uses it) cannot be wired in here —
+   * there is nothing to check. See task-3-report.md for the reasoning.
    */
   async validate(config: Partial<IUnitTestConfig>): Promise<IUnitTestState> {
     if (!config.tests || config.tests.length === 0) {
@@ -91,9 +105,22 @@ export class AdtUnitTest
       );
     }
 
-    // ADT doesn't provide validation endpoint for unit tests
-    // Return a mock success response
+    const containerClass = config.tests[0].containerClass;
+    const containerState = await this.adtClass.read({
+      className: containerClass,
+    });
+
+    if (!containerState) {
+      const notFound = new AdtOperationError(
+        `Container class '${containerClass}' does not exist`,
+      );
+      notFound.code = AdtObjectErrorCodes.OBJECT_NOT_FOUND;
+      notFound.status = 404;
+      throw notFound;
+    }
+
     return {
+      validationResponse: containerState.readResult,
       errors: [],
     };
   }
