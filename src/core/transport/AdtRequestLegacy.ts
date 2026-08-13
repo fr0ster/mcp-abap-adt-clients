@@ -110,4 +110,19 @@ export class AdtRequestLegacy extends AdtRequest {
     const response = await listTransportsLegacy(this.conn);
     return { listResult: response, errors: [] };
   }
+
+  /**
+   * Not supported on legacy systems.
+   *
+   * `/sap/bc/cts/transportrequests` has never been captured, and assuming the
+   * modern parser fits it would be exactly the guess this design exists to
+   * stop. Supported once someone captures a legacy payload.
+   */
+  override async listNodes(): Promise<never> {
+    throw new Error(
+      'listNodes() is not supported on legacy SAP systems: the payload of ' +
+        '/sap/bc/cts/transportrequests has never been captured, so no parser can ' +
+        'honestly claim to read it. Use list() and parse the response yourself.',
+    );
+  }
 }

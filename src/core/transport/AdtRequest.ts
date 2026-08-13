@@ -19,7 +19,10 @@
  * - Check: not supported (transport requests don't have check operation)
  */
 
-import type { IAdtSystemContext } from '@mcp-abap-adt/interfaces';
+import type {
+  IAdtSystemContext,
+  ITransportTree,
+} from '@mcp-abap-adt/interfaces';
 import {
   type HttpError,
   hasDeferredResponses,
@@ -36,6 +39,7 @@ import { safeErrorMessage } from '../../utils/internalUtils';
 import { throwUnsupportedVersions } from '../shared/versions';
 import { createTransport } from './create';
 import { getTransportSearchConfigurations, listTransports } from './list';
+import { parseTransportTree } from './parseTransportTree';
 import { getTransport } from './read';
 import type { ITransportConfig, ITransportState } from './types';
 export class AdtRequest
@@ -166,6 +170,41 @@ export class AdtRequest
     const response = await listTransports(this.connection, { configUri });
 
     return { listResult: response, errors: [] };
+  }
+
+  /**
+   * The transport tree, parsed.
+   *
+   * Adds no request to `list()` — with a `configUri` that is one call, without
+   * one it is two, exactly as `list()` alone.
+   *
+   * Rejects on a body the parser does not recognise: the signature promises
+   * `ITransportTree`, and a reader takes a signature for a guarantee, so the
+   * guarantee here is "this shape or an error" — never a silently empty tree.
+   * An empty `tm:root` is not that failure: it resolves with `requests: []`,
+   * the permanent correct answer on a system holding no transport requests.
+   *
+   * A consumer whose system answers in a shape the default parser does not fit
+   * passes its own and keeps a type; telling it to fall back on the raw
+   * response would be telling it to go untyped, which is the defect this
+   * exists to remove.
+   */
+  async listNodes(options?: IListTransportsOptions): Promise<ITransportTree>;
+  async listNodes<T>(
+    parse: (data: unknown) => T,
+    options?: IListTransportsOptions,
+  ): Promise<T>;
+  async listNodes<T>(
+    first?: IListTransportsOptions | ((data: unknown) => T),
+    second?: IListTransportsOptions,
+  ): Promise<ITransportTree | T> {
+    const parse = typeof first === 'function' ? first : undefined;
+    const options = typeof first === 'function' ? second : first;
+
+    const state = await this.list(options);
+    const data = state.listResult?.data;
+
+    return parse ? parse(data) : parseTransportTree(data);
   }
 
   /**
