@@ -295,6 +295,85 @@ argument to run the saved search Eclipse already uses, or pass `configUri` to
 pick a specific one. See [CHANGELOG.md](../../CHANGELOG.md) (11.0.0 entry) for
 the before/after low-level signature.
 
+#### `listNodes()` — the transport tree, parsed
+
+`list()` hands back the raw ADT response; `listNodes()` parses the same body
+into requests, their tasks, and the containers each request was nested under.
+
+```typescript
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import type { ITransportTree } from '@mcp-abap-adt/interfaces';
+
+const client = new AdtClient(connection);
+
+const tree: ITransportTree = await client.getRequest().listNodes();
+
+for (const request of tree.requests) {
+  request.attributes['tm:number']; // verbatim — never renamed to "number"
+  request.containers;              // outermost first
+  request.tasks;                   // each task's own attributes, links, long_desc
+}
+```
+
+**Containers are a list because the nesting is not fixed.** `?configUri=`
+alone answers `tm:workbench > tm:modifiable > tm:request`; `?targets=true`
+inserts a `tm:target` level in between, and that level carries a human name
+(`"Local Change Requests"`) the request itself does not have — `tm:target`
+alone. A parser that assumed one fixed chain would silently return zero
+requests against the other shape, which is why `containers` walks by element
+name rather than by a path observed on one system.
+
+**Attributes are handed back verbatim.** `request.attributes['tm:number']`,
+not `request.attributes.number` — naming a field is the consumer's decision,
+not this library's.
+
+**It adds no request of its own.** With `configUri` it is one HTTP call;
+without one it is two (the saved-search configuration, then the list) —
+exactly what `list()` does alone. `listNodes()` is `list()` plus parsing, not
+an extra round-trip.
+
+**Pass your own parser and the return type follows it** — no cast:
+
+```typescript
+const mine = await client.getRequest().listNodes(myParse);
+```
+
+That exists for a system whose payload differs from the two captured shapes:
+`myParse` still yields a typed result instead of forcing a caller to fall back
+on raw XML.
+
+**It rejects on a body the parser does not recognise** — that is what stops
+`list()`'s original defect (an empty root read as success) from recurring one
+layer up. An empty `tm:root` is different: that is **not** an error, and
+`listNodes()` resolves with `requests: []` and whatever attributes the root
+itself carried. A system with no transport requests must be able to say so
+without being reported as broken — the distinction is the root element and the
+nesting, never a count.
+
+**Not supported on legacy systems.** `AdtRequestLegacy.listNodes()` throws:
+the `/sap/bc/cts/transportrequests` payload has never been captured, so no
+parser can honestly claim to read it. Use `list()` and parse the response
+yourself on those systems.
+
+**Known limitation — `?targets=true` is not sent.** This library requests
+`?configUri=` alone; Eclipse requests `?targets=true&configUri=`. With
+`targets=true` the server inserts an extra `tm:target` container carrying a
+human name (`"Local Change Requests"`) that the request itself does not
+have — its own `tm:target` attribute is `""`. Not sending it costs nothing in
+the type: `containers` is already an ordered list, so `tm:target` can be
+added later without a breaking change. Whether to send it — always, never, or
+behind a flag on `listNodes()` — is an open decision, not an oversight.
+
+**`parseTransportTree()`** is also exported from the package root, for a
+transport-tree response obtained some other way (a batch result, a fixture,
+anything already held as a string):
+
+```typescript
+import { parseTransportTree } from '@mcp-abap-adt/adt-clients';
+
+const tree = parseTransportTree(xmlAlreadyInHand);
+```
+
 ### What `update()` refuses to write
 
 Five object types — `domain`, `dataElement`, `package`, `tabletype`,

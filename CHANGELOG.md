@@ -70,6 +70,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 ### Added
 
 - `getTransportSearchConfigurations(connection)` — the saved transport searches this system holds, one request, parsed into `ITransportSearchConfiguration[]` (used internally by `list()`'s resolution step).
+- `getRequest().listNodes()` — the transport tree, parsed: requests, their tasks,
+  and the containers they were nested under. Adds no request to `list()`.
+
+  ```ts
+  const tree = await client.getRequest().listNodes();
+  tree.requests[0].attributes['tm:number'];   // verbatim, never renamed
+  tree.requests[0].tasks;
+  tree.requests[0].containers;                // outermost first
+  ```
+
+  Pass your own parser when the default does not fit your system — the return
+  type follows it:
+
+  ```ts
+  const mine = await client.getRequest().listNodes(myParse);
+  ```
+
+  Not supported on legacy systems: the `/sap/bc/cts/transportrequests` payload
+  has never been captured.
+
+- `parseTransportTree()` — exported standalone, for a response obtained elsewhere.
 
 ### Fixed
 
