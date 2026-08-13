@@ -13,8 +13,9 @@
  * Operation chains:
  * - Create: create (no validation, no check, no activate)
  * - Read: read (get transport request details)
- * - Update: not supported (transport requests are immutable after creation)
- * - Delete: not supported (transport requests cannot be deleted via ADT)
+ * - Update: GET current XML, patch the description, PUT (read-modify-write —
+ *   the only field ADT lets a client change on a request)
+ * - Delete: DELETE the item resource (ADT accepts this only for an empty request)
  * - Activate: not supported (transport requests are not activated)
  * - Check: not supported (transport requests don't have check operation)
  */
@@ -38,10 +39,12 @@ import {
 import { safeErrorMessage } from '../../utils/internalUtils';
 import { throwUnsupportedVersions } from '../shared/versions';
 import { createTransport } from './create';
+import { deleteTransport } from './delete';
 import { getTransportSearchConfigurations, listTransports } from './list';
 import { parseTransportTree } from './parseTransportTree';
 import { getTransport } from './read';
 import type { ITransportConfig, ITransportState } from './types';
+import { updateTransport } from './update';
 export class AdtRequest
   implements IAdtObject<ITransportConfig, ITransportState>
 {
@@ -268,26 +271,76 @@ export class AdtRequest
   }
 
   /**
-   * Update transport request
-   * Note: Transport requests are immutable after creation in ADT
+   * Update transport request description
+   *
+   * ADT's only mutable field on a request is its description. Read-modify-write:
+   * GET the current XML, patch the description into it, PUT it back — building
+   * the body from scratch would drop every server-managed field the client does
+   * not model.
    */
   async update(
-    _config: Partial<ITransportConfig>,
+    config: Partial<ITransportConfig>,
     _options?: IAdtOperationOptions,
   ): Promise<ITransportState> {
-    throw new Error(
-      'Update operation is not supported for Transport Request objects in ADT',
-    );
+    if (!config.transportNumber) {
+      throw new Error('Transport request number is required');
+    }
+    if (!config.description) {
+      throw new Error('Transport request description is required for update');
+    }
+
+    try {
+      this.logger?.info?.(
+        'Updating transport request description:',
+        config.transportNumber,
+      );
+      const response = await updateTransport(
+        this.connection,
+        config.transportNumber,
+        config.description,
+      );
+
+      return {
+        transportNumber: config.transportNumber,
+        updateResult: response,
+        errors: [],
+      };
+    } catch (error: unknown) {
+      this.logger?.error('Update failed:', safeErrorMessage(error));
+      throw error;
+    }
   }
 
   /**
    * Delete transport request
-   * Note: Transport requests cannot be deleted via ADT
+   *
+   * ADT accepts this only for a request that holds no objects; a non-empty
+   * request is rejected by the server, not by this client.
    */
-  async delete(_config: Partial<ITransportConfig>): Promise<ITransportState> {
-    throw new Error(
-      'Delete operation is not supported for Transport Request objects in ADT',
-    );
+  async delete(config: Partial<ITransportConfig>): Promise<ITransportState> {
+    if (!config.transportNumber) {
+      throw new Error('Transport request number is required');
+    }
+
+    try {
+      this.logger?.info?.(
+        'Deleting transport request:',
+        config.transportNumber,
+      );
+      const response = await deleteTransport(
+        this.connection,
+        config.transportNumber,
+      );
+
+      return {
+        transportNumber: config.transportNumber,
+        deleteResult: response,
+        errors: [],
+      };
+    } catch (error: unknown) {
+      this.logger?.error('Delete failed:', safeErrorMessage(error));
+      throw error;
+    }
   }
 
   /**
