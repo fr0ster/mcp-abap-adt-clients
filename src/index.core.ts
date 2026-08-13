@@ -31,6 +31,7 @@ export {
   AdtContentTypesBase,
   AdtContentTypesModern,
 } from './core/shared/contentTypes';
+export { parseTransportTree } from './core/transport/parseTransportTree';
 export {
   fetchDiscoveryEndpoints,
   isEndpointInDiscovery,
