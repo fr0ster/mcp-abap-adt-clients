@@ -19,24 +19,28 @@
  * - Check: not supported (test runs don't have check operation)
  */
 
-import type {
-  HttpError,
-  IAbapConnection,
-  IAdtCreatable,
-  IAdtOperationOptions,
-  IAdtReadable,
-  IAdtResponse,
-  IAdtTestRunnable,
-  IAdtValidatable,
-  ILogger,
-  IObjectVersion,
+import {
+  AdtObjectErrorCodes,
+  AdtOperationError,
+  type HttpError,
+  type IAbapConnection,
+  type IAdtCreatable,
+  type IAdtOperationOptions,
+  type IAdtReadable,
+  type IAdtResponse,
+  type IAdtTestRunnable,
+  type IAdtValidatable,
+  type ILogger,
+  type IObjectVersion,
 } from '@mcp-abap-adt/interfaces';
 import {
   headerValueToString,
   safeErrorMessage,
+  safeStringify,
 } from '../../utils/internalUtils';
 import { AdtClass, AdtLocalTestClass } from '../class';
 import { getClassUnitTestResult, getClassUnitTestStatus } from '../class/run';
+import { validateClassName } from '../class/validation';
 import { throwUnsupportedVersions } from '../shared/versions';
 import { startClassUnitTestRun } from './run';
 import type {
@@ -81,8 +85,14 @@ export class AdtUnitTest
   }
 
   /**
-   * Validate unit test configuration before creation
-   * Note: ADT doesn't provide validation endpoint for unit tests
+   * Validate unit test configuration before creation.
+   *
+   * A unit test run targets a class, so validation here is that class's
+   * validation: the container class of the first test definition is checked
+   * against the server's object-name validation endpoint, same as
+   * `AdtClass.validate()`. `containerClass` is the real ADT object (CLAS/OC);
+   * `testClass` may be a local class nested inside it and is not independently
+   * addressable there.
    */
   async validate(config: Partial<IUnitTestConfig>): Promise<IUnitTestState> {
     if (!config.tests || config.tests.length === 0) {
@@ -91,11 +101,46 @@ export class AdtUnitTest
       );
     }
 
-    // ADT doesn't provide validation endpoint for unit tests
-    // Return a mock success response
-    return {
-      errors: [],
-    };
+    const className = config.tests[0].containerClass;
+
+    try {
+      const validationResponse = await validateClassName(
+        this.connection,
+        className,
+      );
+
+      return {
+        validationResponse,
+        errors: [],
+      };
+    } catch (error: unknown) {
+      const e = error as HttpError;
+      const status = e.response?.status;
+      const statusText = e.response?.statusText;
+      const errorMessage = e.response?.data
+        ? typeof e.response.data === 'string'
+          ? e.response.data.substring(0, 500)
+          : safeStringify(e.response.data).substring(0, 500)
+        : e.message || 'Unknown error';
+
+      this.logger?.error?.(
+        `Validate failed: HTTP ${status || '?'} ${statusText || ''}`,
+        { status, statusText, message: errorMessage },
+      );
+
+      if (status && status >= 400 && status < 500) {
+        const customError = new AdtOperationError(
+          `Validation failed for object '${className}': ${errorMessage}`,
+        );
+        customError.code = AdtObjectErrorCodes.VALIDATION_FAILED;
+        customError.status = status;
+        customError.statusText = statusText;
+        customError.originalError = error;
+        throw customError;
+      }
+
+      throw error;
+    }
   }
 
   /**
