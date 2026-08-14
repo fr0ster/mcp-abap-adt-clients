@@ -36,7 +36,7 @@ Per task:
 | 6 release interfaces 15.0.0 | done — `bf1a9ff`, plus review fixes `2517b03`, `d35f1ab` |
 | 6a take interfaces 16.0.0 | **done** — `95ef1b1` (16.0.0, not 15.0.0: 8a/8a-bis shipped in it) |
 | 7 four handlers lose `create()` — an include is not created | **done** — `c1dd6ac`, corrected by `f21f432`: a message class is not an ABAP class and its messages **are** created, so `AdtMessageClassMessage` keeps `create` |
-| 8 narrow the ten handlers | **8 of 10 done** — `domain`, `dataElement`, `functionGroup`, `package`, `messageClass` (+ its message handler), `authorizationField`, `functionInclude`, `transport`. `featureToggle` and `AdtServiceBinding` need interfaces 17.0.0 first |
+| 8 narrow the ten handlers | **8 of 10 done** — `domain`, `dataElement`, `functionGroup`, `package`, `messageClass` (+ its message handler), `authorizationField`, `functionInclude`, `transport`. `featureToggle` and `AdtServiceBinding` need their types narrowed in interfaces — same task, so no release of its own until both sides are done |
 | 8a `IUnitTestConfig` describes the testclasses include — interfaces major | **done, released** — interfaces 16.0.0, PR #36, `027d00e`, tag `v16.0.0` |
 | 8a-bis one `IAdtRunnable`; test-specific runnables deleted | **done, released** — same release; `ITestRunInformation` and `ICdsTestDoubleCheckable` added with it |
 | 8b `AdtUnitTest`'s CRUD half | **done** — `0533d3f`, tests corrected in `8d4b901` |
@@ -50,6 +50,19 @@ Checkboxes below are ticked for Tasks 1–6 accordingly.
 
 - All repository artifacts in **English**.
 - Contract types live in `@mcp-abap-adt/interfaces` and are imported; never redefined locally.
+- **A version appears when the work on the task is finished and we are ready to hand it to
+  consumers** — ruled 2026-08-14, and it governs the rest of this plan. Not when a phase ends,
+  not when a branch is green: those are our bookkeeping, and a consumer pays for it in migrations.
+
+  This plan broke that rule and the cost is measurable: interfaces 15.0.0 and 16.0.0 shipped on
+  the same day, both parts of one contract change, and `adt-clients` went straight from `^14.1.0`
+  to `^16.0.0` — **nothing ever resolved 15.0.0**. It was cut because Phase B had ended, while the
+  work it belonged to was still in progress.
+
+  So the remaining interfaces narrowing (`IFeatureToggleObject`, `IAdtServiceBinding`) does **not**
+  become a release of its own. It is the same task: it lands on a branch, adt-clients consumes
+  that branch and goes green, and only then is one version cut on each side.
+
 - **Publish the dependency first.** interfaces must be on npm before adt-clients consumes it.
   No `file:`, no tarball, no `"link": true` — verify after every `npm install`.
 - Claude opens PRs, merges **reviewed** PRs, tags. `npm publish` is the user's, on the user's
