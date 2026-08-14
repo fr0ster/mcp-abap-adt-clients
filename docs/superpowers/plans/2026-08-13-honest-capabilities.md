@@ -604,11 +604,21 @@ case:
 | `AdtUnitTest` | POST the container class, activate, PUT the include | PUT the include |
 | `AdtCdsUnitTest` | the same, plus the CDS test-double check | the same |
 
-**A report is the one shape this does not cover, and it is not implemented.** Tests for a report
-live in the report itself, so there is no container to create — but `startClassUnitTestRun`
-builds `<aunit:test containerClass="…" class="…"/>` and the legacy builder references
-`/oo/classes/{name}`, so this library runs tests for **classes only** today. If report support is
-ever added it arrives with its own answer to `create`; it does not shape the contract now.
+**A report fits the same shape, and is simply not implemented here.** A report holds local
+classes too, so a *test report* can host the unit tests for another report exactly as a test
+class hosts them for another class — same `create` the container, `update` the tests. Nothing
+about it contradicts the approach above.
+
+What is true is that this library does not do it: `startClassUnitTestRun` builds
+`<aunit:test containerClass="…" class="…"/>` and the legacy builder references
+`/oo/classes/{name}`, so tests are run for **classes only** today. Whether `aunit:test` accepts a
+program container at all is unverified — that is an SAP fact, and it needs a probe, not a
+reading of this code.
+
+**The cost of adding it later, stated now:** `className` in `IUnitTestConfig` names a class. A
+report container makes that field wrong rather than merely incomplete, so report support is a
+breaking change to this same type — worth knowing before someone reaches for it, and not worth
+pre-building a generic "container reference" for a flavour nobody has asked for yet.
 
 ### Task 8a: The config describes the testclasses include, not a run — interfaces major
 
