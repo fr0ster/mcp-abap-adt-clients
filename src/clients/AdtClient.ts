@@ -582,16 +582,15 @@ export class AdtClient {
   /**
    * Get high-level operations for a single message within a MessageClass.
    *
-   * No `create`: a message is not an object ADT creates on its own. It is
-   * merged into the message class's XML and the class is PUT back, which is
-   * `update` — and `update` is an upsert, so a message that was not there
-   * before is written by the same call.
+   * A message class (MSAG) is not an ABAP class, whatever the name suggests,
+   * and a message inside one is an entity that is genuinely created: it does
+   * not exist until someone adds it. So this keeps `create` — unlike a class's
+   * includes, which exist because their class does.
    */
-  getMessageClassMessage(): IAdtReadable<
+  getMessageClassMessage(): IAdtCrud<
     IMessageClassMessageConfig,
     IMessageClassMessageState
-  > &
-    IAdtModifiable<IMessageClassMessageConfig, IMessageClassMessageState> {
+  > {
     this.assertConnected();
     return new AdtMessageClassMessage(this.connection, this.logger);
   }
