@@ -572,7 +572,8 @@ So the target is:
 Everything else — `activate`, `check`, `lock`, `unlock`, `getVersions`, `getVersionSource`,
 `readTransport` — is deleted, as before.
 
-**`create` stays, and it is a real create** — ruled 2026-08-14. A unit test for a class that
+**`create` stays, and it is a real create — and this is the single approach for every test
+handler in the package** — ruled 2026-08-14. A unit test for a class that
 does not exist yet begins by creating that class: **POST** the global class, activate it, then
 PUT the testclasses include. That is one capability spanning two requests, and the first of them
 is the POST rule 2 asks for. `update` is the second request alone, on a class that is already
@@ -583,6 +584,31 @@ the same PUT. That was true only of the include half, and the include half is no
 operation. The same reasoning read the other way is what gives Task 7 its answer: the four
 handlers that write **only** an include have no class to create, so they have no `create` at
 all.
+
+**The container is not necessarily the class under test, and that is what makes `create`
+meaningful.** Nothing requires the tests to live inside the class they exercise: they can sit in
+a separate, empty global class written for the purpose — which is exactly what the CDS flavour
+does, because a CDS view cannot hold a test class at all. So "the class already exists" is a
+statement about the class *under test*, not about the container, and creating a container is a
+real creation every time.
+
+`className` in the config is therefore **the container**, the class that will hold the tests. The
+class under test appears nowhere in the config: it lives inside the ABAP source of the tests
+themselves.
+
+So the same shape holds for every test handler here, and `AdtCdsUnitTest` stops being a special
+case:
+
+| | `create` | `update` |
+|---|---|---|
+| `AdtUnitTest` | POST the container class, activate, PUT the include | PUT the include |
+| `AdtCdsUnitTest` | the same, plus the CDS test-double check | the same |
+
+**A report is the one shape this does not cover, and it is not implemented.** Tests for a report
+live in the report itself, so there is no container to create — but `startClassUnitTestRun`
+builds `<aunit:test containerClass="…" class="…"/>` and the legacy builder references
+`/oo/classes/{name}`, so this library runs tests for **classes only** today. If report support is
+ever added it arrives with its own answer to `create`; it does not shape the contract now.
 
 ### Task 8a: The config describes the testclasses include, not a run — interfaces major
 
@@ -697,6 +723,11 @@ Take the new interfaces version first — `--save`, then the same three resoluti
   directly. This is the ruling's load-bearing half: **`run` must work without any CRUD call**,
   and while it delegates to `create` it cannot be honest about that.
 - **`readMetadata`** follows `read` — same subject, or delete it if `read` covers it.
+- **`AdtUnitTestLegacy.create` must move.** It overrides `create` to start a run against the
+  legacy `/abapunit/testruns` endpoint — the old meaning, in a subclass. Left alone it would
+  keep that meaning under the new contract, which is worse than the state this task is fixing.
+  The legacy endpoint belongs behind `run`, exactly as it does in the modern class; the override
+  of `create` goes.
 
 `AdtCdsUnitTest` already creates a class, activates it and puts a test class inside — its own
 `create` chain stays as it is; check only that it still lines up with the parent's new meaning.
