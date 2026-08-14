@@ -283,7 +283,10 @@ describe('AdtUnitTest (using AdtClient)', () => {
           // Step 7: Ask about the run — a different concern from running it,
           // and since interfaces 16.0.0 a different interface as well.
           logTestStep('getStatus (run)', testsLogger);
-          const statusResponse = await unitTest.getStatus(runId, true);
+          const statusResponse = await unitTest.getStatus(
+            runId,
+            unitTestStatus.with_long_polling ?? true,
+          );
           expect(statusResponse).toBeDefined();
           expect(statusResponse.data).toBeDefined();
 

@@ -318,7 +318,10 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
 
           // Step 6: Ask about the run — its own interface since 16.0.0
           logTestStep('getStatus (run)', testsLogger);
-          const statusResponse = await unitTest.getStatus(runId, true);
+          const statusResponse = await unitTest.getStatus(
+            runId,
+            testCase.params.unit_test_status?.with_long_polling ?? true,
+          );
           expect(statusResponse).toBeDefined();
           expect(statusResponse.data).toBeDefined();
           testsLogger.info?.('CDS unit test status retrieved');

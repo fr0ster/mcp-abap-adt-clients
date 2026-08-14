@@ -17,6 +17,7 @@
 import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { AdtCdsUnitTest } from '../../../../core/unitTest/AdtCdsUnitTest';
 import { AdtUnitTest } from '../../../../core/unitTest/AdtUnitTest';
+import { createLibraryLogger } from '../../../helpers/testLogger';
 
 type Call = { url: string; method: string; data?: unknown };
 
@@ -49,7 +50,7 @@ function makeConn(
 describe('AdtUnitTest.validate()', () => {
   it('rejects before any request when no container class is named (zero calls)', async () => {
     const { conn, calls } = makeConn(() => ({ data: '' }));
-    const h = new AdtUnitTest(conn);
+    const h = new AdtUnitTest(conn, createLibraryLogger());
 
     await expect(h.validate({})).rejects.toThrow(/container class name/i);
     expect(calls).toHaveLength(0);
@@ -61,7 +62,7 @@ describe('AdtUnitTest.validate()', () => {
       expect(r.url).toBe('/sap/bc/adt/oo/classes/ZCL_CONTAINER/source/main');
       return { status: 200, data: 'CLASS zcl_container DEFINITION.' };
     });
-    const h = new AdtUnitTest(conn);
+    const h = new AdtUnitTest(conn, createLibraryLogger());
 
     const state = await h.validate({ className: 'ZCL_CONTAINER' });
 
@@ -80,7 +81,7 @@ describe('AdtUnitTest.validate()', () => {
       );
       return { status: 200, data: '<code-ok/>' };
     });
-    const h = new AdtUnitTest(conn);
+    const h = new AdtUnitTest(conn, createLibraryLogger());
 
     const state = await h.validate({
       className: 'ZCL_CONTAINER',
@@ -103,7 +104,7 @@ describe('AdtUnitTest.validate()', () => {
       expect(r.url).toContain('objname=ZCL_NEW_TESTS');
       return { status: 200, data: '<name-ok/>' };
     });
-    const h = new AdtUnitTest(conn);
+    const h = new AdtUnitTest(conn, createLibraryLogger());
 
     const state = await h.validate({
       className: 'ZCL_NEW_TESTS',
@@ -132,7 +133,7 @@ describe('AdtCdsUnitTest.validate()', () => {
       );
       return { status: 200, data: '<code-ok/>' };
     });
-    const h = new AdtCdsUnitTest(conn);
+    const h = new AdtCdsUnitTest(conn, createLibraryLogger());
 
     const state = await h.validate({
       className: 'ZCL_CDS_DUMMY',
@@ -157,7 +158,7 @@ describe('AdtCdsUnitTest.validate()', () => {
         },
       }),
     );
-    const h = new AdtCdsUnitTest(conn);
+    const h = new AdtCdsUnitTest(conn, createLibraryLogger());
 
     await expect(
       h.validate({
@@ -175,7 +176,7 @@ describe('AdtCdsUnitTest.validate()', () => {
       expect(r.url).toBe('/sap/bc/adt/oo/classes/ZCL_CONTAINER/source/main');
       return { status: 200, data: 'CLASS zcl_container DEFINITION.' };
     });
-    const h = new AdtCdsUnitTest(conn);
+    const h = new AdtCdsUnitTest(conn, createLibraryLogger());
 
     const state = await h.validate({ className: 'ZCL_CONTAINER' });
 

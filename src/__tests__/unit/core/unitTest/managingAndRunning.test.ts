@@ -10,6 +10,7 @@
 
 import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { AdtUnitTest } from '../../../../core/unitTest/AdtUnitTest';
+import { createLibraryLogger } from '../../../helpers/testLogger';
 
 type Call = { url: string; method: string; data?: unknown };
 
@@ -48,7 +49,7 @@ function makeConn(
 describe('AdtUnitTest — managing the tests', () => {
   it('create POSTs the container class before writing anything into it', async () => {
     const { conn, calls } = makeConn();
-    const h = new AdtUnitTest(conn);
+    const h = new AdtUnitTest(conn, createLibraryLogger());
 
     await h.create({
       className: 'ZCL_TESTS',
@@ -76,7 +77,7 @@ describe('AdtUnitTest — managing the tests', () => {
 
   it('update writes only the include — no class is created', async () => {
     const { conn, calls } = makeConn();
-    const h = new AdtUnitTest(conn);
+    const h = new AdtUnitTest(conn, createLibraryLogger());
 
     await h.update({
       className: 'ZCL_TESTS',
@@ -95,7 +96,7 @@ describe('AdtUnitTest — managing the tests', () => {
 
   it('update given a lock handle takes no lock of its own', async () => {
     const { conn, calls } = makeConn();
-    const h = new AdtUnitTest(conn);
+    const h = new AdtUnitTest(conn, createLibraryLogger());
 
     await h.update(
       {
@@ -112,7 +113,7 @@ describe('AdtUnitTest — managing the tests', () => {
 
   it('delete empties the include and deletes no object', async () => {
     const { conn, calls } = makeConn();
-    const h = new AdtUnitTest(conn);
+    const h = new AdtUnitTest(conn, createLibraryLogger());
 
     await h.delete({ className: 'ZCL_TESTS' });
 
@@ -126,7 +127,7 @@ describe('AdtUnitTest — managing the tests', () => {
 
   it('lock locks the container class, not the include', async () => {
     const { conn, calls } = makeConn();
-    const h = new AdtUnitTest(conn);
+    const h = new AdtUnitTest(conn, createLibraryLogger());
 
     const handle = await h.lock({ className: 'ZCL_TESTS' });
 
@@ -141,7 +142,7 @@ describe('AdtUnitTest — managing the tests', () => {
 describe('AdtUnitTest — running', () => {
   it('run issues the run request with no preceding create or update', async () => {
     const { conn, calls } = makeConn(() => RUN_STARTED);
-    const h = new AdtUnitTest(conn);
+    const h = new AdtUnitTest(conn, createLibraryLogger());
 
     const runId = await h.run([
       { containerClass: 'ZCL_TESTS', testClass: 'LTCL' },
@@ -155,7 +156,7 @@ describe('AdtUnitTest — running', () => {
 
   it('rejects an empty test list before issuing anything', async () => {
     const { conn, calls } = makeConn();
-    const h = new AdtUnitTest(conn);
+    const h = new AdtUnitTest(conn, createLibraryLogger());
 
     await expect(h.run([])).rejects.toThrow(/at least one test definition/i);
     expect(calls).toHaveLength(0);
@@ -163,7 +164,7 @@ describe('AdtUnitTest — running', () => {
 
   it('asking about a run is a separate request, taking the id', async () => {
     const { conn, calls } = makeConn(() => ({ data: '<aunit:runStatus/>' }));
-    const h = new AdtUnitTest(conn);
+    const h = new AdtUnitTest(conn, createLibraryLogger());
 
     await h.getStatus('00155D-3F2A', false);
 
