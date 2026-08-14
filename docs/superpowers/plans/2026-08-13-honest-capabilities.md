@@ -40,7 +40,7 @@ Per task:
 | 8a `IUnitTestConfig` describes the testclasses include — interfaces major | **done, released** — interfaces 16.0.0, PR #36, `027d00e`, tag `v16.0.0` |
 | 8a-bis one `IAdtRunnable`; test-specific runnables deleted | **done, released** — same release; `ITestRunInformation` and `ICdsTestDoubleCheckable` added with it |
 | 8b `AdtUnitTest`'s CRUD half | open |
-| 8c delete unit testing's seven absent methods | open |
+| 8c delete unit testing's five absent methods | open |
 | 9 the guard | open |
 | 10 release adt-clients — the narrowing | open |
 
@@ -83,7 +83,7 @@ Checkboxes below are ticked for Tasks 1–6 accordingly.
 | handlers with a problem | 16 | the 11 below plus 5 that have no `create` |
 | type/API subtraction | **15** | **10** declaring unsupported atoms + 5 losing `create` |
 | behavioural code | 3 | `transport`, `unitTest.validate`, `functionGroup.activate` |
-| dead-method deletion | 1 | `unitTest` — seven methods; `update`/`delete` are implemented instead |
+| dead-method deletion | 1 | `unitTest` — five methods; `update`/`delete`/`lock`/`unlock` are implemented instead |
 
 **The ten declaring unsupported atoms:** `dataElement`, `domain`, `functionGroup`, `package`,
 `messageClass`, `authorizationField`, `featureToggle`, **`functionInclude`**,
@@ -841,10 +841,12 @@ Two consequences for this task, and neither is optional:
    class's lock — updating the class and its tests in one window — cannot write the tests
    without the handler taking a second lock on an object it has locked. `create` has no such
    parameter and needs none: it creates the class, so nobody else can be holding its lock.
-2. **`AdtUnitTest` still declares no `IAdtLockable`, and now for a stated reason** rather than
-   by omission: the lock belongs to the container class, so a caller takes it through
-   `getClass().lock()` and hands the handle down. Task 8c deletes the throwing `lock`/`unlock`
-   on that basis.
+2. **`AdtUnitTest` declares `IAdtLockable`, and its lock is the container's** — ruled
+   2026-08-14, reversing an earlier line in this plan that had it deleted. A unit test's subject
+   is the container and its include, and the container is what ADT locks: a global class, or a
+   report once report tests exist. So `lock`/`unlock` are implemented here rather than removed,
+   delegating to the container class's lock, and a caller no longer has to reach for
+   `getClass()` to hold the window its own `update` needs.
 
 **Decide the dead include-lock path while here.** Either it is verified against the trial and
 one copy becomes the live path, or both copies go. Two unreferenced implementations of a lock
@@ -873,19 +875,25 @@ this task (`update` must distinguish "no source given" from "empty source given"
 
 **Files:** `src/core/unitTest/AdtUnitTest.ts`; any test naming them.
 
-Seven methods, implemented but never declared, so nothing in the contract promises them and no
-TypeScript caller can reach them: `activate`, `check`, `lock`, `unlock`, `getVersions`,
-`getVersionSource` — all throwing — plus **`readTransport`**, which does not throw at all: it
-returns an empty state and says in its own comment that a test run has no transport request.
+Five methods, implemented but never declared, so nothing in the contract promises them and no
+TypeScript caller can reach them: `activate`, `check`, `getVersions`, `getVersionSource` — all
+throwing — plus **`readTransport`**, which does not throw at all: it returns an empty state and
+says in its own comment that a test run has no transport request.
+
+**`lock` and `unlock` left this list on 2026-08-14** and moved to Task 8b, where they are
+implemented: the lock is the container's, and the container is the unit test's own subject.
+
+**The same argument may reach `activate` and `readTransport`, and that is not decided here.**
+Both are the container's too — an include is activated by activating its class, and the class is
+what carries a transport. They stay on the deletion list because the ruling named the lock; if it
+extends, they move to 8b as implementations rather than disappearing, and this task shrinks to
+three.
 
 `update` and `delete` are **not** on this list any more; Task 8b implements them.
 
 `check` is deleted rather than implemented even though the include does have a check resource —
 `validate` makes exactly that call, and two names for one request is a duplication this plan is
-removing elsewhere. `lock`/`unlock` go because **the lock is the container class's**: it is
-taken on `/oo/classes/{name}`, not on the include, so a caller that needs to hold it takes it
-through `getClass().lock()` and passes the handle to `update` (Task 8b, "What is locked, and by
-whom"). A `lock` on the unit test would name an object ADT does not lock.
+removing elsewhere.
 
 They sit here rather than in Phase A for two reasons. Deleting a public method is a runtime
 break for JavaScript callers, and Phase A is otherwise additive — no need to force a major for
@@ -899,12 +907,12 @@ sed -n '/^export class AdtUnitTest/,/^{/p' src/core/unitTest/AdtUnitTest.ts
 ```
 
 Expected after Task 8b: `IAdtCreatable`, `IAdtReadable`, `IAdtUpdatable`, `IAdtDeletable`,
-`IAdtValidatable`, `IAdtTestRunnable`. If any of the seven **is** declared, it is a contract change and needs saying
-in the changelog as one.
+`IAdtValidatable`, `IAdtLockable`, `IAdtRunnable`, `ITestRunInformation`. If any of the five
+**is** declared, it is a contract change and needs saying in the changelog as one.
 
 - [ ] **Step 2: Delete them; update any test that calls one.**
 - [ ] **Step 3: Verify** — `npx tsc -p tsconfig.json`, `npm run test:check`, the unit suite.
-- [ ] **Step 4: Commit** with a `BREAKING CHANGE:` footer naming all seven and the runtime
+- [ ] **Step 4: Commit** with a `BREAKING CHANGE:` footer naming all five and the runtime
   consequence: a JavaScript caller moves from a sentence to `TypeError: … is not a function`.
 
 ### Task 9: The guard
