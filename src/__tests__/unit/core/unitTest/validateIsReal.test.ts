@@ -98,6 +98,51 @@ describe('AdtUnitTest.validate()', () => {
     ).rejects.toMatchObject({ code: 'ADT_OBJECT_NOT_FOUND', status: 404 });
     expect(calls).toHaveLength(1);
   });
+
+  it('checks every unique container class, not just the first (a missing second container rejects and names it)', async () => {
+    const { conn, calls } = makeConn((r) => {
+      if (r.url.includes('ZCL_MISSING')) {
+        return Object.assign(new Error('not found'), {
+          response: { status: 404, statusText: 'Not Found', data: '' },
+        });
+      }
+      return { status: 200, data: 'CLASS zcl_container DEFINITION.' };
+    });
+    const h = new AdtUnitTest(conn);
+
+    await expect(
+      h.validate({
+        tests: [
+          { containerClass: 'ZCL_CONTAINER', testClass: 'LTCL_TEST' },
+          { containerClass: 'ZCL_MISSING', testClass: 'LTCL_TEST2' },
+        ],
+      }),
+    ).rejects.toMatchObject({
+      code: 'ADT_OBJECT_NOT_FOUND',
+      status: 404,
+      message: expect.stringContaining('ZCL_MISSING'),
+    });
+    expect(calls).toHaveLength(2);
+  });
+
+  it('deduplicates repeated container classes: one request per unique class, not one per test entry', async () => {
+    const { conn, calls } = makeConn((r) => {
+      expect(r.url).toBe('/sap/bc/adt/oo/classes/ZCL_CONTAINER/source/main');
+      return { status: 200, data: 'CLASS zcl_container DEFINITION.' };
+    });
+    const h = new AdtUnitTest(conn);
+
+    const state = await h.validate({
+      tests: [
+        { containerClass: 'ZCL_CONTAINER', testClass: 'LTCL_TEST1' },
+        { containerClass: 'ZCL_CONTAINER', testClass: 'LTCL_TEST2' },
+        { containerClass: 'ZCL_CONTAINER', testClass: 'LTCL_TEST3' },
+      ],
+    });
+
+    expect(calls).toHaveLength(1);
+    expect(state.errors).toEqual([]);
+  });
 });
 
 describe('AdtCdsUnitTest.validate()', () => {
