@@ -327,7 +327,12 @@ export class AdtClient {
    * Get high-level operations for Domain objects
    * @returns IAdtObject instance for Domain operations
    */
-  getDomain(): IAdtNonVersionedObject<IDomainConfig, IDomainState> {
+  getDomain(): IAdtCrud<IDomainConfig, IDomainState> &
+    IAdtValidatable<IDomainConfig, IDomainState> &
+    IAdtCheckable<IDomainConfig, IDomainState> &
+    IAdtActivatable<IDomainConfig, IDomainState> &
+    IAdtLockable<IDomainConfig, IDomainState> &
+    IAdtTransportAware<IDomainConfig, IDomainState> {
     this.assertConnected();
     return new AdtDomain(
       this.connection,

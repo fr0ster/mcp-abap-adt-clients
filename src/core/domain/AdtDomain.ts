@@ -23,9 +23,14 @@ import { assertDeletable } from '../../utils/deletionCheck';
 import type {
   HttpError,
   IAbapConnection,
-  IAdtNonVersionedObject,
+  IAdtActivatable,
+  IAdtCheckable,
+  IAdtCrud,
+  IAdtLockable,
   IAdtOperationOptions,
   IAdtSystemContext,
+  IAdtTransportAware,
+  IAdtValidatable,
   ILogger,
   IObjectVersion,
 } from '@mcp-abap-adt/interfaces';
@@ -40,7 +45,6 @@ import {
   type LockTracker,
 } from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
-import { throwUnsupportedVersions } from '../shared/versions';
 import { activateDomain } from './activation';
 import { checkDomainSyntax } from './check';
 import { create as createDomain } from './create';
@@ -52,7 +56,13 @@ import { unlockDomain } from './unlock';
 import { updateDomain } from './update';
 import { validateDomainName } from './validation';
 export class AdtDomain
-  implements IAdtNonVersionedObject<IDomainConfig, IDomainState>
+  implements
+    IAdtCrud<IDomainConfig, IDomainState>,
+    IAdtValidatable<IDomainConfig, IDomainState>,
+    IAdtCheckable<IDomainConfig, IDomainState>,
+    IAdtActivatable<IDomainConfig, IDomainState>,
+    IAdtLockable<IDomainConfig, IDomainState>,
+    IAdtTransportAware<IDomainConfig, IDomainState>
 {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
@@ -675,17 +685,5 @@ export class AdtDomain
     const state = await this.lockCap.unlock(config, lockHandle);
     this.lockTracker.untrack(config.domainName as string);
     return state;
-  }
-
-  /** @deprecated Not part of this handler's capability set; throws. Removed in a later major. */
-  async getVersions(
-    _config: Partial<IDomainConfig>,
-  ): Promise<IObjectVersion[]> {
-    throwUnsupportedVersions('domain');
-  }
-
-  /** @deprecated Not part of this handler's capability set; throws. Removed in a later major. */
-  async getVersionSource(_contentUri: string): Promise<string> {
-    throwUnsupportedVersions('domain');
   }
 }
