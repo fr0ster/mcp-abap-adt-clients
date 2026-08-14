@@ -139,6 +139,41 @@ describe('AdtUnitTest — managing the tests', () => {
   });
 });
 
+describe('AdtUnitTest — what it does not have', () => {
+  it("carries no method for the container class's own operations", () => {
+    // These threw, or returned an empty state, until 12.0.0. Activation, the
+    // syntax check, version history and the transport belong to the container
+    // class and are reached through getClass() — a unit test has no resource
+    // for any of them, so it has no method claiming one.
+    const { conn } = makeConn();
+    const h = new AdtUnitTest(conn, createLibraryLogger());
+
+    for (const name of [
+      'activate',
+      'check',
+      'getVersions',
+      'getVersionSource',
+      'readTransport',
+    ]) {
+      expect(name in h).toBe(false);
+    }
+  });
+
+  it('still carries the run conveniences, which no contract promises', () => {
+    // getRunId and the two response getters are this handler remembering its
+    // own last call. That is not a capability — nothing in ADT is "the run I
+    // started last" — so they stay as methods and out of every interface.
+    const { conn } = makeConn();
+    const h = new AdtUnitTest(conn, createLibraryLogger());
+
+    for (const name of ['getRunId', 'getStatusResponse', 'getResultResponse']) {
+      expect(typeof (h as unknown as Record<string, unknown>)[name]).toBe(
+        'function',
+      );
+    }
+  });
+});
+
 describe('AdtUnitTest — running', () => {
   it('run issues the run request with no preceding create or update', async () => {
     const { conn, calls } = makeConn(() => RUN_STARTED);
