@@ -23,6 +23,7 @@ import type {
   IAdtCreatable,
   IAdtCrud,
   IAdtLockable,
+  IAdtModifiable,
   IAdtNonVersionedObject,
   IAdtObject,
   IAdtReadable,
@@ -572,13 +573,17 @@ export class AdtClient {
 
   /**
    * Get high-level operations for a single message within a MessageClass.
-   * Supports read, create/update (upsert), and delete of individual messages.
-   * @returns IAdtObject instance for MessageClassMessage operations
+   *
+   * No `create`: a message is not an object ADT creates on its own. It is
+   * merged into the message class's XML and the class is PUT back, which is
+   * `update` — and `update` is an upsert, so a message that was not there
+   * before is written by the same call.
    */
-  getMessageClassMessage(): IAdtCrud<
+  getMessageClassMessage(): IAdtReadable<
     IMessageClassMessageConfig,
     IMessageClassMessageState
-  > {
+  > &
+    IAdtModifiable<IMessageClassMessageConfig, IMessageClassMessageState> {
     this.assertConnected();
     return new AdtMessageClassMessage(this.connection, this.logger);
   }
@@ -847,10 +852,21 @@ export class AdtClient {
   }
 
   /**
-   * Get high-level operations for LocalTestClass objects
-   * @returns IAdtObject instance for LocalTestClass operations
+   * Get high-level operations for a class's `testclasses` include.
+   *
+   * No `create`: an include is not brought into existence by a request of its
+   * own — it exists because its class does, and writing source into it is
+   * `update`. The lock, activation, metadata and transport it exposes are the
+   * **container class's**, which is what ADT locks and activates.
    */
-  getLocalTestClass(): IAdtSourceObject<ILocalTestClassConfig, IClassState> {
+  getLocalTestClass(): IAdtReadable<ILocalTestClassConfig, IClassState> &
+    IAdtModifiable<ILocalTestClassConfig, IClassState> &
+    IAdtValidatable<ILocalTestClassConfig, IClassState> &
+    IAdtCheckable<ILocalTestClassConfig, IClassState> &
+    IAdtActivatable<ILocalTestClassConfig, IClassState> &
+    IAdtLockable<ILocalTestClassConfig, IClassState> &
+    IAdtVersionable<ILocalTestClassConfig> &
+    IAdtTransportAware<ILocalTestClassConfig, IClassState> {
     this.assertConnected();
     return new AdtLocalTestClass(
       this.connection,
@@ -862,10 +878,21 @@ export class AdtClient {
   }
 
   /**
-   * Get high-level operations for LocalTypes objects
-   * @returns IAdtObject instance for LocalTypes operations
+   * Get high-level operations for a class's `localtypes` include.
+   *
+   * No `create`: an include is not brought into existence by a request of its
+   * own — it exists because its class does, and writing source into it is
+   * `update`. The lock, activation, metadata and transport it exposes are the
+   * **container class's**, which is what ADT locks and activates.
    */
-  getLocalTypes(): IAdtSourceObject<ILocalTypesConfig, IClassState> {
+  getLocalTypes(): IAdtReadable<ILocalTypesConfig, IClassState> &
+    IAdtModifiable<ILocalTypesConfig, IClassState> &
+    IAdtValidatable<ILocalTypesConfig, IClassState> &
+    IAdtCheckable<ILocalTypesConfig, IClassState> &
+    IAdtActivatable<ILocalTypesConfig, IClassState> &
+    IAdtLockable<ILocalTypesConfig, IClassState> &
+    IAdtVersionable<ILocalTypesConfig> &
+    IAdtTransportAware<ILocalTypesConfig, IClassState> {
     this.assertConnected();
     return new AdtLocalTypes(
       this.connection,
@@ -877,13 +904,21 @@ export class AdtClient {
   }
 
   /**
-   * Get high-level operations for LocalDefinitions objects
-   * @returns IAdtObject instance for LocalDefinitions operations
+   * Get high-level operations for a class's `definitions` include.
+   *
+   * No `create`: an include is not brought into existence by a request of its
+   * own — it exists because its class does, and writing source into it is
+   * `update`. The lock, activation, metadata and transport it exposes are the
+   * **container class's**, which is what ADT locks and activates.
    */
-  getLocalDefinitions(): IAdtSourceObject<
-    ILocalDefinitionsConfig,
-    IClassState
-  > {
+  getLocalDefinitions(): IAdtReadable<ILocalDefinitionsConfig, IClassState> &
+    IAdtModifiable<ILocalDefinitionsConfig, IClassState> &
+    IAdtValidatable<ILocalDefinitionsConfig, IClassState> &
+    IAdtCheckable<ILocalDefinitionsConfig, IClassState> &
+    IAdtActivatable<ILocalDefinitionsConfig, IClassState> &
+    IAdtLockable<ILocalDefinitionsConfig, IClassState> &
+    IAdtVersionable<ILocalDefinitionsConfig> &
+    IAdtTransportAware<ILocalDefinitionsConfig, IClassState> {
     this.assertConnected();
     return new AdtLocalDefinitions(
       this.connection,
@@ -895,10 +930,21 @@ export class AdtClient {
   }
 
   /**
-   * Get high-level operations for LocalMacros objects
-   * @returns IAdtObject instance for LocalMacros operations
+   * Get high-level operations for a class's `macros` include.
+   *
+   * No `create`: an include is not brought into existence by a request of its
+   * own — it exists because its class does, and writing source into it is
+   * `update`. The lock, activation, metadata and transport it exposes are the
+   * **container class's**, which is what ADT locks and activates.
    */
-  getLocalMacros(): IAdtSourceObject<ILocalMacrosConfig, IClassState> {
+  getLocalMacros(): IAdtReadable<ILocalMacrosConfig, IClassState> &
+    IAdtModifiable<ILocalMacrosConfig, IClassState> &
+    IAdtValidatable<ILocalMacrosConfig, IClassState> &
+    IAdtCheckable<ILocalMacrosConfig, IClassState> &
+    IAdtActivatable<ILocalMacrosConfig, IClassState> &
+    IAdtLockable<ILocalMacrosConfig, IClassState> &
+    IAdtVersionable<ILocalMacrosConfig> &
+    IAdtTransportAware<ILocalMacrosConfig, IClassState> {
     this.assertConnected();
     return new AdtLocalMacros(
       this.connection,

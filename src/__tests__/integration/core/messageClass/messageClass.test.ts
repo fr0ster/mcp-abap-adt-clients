@@ -252,13 +252,13 @@ describe('MessageClass (using AdtClient)', () => {
           expect(readState.messageClass?.name).toBe(msgClassName);
 
           // ── Step 3: Create message ─────────────────────────────────────────
-          logTestStep(`create message ${msgNo}`, testsLogger);
+          logTestStep(`write message ${msgNo}`, testsLogger);
           // Reading the class already succeeds here, yet the messages endpoint
           // can still answer "Resource MSAG ... does not exist": the two do not
           // agree on when the class is there. Retry rather than treat the first
           // answer as final.
           const createMessage = () =>
-            msgHandler.create({
+            msgHandler.update({
               className: msgClassName,
               msgno: msgNo,
               msgtext: msgTextInitial,

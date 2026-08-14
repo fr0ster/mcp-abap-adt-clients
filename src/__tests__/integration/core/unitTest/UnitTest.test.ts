@@ -233,16 +233,16 @@ describe('AdtUnitTest (using AdtClient)', () => {
             testsLogger.info?.('Existing class source updated');
           }
 
-          // Step 3: Create local test class
-          logTestStep('create (test class)', testsLogger);
-          const createTestClassState = await client.getLocalTestClass().create({
+          // Step 3: Write the tests into the container class's include.
+          // An include is not created — it exists because its class does.
+          logTestStep('update (test class)', testsLogger);
+          const writeTestClassState = await client.getLocalTestClass().update({
             className: containerClass,
             testClassCode: testClassSource,
-            testClassName,
             transportRequest,
           });
-          expect(createTestClassState).toBeDefined();
-          testsLogger.info?.('Local test class created');
+          expect(writeTestClassState).toBeDefined();
+          testsLogger.info?.('Local test class written');
 
           // Step 4: Activate class
           logTestStep('activate', testsLogger);

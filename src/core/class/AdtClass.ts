@@ -44,6 +44,7 @@ import {
   type LockTracker,
 } from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
+import { AdtClassMemberBase } from './AdtClassMemberBase';
 import { activateClass } from './activation';
 import { checkClass, checkClassLocalTestClass } from './check';
 import { create as createClass } from './create';
@@ -64,70 +65,11 @@ import {
   getClassVersionSource,
 } from './versions';
 
-export class AdtClass implements IAdtSourceObject<IClassConfig, IClassState> {
-  protected readonly connection: IAbapConnection;
-  protected readonly logger?: ILogger;
-  protected readonly systemContext: IAdtSystemContext;
-  protected readonly contentTypes?: IAdtContentTypes;
-  private readonly lockTracker: LockTracker;
+export class AdtClass
+  extends AdtClassMemberBase
+  implements IAdtSourceObject<IClassConfig, IClassState>
+{
   public readonly objectType: string = 'Class';
-
-  // LAZY thunk (not a getter that snapshots): captures `this` but reads
-  // this.connection/this.logger only when invoked, after the constructor has
-  // run — so building the capabilities below as class fields is safe.
-  private readonly capCtx = (): ICapabilityContext => ({
-    connection: this.connection,
-    logger: this.logger,
-  });
-
-  private readonly lockCap = new LockCapability<IClassConfig, IClassState>(
-    this.capCtx,
-    {
-      nameOf: (c) => {
-        if (!c.className) throw new Error('Class name is required');
-        return c.className;
-      },
-      acquire: async (ctx, name) => ({
-        lockHandle: await lockClass(ctx.connection, name),
-      }),
-      release: async (ctx, name, handle) => {
-        const result = await unlockClass(ctx.connection, name, handle);
-        return { unlockResult: result, errors: [] };
-      },
-    },
-  );
-
-  private readonly versionsCap = new VersionsCapability<IClassConfig>(
-    this.capCtx,
-    {
-      nameOf: (c) => {
-        if (!c.className) throw new Error('className is required');
-        return c.className;
-      },
-      list: (ctx, name) =>
-        getClassIncludeVersions(ctx.connection, name, 'main'),
-      source: (ctx, uri) => getClassVersionSource(ctx.connection, uri),
-    },
-  );
-
-  constructor(
-    connection: IAbapConnection,
-    logger?: ILogger,
-    systemContext?: IAdtSystemContext,
-    contentTypes?: IAdtContentTypes,
-    lockRegistry?: LockRegistry,
-  ) {
-    this.connection = connection;
-    this.logger = logger;
-    this.systemContext = systemContext ?? {};
-    this.contentTypes = contentTypes;
-    this.lockTracker = createLockTracker(
-      lockRegistry,
-      this.objectType,
-      (className, lockHandle) =>
-        unlockClass(this.connection, className, lockHandle),
-    );
-  }
 
   /**
    * Validate class configuration before creation
@@ -311,47 +253,6 @@ export class AdtClass implements IAdtSourceObject<IClassConfig, IClassState> {
       }
 
       throw error;
-    }
-  }
-
-  /**
-   * Read class metadata (object characteristics: package, responsible, description, etc.)
-   */
-  async readMetadata(
-    config: Partial<IClassConfig>,
-    options?: IReadOptions,
-  ): Promise<IClassState> {
-    const state: IClassState = { errors: [] };
-    if (!config.className) {
-      const error = new Error('Class name is required');
-      state.errors.push({
-        method: 'readMetadata',
-        error,
-        timestamp: new Date(),
-      });
-      throw error;
-    }
-    try {
-      const readOptions = this.contentTypes
-        ? { ...options, accept: this.contentTypes.classRead().accept }
-        : options;
-      const response = await getClassMetadata(
-        this.connection,
-        config.className,
-        readOptions,
-      );
-      state.metadataResult = response;
-      this.logger?.info?.('Class metadata read successfully');
-      return state;
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({
-        method: 'readMetadata',
-        error: err,
-        timestamp: new Date(),
-      });
-      this.logger?.error('Read metadata failed:', safeErrorMessage(err));
-      throw err;
     }
   }
 
@@ -628,56 +529,6 @@ export class AdtClass implements IAdtSourceObject<IClassConfig, IClassState> {
   }
 
   /**
-   * Activate class
-   * No stateful needed - uses same session/cookies
-   */
-  async activate(config: Partial<IClassConfig>): Promise<IClassState> {
-    if (!config.className) {
-      throw new Error('Class name is required');
-    }
-
-    const state: IClassState = {
-      errors: [],
-    };
-
-    try {
-      const activateResult = await activateClass(
-        this.connection,
-        config.className,
-      );
-      state.activateResult = activateResult;
-      return state;
-    } catch (error: unknown) {
-      const e = error as HttpError;
-      const status = e.response?.status;
-      const statusText = e.response?.statusText;
-      const errorMessage = e.response?.data
-        ? typeof e.response.data === 'string'
-          ? e.response.data.substring(0, 500)
-          : safeStringify(e.response.data).substring(0, 500)
-        : e.message || 'Unknown error';
-
-      this.logger?.error?.(
-        `Activate failed: HTTP ${status || '?'} ${statusText || ''}`,
-        { status, statusText, message: errorMessage },
-      );
-
-      if (status && status >= 400 && status < 500) {
-        const customError = new AdtOperationError(
-          `Activation failed for object '${config.className}': ${errorMessage}`,
-        );
-        customError.code = AdtObjectErrorCodes.ACTIVATE_FAILED;
-        customError.status = status;
-        customError.statusText = statusText;
-        customError.originalError = error;
-        throw customError;
-      }
-
-      throw error;
-    }
-  }
-
-  /**
    * Check class
    */
   async check(
@@ -758,27 +609,6 @@ export class AdtClass implements IAdtSourceObject<IClassConfig, IClassState> {
 
       throw error;
     }
-  }
-
-  /**
-   * Lock class
-   */
-  async lock(config: Partial<IClassConfig>): Promise<string> {
-    const handle = await this.lockCap.lock(config);
-    this.lockTracker.track(config.className as string, handle);
-    return handle;
-  }
-
-  /**
-   * Unlock class
-   */
-  async unlock(
-    config: Partial<IClassConfig>,
-    lockHandle: string,
-  ): Promise<IClassState> {
-    const state = await this.lockCap.unlock(config, lockHandle);
-    this.lockTracker.untrack(config.className as string);
-    return state;
   }
 
   /**
@@ -930,61 +760,8 @@ export class AdtClass implements IAdtSourceObject<IClassConfig, IClassState> {
     );
   }
 
-  /**
-   * Read transport request information for the class
-   */
-  async readTransport(
-    config: Partial<IClassConfig>,
-    options?: { withLongPolling?: boolean },
-  ): Promise<IClassState> {
-    const state: IClassState = {
-      errors: [],
-    };
-
-    if (!config.className) {
-      const error = new Error('Class name is required');
-      state.errors.push({
-        method: 'readTransport',
-        error,
-        timestamp: new Date(),
-      });
-      throw error;
-    }
-
-    try {
-      const response = await getClassTransport(
-        this.connection,
-        config.className,
-        options,
-      );
-      state.transportResult = response;
-      this.logger?.info?.('Transport request read successfully');
-      return state;
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({
-        method: 'readTransport',
-        error: err,
-        timestamp: new Date(),
-      });
-      this.logger?.error('Read transport failed:', safeErrorMessage(err));
-      throw err;
-    }
-  }
-
   getVersions(config: Partial<IClassConfig>): Promise<IObjectVersion[]> {
-    return this.versionsCap.getVersions(config);
-  }
-
-  getVersionSource(contentUri: string): Promise<string> {
-    return this.versionsCap.getVersionSource(contentUri);
-  }
-
-  /** Shared by local-include subclasses to target their own include. */
-  protected getIncludeVersions(
-    className: string,
-    includeType: ClassIncludeType,
-  ): Promise<IObjectVersion[]> {
-    return getClassIncludeVersions(this.connection, className, includeType);
+    if (!config.className) throw new Error('className is required');
+    return this.getIncludeVersions(config.className, 'main');
   }
 }

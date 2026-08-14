@@ -28,8 +28,9 @@ import { beginCriticalSection } from '../../utils/criticalSection';
 
 import type {
   IAbapConnection,
-  IAdtCrud,
+  IAdtModifiable,
   IAdtOperationOptions,
+  IAdtReadable,
   ILogger,
   IObjectVersion,
 } from '@mcp-abap-adt/interfaces';
@@ -56,7 +57,9 @@ import { buildMessageClassXml, parseMessageClass } from './xml';
 const BASE = '/sap/bc/adt/messageclass';
 
 export class AdtMessageClassMessage
-  implements IAdtCrud<IMessageClassMessageConfig, IMessageClassMessageState>
+  implements
+    IAdtReadable<IMessageClassMessageConfig, IMessageClassMessageState>,
+    IAdtModifiable<IMessageClassMessageConfig, IMessageClassMessageState>
 {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
@@ -109,17 +112,6 @@ export class AdtMessageClassMessage
   }
 
   // ── create / update (upsert) ───────────────────────────────────────────────
-
-  /**
-   * Create or upsert a single message in the parent class.
-   * Delegates to the update logic.
-   */
-  async create(
-    config: IMessageClassMessageConfig,
-    _options?: IAdtOperationOptions,
-  ): Promise<IMessageClassMessageState> {
-    return this._upsertMessage(config);
-  }
 
   /**
    * Update (upsert) a single message in the parent class.

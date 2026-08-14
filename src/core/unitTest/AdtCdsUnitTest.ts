@@ -237,19 +237,18 @@ export class AdtCdsUnitTest extends AdtUnitTest implements IAdtCdsTestRunnable {
         });
         this.logger?.info?.('Global class activated');
 
-        // Step 2: Create local test class in the global class's testclasses include
-        // Uses parent's adtLocalTestClass which handles locking/unlocking internally
-        this.logger?.info?.(
-          'Step 2: Creating local test class in global class',
-        );
-        const testClassState = await this.adtLocalTestClass.create(
+        // Step 2: Write the tests into the global class's testclasses include.
+        // An include is not created — it exists because its class does — so this
+        // is update, and adtLocalTestClass handles locking/unlocking internally.
+        this.logger?.info?.('Step 2: Writing test class into global class');
+        const testClassState = await this.adtLocalTestClass.update(
           {
             className: config.className,
             testClassCode: config.testClassSource,
             transportRequest: config.transportRequest,
           },
           {
-            activateOnCreate: true, // Activate the parent class after creating test class
+            activateOnUpdate: true, // Activate the parent class after writing the tests
           },
         );
 

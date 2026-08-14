@@ -13,7 +13,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { safeErrorMessage } from '../../utils/internalUtils';
 import type { IReadOptions } from '../shared/types';
-import { AdtClass } from './AdtClass';
+import { AdtClassMemberBase } from './AdtClassMemberBase';
 import { checkClassLocalTypes } from './check';
 import { updateClassLocalTypes } from './includes';
 import type { IClassState } from './types';
@@ -21,7 +21,7 @@ import type { IClassState } from './types';
 // Types defined in @mcp-abap-adt/interfaces
 export type { ILocalTypesConfig } from '@mcp-abap-adt/interfaces';
 
-export class AdtLocalTypes extends AdtClass {
+export class AdtLocalTypes extends AdtClassMemberBase {
   public readonly objectType: string = 'LocalTypes';
 
   /**
@@ -47,90 +47,6 @@ export class AdtLocalTypes extends AdtClass {
       validationResponse: checkResponse,
       errors: [],
     };
-  }
-
-  /**
-   * Create local types with full operation chain
-   * Requires parent class to be locked
-   */
-  async create(
-    config: Partial<ILocalTypesConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IClassState> {
-    if (!config.className) {
-      throw new Error('Class name is required');
-    }
-    if (!config.localTypesCode) {
-      throw new Error('Local types code is required');
-    }
-
-    let lockHandle: string | undefined;
-
-    try {
-      // 1. Lock parent class (stateful only for lock)
-      this.logger?.info?.('Step 1: Locking parent class');
-      lockHandle = await super.lock({ className: config.className });
-      this.logger?.info?.('Parent class locked, handle:', lockHandle);
-
-      // 2. Check local types code
-      const codeToCheck = options?.sourceCode || config.localTypesCode;
-      const state: IClassState = {
-        errors: [],
-      };
-
-      if (codeToCheck) {
-        this.logger?.info?.('Step 2: Checking local types code');
-        const checkResponse = await checkClassLocalTypes(
-          this.connection,
-          config.className,
-          codeToCheck,
-          'inactive',
-          this.contentTypes?.sourceArtifactContentType(),
-        );
-        state.checkResult = checkResponse;
-        this.logger?.info?.('Local types check passed');
-      }
-
-      // 3. Update local types
-      this.logger?.info?.('Step 3: Creating local types');
-      const updateResponse = await updateClassLocalTypes(
-        this.connection,
-        config.className,
-        codeToCheck as string,
-        lockHandle,
-        config.transportRequest,
-        this.contentTypes?.sourceArtifactContentType(),
-      );
-      state.updateResult = updateResponse;
-      this.logger?.info?.('Local types created');
-
-      // 4. Unlock parent class (obligatory stateless after unlock)
-      this.logger?.info?.('Step 4: Unlocking parent class');
-      const unlockState = await super.unlock(
-        { className: config.className },
-        lockHandle,
-      );
-      state.unlockResult = unlockState.unlockResult;
-      lockHandle = undefined;
-
-      return state;
-    } catch (error: unknown) {
-      // Cleanup on error
-      if (lockHandle) {
-        try {
-          this.logger?.warn?.('Unlocking parent class during error cleanup');
-          await super.unlock({ className: config.className }, lockHandle);
-        } catch (unlockError) {
-          this.logger?.warn?.(
-            'Failed to unlock parent class after error:',
-            safeErrorMessage(unlockError),
-          );
-        }
-      }
-
-      this.logger?.error('Create LocalTypes failed:', safeErrorMessage(error));
-      throw error;
-    }
   }
 
   /**

@@ -171,11 +171,12 @@ describe('AdtMessageClassMessage', () => {
     expect(body).toContain('adtcore:description="D1"');
   });
 
-  it('create new message with selfExplanatory+description: PUT body emits both fields', async () => {
+  it('write a message that is not there yet: PUT body emits both fields', async () => {
     const { conn, calls } = recorder();
     const m = new AdtMessageClassMessage(conn, noopLogger);
-    // 003 does not exist in CLASS_XML — it will be pushed as a new message
-    await m.create({
+    // 003 does not exist in CLASS_XML — update is an upsert, so it is pushed
+    // as a new message rather than needing a create of its own
+    await m.update({
       className: 'ZT',
       msgno: '003',
       msgtext: 'BRAND NEW',
