@@ -38,6 +38,7 @@ Per task:
 | 7 five handlers lose `create()` — an include is not created | open |
 | 8 narrow the ten handlers | open |
 | 8a `IUnitTestConfig` describes the testclasses include — interfaces major | open |
+| 8a-bis `IAdtTestRunnable` narrows to `run` | open |
 | 8b `AdtUnitTest`'s CRUD half | open |
 | 8c delete unit testing's seven absent methods | open |
 | 9 the guard | open |
@@ -568,7 +569,7 @@ So the target is:
 |---|---|---|
 | `create` | the container class **and** its include | POST the class, activate it, PUT the tests into it |
 | `read` / `update` / `delete` / `validate` | the testclasses include | manage the test code inside a class that exists |
-| `run` / `getRunId` / `getStatus` / `getResult` | a run | execute whatever tests the class holds, any number of times |
+| `run` | a run | execute whatever tests the class holds, any number of times, and hand back the outcome |
 
 Everything else — `activate`, `check`, `lock`, `unlock`, `getVersions`, `getVersionSource`,
 `readTransport` — is deleted, as before.
@@ -699,6 +700,58 @@ run.
   start until this is on npm, and `npm view @mcp-abap-adt/interfaces version` is how that is
   established, not the tag.
 
+### Task 8a-bis: `run` is the whole running contract
+
+**Repo:** `mcp-abap-adt-interfaces`, same branch and same major as Task 8a.
+**Files:** `src/adt/IAdtUnitTest.ts`, `src/index.ts`, `CHANGELOG.md`, `README.md`.
+
+Ruled 2026-08-14: **running is its own interface, separate from CRUD, and `run` is enough.**
+Internals are a separate question — what matters is that the contract is clean.
+
+`IAdtTestRunnable` today declares six members: `run`, `getRunId`, `getStatus`,
+`getStatusResponse`, `getResult`, `getResultResponse`. Four of them are the handler's memory of
+its last call — `getRunId`, `getStatusResponse`, `getResultResponse` return whatever was stored
+by the previous invocation — and two are the polling machinery. None of that is a capability; it
+is one implementation's bookkeeping raised into a public type.
+
+```ts
+/** Running ABAP Unit and getting the outcome. */
+export interface IAdtTestRunnable<TTests, TOptions, TResult> {
+  run(tests: TTests, options?: TOptions): Promise<TResult>;
+}
+```
+
+This mirrors `IExecutor<TTarget, TResult>` in `execution/IExecutor.ts`, which is already the
+package's answer to "this thing can be executed" and already reduces execution to `run(target)`.
+Two contracts for running, shaped differently, would be the competing-vocabulary problem this
+plan exists to remove.
+
+**`run` therefore returns the outcome, not a run id.** That is the load-bearing consequence and
+it must be stated rather than discovered: if the contract stops at `run`, a caller that only has
+the declared type cannot poll, so `run` has to do the waiting. The integration test already
+records what the alternative costs —
+`src/__tests__/integration/core/unitTest/UnitTest.test.ts:347` says in its own comment that
+`getResult()` is not part of the declared interface "so we need to cast". Casting past the
+declared type is the disease this plan treats.
+
+Hiding the wait inside `run` also erases the only difference `AdtUnitTestLegacy` exists for: a
+legacy system answers `POST /abapunit/testruns` with the result synchronously, a modern one
+returns an id to poll. Under this contract both are `run`, and the flavour is invisible to the
+caller — which is what an interface is for.
+
+- [ ] **Step 1: Decide the result type before writing anything.** `IAdtResponse` keeps today's
+  behaviour (the raw document, parsed by the consumer, consistent with `getResult` now). A parsed
+  report would be a nicer contract and a bigger change, and this plan does not silently take that
+  on — if it is wanted, it is its own task with its own tests.
+- [ ] **Step 2: Narrow `IAdtTestRunnable` to `run`; do the same for `IAdtCdsTestRunnable`**,
+  keeping whatever it adds that is genuinely CDS (the test-double check).
+- [ ] **Step 3:** the five removed members stay as **methods on the classes** — this is a
+  contract change, not a code deletion. A consumer that wants to start a run and poll it itself
+  still can, through the concrete class; it simply is not what the interface promises.
+- [ ] **Step 4:** `npm run build`, `npm run test:check`, `npm run lint:check`; ship in the same
+  major as Task 8a, with the CHANGELOG showing `run` → `getStatus` → `getResult` collapsing into
+  one `await run(...)`.
+
 ### Task 8b: `AdtUnitTest`'s CRUD half becomes real
 
 **Files:** `src/core/unitTest/AdtUnitTest.ts`, `AdtCdsUnitTest.ts`, `AdtUnitTestLegacy.ts`,
@@ -727,8 +780,11 @@ Take the new interfaces version first — `--save`, then the same three resoluti
   `this.adtLocalTestClass`, once `config.testClassSource` exists to check. Task 3's report says
   in as many words that it was omitted only because the config carried nothing to check.
 - **`run(tests, options)`** stops going through `create()` and calls `startClassUnitTestRun`
-  directly. This is the ruling's load-bearing half: **`run` must work without any CRUD call**,
-  and while it delegates to `create` it cannot be honest about that.
+  directly, then waits for the run to finish and returns its result — the whole contract, per
+  Task 8a-bis. This is the ruling's load-bearing half: **`run` must work without any CRUD call**,
+  and while it delegates to `create` it cannot be honest about that. `getRunId`, `getStatus`,
+  `getStatusResponse`, `getResult` and `getResultResponse` remain as methods; they are simply no
+  longer promised by the type.
 - **`readMetadata`** follows `read` — same subject, or delete it if `read` covers it.
 - **`AdtUnitTestLegacy.create` must move.** It overrides `create` to start a run against the
   legacy `/abapunit/testruns` endpoint — the old meaning, in a subclass. Left alone it would
