@@ -11,6 +11,9 @@
  * - create: Legacy CTS REST API does not support creating transport requests.
  *   The endpoint rejects all POST payloads — no useraction value is accepted.
  *   Use SE01/SE09/SE10 transaction to create transports on legacy systems.
+ * - update, delete: Whether the legacy endpoint supports changing a description
+ *   or deleting a request has never been captured. Both are refused rather than
+ *   guessed against the modern `/sap/bc/adt/cts/transportrequests/<NR>` shape.
  */
 
 import type {
@@ -123,6 +126,47 @@ export class AdtRequestLegacy extends AdtRequest {
       'listNodes() is not supported on legacy SAP systems: the payload of ' +
         '/sap/bc/cts/transportrequests has never been captured, so no parser can ' +
         'honestly claim to read it. Use list() and parse the response yourself.',
+    );
+  }
+
+  /**
+   * Update transport request description — NOT supported on legacy systems.
+   *
+   * `AdtRequest.update()` targets the modern `/sap/bc/adt/cts/transportrequests/<NR>`
+   * endpoint, which legacy systems (BASIS < 7.50) do not have. Whether the legacy
+   * `/sap/bc/cts/transportrequests` resource supports changing a description at all
+   * — and if so, in what shape — has never been captured. Inventing a payload for
+   * an uncaptured endpoint is exactly the guessing this design exists to stop.
+   */
+  override async update(
+    _config: Partial<ITransportConfig>,
+    _options?: IAdtOperationOptions,
+  ): Promise<ITransportState> {
+    throw new Error(
+      'Updating transport requests is not supported on legacy SAP systems (BASIS < 7.50). ' +
+        'The legacy /sap/bc/cts/transportrequests endpoint has never been captured, so ' +
+        'whether or how it supports changing a description is unknown. ' +
+        'Use SE01/SE09/SE10 transaction to update transports.',
+    );
+  }
+
+  /**
+   * Delete transport request — NOT supported on legacy systems.
+   *
+   * `AdtRequest.delete()` targets the modern `/sap/bc/adt/cts/transportrequests/<NR>`
+   * endpoint, which legacy systems (BASIS < 7.50) do not have. Whether the legacy
+   * `/sap/bc/cts/transportrequests` resource supports deleting a request at all has
+   * never been captured. Inventing a payload for an uncaptured endpoint is exactly
+   * the guessing this design exists to stop.
+   */
+  override async delete(
+    _config: Partial<ITransportConfig>,
+  ): Promise<ITransportState> {
+    throw new Error(
+      'Deleting transport requests is not supported on legacy SAP systems (BASIS < 7.50). ' +
+        'The legacy /sap/bc/cts/transportrequests endpoint has never been captured, so ' +
+        'whether it supports deleting a request is unknown. ' +
+        'Use SE01/SE09/SE10 transaction to delete transports.',
     );
   }
 }
