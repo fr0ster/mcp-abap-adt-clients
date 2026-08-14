@@ -443,11 +443,18 @@ Deleting an exported type is breaking.
 Fifteen handlers, plus `unitTest`, whose entry stopped being a deletion. **Always a new branch
 off the current `main`** — Phase A has been merged and released by now, so its branch is gone.
 
+**One more interfaces release, and only one.** Phase C changes three things in
+`@mcp-abap-adt/interfaces` — the unit-test config and state (8a), `ILocalTestClassConfig`'s dead
+`testClassName` (8a), and the runnable contract (8a-bis). All are breaking, so they are **one
+major, one PR, one publish**, and the adt-clients work waits once rather than twice. Nothing
+else in the phase touches that package.
+
 **One release, two packages.** The maintainer's ruling on `unitTest` (spec, "the stubs are a
 symptom of `create()` meaning the wrong thing") makes its `update` and `delete` real rather than
 dead, and that needs a config type describing the **testclasses include** where the current one
-describes a **test run**. So Phase C carries an `interfaces` round-trip in the middle of it: Task 8a changes
-that contract and releases it, and the adt-clients work that depends on it waits for npm.
+describes a **test run**. So Phase C carries an `interfaces` round-trip in the middle of it: Tasks 8a and
+8a-bis change those contracts and release them together, and the adt-clients work that depends
+on them waits for npm.
 
 The order below is deliberate. Tasks 7 and 8 need neither `unitTest`'s new config nor the new
 interfaces version, so they proceed while 8a is in review and while its release is being
