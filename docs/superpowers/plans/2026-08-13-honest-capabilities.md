@@ -35,8 +35,8 @@ Per task:
 | 5 split `IAdtModifiable`, delete `IAdtNonVersionedObject` | done — `83582ef` |
 | 6 release interfaces 15.0.0 | done — `bf1a9ff`, plus review fixes `2517b03`, `d35f1ab` |
 | 6a take interfaces 15.0.0 | **next** |
-| 7 five handlers lose `create()` — an include is not created | open |
-| 8 narrow the ten handlers | open |
+| 7 four handlers lose `create()` — an include is not created | **done** — `c1dd6ac`, corrected by `f21f432`: a message class is not an ABAP class and its messages **are** created, so `AdtMessageClassMessage` keeps `create` |
+| 8 narrow the ten handlers | **8 of 10 done** — `domain`, `dataElement`, `functionGroup`, `package`, `messageClass` (+ its message handler), `authorizationField`, `functionInclude`, `transport`. `featureToggle` and `AdtServiceBinding` need interfaces 17.0.0 first |
 | 8a `IUnitTestConfig` describes the testclasses include — interfaces major | **done, released** — interfaces 16.0.0, PR #36, `027d00e`, tag `v16.0.0` |
 | 8a-bis one `IAdtRunnable`; test-specific runnables deleted | **done, released** — same release; `ITestRunInformation` and `ICdsTestDoubleCheckable` added with it |
 | 8b `AdtUnitTest`'s CRUD half | open |
@@ -517,9 +517,15 @@ created.** It exists because its class exists; there is no POST that brings a `t
 one. Writing source is `update`. The same holds for a single message inside a message class:
 `AdtMessageClassMessage` merges it into the class's XML and PUTs the class back.
 
-So these five lose `create()` and `IAdtCreatable` — not because their `create` duplicated their
+So these four lose `create()` and `IAdtCreatable` — not because their `create` duplicated their
 `update`, but because there is nothing for a `create` to do that `update` does not already
 describe honestly.
+
+**`AdtMessageClassMessage` is not among them** — ruled 2026-08-14, after this task had briefly
+removed its `create` too. A message class (MSAG) is a different entity from an ABAP class,
+whatever the name suggests, and a message inside one is genuinely created: it does not exist
+until someone adds it, and only then can it be updated. That is the distinction — an include
+exists because its class does; a message does not exist until it is made.
 
 `AdtMessageClass` is **untouched**: a message class *is* created, by a POST, and keeps the atom.
 `AdtUnitTest` **keeps `create()`** and gains a real one in Task 8b — creating a unit test for a
@@ -540,6 +546,16 @@ class that does not exist yet POSTs that class first.
 
 Per handler, replace the declared composite with the exact intersection of atoms it satisfies.
 The spec's cluster tables give the starting point; **read each class** before writing its list.
+
+**Two of the ten cannot be finished in this package.** `featureToggle` declares
+`IFeatureToggleObject` and `AdtServiceBinding` declares `IAdtServiceBinding`, and **both of those
+types live in `@mcp-abap-adt/interfaces` and extend the fat `IAdtObject`** — so narrowing them is
+an interfaces change, not an adt-clients one. Found 2026-08-14 during execution; the table below
+had listed them as if their types were local. They need a second interfaces major (17.0.0),
+narrowing each to the atoms it satisfies plus its own domain methods — `switchOn`/`switchOff`/
+`getRuntimeState`/`checkState`/`readSource` for the toggle, the service-binding operations for the
+binding. Until that ships, their stubs stay: `featureToggle.readTransport` and both handlers'
+version methods.
 
 | handler | drops |
 |---|---|
