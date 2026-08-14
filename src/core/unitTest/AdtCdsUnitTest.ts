@@ -15,7 +15,7 @@ import {
   AdtOperationError,
   type HttpError,
   type IAbapConnection,
-  type IAdtCdsTestRunnable,
+  type ICdsTestDoubleCheckable,
   type ICdsUnitTestConfig,
   type ICdsUnitTestState,
   type ILogger,
@@ -46,7 +46,10 @@ export type {
  *
  * Combines AdtClass for test class lifecycle and AdtUnitTest for test execution
  */
-export class AdtCdsUnitTest extends AdtUnitTest implements IAdtCdsTestRunnable {
+export class AdtCdsUnitTest
+  extends AdtUnitTest
+  implements ICdsTestDoubleCheckable
+{
   protected adtView: AdtDdl;
   private cdsViewName?: string;
   private className?: string;
@@ -266,21 +269,9 @@ export class AdtCdsUnitTest extends AdtUnitTest implements IAdtCdsTestRunnable {
       }
     }
 
-    // Otherwise, use parent's create for test run
-    // Convert ICdsUnitTestConfig to IUnitTestConfig for parent method
-    if (!config.tests || config.tests.length === 0) {
-      throw new Error('At least one test definition is required for test run');
-    }
-    return await super.create(
-      {
-        tests: config.tests,
-        options: config.options,
-        runId: config.runId,
-        status: config.status,
-        result: config.result,
-      },
-      options,
-    );
+    // Without a template there is no CDS-specific chain: creating the
+    // container class and writing the tests into it is what the parent does.
+    return await super.create(config, options);
   }
 
   /**
@@ -319,7 +310,8 @@ export class AdtCdsUnitTest extends AdtUnitTest implements IAdtCdsTestRunnable {
       }
     }
 
-    // Otherwise, use parent's update (which throws error for test runs)
+    // Otherwise the parent writes the include, which is the same operation
+    // without the CDS-specific activation this branch forces.
     return await super.update(config, options);
   }
 
@@ -354,7 +346,7 @@ export class AdtCdsUnitTest extends AdtUnitTest implements IAdtCdsTestRunnable {
       }
     }
 
-    // Otherwise, use parent's delete (which throws error for test runs)
+    // Otherwise the parent empties the include, leaving the class in place.
     return await super.delete(config);
   }
 
@@ -393,7 +385,6 @@ export class AdtCdsUnitTest extends AdtUnitTest implements IAdtCdsTestRunnable {
           throw new Error('Failed to extract run ID from response');
         }
         this.lastRunId = runId;
-        this.state.runId = runId;
         this.logger?.info?.('Unit test run started, runId:', runId);
         return runId;
       } catch (error: unknown) {

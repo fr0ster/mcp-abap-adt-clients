@@ -305,49 +305,26 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
           expect(metadataState.metadataResult).toBeDefined();
           testsLogger.info?.('CDS unit test class metadata read successfully');
 
-          // Step 5: Create unit test configuration
-          logTestStep('create (unit test)', testsLogger);
-          const unitTestConfig: IUnitTestConfig = {
-            tests: [
-              {
-                containerClass: className,
-                testClass: testClassName,
-              },
-            ],
-            options: testCase.params.unit_test_options || {},
-          };
-          testsLogger.info?.('CDS unit test configuration created');
-
-          // Step 6: Update unit test (if needed - for now just prepare)
-          logTestStep('update (unit test)', testsLogger);
-          testsLogger.info?.('CDS unit test configuration prepared');
-
-          // Step 7: Run unit test (start test execution)
+          // Step 5: Run the tests the generated class holds. No create and no
+          // update first — running is its own capability.
           logTestStep('run (unit test)', testsLogger);
-          const unitTest = client.getUnitTest() as any;
+          const unitTest = client.getUnitTest();
           const runId = await unitTest.run(
-            unitTestConfig.tests!,
-            unitTestConfig.options,
+            [{ containerClass: className, testClass: testClassName }],
+            testCase.params.unit_test_options || {},
           );
           expect(runId).toBeDefined();
           testsLogger.info?.('CDS unit test run started, run ID:', runId);
 
-          // Step 8: Read status (with long polling if configured)
-          logTestStep('read (status)', testsLogger);
-          const statusConfig: IUnitTestConfig = {
-            runId: runId,
-            status: testCase.params.unit_test_status || {},
-          };
-          const statusState = await client
-            .getUnitTest()
-            .read(statusConfig, 'active');
-          expect(statusState).toBeDefined();
-          expect(statusState?.runId).toBe(runId);
-          expect(statusState?.runStatus).toBeDefined();
-          testsLogger.info?.('CDS unit test status:', statusState?.runStatus);
+          // Step 6: Ask about the run — its own interface since 16.0.0
+          logTestStep('getStatus (run)', testsLogger);
+          const statusResponse = await unitTest.getStatus(runId, true);
+          expect(statusResponse).toBeDefined();
+          expect(statusResponse.data).toBeDefined();
+          testsLogger.info?.('CDS unit test status retrieved');
 
-          // Step 9: Read result
-          logTestStep('read (result)', testsLogger);
+          // Step 7: Fetch the result document
+          logTestStep('getResult (run)', testsLogger);
           const resultResponse = await unitTest.getResult(runId, {
             withNavigationUris:
               testCase.params.unit_test_result?.with_navigation_uris || false,

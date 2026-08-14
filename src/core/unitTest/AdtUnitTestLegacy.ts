@@ -1,26 +1,26 @@
 /**
- * AdtUnitTestLegacy - Unit test operations for legacy SAP systems (BASIS < 7.50)
+ * AdtUnitTestLegacy — running ABAP Unit on legacy SAP systems (BASIS < 7.50).
  *
- * Extends AdtUnitTest and overrides run/status/result to use legacy endpoints:
- * - /sap/bc/adt/abapunit/testruns instead of /sap/bc/adt/abapunit/runs
- * - application/xml content types instead of versioned vnd.sap.adt.api.abapunit.* types
+ * One endpoint differs and one behaviour differs:
+ * - `/sap/bc/adt/abapunit/testruns` instead of `/sap/bc/adt/abapunit/runs`,
+ *   with `application/xml` rather than the versioned
+ *   `application/vnd.sap.adt.api.abapunit.*` types;
+ * - the POST answers with the finished result (`aunit:runResult`), so there is
+ *   no run to poll.
  *
- * Key difference: Legacy systems return results synchronously (aunit:runResult)
- * from the POST to /testruns — no run ID, no async polling needed.
+ * Both differences live behind `run`, which is where running belongs. Until
+ * 12.0.0 they lived behind an override of `create`, from when `create` meant
+ * "start a run" — and managing a class's tests, which is what `create` means
+ * now, is identical on a legacy system.
  */
 
-import type {
-  IAdtOperationOptions,
-  IAdtResponse,
-} from '@mcp-abap-adt/interfaces';
+import type { IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { safeErrorMessage } from '../../utils/internalUtils';
 import { AdtUnitTest } from './AdtUnitTest';
 import { startClassUnitTestRunLegacy } from './runLegacy';
 import type {
   IClassUnitTestDefinition,
   IClassUnitTestRunOptions,
-  IUnitTestConfig,
-  IUnitTestState,
 } from './types';
 
 /** Synthetic run ID for legacy synchronous results */
@@ -28,14 +28,15 @@ const LEGACY_SYNC_RUN_ID = 'legacy-sync';
 
 export class AdtUnitTestLegacy extends AdtUnitTest {
   /**
-   * Create unit test run using legacy endpoint.
-   * Legacy returns results synchronously — no run ID or polling needed.
+   * Run the tests. The result comes back with the POST, so the id returned
+   * here is synthetic — it exists so {@link getStatus} and {@link getResult}
+   * keep the same shape they have on a modern system.
    */
-  override async create(
-    config: IUnitTestConfig,
-    _options?: IAdtOperationOptions,
-  ): Promise<IUnitTestState> {
-    if (!config.tests || config.tests.length === 0) {
+  override async run(
+    tests: IClassUnitTestDefinition[],
+    options?: IClassUnitTestRunOptions,
+  ): Promise<string> {
+    if (!tests || tests.length === 0) {
       throw new Error('At least one test definition is required');
     }
 
@@ -43,45 +44,29 @@ export class AdtUnitTestLegacy extends AdtUnitTest {
       this.logger?.info?.('Starting unit test run (legacy)');
       const response = await startClassUnitTestRunLegacy(
         this.connection,
-        config.tests,
-        config.options,
+        tests,
+        options,
       );
 
       this.logger?.debug?.('Unit test run response status:', response.status);
 
-      // Legacy returns results synchronously — store as both status and result
+      // Legacy answers with the finished result — store it as both, since a
+      // caller asking for either is asking about the same document.
       this.lastStatusResponse = response;
       this.lastResultResponse = response;
-
       this.lastRunId = LEGACY_SYNC_RUN_ID;
-      this.logger?.info?.('Unit test run completed (legacy, synchronous)');
 
-      return {
-        createResult: response,
-        runId: LEGACY_SYNC_RUN_ID,
-        runResult: response.data,
-        errors: [],
-      };
+      this.logger?.info?.('Unit test run completed (legacy, synchronous)');
+      return LEGACY_SYNC_RUN_ID;
     } catch (error: unknown) {
-      this.logger?.error('Create failed (legacy):', safeErrorMessage(error));
+      this.logger?.error('Run failed (legacy):', safeErrorMessage(error));
       throw error;
     }
   }
 
   /**
-   * Run unit tests — legacy returns results synchronously.
-   */
-  override async run(
-    tests: IClassUnitTestDefinition[],
-    options?: IClassUnitTestRunOptions,
-  ): Promise<string> {
-    await this.create({ tests, options });
-    return LEGACY_SYNC_RUN_ID;
-  }
-
-  /**
-   * Get unit test status — legacy returns results synchronously,
-   * so this returns the cached response from create().
+   * Status of a run — the response the run itself returned, since a legacy
+   * system finishes before it answers and exposes nothing to poll.
    */
   override async getStatus(
     _runId: string,
@@ -91,14 +76,11 @@ export class AdtUnitTestLegacy extends AdtUnitTest {
       return this.lastStatusResponse;
     }
     throw new Error(
-      'No status available. Legacy systems return results synchronously via create().',
+      'No status available. A legacy system returns the result from run(), so there is nothing to poll before one has been started here.',
     );
   }
 
-  /**
-   * Get unit test result — legacy returns results synchronously,
-   * so this returns the cached response from create().
-   */
+  /** Result of a run — same document, same reason. */
   override async getResult(
     _runId: string,
     _options?: { withNavigationUris?: boolean; format?: 'abapunit' | 'junit' },
@@ -107,26 +89,7 @@ export class AdtUnitTestLegacy extends AdtUnitTest {
       return this.lastResultResponse;
     }
     throw new Error(
-      'No result available. Legacy systems return results synchronously via create().',
+      'No result available. A legacy system returns the result from run(), so there is nothing to fetch before one has been started here.',
     );
-  }
-
-  /**
-   * Read unit test — legacy returns results synchronously,
-   * so this returns the cached result from create().
-   */
-  override async read(
-    _config: Partial<IUnitTestConfig>,
-    _version: 'active' | 'inactive' = 'active',
-  ): Promise<IUnitTestState | undefined> {
-    if (!this.lastResultResponse) {
-      return undefined;
-    }
-    return {
-      runId: LEGACY_SYNC_RUN_ID,
-      runStatus: this.lastStatusResponse?.data,
-      runResult: this.lastResultResponse.data,
-      errors: [],
-    };
   }
 }

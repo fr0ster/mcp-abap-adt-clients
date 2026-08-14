@@ -1,22 +1,22 @@
 /**
- * AdtUnitTest - High-level CRUD operations for Unit Test objects
+ * AdtUnitTest — managing a class's tests, and running them.
  *
- * Implements IAdtObject interface with automatic operation chains,
- * error handling, and resource cleanup.
+ * Two different things, and until 12.0.0 they shared one method: `create`
+ * meant "start a run", which is why `update` and `delete` looked like
+ * capabilities ADT withheld. They are not — the tests live in a class's
+ * `testclasses` include, and `AdtLocalTestClass` has written them all along.
  *
- * Uses low-level functions directly (not Builder classes).
+ * | method | subject |
+ * |---|---|
+ * | `create` | the container class **and** its include — POST the class, activate it, PUT the tests in |
+ * | `read`/`update`/`delete`/`validate` | the include of a class that already exists |
+ * | `lock`/`unlock` | the container class, which is what ADT locks |
+ * | `run` | a run, any number of times, needing no CRUD call at all |
  *
- * Session management:
- * - No stateful needed for unit test operations
- * - Unit tests don't use lock/unlock
- *
- * Operation chains:
- * - Create: create (start test run)
- * - Read: read (get test run status/result)
- * - Update: not supported (test runs cannot be updated)
- * - Delete: not supported (test runs cannot be deleted)
- * - Activate: not supported (test runs are not activated)
- * - Check: not supported (test runs don't have check operation)
+ * The container need not be the class under test: tests can live in a separate
+ * class written for the purpose, which is what the CDS flavour does because a
+ * view cannot hold a test class. So `className` here names the container; the
+ * class under test appears only inside the ABAP source of the tests.
  */
 
 import {
@@ -25,13 +25,17 @@ import {
   type HttpError,
   type IAbapConnection,
   type IAdtCreatable,
+  type IAdtDeletable,
+  type IAdtLockable,
   type IAdtOperationOptions,
   type IAdtReadable,
   type IAdtResponse,
-  type IAdtTestRunnable,
+  type IAdtRunnable,
+  type IAdtUpdatable,
   type IAdtValidatable,
   type ILogger,
-  type IObjectVersion,
+  type ITestRunInformation,
+  type IUnitTestResultOptions,
 } from '@mcp-abap-adt/interfaces';
 import {
   headerValueToString,
@@ -39,7 +43,6 @@ import {
 } from '../../utils/internalUtils';
 import { AdtClass, AdtLocalTestClass } from '../class';
 import { getClassUnitTestResult, getClassUnitTestStatus } from '../class/run';
-import { throwUnsupportedVersions } from '../shared/versions';
 import { startClassUnitTestRun } from './run';
 import type {
   IClassUnitTestDefinition,
@@ -47,31 +50,26 @@ import type {
   IUnitTestConfig,
   IUnitTestState,
 } from './types';
-/**
- * A test run is created, read and validated — never edited. ADT exposes no
- * update, delete, activate, check, lock or version resource for one, so the
- * class declares only the capabilities it honours. The refusing methods below
- * are kept so an existing caller still gets a clear runtime error rather than
- * `undefined is not a function`, but they are no longer part of the contract.
- */
+
 export class AdtUnitTest
   implements
     IAdtCreatable<IUnitTestConfig, IUnitTestState>,
     IAdtReadable<IUnitTestConfig, IUnitTestState>,
+    IAdtUpdatable<IUnitTestConfig, IUnitTestState>,
+    IAdtDeletable<IUnitTestConfig, IUnitTestState>,
     IAdtValidatable<IUnitTestConfig, IUnitTestState>,
-    IAdtTestRunnable
+    IAdtLockable<IUnitTestConfig, IUnitTestState>,
+    IAdtRunnable<IClassUnitTestDefinition[], string, IClassUnitTestRunOptions>,
+    ITestRunInformation
 {
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
   public readonly objectType: string = 'UnitTest';
 
-  // Internal state for convenience methods
   protected lastRunId?: string;
   protected lastStatusResponse?: IAdtResponse;
   protected lastResultResponse?: IAdtResponse;
-  protected state: IUnitTestState = { errors: [] };
 
-  // AdtClass and AdtLocalTestClass for working with test classes
   protected adtClass: AdtClass;
   protected adtLocalTestClass: AdtLocalTestClass;
 
@@ -83,170 +81,120 @@ export class AdtUnitTest
   }
 
   /**
-   * Validate unit test configuration before running.
+   * Validate before writing.
    *
-   * A test run does not create the container class — it already exists, so
-   * `validateClassName` (a name check for an object that does not exist yet)
-   * would be meaningless against it. Instead this confirms every container is
-   * actually there, the same way a caller would find out by trying to read
-   * it: `containerClass` on each entry of `config.tests` is the real ADT
-   * object (CLAS/OC); `tests[].testClass` is only the *name* of the local
-   * test class nested inside it, not its code.
-   *
-   * `create()` serialises every entry of `config.tests` into the run request
-   * (see `startClassUnitTestRun`), so checking only the first container would
-   * report success for a run that will in fact reference a missing one —
-   * validate() must check every unique container the run names, not just the
-   * first. Duplicates collapse to one check each: a run naming the same class
-   * three times should not cost three requests.
-   *
-   * `IUnitTestConfig` carries no field for the local test class's source, so
-   * `checkClassLocalTestClass` (available via `this.adtLocalTestClass`, same
-   * as `AdtLocalTestClass.validate()` uses it) cannot be wired in here —
-   * there is nothing to check. See task-3-report.md for the reasoning.
+   * Two halves, and which apply depends on what is about to be born. The
+   * container class is validated by name only when it does not exist yet —
+   * `validateClassName` takes a package and a description, parameters that mean
+   * nothing for an object already in the system. The test source is checked
+   * whenever there is source to check.
    */
   async validate(config: Partial<IUnitTestConfig>): Promise<IUnitTestState> {
-    if (!config.tests || config.tests.length === 0) {
-      throw new Error(
-        'At least one test definition is required for validation',
-      );
+    if (!config.className) {
+      throw new Error('Container class name is required for validation');
     }
 
-    const containerClasses = [
-      ...new Set(config.tests.map((test) => test.containerClass)),
-    ];
+    const state: IUnitTestState = { errors: [] };
 
-    let validationResponse: IUnitTestState['validationResponse'];
-    for (const containerClass of containerClasses) {
-      const containerState = await this.adtClass.read({
-        className: containerClass,
+    const container = await this.adtClass
+      .read({ className: config.className })
+      .catch(() => undefined);
+
+    if (!container) {
+      // Nothing to test against yet: this is the create path, so the name is
+      // genuinely new and gets the pre-creation check.
+      const nameState = await this.adtClass.validate({
+        className: config.className,
+        packageName: config.packageName,
+        description: config.description,
       });
-
-      if (!containerState) {
-        const notFound = new AdtOperationError(
-          `Container class '${containerClass}' does not exist`,
-        );
-        notFound.code = AdtObjectErrorCodes.OBJECT_NOT_FOUND;
-        notFound.status = 404;
-        throw notFound;
-      }
-
-      validationResponse = containerState.readResult;
+      state.validationResponse = nameState.validationResponse;
+    } else {
+      state.readResult = container.readResult;
     }
 
-    return {
-      validationResponse,
-      errors: [],
-    };
+    if (config.testClassSource !== undefined) {
+      const codeState = await this.adtLocalTestClass.validate({
+        className: config.className,
+        testClassCode: config.testClassSource,
+      });
+      state.checkResult = codeState.validationResponse;
+    }
+
+    return state;
   }
 
   /**
-   * Create unit test run (start test execution)
+   * Create the tests: the container class first, then the tests inside it.
+   *
+   * A POST brings the class into existence, activation makes it real, and the
+   * include is written under the class's lock. `AdtCdsUnitTest` is this same
+   * chain with a view check in front of it.
    */
   async create(
     config: IUnitTestConfig,
-    _options?: IAdtOperationOptions,
+    options?: IAdtOperationOptions,
   ): Promise<IUnitTestState> {
-    if (!config.tests || config.tests.length === 0) {
-      throw new Error('At least one test definition is required');
+    if (!config.className) {
+      throw new Error('Container class name is required');
+    }
+    if (config.testClassSource === undefined) {
+      throw new Error('Test class source is required');
     }
 
+    const state: IUnitTestState = { errors: [] };
+
     try {
-      this.logger?.info?.('Starting unit test run');
-      const response = await startClassUnitTestRun(
-        this.connection,
-        config.tests,
-        config.options,
+      this.logger?.info?.('Step 1: Creating container class', config.className);
+      const createState = await this.adtClass.create({
+        className: config.className,
+        packageName: config.packageName as string,
+        description: config.description ?? `Unit tests ${config.className}`,
+        classTemplate: config.classTemplate,
+        transportRequest: config.transportRequest,
+      });
+      state.createResult = createState.createResult;
+
+      this.logger?.info?.('Step 2: Activating container class');
+      const activateState = await this.adtClass.activate({
+        className: config.className,
+      });
+      state.activateResult = activateState.activateResult;
+
+      this.logger?.info?.('Step 3: Writing tests into the class');
+      const writeState = await this.adtLocalTestClass.update(
+        {
+          className: config.className,
+          testClassCode: config.testClassSource,
+          transportRequest: config.transportRequest,
+        },
+        { activateOnUpdate: options?.activateOnCreate ?? true },
       );
+      state.updateResult = writeState.updateResult;
 
-      // Log response for debugging
-      this.logger?.debug?.('Unit test run response status:', response.status);
-      this.logger?.debug?.(
-        'Unit test run response data type:',
-        typeof response.data,
-      );
-      if (typeof response.data === 'string') {
-        this.logger?.debug?.(
-          'Unit test run response data (first 500 chars):',
-          response.data.substring(0, 500),
-        );
-      } else {
-        this.logger?.debug?.(
-          'Unit test run response data:',
-          JSON.stringify(response.data),
-        );
-      }
-
-      // Extract run ID from response
-      // Response format: XML with aunit:run element containing uri attribute
-      const runId = this.extractRunId(response);
-
-      if (!runId) {
-        this.logger?.error?.(
-          'Failed to extract run ID from response. Response data:',
-          response.data,
-        );
-        throw new Error('Failed to start unit test run: run ID not returned');
-      }
-
-      this.logger?.info?.('Unit test run started, run ID:', runId);
-      this.lastRunId = runId;
-      this.state.runId = runId;
-
-      return {
-        createResult: response,
-        runId,
-        errors: [],
-      };
+      return state;
     } catch (error: unknown) {
       this.logger?.error('Create failed:', safeErrorMessage(error));
       throw error;
     }
   }
 
-  /**
-   * Read unit test run (get status or result)
-   */
+  /** Read the tests — the whole `testclasses` include of the container class. */
   async read(
     config: Partial<IUnitTestConfig>,
-    _version: 'active' | 'inactive' = 'active',
+    version: 'active' | 'inactive' = 'active',
   ): Promise<IUnitTestState | undefined> {
-    if (!config.runId) {
-      throw new Error('Test run ID is required');
+    if (!config.className) {
+      throw new Error('Container class name is required');
     }
 
     try {
-      // Read status
-      const statusResponse = await getClassUnitTestStatus(
-        this.connection,
-        config.runId,
-        true, // withLongPolling
+      const state = await this.adtLocalTestClass.read(
+        { className: config.className },
+        version,
       );
-
-      // Read result if available
-      let resultResponse: IAdtResponse | undefined;
-      try {
-        resultResponse = await getClassUnitTestResult(
-          this.connection,
-          config.runId,
-        );
-        this.lastResultResponse = resultResponse;
-      } catch (_error) {
-        // Result might not be available yet
-        this.logger?.info?.('Test result not available yet');
-      }
-
-      this.lastStatusResponse = statusResponse;
-      this.state.runId = config.runId;
-      this.state.runStatus = statusResponse.data;
-      this.state.runResult = resultResponse?.data;
-
-      return {
-        runId: config.runId,
-        runStatus: statusResponse.data,
-        runResult: resultResponse?.data,
-        errors: [],
-      };
+      if (!state) return undefined;
+      return { readResult: state.readResult, errors: [] };
     } catch (error: unknown) {
       const e = error as HttpError;
       if (e.response?.status === 404) {
@@ -256,92 +204,133 @@ export class AdtUnitTest
     }
   }
 
-  /**
-   * Read unit test metadata
-   * For unit tests, metadata is the same as read() result (status/result information)
-   */
+  /** Metadata of the container class — an include carries none of its own. */
   async readMetadata(
     config: Partial<IUnitTestConfig>,
   ): Promise<IUnitTestState> {
-    // For unit tests, metadata is the same as read() result
-    const readResult = await this.read(config);
-    if (!readResult) {
-      throw new Error('Unit test run not found');
+    if (!config.className) {
+      throw new Error('Container class name is required');
     }
-    return readResult;
+    const state = await this.adtLocalTestClass.readMetadata({
+      className: config.className,
+    });
+    return { metadataResult: state.metadataResult, errors: [] };
   }
 
   /**
-   * Update unit test run
-   * Note: Test runs cannot be updated
+   * Replace the tests in a class that already exists.
+   *
+   * `options.lockHandle` writes inside a lock the caller already holds, which is
+   * the point of having both this and {@link create}: the container's lock is
+   * taken once and a caller can update the class and its tests in one window.
    */
   async update(
-    _config: Partial<IUnitTestConfig>,
-    _options?: IAdtOperationOptions,
+    config: Partial<IUnitTestConfig>,
+    options?: IAdtOperationOptions,
   ): Promise<IUnitTestState> {
-    throw new Error(
-      'Update operation is not supported for Unit Test objects in ADT',
+    if (!config.className) {
+      throw new Error('Container class name is required');
+    }
+    if (config.testClassSource === undefined && !options?.sourceCode) {
+      throw new Error('Test class source is required');
+    }
+
+    const state = await this.adtLocalTestClass.update(
+      {
+        className: config.className,
+        testClassCode: config.testClassSource,
+        transportRequest: config.transportRequest,
+      },
+      options,
     );
+    return { updateResult: state.updateResult, errors: [] };
   }
 
   /**
-   * Delete unit test run
-   * Note: Test runs cannot be deleted via ADT
+   * Remove the tests by writing an empty include.
+   *
+   * This deletes no ADT object: the container class stays, and every local test
+   * class in the include goes, because the include is what ADT addresses.
    */
-  async delete(_config: Partial<IUnitTestConfig>): Promise<IUnitTestState> {
-    throw new Error(
-      'Delete operation is not supported for Unit Test objects in ADT',
-    );
+  async delete(config: Partial<IUnitTestConfig>): Promise<IUnitTestState> {
+    if (!config.className) {
+      throw new Error('Container class name is required');
+    }
+    const state = await this.adtLocalTestClass.delete({
+      className: config.className,
+      transportRequest: config.transportRequest,
+    });
+    return { updateResult: state.updateResult, errors: [] };
   }
 
-  /**
-   * Activate unit test run
-   * Note: Test runs are not activated
-   */
-  async activate(_config: Partial<IUnitTestConfig>): Promise<IUnitTestState> {
-    throw new Error(
-      'Activate operation is not supported for Unit Test objects in ADT',
-    );
+  /** Lock the container class — an include has no lock of its own. */
+  async lock(config: Partial<IUnitTestConfig>): Promise<string> {
+    if (!config.className) {
+      throw new Error('Container class name is required');
+    }
+    return await this.adtLocalTestClass.lock({ className: config.className });
   }
 
-  /**
-   * Check unit test run
-   * Note: Test runs don't have check operation
-   */
-  async check(
-    _config: Partial<IUnitTestConfig>,
-    _status?: string,
+  /** Unlock the container class. */
+  async unlock(
+    config: Partial<IUnitTestConfig>,
+    lockHandle: string,
   ): Promise<IUnitTestState> {
-    throw new Error(
-      'Check operation is not supported for Unit Test objects in ADT',
+    if (!config.className) {
+      throw new Error('Container class name is required');
+    }
+    await this.adtLocalTestClass.unlock(
+      { className: config.className },
+      lockHandle,
     );
+    return { errors: [] };
   }
 
   /**
-   * Run unit tests (convenience method that wraps create)
+   * Run the tests, and return the run's id.
+   *
+   * Needs no `create` and no `update`: the tests may have been in the class for
+   * years. Ask about the run through {@link getStatus} and {@link getResult}.
    */
   async run(
     tests: IClassUnitTestDefinition[],
     options?: IClassUnitTestRunOptions,
   ): Promise<string> {
-    const result = await this.create({
+    if (!tests || tests.length === 0) {
+      throw new Error('At least one test definition is required');
+    }
+
+    this.logger?.info?.('Starting unit test run');
+    const response = await startClassUnitTestRun(
+      this.connection,
       tests,
       options,
-    });
-    this.lastRunId = result.runId;
-    return result.runId as string;
+    );
+
+    const runId = this.extractRunId(response);
+    if (!runId) {
+      this.logger?.error?.(
+        'Failed to extract run ID from response. Response data:',
+        response.data,
+      );
+      const failed = new AdtOperationError(
+        'Failed to start unit test run: run ID not returned',
+      );
+      failed.code = AdtObjectErrorCodes.CREATE_FAILED;
+      throw failed;
+    }
+
+    this.logger?.info?.('Unit test run started, run ID:', runId);
+    this.lastRunId = runId;
+    return runId;
   }
 
-  /**
-   * Get run ID from last operation
-   */
+  /** Run id of the most recent {@link run}, if one has been started here. */
   getRunId(): string | undefined {
     return this.lastRunId;
   }
 
-  /**
-   * Get unit test status (convenience method)
-   */
+  /** Poll a run. */
   async getStatus(
     runId: string,
     withLongPolling: boolean = true,
@@ -355,19 +344,15 @@ export class AdtUnitTest
     return response;
   }
 
-  /**
-   * Get status response from last getStatus call
-   */
+  /** Response of the most recent {@link getStatus}, if one has been made. */
   getStatusResponse(): IAdtResponse | undefined {
     return this.lastStatusResponse;
   }
 
-  /**
-   * Get unit test result (convenience method)
-   */
+  /** Fetch the result document of a finished run. */
   async getResult(
     runId: string,
-    options?: { withNavigationUris?: boolean; format?: 'abapunit' | 'junit' },
+    options?: IUnitTestResultOptions,
   ): Promise<IAdtResponse> {
     const response = await getClassUnitTestResult(
       this.connection,
@@ -378,9 +363,7 @@ export class AdtUnitTest
     return response;
   }
 
-  /**
-   * Get result response from last getResult call
-   */
+  /** Response of the most recent {@link getResult}, if one has been made. */
   getResultResponse(): IAdtResponse | undefined {
     return this.lastResultResponse;
   }
@@ -406,72 +389,26 @@ export class AdtUnitTest
     // URI format: /sap/bc/adt/abapunit/runs/{runId}
     const data = response.data;
     if (typeof data === 'string') {
-      // Parse XML to extract URI
       const uriMatch = data.match(/uri="([^"]+)"/);
       if (uriMatch) {
-        const uri = uriMatch[1];
-        const runIdMatch = uri.match(/\/runs\/([^/]+)/);
+        const runIdMatch = uriMatch[1].match(/\/runs\/([^/]+)/);
         if (runIdMatch) {
           return runIdMatch[1];
         }
       }
-      // Try alternative XML format
       const runMatch = data.match(/<aunit:run[^>]*uri="([^"]+)"/);
       if (runMatch) {
-        const uri = runMatch[1];
-        const runIdMatch = uri.match(/\/runs\/([^/]+)/);
+        const runIdMatch = runMatch[1].match(/\/runs\/([^/]+)/);
         if (runIdMatch) {
           return runIdMatch[1];
         }
       }
     } else if (data?.uri) {
-      const uri = data.uri;
-      const runIdMatch = uri.match(/\/runs\/([^/]+)/);
+      const runIdMatch = data.uri.match(/\/runs\/([^/]+)/);
       if (runIdMatch) {
         return runIdMatch[1];
       }
     }
     return undefined;
-  }
-
-  /**
-   * Read transport request information for unit test
-   * Note: Unit tests are test runs, not ADT objects, so they don't have transport requests
-   */
-  async readTransport(
-    _config: Partial<IUnitTestConfig>,
-  ): Promise<IUnitTestState> {
-    // Unit tests are test runs, not ADT objects, so they don't have transport requests
-    // Return empty state
-    return {
-      errors: [],
-    };
-  }
-
-  /**
-   * Lock unit test (not supported)
-   */
-  async lock(_config: Partial<IUnitTestConfig>): Promise<string> {
-    throw new Error('Lock operation is not supported for unit tests');
-  }
-
-  /**
-   * Unlock unit test (not supported)
-   */
-  async unlock(
-    _config: Partial<IUnitTestConfig>,
-    _lockHandle: string,
-  ): Promise<IUnitTestState> {
-    throw new Error('Unlock operation is not supported for unit tests');
-  }
-
-  async getVersions(
-    _config: Partial<IUnitTestConfig>,
-  ): Promise<IObjectVersion[]> {
-    throwUnsupportedVersions('unit test');
-  }
-
-  async getVersionSource(_contentUri: string): Promise<string> {
-    throwUnsupportedVersions('unit test');
   }
 }

@@ -16,24 +16,29 @@
 import type {
   IAbapConnection,
   IAdtActivatable,
-  IAdtCdsTestRunnable,
   IAdtCheckable,
   IAdtClientOptions,
   IAdtContentTypes,
   IAdtCreatable,
   IAdtCrud,
+  IAdtDeletable,
   IAdtLockable,
   IAdtModifiable,
   IAdtObject,
   IAdtReadable,
+  IAdtRunnable,
   IAdtSourceObject,
   IAdtSystemContext,
-  IAdtTestRunnable,
   IAdtTransportAware,
+  IAdtUpdatable,
   IAdtValidatable,
   IAdtVersionable,
+  ICdsTestDoubleCheckable,
+  IClassUnitTestDefinition,
+  IClassUnitTestRunOptions,
   ILogger,
   ISessionLifecycleAware,
+  ITestRunInformation,
 } from '@mcp-abap-adt/interfaces';
 import { ADT_SESSION_ERROR } from '@mcp-abap-adt/interfaces';
 import {
@@ -812,8 +817,12 @@ export class AdtClient {
    */
   getUnitTest(): IAdtCreatable<IUnitTestConfig, IUnitTestState> &
     IAdtReadable<IUnitTestConfig, IUnitTestState> &
+    IAdtUpdatable<IUnitTestConfig, IUnitTestState> &
+    IAdtDeletable<IUnitTestConfig, IUnitTestState> &
     IAdtValidatable<IUnitTestConfig, IUnitTestState> &
-    IAdtTestRunnable {
+    IAdtLockable<IUnitTestConfig, IUnitTestState> &
+    IAdtRunnable<IClassUnitTestDefinition[], string, IClassUnitTestRunOptions> &
+    ITestRunInformation {
     this.assertConnected();
     return new AdtUnitTest(this.connection, this.logger);
   }
@@ -826,8 +835,17 @@ export class AdtClient {
    */
   getCdsUnitTest(): IAdtCreatable<ICdsUnitTestConfig, ICdsUnitTestState> &
     IAdtReadable<ICdsUnitTestConfig, ICdsUnitTestState> &
+    IAdtUpdatable<ICdsUnitTestConfig, ICdsUnitTestState> &
+    IAdtDeletable<ICdsUnitTestConfig, ICdsUnitTestState> &
     IAdtValidatable<ICdsUnitTestConfig, ICdsUnitTestState> &
-    IAdtCdsTestRunnable {
+    IAdtLockable<ICdsUnitTestConfig, ICdsUnitTestState> &
+    IAdtRunnable<
+      IClassUnitTestDefinition[] | string,
+      string,
+      IClassUnitTestRunOptions
+    > &
+    ITestRunInformation &
+    ICdsTestDoubleCheckable {
     this.assertConnected();
     return new AdtCdsUnitTest(this.connection, this.logger);
   }

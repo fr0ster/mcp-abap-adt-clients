@@ -99,16 +99,19 @@ export class AdtLocalTestClass extends AdtClassMemberBase {
     if (!config.className) {
       throw new Error('Class name is required');
     }
-    if (!config.testClassCode) {
+    // An empty string is source: writing it is how a test class is removed
+    // (see delete()). Only its absence is an error, so this asks whether the
+    // caller gave source at all rather than whether the source is truthy.
+    if (
+      config.testClassCode === undefined &&
+      options?.sourceCode === undefined
+    ) {
       throw new Error('Test class code is required');
     }
 
     // Low-level mode: if lockHandle is provided, perform only update operation
     if (options?.lockHandle) {
-      const codeToUpdate = options?.sourceCode || config.testClassCode;
-      if (!codeToUpdate) {
-        throw new Error('Test class code is required for update');
-      }
+      const codeToUpdate = options?.sourceCode ?? config.testClassCode ?? '';
 
       this.logger?.info?.(
         'Low-level update: performing update only (lockHandle provided)',
@@ -141,9 +144,10 @@ export class AdtLocalTestClass extends AdtClassMemberBase {
       state.lockHandle = parentLockHandle;
       this.logger?.info?.('Parent class locked, handle:', parentLockHandle);
 
-      // 2. Check test class code
-      const codeToCheck = options?.sourceCode || config.testClassCode;
-      if (codeToCheck) {
+      // 2. Check test class code. Empty source is a deletion — there is nothing
+      // to syntax-check, and ADT rejects an empty body on the check resource.
+      const codeToCheck = options?.sourceCode ?? config.testClassCode ?? '';
+      if (codeToCheck !== '') {
         this.logger?.info?.('Step 2: Checking test class code');
         const checkResponse = await checkClassLocalTestClass(
           this.connection,
@@ -161,7 +165,7 @@ export class AdtLocalTestClass extends AdtClassMemberBase {
       const updateResponse = await updateClassTestInclude(
         this.connection,
         config.className,
-        codeToCheck as string,
+        codeToCheck,
         parentLockHandle,
         config.transportRequest,
         this.contentTypes?.sourceArtifactContentType(),

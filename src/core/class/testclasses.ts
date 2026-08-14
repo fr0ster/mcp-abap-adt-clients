@@ -20,7 +20,9 @@ export async function updateClassTestInclude(
   transportRequest?: string,
   sourceContentType?: string,
 ): Promise<IAdtResponse> {
-  if (!testClassSource) {
+  // Empty source is legitimate: PUTting it is how a test class is deleted.
+  // Only a missing argument is an error.
+  if (testClassSource === undefined || testClassSource === null) {
     throw new Error('Test class source code is required');
   }
 
