@@ -26,10 +26,15 @@ import { assertDeletable } from '../../utils/deletionCheck';
 import type {
   HttpError,
   IAbapConnection,
+  IAdtActivatable,
+  IAdtCheckable,
   IAdtContentTypes,
-  IAdtNonVersionedObject,
+  IAdtCrud,
+  IAdtLockable,
   IAdtOperationOptions,
   IAdtSystemContext,
+  IAdtTransportAware,
+  IAdtValidatable,
   ILogger,
   IObjectVersion,
 } from '@mcp-abap-adt/interfaces';
@@ -40,7 +45,6 @@ import {
   type LockTracker,
 } from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
-import { throwUnsupportedVersions } from '../shared/versions';
 import { activateFunctionGroup } from './activation';
 import { checkFunctionGroup } from './check';
 import { create as createFunctionGroup } from './create';
@@ -51,7 +55,13 @@ import type { IFunctionGroupConfig, IFunctionGroupState } from './types';
 import { updateFunctionGroup } from './update';
 import { validateFunctionGroupName } from './validation';
 export class AdtFunctionGroup
-  implements IAdtNonVersionedObject<IFunctionGroupConfig, IFunctionGroupState>
+  implements
+    IAdtCrud<IFunctionGroupConfig, IFunctionGroupState>,
+    IAdtValidatable<IFunctionGroupConfig, IFunctionGroupState>,
+    IAdtCheckable<IFunctionGroupConfig, IFunctionGroupState>,
+    IAdtActivatable<IFunctionGroupConfig, IFunctionGroupState>,
+    IAdtLockable<IFunctionGroupConfig, IFunctionGroupState>,
+    IAdtTransportAware<IFunctionGroupConfig, IFunctionGroupState>
 {
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
@@ -783,17 +793,5 @@ export class AdtFunctionGroup
       unlockResult: result,
       errors: [],
     };
-  }
-
-  /** @deprecated Not part of this handler's capability set; throws. Removed in a later major. */
-  async getVersions(
-    _config: Partial<IFunctionGroupConfig>,
-  ): Promise<IObjectVersion[]> {
-    throwUnsupportedVersions('function group');
-  }
-
-  /** @deprecated Not part of this handler's capability set; throws. Removed in a later major. */
-  async getVersionSource(_contentUri: string): Promise<string> {
-    throwUnsupportedVersions('function group');
   }
 }

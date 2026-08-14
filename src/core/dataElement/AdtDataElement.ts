@@ -23,9 +23,14 @@ import { assertDeletable } from '../../utils/deletionCheck';
 import type {
   HttpError,
   IAbapConnection,
-  IAdtNonVersionedObject,
+  IAdtActivatable,
+  IAdtCheckable,
+  IAdtCrud,
+  IAdtLockable,
   IAdtOperationOptions,
   IAdtSystemContext,
+  IAdtTransportAware,
+  IAdtValidatable,
   ILogger,
   IObjectVersion,
 } from '@mcp-abap-adt/interfaces';
@@ -36,7 +41,6 @@ import {
   type LockTracker,
 } from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
-import { throwUnsupportedVersions } from '../shared/versions';
 import { activateDataElement } from './activation';
 import { checkDataElement } from './check';
 import { create as createDataElement } from './create';
@@ -48,7 +52,13 @@ import { unlockDataElement } from './unlock';
 import { updateDataElement } from './update';
 import { validateDataElementName } from './validation';
 export class AdtDataElement
-  implements IAdtNonVersionedObject<IDataElementConfig, IDataElementState>
+  implements
+    IAdtCrud<IDataElementConfig, IDataElementState>,
+    IAdtValidatable<IDataElementConfig, IDataElementState>,
+    IAdtCheckable<IDataElementConfig, IDataElementState>,
+    IAdtActivatable<IDataElementConfig, IDataElementState>,
+    IAdtLockable<IDataElementConfig, IDataElementState>,
+    IAdtTransportAware<IDataElementConfig, IDataElementState>
 {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
@@ -709,17 +719,5 @@ export class AdtDataElement
       unlockResult: result,
       errors: [],
     };
-  }
-
-  /** @deprecated Not part of this handler's capability set; throws. Removed in a later major. */
-  async getVersions(
-    _config: Partial<IDataElementConfig>,
-  ): Promise<IObjectVersion[]> {
-    throwUnsupportedVersions('data element');
-  }
-
-  /** @deprecated Not part of this handler's capability set; throws. Removed in a later major. */
-  async getVersionSource(_contentUri: string): Promise<string> {
-    throwUnsupportedVersions('data element');
   }
 }

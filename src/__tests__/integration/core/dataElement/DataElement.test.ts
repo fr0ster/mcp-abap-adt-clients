@@ -375,7 +375,7 @@ describe('DataElement (using AdtClient)', () => {
 
         // Create BaseTester instance
         const tester = new BaseTester(
-          // getDataElement() is narrowed to IAdtNonVersionedObject (no
+          // getDataElement() declares no IAdtVersionable (no
           // getVersions/getVersionSource); BaseTester's generic type still
           // requires the full interface — cast through it.
           client.getDataElement() as unknown as IAdtObject<
@@ -474,7 +474,7 @@ describe('DataElement (using AdtClient)', () => {
         try {
           // Create BaseTester instance
           const tester = new BaseTester(
-            // getDataElement() is narrowed to IAdtNonVersionedObject (no
+            // getDataElement() declares no IAdtVersionable (no
             // getVersions/getVersionSource); cast through the full interface.
             client.getDataElement() as unknown as IAdtObject<
               IDataElementConfig,

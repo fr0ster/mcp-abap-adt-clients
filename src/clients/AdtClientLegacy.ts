@@ -15,12 +15,12 @@
 
 import type {
   IAbapConnection,
+  IAdtActivatable,
   IAdtCheckable,
   IAdtClientOptions,
   IAdtCreatable,
   IAdtCrud,
   IAdtLockable,
-  IAdtNonVersionedObject,
   IAdtObject,
   IAdtReadable,
   IAdtSourceObject,
@@ -113,10 +113,15 @@ export class AdtClientLegacy extends AdtClient {
     );
   }
 
-  override getFunctionGroup(): IAdtNonVersionedObject<
+  override getFunctionGroup(): IAdtCrud<
     IFunctionGroupConfig,
     IFunctionGroupState
-  > {
+  > &
+    IAdtValidatable<IFunctionGroupConfig, IFunctionGroupState> &
+    IAdtCheckable<IFunctionGroupConfig, IFunctionGroupState> &
+    IAdtActivatable<IFunctionGroupConfig, IFunctionGroupState> &
+    IAdtLockable<IFunctionGroupConfig, IFunctionGroupState> &
+    IAdtTransportAware<IFunctionGroupConfig, IFunctionGroupState> {
     return new AdtFunctionGroupLegacy(
       this.connection,
       this.logger,

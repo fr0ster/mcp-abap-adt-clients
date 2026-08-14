@@ -24,7 +24,6 @@ import type {
   IAdtCrud,
   IAdtLockable,
   IAdtModifiable,
-  IAdtNonVersionedObject,
   IAdtObject,
   IAdtReadable,
   IAdtSourceObject,
@@ -390,10 +389,12 @@ export class AdtClient {
    * Get high-level operations for DataElement objects
    * @returns IAdtObject instance for DataElement operations
    */
-  getDataElement(): IAdtNonVersionedObject<
-    IDataElementConfig,
-    IDataElementState
-  > {
+  getDataElement(): IAdtCrud<IDataElementConfig, IDataElementState> &
+    IAdtValidatable<IDataElementConfig, IDataElementState> &
+    IAdtCheckable<IDataElementConfig, IDataElementState> &
+    IAdtActivatable<IDataElementConfig, IDataElementState> &
+    IAdtLockable<IDataElementConfig, IDataElementState> &
+    IAdtTransportAware<IDataElementConfig, IDataElementState> {
     this.assertConnected();
     return new AdtDataElement(
       this.connection,
@@ -487,10 +488,12 @@ export class AdtClient {
    * Get high-level operations for FunctionGroup objects
    * @returns IAdtObject instance for FunctionGroup operations
    */
-  getFunctionGroup(): IAdtNonVersionedObject<
-    IFunctionGroupConfig,
-    IFunctionGroupState
-  > {
+  getFunctionGroup(): IAdtCrud<IFunctionGroupConfig, IFunctionGroupState> &
+    IAdtValidatable<IFunctionGroupConfig, IFunctionGroupState> &
+    IAdtCheckable<IFunctionGroupConfig, IFunctionGroupState> &
+    IAdtActivatable<IFunctionGroupConfig, IFunctionGroupState> &
+    IAdtLockable<IFunctionGroupConfig, IFunctionGroupState> &
+    IAdtTransportAware<IFunctionGroupConfig, IFunctionGroupState> {
     this.assertConnected();
     return new AdtFunctionGroup(
       this.connection,
