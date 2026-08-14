@@ -37,7 +37,7 @@ Per task:
 | 6a take interfaces 15.0.0 | **next** |
 | 7 five handlers lose `create()` — an include is not created | open |
 | 8 narrow the ten handlers | open |
-| 8a `IUnitTestConfig` describes a test class — interfaces major | open |
+| 8a `IUnitTestConfig` describes the testclasses include — interfaces major | open |
 | 8b `AdtUnitTest`'s CRUD half | open |
 | 8c delete unit testing's seven absent methods | open |
 | 9 the guard | open |
@@ -444,13 +444,14 @@ off the current `main`** — Phase A has been merged and released by now, so its
 
 **One release, two packages.** The maintainer's ruling on `unitTest` (spec, "the stubs are a
 symptom of `create()` meaning the wrong thing") makes its `update` and `delete` real rather than
-dead, and that needs a config type describing a **test class** where the current one describes a
-**test run**. So Phase C carries an `interfaces` round-trip in the middle of it: Task 8a changes
+dead, and that needs a config type describing the **testclasses include** where the current one
+describes a **test run**. So Phase C carries an `interfaces` round-trip in the middle of it: Task 8a changes
 that contract and releases it, and the adt-clients work that depends on it waits for npm.
 
-The order below is deliberate. Tasks 7 and 8 touch neither `unitTest` nor the new config, so
-they proceed while 8a is in review and while its release is being published — nothing in the
-phase is blocked on that except 8b.
+The order below is deliberate. Tasks 7 and 8 need neither `unitTest`'s new config nor the new
+interfaces version, so they proceed while 8a is in review and while its release is being
+published — 8b is the only task blocked on it. Task 7 does touch one `unitTest` **test** file,
+which calls `getLocalTestClass().create()`; that is a call site, not a dependency.
 
 ### Task 6a: Take the published interfaces major
 
@@ -517,7 +518,7 @@ describe honestly.
 class that does not exist yet POSTs that class first.
 
 - [ ] **Step 1:** `grep -rn "\.create(" src/__tests__` for calls on these five and move them to
-  `update()`. `src/__tests__/integration/core/unitTest/UnitTest.test.ts:239` is one of them.
+  `update()`. `src/__tests__/integration/core/unitTest/UnitTest.test.ts:238` is one of them.
 - [ ] **Step 2:** delete the five `create` methods and their `IAdtCreatable` declarations.
 - [ ] **Step 3: Narrow the getters.** `getLocalTestClass()`, `getLocalTypes()`,
   `getLocalDefinitions()` and `getLocalMacros()` declare `IAdtSourceObject`, which includes
@@ -680,11 +681,6 @@ boundaries, rewriting one class and PUTting the rest back unchanged. That is a d
 with its own risks, and it is not in this plan. If it is ever wanted, the config gains the field
 back **together with** the code that honours it and a test with two test classes in one include.*
 
-`className` and `testClassSource` are **not new names invented here**: `ICdsUnitTestConfig`,
-which extends this type, already carries both with exactly these meanings — the class that holds
-the tests and the source that goes into it. Aligning the parent lets the CDS config stop
-redeclaring them.
-
 `IUnitTestState`'s `runId`, `runStatus` and `runResult` go the same way and for the same reason:
 after the split, the methods that return a state are the CRUD ones, and none of them produces a
 run.
@@ -705,7 +701,7 @@ run.
 
 ### Task 8b: `AdtUnitTest`'s CRUD half becomes real
 
-**Files:** `src/core/unitTest/AdtUnitTest.ts`, `AdtCdsUnitTest.ts`,
+**Files:** `src/core/unitTest/AdtUnitTest.ts`, `AdtCdsUnitTest.ts`, `AdtUnitTestLegacy.ts`,
 `src/core/unitTest/types.ts`; the tests naming `create` on the handler.
 
 Take the new interfaces version first — `--save`, then the same three resolution checks as Task
@@ -721,8 +717,9 @@ Take the new interfaces version first — `--save`, then the same three resoluti
   config.testClassSource, transportRequest })` — the include only, no class creation. The member
   already exists on the class; this task wires it up, it does not build a second implementation.
 - **`delete(config)`** → `this.adtLocalTestClass.delete(...)`, which is a PUT of empty source.
-  Say so in the doc comment: a caller deleting a test class is not deleting an ADT object.
-- **`read(config)`** → the test class source, via `this.adtLocalTestClass.read(...)`. It no
+  Say so in the doc comment: this empties the include — every test class in it — and deletes no
+  ADT object. The container class stays.
+- **`read(config)`** → the include's source, via `this.adtLocalTestClass.read(...)`. It no
   longer takes a `runId`, and **that is the breaking change a consumer feels most**: polling a
   run moves to `getStatus(runId)`, which has existed since 13.1.0.
 - **`validate(config)`** keeps the container-existence check written in Task 3 and finally wires
@@ -790,7 +787,8 @@ this task (`update` must distinguish "no source given" from "empty source given"
   container class, activates it and PUTs the include. `update()` PUTs the include alone.
 - [ ] **Step 3: Verify** — `npx tsc -p tsconfig.json`, `npm run test:check`, the unit suite.
 - [ ] **Step 4: Commit** with a `BREAKING CHANGE:` footer covering all three: `create` changes
-  subject from a run to the test class, `read` with it, and the config changes shape.
+  subject from a run to the container class and its include, `read` from a run to the include,
+  and the config changes shape.
 
 ### Task 8c: Delete what unit testing genuinely does not have
 
@@ -849,7 +847,7 @@ the contract it receives:
 
 ```ts
 getClass(): IAdtSourceObject<IClassConfig, IClassState>
-getDomain(): IAdtNonVersionedObject<IDomainConfig, IDomainState>   // the composite being deleted
+getDomain(): IAdtCrud<IDomainConfig, IDomainState> & IAdtValidatable<…> & …   // after Task 8
 ```
 
 Checking the class would let a getter keep a wide composite while the class underneath is
@@ -946,8 +944,10 @@ read-modify-write corrupt updates silently, and it would let this guard pass vac
 **Check 3 — behaviour, runtime, driven by the manifest.** For each handler, for each atom it
 claims, assert that atom's semantics against a recording connection. Every method of every
 atom, not one per atom — `readMetadata`, `unlock` and `getVersionSource` are where stubs hid.
-The verbs are invariant. And for `IAdtActivatable` the assertion is **not** merely that a POST
-went out: an error-severity `<msg>` in the response must reach the caller, which is the only
+The verbs are invariant — **one capability may still be several requests**: `AdtUnitTest.create`
+POSTs the container class, activates it and PUTs the include, so the assertion is that the POST
+rule 2 requires is among them, not that exactly one request went out. And for `IAdtActivatable`
+the assertion is **not** merely that a POST went out: an error-severity `<msg>` in the response must reach the caller, which is the only
 check that would have caught `functionGroup`.
 
 - [ ] **Step 1:** write Check 2 first — it is the simplest and immediately lists what the
