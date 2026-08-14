@@ -212,20 +212,22 @@ describe('AdtMessageClass', () => {
     expect(st?.messageClass?.name).toBe('ZT');
   });
 
-  it('activate/check/getVersions/getVersionSource throw UNSUPPORTED', async () => {
+  it('carries no method for what a message class cannot do', () => {
+    // These threw ADT_UNSUPPORTED_OPERATION until they were deleted: a message
+    // class is not activated, has no syntax check, no version history, and
+    // travels in its package's transport rather than carrying one of its own.
     const mc = new AdtMessageClass(
       conn(async () => ({}) as IAdtResponse),
       noopLogger,
     );
-    for (const fn of [
-      () => mc.activate({ name: 'ZT' }),
-      () => mc.check({ name: 'ZT' }),
-      () => mc.getVersions({ name: 'ZT' }),
-      () => mc.getVersionSource('any-uri'),
+    for (const name of [
+      'activate',
+      'check',
+      'getVersions',
+      'getVersionSource',
+      'readTransport',
     ]) {
-      await expect(fn()).rejects.toMatchObject({
-        code: 'ADT_UNSUPPORTED_OPERATION',
-      });
+      expect(name in mc).toBe(false);
     }
   });
 
