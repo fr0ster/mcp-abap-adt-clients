@@ -3,12 +3,7 @@
  */
 
 import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
-import { XMLParser } from 'fast-xml-parser';
-import {
-  ACCEPT_LOCK,
-  ACCEPT_SOURCE,
-  CT_SOURCE,
-} from '../../constants/contentTypes';
+import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
 import { activateObjectInSession } from '../../utils/activationUtils';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -50,66 +45,6 @@ export async function updateClassTestInclude(
     method: 'PUT',
     timeout: getTimeout('default'),
     data: testClassSource,
-    headers,
-  });
-}
-
-export async function lockClassTestClasses(
-  connection: IAbapConnection,
-  className: string,
-): Promise<string> {
-  const encodedName = encodeSapObjectName(className).toLowerCase();
-  const url = `/sap/bc/adt/oo/classes/${encodedName}/includes/testclasses?_action=LOCK&accessMode=MODIFY`;
-
-  const headers = {
-    Accept: ACCEPT_LOCK,
-  };
-
-  const response = await connection.makeAdtRequest({
-    url,
-    method: 'POST',
-    timeout: getTimeout('default'),
-    data: null,
-    headers,
-  });
-
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: '',
-  });
-  const result = parser.parse(response.data);
-  const lockHandle = result?.['asx:abap']?.['asx:values']?.DATA?.LOCK_HANDLE;
-
-  if (!lockHandle) {
-    throw new Error(
-      'Failed to obtain lock handle for test classes. They may already be locked by another user.',
-    );
-  }
-
-  return lockHandle;
-}
-
-export async function unlockClassTestClasses(
-  connection: IAbapConnection,
-  className: string,
-  lockHandle: string,
-): Promise<IAdtResponse> {
-  if (!lockHandle) {
-    throw new Error('lockHandle is required to unlock test classes');
-  }
-
-  const encodedName = encodeSapObjectName(className).toLowerCase();
-  const url = `/sap/bc/adt/oo/classes/${encodedName}/includes/testclasses?_action=UNLOCK&lockHandle=${encodeURIComponent(lockHandle)}`;
-
-  const headers = {
-    'Content-Type': 'application/x-www-form-urlencoded',
-  };
-
-  return connection.makeAdtRequest({
-    url,
-    method: 'POST',
-    timeout: getTimeout('default'),
-    data: null,
     headers,
   });
 }
