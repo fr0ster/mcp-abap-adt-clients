@@ -16,6 +16,35 @@ handler × atom product, and per-atom behaviour tests — that keeps the state t
 approved 2026-08-13 after eight review rounds. **Read it before Task 1** — every number here
 comes from it.
 
+## Status — 2026-08-14
+
+| phase | state |
+|---|---|
+| **A** — behavioural fixes in adt-clients (Tasks 1–4) | **done and released**, adt-clients 11.1.0 (PR #107, `0bef713`) |
+| **B** — the atoms, in interfaces (Tasks 5–6) | **done, released and published**, interfaces 15.0.0 (PR #35, `e22c52c`, `npm view` → 15.0.0) |
+| **C** — narrowing, in adt-clients (Tasks 6a–10) | **not started**; Task 6a is unblocked now that 15.0.0 is on npm |
+
+Per task:
+
+| task | state |
+|---|---|
+| 1 `functionGroup.activate` | done — `b508926` |
+| 2 `transport.update`/`delete` | done — `8baa25d` |
+| 3 `unitTest.validate` | done — `2b17f5a`, corrected in `2c97af3` |
+| 4 release adt-clients 11.1.0 | done — `0bef713` |
+| 5 split `IAdtModifiable`, delete `IAdtNonVersionedObject` | done — `83582ef` |
+| 6 release interfaces 15.0.0 | done — `bf1a9ff`, plus review fixes `2517b03`, `d35f1ab` |
+| 6a take interfaces 15.0.0 | **next** |
+| 7 delete `create()` aliases | **withdrawn** — see the task for why |
+| 8 narrow the ten handlers | open |
+| 8a `IUnitTestConfig` describes a test class — interfaces major | open |
+| 8b `AdtUnitTest`'s CRUD half | open |
+| 8c delete unit testing's seven absent methods | open |
+| 9 the guard | open |
+| 10 release adt-clients — the narrowing | open |
+
+Checkboxes below are ticked for Tasks 1–6 accordingly.
+
 ## Global Constraints
 
 - All repository artifacts in **English**.
@@ -95,7 +124,7 @@ its own implementation and was missed when 10.0.2 fixed the rest.
 This is the defect 10.0.2 removed: `activationExecuted=false` means no work was done, **not**
 failure; only an error-severity `<msg>` is the verdict.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 /**
@@ -168,7 +197,7 @@ describe('function group activation reports what the server said', () => {
 Read the real `IFunctionGroupConfig` for the argument name before writing — `functionGroupName`
 is the expected field but confirm it.
 
-- [ ] **Step 2: Run it, confirm the first case fails**
+- [x] **Step 2: Run it, confirm the first case fails**
 
 ```bash
 MCP_ENV_PATH=/tmp/nonexistent-env npx jest src/__tests__/unit/core/functionGroup 2>&1 | tee unit-run.log
@@ -176,7 +205,7 @@ MCP_ENV_PATH=/tmp/nonexistent-env npx jest src/__tests__/unit/core/functionGroup
 
 Expected: the error-message case fails — today the handler resolves with `errors: []`.
 
-- [ ] **Step 3: Call the shared assert**
+- [x] **Step 3: Call the shared assert**
 
 In `AdtFunctionGroup.ts`, at **all three** call sites of `activateFunctionGroup` (around lines
 221, 565 and 711), pass the response through:
@@ -190,7 +219,7 @@ assertActivationSucceeded('Function group', result.data);
 
 Do not change `activation.ts`'s request — the verb and URL are already right.
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
 
 ```bash
 MCP_ENV_PATH=/tmp/nonexistent-env npx jest src/__tests__/unit 2>&1 | tee unit-run.log
@@ -199,7 +228,7 @@ npm run test:check           # the tests — tsconfig.json excludes src/__tests_
 npm run lint
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/core/functionGroup src/__tests__/unit/core/functionGroup
@@ -224,7 +253,7 @@ The stubs say "immutable after creation" and "cannot be deleted via ADT". Both a
 changes a request's description, and deletes an **empty** request. `AdtPackage` implements both
 against the same server — read `src/core/package/update.ts` and `delete.ts` for the shape.
 
-- [ ] **Step 1: Read the reference implementation**
+- [x] **Step 1: Read the reference implementation**
 
 ```bash
 cat src/core/package/update.ts src/core/package/delete.ts
@@ -235,7 +264,7 @@ The item resource is `/sap/bc/adt/cts/transportrequests/<NUMBER>` and takes
 `application/vnd.sap.adt.transportorganizer.v1+xml` — captured 2026-08-07, and different from
 the collection's type.
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 Assert, against a recording connection:
 
@@ -247,7 +276,7 @@ Assert, against a recording connection:
 - neither touches the collection or the search-configuration endpoint;
 - `update` without a description rejects **before** any request goes out.
 
-- [ ] **Step 3: Implement, following `package`'s shape**
+- [x] **Step 3: Implement, following `package`'s shape**
 
 **Use read-modify-write: GET, patch the description, PUT.** This is decided here rather than
 left to the implementer, because no test in this plan can settle it — a recording mock cannot
@@ -260,9 +289,9 @@ So the test asserts **exactly one GET followed by exactly one PUT**, and the moc
 GET with a realistic transport-request body. If a later SAP run shows a partial PUT is
 accepted, simplifying is cheap; guessing the other way corrupts data.
 
-- [ ] **Step 4: Replace the stubs in `AdtRequest.ts`** and delete the "not supported" messages.
+- [x] **Step 4: Replace the stubs in `AdtRequest.ts`** and delete the "not supported" messages.
 
-- [ ] **Step 5: Verify and commit**
+- [x] **Step 5: Verify and commit**
 
 ```bash
 MCP_ENV_PATH=/tmp/nonexistent-env npx jest src/__tests__/unit 2>&1 | tee unit-run.log
@@ -295,14 +324,14 @@ the test code is checked; `validateClassName` — a name check for an object tha
 yet — would be meaningless against a class that is already there. `AdtCdsUnitTest` does create a
 global dummy class, so that name *is* validated, and it needs its own override.
 
-- [ ] **Step 1: Write the failing test** — `validate` issues a request and reports what came
+- [x] **Step 1: Write the failing test** — `validate` issues a request and reports what came
   back; a container that is not there produces errors rather than an empty success.
 
-- [ ] **Step 2: Implement it from the existing checks** — `AdtClass.read` for the container,
+- [x] **Step 2: Implement it from the existing checks** — `AdtClass.read` for the container,
   `checkClassLocalTestClass` via `this.adtLocalTestClass` for the code, `validateClassName` for
   the CDS dummy class. Delete nothing, and write no new low-level function.
 
-- [ ] **Step 3: Verify and commit**
+- [x] **Step 3: Verify and commit**
 
 ```bash
 git commit -m "fix(unitTest): validate what is actually created
@@ -320,16 +349,16 @@ too, so that name is validated before creating it."
 **Additive, so a minor.** Three handlers get behavioural fixes across four methods; nothing is removed
 and no type changes. The deletions that would have forced a major moved to Phase C.
 
-- [ ] **Step 1: Ask the user for the version.** State the assessment: additive, so a minor on
+- [x] **Step 1: Ask the user for the version.** State the assessment: additive, so a minor on
   top of 11.0.0. Wait.
-- [ ] **Step 2: Sweep the docs** — `README.md` and all of `docs/`, not only the changelog.
+- [x] **Step 2: Sweep the docs** — `README.md` and all of `docs/`, not only the changelog.
   A doc describing the old contract is worse than none.
-- [ ] **Step 3: CHANGELOG** — three handlers receive behavioural fixes, across four methods:
+- [x] **Step 3: CHANGELOG** — three handlers receive behavioural fixes, across four methods:
   `functionGroup.activate`, `unitTest.validate`, `transport.update` and `transport.delete`.
   Nothing is removed, so no runtime-break note belongs here — the deletions that would have
   needed one are in Phase C.
-- [ ] **Step 4: Bump, relock, build, full unit suite; read every log.**
-- [ ] **Step 5: PR, user review, merge, tag, GitHub release.** Then stop.
+- [x] **Step 4: Bump, relock, build, full unit suite; read every log.**
+- [x] **Step 5: PR, user review, merge, tag, GitHub release.** Then stop.
 
 **Phase B does not wait for this.** `interfaces` does not depend on adt-clients, and Phase A
 uses none of the new atoms — the two can run in parallel. Only **Phase C** needs both: the
@@ -370,27 +399,27 @@ export interface IAdtModifiable<TConfig, TReadResult = TConfig>
 
 Move the existing doc comments onto the atom each method now belongs to; do not rewrite them.
 
-- [ ] **Step 1: Write the compile-only assertion** — `IAdtCrud` is still assignable to and from
+- [x] **Step 1: Write the compile-only assertion** — `IAdtCrud` is still assignable to and from
   the four-atom intersection (so the split is shape-preserving), and a type with `update` but
   no `delete` satisfies `IAdtUpdatable` and **not** `IAdtModifiable`.
-- [ ] **Step 2: Run `npm run test:check`, confirm it fails.**
-- [ ] **Step 3: Split the interface. Delete `IAdtNonVersionedObject` and its barrel export.**
-- [ ] **Step 4: `npm run test:check` and `npm run lint:check` clean.** Then prove the typecheck
+- [x] **Step 2: Run `npm run test:check`, confirm it fails.**
+- [x] **Step 3: Split the interface. Delete `IAdtNonVersionedObject` and its barrel export.**
+- [x] **Step 4: `npm run test:check` and `npm run lint:check` clean.** Then prove the typecheck
   is load-bearing: merge `delete` back into `IAdtUpdatable`, confirm the assertion fails,
   revert that one edit.
-- [ ] **Step 5: Commit.**
+- [x] **Step 5: Commit.**
 
 ### Task 6: Release interfaces — a major
 
 Deleting an exported type is breaking.
 
-- [ ] Ask the user for the version; state that the removal forces a major.
-- [ ] Sweep `README.md` — it lists what the package covers. Both new atoms belong there, and
+- [x] Ask the user for the version; state that the removal forces a major.
+- [x] Sweep `README.md` — it lists what the package covers. Both new atoms belong there, and
   any mention of `IAdtNonVersionedObject` must go.
-- [ ] CHANGELOG with the removal as a **Breaking** entry and the reason: a type defined by
+- [x] CHANGELOG with the removal as a **Breaking** entry and the reason: a type defined by
   absence has no place in a capability vocabulary, and `Non` means nothing to the compiler —
   `IAdtNonVersionedObject & IAdtVersionable` compiled and handed out `getVersions`.
-- [ ] Bump, relock, build; PR; user review; merge; tag; GitHub release. Then stop.
+- [x] Bump, relock, build; PR; user review; merge; tag; GitHub release. Then stop.
 
 **Phase C does not start until this version is on npm.**
 
