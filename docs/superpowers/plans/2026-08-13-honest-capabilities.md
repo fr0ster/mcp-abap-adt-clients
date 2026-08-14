@@ -456,6 +456,27 @@ describes a **test run**. So Phase C carries an `interfaces` round-trip in the m
 8a-bis change those contracts and release them together, and the adt-clients work that depends
 on them waits for npm.
 
+### The order, revised 2026-08-14
+
+**One interfaces major, and it comes late.** Two handlers turned out to need an interfaces change
+(`featureToggle`, `AdtServiceBinding` — see Task 8), and the guard in Task 9 will almost
+certainly surface more: its whole purpose is to compare every getter against every atom in both
+directions, and the types that lose are not all local. Shipping an interfaces major for the two
+known cases now would mean shipping another for what the guard finds next — two majors where one
+will do, which is why the sequence is:
+
+1. **6a** — take interfaces 16.0.0, already on npm;
+2. **8b, 8c** — `AdtUnitTest` under the new contract, then what unit testing does not have;
+3. **9** — the guard, whose **first run is the inventory**: collect every disagreement it names,
+   including the ones that can only be fixed in interfaces;
+4. **one interfaces major** — `IFeatureToggleObject`, `IAdtServiceBinding` and everything from
+   step 3, together;
+5. finish narrowing those two handlers; the guard goes green;
+6. **10** — release adt-clients.
+
+Until step 4, `featureToggle` and `AdtServiceBinding` keep their stubs. They have carried them
+all along; nothing gets worse by their waiting for a release that knows what it contains.
+
 The order below is deliberate. Tasks 7 and 8 need neither `unitTest`'s new config nor the new
 interfaces version, so they proceed while 8a is in review and while its release is being
 published — 8b is the only task blocked on it. Task 7 does touch one `unitTest` **test** file,
