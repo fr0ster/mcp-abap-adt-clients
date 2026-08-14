@@ -124,7 +124,9 @@ async function updateClassInclude(
   transportRequest?: string,
   sourceContentType?: string,
 ): Promise<IAdtResponse> {
-  if (!includeSource) {
+  // Empty source is legitimate: PUTting it is how an include is emptied.
+  // Only a missing argument is an error.
+  if (includeSource === undefined || includeSource === null) {
     throw new Error(`${includeType} source code is required`);
   }
 

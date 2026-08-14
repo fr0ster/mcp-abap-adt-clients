@@ -96,16 +96,15 @@ export class AdtLocalMacros extends AdtClassMemberBase {
     if (!config.className) {
       throw new Error('Class name is required');
     }
-    if (!config.macrosCode) {
+    // An empty string is source: writing it is how the include is emptied
+    // (see delete()). Only its absence is an error.
+    if (config.macrosCode === undefined && options?.sourceCode === undefined) {
       throw new Error('Macros code is required');
     }
 
     // Low-level mode: if lockHandle is provided, perform only update operation
     if (options?.lockHandle) {
-      const codeToUpdate = options?.sourceCode || config.macrosCode;
-      if (!codeToUpdate) {
-        throw new Error('Macros code is required for update');
-      }
+      const codeToUpdate = options?.sourceCode ?? config.macrosCode ?? '';
 
       this.logger?.info?.(
         'Low-level update: performing update only (lockHandle provided)',
@@ -138,8 +137,9 @@ export class AdtLocalMacros extends AdtClassMemberBase {
       this.logger?.info?.('Parent class locked, handle:', lockHandle);
 
       // 2. Check local macros code
-      const codeToCheck = options?.sourceCode || config.macrosCode;
-      if (codeToCheck) {
+      // Empty source is a deletion — nothing to syntax-check.
+      const codeToCheck = options?.sourceCode ?? config.macrosCode ?? '';
+      if (codeToCheck !== '') {
         this.logger?.info?.('Step 2: Checking local macros code');
         const checkResponse = await checkClassMacros(
           this.connection,
@@ -157,7 +157,7 @@ export class AdtLocalMacros extends AdtClassMemberBase {
       const updateResponse = await updateClassMacros(
         this.connection,
         config.className,
-        codeToCheck as string,
+        codeToCheck,
         lockHandle,
         config.transportRequest,
         this.contentTypes?.sourceArtifactContentType(),

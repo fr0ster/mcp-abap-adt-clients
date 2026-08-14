@@ -16,6 +16,7 @@ import {
   CT_DELETION,
   CT_TRANSPORT_CHECK,
 } from '../../constants/contentTypes';
+import { assertActivationSucceeded } from '../../utils/activationUtils';
 import { buildQueryString } from '../../utils/internalUtils';
 import { getSystemInformation } from '../../utils/systemInfo';
 import { getTimeout } from '../../utils/timeouts';
@@ -546,6 +547,11 @@ export class AdtServiceBinding implements IAdtServiceBinding {
       bindingName: config.bindingName,
       preauditRequested: true,
     });
+
+    // Activation is judged by the messages, never by the status code: ADT
+    // answers 200 with a <msg type="E"> when it refuses. Ten other handlers
+    // call this; this one returned errors: [] whatever came back.
+    assertActivationSucceeded('Service binding', activateResult.data);
 
     return {
       errors: [],

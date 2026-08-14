@@ -101,16 +101,18 @@ export class AdtLocalDefinitions extends AdtClassMemberBase {
     if (!config.className) {
       throw new Error('Class name is required');
     }
-    if (!config.definitionsCode) {
+    // An empty string is source: writing it is how the include is emptied
+    // (see delete()). Only its absence is an error.
+    if (
+      config.definitionsCode === undefined &&
+      options?.sourceCode === undefined
+    ) {
       throw new Error('Definitions code is required');
     }
 
     // Low-level mode: if lockHandle is provided, perform only update operation
     if (options?.lockHandle) {
-      const codeToUpdate = options?.sourceCode || config.definitionsCode;
-      if (!codeToUpdate) {
-        throw new Error('Definitions code is required for update');
-      }
+      const codeToUpdate = options?.sourceCode ?? config.definitionsCode ?? '';
 
       this.logger?.info?.(
         'Low-level update: performing update only (lockHandle provided)',
@@ -143,8 +145,9 @@ export class AdtLocalDefinitions extends AdtClassMemberBase {
       this.logger?.info?.('Parent class locked, handle:', lockHandle);
 
       // 2. Check local definitions code
-      const codeToCheck = options?.sourceCode || config.definitionsCode;
-      if (codeToCheck) {
+      // Empty source is a deletion — nothing to syntax-check.
+      const codeToCheck = options?.sourceCode ?? config.definitionsCode ?? '';
+      if (codeToCheck !== '') {
         this.logger?.info?.('Step 2: Checking local definitions code');
         const checkResponse = await checkClassDefinitions(
           this.connection,
@@ -162,7 +165,7 @@ export class AdtLocalDefinitions extends AdtClassMemberBase {
       const updateResponse = await updateClassDefinitions(
         this.connection,
         config.className,
-        codeToCheck as string,
+        codeToCheck,
         lockHandle,
         config.transportRequest,
         this.contentTypes?.sourceArtifactContentType(),

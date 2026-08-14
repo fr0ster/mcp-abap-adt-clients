@@ -96,16 +96,18 @@ export class AdtLocalTypes extends AdtClassMemberBase {
     if (!config.className) {
       throw new Error('Class name is required');
     }
-    if (!config.localTypesCode) {
+    // An empty string is source: writing it is how the include is emptied
+    // (see delete()). Only its absence is an error.
+    if (
+      config.localTypesCode === undefined &&
+      options?.sourceCode === undefined
+    ) {
       throw new Error('Local types code is required');
     }
 
     // Low-level mode: if lockHandle is provided, perform only update operation
     if (options?.lockHandle) {
-      const codeToUpdate = options?.sourceCode || config.localTypesCode;
-      if (!codeToUpdate) {
-        throw new Error('Local types code is required for update');
-      }
+      const codeToUpdate = options?.sourceCode ?? config.localTypesCode ?? '';
 
       this.logger?.info?.(
         'Low-level update: performing update only (lockHandle provided)',
@@ -134,12 +136,13 @@ export class AdtLocalTypes extends AdtClassMemberBase {
       this.logger?.info?.('Parent class locked, handle:', lockHandle);
 
       // 2. Check local types code
-      const codeToCheck = options?.sourceCode || config.localTypesCode;
+      // Empty source is a deletion — nothing to syntax-check.
+      const codeToCheck = options?.sourceCode ?? config.localTypesCode ?? '';
       const state: IClassState = {
         errors: [],
       };
 
-      if (codeToCheck) {
+      if (codeToCheck !== '') {
         this.logger?.info?.('Step 2: Checking local types code');
         const checkResponse = await checkClassLocalTypes(
           this.connection,
@@ -157,7 +160,7 @@ export class AdtLocalTypes extends AdtClassMemberBase {
       const updateResponse = await updateClassLocalTypes(
         this.connection,
         config.className,
-        codeToCheck as string,
+        codeToCheck,
         lockHandle,
         config.transportRequest,
         this.contentTypes?.sourceArtifactContentType(),
