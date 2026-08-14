@@ -53,3 +53,28 @@ describe('legacy transport list', () => {
     expect(calls).toHaveLength(0);
   });
 });
+
+describe('legacy transport update/delete', () => {
+  it('rejects update() instead of inheriting the modern endpoint (zero requests)', async () => {
+    const { connection, calls } = recordingConnection();
+
+    await expect(
+      new AdtRequestLegacy(connection).update({
+        transportNumber: 'DEVK900001',
+        description: 'new description',
+      }),
+    ).rejects.toThrow(/not supported on legacy/);
+    expect(calls).toHaveLength(0);
+  });
+
+  it('rejects delete() instead of inheriting the modern endpoint (zero requests)', async () => {
+    const { connection, calls } = recordingConnection();
+
+    await expect(
+      new AdtRequestLegacy(connection).delete({
+        transportNumber: 'DEVK900001',
+      }),
+    ).rejects.toThrow(/not supported on legacy/);
+    expect(calls).toHaveLength(0);
+  });
+});

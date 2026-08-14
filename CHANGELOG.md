@@ -5,6 +5,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [11.1.0] - 2026-08-13
+
+### Fixed
+
+- **`functionGroup.activate()` reported success no matter what the server answered — a false positive in an operation's result, not a missing feature.** It POSTed `/sap/bc/adt/activation?method=activate` correctly, then threw the response away: neither the handler nor its caller ever read `<msg type="E">`, so a failed activation reached the caller as `errors: []`, indistinguishable from a real success. This is the strongest reason to take this release — every other fix here is a capability that was missing; this one was a wrong answer reported as a right one. Nine other object types already share one activation rule via `assertActivationSucceeded` (10.0.2); function group had its own inline activation and was missed when that fix went in, because the 10.0.2 guard only catches a handler that decides success on its own from `activationExecuted` — not one that parses nothing at all. The check now lives inside `core/functionGroup/activation.ts`, so a caller cannot bypass it by calling the low-level function directly.
+
+- **`transport.update()` and `transport.delete()` work.** Both were stubs that threw a fixed string claiming ADT could not do it: "immutable after creation" and "cannot be deleted via ADT". Both claims were false — ADT changes a request's description and deletes a request that holds no objects, against the same server `AdtPackage` already talks to for its own read-modify-write update.
+
+  - `update()` is GET the current XML → patch `tm:desc` → PUT, the same read-modify-write shape `package.update()` uses, because building the PUT body from scratch would drop every server-managed field this client does not model (owner, type, target, tasks, links).
+  - `delete()` is a plain `DELETE` on the item resource (`/sap/bc/adt/cts/transportrequests/<NUMBER>`). ADT accepts it only while the request is empty; a request still holding objects is rejected by the server, not by this client.
+
+  Both are new low-level modules, `core/transport/update.ts` and `core/transport/delete.ts`, wired into `AdtRequest.update()` / `AdtRequest.delete()`. `AdtRequestLegacy` extends `AdtRequest` and had not overridden either, so it silently inherited these two and would have called the modern `/sap/bc/adt/cts/transportrequests/<NR>` endpoint on systems that do not have it — the same class of bug already fixed once on this class for `list()`. It now explicitly overrides both to reject: whether the legacy `/sap/bc/cts/transportrequests` endpoint supports changing a description or deleting a request has never been captured, and inventing a payload for an uncaptured endpoint is exactly the guessing this release exists to stop.
+
+- **Unit test validation is real.** `AdtUnitTest.validate()` returned what its own comment called "a mock success response", regardless of whether the container class existed. ADT's only validation for a unit test run is a *name* check performed **before** the object it belongs to is created, so what "validate" can honestly mean depends on what `create()` is about to build — and the two handlers do not get the same amount of it:
+
+  - **Testing an existing class** (`getUnitTest()`) — the container class already exists; there is no new name to check. `validate()` now reads that container (`this.adtClass.read(...)`) and throws `AdtOperationError` (`OBJECT_NOT_FOUND`, HTTP 404) if it is missing, instead of always answering success. It checks **only** that the container exists: `IUnitTestConfig` carries no field for the local test class's source, and `checkClassLocalTestClass` needs that source to check anything — there is nothing to hand it.
+  - **Testing CDS** (`getCdsUnitTest()`) — when `className`, `classTemplate` and `testClassSource` are all present, `create()` creates a *new* global dummy class and puts a local test class inside it, and `ICdsUnitTestConfig` **does** carry `testClassSource`. `AdtCdsUnitTest` previously inherited the parent's mock outright; it now overrides `validate()` to check both halves of what `create()` is about to build: `validateClassName()` against the dummy class name (the one genuinely-new name in unit testing), and `AdtLocalTestClass.validate()` against the local test class code. A plain test run (no class being created) still defers to the parent, which confirms the container exists.
+
+  The gap is named rather than hidden: a reader of `getUnitTest().validate()` should know they get container-existence only, not a code check, and know why — the config shape they are holding cannot carry what a code check would need.
+
+No public type changed and nothing was removed — all three fixes are inside existing method bodies (or, for function group, an existing internal function). `getRequest()` continues to return the concrete `AdtRequest` type, so `update()`/`delete()` becoming real does not change any declared surface.
+
 ## [11.0.0] - 2026-08-12
 
 ### Breaking

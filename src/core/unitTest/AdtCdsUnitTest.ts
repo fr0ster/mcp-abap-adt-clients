@@ -10,18 +10,23 @@
  * Uses AdtClass for test class lifecycle operations and AdtUnitTest for test execution.
  */
 
-import type {
-  IAbapConnection,
-  IAdtCdsTestRunnable,
-  ICdsUnitTestConfig,
-  ICdsUnitTestState,
-  ILogger,
+import {
+  AdtObjectErrorCodes,
+  AdtOperationError,
+  type HttpError,
+  type IAbapConnection,
+  type IAdtCdsTestRunnable,
+  type ICdsUnitTestConfig,
+  type ICdsUnitTestState,
+  type ILogger,
 } from '@mcp-abap-adt/interfaces';
 import {
   headerValueToString,
   safeErrorMessage,
+  safeStringify,
 } from '../../utils/internalUtils';
 import { startClassUnitTestRunByObject } from '../class/run';
+import { validateClassName } from '../class/validation';
 import { AdtDdl } from '../ddl/AdtDdl';
 import { AdtUnitTest } from './AdtUnitTest';
 import { checkCdsTestDoublesAvailability } from './checkCdsTestDoublesAvailability';
@@ -111,6 +116,90 @@ export class AdtCdsUnitTest extends AdtUnitTest implements IAdtCdsTestRunnable {
       );
       throw error;
     }
+  }
+
+  /**
+   * Override: Validate what `create()` is about to build.
+   *
+   * When `className`, `classTemplate` and `testClassSource` are all present —
+   * the same combination `create()` uses to pick its class-creation path —
+   * this checks both halves of what that path builds:
+   *
+   * 1. `validateClassName` for the dummy global class Step 1 of `create()`
+   *    creates. This is the one place in unit testing where a name is
+   *    genuinely new, unlike the container class `AdtUnitTest.validate()`
+   *    checks (which already exists).
+   * 2. `checkClassLocalTestClass`, via `this.adtLocalTestClass`, for the
+   *    local test class Step 2 of `create()` puts inside it — the same check
+   *    `AdtLocalTestClass.validate()` performs.
+   *
+   * Otherwise this is a plain test run (no class being created), so it
+   * defers to the parent's validate (confirms the container class exists).
+   */
+  async validate(
+    config: Partial<ICdsUnitTestConfig>,
+  ): Promise<ICdsUnitTestState> {
+    if (config.className && config.classTemplate && config.testClassSource) {
+      this.logger?.info?.(
+        'Validating CDS unit test class name:',
+        config.className,
+      );
+
+      let validationResponse: Awaited<ReturnType<typeof validateClassName>>;
+      try {
+        validationResponse = await validateClassName(
+          this.connection,
+          config.className,
+          config.packageName,
+          config.description || `CDS unit test for ${config.className}`,
+        );
+      } catch (error: unknown) {
+        // Mirrors AdtClass.validate()'s catch block: a 4xx here means the
+        // name itself was rejected, so it is reported the same way.
+        const e = error as HttpError;
+        const status = e.response?.status;
+        const statusText = e.response?.statusText;
+        const errorMessage = e.response?.data
+          ? typeof e.response.data === 'string'
+            ? e.response.data.substring(0, 500)
+            : safeStringify(e.response.data).substring(0, 500)
+          : e.message || 'Unknown error';
+
+        this.logger?.error?.(
+          `Validate failed: HTTP ${status || '?'} ${statusText || ''}`,
+          { status, statusText, message: errorMessage },
+        );
+
+        if (status && status >= 400 && status < 500) {
+          const customError = new AdtOperationError(
+            `Validation failed for object '${config.className}': ${errorMessage}`,
+          );
+          customError.code = AdtObjectErrorCodes.VALIDATION_FAILED;
+          customError.status = status;
+          customError.statusText = statusText;
+          customError.originalError = error;
+          throw customError;
+        }
+
+        throw error;
+      }
+
+      this.logger?.info?.('Validating CDS local test class code');
+      const testClassState = await this.adtLocalTestClass.validate({
+        className: config.className,
+        testClassCode: config.testClassSource,
+      });
+
+      return {
+        validationResponse,
+        testClassState,
+        errors: [],
+      };
+    }
+
+    // Otherwise, use parent's validate (confirms the container class exists
+    // for a plain test run).
+    return await super.validate(config);
   }
 
   /**
