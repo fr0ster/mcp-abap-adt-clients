@@ -41,7 +41,7 @@ Per task:
 | 8a-bis one `IAdtRunnable`; test-specific runnables deleted | **done, released** — same release; `ITestRunInformation` and `ICdsTestDoubleCheckable` added with it |
 | 8b `AdtUnitTest`'s CRUD half | **done** — `0533d3f`, tests corrected in `8d4b901` |
 | 8c delete unit testing's five absent methods | **done** — nothing to delete; 8b's rewrite carried none of them over, and `095b490` pins the absence |
-| 9 the guard | open |
+| 9 the guard | **done** — `bc7ba93`; 444 assertions, and the first run found three defects the types could not see |
 | 10 release adt-clients — the narrowing | open |
 
 Checkboxes below are ticked for Tasks 1–6 accordingly.
@@ -1086,8 +1086,27 @@ check that would have caught `functionGroup`.
 - [ ] **Step 3:** Check 1. Expect it to fail at first and to name real disagreements; fix the
   manifest or the handler, never the check.
 - [ ] **Step 4:** Check 3, atom by atom.
-- [ ] **Step 5:** confirm the target state: no `is not supported` anywhere under
+- [x] **Step 5:** confirm the target state: no `is not supported` anywhere under
   `src/core/*/Adt*.ts`, no `throwUnsupportedVersions`, all three checks green.
+
+**Executed 2026-08-14.** All three checks are green, and the first run of Check 3 found three
+defects no type could have shown:
+
+1. **`localTypes`, `localDefinitions` and `localMacros` could never delete.** `delete` writes
+   empty source and `update` rejected a falsy one, so it threw before issuing a request — the
+   same defect 8b fixed in `AdtLocalTestClass`, present in all three siblings and in the shared
+   low-level guard in `includes.ts`.
+2. **Service binding activation reported success whatever the server said** — `errors: []` with
+   an error-severity `<msg>` in the response, exactly the `functionGroup` defect of Phase A. It
+   now calls `assertActivationSucceeded`.
+3. **`getService()` hands out a service binding**, and the manifest claimed the full set for it.
+   The manifest was wrong, not the code; corrected with the reason recorded in the entry.
+
+**What the target state does not yet include.** Three handlers still carry stubs, and all three
+are blocked on the same interfaces change: `featureToggle` (versions, transport), and
+`serviceBinding`/`service` (versions, lock). They are listed exactly in `KnownDisagreements` in
+`shape.ts`, which is asserted for equality — a new disagreement fails the check, and so does
+fixing one and leaving it listed.
 
 ### Task 10: Release adt-clients — the narrowing
 
