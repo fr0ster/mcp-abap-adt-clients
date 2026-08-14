@@ -6,7 +6,7 @@
 does not do what its capability promises.
 
 **Architecture:** Two positive atoms split out of `IAdtModifiable`; one negative composite
-deleted; ten handlers narrowed to the exact intersection of atoms they satisfy; `unitTest`'s
+deleted; fifteen handlers narrowed to the exact intersection of atoms they satisfy; `unitTest`'s
 CRUD half given a subject; three behavioural defects fixed; and a guard — manifest, compile-time equality over the full
 handler × atom product, and per-atom behaviour tests — that keeps the state true.
 
@@ -35,7 +35,7 @@ Per task:
 | 5 split `IAdtModifiable`, delete `IAdtNonVersionedObject` | done — `83582ef` |
 | 6 release interfaces 15.0.0 | done — `bf1a9ff`, plus review fixes `2517b03`, `d35f1ab` |
 | 6a take interfaces 15.0.0 | **next** |
-| 7 delete `create()` aliases | **withdrawn** — see the task for why |
+| 7 five handlers lose `create()` — an include is not created | open |
 | 8 narrow the ten handlers | open |
 | 8a `IUnitTestConfig` describes a test class — interfaces major | open |
 | 8b `AdtUnitTest`'s CRUD half | open |
@@ -67,12 +67,20 @@ Checkboxes below are ticked for Tasks 1–6 accordingly.
    DELETE, `check` → POST, `activate` → POST. A handler that cannot meet its atom's verb does
    not have that capability — the guard rejecting it is the guard working.
 
+   **A part of an object has no `create`.** A class's include is not brought into existence by
+   a request of its own: it exists because its class does, and writing source into it is a PUT,
+   which is `update`. So the four include handlers do not deviate from rule 2 — they simply do
+   not have `IAdtCreatable`, and Task 7 removes it. Creating a unit test *for a class that does
+   not exist yet* is a different operation and does meet the rule: it POSTs the global class,
+   activates it, then PUTs the include (Task 8b). One capability, two requests, and the first
+   of them is the POST rule 2 asks for.
+
 ## Scope, fixed
 
 | | count | who |
 |---|---|---|
-| handlers with a problem | 11 | the 11 below; no handler loses `create()` — see Task 7 |
-| type/API subtraction | **10** | the 10 declaring unsupported atoms |
+| handlers with a problem | 16 | the 11 below plus 5 that have no `create` |
+| type/API subtraction | **15** | **10** declaring unsupported atoms + 5 losing `create` |
 | behavioural code | 3 | `transport`, `unitTest.validate`, `functionGroup.activate` |
 | dead-method deletion | 1 | `unitTest` — seven methods; `update`/`delete` are implemented instead |
 
@@ -91,9 +99,13 @@ miscounted, in both directions, before this line was written:
 - **plus `functionInclude`**, which has no version stub at all and joins by a different route:
   it declares `IAdtTransportAware` while its `readTransport` throws.
 
-Nine plus one is **ten**, and that is the whole subtraction. It was fifteen until 2026-08-14,
-when the five `create()` aliases turned out not to be aliases and the task deleting them was
-withdrawn — see Task 7 for the evidence and the ruling.
+Nine plus one is ten, and ten plus the five that have no `create` is **15**.
+
+**The five with no `create`:** `AdtLocalTestClass`, `AdtLocalTypes`, `AdtLocalDefinitions`,
+`AdtLocalMacros`, `AdtMessageClassMessage`. Not because their `create` duplicated their
+`update` — it does not — but because an include, and a single message, are parts of an object
+rather than objects: nothing creates one. See Task 7. `AdtMessageClass` is **not** among them —
+a message class is created by a POST and keeps `IAdtCreatable`.
 
 ---
 
@@ -427,7 +439,7 @@ Deleting an exported type is breaking.
 
 ## Phase C — narrowing, in adt-clients
 
-Ten handlers, plus `unitTest`, whose entry stopped being a deletion. **Always a new branch
+Fifteen handlers, plus `unitTest`, whose entry stopped being a deletion. **Always a new branch
 off the current `main`** — Phase A has been merged and released by now, so its branch is gone.
 
 **One release, two packages.** The maintainer's ruling on `unitTest` (spec, "the stubs are a
@@ -477,32 +489,43 @@ wrong version is installed.
 - [ ] **Step 4: Commit `package.json` and `package-lock.json` together**, before any source
   change depends on them.
 
-### Task 7 — withdrawn: `create` and `update` are always separate operations
+### Task 7: Five handlers have no `create` — an include is not created
 
-**Nothing to do. Kept as a record, because the deletion it proposed was carried in this plan for
-two days and its evidence is worth keeping.**
+**Files:** `src/core/class/AdtLocalTestClass.ts`, `AdtLocalTypes.ts`, `AdtLocalDefinitions.ts`,
+`AdtLocalMacros.ts`, `src/core/messageClass/AdtMessageClassMessage.ts`; the getters on
+`AdtClient`/`AdtClientLegacy` that return them; their barrels; the tests naming `create` on them.
 
-The task read "delete the five `create()` aliases" — `AdtMessageClassMessage`,
-`AdtLocalTestClass`, `AdtLocalTypes`, `AdtLocalDefinitions`, `AdtLocalMacros` — on the grounds
-that each already has a separate `update()`, so `create()` had nothing of its own to do. The
-2026-08-13 verification behind that established only that a separate `update()` *exists*; it
-never compared the two bodies. Read side by side, four of the five differ:
+**This task was withdrawn on 2026-08-14 and reinstated the same day with a different reason.**
+The withdrawal was right to reject the reason then on the table — "`create` is an alias of
+`update`" — because it is not: `update` on all four include handlers carries a low-level
+`options.lockHandle` path that `create` does not, and `AdtLocalTestClass` splits
+`activateOnCreate` from `activateOnUpdate`. Two methods that differ in code are not an alias,
+and **`create` and `update` are always separate operations** where both exist.
 
-| handler | `create` vs `update` |
-|---|---|
-| `AdtLocalTestClass` | `create` honours `activateOnCreate`; `update` honours `activateOnUpdate` **and** a low-level `options.lockHandle` path that writes inside a lock the caller already holds |
-| `AdtLocalTypes`, `AdtLocalDefinitions`, `AdtLocalMacros` | same low-level `lockHandle` path on `update` only |
-| `AdtMessageClassMessage` | both are `return this._upsertMessage(config)` — the same line twice |
+The reason that decides it is about the object, not the methods. **A class's include cannot be
+created.** It exists because its class exists; there is no POST that brings a `testclasses`,
+`localtypes`, `definitions` or `macros` include into being, only a PUT that writes source into
+one. Writing source is `update`. The same holds for a single message inside a message class:
+`AdtMessageClassMessage` merges it into the class's XML and PUTs the class back.
 
-**Ruled 2026-08-14: `create` and `update` are always separate operations.** Almost every object
-in this library has both, and some have `run` on top. That a server answers them with the same
-PUT is a fact about the wire, not about the API: the two verbs mean different things to a
-caller, and collapsing them would make this library the odd one out among its own handlers.
+So these five lose `create()` and `IAdtCreatable` — not because their `create` duplicated their
+`update`, but because there is nothing for a `create` to do that `update` does not already
+describe honestly.
 
-So no handler loses `create()` and none loses `IAdtCreatable`. `AdtMessageClassMessage`'s
-implementation being one upsert behind two names is an observation about that handler, not a
-reason to remove one of them — if it is worth changing, the change is to give `create` the
-create semantics, not to delete it.
+`AdtMessageClass` is **untouched**: a message class *is* created, by a POST, and keeps the atom.
+`AdtUnitTest` **keeps `create()`** and gains a real one in Task 8b — creating a unit test for a
+class that does not exist yet POSTs that class first.
+
+- [ ] **Step 1:** `grep -rn "\.create(" src/__tests__` for calls on these five and move them to
+  `update()`. `src/__tests__/integration/core/unitTest/UnitTest.test.ts:239` is one of them.
+- [ ] **Step 2:** delete the five `create` methods and their `IAdtCreatable` declarations.
+- [ ] **Step 3: Narrow the getters.** `getLocalTestClass()`, `getLocalTypes()`,
+  `getLocalDefinitions()` and `getLocalMacros()` declare `IAdtSourceObject`, which includes
+  `IAdtCreatable` — they stop satisfying it the moment the method is gone, so each getter's
+  return type becomes the intersection it does satisfy. This is the same work as Task 8 and can
+  be reviewed with it, but it is caused by *this* task.
+- [ ] **Step 4:** verify; commit with a `BREAKING CHANGE:` footer naming all five methods and
+  the four getters.
 
 ### Task 8: Narrow the ten handlers that declare what they cannot do
 
@@ -542,22 +565,26 @@ So the target is:
 
 | method | subject | meaning |
 |---|---|---|
-| `read` / `update` / `delete` / `validate` | the local test class | manage the test code inside its container |
+| `create` | the container class **and** its include | POST the class, activate it, PUT the tests into it |
+| `read` / `update` / `delete` / `validate` | the testclasses include | manage the test code inside a class that exists |
 | `run` / `getRunId` / `getStatus` / `getResult` | a run | execute whatever tests the class holds, any number of times |
 
 Everything else — `activate`, `check`, `lock`, `unlock`, `getVersions`, `getVersionSource`,
 `readTransport` — is deleted, as before.
 
-**`create` stays, and `IAdtCreatable` with it** — ruled 2026-08-14: a separate `create` and
-`update` is this library's convention, almost every object has both, and some have `run` on top.
-An earlier draft of this plan proposed deleting it on the grounds that ADT answers both with one
-PUT on the `testclasses` include. That is true of the wire and beside the point: `create` and
-`update` differ in what they mean to a caller, and in `AdtLocalTestClass` they differ in code
-too — `update` carries a low-level `options.lockHandle` path that writes inside an existing lock
-window, and each honours a different activate flag. `create` writes the test class; `update`
-replaces it; `run` needs neither to have been called in this process.
+**`create` stays, and it is a real create** — ruled 2026-08-14. A unit test for a class that
+does not exist yet begins by creating that class: **POST** the global class, activate it, then
+PUT the testclasses include. That is one capability spanning two requests, and the first of them
+is the POST rule 2 asks for. `update` is the second request alone, on a class that is already
+there.
 
-### Task 8a: The config describes a test class, not a run — interfaces major
+An earlier draft proposed deleting `create` on the grounds that ADT answers it and `update` with
+the same PUT. That was true only of the include half, and the include half is not the whole
+operation. The same reasoning read the other way is what gives Task 7 its answer: the four
+handlers that write **only** an include have no class to create, so they have no `create` at
+all.
+
+### Task 8a: The config describes the testclasses include, not a run — interfaces major
 
 **Repo:** `mcp-abap-adt-interfaces`, new branch off `master`.
 **Files:** `src/adt/IAdtUnitTest.ts`, `CHANGELOG.md`, `README.md`, `package.json`.
@@ -571,15 +598,51 @@ running needs no config at all.
 
 ```ts
 export interface IUnitTestConfig {
-  /** The class holding the local test class — CLAS/OC, must already exist. */
+  /** The class whose testclasses include holds the tests — CLAS/OC. */
   className: string;
-  /** ABAP source of the local test class; required to write it, absent when reading. */
+  /**
+   * Source of the **whole** testclasses include — every local test class in it.
+   * Required to write it, absent when reading.
+   */
   testClassSource?: string;
-  /** Name of the test class inside the include, when it must be named. */
-  testClassName?: string;
+  /** Creating the container class: where it goes, and what it is. `create` only. */
+  packageName?: string;
+  description?: string;
+  classTemplate?: string;
   transportRequest?: string;
 }
 ```
+
+The last four exist because **`create` creates the container class**: it POSTs the class,
+activates it, then PUTs the include (Task 8b). They are optional because `update`, `read` and
+`delete` do not use them, and they are exactly the fields `ICdsUnitTestConfig` already carries
+for the same purpose — so after this task that type declares only what is genuinely CDS-specific
+(`cdsViewName`).
+
+**The subject is the include, not one test class, and the config must not pretend otherwise.**
+An earlier draft of this block carried `testClassName`, "the test class inside the include, when
+it must be named". Nothing addresses one: `AdtLocalTestClass.read` GETs
+`/oo/classes/{name}/includes/testclasses` whole, `update` PUTs a source that **replaces** the
+include whole, and `delete` PUTs an empty one. A `delete({ testClassName: 'LTCL_ONE' })` would
+remove every test class in the include, not that one.
+
+The field is not merely unused — it is actively misleading today: the integration test at
+`src/__tests__/integration/core/unitTest/UnitTest.test.ts:241` passes `testClassName` to
+`getLocalTestClass().create()`, which ignores it, and has always ignored it.
+
+A test class name *is* meaningful in exactly one place, and it is not CRUD:
+`activateClassTestClasses` builds the activation fragment `#testclass=NAME`, reached through
+`AdtClass.activateTestClasses`, which declares its own inline `& { testClassName: string }`
+rather than taking it from a config. That is where the name belongs, and it stays there.
+
+- [ ] **While in this file, drop `testClassName` from `ILocalTestClassConfig` too** (interfaces,
+  `src/adt/IAdtClass.ts`) — same reasoning, same major, and no production path reads it. Confirm
+  that with a grep before deleting, and fix the integration test that passes it.
+
+*Addressing an individual test class would mean parsing the include's ABAP to find its
+boundaries, rewriting one class and PUTting the rest back unchanged. That is a different feature
+with its own risks, and it is not in this plan. If it is ever wanted, the config gains the field
+back **together with** the code that honours it and a test with two test classes in one include.*
 
 `className` and `testClassSource` are **not new names invented here**: `ICdsUnitTestConfig`,
 which extends this type, already carries both with exactly these meanings — the class that holds
@@ -612,9 +675,15 @@ run.
 Take the new interfaces version first — `--save`, then the same three resolution checks as Task
 6a. Then, in `AdtUnitTest`:
 
+- **`create(config)`** → the container class first. `this.adtClass.create({ className,
+  packageName, description, classTemplate, transportRequest })` — a **POST** — then
+  `this.adtClass.activate(...)`, then the include via `this.adtLocalTestClass.update(...)`.
+  `AdtCdsUnitTest.create` is this chain already, step for step; read it before writing this one.
+  This is what makes `create` a create rather than a second name for `update`: a unit test for a
+  class that does not exist yet begins by creating the class.
 - **`update(config)`** → `this.adtLocalTestClass.update({ className, testClassCode:
-  config.testClassSource, testClassName, transportRequest })`. The member already exists on the
-  class; this task wires it up, it does not build a second implementation.
+  config.testClassSource, transportRequest })` — the include only, no class creation. The member
+  already exists on the class; this task wires it up, it does not build a second implementation.
 - **`delete(config)`** → `this.adtLocalTestClass.delete(...)`, which is a PUT of empty source.
   Say so in the doc comment: a caller deleting a test class is not deleting an ADT object.
 - **`read(config)`** → the test class source, via `this.adtLocalTestClass.read(...)`. It no
@@ -653,8 +722,8 @@ Two consequences for this task, and neither is optional:
 1. **`AdtUnitTest.update` must accept `options.lockHandle` and pass it through**, exactly as
    `AdtLocalTestClass.update` does. Without it, a caller that already holds the container
    class's lock — updating the class and its tests in one window — cannot write the tests
-   without the handler taking a second lock on an object it has locked. That passthrough is the
-   real difference between `create` and `update` here, and it is the reason both exist.
+   without the handler taking a second lock on an object it has locked. `create` has no such
+   parameter and needs none: it creates the class, so nobody else can be holding its lock.
 2. **`AdtUnitTest` still declares no `IAdtLockable`, and now for a stated reason** rather than
    by omission: the lock belongs to the container class, so a caller takes it through
    `getClass().lock()` and hands the handle down. Task 8c deletes the throwing `lock`/`unlock`
@@ -676,9 +745,8 @@ this task (`update` must distinguish "no source given" from "empty source given"
   given `options.lockHandle`, takes no lock of its own; `delete` PUTs empty source; `read`
   returns the include, not a run; `run` issues the run request **with no preceding create**;
   `validate` issues both the container read and the source check.
-- [ ] **Step 2: Implement.** `create()` **stays** and keeps `IAdtCreatable` (see the ruling
-  above); it writes the test class where `update` replaces it, over the corresponding
-  `AdtLocalTestClass` methods.
+- [ ] **Step 2: Implement.** `create()` **stays** and keeps `IAdtCreatable`: it POSTs the
+  container class, activates it and PUTs the include. `update()` PUTs the include alone.
 - [ ] **Step 3: Verify** — `npx tsc -p tsconfig.json`, `npm run test:check`, the unit suite.
 - [ ] **Step 4: Commit** with a `BREAKING CHANGE:` footer covering all three: `create` changes
   subject from a run to the test class, `read` with it, and the config changes shape.
@@ -852,7 +920,8 @@ check that would have caught `functionGroup`.
 
 ### Task 10: Release adt-clients — the narrowing
 
-A major: ten handlers lose declared capabilities, and `unitTest` changes what its methods mean.
+A major: ten handlers lose declared capabilities, five lose `create()` — fifteen in all — and
+`unitTest` changes what its methods mean.
 
 - [ ] Ask for the version. Sweep the docs. CHANGELOG listing, per handler, what it no longer
   declares — a consumer needs to know which of its calls stops compiling.
