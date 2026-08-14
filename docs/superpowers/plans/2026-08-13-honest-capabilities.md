@@ -34,13 +34,13 @@ Per task:
 | 4 release adt-clients 11.1.0 | done — `0bef713` |
 | 5 split `IAdtModifiable`, delete `IAdtNonVersionedObject` | done — `83582ef` |
 | 6 release interfaces 15.0.0 | done — `bf1a9ff`, plus review fixes `2517b03`, `d35f1ab` |
-| 6a take interfaces 15.0.0 | **next** |
+| 6a take interfaces 16.0.0 | **done** — `95ef1b1` (16.0.0, not 15.0.0: 8a/8a-bis shipped in it) |
 | 7 four handlers lose `create()` — an include is not created | **done** — `c1dd6ac`, corrected by `f21f432`: a message class is not an ABAP class and its messages **are** created, so `AdtMessageClassMessage` keeps `create` |
 | 8 narrow the ten handlers | **8 of 10 done** — `domain`, `dataElement`, `functionGroup`, `package`, `messageClass` (+ its message handler), `authorizationField`, `functionInclude`, `transport`. `featureToggle` and `AdtServiceBinding` need interfaces 17.0.0 first |
 | 8a `IUnitTestConfig` describes the testclasses include — interfaces major | **done, released** — interfaces 16.0.0, PR #36, `027d00e`, tag `v16.0.0` |
 | 8a-bis one `IAdtRunnable`; test-specific runnables deleted | **done, released** — same release; `ITestRunInformation` and `ICdsTestDoubleCheckable` added with it |
-| 8b `AdtUnitTest`'s CRUD half | open |
-| 8c delete unit testing's five absent methods | open |
+| 8b `AdtUnitTest`'s CRUD half | **done** — `0533d3f`, tests corrected in `8d4b901` |
+| 8c delete unit testing's five absent methods | **done** — nothing to delete; 8b's rewrite carried none of them over, and `095b490` pins the absence |
 | 9 the guard | open |
 | 10 release adt-clients — the narrowing | open |
 
@@ -937,7 +937,13 @@ break for JavaScript callers, and Phase A is otherwise additive — no need to f
 it. And the shape guard in Task 9 cannot run while they exist: TypeScript reads shape, not
 intent, so a class carrying `check` satisfies `IAdtCheckable` however little it declares.
 
-- [ ] **Step 1: Confirm the class declares none of the seven**
+**Executed 2026-08-14: there was nothing to delete.** Task 8b rewrote `AdtUnitTest` from its
+capabilities outwards rather than editing the old class, so none of the five was carried over —
+verified on `AdtUnitTest`, `AdtCdsUnitTest` and `AdtUnitTestLegacy`. What the task left behind is
+the assertion instead: a rewrite is not a guarantee, and a class that *carries* a method
+satisfies that atom structurally whatever it declares, which is what Task 9 reads.
+
+- [x] **Step 1: Confirm the class declares none of the five**
 
 ```bash
 sed -n '/^export class AdtUnitTest/,/^{/p' src/core/unitTest/AdtUnitTest.ts
