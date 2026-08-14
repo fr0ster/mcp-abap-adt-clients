@@ -22,7 +22,7 @@ comes from it.
 |---|---|
 | **A** — behavioural fixes in adt-clients (Tasks 1–4) | **done and released**, adt-clients 11.1.0 (PR #107, `0bef713`) |
 | **B** — the atoms, in interfaces (Tasks 5–6) | **done, released and published**, interfaces 15.0.0 (PR #35, `e22c52c`, `npm view` → 15.0.0) |
-| **C** — narrowing, in adt-clients (Tasks 6a–10) | **started with its interfaces half** — 8a/8a-bis are in review as 16.0.0; Task 6a is unblocked, and once 16.0.0 is on npm it takes that version rather than 15.0.0 |
+| **C** — narrowing, in adt-clients (Tasks 6a–10) | **interfaces half done** — 16.0.0 tagged and released on GitHub. Tasks 7 and 8 can start now; Task 6a takes 16.0.0 once it is on npm, and 8b waits for that |
 
 Per task:
 
@@ -37,8 +37,8 @@ Per task:
 | 6a take interfaces 15.0.0 | **next** |
 | 7 five handlers lose `create()` — an include is not created | open |
 | 8 narrow the ten handlers | open |
-| 8a `IUnitTestConfig` describes the testclasses include — interfaces major | **done, in review** — interfaces PR #36, `22031d2` + `876cf0a` (16.0.0) |
-| 8a-bis one `IAdtRunnable`; test-specific runnables deleted | **done, in review** — same PR; `ITestRunInformation` added with it |
+| 8a `IUnitTestConfig` describes the testclasses include — interfaces major | **done, released** — interfaces 16.0.0, PR #36, `027d00e`, tag `v16.0.0` |
+| 8a-bis one `IAdtRunnable`; test-specific runnables deleted | **done, released** — same release; `ITestRunInformation` and `ICdsTestDoubleCheckable` added with it |
 | 8b `AdtUnitTest`'s CRUD half | open |
 | 8c delete unit testing's seven absent methods | open |
 | 9 the guard | open |
