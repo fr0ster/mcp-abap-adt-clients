@@ -22,7 +22,7 @@ comes from it.
 |---|---|
 | **A** — behavioural fixes in adt-clients (Tasks 1–4) | **done and released**, adt-clients 11.1.0 (PR #107, `0bef713`) |
 | **B** — the atoms, in interfaces (Tasks 5–6) | **done, released and published**, interfaces 15.0.0 (PR #35, `e22c52c`, `npm view` → 15.0.0) |
-| **C** — narrowing, in adt-clients (Tasks 6a–10) | **not started**; Task 6a is unblocked now that 15.0.0 is on npm |
+| **C** — narrowing, in adt-clients (Tasks 6a–10) | **started with its interfaces half** — 8a/8a-bis are in review as 16.0.0; Task 6a is unblocked, and once 16.0.0 is on npm it takes that version rather than 15.0.0 |
 
 Per task:
 
@@ -37,8 +37,8 @@ Per task:
 | 6a take interfaces 15.0.0 | **next** |
 | 7 five handlers lose `create()` — an include is not created | open |
 | 8 narrow the ten handlers | open |
-| 8a `IUnitTestConfig` describes the testclasses include — interfaces major | open |
-| 8a-bis one `IAdtRunnable`; test-specific runnables deleted | open |
+| 8a `IUnitTestConfig` describes the testclasses include — interfaces major | **done, in review** — interfaces PR #36, `22031d2` + `876cf0a` (16.0.0) |
+| 8a-bis one `IAdtRunnable`; test-specific runnables deleted | **done, in review** — same PR; `ITestRunInformation` added with it |
 | 8b `AdtUnitTest`'s CRUD half | open |
 | 8c delete unit testing's seven absent methods | open |
 | 9 the guard | open |
@@ -765,10 +765,15 @@ which is suggestive and not proof: a collection that accepts POST need not answe
 - [ ] **Step 4:** `npm run build`, `npm run test:check`, `npm run lint:check`; ship in the same
   major as Task 8a.
 
-**`TestRunInformation` itself is not in this plan.** It is new capability, not honesty about
-existing capability, and it needs an answer to the probe above before its shape can be written.
-Recorded here so the removal from the running contract is a decision with a destination rather
-than a loose end.
+**The interface shipped; the class did not.** Ruled 2026-08-14, after the pre-flight check found
+that six handlers in `mcp-abap-adt` read `runStatus`/`runResult` from `read({runId})` — removing
+the running contract with no replacement would have left the consumer casting past its declared
+type, which is the disease this plan treats. So `ITestRunInformation` is **in 16.0.0**, declaring
+only what is proven: status by id, result by id. The listing stays out until probed.
+
+`TestRunInformation` as a **class** is still not in this plan: it is new capability rather than
+honesty about existing capability. Until it exists the methods stay on the unit-test handlers,
+which is a contract change rather than a deletion.
 
 ### Task 8b: `AdtUnitTest`'s CRUD half becomes real
 
