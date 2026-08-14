@@ -218,34 +218,21 @@ type Offenders = {
 };
 
 /**
- * What disagrees today, and why it cannot be fixed here.
+ * Nothing disagrees.
  *
- * Both handlers declare a composite that lives in `@mcp-abap-adt/interfaces`
- * and extends the fat `IAdtObject` — `IFeatureToggleObject` and
- * `IAdtServiceBinding` — so narrowing them is a change to that package, not to
- * this one. They are listed **exactly**: the assertion below fails if a
- * disagreement is added, and equally if one of these is fixed and left in the
- * list, so the list cannot outlive the problem it records.
+ * This held three entries until 2026-08-14 — `featureToggle`, `serviceBinding`
+ * and `service`, each offering version history and either a transport or a lock
+ * that ADT does not give them. All three were the same cause: their composites
+ * lived in `@mcp-abap-adt/interfaces` and extended the fat `IAdtObject`, so
+ * they could not be fixed from here. They were narrowed there, the handlers
+ * followed, and the list is empty.
  *
- * Fixing them is the interfaces major this plan waits for. Until then a
- * consumer calling `getFeatureToggle().getVersions()` or
- * `getServiceBinding().lock()` gets a method that throws.
+ * It stays as a named type rather than being deleted: a disagreement that
+ * cannot be fixed in this package is a fact worth recording rather than
+ * tolerating silently, and the next one will have somewhere to go — with the
+ * assertion below failing until someone writes down why.
  */
-export interface KnownDisagreements {
-  featureToggle: {
-    versionable: 'offered but not claimed';
-    transportAware: 'offered but not claimed';
-  };
-  serviceBinding: {
-    lockable: 'offered but not claimed';
-    versionable: 'offered but not claimed';
-  };
-  /** `getService()` hands out the same binding, so it inherits the same two. */
-  service: {
-    lockable: 'offered but not claimed';
-    versionable: 'offered but not claimed';
-  };
-}
+export type KnownDisagreements = {};
 
 /**
  * The assertion.

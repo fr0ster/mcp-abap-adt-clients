@@ -20,7 +20,6 @@ import { assertActivationSucceeded } from '../../utils/activationUtils';
 import { buildQueryString } from '../../utils/internalUtils';
 import { getSystemInformation } from '../../utils/systemInfo';
 import { getTimeout } from '../../utils/timeouts';
-import { throwUnsupportedVersions } from '../shared/versions';
 import type {
   IActivateServiceBindingParams,
   IAdtServiceBinding,
@@ -602,17 +601,6 @@ export class AdtServiceBinding implements IAdtServiceBinding {
     };
   }
 
-  async lock(_config: Partial<IServiceBindingConfig>): Promise<string> {
-    throw new Error('Lock is not supported for service bindings via ADT API');
-  }
-
-  async unlock(
-    _config: Partial<IServiceBindingConfig>,
-    _lockHandle: string,
-  ): Promise<IServiceBindingState> {
-    throw new Error('Unlock is not supported for service bindings via ADT API');
-  }
-
   async getServiceBindingTypes(): Promise<IAdtResponse> {
     return this.connection.makeAdtRequest({
       url: '/sap/bc/adt/businessservices/bindings/bindingtypes',
@@ -1077,16 +1065,6 @@ export class AdtServiceBinding implements IAdtServiceBinding {
         Accept: 'application/xml, application/json, text/plain',
       },
     });
-  }
-
-  async getVersions(
-    _config: Partial<IServiceBindingConfig>,
-  ): Promise<IObjectVersion[]> {
-    throwUnsupportedVersions('service binding');
-  }
-
-  async getVersionSource(_contentUri: string): Promise<string> {
-    throwUnsupportedVersions('service binding');
   }
 }
 

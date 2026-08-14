@@ -66,8 +66,15 @@ function extractTransport(entry: Record<string, any>): {
   return { request, description };
 }
 
-/** Throw a typed "no version history" error. Used by non-source types and by
- *  source types when SAP reports the versions resource is absent (404/406). */
+/**
+ * Throw a typed "no version history" error.
+ *
+ * Since 12.0.0 no handler calls this to *declare* an absence — a type without
+ * version history simply has no `getVersions`. What remains is the honest use:
+ * a type that does have versions, on a system that answers 404/406 for the
+ * resource. That is a runtime fact, not a contract, and `throwVersionsError`
+ * below is the only caller.
+ */
 export function throwUnsupportedVersions(detail?: string): never {
   const e = new AdtOperationError(
     `Version history is not available${detail ? ` for ${detail}` : ''}`,
