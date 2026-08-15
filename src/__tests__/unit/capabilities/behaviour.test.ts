@@ -153,7 +153,10 @@ const VERB_BY_HANDLER: Record<string, string> = {
   'localDefinitions.delete': 'PUT',
   'localMacros.delete': 'PUT',
   'unitTest.delete': 'PUT',
-  // A message is removed by rewriting its class's XML, and the class is PUT.
+  // A message is added and removed the same way: by rewriting its class's XML,
+  // and the class is PUT. There is no collection to POST to — the message is
+  // not a resource of its own.
+  'messageClassMessage.create': 'PUT',
   'messageClassMessage.delete': 'PUT',
   // Feature toggles are validated by asking the collection whether the name is
   // taken — GET /sfw/featuretoggles.
@@ -211,8 +214,11 @@ const RESOURCE_BY_HANDLER: Record<string, string> = {
   // A binding's variant is validated against the discovery endpoint that lists
   // the variants this system offers — a sibling of the binding, not an
   // ancestor of it.
-  'service.validate': '/businessservices/bindings/bindingtypes',
-  'serviceBinding.validate': '/businessservices/bindings/bindingtypes',
+  'service.validate': '/sap/bc/adt/businessservices/bindings/bindingtypes',
+  'serviceBinding.validate':
+    '/sap/bc/adt/businessservices/bindings/bindingtypes',
+  // Creating a message writes the class it lives in.
+  'messageClassMessage.create': '/sap/bc/adt/messageclass/zguard_msg',
 };
 
 /**
@@ -234,20 +240,37 @@ function expectedResource(
   const declared = RESOURCE_BY_HANDLER[key];
   if (declared) {
     return {
-      test: (url: string) => url.toLowerCase().includes(declared),
+      test: (url: string) => {
+        const u = url.toLowerCase().split('?')[0];
+        return u === declared || u.startsWith(`${declared}/`);
+      },
       describe: declared,
     };
   }
   const subject = entry.subject.toLowerCase();
   const collection = subject.slice(0, subject.lastIndexOf('/'));
   const part = entry.include ? `${subject}/includes/${entry.include}` : subject;
-  const at = (path: string) => ({
-    test: (url: string) => url.toLowerCase().startsWith(path),
+  /** The path, with the query dropped — the query is never the resource. */
+  const pathOf = (url: string) => url.toLowerCase().split('?')[0];
+  /** Exactly this resource, and not a neighbour whose name starts the same. */
+  const exactly = (path: string) => ({
+    test: (url: string) => pathOf(url) === path,
+    describe: path,
+  });
+  /**
+   * This resource or something beneath it — with the boundary checked, so
+   * `/versions/1` does not accept `/versions/1-wrong`, and a collection does
+   * not accept a lock on one of its members.
+   */
+  const under = (path: string) => ({
+    test: (url: string) => {
+      const u = pathOf(url);
+      return u === path || u.startsWith(`${path}/`);
+    },
     describe: path,
   });
   const anyOf = (...paths: string[]) => ({
-    test: (url: string) =>
-      paths.some((path) => url.toLowerCase().includes(path)),
+    test: (url: string) => paths.some((path) => under(path).test(url)),
     describe: paths.join(' or '),
   });
 
@@ -257,29 +280,29 @@ function expectedResource(
     case 'read':
     case 'update':
     case 'getVersions':
-      return at(part);
+      return under(part);
     // Metadata, the lock and the transport are the whole object's, even when
     // the handler writes only a part of it.
     case 'readMetadata':
     case 'lock':
     case 'unlock':
     case 'readTransport':
-      return anyOf(subject, '/cts/transportchecks');
+      return anyOf(subject, '/sap/bc/adt/cts/transportchecks');
     // Creating means POSTing to the collection the object will live in — and
     // only that. A chain may validate the name first, but a validation is not
     // evidence that anything was created, and accepting it here let a create
     // that stopped after the check pass. Caught in review, 2026-08-15.
     case 'create':
-      return at(collection);
+      return exactly(collection);
     // Deleting is either a DELETE on the object or the deletion service; for a
     // part, it is a write to that part.
     case 'delete':
-      return anyOf(part, '/deletion/delete');
+      return anyOf(part, '/sap/bc/adt/deletion/delete');
     // Shared services, each taking the object as an argument.
     case 'check':
-      return anyOf('/checkruns', subject);
+      return anyOf('/sap/bc/adt/checkruns', subject);
     case 'activate':
-      return anyOf('/activation', subject);
+      return anyOf('/sap/bc/adt/activation', subject);
     // A name is validated wherever names live: a dedicated validation
     // resource, a check run over the source, or the namespace the object
     // would sit in — which for a function include is its group, and for a
@@ -300,9 +323,9 @@ function expectedResource(
     // in it — but the URI it was handed is, and a method free to fetch anything
     // it likes is not being checked at all.
     case 'getVersionSource':
-      return at(VERSION_CONTENT_URI.toLowerCase());
+      return exactly(VERSION_CONTENT_URI.toLowerCase());
     default:
-      return at(subject);
+      return under(subject);
   }
 }
 
