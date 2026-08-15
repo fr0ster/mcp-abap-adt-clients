@@ -137,7 +137,13 @@ export const HANDLERS = {
       read: '/sap/bc/adt/oo/classes/ZCL_GUARD/source/main',
       readMetadata: '/sap/bc/adt/oo/classes/ZCL_GUARD',
       update: '/sap/bc/adt/oo/classes/zcl_guard/source/main',
-      delete: '/sap/bc/adt/deletion/delete',
+      delete: [
+        // ADT refuses a delete it has not approved, so the check is the
+        // operation's first half rather than a nicety: a delete that skips it
+        // is a different operation from the one this capability names.
+        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
+        '/sap/bc/adt/deletion/delete',
+      ],
       validate: '/sap/bc/adt/oo/validation/objectname',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -162,7 +168,13 @@ export const HANDLERS = {
       read: '/sap/bc/adt/oo/interfaces/ZIF_GUARD/source/main',
       readMetadata: '/sap/bc/adt/oo/interfaces/ZIF_GUARD',
       update: '/sap/bc/adt/oo/interfaces/ZIF_GUARD/source/main',
-      delete: '/sap/bc/adt/deletion/delete',
+      delete: [
+        // ADT refuses a delete it has not approved, so the check is the
+        // operation's first half rather than a nicety: a delete that skips it
+        // is a different operation from the one this capability names.
+        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
+        '/sap/bc/adt/deletion/delete',
+      ],
       validate: '/sap/bc/adt/oo/validation/objectname',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -187,7 +199,13 @@ export const HANDLERS = {
       read: '/sap/bc/adt/programs/programs/ZGUARD/source/main',
       readMetadata: '/sap/bc/adt/programs/programs/ZGUARD',
       update: '/sap/bc/adt/programs/programs/zguard/source/main',
-      delete: '/sap/bc/adt/deletion/delete',
+      delete: [
+        // ADT refuses a delete it has not approved, so the check is the
+        // operation's first half rather than a nicety: a delete that skips it
+        // is a different operation from the one this capability names.
+        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
+        '/sap/bc/adt/deletion/delete',
+      ],
       validate: '/sap/bc/adt/programs/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -211,7 +229,13 @@ export const HANDLERS = {
       create: '/sap/bc/adt/ddic/ddl/sources',
       read: '/sap/bc/adt/ddic/ddl/sources/ZGUARD_DDL/source/main',
       readMetadata: '/sap/bc/adt/ddic/ddl/sources/ZGUARD_DDL',
-      delete: '/sap/bc/adt/deletion/delete',
+      delete: [
+        // ADT refuses a delete it has not approved, so the check is the
+        // operation's first half rather than a nicety: a delete that skips it
+        // is a different operation from the one this capability names.
+        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
+        '/sap/bc/adt/deletion/delete',
+      ],
       validate: '/sap/bc/adt/ddic/ddl/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -236,7 +260,13 @@ export const HANDLERS = {
       create: '/sap/bc/adt/ddic/tables',
       read: '/sap/bc/adt/ddic/tables/ZGUARD_TAB/source/main',
       readMetadata: '/sap/bc/adt/ddic/tables/ZGUARD_TAB',
-      delete: '/sap/bc/adt/deletion/delete',
+      delete: [
+        // ADT refuses a delete it has not approved, so the check is the
+        // operation's first half rather than a nicety: a delete that skips it
+        // is a different operation from the one this capability names.
+        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
+        '/sap/bc/adt/deletion/delete',
+      ],
       validate: '/sap/bc/adt/ddic/tables/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -260,7 +290,13 @@ export const HANDLERS = {
       create: '/sap/bc/adt/ddic/structures',
       read: '/sap/bc/adt/ddic/structures/ZGUARD_STRU/source/main',
       readMetadata: '/sap/bc/adt/ddic/structures/ZGUARD_STRU',
-      delete: '/sap/bc/adt/deletion/delete',
+      delete: [
+        // ADT refuses a delete it has not approved, so the check is the
+        // operation's first half rather than a nicety: a delete that skips it
+        // is a different operation from the one this capability names.
+        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
+        '/sap/bc/adt/deletion/delete',
+      ],
       validate: '/sap/bc/adt/ddic/structures/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -285,7 +321,13 @@ export const HANDLERS = {
       create: '/sap/bc/adt/ddic/tabletypes',
       read: '/sap/bc/adt/ddic/tabletypes/ZGUARD_TTYP',
       readMetadata: '/sap/bc/adt/ddic/tabletypes/ZGUARD_TTYP',
-      delete: '/sap/bc/adt/deletion/delete',
+      delete: [
+        // ADT refuses a delete it has not approved, so the check is the
+        // operation's first half rather than a nicety: a delete that skips it
+        // is a different operation from the one this capability names.
+        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
+        '/sap/bc/adt/deletion/delete',
+      ],
       validate: '/sap/bc/adt/ddic/tabletypes/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -311,7 +353,13 @@ export const HANDLERS = {
       read: '/sap/bc/adt/acm/dcl/sources/zguard_dcl/source/main',
       readMetadata: '/sap/bc/adt/acm/dcl/sources/zguard_dcl',
       update: '/sap/bc/adt/acm/dcl/sources/zguard_dcl/source/main',
-      delete: '/sap/bc/adt/deletion/delete',
+      delete: [
+        // ADT refuses a delete it has not approved, so the check is the
+        // operation's first half rather than a nicety: a delete that skips it
+        // is a different operation from the one this capability names.
+        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
+        '/sap/bc/adt/deletion/delete',
+      ],
       validate: '/sap/bc/adt/acm/dcl/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -338,7 +386,13 @@ export const HANDLERS = {
       read: '/sap/bc/adt/ddic/structures/zguard_app/source/main',
       readMetadata: '/sap/bc/adt/ddic/structures/zguard_app',
       update: '/sap/bc/adt/ddic/structures/zguard_app/source/main',
-      delete: '/sap/bc/adt/deletion/delete',
+      delete: [
+        // ADT refuses a delete it has not approved, so the check is the
+        // operation's first half rather than a nicety: a delete that skips it
+        // is a different operation from the one this capability names.
+        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
+        '/sap/bc/adt/deletion/delete',
+      ],
       validate: '/sap/bc/adt/ddic/structures/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -366,7 +420,13 @@ export const HANDLERS = {
       read: '/sap/bc/adt/bo/behaviordefinitions/zguard_bdef/source/main',
       readMetadata: '/sap/bc/adt/bo/behaviordefinitions/zguard_bdef',
       update: '/sap/bc/adt/bo/behaviordefinitions/zguard_bdef/source/main',
-      delete: '/sap/bc/adt/deletion/delete',
+      delete: [
+        // ADT refuses a delete it has not approved, so the check is the
+        // operation's first half rather than a nicety: a delete that skips it
+        // is a different operation from the one this capability names.
+        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
+        '/sap/bc/adt/deletion/delete',
+      ],
       validate: '/sap/bc/adt/bo/behaviordefinitions/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -396,7 +456,13 @@ export const HANDLERS = {
         '/sap/bc/adt/oo/classes/zbp_guard/source/main',
         '/sap/bc/adt/oo/classes/zbp_guard/includes/implementations',
       ],
-      delete: '/sap/bc/adt/deletion/delete',
+      delete: [
+        // ADT refuses a delete it has not approved, so the check is the
+        // operation's first half rather than a nicety: a delete that skips it
+        // is a different operation from the one this capability names.
+        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
+        '/sap/bc/adt/deletion/delete',
+      ],
       validate: '/sap/bc/adt/oo/validation/objectname',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -445,7 +511,13 @@ export const HANDLERS = {
       read: '/sap/bc/adt/enhancements/enhoxhh/zguard_enh/source/main',
       readMetadata: '/sap/bc/adt/enhancements/enhoxhh/zguard_enh',
       update: '/sap/bc/adt/enhancements/enhoxhh/zguard_enh/source/main',
-      delete: '/sap/bc/adt/deletion/delete',
+      delete: [
+        // ADT refuses a delete it has not approved, so the check is the
+        // operation's first half rather than a nicety: a delete that skips it
+        // is a different operation from the one this capability names.
+        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
+        '/sap/bc/adt/deletion/delete',
+      ],
       validate: '/sap/bc/adt/enhancements/enhoxhh/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -471,7 +543,13 @@ export const HANDLERS = {
       read: '/sap/bc/adt/ddic/srvd/sources/zguard_srvd/source/main',
       readMetadata: '/sap/bc/adt/ddic/srvd/sources/zguard_srvd',
       update: '/sap/bc/adt/ddic/srvd/sources/zguard_srvd/source/main',
-      delete: '/sap/bc/adt/deletion/delete',
+      delete: [
+        // ADT refuses a delete it has not approved, so the check is the
+        // operation's first half rather than a nicety: a delete that skips it
+        // is a different operation from the one this capability names.
+        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
+        '/sap/bc/adt/deletion/delete',
+      ],
       validate: '/sap/bc/adt/ddic/srvd/sources/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -499,7 +577,13 @@ export const HANDLERS = {
       readMetadata: '/sap/bc/adt/functions/groups/ZGUARD_FG/fmodules/ZGUARD_FM',
       update:
         '/sap/bc/adt/functions/groups/zguard_fg/fmodules/zguard_fm/source/main',
-      delete: '/sap/bc/adt/deletion/delete',
+      delete: [
+        // ADT refuses a delete it has not approved, so the check is the
+        // operation's first half rather than a nicety: a delete that skips it
+        // is a different operation from the one this capability names.
+        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
+        '/sap/bc/adt/deletion/delete',
+      ],
       validate: '/sap/bc/adt/functions/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -526,7 +610,13 @@ export const HANDLERS = {
       read: '/sap/bc/adt/ddic/dsfd/sources/zguard_dsfd/source/main',
       readMetadata: '/sap/bc/adt/ddic/dsfd/sources/zguard_dsfd',
       update: '/sap/bc/adt/ddic/dsfd/sources/zguard_dsfd/source/main',
-      delete: '/sap/bc/adt/deletion/delete',
+      delete: [
+        // ADT refuses a delete it has not approved, so the check is the
+        // operation's first half rather than a nicety: a delete that skips it
+        // is a different operation from the one this capability names.
+        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
+        '/sap/bc/adt/deletion/delete',
+      ],
       validate: '/sap/bc/adt/ddic/dsfd/sources/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -553,7 +643,13 @@ export const HANDLERS = {
       read: '/sap/bc/adt/ddic/dsfi/zguard_dsfi/source/main',
       readMetadata: '/sap/bc/adt/ddic/dsfi/zguard_dsfi',
       update: '/sap/bc/adt/ddic/dsfi/zguard_dsfi/source/main',
-      delete: '/sap/bc/adt/deletion/delete',
+      delete: [
+        // ADT refuses a delete it has not approved, so the check is the
+        // operation's first half rather than a nicety: a delete that skips it
+        // is a different operation from the one this capability names.
+        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
+        '/sap/bc/adt/deletion/delete',
+      ],
       validate: '/sap/bc/adt/ddic/dsfi/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -579,7 +675,13 @@ export const HANDLERS = {
       read: '/sap/bc/adt/xslt/transformations/zguard_xslt/source/main',
       readMetadata: '/sap/bc/adt/xslt/transformations/zguard_xslt',
       update: '/sap/bc/adt/xslt/transformations/zguard_xslt/source/main',
-      delete: '/sap/bc/adt/deletion/delete',
+      delete: [
+        // ADT refuses a delete it has not approved, so the check is the
+        // operation's first half rather than a nicety: a delete that skips it
+        // is a different operation from the one this capability names.
+        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
+        '/sap/bc/adt/deletion/delete',
+      ],
       validate: '/sap/bc/adt/xslt/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -608,6 +710,12 @@ export const HANDLERS = {
     requests: {
       read: '/sap/bc/adt/businessservices/bindings/zguard_srvb',
       readMetadata: '/sap/bc/adt/businessservices/bindings/zguard_srvb',
+      // NOTE — this handler does **not** check before deleting, unlike the 26
+      // others that use the deletion service. Recorded as it is rather than
+      // declared as it ought to be: adding the check means adding a request to
+      // a live operation, and whether ADT answers /deletion/check for a service
+      // binding is not something this plan's unit tests can establish. Found by
+      // this guard, 2026-08-15; worth a probe and a follow-up.
       delete: '/sap/bc/adt/deletion/delete',
       validate: '/sap/bc/adt/businessservices/bindings/bindingtypes',
       check: '/sap/bc/adt/checkruns',
@@ -641,7 +749,13 @@ export const HANDLERS = {
       read: '/sap/bc/adt/ddic/domains/ZGUARD_DOM',
       readMetadata: '/sap/bc/adt/ddic/domains/ZGUARD_DOM',
       update: '/sap/bc/adt/ddic/domains/zguard_dom',
-      delete: '/sap/bc/adt/deletion/delete',
+      delete: [
+        // ADT refuses a delete it has not approved, so the check is the
+        // operation's first half rather than a nicety: a delete that skips it
+        // is a different operation from the one this capability names.
+        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
+        '/sap/bc/adt/deletion/delete',
+      ],
       validate: '/sap/bc/adt/ddic/domains/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -676,7 +790,13 @@ export const HANDLERS = {
       create: '/sap/bc/adt/ddic/dataelements',
       read: '/sap/bc/adt/ddic/dataelements/ZGUARD_DTEL',
       readMetadata: '/sap/bc/adt/ddic/dataelements/ZGUARD_DTEL',
-      delete: '/sap/bc/adt/deletion/delete',
+      delete: [
+        // ADT refuses a delete it has not approved, so the check is the
+        // operation's first half rather than a nicety: a delete that skips it
+        // is a different operation from the one this capability names.
+        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
+        '/sap/bc/adt/deletion/delete',
+      ],
       validate: '/sap/bc/adt/ddic/dataelements/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -714,7 +834,13 @@ export const HANDLERS = {
       read: '/sap/bc/adt/functions/groups/ZGUARD_FG',
       readMetadata: '/sap/bc/adt/functions/groups/ZGUARD_FG',
       update: '/sap/bc/adt/functions/groups/ZGUARD_FG',
-      delete: '/sap/bc/adt/deletion/delete',
+      delete: [
+        // ADT refuses a delete it has not approved, so the check is the
+        // operation's first half rather than a nicety: a delete that skips it
+        // is a different operation from the one this capability names.
+        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
+        '/sap/bc/adt/deletion/delete',
+      ],
       validate: '/sap/bc/adt/functions/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -749,7 +875,13 @@ export const HANDLERS = {
       create: ['/sap/bc/adt/packages/validation', '/sap/bc/adt/packages'],
       read: '/sap/bc/adt/packages/ZGUARD_PKG',
       readMetadata: '/sap/bc/adt/packages/ZGUARD_PKG',
-      delete: '/sap/bc/adt/deletion/delete',
+      delete: [
+        // ADT refuses a delete it has not approved, so the check is the
+        // operation's first half rather than a nicety: a delete that skips it
+        // is a different operation from the one this capability names.
+        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
+        '/sap/bc/adt/deletion/delete',
+      ],
       validate: '/sap/bc/adt/packages/validation',
       check: '/sap/bc/adt/checkruns',
       lock: '/sap/bc/adt/packages/zguard_pkg',
@@ -783,7 +915,13 @@ export const HANDLERS = {
       readMetadata:
         '/sap/bc/adt/functions/groups/zguard_fg/includes/LZGUARD_FGF01',
       update: '/sap/bc/adt/functions/groups/zguard_fg/includes/LZGUARD_FGF01',
-      delete: '/sap/bc/adt/deletion/delete',
+      delete: [
+        // ADT refuses a delete it has not approved, so the check is the
+        // operation's first half rather than a nicety: a delete that skips it
+        // is a different operation from the one this capability names.
+        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
+        '/sap/bc/adt/deletion/delete',
+      ],
       validate: '/sap/bc/adt/functions/groups/zguard_fg',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -818,7 +956,13 @@ export const HANDLERS = {
       read: '/sap/bc/adt/aps/iam/auth/ZGUARD_AUTH',
       readMetadata: '/sap/bc/adt/aps/iam/auth/ZGUARD_AUTH',
       update: '/sap/bc/adt/aps/iam/auth/ZGUARD_AUTH',
-      delete: '/sap/bc/adt/deletion/delete',
+      delete: [
+        // ADT refuses a delete it has not approved, so the check is the
+        // operation's first half rather than a nicety: a delete that skips it
+        // is a different operation from the one this capability names.
+        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
+        '/sap/bc/adt/deletion/delete',
+      ],
       validate: '/sap/bc/adt/aps/iam/auth/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -850,7 +994,13 @@ export const HANDLERS = {
       read: '/sap/bc/adt/sfw/featuretoggles/zguard_ft',
       readMetadata: '/sap/bc/adt/sfw/featuretoggles/zguard_ft',
       update: '/sap/bc/adt/sfw/featuretoggles/zguard_ft',
-      delete: '/sap/bc/adt/deletion/delete',
+      delete: [
+        // ADT refuses a delete it has not approved, so the check is the
+        // operation's first half rather than a nicety: a delete that skips it
+        // is a different operation from the one this capability names.
+        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
+        '/sap/bc/adt/deletion/delete',
+      ],
       validate: '/sap/bc/adt/sfw/featuretoggles',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -886,6 +1036,12 @@ export const HANDLERS = {
     requests: {
       read: '/sap/bc/adt/businessservices/bindings/zguard_srvb',
       readMetadata: '/sap/bc/adt/businessservices/bindings/zguard_srvb',
+      // NOTE — this handler does **not** check before deleting, unlike the 26
+      // others that use the deletion service. Recorded as it is rather than
+      // declared as it ought to be: adding the check means adding a request to
+      // a live operation, and whether ADT answers /deletion/check for a service
+      // binding is not something this plan's unit tests can establish. Found by
+      // this guard, 2026-08-15; worth a probe and a follow-up.
       delete: '/sap/bc/adt/deletion/delete',
       validate: '/sap/bc/adt/businessservices/bindings/bindingtypes',
       check: '/sap/bc/adt/checkruns',
@@ -1050,7 +1206,13 @@ export const HANDLERS = {
       read: '/sap/bc/adt/messageclass/zguard_msg',
       readMetadata: '/sap/bc/adt/messageclass/zguard_msg',
       update: '/sap/bc/adt/messageclass/zguard_msg',
-      delete: '/sap/bc/adt/deletion/delete',
+      delete: [
+        // ADT refuses a delete it has not approved, so the check is the
+        // operation's first half rather than a nicety: a delete that skips it
+        // is a different operation from the one this capability names.
+        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
+        '/sap/bc/adt/deletion/delete',
+      ],
       validate: '/sap/bc/adt/messageclass/validation',
       lock: '/sap/bc/adt/messageclass/zguard_msg',
       unlock: '/sap/bc/adt/messageclass/zguard_msg',
@@ -1160,7 +1322,13 @@ export const HANDLERS = {
       read: '/sap/bc/adt/oo/classes/ZCL_GUARD_CDS_TESTS/includes/testclasses',
       readMetadata: '/sap/bc/adt/oo/classes/ZCL_GUARD_CDS_TESTS',
       update: '/sap/bc/adt/oo/classes/zcl_guard_cds_tests/includes/testclasses',
-      delete: '/sap/bc/adt/deletion/delete',
+      delete: [
+        // ADT refuses a delete it has not approved, so the check is the
+        // operation's first half rather than a nicety: a delete that skips it
+        // is a different operation from the one this capability names.
+        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
+        '/sap/bc/adt/deletion/delete',
+      ],
       validate: '/sap/bc/adt/checkruns',
       lock: '/sap/bc/adt/oo/classes/zcl_guard_cds_tests',
       unlock: '/sap/bc/adt/oo/classes/zcl_guard_cds_tests',
