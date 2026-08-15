@@ -345,6 +345,13 @@ declares its own methods, which this does not.
 (An earlier revision said "all 36 getters", which is simply false — corrected in review,
 2026-08-15.)
 
+That rule is stated here and followed here, but it is **not** yet true of the client as a whole:
+the same count found five different kinds of return type across the 37 getters, two of them
+concrete classes. Making them one is
+[issue #109](https://github.com/fr0ster/mcp-abap-adt-clients/issues/109) — a separate,
+breaking pass with its own spec. ATC conforms to the rule so it adds nothing to that pile; it
+does not clean it either, and this spec does not wait for it.
+
 The concrete class is not the return type. A consumer never names `AdtAtc`, and returning it
 would hand out whatever else the class happens to carry — the exact gap the capability guard
 exists to close on the other client.
