@@ -97,7 +97,7 @@ IAdtRunnable<IAtcRunTarget, IAtcRunResult, IAtcRunOptions>
 
 // reading a worklist — its own interface, as ITestRunInformation is
 interface IAtcFindings {
-  getFindings(worklistId: string, options?: IAtcFindingsOptions): Promise<IAdtResponse>;
+  getFindings(worklistId: string): Promise<IAdtResponse>;
 }
 ```
 
@@ -136,7 +136,7 @@ interface IAtcRunResult {
   findingStats: string;
 }
 ```
-- `getFindings(worklistId, options)` reads the worklist. One request, no retry.
+- `getFindings(worklistId)` reads the worklist. One request, no retry, no options.
 
 ```ts
 interface IAtcRunOptions {
@@ -147,26 +147,28 @@ interface IAtcRunOptions {
   checkVariant?: string;
   /**
    * `maximumVerdicts` in the run payload: a **cap on results**, not a page size.
-   * Defaults to 100.
+   * Defaults to 100. A positive integer — it is serialised straight into an XML
+   * attribute, so `run()` rejects 0, a negative, a fraction and NaN rather than
+   * sending them and letting the server decide. The server's own bounds are
+   * unknown; see the probe.
    */
   maximumVerdicts?: number;
 }
 
-interface IAtcFindingsOptions {
-  /**
-   * Ask the server to include findings someone has exempted. Defaults to
-   * `false`, which is what the request carries when the option is omitted —
-   * `GET /atc/worklists/{id}?includeExemptedFindings=false`, the only form
-   * observed.
-   */
-  includeExemptedFindings?: boolean;
-}
 ```
 
-Nothing else is in it. `format` is not: `checkstyle` was answered with a **406** and one accepted
-type, so a format option would offer a choice that does not exist. A timestamp filter and an
-object-set selector appear in ADT's worklist documentation but in no captured response here, and
-this package does not publish options it has not seen answered.
+**`getFindings` takes no options**, and there is no `IAtcFindingsOptions`.
+
+The obvious candidate was `includeExemptedFindings`, and publishing it as a boolean would promise
+that `true` works — while the only request anyone has made carries `false`. That is exactly what
+this package's own rule forbids: **do not publish an option nobody has seen answered.** A
+previous revision stated that rule and broke it in the same breath; caught in review,
+2026-08-15. The request sends `includeExemptedFindings=false`, the observed form, and `true`
+joins the probe list.
+
+`format` is out for a stronger reason: `checkstyle` was answered with a **406** and one accepted
+type, so the option would offer a choice that does not exist. The timestamp and object-set
+filters ADT documents appear in no captured response here.
 
 On the only system anyone has probed this is complete: the run returns finished counts, so a
 caller runs and then reads, and gets a correct answer including a correct zero. That is the whole
@@ -265,7 +267,7 @@ union is a promise about which objects this package can check.
 ## What goes in `interfaces`
 
 - the parameter types from #17, corrected: no `run_id`, no `with_long_polling`, no `checkstyle`;
-- `IAtcRunTarget` / `IAtcObjectRef` / `IAtcRunResult` / `IAtcRunOptions` / `IAtcFindingsOptions`;
+- `IAtcRunTarget` / `IAtcObjectRef` / `IAtcRunResult` / `IAtcRunOptions`;
 - `IAtcFindings`.
 
 `IAtcLog` already in the package (`runtime/IAtcLog.ts`) is **not** this: it reads a check-failure
@@ -276,12 +278,33 @@ are the same resource under two ids is unverified.
 One release, both packages, cut when the work is done — the rule the last three interfaces
 releases were cut against.
 
-## The guard applies
+## Where this lives
 
-Any new handler joins `src/__tests__/unit/capabilities/manifest.ts`: its factory, its config, the
-capabilities it claims, and the **request each method makes** — method and path, the whole chain.
-The completeness check fails on a factory with no entry, so this is not optional. An ATC entry
-claims `runnable` and its findings capability, and nothing else.
+**`AdtRuntimeClient.getAtc()`, in `src/runtime/atc/`, beside `AtcLog`.** Not `AdtClient`: that
+client hands out per-object CRUD handlers, and a check run is not an ADT object — the same reason
+`getProfiler()`, `getDumps()` and `getAtcLog()` are on the runtime client. Running checks and
+reading findings is runtime analysis, and it belongs where the profiler traces and the ATC
+**logs** already are.
+
+Not an extension of `AtcLog` either: that reads a check-failure or execution log by
+`executionId`, this runs checks and reads a worklist. Same subject, different resources, and one
+handler holding both would have halves with nothing to do with each other.
+
+**This decides what the capability guard covers**, which a previous revision got wrong by
+asserting the guard applies. `src/__tests__/unit/capabilities/` walks `AdtClient` and
+`AdtClientLegacy`; it does not know `AdtRuntimeClient` exists, and no runtime handler is in its
+manifest. An ATC handler placed there is **not** covered, and claiming otherwise would have been
+false. Raised in review, 2026-08-15.
+
+The plan picks one of two, with a reason rather than by inheriting this sentence:
+
+- **extend the completeness check to `AdtRuntimeClient`** — correct, and it immediately demands
+  manifest entries for a dozen runtime handlers that have none. A larger job than this feature.
+- **give ATC its own behavioural test in the guard's shape** — every method, the request it
+  makes, method and path. Proportionate, and it leaves the runtime client uncovered as it is
+  today.
+
+The second is what this spec expects; the first is worth doing and is not this.
 
 ## Deliberately not in scope
 
@@ -314,6 +337,8 @@ proven, on the trial.
 |---|---|
 | run one object of **each** kind #68 lists, and a few it does not (DDL source, table, behavior definition) | fixes `AtcObjectType` — **the only thing blocking the synchronous contract** |
 | the run response, captured whole, with known findings present | what the `FINDING_STATS` positions mean. **Not a blocker**: the contract returns the triple verbatim precisely so it does not need to know. Parsing it into named counts is a later improvement, and it needs this before it can be one |
+| `GET /atc/worklists/{id}?includeExemptedFindings=true` | whether that option exists at all — it stays out of the contract until answered |
+| `maximumVerdicts` at its edges — 0, 1, something enormous | the server's bounds, which nothing states |
 | `POST /atc/runs?...&clientWait=true` | the lead on waiting; `false` is what #68 sends, unexplained |
 | a worklist read **between** starting a run and its completion, if a run can be made slow enough | the only way to see whether an unfinished worklist is distinguishable |
 
