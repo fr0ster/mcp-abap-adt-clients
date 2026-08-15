@@ -200,6 +200,9 @@ const VERB_NOT_REACHED: Record<string, string> = {
   'serviceBinding.create': 'as service.create',
 };
 
+/** The content URI `getVersionSource` is handed, and must fetch. */
+const VERSION_CONTENT_URI = '/sap/bc/adt/guard/versions/1';
+
 /**
  * Where a method addresses a resource that is neither the object nor one of the
  * shared services — verified by reading the handler, like the verb deviations.
@@ -262,9 +265,12 @@ function expectedResource(
     case 'unlock':
     case 'readTransport':
       return anyOf(subject, '/cts/transportchecks');
-    // Creating means POSTing to the collection the object will live in.
+    // Creating means POSTing to the collection the object will live in — and
+    // only that. A chain may validate the name first, but a validation is not
+    // evidence that anything was created, and accepting it here let a create
+    // that stopped after the check pass. Caught in review, 2026-08-15.
     case 'create':
-      return anyOf(collection, '/validation');
+      return at(collection);
     // Deleting is either a DELETE on the object or the deletion service; for a
     // part, it is a write to that part.
     case 'delete':
@@ -290,9 +296,11 @@ function expectedResource(
         },
         describe: `a validation resource, a check run, or an ancestor of ${subject}`,
       };
-    // Takes a content URI from a version list; the object is not in it.
+    // Takes a content URI from a version list, so the object's own path is not
+    // in it — but the URI it was handed is, and a method free to fetch anything
+    // it likes is not being checked at all.
     case 'getVersionSource':
-      return { test: () => true, describe: 'the content URI it was given' };
+      return at(VERSION_CONTENT_URI.toLowerCase());
     default:
       return at(subject);
   }
@@ -310,7 +318,7 @@ async function invoke(
       await fn.call(handler, config, 'GUARD-LOCK');
       return;
     case 'getVersionSource':
-      await fn.call(handler, '/sap/bc/adt/guard/versions/1');
+      await fn.call(handler, VERSION_CONTENT_URI);
       return;
     case 'check':
       await fn.call(handler, config, 'inactive');
