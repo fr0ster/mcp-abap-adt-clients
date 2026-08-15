@@ -10,14 +10,20 @@ import { XMLParser } from 'fast-xml-parser';
 import {
   ACCEPT_CHECK_MESSAGES,
   ACCEPT_DELETION,
+  ACCEPT_DELETION_CHECK,
   ACCEPT_TRANSPORT_CHECK,
   ACCEPT_VALIDATION,
   CT_CHECK_OBJECTS,
   CT_DELETION,
+  CT_DELETION_CHECK,
   CT_TRANSPORT_CHECK,
 } from '../../constants/contentTypes';
 import { assertActivationSucceeded } from '../../utils/activationUtils';
-import { buildQueryString } from '../../utils/internalUtils';
+import { assertDeletable } from '../../utils/deletionCheck';
+import {
+  buildQueryString,
+  encodeSapObjectName,
+} from '../../utils/internalUtils';
 import { getSystemInformation } from '../../utils/systemInfo';
 import { getTimeout } from '../../utils/timeouts';
 import type {
@@ -523,6 +529,27 @@ export class AdtServiceBinding implements IAdtServiceBinding {
     } catch {
       // best-effort: if read/unpublish fails, try delete directly
     }
+
+    // Ask ADT whether the binding may go, as every other object type does.
+    // Until 12.0.0 this handler alone deleted without asking — the capability
+    // guard found it. A delete the server never approved is one a caller has no
+    // reason to believe happened, and the check is the same generic service for
+    // a binding as for a class: it takes the object's URI and nothing else.
+    const encoded = encodeSapObjectName(config.bindingName).toLowerCase();
+    const checkResponse = await this.connection.makeAdtRequest({
+      url: '/sap/bc/adt/deletion/check',
+      method: 'POST',
+      timeout: getTimeout('default'),
+      data: `<?xml version="1.0" encoding="UTF-8"?>
+<del:checkRequest xmlns:del="http://www.sap.com/adt/deletion" xmlns:adtcore="http://www.sap.com/adt/core">
+  <del:object adtcore:uri="/sap/bc/adt/businessservices/bindings/${encoded}"/>
+</del:checkRequest>`,
+      headers: {
+        Accept: ACCEPT_DELETION_CHECK,
+        'Content-Type': CT_DELETION_CHECK,
+      },
+    });
+    assertDeletable(checkResponse.data);
 
     const deleteResult = await this.deleteServiceBinding({
       bindingName: config.bindingName,

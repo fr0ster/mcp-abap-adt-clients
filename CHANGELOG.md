@@ -79,6 +79,11 @@ Every handler now declares what ADT gives it, and nothing else. This finishes wh
   low-level guard now treat an empty string as source and only a missing argument as an error.
 - **Service binding activation reported success whatever the server said** — `errors: []` with
   an error-severity `<msg>` in the response, the same defect `functionGroup` had before 11.1.0.
+- **A service binding was deleted without asking ADT first.** It POSTed
+  `/deletion/delete` straight away — alone among the 28 handlers that use the deletion service,
+  every other one of which checks first. A delete the server never approved is one a caller has
+  no reason to believe happened. Found by the capability guard, which requires both halves of
+  the operation.
 - **`unitTest.validate` validated the wrong thing.** It now checks what is about to be born: the
   container's name only when the class does not exist yet, and the test source whenever there is
   source to check.

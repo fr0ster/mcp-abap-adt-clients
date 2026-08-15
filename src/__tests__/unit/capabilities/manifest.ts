@@ -710,13 +710,10 @@ export const HANDLERS = {
     requests: {
       read: '/sap/bc/adt/businessservices/bindings/zguard_srvb',
       readMetadata: '/sap/bc/adt/businessservices/bindings/zguard_srvb',
-      // NOTE — this handler does **not** check before deleting, unlike the 26
-      // others that use the deletion service. Recorded as it is rather than
-      // declared as it ought to be: adding the check means adding a request to
-      // a live operation, and whether ADT answers /deletion/check for a service
-      // binding is not something this plan's unit tests can establish. Found by
-      // this guard, 2026-08-15; worth a probe and a follow-up.
-      delete: '/sap/bc/adt/deletion/delete',
+      delete: [
+        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
+        '/sap/bc/adt/deletion/delete',
+      ],
       validate: '/sap/bc/adt/businessservices/bindings/bindingtypes',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -1036,13 +1033,10 @@ export const HANDLERS = {
     requests: {
       read: '/sap/bc/adt/businessservices/bindings/zguard_srvb',
       readMetadata: '/sap/bc/adt/businessservices/bindings/zguard_srvb',
-      // NOTE — this handler does **not** check before deleting, unlike the 26
-      // others that use the deletion service. Recorded as it is rather than
-      // declared as it ought to be: adding the check means adding a request to
-      // a live operation, and whether ADT answers /deletion/check for a service
-      // binding is not something this plan's unit tests can establish. Found by
-      // this guard, 2026-08-15; worth a probe and a follow-up.
-      delete: '/sap/bc/adt/deletion/delete',
+      delete: [
+        { method: 'POST', path: '/sap/bc/adt/deletion/check' },
+        '/sap/bc/adt/deletion/delete',
+      ],
       validate: '/sap/bc/adt/businessservices/bindings/bindingtypes',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
