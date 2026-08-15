@@ -34,16 +34,32 @@ import type {
   IAdtValidatable,
   IAdtVersionable,
 } from '@mcp-abap-adt/interfaces';
-import type { AdtClient } from '../../../clients/AdtClient';
+import type { Atom, HANDLERS } from './manifest';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+/**
+ * The claims, **derived** from the manifest rather than restated.
+ *
+ * An earlier version of this file hand-maintained a second copy of the same
+ * 36-entry list, and a comment claiming a check kept the two together. That
+ * check did not exist — a grep for its name found nothing — so the two lists
+ * could drift indefinitely, which is the exact class of silent regression this
+ * guard is for. Caught in review, 2026-08-14.
+ *
+ * Both halves now come from `HANDLERS`: the capability set from its
+ * `capabilities` tuple, and the contract from the **return type of its own
+ * factory closure**, which is the type a consumer receives. There is nothing
+ * left to keep in step.
+ */
+type Claims = {
+  [H in keyof typeof HANDLERS]: (typeof HANDLERS)[H]['capabilities'][number];
+};
+
 /** The contract a consumer receives — the factory's return type, not the class. */
-type Contract<K extends keyof AdtClient> = AdtClient[K] extends (
-  ...args: never[]
-) => infer R
-  ? R
-  : never;
+type Contract<H extends keyof typeof HANDLERS> = ReturnType<
+  (typeof HANDLERS)[H]['factory']
+>;
 
 /**
  * Does `T` offer the atom?
@@ -53,7 +69,7 @@ type Contract<K extends keyof AdtClient> = AdtClient[K] extends (
  * offered at all, not whether it is typed over the right config — which tsc
  * already settles inside each handler.
  */
-type Offers<T, Atom> = T extends Atom ? true : false;
+type Offers<T, A> = T extends A ? true : false;
 
 type OffersAtom<T, A extends string> = A extends 'creatable'
   ? Offers<T, IAdtCreatable<any, any>>
@@ -77,145 +93,36 @@ type OffersAtom<T, A extends string> = A extends 'creatable'
                     ? Offers<T, IAdtTransportAware<any, any>>
                     : never;
 
-/**
- * The manifest, restated as types.
- *
- * `manifest.ts` is the runtime source of truth and this is the same claim in
- * the type system — the two are kept together by `manifestAgreesWithTypes` in
- * `behaviour.test.ts`, which fails if a factory's claims differ between them.
- */
-export interface Claims {
-  class: FullSet;
-  interface: FullSet;
-  program: FullSet;
-  ddl: FullSet;
-  table: FullSet;
-  structure: FullSet;
-  tableType: FullSet;
-  accessControl: FullSet;
-  appendStructure: FullSet;
-  behaviorDefinition: FullSet;
-  behaviorImplementation: FullSet;
-  metadataExtension: FullSet;
-  enhancement: FullSet;
-  serviceDefinition: FullSet;
-  functionModule: FullSet;
-  scalarFunction: FullSet;
-  scalarFunctionImplementation: FullSet;
-  transformation: FullSet;
-  service: Exclude<FullSet, 'versionable' | 'lockable'>;
-
-  domain: Exclude<FullSet, 'versionable'>;
-  dataElement: Exclude<FullSet, 'versionable'>;
-  functionGroup: Exclude<FullSet, 'versionable'>;
-  package: Exclude<FullSet, 'versionable' | 'activatable'>;
-  functionInclude: Exclude<FullSet, 'transportAware'>;
-  authorizationField: Exclude<FullSet, 'versionable' | 'transportAware'>;
-  featureToggle: Exclude<FullSet, 'versionable' | 'transportAware'>;
-  serviceBinding: Exclude<FullSet, 'versionable' | 'lockable'>;
-
-  localTestClass: Exclude<FullSet, 'creatable'>;
-  localTypes: Exclude<FullSet, 'creatable'>;
-  localDefinitions: Exclude<FullSet, 'creatable'>;
-  localMacros: Exclude<FullSet, 'creatable'>;
-
-  messageClass:
-    | 'creatable'
-    | 'readable'
-    | 'updatable'
-    | 'deletable'
-    | 'validatable'
-    | 'lockable';
-  messageClassMessage: 'creatable' | 'readable' | 'updatable' | 'deletable';
-  transport: 'creatable' | 'readable' | 'updatable' | 'deletable';
-  unitTest:
-    | 'creatable'
-    | 'readable'
-    | 'updatable'
-    | 'deletable'
-    | 'validatable'
-    | 'lockable';
-  cdsUnitTest:
-    | 'creatable'
-    | 'readable'
-    | 'updatable'
-    | 'deletable'
-    | 'validatable'
-    | 'lockable';
-}
-
-type FullSet =
-  | 'creatable'
-  | 'readable'
-  | 'updatable'
-  | 'deletable'
-  | 'validatable'
-  | 'checkable'
-  | 'activatable'
-  | 'lockable'
-  | 'versionable'
-  | 'transportAware';
-
-/** Which factory each claim is about. */
-interface Factories {
-  class: 'getClass';
-  interface: 'getInterface';
-  program: 'getProgram';
-  ddl: 'getDdl';
-  table: 'getTable';
-  structure: 'getStructure';
-  tableType: 'getTableType';
-  accessControl: 'getAccessControl';
-  appendStructure: 'getAppendStructure';
-  behaviorDefinition: 'getBehaviorDefinition';
-  behaviorImplementation: 'getBehaviorImplementation';
-  metadataExtension: 'getMetadataExtension';
-  enhancement: 'getEnhancement';
-  serviceDefinition: 'getServiceDefinition';
-  functionModule: 'getFunctionModule';
-  scalarFunction: 'getScalarFunction';
-  scalarFunctionImplementation: 'getScalarFunctionImplementation';
-  transformation: 'getTransformation';
-  service: 'getService';
-  domain: 'getDomain';
-  dataElement: 'getDataElement';
-  functionGroup: 'getFunctionGroup';
-  package: 'getPackage';
-  functionInclude: 'getFunctionInclude';
-  authorizationField: 'getAuthorizationField';
-  featureToggle: 'getFeatureToggle';
-  serviceBinding: 'getServiceBinding';
-  localTestClass: 'getLocalTestClass';
-  localTypes: 'getLocalTypes';
-  localDefinitions: 'getLocalDefinitions';
-  localMacros: 'getLocalMacros';
-  messageClass: 'getMessageClass';
-  messageClassMessage: 'getMessageClassMessage';
-  transport: 'getRequest';
-  unitTest: 'getUnitTest';
-  cdsUnitTest: 'getCdsUnitTest';
-}
-
 /** Every (factory, atom) pair whose type and claim disagree. */
 type Disagreements = {
   [H in keyof Claims]: {
-    [A in FullSet as OffersAtom<
-      Contract<Factories[H] & keyof AdtClient>,
-      A
-    > extends (A extends Claims[H] ? true : false)
+    [A in Atom as OffersAtom<Contract<H>, A> extends (
+      A extends Claims[H]
+        ? true
+        : false
+    )
       ? never
-      : A]: OffersAtom<Contract<Factories[H] & keyof AdtClient>, A> extends true
+      : A]: OffersAtom<Contract<H>, A> extends true
       ? 'offered but not claimed'
       : 'claimed but not offered';
   };
 };
 
-/** A handler with no disagreements contributes `{}`. */
+/**
+ * Every disagreement, flattened to `handler.atom: which way round`.
+ *
+ * A union of strings rather than a nested type on purpose: `tsc` prints a type
+ * alias by **name** in CLI output and expands a union of literals, so this is
+ * the difference between a CI log that says `Type 'boolean' is not assignable
+ * to type 'Offenders'` and one that says exactly which factory and which atom.
+ * The earlier version claimed the first was the second — caught in review,
+ * 2026-08-14, by running the failure and reading the log.
+ */
 type Offenders = {
-  [H in keyof Disagreements as keyof Disagreements[H] extends never
-    ? never
-    : H]: Disagreements[H];
-};
+  [H in keyof Disagreements]: {
+    [A in keyof Disagreements[H]]: `${H & string}.${A & string} — ${Disagreements[H][A] & string}`;
+  }[keyof Disagreements[H]];
+}[keyof Disagreements];
 
 /**
  * Nothing disagrees.
@@ -225,27 +132,26 @@ type Offenders = {
  * that ADT does not give them. All three were the same cause: their composites
  * lived in `@mcp-abap-adt/interfaces` and extended the fat `IAdtObject`, so
  * they could not be fixed from here. They were narrowed there, the handlers
- * followed, and the list is empty.
+ * followed, and nothing is left.
  *
  * It stays as a named type rather than being deleted: a disagreement that
  * cannot be fixed in this package is a fact worth recording rather than
- * tolerating silently, and the next one will have somewhere to go — with the
+ * tolerating silently, and the next one has somewhere to go — with the
  * assertion below failing until someone writes down why.
  */
-export type KnownDisagreements = {};
+export type KnownDisagreements = never;
 
 /**
  * The assertion.
  *
- * When this fails, the error names every factory that disagrees and, per atom,
- * which way round. Fix the manifest or the handler — never the check.
+ * When this fails, the error names every disagreeing factory and atom, and
+ * which way round — verified by reading the `npm run test:check` output, not
+ * by assuming. Fix the manifest or the handler; never the check.
  */
-type Equal<A, B> =
-  (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2
-    ? true
-    : false;
-
-export type _EveryFactoryMatchesItsClaim =
-  Equal<Offenders, KnownDisagreements> extends true ? true : Offenders;
+export type _EveryFactoryMatchesItsClaim = [Offenders] extends [
+  KnownDisagreements,
+]
+  ? true
+  : Offenders;
 
 export const everyFactoryMatchesItsClaim: _EveryFactoryMatchesItsClaim = true;

@@ -14,6 +14,7 @@
 
 import { AdtClient } from '../../../clients/AdtClient';
 import { AdtClientLegacy } from '../../../clients/AdtClientLegacy';
+import type { HandlerEntry } from './manifest';
 import { HANDLERS, NOT_HANDLERS } from './manifest';
 
 /** Every `get*` on the prototype chain, subclass overrides included. */
@@ -77,7 +78,9 @@ describe('capability guard — completeness', () => {
     // A capability this package refuses is a claim about ADT, and a claim
     // about ADT with no reason beside it is the kind of thing this whole plan
     // exists to remove. Entries that carry the full set need no note.
-    const narrowWithoutReason = Object.entries(HANDLERS)
+    const narrowWithoutReason = Object.entries(
+      HANDLERS as Record<string, HandlerEntry>,
+    )
       .filter(([, e]) => e.capabilities.length < 10 && !e.why?.trim())
       .map(([name]) => name);
 
