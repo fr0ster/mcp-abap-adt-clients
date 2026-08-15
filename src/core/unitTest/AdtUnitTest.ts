@@ -96,9 +96,20 @@ export class AdtUnitTest
 
     const state: IUnitTestState = { errors: [] };
 
+    // Only "it is not there" routes to the create path. Everything else — an
+    // auth failure, a 500, a dropped connection — is a fact about this request,
+    // not about the class, and validating a *name* on the back of it would
+    // report something that was never asked.
     const container = await this.adtClass
       .read({ className: config.className })
-      .catch(() => undefined);
+      .catch((error: unknown) => {
+        const status = (error as HttpError)?.response?.status;
+        const code = (error as { code?: string })?.code;
+        if (status === 404 || code === AdtObjectErrorCodes.OBJECT_NOT_FOUND) {
+          return undefined;
+        }
+        throw error;
+      });
 
     if (!container) {
       // Nothing to test against yet: this is the create path, so the name is
@@ -231,7 +242,10 @@ export class AdtUnitTest
     if (!config.className) {
       throw new Error('Container class name is required');
     }
-    if (config.testClassSource === undefined && !options?.sourceCode) {
+    if (
+      config.testClassSource === undefined &&
+      options?.sourceCode === undefined
+    ) {
       throw new Error('Test class source is required');
     }
 

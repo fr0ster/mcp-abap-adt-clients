@@ -13,15 +13,17 @@
  * handler then carries only methods it means.
  */
 
-import type {
-  HttpError,
-  IAbapConnection,
-  IAdtContentTypes,
-  IAdtSystemContext,
-  ILogger,
-  IObjectVersion,
+import {
+  AdtObjectErrorCodes,
+  AdtOperationError,
+  type HttpError,
+  type IAbapConnection,
+  type IAdtContentTypes,
+  type IAdtSystemContext,
+  type ILogger,
+  type IObjectVersion,
 } from '@mcp-abap-adt/interfaces';
-import { safeErrorMessage } from '../../utils/internalUtils';
+import { safeErrorMessage, safeStringify } from '../../utils/internalUtils';
 import {
   type ICapabilityContext,
   LockCapability,
@@ -156,17 +158,30 @@ export abstract class AdtClassMemberBase {
     } catch (error: unknown) {
       const e = error as HttpError;
       const status = e.response?.status;
-      const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({
-        method: 'activate',
-        error: err,
-        timestamp: new Date(),
-      });
-      this.logger?.error(
-        'Activate failed:',
-        status ? `${status} ${safeErrorMessage(err)}` : safeErrorMessage(err),
+      const statusText = e.response?.statusText;
+      const errorMessage = e.response?.data
+        ? typeof e.response.data === 'string'
+          ? e.response.data.substring(0, 500)
+          : safeStringify(e.response.data).substring(0, 500)
+        : e.message || 'Unknown error';
+
+      this.logger?.error?.(
+        `Activate failed: HTTP ${status || '?'} ${statusText || ''}`,
+        { status, statusText, message: errorMessage },
       );
-      throw err;
+
+      if (status && status >= 400 && status < 500) {
+        const customError = new AdtOperationError(
+          `Activation failed for object '${config.className}': ${errorMessage}`,
+        );
+        customError.code = AdtObjectErrorCodes.ACTIVATE_FAILED;
+        customError.status = status;
+        customError.statusText = statusText;
+        customError.originalError = error;
+        throw customError;
+      }
+
+      throw error;
     }
   }
 

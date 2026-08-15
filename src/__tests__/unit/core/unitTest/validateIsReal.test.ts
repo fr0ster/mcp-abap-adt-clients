@@ -115,6 +115,26 @@ describe('AdtUnitTest.validate()', () => {
     expect(calls).toHaveLength(2);
     expect(state.validationResponse?.data).toBe('<name-ok/>');
   });
+  it('a read that fails for any other reason is reported, not treated as absence', async () => {
+    // A 500 is a fact about the request, not about the class. Routing it into
+    // the create path would validate a NAME for a class that exists and report
+    // something nobody asked — caught in review, 2026-08-14.
+    const { conn, calls } = makeConn(() =>
+      Object.assign(new Error('server error'), {
+        response: {
+          status: 500,
+          statusText: 'Internal Server Error',
+          data: '',
+        },
+      }),
+    );
+    const h = new AdtUnitTest(conn, createLibraryLogger());
+
+    await expect(h.validate({ className: 'ZCL_CONTAINER' })).rejects.toThrow(
+      /server error/i,
+    );
+    expect(calls).toHaveLength(1);
+  });
 });
 
 describe('AdtCdsUnitTest.validate()', () => {

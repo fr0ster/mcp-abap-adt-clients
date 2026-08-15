@@ -111,6 +111,23 @@ describe('AdtUnitTest — managing the tests', () => {
     expect(calls[0].url).toContain('lockHandle=HELD-BY-CALLER');
   });
 
+  it('update accepts empty source inside a caller-held lock', async () => {
+    // Clearing the tests while holding the container's lock is the only route
+    // there is: delete() takes no lock handle. A truthy guard here rejected the
+    // empty string and made that impossible — caught in review, 2026-08-14.
+    const { conn, calls } = makeConn();
+    const h = new AdtUnitTest(conn, createLibraryLogger());
+
+    await h.update(
+      { className: 'ZCL_TESTS' },
+      { lockHandle: 'HELD-BY-CALLER', sourceCode: '' },
+    );
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].method).toBe('PUT');
+    expect(calls[0].data).toBe('');
+  });
+
   it('delete empties the include and deletes no object', async () => {
     const { conn, calls } = makeConn();
     const h = new AdtUnitTest(conn, createLibraryLogger());
