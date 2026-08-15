@@ -26,9 +26,11 @@ shapes. What is not worth keeping is the API they wrapped it in.
 
 ## The shape: this is profiling, not CRUD
 
-The decisive observation, and the thing that settles an otherwise blocking disagreement about
-whether ATC is synchronous: **an ATC run is the same shape as a profiled execution** — start a
-process, then look for the result it produces.
+**An ATC run is the same shape as a profiled execution** — start a process, then look for the
+result it produces. That is why this is not a CRUD object, and it is the whole of what the
+analogy gives. An earlier draft claimed it also settled whether ATC is synchronous; it does not,
+and the two sections below say why — the analogy breaks exactly where completion is concerned,
+which is why waiting is left undesigned.
 
 `ClassExecutor.runWithProfiling` (`src/executors/class/ClassExecutor.ts:86-125`) already does
 this. It does **not** poll a status resource, because none exists; it retries fetching the
@@ -102,6 +104,14 @@ interface IAtcFindings {
 - `run(target, options)` creates the worklist, starts the run, and returns `IAtcRunResult` — the
   worklist id and the `FINDING_STATS` the run response carried. Nothing more: those two are what
   the server hands back, and both were observed.
+
+**How many findings a run may return.** The payload carries `maximumVerdicts="N"`, so `run()`
+cannot build its request without a number. `IAtcRunOptions.maximumVerdicts` is optional and
+defaults to **100** — the value #68 uses in both its call sites, which is the only number anyone
+has run against a real system. It is a cap on results, not a page size: nothing observed says
+what happens at the boundary, so a caller wanting everything raises it rather than paging, and
+the default being a cap is worth saying in the method's documentation rather than leaving a
+caller to discover a truncated worklist.
 
 **Where the check variant comes from.** `POST /atc/worklists` requires one, so `run()` cannot
 proceed without deciding this. `IAtcRunOptions.checkVariant` is optional; when the caller omits
@@ -252,15 +262,20 @@ seen and to leave the rest to a probe. A consumer that needs "run and collect" t
 One session against the trial answers everything still open, and until it happens further design
 rounds produce findings rather than progress — three of them so far have.
 
+The check-variant path is **not** among them: `POST /atc/customizing` returning
+`systemCheckVariant` was observed on the trial on 2026-07-20, with a value
+(`ABAP_CLOUD_DEVELOPMENT_DEFAULT`), which is why the contract can depend on it. An earlier
+revision listed it here as well as in the traffic table — proven and unproven at once. It is
+proven, on the trial.
+
 | ask | why it blocks something |
 |---|---|
-| `POST /atc/customizing` → is `systemCheckVariant` there, and usable as `checkVariant`? | `run()`'s first request depends on it |
 | the run response, captured whole | `FINDING_STATS` positions — what a triple like `0,1,2` means with known findings present |
 | run one object of **each** kind #68 lists, and a few it does not (DDL source, table, behavior definition) | fixes `AtcObjectType`, the last undecided part of the contract |
 | `POST /atc/runs?...&clientWait=true` | the lead on waiting; `false` is what #68 sends, unexplained |
 | a worklist read **between** starting a run and its completion, if a run can be made slow enough | the only way to see whether an unfinished worklist is distinguishable |
 
-The first three close the synchronous contract. The last two decide whether waiting is designed
+The first two close the synchronous contract. The last two decide whether waiting is designed
 at all.
 
 ## Open questions
