@@ -2,7 +2,7 @@
 
 **Status:** blocked on a probe, 2026-08-15. The shape is agreed and the synchronous contract is
 all but complete — one part of it, the set of checkable object types, is a fact nobody has
-captured, and so is the whole question of waiting. See "The probe that unblocks this". Not
+captured, and so is the whole question of waiting. See "The probes that unblock this". Not
 implemented.
 
 **Scope:** an ATC client in `@mcp-abap-adt/adt-clients`, and the contract it needs in
@@ -268,6 +268,8 @@ union is a promise about which objects this package can check.
 
 - the parameter types from #17, corrected: no `run_id`, no `with_long_polling`, no `checkstyle`;
 - `IAtcRunTarget` / `IAtcObjectRef` / `IAtcRunResult` / `IAtcRunOptions`;
+- `IAtcFindings`, and nothing composing it with `IAdtRunnable` — the getter spells that
+  intersection itself, as `AdtClient`'s getters do;
 - `IAtcFindings`.
 
 `IAtcLog` already in the package (`runtime/IAtcLog.ts`) is **not** this: it reads a check-failure
@@ -306,6 +308,24 @@ The plan picks one of two, with a reason rather than by inheriting this sentence
 
 The second is what this spec expects; the first is worth doing and is not this.
 
+### What `getAtc()` returns
+
+The intersection, spelled at the getter — no new named composite:
+
+```ts
+getAtc(): IAdtRunnable<IAtcRunTarget, IAtcRunResult, IAtcRunOptions> & IAtcFindings;
+```
+
+That is what adt-clients 12.0.0 did to all 36 getters on `AdtClient`, and the reason holds here:
+the factory's return type **is** the contract a consumer receives, and both halves already have
+names. A third name over them — `IAtc extends IAdtRunnable<…>, IAtcFindings` — would abbreviate
+two types into one and buy nothing; `IAtcLog` beside it is a named interface because it declares
+its own methods, which this does not.
+
+The concrete class is not the return type. A consumer never names `AdtAtc`, and returning it
+would hand out whatever else the class happens to carry — the exact gap the capability guard
+exists to close on the other client.
+
 ## Deliberately not in scope
 
 **`runSync()`** — #68 also adds a synchronous ABAP Unit runner: one `POST /abapunit/testruns`
@@ -322,10 +342,19 @@ appearing, then from a count whose timing is unknown. The third answer is to des
 seen and to leave the rest to a probe. A consumer that needs "run and collect" today composes
 `run()` and `getFindings()` itself, and on the probed system that is correct.
 
-## The probe that unblocks this
+## The probes that unblock this
 
-One session against the trial answers everything still open, and until it happens further design
-rounds produce findings rather than progress — three of them so far have.
+**Two systems, and the trial cannot stand in for the other.** A previous revision claimed one
+session against the trial "answers everything still open"; it cannot. On a system where the run
+comes back finished, `clientWait=true` changes nothing observable, and there is no interval in
+which to catch an unfinished worklist. Waiting can only be studied where the run is actually
+asynchronous — which is on-prem, where it is claimed and unverified. Raised in review,
+2026-08-15.
+
+### On the trial — closes the synchronous contract
+
+Credentials for this exist; the run is synchronous there, which is exactly why it can settle the
+contract and nothing about waiting.
 
 The check-variant path is **not** among them: `POST /atc/customizing` returning
 `systemCheckVariant` was observed on the trial on 2026-07-20, with a value
@@ -339,18 +368,35 @@ proven, on the trial.
 | the run response, captured whole, with known findings present | what the `FINDING_STATS` positions mean. **Not a blocker**: the contract returns the triple verbatim precisely so it does not need to know. Parsing it into named counts is a later improvement, and it needs this before it can be one |
 | `GET /atc/worklists/{id}?includeExemptedFindings=true` | whether that option exists at all — it stays out of the contract until answered |
 | `maximumVerdicts` at its edges — 0, 1, something enormous | the server's bounds, which nothing states |
-| `POST /atc/runs?...&clientWait=true` | the lead on waiting; `false` is what #68 sends, unexplained |
-| a worklist read **between** starting a run and its completion, if a run can be made slow enough | the only way to see whether an unfinished worklist is distinguishable |
 
-Only the first closes the synchronous contract. The rest are improvements and the waiting
-question — worth the same session, since it is one connection either way.
+The first row is the blocker. The other two are improvements that would let an option and a
+validated range join the contract; they are cheap on the same connection.
+
+### On an on-prem system — decides whether waiting is designed at all
+
+Nothing here can be answered from the cloud trial, and this machine reaches cloud only, so it
+needs the on-prem route (a run from a machine that reaches one).
+
+| ask | why |
+|---|---|
+| does `POST /atc/runs` return before the checks finish? | the whole premise of waiting. If it does not, waiting is never designed and this spec is complete as written |
+| `GET /atc/runs/{id}` — 404 as on the trial, or a real status resource? | #68 built its polling on this; nobody has captured it |
+| `POST /atc/runs?...&clientWait=true` | whether the server will simply hold the request, which would answer the question by removing it |
+| a worklist read **between** start and completion | whether an unfinished worklist is distinguishable from an empty result at all — the thing that made two drafts of this spec wrong |
+
+Until that second probe happens, `run()` stays start-only, and that is a decision rather than an
+omission.
 
 ## Open questions
 
-1. **What marks a run finished?** Unanswered, and the reason `run()` does not wait.
-   `FINDING_STATS` is the candidate — is it populated before the work is done? — and `clientWait`
-   is the lead: #68 passes `false` without saying what `true` does. **This is the probe that
-   unblocks waiting**, and nothing else in the spec depends on it.
-3. **On-prem behaviour.** Needs a probe from a machine that reaches an on-prem system; this one
-   reaches cloud only.
-4. **Object coverage** — the checkable set, above.
+Two, and each belongs to one of the probes above rather than to another round of design.
+
+1. **The checkable object set** — `AtcObjectType`. Blocks the synchronous contract; the trial
+   answers it.
+2. **Whether ATC is ever asynchronous, and what marks a run finished.** Decides only whether
+   waiting is designed; needs an on-prem system, and until then `run()` is start-only by
+   decision.
+
+Everything else this spec once listed here has been decided in the text: the check variant, the
+finding statistics, `maximumVerdicts`, the target's shape, where the handler lives, and what the
+accessor returns.
