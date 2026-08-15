@@ -19,6 +19,7 @@
 import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { AdtClient } from '../../../clients/AdtClient';
 import { createLibraryLogger } from '../../helpers/testLogger';
+import type { RequestSpec } from './manifest';
 import {
   ATOM_METHODS,
   type Atom,
@@ -259,25 +260,36 @@ function expectedResource(
   key: string,
   entry: HandlerEntry,
   method: string,
-): { describe: string; all: string[]; action?: string } {
+  defaultVerb: string,
+): {
+  describe: string;
+  all: { method: string; path: string }[];
+  action?: string;
+} {
   // The URI `getVersionSource` was handed. It comes from a version list, not
   // from the object's path, so it is the one request the manifest cannot name.
   if (method === 'getVersionSource') {
     return {
       describe: VERSION_CONTENT_URI,
-      all: [VERSION_CONTENT_URI.toLowerCase()],
+      all: [{ method: 'GET', path: VERSION_CONTENT_URI.toLowerCase() }],
     };
   }
 
   const declared = entry.requests?.[method];
   if (!declared) {
     return {
-      describe: `a resource the manifest names for ${method} — this entry claims the capability and names none`,
-      all: ['\u0000never'],
+      describe: `a request the manifest names for ${method} — this entry claims the capability and names none`,
+      all: [{ method: defaultVerb, path: '\u0000never' }],
     };
   }
-  const all = (typeof declared === 'string' ? [declared] : declared).map((u) =>
-    u.toLowerCase(),
+
+  const specs = Array.isArray(declared)
+    ? (declared as RequestSpec[])
+    : [declared as RequestSpec];
+  const all = specs.map((spec) =>
+    typeof spec === 'string'
+      ? { method: defaultVerb, path: spec.toLowerCase() }
+      : { method: spec.method, path: spec.path.toLowerCase() },
   );
 
   // A lock and an unlock are the same POST on the same resource, told apart by
@@ -286,7 +298,9 @@ function expectedResource(
     method === 'lock' ? 'LOCK' : method === 'unlock' ? 'UNLOCK' : undefined;
 
   return {
-    describe: all.join(' and ') + (action ? `?_action=${action}` : ''),
+    describe:
+      all.map((r) => `${r.method} ${r.path}`).join(' and ') +
+      (action ? `?_action=${action}` : ''),
     all,
     action,
   };
@@ -423,27 +437,38 @@ describe('capability guard — behaviour', () => {
 
             // And on the right resource. A verb on the wrong URL is still the
             // wrong request — the whole point of naming a capability.
-            const resource = expectedResource(key, entry, method);
-            const paths = calls
+            const resource = expectedResource(key, entry, method, verb);
+            const made = calls
               .filter(
                 (c) =>
-                  (c.method === verb ||
-                    (method === 'delete' &&
-                      c.url.includes('/deletion/delete'))) &&
-                  (!resource.action ||
-                    new RegExp(`_action=${resource.action}(&|$)`, 'i').test(
-                      c.url,
-                    )),
+                  !resource.action ||
+                  new RegExp(`_action=${resource.action}(&|$)`, 'i').test(
+                    c.url,
+                  ),
               )
-              .map((c) => c.url.toLowerCase().split('?')[0]);
+              .map((c) => ({
+                method: c.method,
+                path: c.url.toLowerCase().split('?')[0],
+              }));
 
-            // Every named resource, not any of them: an operation that
-            // addresses two and stops after the first has not done what it
-            // claims.
-            const missing = resource.all.filter((w) => !paths.includes(w));
+            // Every named request, method and path together: an operation whose
+            // chain mixes verbs — POST the class, then PUT the tests into it —
+            // is only half done if the second never happens, and a list under
+            // one implied verb could not say that.
+            const missing = resource.all.filter(
+              (want) =>
+                !made.some(
+                  (c) =>
+                    c.path === want.path &&
+                    (c.method === want.method ||
+                      (method === 'delete' &&
+                        want.method === 'DELETE' &&
+                        c.path.includes('/deletion/delete'))),
+                ),
+            );
             if (missing.length > 0) {
               throw new Error(
-                `${name}.${method} never ${verb}s ${resource.describe} — it went to ${paths.join(', ') || 'nothing'}`,
+                `${name}.${method} never made ${resource.describe} — it made ${made.map((c) => `${c.method} ${c.path}`).join(', ') || 'nothing'}`,
               );
             }
           });

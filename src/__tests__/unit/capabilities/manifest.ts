@@ -49,6 +49,19 @@ const FULL = [
   'transportAware',
 ] as const;
 
+/**
+ * One request a method must make.
+ *
+ * A bare string means the capability's own verb — `create` POSTs, `update`
+ * PUTs. A pair is for an operation whose chain mixes them: `unitTest.create`
+ * POSTs the container class and then **PUT**s the tests into its include, and a
+ * list under one implied verb could not say so, so the second half went
+ * unchecked. Found in review, 2026-08-15.
+ */
+export type RequestSpec =
+  | string
+  | { readonly method: string; readonly path: string };
+
 export interface HandlerEntry {
   /** How a consumer reaches it. The closure hides any arguments the getter takes. */
   factory: (client: AdtClient) => unknown;
@@ -91,7 +104,7 @@ export interface HandlerEntry {
    * `includes/main/versions`, most source objects `source/main/versions`, an
    * include just `versions` under itself. Found in review, 2026-08-15.
    */
-  requests?: Readonly<Record<string, string | readonly string[]>>;
+  requests?: Readonly<Record<string, RequestSpec | readonly RequestSpec[]>>;
   /** What ADT gives this object. */
   capabilities: readonly Atom[];
   /** Why this set, when the set is not the full one. */
@@ -1098,9 +1111,12 @@ export const HANDLERS = {
     requests: {
       create: [
         '/sap/bc/adt/oo/classes',
-        '/sap/bc/adt/activation',
-        '/sap/bc/adt/oo/classes/zcl_guard_tests',
-        '/sap/bc/adt/checkruns',
+        // The class is POSTed and then the tests are PUT into it —
+        // both are the operation, and the second is the point of it.
+        {
+          method: 'PUT',
+          path: '/sap/bc/adt/oo/classes/zcl_guard_tests/includes/testclasses',
+        },
       ],
       read: '/sap/bc/adt/oo/classes/ZCL_GUARD_TESTS/includes/testclasses',
       readMetadata: '/sap/bc/adt/oo/classes/ZCL_GUARD_TESTS',
@@ -1134,9 +1150,12 @@ export const HANDLERS = {
     requests: {
       create: [
         '/sap/bc/adt/oo/classes',
-        '/sap/bc/adt/activation',
-        '/sap/bc/adt/oo/classes/zcl_guard_cds_tests',
-        '/sap/bc/adt/checkruns',
+        // The class is POSTed and then the tests are PUT into it —
+        // both are the operation, and the second is the point of it.
+        {
+          method: 'PUT',
+          path: '/sap/bc/adt/oo/classes/zcl_guard_cds_tests/includes/testclasses',
+        },
       ],
       read: '/sap/bc/adt/oo/classes/ZCL_GUARD_CDS_TESTS/includes/testclasses',
       readMetadata: '/sap/bc/adt/oo/classes/ZCL_GUARD_CDS_TESTS',
