@@ -63,15 +63,26 @@ export interface HandlerEntry {
   /** For a handler whose subject is a part of its object: which part. */
   include?: string;
   /**
-   * Where **this** object's name or source is validated.
+   * The request each method makes, by resource — the ADT path it must address.
    *
-   * ADT has no single validation endpoint: a class name goes to
-   * `/oo/validation/objectname`, a domain's to `/ddic/domains/validation`, and
-   * an include's source through a check run. Accepting "any /validation" let a
-   * class validated against the domain endpoint pass — found in review,
-   * 2026-08-15 — so each object says where its own lives.
+   * Six review rounds went into arriving at this rather than a rule. Every
+   * attempt to describe the right resource by its *shape* — under the subject,
+   * ending in `/versions`, containing `/validation` — was satisfied by a path
+   * that was not the resource: `…/testclasses/wrong/versions` ends the same
+   * way, a class validated against the domain endpoint contains `/validation`,
+   * a lock on an include sits under its class. So nothing is described here;
+   * everything is named.
+   *
+   * A list where the operation genuinely addresses more than one resource, and
+   * **all** of them are required — a behaviour implementation writes the
+   * class's main source and then the implementation include, and naming only
+   * the first let the second disappear unnoticed.
+   *
+   * A method absent from this map is one the generic fixture cannot drive to
+   * its request; those are listed in `VERB_NOT_REACHED` in `behaviour.test.ts`
+   * and never reach this check. `getVersionSource` is absent everywhere: it
+   * fetches the content URI it was handed, which is not the object's path.
    */
-  validation?: string;
   /**
    * Where **this** object's version list lives.
    *
@@ -80,22 +91,7 @@ export interface HandlerEntry {
    * `includes/main/versions`, most source objects `source/main/versions`, an
    * include just `versions` under itself. Found in review, 2026-08-15.
    */
-  versions?: string;
-  /**
-   * The resource `update` writes.
-   *
-   * "A PUT under the object" is not enough: `getClass().update()` writing
-   * `includes/testclasses` instead of `source/main` is a PUT under the class
-   * either way, and would have passed. Found in review, 2026-08-15. Absent for
-   * a handler whose update the generic fixture cannot reach — those are listed
-   * in `VERB_NOT_REACHED` and never get this far.
-   *
-   * A list where the operation genuinely writes more than one resource, and
-   * **all** of them are required: a behaviour implementation PUTs the class's
-   * main source and then the implementation include, and naming only the first
-   * let the second disappear unnoticed. Found in review, 2026-08-15.
-   */
-  writes?: string | readonly string[];
+  requests?: Readonly<Record<string, string | readonly string[]>>;
   /** What ADT gives this object. */
   capabilities: readonly Atom[];
   /** Why this set, when the set is not the full one. */
@@ -123,9 +119,20 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
     },
-    validation: '/sap/bc/adt/oo/validation/objectname',
-    versions: '/sap/bc/adt/oo/classes/ZCL_GUARD/includes/main/versions',
-    writes: '/sap/bc/adt/oo/classes/ZCL_GUARD/source/main',
+    requests: {
+      create: '/sap/bc/adt/oo/classes',
+      read: '/sap/bc/adt/oo/classes/ZCL_GUARD/source/main',
+      readMetadata: '/sap/bc/adt/oo/classes/ZCL_GUARD',
+      update: '/sap/bc/adt/oo/classes/zcl_guard/source/main',
+      delete: '/sap/bc/adt/deletion/delete',
+      validate: '/sap/bc/adt/oo/validation/objectname',
+      check: '/sap/bc/adt/checkruns',
+      activate: '/sap/bc/adt/activation',
+      lock: '/sap/bc/adt/oo/classes/zcl_guard',
+      unlock: '/sap/bc/adt/oo/classes/zcl_guard',
+      getVersions: '/sap/bc/adt/oo/classes/ZCL_GUARD/includes/main/versions',
+      readTransport: '/sap/bc/adt/oo/classes/ZCL_GUARD/transport',
+    },
     capabilities: FULL,
   },
   interface: {
@@ -137,9 +144,20 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
     },
-    validation: '/sap/bc/adt/oo/validation/objectname',
-    versions: '/sap/bc/adt/oo/interfaces/ZIF_GUARD/source/main/versions',
-    writes: '/sap/bc/adt/oo/interfaces/ZIF_GUARD/source/main',
+    requests: {
+      create: '/sap/bc/adt/oo/interfaces',
+      read: '/sap/bc/adt/oo/interfaces/ZIF_GUARD/source/main',
+      readMetadata: '/sap/bc/adt/oo/interfaces/ZIF_GUARD',
+      update: '/sap/bc/adt/oo/interfaces/ZIF_GUARD/source/main',
+      delete: '/sap/bc/adt/deletion/delete',
+      validate: '/sap/bc/adt/oo/validation/objectname',
+      check: '/sap/bc/adt/checkruns',
+      activate: '/sap/bc/adt/activation',
+      lock: '/sap/bc/adt/oo/interfaces/zif_guard',
+      unlock: '/sap/bc/adt/oo/interfaces/ZIF_GUARD',
+      getVersions: '/sap/bc/adt/oo/interfaces/ZIF_GUARD/source/main/versions',
+      readTransport: '/sap/bc/adt/oo/interfaces/ZIF_GUARD/transport',
+    },
     capabilities: FULL,
   },
   program: {
@@ -151,9 +169,20 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
     },
-    validation: '/sap/bc/adt/programs/validation',
-    versions: '/sap/bc/adt/programs/programs/ZGUARD/source/main/versions',
-    writes: '/sap/bc/adt/programs/programs/ZGUARD/source/main',
+    requests: {
+      create: '/sap/bc/adt/programs/programs',
+      read: '/sap/bc/adt/programs/programs/ZGUARD/source/main',
+      readMetadata: '/sap/bc/adt/programs/programs/ZGUARD',
+      update: '/sap/bc/adt/programs/programs/zguard/source/main',
+      delete: '/sap/bc/adt/deletion/delete',
+      validate: '/sap/bc/adt/programs/validation',
+      check: '/sap/bc/adt/checkruns',
+      activate: '/sap/bc/adt/activation',
+      lock: '/sap/bc/adt/programs/programs/zguard',
+      unlock: '/sap/bc/adt/programs/programs/zguard',
+      getVersions: '/sap/bc/adt/programs/programs/ZGUARD/source/main/versions',
+      readTransport: '/sap/bc/adt/programs/programs/ZGUARD/transport',
+    },
     capabilities: FULL,
   },
   ddl: {
@@ -165,8 +194,20 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
     },
-    validation: '/sap/bc/adt/ddic/ddl/validation',
-    versions: '/sap/bc/adt/ddic/ddl/sources/ZGUARD_DDL/source/main/versions',
+    requests: {
+      create: '/sap/bc/adt/ddic/ddl/sources',
+      read: '/sap/bc/adt/ddic/ddl/sources/ZGUARD_DDL/source/main',
+      readMetadata: '/sap/bc/adt/ddic/ddl/sources/ZGUARD_DDL',
+      delete: '/sap/bc/adt/deletion/delete',
+      validate: '/sap/bc/adt/ddic/ddl/validation',
+      check: '/sap/bc/adt/checkruns',
+      activate: '/sap/bc/adt/activation',
+      lock: '/sap/bc/adt/ddic/ddl/sources/zguard_ddl',
+      unlock: '/sap/bc/adt/ddic/ddl/sources/zguard_ddl',
+      getVersions:
+        '/sap/bc/adt/ddic/ddl/sources/ZGUARD_DDL/source/main/versions',
+      readTransport: '/sap/bc/adt/ddic/ddl/sources/ZGUARD_DDL/transport',
+    },
     capabilities: FULL,
   },
   table: {
@@ -178,8 +219,19 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
     },
-    validation: '/sap/bc/adt/ddic/tables/validation',
-    versions: '/sap/bc/adt/ddic/tables/ZGUARD_TAB/source/main/versions',
+    requests: {
+      create: '/sap/bc/adt/ddic/tables',
+      read: '/sap/bc/adt/ddic/tables/ZGUARD_TAB/source/main',
+      readMetadata: '/sap/bc/adt/ddic/tables/ZGUARD_TAB',
+      delete: '/sap/bc/adt/deletion/delete',
+      validate: '/sap/bc/adt/ddic/tables/validation',
+      check: '/sap/bc/adt/checkruns',
+      activate: '/sap/bc/adt/activation',
+      lock: '/sap/bc/adt/ddic/tables/ZGUARD_TAB',
+      unlock: '/sap/bc/adt/ddic/tables/ZGUARD_TAB',
+      getVersions: '/sap/bc/adt/ddic/tables/ZGUARD_TAB/source/main/versions',
+      readTransport: '/sap/bc/adt/ddic/tables/ZGUARD_TAB/transport',
+    },
     capabilities: FULL,
   },
   structure: {
@@ -191,8 +243,20 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
     },
-    validation: '/sap/bc/adt/ddic/structures/validation',
-    versions: '/sap/bc/adt/ddic/structures/ZGUARD_STRU/source/main/versions',
+    requests: {
+      create: '/sap/bc/adt/ddic/structures',
+      read: '/sap/bc/adt/ddic/structures/ZGUARD_STRU/source/main',
+      readMetadata: '/sap/bc/adt/ddic/structures/ZGUARD_STRU',
+      delete: '/sap/bc/adt/deletion/delete',
+      validate: '/sap/bc/adt/ddic/structures/validation',
+      check: '/sap/bc/adt/checkruns',
+      activate: '/sap/bc/adt/activation',
+      lock: '/sap/bc/adt/ddic/structures/zguard_stru',
+      unlock: '/sap/bc/adt/ddic/structures/zguard_stru',
+      getVersions:
+        '/sap/bc/adt/ddic/structures/ZGUARD_STRU/source/main/versions',
+      readTransport: '/sap/bc/adt/ddic/structures/ZGUARD_STRU/transport',
+    },
     capabilities: FULL,
   },
   tableType: {
@@ -204,8 +268,20 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
     },
-    validation: '/sap/bc/adt/ddic/tabletypes/validation',
-    versions: '/sap/bc/adt/ddic/tabletypes/ZGUARD_TTYP/source/main/versions',
+    requests: {
+      create: '/sap/bc/adt/ddic/tabletypes',
+      read: '/sap/bc/adt/ddic/tabletypes/ZGUARD_TTYP',
+      readMetadata: '/sap/bc/adt/ddic/tabletypes/ZGUARD_TTYP',
+      delete: '/sap/bc/adt/deletion/delete',
+      validate: '/sap/bc/adt/ddic/tabletypes/validation',
+      check: '/sap/bc/adt/checkruns',
+      activate: '/sap/bc/adt/activation',
+      lock: '/sap/bc/adt/ddic/tabletypes/ZGUARD_TTYP',
+      unlock: '/sap/bc/adt/ddic/tabletypes/ZGUARD_TTYP',
+      getVersions:
+        '/sap/bc/adt/ddic/tabletypes/ZGUARD_TTYP/source/main/versions',
+      readTransport: '/sap/bc/adt/ddic/tabletypes/ZGUARD_TTYP/transport',
+    },
     capabilities: FULL,
   },
   accessControl: {
@@ -217,9 +293,21 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
     },
-    validation: '/sap/bc/adt/acm/dcl/validation',
-    versions: '/sap/bc/adt/acm/dcl/sources/ZGUARD_DCL/source/main/versions',
-    writes: '/sap/bc/adt/acm/dcl/sources/ZGUARD_DCL/source/main',
+    requests: {
+      create: '/sap/bc/adt/acm/dcl/sources',
+      read: '/sap/bc/adt/acm/dcl/sources/zguard_dcl/source/main',
+      readMetadata: '/sap/bc/adt/acm/dcl/sources/zguard_dcl',
+      update: '/sap/bc/adt/acm/dcl/sources/zguard_dcl/source/main',
+      delete: '/sap/bc/adt/deletion/delete',
+      validate: '/sap/bc/adt/acm/dcl/validation',
+      check: '/sap/bc/adt/checkruns',
+      activate: '/sap/bc/adt/activation',
+      lock: '/sap/bc/adt/acm/dcl/sources/zguard_dcl',
+      unlock: '/sap/bc/adt/acm/dcl/sources/zguard_dcl',
+      getVersions:
+        '/sap/bc/adt/acm/dcl/sources/zguard_dcl/source/main/versions',
+      readTransport: '/sap/bc/adt/acm/dcl/sources/zguard_dcl/transport',
+    },
     capabilities: FULL,
   },
   appendStructure: {
@@ -232,9 +320,21 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
     },
-    validation: '/sap/bc/adt/ddic/structures/validation',
-    versions: '/sap/bc/adt/ddic/structures/ZGUARD_APP/source/main/versions',
-    writes: '/sap/bc/adt/ddic/structures/ZGUARD_APP/source/main',
+    requests: {
+      create: '/sap/bc/adt/ddic/structures',
+      read: '/sap/bc/adt/ddic/structures/zguard_app/source/main',
+      readMetadata: '/sap/bc/adt/ddic/structures/zguard_app',
+      update: '/sap/bc/adt/ddic/structures/zguard_app/source/main',
+      delete: '/sap/bc/adt/deletion/delete',
+      validate: '/sap/bc/adt/ddic/structures/validation',
+      check: '/sap/bc/adt/checkruns',
+      activate: '/sap/bc/adt/activation',
+      lock: '/sap/bc/adt/ddic/structures/zguard_app',
+      unlock: '/sap/bc/adt/ddic/structures/zguard_app',
+      getVersions:
+        '/sap/bc/adt/ddic/structures/zguard_app/source/main/versions',
+      readTransport: '/sap/bc/adt/ddic/structures/zguard_app/transport',
+    },
     capabilities: FULL,
   },
   behaviorDefinition: {
@@ -248,10 +348,21 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
     },
-    validation: '/sap/bc/adt/bo/behaviordefinitions/validation',
-    versions:
-      '/sap/bc/adt/bo/behaviordefinitions/ZGUARD_BDEF/source/main/versions',
-    writes: '/sap/bc/adt/bo/behaviordefinitions/ZGUARD_BDEF/source/main',
+    requests: {
+      create: '/sap/bc/adt/bo/behaviordefinitions',
+      read: '/sap/bc/adt/bo/behaviordefinitions/zguard_bdef/source/main',
+      readMetadata: '/sap/bc/adt/bo/behaviordefinitions/zguard_bdef',
+      update: '/sap/bc/adt/bo/behaviordefinitions/zguard_bdef/source/main',
+      delete: '/sap/bc/adt/deletion/delete',
+      validate: '/sap/bc/adt/bo/behaviordefinitions/validation',
+      check: '/sap/bc/adt/checkruns',
+      activate: '/sap/bc/adt/activation',
+      lock: '/sap/bc/adt/bo/behaviordefinitions/zguard_bdef',
+      unlock: '/sap/bc/adt/bo/behaviordefinitions/zguard_bdef',
+      getVersions:
+        '/sap/bc/adt/bo/behaviordefinitions/zguard_bdef/source/main/versions',
+      readTransport: '/sap/bc/adt/bo/behaviordefinitions/zguard_bdef/transport',
+    },
     capabilities: FULL,
   },
   behaviorImplementation: {
@@ -264,21 +375,44 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
     },
-    validation: '/sap/bc/adt/oo/validation/objectname',
-    versions:
-      '/sap/bc/adt/oo/classes/ZBP_GUARD/includes/implementations/versions',
-    writes: [
-      '/sap/bc/adt/oo/classes/ZBP_GUARD/source/main',
-      '/sap/bc/adt/oo/classes/ZBP_GUARD/includes/implementations',
-    ],
+    requests: {
+      create: '/sap/bc/adt/oo/classes',
+      read: '/sap/bc/adt/oo/classes/ZBP_GUARD/source/main',
+      readMetadata: '/sap/bc/adt/oo/classes/ZBP_GUARD',
+      update: [
+        '/sap/bc/adt/oo/classes/zbp_guard/source/main',
+        '/sap/bc/adt/oo/classes/zbp_guard/includes/implementations',
+      ],
+      delete: '/sap/bc/adt/deletion/delete',
+      validate: '/sap/bc/adt/oo/validation/objectname',
+      check: '/sap/bc/adt/checkruns',
+      activate: '/sap/bc/adt/activation',
+      lock: '/sap/bc/adt/oo/classes/zbp_guard',
+      unlock: '/sap/bc/adt/oo/classes/zbp_guard',
+      getVersions:
+        '/sap/bc/adt/oo/classes/ZBP_GUARD/includes/implementations/versions',
+      readTransport: '/sap/bc/adt/oo/classes/ZBP_GUARD/transport',
+    },
     capabilities: FULL,
   },
   metadataExtension: {
     factory: (c: AdtClient) => c.getMetadataExtension(),
     subject: '/sap/bc/adt/ddic/ddlx/sources/ZGUARD_DDLX',
     config: { name: 'ZGUARD_DDLX', packageName: '$TMP', description: 'guard' },
-    validation: '/sap/bc/adt/ddic/ddlx/sources/validation',
-    versions: '/sap/bc/adt/ddic/ddlx/sources/ZGUARD_DDLX/source/main/versions',
+    requests: {
+      create: '/sap/bc/adt/ddic/ddlx/sources',
+      read: '/sap/bc/adt/ddic/ddlx/sources/zguard_ddlx/source/main',
+      readMetadata: '/sap/bc/adt/ddic/ddlx/sources/zguard_ddlx',
+      delete: '/sap/bc/adt/ddic/ddlx/sources/zguard_ddlx',
+      validate: '/sap/bc/adt/ddic/ddlx/sources/validation',
+      check: '/sap/bc/adt/checkruns',
+      activate: '/sap/bc/adt/activation',
+      lock: '/sap/bc/adt/ddic/ddlx/sources/zguard_ddlx',
+      unlock: '/sap/bc/adt/ddic/ddlx/sources/zguard_ddlx',
+      getVersions:
+        '/sap/bc/adt/ddic/ddlx/sources/zguard_ddlx/source/main/versions',
+      readTransport: '/sap/bc/adt/ddic/ddlx/sources/zguard_ddlx/transport',
+    },
     capabilities: FULL,
   },
   enhancement: {
@@ -293,10 +427,21 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
     },
-    validation: '/sap/bc/adt/enhancements/enhoxhh/validation',
-    versions:
-      '/sap/bc/adt/enhancements/enhoxhh/ZGUARD_ENH/source/main/versions',
-    writes: '/sap/bc/adt/enhancements/enhoxhh/ZGUARD_ENH/source/main',
+    requests: {
+      create: '/sap/bc/adt/enhancements/enhoxhh',
+      read: '/sap/bc/adt/enhancements/enhoxhh/zguard_enh/source/main',
+      readMetadata: '/sap/bc/adt/enhancements/enhoxhh/zguard_enh',
+      update: '/sap/bc/adt/enhancements/enhoxhh/zguard_enh/source/main',
+      delete: '/sap/bc/adt/deletion/delete',
+      validate: '/sap/bc/adt/enhancements/enhoxhh/validation',
+      check: '/sap/bc/adt/checkruns',
+      activate: '/sap/bc/adt/activation',
+      lock: '/sap/bc/adt/enhancements/enhoxhh/zguard_enh',
+      unlock: '/sap/bc/adt/enhancements/enhoxhh/zguard_enh',
+      getVersions:
+        '/sap/bc/adt/enhancements/enhoxhh/zguard_enh/source/main/versions',
+      readTransport: '/sap/bc/adt/enhancements/enhoxhh/zguard_enh/transport',
+    },
     capabilities: FULL,
   },
   serviceDefinition: {
@@ -308,9 +453,21 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
     },
-    validation: '/sap/bc/adt/ddic/srvd/sources/validation',
-    versions: '/sap/bc/adt/ddic/srvd/sources/ZGUARD_SRVD/source/main/versions',
-    writes: '/sap/bc/adt/ddic/srvd/sources/ZGUARD_SRVD/source/main',
+    requests: {
+      create: '/sap/bc/adt/ddic/srvd/sources',
+      read: '/sap/bc/adt/ddic/srvd/sources/zguard_srvd/source/main',
+      readMetadata: '/sap/bc/adt/ddic/srvd/sources/zguard_srvd',
+      update: '/sap/bc/adt/ddic/srvd/sources/zguard_srvd/source/main',
+      delete: '/sap/bc/adt/deletion/delete',
+      validate: '/sap/bc/adt/ddic/srvd/sources/validation',
+      check: '/sap/bc/adt/checkruns',
+      activate: '/sap/bc/adt/activation',
+      lock: '/sap/bc/adt/ddic/srvd/sources/zguard_srvd',
+      unlock: '/sap/bc/adt/ddic/srvd/sources/zguard_srvd',
+      getVersions:
+        '/sap/bc/adt/ddic/srvd/sources/zguard_srvd/source/main/versions',
+      readTransport: '/sap/bc/adt/ddic/srvd/sources/zguard_srvd/transport',
+    },
     capabilities: FULL,
   },
   functionModule: {
@@ -323,11 +480,23 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
     },
-    validation: '/sap/bc/adt/functions/validation',
-    versions:
-      '/sap/bc/adt/functions/groups/ZGUARD_FG/fmodules/ZGUARD_FM/source/main/versions',
-    writes:
-      '/sap/bc/adt/functions/groups/ZGUARD_FG/fmodules/ZGUARD_FM/source/main',
+    requests: {
+      create: '/sap/bc/adt/functions/groups/zguard_fg/fmodules',
+      read: '/sap/bc/adt/functions/groups/ZGUARD_FG/fmodules/ZGUARD_FM/source/main',
+      readMetadata: '/sap/bc/adt/functions/groups/ZGUARD_FG/fmodules/ZGUARD_FM',
+      update:
+        '/sap/bc/adt/functions/groups/zguard_fg/fmodules/zguard_fm/source/main',
+      delete: '/sap/bc/adt/deletion/delete',
+      validate: '/sap/bc/adt/functions/validation',
+      check: '/sap/bc/adt/checkruns',
+      activate: '/sap/bc/adt/activation',
+      lock: '/sap/bc/adt/functions/groups/zguard_fg/fmodules/zguard_fm',
+      unlock: '/sap/bc/adt/functions/groups/zguard_fg/fmodules/zguard_fm',
+      getVersions:
+        '/sap/bc/adt/functions/groups/ZGUARD_FG/fmodules/ZGUARD_FM/source/main/versions',
+      readTransport:
+        '/sap/bc/adt/functions/groups/ZGUARD_FG/fmodules/ZGUARD_FM/transport',
+    },
     capabilities: FULL,
   },
   scalarFunction: {
@@ -339,9 +508,21 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
     },
-    validation: '/sap/bc/adt/ddic/dsfd/sources/validation',
-    versions: '/sap/bc/adt/ddic/dsfd/sources/ZGUARD_DSFD/source/main/versions',
-    writes: '/sap/bc/adt/ddic/dsfd/sources/ZGUARD_DSFD/source/main',
+    requests: {
+      create: '/sap/bc/adt/ddic/dsfd/sources',
+      read: '/sap/bc/adt/ddic/dsfd/sources/zguard_dsfd/source/main',
+      readMetadata: '/sap/bc/adt/ddic/dsfd/sources/zguard_dsfd',
+      update: '/sap/bc/adt/ddic/dsfd/sources/zguard_dsfd/source/main',
+      delete: '/sap/bc/adt/deletion/delete',
+      validate: '/sap/bc/adt/ddic/dsfd/sources/validation',
+      check: '/sap/bc/adt/checkruns',
+      activate: '/sap/bc/adt/activation',
+      lock: '/sap/bc/adt/ddic/dsfd/sources/zguard_dsfd',
+      unlock: '/sap/bc/adt/ddic/dsfd/sources/zguard_dsfd',
+      getVersions:
+        '/sap/bc/adt/ddic/dsfd/sources/zguard_dsfd/source/main/versions',
+      readTransport: '/sap/bc/adt/ddic/dsfd/sources/zguard_dsfd/transport',
+    },
     capabilities: FULL,
   },
   scalarFunctionImplementation: {
@@ -354,9 +535,20 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
     },
-    validation: '/sap/bc/adt/ddic/dsfi/validation',
-    versions: '/sap/bc/adt/ddic/dsfi/ZGUARD_DSFI/source/main/versions',
-    writes: '/sap/bc/adt/ddic/dsfi/ZGUARD_DSFI/source/main',
+    requests: {
+      create: '/sap/bc/adt/ddic/dsfi',
+      read: '/sap/bc/adt/ddic/dsfi/zguard_dsfi/source/main',
+      readMetadata: '/sap/bc/adt/ddic/dsfi/zguard_dsfi',
+      update: '/sap/bc/adt/ddic/dsfi/zguard_dsfi/source/main',
+      delete: '/sap/bc/adt/deletion/delete',
+      validate: '/sap/bc/adt/ddic/dsfi/validation',
+      check: '/sap/bc/adt/checkruns',
+      activate: '/sap/bc/adt/activation',
+      lock: '/sap/bc/adt/ddic/dsfi/zguard_dsfi',
+      unlock: '/sap/bc/adt/ddic/dsfi/zguard_dsfi',
+      getVersions: '/sap/bc/adt/ddic/dsfi/zguard_dsfi/source/main/versions',
+      readTransport: '/sap/bc/adt/ddic/dsfi/zguard_dsfi/transport',
+    },
     capabilities: FULL,
   },
   transformation: {
@@ -369,10 +561,21 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
     },
-    validation: '/sap/bc/adt/xslt/validation',
-    versions:
-      '/sap/bc/adt/xslt/transformations/ZGUARD_XSLT/source/main/versions',
-    writes: '/sap/bc/adt/xslt/transformations/ZGUARD_XSLT/source/main',
+    requests: {
+      create: '/sap/bc/adt/xslt/transformations',
+      read: '/sap/bc/adt/xslt/transformations/zguard_xslt/source/main',
+      readMetadata: '/sap/bc/adt/xslt/transformations/zguard_xslt',
+      update: '/sap/bc/adt/xslt/transformations/zguard_xslt/source/main',
+      delete: '/sap/bc/adt/deletion/delete',
+      validate: '/sap/bc/adt/xslt/validation',
+      check: '/sap/bc/adt/checkruns',
+      activate: '/sap/bc/adt/activation',
+      lock: '/sap/bc/adt/xslt/transformations/zguard_xslt',
+      unlock: '/sap/bc/adt/xslt/transformations/zguard_xslt',
+      getVersions:
+        '/sap/bc/adt/xslt/transformations/zguard_xslt/source/main/versions',
+      readTransport: '/sap/bc/adt/xslt/transformations/zguard_xslt/transport',
+    },
     capabilities: FULL,
   },
   service: {
@@ -389,7 +592,15 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
     },
-    validation: '/sap/bc/adt/businessservices/bindings/bindingtypes',
+    requests: {
+      read: '/sap/bc/adt/businessservices/bindings/zguard_srvb',
+      readMetadata: '/sap/bc/adt/businessservices/bindings/zguard_srvb',
+      delete: '/sap/bc/adt/deletion/delete',
+      validate: '/sap/bc/adt/businessservices/bindings/bindingtypes',
+      check: '/sap/bc/adt/checkruns',
+      activate: '/sap/bc/adt/activation',
+      readTransport: '/sap/bc/adt/cts/transportchecks',
+    },
     capabilities: [
       'creatable',
       'readable',
@@ -412,8 +623,19 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
     },
-    validation: '/sap/bc/adt/ddic/domains/validation',
-    writes: '/sap/bc/adt/ddic/domains/ZGUARD_DOM',
+    requests: {
+      create: '/sap/bc/adt/ddic/domains',
+      read: '/sap/bc/adt/ddic/domains/ZGUARD_DOM',
+      readMetadata: '/sap/bc/adt/ddic/domains/ZGUARD_DOM',
+      update: '/sap/bc/adt/ddic/domains/zguard_dom',
+      delete: '/sap/bc/adt/deletion/delete',
+      validate: '/sap/bc/adt/ddic/domains/validation',
+      check: '/sap/bc/adt/checkruns',
+      activate: '/sap/bc/adt/activation',
+      lock: '/sap/bc/adt/ddic/domains/zguard_dom',
+      unlock: '/sap/bc/adt/ddic/domains/zguard_dom',
+      readTransport: '/sap/bc/adt/ddic/domains/ZGUARD_DOM/transport',
+    },
     capabilities: [
       'creatable',
       'readable',
@@ -437,7 +659,18 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
     },
-    validation: '/sap/bc/adt/ddic/dataelements/validation',
+    requests: {
+      create: '/sap/bc/adt/ddic/dataelements',
+      read: '/sap/bc/adt/ddic/dataelements/ZGUARD_DTEL',
+      readMetadata: '/sap/bc/adt/ddic/dataelements/ZGUARD_DTEL',
+      delete: '/sap/bc/adt/deletion/delete',
+      validate: '/sap/bc/adt/ddic/dataelements/validation',
+      check: '/sap/bc/adt/checkruns',
+      activate: '/sap/bc/adt/activation',
+      lock: '/sap/bc/adt/ddic/dataelements/zguard_dtel',
+      unlock: '/sap/bc/adt/ddic/dataelements/zguard_dtel',
+      readTransport: '/sap/bc/adt/ddic/dataelements/ZGUARD_DTEL/transport',
+    },
     capabilities: [
       'creatable',
       'readable',
@@ -459,8 +692,23 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
     },
-    validation: '/sap/bc/adt/functions/validation',
-    writes: '/sap/bc/adt/functions/groups/ZGUARD_FG',
+    requests: {
+      create: [
+        '/sap/bc/adt/functions/validation',
+        '/sap/bc/adt/functions/groups',
+        '/sap/bc/adt/checkruns',
+      ],
+      read: '/sap/bc/adt/functions/groups/ZGUARD_FG',
+      readMetadata: '/sap/bc/adt/functions/groups/ZGUARD_FG',
+      update: '/sap/bc/adt/functions/groups/ZGUARD_FG',
+      delete: '/sap/bc/adt/deletion/delete',
+      validate: '/sap/bc/adt/functions/validation',
+      check: '/sap/bc/adt/checkruns',
+      activate: '/sap/bc/adt/activation',
+      lock: '/sap/bc/adt/functions/groups/zguard_fg',
+      unlock: '/sap/bc/adt/functions/groups/zguard_fg',
+      readTransport: '/sap/bc/adt/functions/groups/ZGUARD_FG/transport',
+    },
     capabilities: [
       'creatable',
       'readable',
@@ -484,7 +732,17 @@ export const HANDLERS = {
       responsible: 'GUARD',
       description: 'guard',
     },
-    validation: '/sap/bc/adt/packages/validation',
+    requests: {
+      create: ['/sap/bc/adt/packages/validation', '/sap/bc/adt/packages'],
+      read: '/sap/bc/adt/packages/ZGUARD_PKG',
+      readMetadata: '/sap/bc/adt/packages/ZGUARD_PKG',
+      delete: '/sap/bc/adt/deletion/delete',
+      validate: '/sap/bc/adt/packages/validation',
+      check: '/sap/bc/adt/checkruns',
+      lock: '/sap/bc/adt/packages/zguard_pkg',
+      unlock: '/sap/bc/adt/packages/zguard_pkg',
+      readTransport: '/sap/bc/adt/packages/ZGUARD_PKG/transport',
+    },
     capabilities: [
       'creatable',
       'readable',
@@ -506,10 +764,21 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
     },
-    validation: '/sap/bc/adt/functions/groups/ZGUARD_FG',
-    versions:
-      '/sap/bc/adt/functions/groups/ZGUARD_FG/includes/LZGUARD_FGF01/versions',
-    writes: '/sap/bc/adt/functions/groups/ZGUARD_FG/includes/LZGUARD_FGF01',
+    requests: {
+      create: '/sap/bc/adt/functions/groups/zguard_fg/includes',
+      read: '/sap/bc/adt/functions/groups/zguard_fg/includes/LZGUARD_FGF01/source/main',
+      readMetadata:
+        '/sap/bc/adt/functions/groups/zguard_fg/includes/LZGUARD_FGF01',
+      update: '/sap/bc/adt/functions/groups/zguard_fg/includes/LZGUARD_FGF01',
+      delete: '/sap/bc/adt/deletion/delete',
+      validate: '/sap/bc/adt/functions/groups/zguard_fg',
+      check: '/sap/bc/adt/checkruns',
+      activate: '/sap/bc/adt/activation',
+      lock: '/sap/bc/adt/functions/groups/zguard_fg/includes/LZGUARD_FGF01',
+      unlock: '/sap/bc/adt/functions/groups/zguard_fg/includes/LZGUARD_FGF01',
+      getVersions:
+        '/sap/bc/adt/functions/groups/zguard_fg/includes/LZGUARD_FGF01/versions',
+    },
     capabilities: [
       'creatable',
       'readable',
@@ -531,8 +800,18 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
     },
-    validation: '/sap/bc/adt/aps/iam/auth/validation',
-    writes: '/sap/bc/adt/aps/iam/auth/ZGUARD_AUTH',
+    requests: {
+      create: '/sap/bc/adt/aps/iam/auth',
+      read: '/sap/bc/adt/aps/iam/auth/ZGUARD_AUTH',
+      readMetadata: '/sap/bc/adt/aps/iam/auth/ZGUARD_AUTH',
+      update: '/sap/bc/adt/aps/iam/auth/ZGUARD_AUTH',
+      delete: '/sap/bc/adt/deletion/delete',
+      validate: '/sap/bc/adt/aps/iam/auth/validation',
+      check: '/sap/bc/adt/checkruns',
+      activate: '/sap/bc/adt/activation',
+      lock: '/sap/bc/adt/aps/iam/auth/ZGUARD_AUTH',
+      unlock: '/sap/bc/adt/aps/iam/auth/ZGUARD_AUTH',
+    },
     capabilities: [
       'creatable',
       'readable',
@@ -553,7 +832,18 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
     },
-    validation: '/sap/bc/adt/sfw/featuretoggles',
+    requests: {
+      create: '/sap/bc/adt/sfw/featuretoggles',
+      read: '/sap/bc/adt/sfw/featuretoggles/zguard_ft',
+      readMetadata: '/sap/bc/adt/sfw/featuretoggles/zguard_ft',
+      update: '/sap/bc/adt/sfw/featuretoggles/zguard_ft',
+      delete: '/sap/bc/adt/deletion/delete',
+      validate: '/sap/bc/adt/sfw/featuretoggles',
+      check: '/sap/bc/adt/checkruns',
+      activate: '/sap/bc/adt/activation',
+      lock: '/sap/bc/adt/sfw/featuretoggles/zguard_ft',
+      unlock: '/sap/bc/adt/sfw/featuretoggles/zguard_ft',
+    },
     capabilities: [
       'creatable',
       'readable',
@@ -580,7 +870,15 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
     },
-    validation: '/sap/bc/adt/businessservices/bindings/bindingtypes',
+    requests: {
+      read: '/sap/bc/adt/businessservices/bindings/zguard_srvb',
+      readMetadata: '/sap/bc/adt/businessservices/bindings/zguard_srvb',
+      delete: '/sap/bc/adt/deletion/delete',
+      validate: '/sap/bc/adt/businessservices/bindings/bindingtypes',
+      check: '/sap/bc/adt/checkruns',
+      activate: '/sap/bc/adt/activation',
+      readTransport: '/sap/bc/adt/cts/transportchecks',
+    },
     capabilities: [
       'creatable',
       'readable',
@@ -603,9 +901,20 @@ export const HANDLERS = {
       className: 'ZCL_GUARD',
       testClassCode: 'CLASS ltcl DEFINITION FOR TESTING.',
     },
-    validation: '/sap/bc/adt/checkruns',
-    versions: '/sap/bc/adt/oo/classes/ZCL_GUARD/includes/testclasses/versions',
-    writes: '/sap/bc/adt/oo/classes/ZCL_GUARD/includes/testclasses',
+    requests: {
+      read: '/sap/bc/adt/oo/classes/ZCL_GUARD/includes/testclasses',
+      readMetadata: '/sap/bc/adt/oo/classes/ZCL_GUARD',
+      update: '/sap/bc/adt/oo/classes/zcl_guard/includes/testclasses',
+      delete: '/sap/bc/adt/oo/classes/zcl_guard/includes/testclasses',
+      validate: '/sap/bc/adt/checkruns',
+      check: '/sap/bc/adt/checkruns',
+      activate: '/sap/bc/adt/activation',
+      lock: '/sap/bc/adt/oo/classes/zcl_guard',
+      unlock: '/sap/bc/adt/oo/classes/zcl_guard',
+      getVersions:
+        '/sap/bc/adt/oo/classes/ZCL_GUARD/includes/testclasses/versions',
+      readTransport: '/sap/bc/adt/oo/classes/ZCL_GUARD/transport',
+    },
     capabilities: [
       'readable',
       'updatable',
@@ -624,10 +933,20 @@ export const HANDLERS = {
     subject: '/sap/bc/adt/oo/classes/ZCL_GUARD',
     include: 'implementations',
     config: { className: 'ZCL_GUARD', localTypesCode: 'TYPES ty_x TYPE i.' },
-    validation: '/sap/bc/adt/checkruns',
-    versions:
-      '/sap/bc/adt/oo/classes/ZCL_GUARD/includes/implementations/versions',
-    writes: '/sap/bc/adt/oo/classes/ZCL_GUARD/includes/implementations',
+    requests: {
+      read: '/sap/bc/adt/oo/classes/ZCL_GUARD/includes/implementations',
+      readMetadata: '/sap/bc/adt/oo/classes/ZCL_GUARD',
+      update: '/sap/bc/adt/oo/classes/zcl_guard/includes/implementations',
+      delete: '/sap/bc/adt/oo/classes/zcl_guard/includes/implementations',
+      validate: '/sap/bc/adt/checkruns',
+      check: '/sap/bc/adt/checkruns',
+      activate: '/sap/bc/adt/activation',
+      lock: '/sap/bc/adt/oo/classes/zcl_guard',
+      unlock: '/sap/bc/adt/oo/classes/zcl_guard',
+      getVersions:
+        '/sap/bc/adt/oo/classes/ZCL_GUARD/includes/implementations/versions',
+      readTransport: '/sap/bc/adt/oo/classes/ZCL_GUARD/transport',
+    },
     capabilities: [
       'readable',
       'updatable',
@@ -649,9 +968,20 @@ export const HANDLERS = {
       className: 'ZCL_GUARD',
       definitionsCode: 'CLASS lcl DEFINITION.',
     },
-    validation: '/sap/bc/adt/checkruns',
-    versions: '/sap/bc/adt/oo/classes/ZCL_GUARD/includes/definitions/versions',
-    writes: '/sap/bc/adt/oo/classes/ZCL_GUARD/includes/definitions',
+    requests: {
+      read: '/sap/bc/adt/oo/classes/ZCL_GUARD/includes/definitions',
+      readMetadata: '/sap/bc/adt/oo/classes/ZCL_GUARD',
+      update: '/sap/bc/adt/oo/classes/zcl_guard/includes/definitions',
+      delete: '/sap/bc/adt/oo/classes/zcl_guard/includes/definitions',
+      validate: '/sap/bc/adt/checkruns',
+      check: '/sap/bc/adt/checkruns',
+      activate: '/sap/bc/adt/activation',
+      lock: '/sap/bc/adt/oo/classes/zcl_guard',
+      unlock: '/sap/bc/adt/oo/classes/zcl_guard',
+      getVersions:
+        '/sap/bc/adt/oo/classes/ZCL_GUARD/includes/definitions/versions',
+      readTransport: '/sap/bc/adt/oo/classes/ZCL_GUARD/transport',
+    },
     capabilities: [
       'readable',
       'updatable',
@@ -670,9 +1000,19 @@ export const HANDLERS = {
     subject: '/sap/bc/adt/oo/classes/ZCL_GUARD',
     include: 'macros',
     config: { className: 'ZCL_GUARD', macrosCode: 'DEFINE mac.' },
-    validation: '/sap/bc/adt/checkruns',
-    versions: '/sap/bc/adt/oo/classes/ZCL_GUARD/includes/macros/versions',
-    writes: '/sap/bc/adt/oo/classes/ZCL_GUARD/includes/macros',
+    requests: {
+      read: '/sap/bc/adt/oo/classes/ZCL_GUARD/includes/macros',
+      readMetadata: '/sap/bc/adt/oo/classes/ZCL_GUARD',
+      update: '/sap/bc/adt/oo/classes/zcl_guard/includes/macros',
+      delete: '/sap/bc/adt/oo/classes/zcl_guard/includes/macros',
+      validate: '/sap/bc/adt/checkruns',
+      check: '/sap/bc/adt/checkruns',
+      activate: '/sap/bc/adt/activation',
+      lock: '/sap/bc/adt/oo/classes/zcl_guard',
+      unlock: '/sap/bc/adt/oo/classes/zcl_guard',
+      getVersions: '/sap/bc/adt/oo/classes/ZCL_GUARD/includes/macros/versions',
+      readTransport: '/sap/bc/adt/oo/classes/ZCL_GUARD/transport',
+    },
     capabilities: [
       'readable',
       'updatable',
@@ -692,8 +1032,16 @@ export const HANDLERS = {
     factory: (c: AdtClient) => c.getMessageClass(),
     subject: '/sap/bc/adt/messageclass/ZGUARD_MSG',
     config: { name: 'ZGUARD_MSG', packageName: '$TMP', description: 'guard' },
-    validation: '/sap/bc/adt/messageclass/validation',
-    writes: '/sap/bc/adt/messageclass/ZGUARD_MSG',
+    requests: {
+      create: '/sap/bc/adt/messageclass',
+      read: '/sap/bc/adt/messageclass/zguard_msg',
+      readMetadata: '/sap/bc/adt/messageclass/zguard_msg',
+      update: '/sap/bc/adt/messageclass/zguard_msg',
+      delete: '/sap/bc/adt/deletion/delete',
+      validate: '/sap/bc/adt/messageclass/validation',
+      lock: '/sap/bc/adt/messageclass/zguard_msg',
+      unlock: '/sap/bc/adt/messageclass/zguard_msg',
+    },
     capabilities: [
       'creatable',
       'readable',
@@ -708,7 +1056,13 @@ export const HANDLERS = {
     factory: (c: AdtClient) => c.getMessageClassMessage(),
     subject: '/sap/bc/adt/messageclass/ZGUARD_MSG',
     config: { className: 'ZGUARD_MSG', msgno: '001', msgtext: 'guard' },
-    writes: '/sap/bc/adt/messageclass/ZGUARD_MSG',
+    requests: {
+      create: '/sap/bc/adt/messageclass/zguard_msg',
+      read: '/sap/bc/adt/messageclass/zguard_msg',
+      readMetadata: '/sap/bc/adt/messageclass/zguard_msg',
+      update: '/sap/bc/adt/messageclass/zguard_msg',
+      delete: '/sap/bc/adt/messageclass/zguard_msg',
+    },
     capabilities: ['creatable', 'readable', 'updatable', 'deletable'],
     why: 'A message is created, read, changed and removed through its class’s XML, and is nothing else in its own right.',
   },
@@ -719,6 +1073,12 @@ export const HANDLERS = {
       description: 'guard',
       transportNumber: 'DEVK900000',
       owner: 'GUARD',
+    },
+    requests: {
+      create: '/sap/bc/adt/cts/transportrequests',
+      read: '/sap/bc/adt/cts/transportrequests/DEVK900000',
+      readMetadata: '/sap/bc/adt/cts/transportrequests/DEVK900000',
+      delete: '/sap/bc/adt/cts/transportrequests/DEVK900000',
     },
     capabilities: ['creatable', 'readable', 'updatable', 'deletable'],
     why: 'A request is created, read, described anew and deleted while empty. Its number is system-generated, so there is nothing to validate before creating one.',
@@ -735,8 +1095,21 @@ export const HANDLERS = {
       description: 'guard',
       testClassSource: 'CLASS ltcl DEFINITION FOR TESTING.',
     },
-    validation: '/sap/bc/adt/checkruns',
-    writes: '/sap/bc/adt/oo/classes/ZCL_GUARD_TESTS/includes/testclasses',
+    requests: {
+      create: [
+        '/sap/bc/adt/oo/classes',
+        '/sap/bc/adt/activation',
+        '/sap/bc/adt/oo/classes/zcl_guard_tests',
+        '/sap/bc/adt/checkruns',
+      ],
+      read: '/sap/bc/adt/oo/classes/ZCL_GUARD_TESTS/includes/testclasses',
+      readMetadata: '/sap/bc/adt/oo/classes/ZCL_GUARD_TESTS',
+      update: '/sap/bc/adt/oo/classes/zcl_guard_tests/includes/testclasses',
+      delete: '/sap/bc/adt/oo/classes/zcl_guard_tests/includes/testclasses',
+      validate: '/sap/bc/adt/checkruns',
+      lock: '/sap/bc/adt/oo/classes/zcl_guard_tests',
+      unlock: '/sap/bc/adt/oo/classes/zcl_guard_tests',
+    },
     capabilities: [
       'creatable',
       'readable',
@@ -758,8 +1131,21 @@ export const HANDLERS = {
       cdsViewName: 'ZGUARD_VIEW',
       testClassSource: 'CLASS ltcl DEFINITION FOR TESTING.',
     },
-    validation: '/sap/bc/adt/checkruns',
-    writes: '/sap/bc/adt/oo/classes/ZCL_GUARD_CDS_TESTS/includes/testclasses',
+    requests: {
+      create: [
+        '/sap/bc/adt/oo/classes',
+        '/sap/bc/adt/activation',
+        '/sap/bc/adt/oo/classes/zcl_guard_cds_tests',
+        '/sap/bc/adt/checkruns',
+      ],
+      read: '/sap/bc/adt/oo/classes/ZCL_GUARD_CDS_TESTS/includes/testclasses',
+      readMetadata: '/sap/bc/adt/oo/classes/ZCL_GUARD_CDS_TESTS',
+      update: '/sap/bc/adt/oo/classes/zcl_guard_cds_tests/includes/testclasses',
+      delete: '/sap/bc/adt/deletion/delete',
+      validate: '/sap/bc/adt/checkruns',
+      lock: '/sap/bc/adt/oo/classes/zcl_guard_cds_tests',
+      unlock: '/sap/bc/adt/oo/classes/zcl_guard_cds_tests',
+    },
     capabilities: [
       'creatable',
       'readable',

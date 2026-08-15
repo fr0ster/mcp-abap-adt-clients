@@ -259,143 +259,37 @@ function expectedResource(
   key: string,
   entry: HandlerEntry,
   method: string,
-): { test: (url: string) => boolean; describe: string } {
-  const declared = RESOURCE_BY_HANDLER[key];
-  if (declared) {
+): { describe: string; all: string[]; action?: string } {
+  // The URI `getVersionSource` was handed. It comes from a version list, not
+  // from the object's path, so it is the one request the manifest cannot name.
+  if (method === 'getVersionSource') {
     return {
-      test: (url: string) => {
-        const u = url.toLowerCase().split('?')[0];
-        return u === declared || u.startsWith(`${declared}/`);
-      },
-      describe: declared,
+      describe: VERSION_CONTENT_URI,
+      all: [VERSION_CONTENT_URI.toLowerCase()],
     };
   }
-  const subject = entry.subject.toLowerCase();
-  const collection = subject.slice(0, subject.lastIndexOf('/'));
-  const part = entry.include ? `${subject}/includes/${entry.include}` : subject;
-  /** The path, with the query dropped — the query is never the resource. */
-  const pathOf = (url: string) => url.toLowerCase().split('?')[0];
-  /** Exactly this resource, and not a neighbour whose name starts the same. */
-  const exactly = (path: string) => ({
-    test: (url: string) => pathOf(url) === path,
-    describe: path,
-  });
-  /**
-   * This resource or something beneath it — with the boundary checked, so
-   * `/versions/1` does not accept `/versions/1-wrong`, and a collection does
-   * not accept a lock on one of its members.
-   */
-  const under = (path: string) => ({
-    test: (url: string) => {
-      const u = pathOf(url);
-      return u === path || u.startsWith(`${path}/`);
-    },
-    describe: path,
-  });
-  const anyOf = (...paths: string[]) => ({
-    test: (url: string) => paths.some((path) => under(path).test(url)),
-    describe: paths.join(' or '),
-  });
 
-  switch (method) {
-    // The object's own resource — or, for a handler whose subject is one part
-    // of an object, that part. This is the case the review was about.
-    case 'read':
-      return under(part);
-    // The resource this handler writes, named in the manifest — a PUT anywhere
-    // under the object is not the same as a PUT on the right part of it.
-    case 'update': {
-      const where = entry.writes;
-      if (!where) {
-        return {
-          test: () => false,
-          describe:
-            'the resource the manifest says update writes — this entry claims updatable and names none',
-        };
-      }
-      // Every named resource, not any of them: an operation that writes two
-      // and stops after the first has not done what it claims.
-      const wanted = (typeof where === 'string' ? [where] : where).map((w) =>
-        w.toLowerCase(),
-      );
-      return {
-        test: () => false, // never used — `all` below replaces the single check
-        describe: wanted.join(' and '),
-        all: wanted,
-      } as ReturnType<typeof exactly> & { all: string[] };
-    }
-    // The version list this object actually has, named in the manifest. Neither
-    // "under the subject" nor "ends with /versions" is enough: the first admits
-    // the include itself, the second admits `…/testclasses/wrong/versions`.
-    case 'getVersions': {
-      const where = entry.versions;
-      if (!where) {
-        return {
-          test: () => false,
-          describe:
-            'the versions resource the manifest names — this entry claims versionable and names none',
-        };
-      }
-      return exactly(where.toLowerCase());
-    }
-    // Metadata, the lock and the transport are the whole object's, even when
-    // the handler writes only a part of it.
-    case 'readMetadata':
-    case 'readTransport':
-      return anyOf(subject, '/sap/bc/adt/cts/transportchecks');
-    // A lock and an unlock are the same POST on the same resource, told apart
-    // only by `_action` — which the path comparison drops. Swapping the two
-    // would have passed. Found in review, 2026-08-15.
-    case 'lock':
-    case 'unlock': {
-      const action = method === 'lock' ? 'LOCK' : 'UNLOCK';
-      // The object itself, exactly. A class member is locked by locking its
-      // class — this branch accepting anything under the subject would have
-      // passed a lock on the include, which is the thing this release removed.
-      return {
-        test: (url: string) =>
-          exactly(subject).test(url) &&
-          new RegExp(`_action=${action}(&|$)`, 'i').test(url),
-        describe: `${subject}?_action=${action}`,
-      };
-    }
-    // Creating means POSTing to the collection the object will live in — and
-    // only that. A chain may validate the name first, but a validation is not
-    // evidence that anything was created, and accepting it here let a create
-    // that stopped after the check pass. Caught in review, 2026-08-15.
-    case 'create':
-      return exactly(collection);
-    // Deleting is either a DELETE on the object or the deletion service; for a
-    // part, it is a write to that part.
-    case 'delete':
-      return anyOf(part, '/sap/bc/adt/deletion/delete');
-    // Shared services, each taking the object as an argument.
-    case 'check':
-      return anyOf('/sap/bc/adt/checkruns', subject);
-    case 'activate':
-      return anyOf('/sap/bc/adt/activation', subject);
-    // Where **this** object's validation lives, from the manifest. ADT has no
-    // single validation endpoint, and accepting any of them let a class
-    // validated against the domain endpoint pass. Found in review, 2026-08-15.
-    case 'validate': {
-      const where = entry.validation;
-      if (!where) {
-        return {
-          test: () => false,
-          describe:
-            'a validation resource the manifest names — this entry claims validatable and names none',
-        };
-      }
-      return exactly(where.toLowerCase());
-    }
-    // Takes a content URI from a version list, so the object's own path is not
-    // in it — but the URI it was handed is, and a method free to fetch anything
-    // it likes is not being checked at all.
-    case 'getVersionSource':
-      return exactly(VERSION_CONTENT_URI.toLowerCase());
-    default:
-      return under(subject);
+  const declared = entry.requests?.[method];
+  if (!declared) {
+    return {
+      describe: `a resource the manifest names for ${method} — this entry claims the capability and names none`,
+      all: ['\u0000never'],
+    };
   }
+  const all = (typeof declared === 'string' ? [declared] : declared).map((u) =>
+    u.toLowerCase(),
+  );
+
+  // A lock and an unlock are the same POST on the same resource, told apart by
+  // `_action` alone — which a path comparison drops.
+  const action =
+    method === 'lock' ? 'LOCK' : method === 'unlock' ? 'UNLOCK' : undefined;
+
+  return {
+    describe: all.join(' and ') + (action ? `?_action=${action}` : ''),
+    all,
+    action,
+  };
 }
 
 /** Call one method of one atom with arguments that fit its signature. */
@@ -529,37 +423,27 @@ describe('capability guard — behaviour', () => {
 
             // And on the right resource. A verb on the wrong URL is still the
             // wrong request — the whole point of naming a capability.
-            const resource = expectedResource(key, entry, method) as ReturnType<
-              typeof expectedResource
-            > & { all?: string[] };
-            // Where a method must write several resources, every one is
-            // required — see `writes` in the manifest.
-            if (resource.all) {
-              const paths = calls
-                .filter((c) => c.method === verb)
-                .map((c) => c.url.toLowerCase().split('?')[0]);
-              const missing = resource.all.filter((w) => !paths.includes(w));
-              if (missing.length > 0) {
-                throw new Error(
-                  `${name}.${method} never ${verb}s ${missing.join(' and ')} — it went to ${paths.join(', ') || 'nothing'}`,
-                );
-              }
-              return;
-            }
-            const onSubject = calls.filter(
-              (c) =>
-                (c.method === verb ||
-                  (method === 'delete' &&
-                    c.url.includes('/deletion/delete'))) &&
-                resource.test(c.url),
-            );
-            if (onSubject.length === 0) {
+            const resource = expectedResource(key, entry, method);
+            const paths = calls
+              .filter(
+                (c) =>
+                  (c.method === verb ||
+                    (method === 'delete' &&
+                      c.url.includes('/deletion/delete'))) &&
+                  (!resource.action ||
+                    new RegExp(`_action=${resource.action}(&|$)`, 'i').test(
+                      c.url,
+                    )),
+              )
+              .map((c) => c.url.toLowerCase().split('?')[0]);
+
+            // Every named resource, not any of them: an operation that
+            // addresses two and stops after the first has not done what it
+            // claims.
+            const missing = resource.all.filter((w) => !paths.includes(w));
+            if (missing.length > 0) {
               throw new Error(
-                `${name}.${method} issued its ${verb} but never on ${resource.describe} — it went to ` +
-                  calls
-                    .filter((c) => c.method === verb)
-                    .map((c) => c.url.split('?')[0])
-                    .join(', '),
+                `${name}.${method} never ${verb}s ${resource.describe} — it went to ${paths.join(', ') || 'nothing'}`,
               );
             }
           });
