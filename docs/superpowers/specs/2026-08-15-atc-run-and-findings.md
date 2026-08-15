@@ -138,6 +138,36 @@ interface IAtcRunResult {
 ```
 - `getFindings(worklistId, options)` reads the worklist. One request, no retry.
 
+```ts
+interface IAtcRunOptions {
+  /**
+   * The check variant to run. Omitted, the client reads `/atc/customizing` and
+   * uses `systemCheckVariant` — see below.
+   */
+  checkVariant?: string;
+  /**
+   * `maximumVerdicts` in the run payload: a **cap on results**, not a page size.
+   * Defaults to 100.
+   */
+  maximumVerdicts?: number;
+}
+
+interface IAtcFindingsOptions {
+  /**
+   * Ask the server to include findings someone has exempted. Defaults to
+   * `false`, which is what the request carries when the option is omitted —
+   * `GET /atc/worklists/{id}?includeExemptedFindings=false`, the only form
+   * observed.
+   */
+  includeExemptedFindings?: boolean;
+}
+```
+
+Nothing else is in it. `format` is not: `checkstyle` was answered with a **406** and one accepted
+type, so a format option would offer a choice that does not exist. A timestamp filter and an
+object-set selector appear in ADT's worklist documentation but in no captured response here, and
+this package does not publish options it has not seen answered.
+
 On the only system anyone has probed this is complete: the run returns finished counts, so a
 caller runs and then reads, and gets a correct answer including a correct zero. That is the whole
 of what is known to work, and it is what this spec designs.
@@ -202,14 +232,26 @@ interface IAtcObjectRef {
 }
 
 interface IAtcRunTarget {
-  /** One or more objects to check, as one inclusive object set. */
-  objects: readonly IAtcObjectRef[];
+  /**
+   * One or more objects to check, as one inclusive object set.
+   *
+   * A non-empty tuple, not an array: "one or more" in a doc comment over a type
+   * that admits `[]` is a promise the compiler does not keep, and an empty
+   * object set would start a run over nothing. `run()` also rejects an empty
+   * array at runtime, for callers who arrive from JavaScript.
+   */
+  objects: readonly [IAtcObjectRef, ...IAtcObjectRef[]];
 }
 ```
 
 Exclusive object sets (`kind` is an attribute, so other values exist) are **not** in this
 contract: nothing has established what they accept, and a field nobody has seen answered is the
 kind of promise this package spent three releases removing.
+
+```ts
+// Blocked: the members are what the probe returns, not what #68 inherited.
+type AtcObjectType = /* the confirmed set — see below */ never;
+```
 
 `AtcObjectType` is the set whose ADT URI can be built, and **it is the one part of the
 synchronous contract that cannot be decided from here.** #68 maps `class`, `interface`,
@@ -270,13 +312,13 @@ proven, on the trial.
 
 | ask | why it blocks something |
 |---|---|
-| the run response, captured whole | `FINDING_STATS` positions — what a triple like `0,1,2` means with known findings present |
-| run one object of **each** kind #68 lists, and a few it does not (DDL source, table, behavior definition) | fixes `AtcObjectType`, the last undecided part of the contract |
+| run one object of **each** kind #68 lists, and a few it does not (DDL source, table, behavior definition) | fixes `AtcObjectType` — **the only thing blocking the synchronous contract** |
+| the run response, captured whole, with known findings present | what the `FINDING_STATS` positions mean. **Not a blocker**: the contract returns the triple verbatim precisely so it does not need to know. Parsing it into named counts is a later improvement, and it needs this before it can be one |
 | `POST /atc/runs?...&clientWait=true` | the lead on waiting; `false` is what #68 sends, unexplained |
 | a worklist read **between** starting a run and its completion, if a run can be made slow enough | the only way to see whether an unfinished worklist is distinguishable |
 
-The first two close the synchronous contract. The last two decide whether waiting is designed
-at all.
+Only the first closes the synchronous contract. The rest are improvements and the waiting
+question — worth the same session, since it is one connection either way.
 
 ## Open questions
 
