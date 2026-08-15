@@ -62,6 +62,16 @@ export interface HandlerEntry {
   subject: string;
   /** For a handler whose subject is a part of its object: which part. */
   include?: string;
+  /**
+   * Where **this** object's name or source is validated.
+   *
+   * ADT has no single validation endpoint: a class name goes to
+   * `/oo/validation/objectname`, a domain's to `/ddic/domains/validation`, and
+   * an include's source through a check run. Accepting "any /validation" let a
+   * class validated against the domain endpoint pass — found in review,
+   * 2026-08-15 — so each object says where its own lives.
+   */
+  validation?: string;
   /** What ADT gives this object. */
   capabilities: readonly Atom[];
   /** Why this set, when the set is not the full one. */
@@ -89,6 +99,7 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
     },
+    validation: '/sap/bc/adt/oo/validation/objectname',
     capabilities: FULL,
   },
   interface: {
@@ -100,6 +111,7 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
     },
+    validation: '/sap/bc/adt/oo/validation/objectname',
     capabilities: FULL,
   },
   program: {
@@ -111,6 +123,7 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
     },
+    validation: '/sap/bc/adt/programs/validation',
     capabilities: FULL,
   },
   ddl: {
@@ -122,6 +135,7 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
     },
+    validation: '/sap/bc/adt/ddic/ddl/validation',
     capabilities: FULL,
   },
   table: {
@@ -133,6 +147,7 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
     },
+    validation: '/sap/bc/adt/ddic/tables/validation',
     capabilities: FULL,
   },
   structure: {
@@ -144,6 +159,7 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
     },
+    validation: '/sap/bc/adt/ddic/structures/validation',
     capabilities: FULL,
   },
   tableType: {
@@ -155,6 +171,7 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
     },
+    validation: '/sap/bc/adt/ddic/tabletypes/validation',
     capabilities: FULL,
   },
   accessControl: {
@@ -166,6 +183,7 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
     },
+    validation: '/sap/bc/adt/acm/dcl/validation',
     capabilities: FULL,
   },
   appendStructure: {
@@ -178,6 +196,7 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
     },
+    validation: '/sap/bc/adt/ddic/structures/validation',
     capabilities: FULL,
   },
   behaviorDefinition: {
@@ -191,6 +210,7 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
     },
+    validation: '/sap/bc/adt/bo/behaviordefinitions/validation',
     capabilities: FULL,
   },
   behaviorImplementation: {
@@ -203,12 +223,14 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
     },
+    validation: '/sap/bc/adt/oo/validation/objectname',
     capabilities: FULL,
   },
   metadataExtension: {
     factory: (c: AdtClient) => c.getMetadataExtension(),
     subject: '/sap/bc/adt/ddic/ddlx/sources/ZGUARD_DDLX',
     config: { name: 'ZGUARD_DDLX', packageName: '$TMP', description: 'guard' },
+    validation: '/sap/bc/adt/ddic/ddlx/sources/validation',
     capabilities: FULL,
   },
   enhancement: {
@@ -223,6 +245,7 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
     },
+    validation: '/sap/bc/adt/enhancements/enhoxhh/validation',
     capabilities: FULL,
   },
   serviceDefinition: {
@@ -234,6 +257,7 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
     },
+    validation: '/sap/bc/adt/ddic/srvd/sources/validation',
     capabilities: FULL,
   },
   functionModule: {
@@ -246,6 +270,7 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
     },
+    validation: '/sap/bc/adt/functions/validation',
     capabilities: FULL,
   },
   scalarFunction: {
@@ -257,6 +282,7 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
     },
+    validation: '/sap/bc/adt/ddic/dsfd/sources/validation',
     capabilities: FULL,
   },
   scalarFunctionImplementation: {
@@ -269,6 +295,7 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
     },
+    validation: '/sap/bc/adt/ddic/dsfi/validation',
     capabilities: FULL,
   },
   transformation: {
@@ -281,6 +308,7 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
     },
+    validation: '/sap/bc/adt/xslt/validation',
     capabilities: FULL,
   },
   service: {
@@ -297,6 +325,7 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
     },
+    validation: '/sap/bc/adt/businessservices/bindings/bindingtypes',
     capabilities: [
       'creatable',
       'readable',
@@ -319,6 +348,7 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
     },
+    validation: '/sap/bc/adt/ddic/domains/validation',
     capabilities: [
       'creatable',
       'readable',
@@ -342,6 +372,7 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
     },
+    validation: '/sap/bc/adt/ddic/dataelements/validation',
     capabilities: [
       'creatable',
       'readable',
@@ -363,6 +394,7 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
     },
+    validation: '/sap/bc/adt/functions/validation',
     capabilities: [
       'creatable',
       'readable',
@@ -386,6 +418,7 @@ export const HANDLERS = {
       responsible: 'GUARD',
       description: 'guard',
     },
+    validation: '/sap/bc/adt/packages/validation',
     capabilities: [
       'creatable',
       'readable',
@@ -407,6 +440,7 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
     },
+    validation: '/sap/bc/adt/functions/groups/ZGUARD_FG',
     capabilities: [
       'creatable',
       'readable',
@@ -428,6 +462,7 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
     },
+    validation: '/sap/bc/adt/aps/iam/auth/validation',
     capabilities: [
       'creatable',
       'readable',
@@ -448,6 +483,7 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
     },
+    validation: '/sap/bc/adt/sfw/featuretoggles',
     capabilities: [
       'creatable',
       'readable',
@@ -474,6 +510,7 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
     },
+    validation: '/sap/bc/adt/businessservices/bindings/bindingtypes',
     capabilities: [
       'creatable',
       'readable',
@@ -496,6 +533,7 @@ export const HANDLERS = {
       className: 'ZCL_GUARD',
       testClassCode: 'CLASS ltcl DEFINITION FOR TESTING.',
     },
+    validation: '/sap/bc/adt/checkruns',
     capabilities: [
       'readable',
       'updatable',
@@ -514,6 +552,7 @@ export const HANDLERS = {
     subject: '/sap/bc/adt/oo/classes/ZCL_GUARD',
     include: 'implementations',
     config: { className: 'ZCL_GUARD', localTypesCode: 'TYPES ty_x TYPE i.' },
+    validation: '/sap/bc/adt/checkruns',
     capabilities: [
       'readable',
       'updatable',
@@ -535,6 +574,7 @@ export const HANDLERS = {
       className: 'ZCL_GUARD',
       definitionsCode: 'CLASS lcl DEFINITION.',
     },
+    validation: '/sap/bc/adt/checkruns',
     capabilities: [
       'readable',
       'updatable',
@@ -553,6 +593,7 @@ export const HANDLERS = {
     subject: '/sap/bc/adt/oo/classes/ZCL_GUARD',
     include: 'macros',
     config: { className: 'ZCL_GUARD', macrosCode: 'DEFINE mac.' },
+    validation: '/sap/bc/adt/checkruns',
     capabilities: [
       'readable',
       'updatable',
@@ -572,6 +613,7 @@ export const HANDLERS = {
     factory: (c: AdtClient) => c.getMessageClass(),
     subject: '/sap/bc/adt/messageclass/ZGUARD_MSG',
     config: { name: 'ZGUARD_MSG', packageName: '$TMP', description: 'guard' },
+    validation: '/sap/bc/adt/messageclass/validation',
     capabilities: [
       'creatable',
       'readable',
@@ -612,6 +654,7 @@ export const HANDLERS = {
       description: 'guard',
       testClassSource: 'CLASS ltcl DEFINITION FOR TESTING.',
     },
+    validation: '/sap/bc/adt/checkruns',
     capabilities: [
       'creatable',
       'readable',
@@ -633,6 +676,7 @@ export const HANDLERS = {
       cdsViewName: 'ZGUARD_VIEW',
       testClassSource: 'CLASS ltcl DEFINITION FOR TESTING.',
     },
+    validation: '/sap/bc/adt/checkruns',
     capabilities: [
       'creatable',
       'readable',

@@ -279,8 +279,20 @@ function expectedResource(
     // of an object, that part. This is the case the review was about.
     case 'read':
     case 'update':
-    case 'getVersions':
       return under(part);
+    // A version list is its own sub-resource. Under the subject is not enough:
+    // a GET on the include itself, or on its source, is under the subject too,
+    // and would have counted. Found in review, 2026-08-15.
+    case 'getVersions':
+      return {
+        test: (url: string) => {
+          const u = pathOf(url);
+          return (
+            (u === part || u.startsWith(`${part}/`)) && u.endsWith('/versions')
+          );
+        },
+        describe: `a /versions resource under ${part}`,
+      };
     // Metadata, the lock and the transport are the whole object's, even when
     // the handler writes only a part of it.
     case 'readMetadata':
@@ -303,22 +315,20 @@ function expectedResource(
       return anyOf('/sap/bc/adt/checkruns', subject);
     case 'activate':
       return anyOf('/sap/bc/adt/activation', subject);
-    // A name is validated wherever names live: a dedicated validation
-    // resource, a check run over the source, or the namespace the object
-    // would sit in — which for a function include is its group, and for a
-    // feature toggle is the collection.
-    case 'validate':
-      return {
-        test: (url: string) => {
-          const u = url.toLowerCase().split('?')[0];
-          return (
-            u.includes('/validation') ||
-            u.includes('/checkruns') ||
-            subject.startsWith(u)
-          );
-        },
-        describe: `a validation resource, a check run, or an ancestor of ${subject}`,
-      };
+    // Where **this** object's validation lives, from the manifest. ADT has no
+    // single validation endpoint, and accepting any of them let a class
+    // validated against the domain endpoint pass. Found in review, 2026-08-15.
+    case 'validate': {
+      const where = entry.validation;
+      if (!where) {
+        return {
+          test: () => false,
+          describe:
+            'a validation resource the manifest names — this entry claims validatable and names none',
+        };
+      }
+      return under(where.toLowerCase());
+    }
     // Takes a content URI from a version list, so the object's own path is not
     // in it — but the URI it was handed is, and a method free to fetch anything
     // it likes is not being checked at all.
