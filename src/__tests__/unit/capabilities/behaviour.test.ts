@@ -200,6 +200,104 @@ const VERB_NOT_REACHED: Record<string, string> = {
   'serviceBinding.create': 'as service.create',
 };
 
+/**
+ * Where a method addresses a resource that is neither the object nor one of the
+ * shared services — verified by reading the handler, like the verb deviations.
+ */
+const RESOURCE_BY_HANDLER: Record<string, string> = {
+  // A binding's variant is validated against the discovery endpoint that lists
+  // the variants this system offers — a sibling of the binding, not an
+  // ancestor of it.
+  'service.validate': '/businessservices/bindings/bindingtypes',
+  'serviceBinding.validate': '/businessservices/bindings/bindingtypes',
+};
+
+/**
+ * Which resource the matching request has to have addressed.
+ *
+ * The verb alone is not the capability: `getLocalTestClass().getVersions()`
+ * reading `includes/main/versions` instead of `includes/testclasses/versions`
+ * is a GET either way, and would have passed. Caught in review, 2026-08-15.
+ *
+ * Most methods address the object itself. The rest address an ADT service that
+ * takes the object as an argument — one activation endpoint, one check runner,
+ * one deletion service — and those are named here once rather than per handler.
+ */
+function expectedResource(
+  key: string,
+  entry: HandlerEntry,
+  method: string,
+): { test: (url: string) => boolean; describe: string } {
+  const declared = RESOURCE_BY_HANDLER[key];
+  if (declared) {
+    return {
+      test: (url: string) => url.toLowerCase().includes(declared),
+      describe: declared,
+    };
+  }
+  const subject = entry.subject.toLowerCase();
+  const collection = subject.slice(0, subject.lastIndexOf('/'));
+  const part = entry.include ? `${subject}/includes/${entry.include}` : subject;
+  const at = (path: string) => ({
+    test: (url: string) => url.toLowerCase().startsWith(path),
+    describe: path,
+  });
+  const anyOf = (...paths: string[]) => ({
+    test: (url: string) =>
+      paths.some((path) => url.toLowerCase().includes(path)),
+    describe: paths.join(' or '),
+  });
+
+  switch (method) {
+    // The object's own resource — or, for a handler whose subject is one part
+    // of an object, that part. This is the case the review was about.
+    case 'read':
+    case 'update':
+    case 'getVersions':
+      return at(part);
+    // Metadata, the lock and the transport are the whole object's, even when
+    // the handler writes only a part of it.
+    case 'readMetadata':
+    case 'lock':
+    case 'unlock':
+    case 'readTransport':
+      return anyOf(subject, '/cts/transportchecks');
+    // Creating means POSTing to the collection the object will live in.
+    case 'create':
+      return anyOf(collection, '/validation');
+    // Deleting is either a DELETE on the object or the deletion service; for a
+    // part, it is a write to that part.
+    case 'delete':
+      return anyOf(part, '/deletion/delete');
+    // Shared services, each taking the object as an argument.
+    case 'check':
+      return anyOf('/checkruns', subject);
+    case 'activate':
+      return anyOf('/activation', subject);
+    // A name is validated wherever names live: a dedicated validation
+    // resource, a check run over the source, or the namespace the object
+    // would sit in — which for a function include is its group, and for a
+    // feature toggle is the collection.
+    case 'validate':
+      return {
+        test: (url: string) => {
+          const u = url.toLowerCase().split('?')[0];
+          return (
+            u.includes('/validation') ||
+            u.includes('/checkruns') ||
+            subject.startsWith(u)
+          );
+        },
+        describe: `a validation resource, a check run, or an ancestor of ${subject}`,
+      };
+    // Takes a content URI from a version list; the object is not in it.
+    case 'getVersionSource':
+      return { test: () => true, describe: 'the content URI it was given' };
+    default:
+      return at(subject);
+  }
+}
+
 /** Call one method of one atom with arguments that fit its signature. */
 async function invoke(
   handler: Record<string, unknown>,
@@ -326,6 +424,26 @@ describe('capability guard — behaviour', () => {
                   .map((c) => c.method)
                   .join(', ')} but never a ${verb}` +
                   (refusal ? ` — it refused: ${String(refusal)}` : ''),
+              );
+            }
+
+            // And on the right resource. A verb on the wrong URL is still the
+            // wrong request — the whole point of naming a capability.
+            const resource = expectedResource(key, entry, method);
+            const onSubject = calls.filter(
+              (c) =>
+                (c.method === verb ||
+                  (method === 'delete' &&
+                    c.url.includes('/deletion/delete'))) &&
+                resource.test(c.url),
+            );
+            if (onSubject.length === 0) {
+              throw new Error(
+                `${name}.${method} issued its ${verb} but never on ${resource.describe} — it went to ` +
+                  calls
+                    .filter((c) => c.method === verb)
+                    .map((c) => c.url.split('?')[0])
+                    .join(', '),
               );
             }
           });

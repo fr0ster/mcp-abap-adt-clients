@@ -54,6 +54,14 @@ export interface HandlerEntry {
   factory: (client: AdtClient) => unknown;
   /** Enough config for every method the entry claims. */
   config: Record<string, unknown>;
+  /**
+   * The ADT resource this object **is**, so a check can ask whether a method
+   * addressed it — not merely whether it used the right verb. A chain that
+   * PUTs the wrong include still PUTs.
+   */
+  subject: string;
+  /** For a handler whose subject is a part of its object: which part. */
+  include?: string;
   /** What ADT gives this object. */
   capabilities: readonly Atom[];
   /** Why this set, when the set is not the full one. */
@@ -74,6 +82,7 @@ export const HANDLERS = {
   // ── Source objects: the full set ─────────────────────────────────────────
   class: {
     factory: (c: AdtClient) => c.getClass(),
+    subject: '/sap/bc/adt/oo/classes/ZCL_GUARD',
     config: {
       sourceCode: 'CLASS zcl_guard DEFINITION PUBLIC. ENDCLASS.',
       className: 'ZCL_GUARD',
@@ -84,6 +93,7 @@ export const HANDLERS = {
   },
   interface: {
     factory: (c: AdtClient) => c.getInterface(),
+    subject: '/sap/bc/adt/oo/interfaces/ZIF_GUARD',
     config: {
       sourceCode: 'INTERFACE zif_guard PUBLIC. ENDINTERFACE.',
       interfaceName: 'ZIF_GUARD',
@@ -94,6 +104,7 @@ export const HANDLERS = {
   },
   program: {
     factory: (c: AdtClient) => c.getProgram(),
+    subject: '/sap/bc/adt/programs/programs/ZGUARD',
     config: {
       sourceCode: 'REPORT zguard.',
       programName: 'ZGUARD',
@@ -104,6 +115,7 @@ export const HANDLERS = {
   },
   ddl: {
     factory: (c: AdtClient) => c.getDdl(),
+    subject: '/sap/bc/adt/ddic/ddl/sources/ZGUARD_DDL',
     config: {
       sourceCode: 'define view zguard_ddl as select from t000 { mandt }',
       ddlName: 'ZGUARD_DDL',
@@ -114,6 +126,7 @@ export const HANDLERS = {
   },
   table: {
     factory: (c: AdtClient) => c.getTable(),
+    subject: '/sap/bc/adt/ddic/tables/ZGUARD_TAB',
     config: {
       sourceCode: "@EndUserText.label: 'guard'\ndefine table zguard_tab {}",
       tableName: 'ZGUARD_TAB',
@@ -124,6 +137,7 @@ export const HANDLERS = {
   },
   structure: {
     factory: (c: AdtClient) => c.getStructure(),
+    subject: '/sap/bc/adt/ddic/structures/ZGUARD_STRU',
     config: {
       sourceCode: 'define structure zguard_stru {}',
       structureName: 'ZGUARD_STRU',
@@ -134,6 +148,7 @@ export const HANDLERS = {
   },
   tableType: {
     factory: (c: AdtClient) => c.getTableType(),
+    subject: '/sap/bc/adt/ddic/tabletypes/ZGUARD_TTYP',
     config: {
       sourceCode: 'define table type zguard_ttyp of zguard_stru;',
       tableTypeName: 'ZGUARD_TTYP',
@@ -144,6 +159,7 @@ export const HANDLERS = {
   },
   accessControl: {
     factory: (c: AdtClient) => c.getAccessControl(),
+    subject: '/sap/bc/adt/acm/dcl/sources/ZGUARD_DCL',
     config: {
       sourceCode: "@EndUserText.label: 'guard'\ndefine role zguard_dcl {}",
       accessControlName: 'ZGUARD_DCL',
@@ -154,6 +170,7 @@ export const HANDLERS = {
   },
   appendStructure: {
     factory: (c: AdtClient) => c.getAppendStructure(),
+    subject: '/sap/bc/adt/ddic/structures/ZGUARD_APP',
     config: {
       sourceCode: 'extend structure zguard_tab with zguard_app {}',
       appendStructureName: 'ZGUARD_APP',
@@ -165,6 +182,7 @@ export const HANDLERS = {
   },
   behaviorDefinition: {
     factory: (c: AdtClient) => c.getBehaviorDefinition(),
+    subject: '/sap/bc/adt/bo/behaviordefinitions/ZGUARD_BDEF',
     config: {
       sourceCode: 'managed implementation in class zbp_guard unique;',
       name: 'ZGUARD_BDEF',
@@ -177,6 +195,7 @@ export const HANDLERS = {
   },
   behaviorImplementation: {
     factory: (c: AdtClient) => c.getBehaviorImplementation(),
+    subject: '/sap/bc/adt/oo/classes/ZBP_GUARD',
     config: {
       sourceCode: 'CLASS zbp_guard DEFINITION PUBLIC. ENDCLASS.',
       className: 'ZBP_GUARD',
@@ -188,11 +207,13 @@ export const HANDLERS = {
   },
   metadataExtension: {
     factory: (c: AdtClient) => c.getMetadataExtension(),
+    subject: '/sap/bc/adt/ddic/ddlx/sources/ZGUARD_DDLX',
     config: { name: 'ZGUARD_DDLX', packageName: '$TMP', description: 'guard' },
     capabilities: FULL,
   },
   enhancement: {
     factory: (c: AdtClient) => c.getEnhancement(),
+    subject: '/sap/bc/adt/enhancements/enhoxhh/ZGUARD_ENH',
     config: {
       enhancementName: 'ZGUARD_ENH',
       // enhoxhh is the flavour whose source can be updated; the others have no
@@ -206,6 +227,7 @@ export const HANDLERS = {
   },
   serviceDefinition: {
     factory: (c: AdtClient) => c.getServiceDefinition(),
+    subject: '/sap/bc/adt/ddic/srvd/sources/ZGUARD_SRVD',
     config: {
       sourceCode: 'define service zguard_srvd { expose t000; }',
       serviceDefinitionName: 'ZGUARD_SRVD',
@@ -216,6 +238,7 @@ export const HANDLERS = {
   },
   functionModule: {
     factory: (c: AdtClient) => c.getFunctionModule(),
+    subject: '/sap/bc/adt/functions/groups/ZGUARD_FG/fmodules/ZGUARD_FM',
     config: {
       sourceCode: 'FUNCTION zguard_fm. ENDFUNCTION.',
       functionGroupName: 'ZGUARD_FG',
@@ -227,6 +250,7 @@ export const HANDLERS = {
   },
   scalarFunction: {
     factory: (c: AdtClient) => c.getScalarFunction(),
+    subject: '/sap/bc/adt/ddic/dsfd/sources/ZGUARD_DSFD',
     config: {
       sourceCode: 'define function zguard_dsfd returns { x : abap.int4; }',
       scalarFunctionName: 'ZGUARD_DSFD',
@@ -237,6 +261,7 @@ export const HANDLERS = {
   },
   scalarFunctionImplementation: {
     factory: (c: AdtClient) => c.getScalarFunctionImplementation(),
+    subject: '/sap/bc/adt/ddic/dsfi/ZGUARD_DSFI',
     config: {
       implementationName: 'ZGUARD_DSFI',
       scalarFunctionName: 'ZGUARD_DSFD',
@@ -248,6 +273,7 @@ export const HANDLERS = {
   },
   transformation: {
     factory: (c: AdtClient) => c.getTransformation(),
+    subject: '/sap/bc/adt/xslt/transformations/ZGUARD_XSLT',
     config: {
       sourceCode: '<xsl:transform version="1.0"/>',
       transformationName: 'ZGUARD_XSLT',
@@ -259,6 +285,7 @@ export const HANDLERS = {
   },
   service: {
     factory: (c: AdtClient) => c.getService(),
+    subject: '/sap/bc/adt/businessservices/bindings/ZGUARD_SRVB',
     config: {
       bindingName: 'ZGUARD_SRVB',
       serviceDefinitionName: 'ZGUARD_SRVD',
@@ -286,6 +313,7 @@ export const HANDLERS = {
   // ── Objects with no version history ──────────────────────────────────────
   domain: {
     factory: (c: AdtClient) => c.getDomain(),
+    subject: '/sap/bc/adt/ddic/domains/ZGUARD_DOM',
     config: {
       domainName: 'ZGUARD_DOM',
       packageName: '$TMP',
@@ -306,6 +334,7 @@ export const HANDLERS = {
   },
   dataElement: {
     factory: (c: AdtClient) => c.getDataElement(),
+    subject: '/sap/bc/adt/ddic/dataelements/ZGUARD_DTEL',
     config: {
       dataElementName: 'ZGUARD_DTEL',
       typeKind: 'domain',
@@ -328,6 +357,7 @@ export const HANDLERS = {
   },
   functionGroup: {
     factory: (c: AdtClient) => c.getFunctionGroup(),
+    subject: '/sap/bc/adt/functions/groups/ZGUARD_FG',
     config: {
       functionGroupName: 'ZGUARD_FG',
       packageName: '$TMP',
@@ -348,6 +378,7 @@ export const HANDLERS = {
   },
   package: {
     factory: (c: AdtClient) => c.getPackage(),
+    subject: '/sap/bc/adt/packages/ZGUARD_PKG',
     config: {
       packageName: 'ZGUARD_PKG',
       superPackage: '$TMP',
@@ -369,6 +400,7 @@ export const HANDLERS = {
   },
   functionInclude: {
     factory: (c: AdtClient) => c.getFunctionInclude(),
+    subject: '/sap/bc/adt/functions/groups/ZGUARD_FG/includes/LZGUARD_FGF01',
     config: {
       functionGroupName: 'ZGUARD_FG',
       includeName: 'LZGUARD_FGF01',
@@ -390,6 +422,7 @@ export const HANDLERS = {
   },
   authorizationField: {
     factory: (c: AdtClient) => c.getAuthorizationField(),
+    subject: '/sap/bc/adt/aps/iam/auth/ZGUARD_AUTH',
     config: {
       authorizationFieldName: 'ZGUARD_AUTH',
       packageName: '$TMP',
@@ -409,6 +442,7 @@ export const HANDLERS = {
   },
   featureToggle: {
     factory: (c: AdtClient) => c.getFeatureToggle(),
+    subject: '/sap/bc/adt/sfw/featuretoggles/ZGUARD_FT',
     config: {
       featureToggleName: 'ZGUARD_FT',
       packageName: '$TMP',
@@ -428,6 +462,7 @@ export const HANDLERS = {
   },
   serviceBinding: {
     factory: (c: AdtClient) => c.getServiceBinding(),
+    subject: '/sap/bc/adt/businessservices/bindings/ZGUARD_SRVB',
     config: {
       bindingName: 'ZGUARD_SRVB',
       serviceDefinitionName: 'ZGUARD_SRVD',
@@ -455,6 +490,8 @@ export const HANDLERS = {
   // ── Parts of an object: no create ────────────────────────────────────────
   localTestClass: {
     factory: (c: AdtClient) => c.getLocalTestClass(),
+    subject: '/sap/bc/adt/oo/classes/ZCL_GUARD',
+    include: 'testclasses',
     config: {
       className: 'ZCL_GUARD',
       testClassCode: 'CLASS ltcl DEFINITION FOR TESTING.',
@@ -474,6 +511,8 @@ export const HANDLERS = {
   },
   localTypes: {
     factory: (c: AdtClient) => c.getLocalTypes(),
+    subject: '/sap/bc/adt/oo/classes/ZCL_GUARD',
+    include: 'implementations',
     config: { className: 'ZCL_GUARD', localTypesCode: 'TYPES ty_x TYPE i.' },
     capabilities: [
       'readable',
@@ -490,6 +529,8 @@ export const HANDLERS = {
   },
   localDefinitions: {
     factory: (c: AdtClient) => c.getLocalDefinitions(),
+    subject: '/sap/bc/adt/oo/classes/ZCL_GUARD',
+    include: 'definitions',
     config: {
       className: 'ZCL_GUARD',
       definitionsCode: 'CLASS lcl DEFINITION.',
@@ -509,6 +550,8 @@ export const HANDLERS = {
   },
   localMacros: {
     factory: (c: AdtClient) => c.getLocalMacros(),
+    subject: '/sap/bc/adt/oo/classes/ZCL_GUARD',
+    include: 'macros',
     config: { className: 'ZCL_GUARD', macrosCode: 'DEFINE mac.' },
     capabilities: [
       'readable',
@@ -527,6 +570,7 @@ export const HANDLERS = {
   // ── Objects that are not source, and not shaped like it ──────────────────
   messageClass: {
     factory: (c: AdtClient) => c.getMessageClass(),
+    subject: '/sap/bc/adt/messageclass/ZGUARD_MSG',
     config: { name: 'ZGUARD_MSG', packageName: '$TMP', description: 'guard' },
     capabilities: [
       'creatable',
@@ -540,12 +584,14 @@ export const HANDLERS = {
   },
   messageClassMessage: {
     factory: (c: AdtClient) => c.getMessageClassMessage(),
+    subject: '/sap/bc/adt/messageclass/ZGUARD_MSG',
     config: { className: 'ZGUARD_MSG', msgno: '001', msgtext: 'guard' },
     capabilities: ['creatable', 'readable', 'updatable', 'deletable'],
     why: 'A message is created, read, changed and removed through its class’s XML, and is nothing else in its own right.',
   },
   transport: {
     factory: (c: AdtClient) => c.getRequest(),
+    subject: '/sap/bc/adt/cts/transportrequests/DEVK900000',
     config: {
       description: 'guard',
       transportNumber: 'DEVK900000',
@@ -558,6 +604,8 @@ export const HANDLERS = {
   // ── Unit tests: CRUD over the container, and running ─────────────────────
   unitTest: {
     factory: (c: AdtClient) => c.getUnitTest(),
+    subject: '/sap/bc/adt/oo/classes/ZCL_GUARD_TESTS',
+    include: 'testclasses',
     config: {
       className: 'ZCL_GUARD_TESTS',
       packageName: '$TMP',
@@ -576,6 +624,8 @@ export const HANDLERS = {
   },
   cdsUnitTest: {
     factory: (c: AdtClient) => c.getCdsUnitTest(),
+    subject: '/sap/bc/adt/oo/classes/ZCL_GUARD_CDS_TESTS',
+    include: 'testclasses',
     config: {
       className: 'ZCL_GUARD_CDS_TESTS',
       packageName: '$TMP',
