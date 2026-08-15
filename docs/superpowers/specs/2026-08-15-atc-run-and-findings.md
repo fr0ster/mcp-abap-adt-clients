@@ -1,8 +1,9 @@
 # ATC: start a run, then look for the result
 
-**Status:** the contract for what has been **observed** is agreed, 2026-08-15. Whether ATC is
-asynchronous anywhere is unprobed, and this spec deliberately does not design for it — see
-"What is not designed here". Not implemented.
+**Status:** blocked on a probe, 2026-08-15. The shape is agreed and the synchronous contract is
+all but complete — one part of it, the set of checkable object types, is a fact nobody has
+captured, and so is the whole question of waiting. See "The probe that unblocks this". Not
+implemented.
 
 **Scope:** an ATC client in `@mcp-abap-adt/adt-clients`, and the contract it needs in
 `@mcp-abap-adt/interfaces`. The MCP server is a separate consumer and out of scope here.
@@ -101,6 +102,30 @@ interface IAtcFindings {
 - `run(target, options)` creates the worklist, starts the run, and returns `IAtcRunResult` — the
   worklist id and the `FINDING_STATS` the run response carried. Nothing more: those two are what
   the server hands back, and both were observed.
+
+**Where the check variant comes from.** `POST /atc/worklists` requires one, so `run()` cannot
+proceed without deciding this. `IAtcRunOptions.checkVariant` is optional; when the caller omits
+it, the client reads `POST /atc/customizing` and uses `systemCheckVariant`. That is not a
+convenience — on the trial `/atc/variants` returns `totalItemCount 0`, so customizing is the only
+observed source of a usable variant, and a contract that demanded the caller supply one would be
+unusable there. The read happens per `run()` call; caching it is an optimisation nobody has
+measured a need for, and a cached variant is wrong the moment the system's default changes.
+
+**What `IAtcRunResult` carries.** The worklist id, and the finding statistics **as the server
+sent them** — the raw `description` string, e.g. `"0,0,1"`:
+
+```ts
+interface IAtcRunResult {
+  worklistId: string;
+  /**
+   * `FINDING_STATS` from the run response, verbatim — a comma-separated triple.
+   * Not parsed into named counts: which position is which severity has not been
+   * established, and inventing `{ errors, warnings, infos }` would put three
+   * guesses into a public type. Parse it when a probe says what it means.
+   */
+  findingStats: string;
+}
+```
 - `getFindings(worklistId, options)` reads the worklist. One request, no retry.
 
 On the only system anyone has probed this is complete: the run returns finished counts, so a
@@ -176,11 +201,14 @@ Exclusive object sets (`kind` is an attribute, so other values exist) are **not*
 contract: nothing has established what they accept, and a field nobody has seen answered is the
 kind of promise this package spent three releases removing.
 
-`AtcObjectType` is the set whose ADT URI can be built. #68 maps `class`, `interface`, `program`,
-`include`, `function_group`, `package` (`buildAtcObjectUri`). Whether that is ATC's checkable set
-or just what its author needed is **unknown**, and it is a contract decision rather than an
-implementation detail: an object type absent from the map cannot be checked at all. Confirm the
-set against a live system before fixing it; ship the confirmed set, not the inherited one.
+`AtcObjectType` is the set whose ADT URI can be built, and **it is the one part of the
+synchronous contract that cannot be decided from here.** #68 maps `class`, `interface`,
+`program`, `include`, `function_group`, `package` (`buildAtcObjectUri`); whether that is ATC's
+checkable set, a subset, or partly wrong is unknown, and an object type absent from the map
+cannot be checked at all. It is a contract decision, not an implementation detail — a published
+union is a promise about which objects this package can check.
+
+**Blocked on the probe below.** Ship the confirmed set, not the inherited one.
 
 ## What goes in `interfaces`
 
@@ -218,6 +246,22 @@ and two drafts of this spec tried to reason one into existence — first from th
 appearing, then from a count whose timing is unknown. The third answer is to design for what was
 seen and to leave the rest to a probe. A consumer that needs "run and collect" today composes
 `run()` and `getFindings()` itself, and on the probed system that is correct.
+
+## The probe that unblocks this
+
+One session against the trial answers everything still open, and until it happens further design
+rounds produce findings rather than progress — three of them so far have.
+
+| ask | why it blocks something |
+|---|---|
+| `POST /atc/customizing` → is `systemCheckVariant` there, and usable as `checkVariant`? | `run()`'s first request depends on it |
+| the run response, captured whole | `FINDING_STATS` positions — what a triple like `0,1,2` means with known findings present |
+| run one object of **each** kind #68 lists, and a few it does not (DDL source, table, behavior definition) | fixes `AtcObjectType`, the last undecided part of the contract |
+| `POST /atc/runs?...&clientWait=true` | the lead on waiting; `false` is what #68 sends, unexplained |
+| a worklist read **between** starting a run and its completion, if a run can be made slow enough | the only way to see whether an unfinished worklist is distinguishable |
+
+The first three close the synchronous contract. The last two decide whether waiting is designed
+at all.
 
 ## Open questions
 
