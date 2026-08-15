@@ -72,6 +72,15 @@ export interface HandlerEntry {
    * 2026-08-15 — so each object says where its own lives.
    */
   validation?: string;
+  /**
+   * Where **this** object's version list lives.
+   *
+   * A suffix rule is not enough — `…/testclasses/wrong/versions` ends the same
+   * way — and the paths differ by object anyway: a class reads
+   * `includes/main/versions`, most source objects `source/main/versions`, an
+   * include just `versions` under itself. Found in review, 2026-08-15.
+   */
+  versions?: string;
   /** What ADT gives this object. */
   capabilities: readonly Atom[];
   /** Why this set, when the set is not the full one. */
@@ -100,6 +109,7 @@ export const HANDLERS = {
       description: 'guard',
     },
     validation: '/sap/bc/adt/oo/validation/objectname',
+    versions: '/sap/bc/adt/oo/classes/ZCL_GUARD/includes/main/versions',
     capabilities: FULL,
   },
   interface: {
@@ -112,6 +122,7 @@ export const HANDLERS = {
       description: 'guard',
     },
     validation: '/sap/bc/adt/oo/validation/objectname',
+    versions: '/sap/bc/adt/oo/interfaces/ZIF_GUARD/source/main/versions',
     capabilities: FULL,
   },
   program: {
@@ -124,6 +135,7 @@ export const HANDLERS = {
       description: 'guard',
     },
     validation: '/sap/bc/adt/programs/validation',
+    versions: '/sap/bc/adt/programs/programs/ZGUARD/source/main/versions',
     capabilities: FULL,
   },
   ddl: {
@@ -136,6 +148,7 @@ export const HANDLERS = {
       description: 'guard',
     },
     validation: '/sap/bc/adt/ddic/ddl/validation',
+    versions: '/sap/bc/adt/ddic/ddl/sources/ZGUARD_DDL/source/main/versions',
     capabilities: FULL,
   },
   table: {
@@ -148,6 +161,7 @@ export const HANDLERS = {
       description: 'guard',
     },
     validation: '/sap/bc/adt/ddic/tables/validation',
+    versions: '/sap/bc/adt/ddic/tables/ZGUARD_TAB/source/main/versions',
     capabilities: FULL,
   },
   structure: {
@@ -160,6 +174,7 @@ export const HANDLERS = {
       description: 'guard',
     },
     validation: '/sap/bc/adt/ddic/structures/validation',
+    versions: '/sap/bc/adt/ddic/structures/ZGUARD_STRU/source/main/versions',
     capabilities: FULL,
   },
   tableType: {
@@ -172,6 +187,7 @@ export const HANDLERS = {
       description: 'guard',
     },
     validation: '/sap/bc/adt/ddic/tabletypes/validation',
+    versions: '/sap/bc/adt/ddic/tabletypes/ZGUARD_TTYP/source/main/versions',
     capabilities: FULL,
   },
   accessControl: {
@@ -184,6 +200,7 @@ export const HANDLERS = {
       description: 'guard',
     },
     validation: '/sap/bc/adt/acm/dcl/validation',
+    versions: '/sap/bc/adt/acm/dcl/sources/ZGUARD_DCL/source/main/versions',
     capabilities: FULL,
   },
   appendStructure: {
@@ -197,6 +214,7 @@ export const HANDLERS = {
       description: 'guard',
     },
     validation: '/sap/bc/adt/ddic/structures/validation',
+    versions: '/sap/bc/adt/ddic/structures/ZGUARD_APP/source/main/versions',
     capabilities: FULL,
   },
   behaviorDefinition: {
@@ -211,6 +229,8 @@ export const HANDLERS = {
       description: 'guard',
     },
     validation: '/sap/bc/adt/bo/behaviordefinitions/validation',
+    versions:
+      '/sap/bc/adt/bo/behaviordefinitions/ZGUARD_BDEF/source/main/versions',
     capabilities: FULL,
   },
   behaviorImplementation: {
@@ -224,6 +244,8 @@ export const HANDLERS = {
       description: 'guard',
     },
     validation: '/sap/bc/adt/oo/validation/objectname',
+    versions:
+      '/sap/bc/adt/oo/classes/ZBP_GUARD/includes/implementations/versions',
     capabilities: FULL,
   },
   metadataExtension: {
@@ -231,6 +253,7 @@ export const HANDLERS = {
     subject: '/sap/bc/adt/ddic/ddlx/sources/ZGUARD_DDLX',
     config: { name: 'ZGUARD_DDLX', packageName: '$TMP', description: 'guard' },
     validation: '/sap/bc/adt/ddic/ddlx/sources/validation',
+    versions: '/sap/bc/adt/ddic/ddlx/sources/ZGUARD_DDLX/source/main/versions',
     capabilities: FULL,
   },
   enhancement: {
@@ -246,6 +269,8 @@ export const HANDLERS = {
       description: 'guard',
     },
     validation: '/sap/bc/adt/enhancements/enhoxhh/validation',
+    versions:
+      '/sap/bc/adt/enhancements/enhoxhh/ZGUARD_ENH/source/main/versions',
     capabilities: FULL,
   },
   serviceDefinition: {
@@ -258,6 +283,7 @@ export const HANDLERS = {
       description: 'guard',
     },
     validation: '/sap/bc/adt/ddic/srvd/sources/validation',
+    versions: '/sap/bc/adt/ddic/srvd/sources/ZGUARD_SRVD/source/main/versions',
     capabilities: FULL,
   },
   functionModule: {
@@ -271,6 +297,8 @@ export const HANDLERS = {
       description: 'guard',
     },
     validation: '/sap/bc/adt/functions/validation',
+    versions:
+      '/sap/bc/adt/functions/groups/ZGUARD_FG/fmodules/ZGUARD_FM/source/main/versions',
     capabilities: FULL,
   },
   scalarFunction: {
@@ -283,6 +311,7 @@ export const HANDLERS = {
       description: 'guard',
     },
     validation: '/sap/bc/adt/ddic/dsfd/sources/validation',
+    versions: '/sap/bc/adt/ddic/dsfd/sources/ZGUARD_DSFD/source/main/versions',
     capabilities: FULL,
   },
   scalarFunctionImplementation: {
@@ -296,6 +325,7 @@ export const HANDLERS = {
       description: 'guard',
     },
     validation: '/sap/bc/adt/ddic/dsfi/validation',
+    versions: '/sap/bc/adt/ddic/dsfi/ZGUARD_DSFI/source/main/versions',
     capabilities: FULL,
   },
   transformation: {
@@ -309,6 +339,8 @@ export const HANDLERS = {
       description: 'guard',
     },
     validation: '/sap/bc/adt/xslt/validation',
+    versions:
+      '/sap/bc/adt/xslt/transformations/ZGUARD_XSLT/source/main/versions',
     capabilities: FULL,
   },
   service: {
@@ -441,6 +473,8 @@ export const HANDLERS = {
       description: 'guard',
     },
     validation: '/sap/bc/adt/functions/groups/ZGUARD_FG',
+    versions:
+      '/sap/bc/adt/functions/groups/ZGUARD_FG/includes/LZGUARD_FGF01/versions',
     capabilities: [
       'creatable',
       'readable',
@@ -534,6 +568,7 @@ export const HANDLERS = {
       testClassCode: 'CLASS ltcl DEFINITION FOR TESTING.',
     },
     validation: '/sap/bc/adt/checkruns',
+    versions: '/sap/bc/adt/oo/classes/ZCL_GUARD/includes/testclasses/versions',
     capabilities: [
       'readable',
       'updatable',
@@ -553,6 +588,8 @@ export const HANDLERS = {
     include: 'implementations',
     config: { className: 'ZCL_GUARD', localTypesCode: 'TYPES ty_x TYPE i.' },
     validation: '/sap/bc/adt/checkruns',
+    versions:
+      '/sap/bc/adt/oo/classes/ZCL_GUARD/includes/implementations/versions',
     capabilities: [
       'readable',
       'updatable',
@@ -575,6 +612,7 @@ export const HANDLERS = {
       definitionsCode: 'CLASS lcl DEFINITION.',
     },
     validation: '/sap/bc/adt/checkruns',
+    versions: '/sap/bc/adt/oo/classes/ZCL_GUARD/includes/definitions/versions',
     capabilities: [
       'readable',
       'updatable',
@@ -594,6 +632,7 @@ export const HANDLERS = {
     include: 'macros',
     config: { className: 'ZCL_GUARD', macrosCode: 'DEFINE mac.' },
     validation: '/sap/bc/adt/checkruns',
+    versions: '/sap/bc/adt/oo/classes/ZCL_GUARD/includes/macros/versions',
     capabilities: [
       'readable',
       'updatable',

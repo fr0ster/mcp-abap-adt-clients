@@ -280,19 +280,20 @@ function expectedResource(
     case 'read':
     case 'update':
       return under(part);
-    // A version list is its own sub-resource. Under the subject is not enough:
-    // a GET on the include itself, or on its source, is under the subject too,
-    // and would have counted. Found in review, 2026-08-15.
-    case 'getVersions':
-      return {
-        test: (url: string) => {
-          const u = pathOf(url);
-          return (
-            (u === part || u.startsWith(`${part}/`)) && u.endsWith('/versions')
-          );
-        },
-        describe: `a /versions resource under ${part}`,
-      };
+    // The version list this object actually has, named in the manifest. Neither
+    // "under the subject" nor "ends with /versions" is enough: the first admits
+    // the include itself, the second admits `…/testclasses/wrong/versions`.
+    case 'getVersions': {
+      const where = entry.versions;
+      if (!where) {
+        return {
+          test: () => false,
+          describe:
+            'the versions resource the manifest names — this entry claims versionable and names none',
+        };
+      }
+      return exactly(where.toLowerCase());
+    }
     // Metadata, the lock and the transport are the whole object's, even when
     // the handler writes only a part of it.
     case 'readMetadata':
@@ -327,7 +328,7 @@ function expectedResource(
             'a validation resource the manifest names — this entry claims validatable and names none',
         };
       }
-      return under(where.toLowerCase());
+      return exactly(where.toLowerCase());
     }
     // Takes a content URI from a version list, so the object's own path is not
     // in it — but the URI it was handed is, and a method free to fetch anything
