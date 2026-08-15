@@ -1,6 +1,8 @@
 # ATC: start a run, then look for the result
 
-**Status:** design agreed 2026-08-15. Not implemented.
+**Status:** the contract for what has been **observed** is agreed, 2026-08-15. Whether ATC is
+asynchronous anywhere is unprobed, and this spec deliberately does not design for it — see
+"What is not designed here". Not implemented.
 
 **Scope:** an ATC client in `@mcp-abap-adt/adt-clients`, and the contract it needs in
 `@mcp-abap-adt/interfaces`. The MCP server is a separate consumer and out of scope here.
@@ -70,44 +72,46 @@ Two things must be probed before this is more than a design:
 Until one of those is answered, the retry loop is a guess with a default, and the spec says so
 rather than implying otherwise.
 
-That form survives both answers to the question nobody has settled:
-
-| | run is synchronous (cloud trial, probed 2026-07-20) | run is asynchronous (on-prem, claimed by #68) |
-|---|---|---|
-| status resource | `GET /atc/runs/{id}` → **404**, `GET /atc/runs` → **405** | claimed to exist |
-| artifact retry | finds findings on the first attempt | finds them on a later one |
-
-So the client does not branch on system type, and does not need a status method at all. **Not
-knowing whether ATC is asynchronous stops being a blocker; it becomes a default for the retry
-count.**
+An earlier draft of this spec claimed retrying the fetch "survives both answers" and that no
+status resource is needed. That was wrong for the reason above, and is struck: a retried `GET`
+can see the same empty pre-run worklist every time and prove nothing. Retrying is not a readiness
+rule when the artifact predates the work. Raised in review twice, 2026-08-15 — the second time
+because the paragraph was left standing next to the analysis that refuted it.
 
 ## The contract
 
 Two capabilities, not a CRUD object.
 
-**`run()` starts and waits, and returns the findings.** Decided here rather than left to the
-plan, because it fixes the generic parameters, the retry options and what `getFindings` is for —
-review was right that these cannot be separated:
+**`run()` starts a run and returns what the server answered. It does not wait.** Two drafts of
+this spec had it waiting, and both were unimplementable for the same reason: waiting needs a
+signal that says "finished", and no such signal has been observed. `FINDING_STATS` is a
+candidate and `clientWait` is a lead, but a contract cannot promise to wait for something nobody
+has watched arrive.
 
 ```ts
-// starting a run and getting its result — the atom that exists since interfaces 16.0.0
+// starting a run — the atom that exists since interfaces 16.0.0
 IAdtRunnable<IAtcRunTarget, IAtcRunResult, IAtcRunOptions>
 
-// reading a worklist that already exists — its own interface, as ITestRunInformation is
+// reading a worklist — its own interface, as ITestRunInformation is
 interface IAtcFindings {
   getFindings(worklistId: string, options?: IAtcFindingsOptions): Promise<IAdtResponse>;
 }
 ```
 
-- `run(target, options)` creates the worklist, starts the run, waits until the worklist carries
-  what the run said it would, and returns `IAtcRunResult` — the worklist id, the counts, and the
-  findings. `options` carries the retry bounds, as `runWithProfiling`'s do.
-- `getFindings(worklistId)` reads a worklist and returns; it does **not** wait. Its purpose is a
-  worklist that already exists — they persist, and re-reading yesterday's run is a real use.
+- `run(target, options)` creates the worklist, starts the run, and returns `IAtcRunResult` — the
+  worklist id and the `FINDING_STATS` the run response carried. Nothing more: those two are what
+  the server hands back, and both were observed.
+- `getFindings(worklistId, options)` reads the worklist. One request, no retry.
 
-The alternative — `run()` returns an id and the caller polls — was rejected for the reason the
-profiler was: it makes every caller reimplement the readiness rule, and the readiness rule is the
-part that needs the server's own count to be correct.
+On the only system anyone has probed this is complete: the run returns finished counts, so a
+caller runs and then reads, and gets a correct answer including a correct zero. That is the whole
+of what is known to work, and it is what this spec designs.
+
+**No retry, no `withLongPolling`, no status method** — not because ATC is known to be
+synchronous everywhere, but because the opposite is unobserved, and a retry loop with no
+readiness rule is a race with a timeout on it. If a probe finds an asynchronous system, waiting
+is added **then**, against whatever marker that probe shows — as an option on `run()` or a
+separate `runAndCollect`, decided on the evidence rather than ahead of it.
 
 ### What the contract must not have
 
@@ -181,7 +185,7 @@ set against a live system before fixing it; ship the confirmed set, not the inhe
 ## What goes in `interfaces`
 
 - the parameter types from #17, corrected: no `run_id`, no `with_long_polling`, no `checkstyle`;
-- `IAtcRunTarget` / `IAtcRunStarted` / `IAtcRunOptions` / `IAtcFindingsOptions`;
+- `IAtcRunTarget` / `IAtcObjectRef` / `IAtcRunResult` / `IAtcRunOptions` / `IAtcFindingsOptions`;
 - `IAtcFindings`.
 
 `IAtcLog` already in the package (`runtime/IAtcLog.ts`) is **not** this: it reads a check-failure
@@ -207,14 +211,20 @@ motivation is that the async `/abapunit/runs` path fails on 7.5x backends. Nothi
 reach that endpoint, so it is additive and worth having — but it is a different subject with a
 different endpoint, and mixing it into ATC is what made #68 an 11k-line diff. Its own spec.
 
+## What is not designed here
+
+**Waiting for an asynchronous run.** It needs a completion marker, no marker has been observed,
+and two drafts of this spec tried to reason one into existence — first from the artifact
+appearing, then from a count whose timing is unknown. The third answer is to design for what was
+seen and to leave the rest to a probe. A consumer that needs "run and collect" today composes
+`run()` and `getFindings()` itself, and on the probed system that is correct.
+
 ## Open questions
 
-1. **What marks a run finished?** `FINDING_STATS` from the run response is the candidate, and
-   it needs the two probes above — is it populated before the work is done, and does `clientWait`
-   make the question moot. Until then the retry loop is a guess.
-2. **Retry defaults.** `ClassExecutor` uses 5 attempts × 2000 ms as call parameters with
-   defaults. #68 hardcodes 75 × 4000 ms — five minutes of silence — in the module, justified by
-   a comment citing an unnamed Java reference. Take the former's shape; pick the numbers.
+1. **What marks a run finished?** Unanswered, and the reason `run()` does not wait.
+   `FINDING_STATS` is the candidate — is it populated before the work is done? — and `clientWait`
+   is the lead: #68 passes `false` without saying what `true` does. **This is the probe that
+   unblocks waiting**, and nothing else in the spec depends on it.
 3. **On-prem behaviour.** Needs a probe from a machine that reaches an on-prem system; this one
    reaches cloud only.
 4. **Object coverage** — the checkable set, above.
