@@ -160,7 +160,8 @@ const VERB_BY_HANDLER: Record<string, string> = {
   'featureToggle.validate': 'GET',
   // A function include's name is validated the same way, against its group.
   'functionInclude.validate': 'GET',
-  // A service binding's validation is a GET on the binding resource.
+  // A service binding's validation starts with a GET on the bindingtypes
+  // discovery endpoint; a transport check POSTs after it.
   'service.validate': 'GET',
   'serviceBinding.validate': 'GET',
   // Its transport is checked through POST /cts/transportchecks rather than read
@@ -194,7 +195,8 @@ const VERB_NOT_REACHED: Record<string, string> = {
   'service.update':
     'reads the binding first; the generic body is not a binding',
   'serviceBinding.update': 'as service.update',
-  'service.create': 'reads the service definition first',
+  'service.create':
+    'asks the bindingtypes discovery endpoint first and refuses when the generic body lists no variant',
   'serviceBinding.create': 'as service.create',
 };
 

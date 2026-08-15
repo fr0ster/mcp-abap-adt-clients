@@ -242,7 +242,10 @@ export class AdtUnitTest
     if (!config.className) {
       throw new Error('Container class name is required');
     }
-    if (config.testClassSource === undefined && !options?.sourceCode) {
+    if (
+      config.testClassSource === undefined &&
+      options?.sourceCode === undefined
+    ) {
       throw new Error('Test class source is required');
     }
 

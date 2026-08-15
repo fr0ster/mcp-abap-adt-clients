@@ -91,7 +91,29 @@ type OffersAtom<T, A extends string> = A extends 'creatable'
                   ? Offers<T, IAdtVersionable<any>>
                   : A extends 'transportAware'
                     ? Offers<T, IAdtTransportAware<any, any>>
-                    : never;
+                    : // An atom this chain does not know resolves to `never`,
+                      // and `never extends true` is vacuously true — so it would
+                      // drop out of the product and be checked by nothing at
+                      // all. `AtomsAreAllMapped` below refuses to compile if a
+                      // new atom is added to the manifest without a line here.
+                      never;
+
+/**
+ * Every atom in the manifest has a line in the chain above.
+ *
+ * Found in review, 2026-08-14: adding a new atom to `ATOM_METHODS` and claiming
+ * it on a handler left `npm run test:check` green, because the unknown name
+ * fell through to `never` and the mapped type silently skipped it. A guard that
+ * covers less when someone extends it is the failure mode this whole file is
+ * against, so the omission now fails here rather than passing quietly.
+ */
+type UnmappedAtoms = {
+  [A in Atom]: OffersAtom<{ create: never }, A> extends never ? A : never;
+}[Atom];
+
+export const everyAtomIsMapped: [UnmappedAtoms] extends [never]
+  ? true
+  : UnmappedAtoms = true;
 
 /** Every (factory, atom) pair whose type and claim disagree. */
 type Disagreements = {
