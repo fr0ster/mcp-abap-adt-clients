@@ -268,9 +268,8 @@ union is a promise about which objects this package can check.
 
 - the parameter types from #17, corrected: no `run_id`, no `with_long_polling`, no `checkstyle`;
 - `IAtcRunTarget` / `IAtcObjectRef` / `IAtcRunResult` / `IAtcRunOptions`;
-- `IAtcFindings`, and nothing composing it with `IAdtRunnable` — the getter spells that
-  intersection itself, as `AdtClient`'s getters do;
-- `IAtcFindings`.
+- `IAtcFindings` — and **nothing** composing it with `IAdtRunnable`: the getter spells that
+  intersection itself.
 
 `IAtcLog` already in the package (`runtime/IAtcLog.ts`) is **not** this: it reads a check-failure
 or execution **log** by `executionId`, a diagnostic-log sibling of `IApplicationLog`. Different
@@ -279,6 +278,26 @@ are the same resource under two ids is unverified.
 
 One release, both packages, cut when the work is done — the rule the last three interfaces
 releases were cut against.
+
+## Which systems this is for
+
+**Everything here was observed on the cloud trial, and nothing on-prem has been captured.** The
+requests are the same either way — the URLs and payloads are not in question — but the *shape of
+the answers* is, and #68 claims an on-prem run response this spec has never seen.
+
+The handler does **not** gate on environment. `isCloudEnvironment()` exists, but refusing to run
+where the traffic is probably identical would be a guess in the other direction, and a
+cloud-only ATC is a promise about on-prem that nobody has earned either.
+
+What it does instead is refuse to invent: **`run()` parses the run response, and if the response
+does not carry what it expects, it fails rather than defaulting.** A missing `FINDING_STATS`
+becomes an error naming what was absent — not `findingStats: "0,0,0"`, and not an empty result.
+The dangerous outcome on an unverified system is not an exception; it is a confident zero, which
+is indistinguishable from a clean check. Every silent-success defect this package fixed in
+12.0.0 had that shape.
+
+So: **verified on cloud, unverified on-prem, honest on both** — and the on-prem probe below is
+what would turn the second half of that sentence into a fact.
 
 ## Where this lives
 
@@ -316,11 +335,15 @@ The intersection, spelled at the getter — no new named composite:
 getAtc(): IAdtRunnable<IAtcRunTarget, IAtcRunResult, IAtcRunOptions> & IAtcFindings;
 ```
 
-That is what adt-clients 12.0.0 did to all 36 getters on `AdtClient`, and the reason holds here:
-the factory's return type **is** the contract a consumer receives, and both halves already have
-names. A third name over them — `IAtc extends IAdtRunnable<…>, IAtcFindings` — would abbreviate
-two types into one and buy nothing; `IAtcLog` beside it is a named interface because it declares
-its own methods, which this does not.
+The precedent, counted rather than asserted: of `AdtClient`'s 37 getters, **13 spell an
+intersection and 24 return a single named type** — mostly `IAdtSourceObject`, which names a set
+several handlers share exactly. So the rule is not "always inline"; it is that a composite earns
+a name when more than one handler has that set. ATC's is used by one getter, so a third name over
+two types that already have one would buy nothing. `IAtcLog` beside it is named because it
+declares its own methods, which this does not.
+
+(An earlier revision said "all 36 getters", which is simply false — corrected in review,
+2026-08-15.)
 
 The concrete class is not the return type. A consumer never names `AdtAtc`, and returning it
 would hand out whatever else the class happens to carry — the exact gap the capability guard
