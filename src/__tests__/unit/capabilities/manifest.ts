@@ -89,8 +89,13 @@ export interface HandlerEntry {
    * either way, and would have passed. Found in review, 2026-08-15. Absent for
    * a handler whose update the generic fixture cannot reach — those are listed
    * in `VERB_NOT_REACHED` and never get this far.
+   *
+   * A list where the operation genuinely writes more than one resource, and
+   * **all** of them are required: a behaviour implementation PUTs the class's
+   * main source and then the implementation include, and naming only the first
+   * let the second disappear unnoticed. Found in review, 2026-08-15.
    */
-  writes?: string;
+  writes?: string | readonly string[];
   /** What ADT gives this object. */
   capabilities: readonly Atom[];
   /** Why this set, when the set is not the full one. */
@@ -262,7 +267,10 @@ export const HANDLERS = {
     validation: '/sap/bc/adt/oo/validation/objectname',
     versions:
       '/sap/bc/adt/oo/classes/ZBP_GUARD/includes/implementations/versions',
-    writes: '/sap/bc/adt/oo/classes/ZBP_GUARD/source/main',
+    writes: [
+      '/sap/bc/adt/oo/classes/ZBP_GUARD/source/main',
+      '/sap/bc/adt/oo/classes/ZBP_GUARD/includes/implementations',
+    ],
     capabilities: FULL,
   },
   metadataExtension: {

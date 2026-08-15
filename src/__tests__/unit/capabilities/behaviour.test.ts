@@ -313,7 +313,16 @@ function expectedResource(
             'the resource the manifest says update writes — this entry claims updatable and names none',
         };
       }
-      return exactly(where.toLowerCase());
+      // Every named resource, not any of them: an operation that writes two
+      // and stops after the first has not done what it claims.
+      const wanted = (typeof where === 'string' ? [where] : where).map((w) =>
+        w.toLowerCase(),
+      );
+      return {
+        test: () => false, // never used — `all` below replaces the single check
+        describe: wanted.join(' and '),
+        all: wanted,
+      } as ReturnType<typeof exactly> & { all: string[] };
     }
     // The version list this object actually has, named in the manifest. Neither
     // "under the subject" nor "ends with /versions" is enough: the first admits
@@ -340,9 +349,12 @@ function expectedResource(
     case 'lock':
     case 'unlock': {
       const action = method === 'lock' ? 'LOCK' : 'UNLOCK';
+      // The object itself, exactly. A class member is locked by locking its
+      // class — this branch accepting anything under the subject would have
+      // passed a lock on the include, which is the thing this release removed.
       return {
         test: (url: string) =>
-          under(subject).test(url) &&
+          exactly(subject).test(url) &&
           new RegExp(`_action=${action}(&|$)`, 'i').test(url),
         describe: `${subject}?_action=${action}`,
       };
@@ -517,7 +529,23 @@ describe('capability guard — behaviour', () => {
 
             // And on the right resource. A verb on the wrong URL is still the
             // wrong request — the whole point of naming a capability.
-            const resource = expectedResource(key, entry, method);
+            const resource = expectedResource(key, entry, method) as ReturnType<
+              typeof expectedResource
+            > & { all?: string[] };
+            // Where a method must write several resources, every one is
+            // required — see `writes` in the manifest.
+            if (resource.all) {
+              const paths = calls
+                .filter((c) => c.method === verb)
+                .map((c) => c.url.toLowerCase().split('?')[0]);
+              const missing = resource.all.filter((w) => !paths.includes(w));
+              if (missing.length > 0) {
+                throw new Error(
+                  `${name}.${method} never ${verb}s ${missing.join(' and ')} — it went to ${paths.join(', ') || 'nothing'}`,
+                );
+              }
+              return;
+            }
             const onSubject = calls.filter(
               (c) =>
                 (c.method === verb ||
