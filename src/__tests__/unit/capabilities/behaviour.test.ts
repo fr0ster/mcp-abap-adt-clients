@@ -29,6 +29,27 @@ import {
 type Recorded = { url: string; method: string };
 
 /**
+ * The URL as it would go on the wire.
+ *
+ * Some handlers put `_action=LOCK` in the URL and some pass it as `params`,
+ * which axios folds into the query. A recorder that reads only `url` cannot
+ * tell a lock from an unlock for the second kind — found while distinguishing
+ * the two, 2026-08-15.
+ */
+function wireUrl(req: {
+  url: string;
+  params?: Record<string, unknown>;
+}): string {
+  if (!req.params) return req.url;
+  const query = Object.entries(req.params)
+    .map(([k, v]) => `${k}=${String(v)}`)
+    .join('&');
+  return query
+    ? `${req.url}${req.url.includes('?') ? '&' : '?'}${query}`
+    : req.url;
+}
+
+/**
  * Answers every request with a body the low-level parsers accept.
  *
  * A realistic body matters: an empty one is what let read-modify-write corrupt
@@ -87,8 +108,10 @@ function recordingClient(activationBody: string = ACTIVATION_OK) {
     getBaseUrl: async () => 'https://example',
     getSessionId: () => null,
     setSessionType: () => {},
-    makeAdtRequest: async (req: Recorded) => {
-      calls.push({ url: req.url, method: req.method });
+    makeAdtRequest: async (
+      req: Recorded & { params?: Record<string, unknown> },
+    ) => {
+      calls.push({ url: wireUrl(req), method: req.method });
       return {
         status: 200,
         statusText: 'OK',
@@ -278,8 +301,20 @@ function expectedResource(
     // The object's own resource — or, for a handler whose subject is one part
     // of an object, that part. This is the case the review was about.
     case 'read':
-    case 'update':
       return under(part);
+    // The resource this handler writes, named in the manifest — a PUT anywhere
+    // under the object is not the same as a PUT on the right part of it.
+    case 'update': {
+      const where = entry.writes;
+      if (!where) {
+        return {
+          test: () => false,
+          describe:
+            'the resource the manifest says update writes — this entry claims updatable and names none',
+        };
+      }
+      return exactly(where.toLowerCase());
+    }
     // The version list this object actually has, named in the manifest. Neither
     // "under the subject" nor "ends with /versions" is enough: the first admits
     // the include itself, the second admits `…/testclasses/wrong/versions`.
@@ -297,10 +332,21 @@ function expectedResource(
     // Metadata, the lock and the transport are the whole object's, even when
     // the handler writes only a part of it.
     case 'readMetadata':
-    case 'lock':
-    case 'unlock':
     case 'readTransport':
       return anyOf(subject, '/sap/bc/adt/cts/transportchecks');
+    // A lock and an unlock are the same POST on the same resource, told apart
+    // only by `_action` — which the path comparison drops. Swapping the two
+    // would have passed. Found in review, 2026-08-15.
+    case 'lock':
+    case 'unlock': {
+      const action = method === 'lock' ? 'LOCK' : 'UNLOCK';
+      return {
+        test: (url: string) =>
+          under(subject).test(url) &&
+          new RegExp(`_action=${action}(&|$)`, 'i').test(url),
+        describe: `${subject}?_action=${action}`,
+      };
+    }
     // Creating means POSTing to the collection the object will live in — and
     // only that. A chain may validate the name first, but a validation is not
     // evidence that anything was created, and accepting it here let a create
