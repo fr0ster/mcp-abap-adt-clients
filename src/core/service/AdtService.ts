@@ -10,16 +10,22 @@ import { XMLParser } from 'fast-xml-parser';
 import {
   ACCEPT_CHECK_MESSAGES,
   ACCEPT_DELETION,
+  ACCEPT_DELETION_CHECK,
   ACCEPT_TRANSPORT_CHECK,
   ACCEPT_VALIDATION,
   CT_CHECK_OBJECTS,
   CT_DELETION,
+  CT_DELETION_CHECK,
   CT_TRANSPORT_CHECK,
 } from '../../constants/contentTypes';
-import { buildQueryString } from '../../utils/internalUtils';
+import { assertActivationSucceeded } from '../../utils/activationUtils';
+import { assertDeletable } from '../../utils/deletionCheck';
+import {
+  buildQueryString,
+  encodeSapObjectName,
+} from '../../utils/internalUtils';
 import { getSystemInformation } from '../../utils/systemInfo';
 import { getTimeout } from '../../utils/timeouts';
-import { throwUnsupportedVersions } from '../shared/versions';
 import type {
   IActivateServiceBindingParams,
   IAdtServiceBinding,
@@ -524,6 +530,27 @@ export class AdtServiceBinding implements IAdtServiceBinding {
       // best-effort: if read/unpublish fails, try delete directly
     }
 
+    // Ask ADT whether the binding may go, as every other object type does.
+    // Until 12.0.0 this handler alone deleted without asking — the capability
+    // guard found it. A delete the server never approved is one a caller has no
+    // reason to believe happened, and the check is the same generic service for
+    // a binding as for a class: it takes the object's URI and nothing else.
+    const encoded = encodeSapObjectName(config.bindingName).toLowerCase();
+    const checkResponse = await this.connection.makeAdtRequest({
+      url: '/sap/bc/adt/deletion/check',
+      method: 'POST',
+      timeout: getTimeout('default'),
+      data: `<?xml version="1.0" encoding="UTF-8"?>
+<del:checkRequest xmlns:del="http://www.sap.com/adt/deletion" xmlns:adtcore="http://www.sap.com/adt/core">
+  <del:object adtcore:uri="/sap/bc/adt/businessservices/bindings/${encoded}"/>
+</del:checkRequest>`,
+      headers: {
+        Accept: ACCEPT_DELETION_CHECK,
+        'Content-Type': CT_DELETION_CHECK,
+      },
+    });
+    assertDeletable(checkResponse.data);
+
     const deleteResult = await this.deleteServiceBinding({
       bindingName: config.bindingName,
       transportRequest: config.transportRequest,
@@ -546,6 +573,11 @@ export class AdtServiceBinding implements IAdtServiceBinding {
       bindingName: config.bindingName,
       preauditRequested: true,
     });
+
+    // Activation is judged by the messages, never by the status code: ADT
+    // answers 200 with a <msg type="E"> when it refuses. Ten other handlers
+    // call this; this one returned errors: [] whatever came back.
+    assertActivationSucceeded('Service binding', activateResult.data);
 
     return {
       errors: [],
@@ -594,17 +626,6 @@ export class AdtServiceBinding implements IAdtServiceBinding {
       errors: [],
       transportResult,
     };
-  }
-
-  async lock(_config: Partial<IServiceBindingConfig>): Promise<string> {
-    throw new Error('Lock is not supported for service bindings via ADT API');
-  }
-
-  async unlock(
-    _config: Partial<IServiceBindingConfig>,
-    _lockHandle: string,
-  ): Promise<IServiceBindingState> {
-    throw new Error('Unlock is not supported for service bindings via ADT API');
   }
 
   async getServiceBindingTypes(): Promise<IAdtResponse> {
@@ -1071,16 +1092,6 @@ export class AdtServiceBinding implements IAdtServiceBinding {
         Accept: 'application/xml, application/json, text/plain',
       },
     });
-  }
-
-  async getVersions(
-    _config: Partial<IServiceBindingConfig>,
-  ): Promise<IObjectVersion[]> {
-    throwUnsupportedVersions('service binding');
-  }
-
-  async getVersionSource(_contentUri: string): Promise<string> {
-    throwUnsupportedVersions('service binding');
   }
 }
 

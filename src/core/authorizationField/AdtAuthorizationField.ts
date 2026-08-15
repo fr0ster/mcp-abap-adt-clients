@@ -36,7 +36,6 @@ import {
   type LockRegistry,
   type LockTracker,
 } from '../shared/LockRegistry';
-import { throwUnsupportedVersions } from '../shared/versions';
 import { activateAuthorizationField } from './activation';
 import { checkAuthorizationField } from './check';
 import { create as createAuthorizationField } from './create';
@@ -591,20 +590,6 @@ export class AdtAuthorizationField
   }
 
   /**
-   * Read transport info — not supported by the APS IAM endpoint yet.
-   *
-   * @deprecated Not part of this handler's capability set; throws. Removed in a later major.
-   */
-  async readTransport(): Promise<IAuthorizationFieldState> {
-    const error = new Error(
-      'readTransport is not supported for authorization fields',
-    );
-    return {
-      errors: [{ method: 'readTransport', error, timestamp: new Date() }],
-    };
-  }
-
-  /**
    * Lock authorization field for modification.
    */
   async lock(config: Partial<IAuthorizationFieldConfig>): Promise<string> {
@@ -642,17 +627,5 @@ export class AdtAuthorizationField
     this.connection.setSessionType('stateless');
     this.lockTracker.untrack(config.authorizationFieldName);
     return { errors: [] };
-  }
-
-  /** @deprecated Not part of this handler's capability set; throws. Removed in a later major. */
-  async getVersions(
-    _config: Partial<IAuthorizationFieldConfig>,
-  ): Promise<IObjectVersion[]> {
-    throwUnsupportedVersions('authorization field');
-  }
-
-  /** @deprecated Not part of this handler's capability set; throws. Removed in a later major. */
-  async getVersionSource(_contentUri: string): Promise<string> {
-    throwUnsupportedVersions('authorization field');
   }
 }

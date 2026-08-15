@@ -457,7 +457,7 @@ See [Tools Documentation](tools/README.md) for complete details and options.
 ### AdtClient Overview
 
 - Factory accessors for ADT objects: `client.getClass()`, `client.getProgram()`, `client.getDdl()` (DDL sources — CDS views, AMDP table functions; formerly `getView()`), `client.getTable()`, `client.getScalarFunction()`, `client.getScalarFunctionImplementation()`, `client.getAppendStructure()`, `client.getRequest()`, `client.getUtils()`, etc.
-- Each accessor returns an `Adt*` object typed to its **honest capability set** (since 8.0.0). A full source-backed object (e.g. `getClass()`) returns `IAdtSourceObject`; one with no version history (e.g. `getDomain()`) returns `IAdtNonVersionedObject`; others return the intersection of the capability atoms they actually support. Calling a capability a handler lacks — e.g. `client.getDomain().getVersions(...)` — is now a **compile error** rather than a runtime throw. See the [Type System](#type-system) section.
+- Each accessor returns an `Adt*` object typed to its **honest capability set** (since 8.0.0, completed in 12.0.0). A full source-backed object (e.g. `getClass()`) returns `IAdtSourceObject`; everything else returns the intersection of the capability atoms it actually supports, written positively — there is no composite named for what an object lacks. Calling a capability a handler lacks — e.g. `client.getDomain().getVersions(...)` — is a **compile error** rather than a runtime throw. See the [Type System](#type-system) section.
 - See `src/index.ts` for the full type exports and object configs.
 
 ### AdtObject Methods (with Long Polling Support)
@@ -601,7 +601,7 @@ What this package exports is what it owns: the clients, the handler classes, the
 
 ### Honest capability types (since 8.0.0)
 
-`@mcp-abap-adt/interfaces` (`^14.1.0`) splits the fat `IAdtObject` contract into **capability atoms** — `IAdtCreatable`, `IAdtReadable`, `IAdtModifiable` (and `IAdtCrud`, their composite), `IAdtValidatable`, `IAdtCheckable`, `IAdtActivatable`, `IAdtLockable`, `IAdtVersionable`, `IAdtTransportAware`, `IAdtSearchable` — each covering one slice of the lifecycle, plus two named composites: `IAdtSourceObject` and `IAdtNonVersionedObject` (all but versions). Since interfaces 13.0.0 `IAdtObject` is itself assembled from the atoms, so the atoms are the definitions and the composite cannot drift from them.
+`@mcp-abap-adt/interfaces` (`^17.0.0`) splits the fat `IAdtObject` contract into **capability atoms** — `IAdtCreatable`, `IAdtReadable`, `IAdtUpdatable`, `IAdtDeletable` (and `IAdtModifiable`/`IAdtCrud`, their composites), `IAdtValidatable`, `IAdtCheckable`, `IAdtActivatable`, `IAdtLockable`, `IAdtVersionable`, `IAdtTransportAware`, `IAdtSearchable` — each covering one slice of the lifecycle, plus one named composite, `IAdtSourceObject`. There is no composite for "everything but versions": a vocabulary states what an object supports, never what it lacks. Since interfaces 13.0.0 `IAdtObject` is itself assembled from the atoms, so the atoms are the definitions and the composite cannot drift from them.
 
 Since **8.0.0**, each handler `implements` only the atoms it genuinely supports, and `AdtClient.getXxx()` (and `AdtClientBatch.getXxx()`) return types are narrowed to match:
 
@@ -614,7 +614,11 @@ Previously the second call compiled and threw `ADT_UNSUPPORTED_OPERATION` at run
 
 `IAdtObject` remains available but is **`@deprecated`** — it is the full-capability composite, structurally identical to `IAdtSourceObject`, kept for backward compatibility and removed in a later major.
 
-Since **9.0.0** no accessor returns the wide type. `getUnitTest()` and `getCdsUnitTest()` were the last, and now return `IAdtCreatable & IAdtReadable & IAdtValidatable & IAdtTestRunnable` (`IAdtCdsTestRunnable` for CDS): ADT exposes no update, delete, activate, check, lock or version resource for a test run, so the previous type promised thirteen methods of which nine threw — while omitting `run()`, the one thing the handler is for. `getRequest()`, `getFeatureToggle()` and `getServiceBinding()` return their concrete handler types.
+Since **9.0.0** no accessor returns the wide type, and since **12.0.0** none returns a type carrying a method that throws — including `getRequest()`, `getFeatureToggle()` and `getServiceBinding()`, which were the last three.
+
+`getUnitTest()` and `getCdsUnitTest()` changed meaning rather than shape: a unit test's subject is the container class and its `testclasses` include, so `create()` creates that class and writes the tests into it, `update`/`delete`/`read` manage the include, `lock`/`unlock` take the container's lock, and running is `IAdtRunnable` — one method, with `getStatus`/`getResult` on `ITestRunInformation` because asking about a run is not running it.
+
+**A guard keeps this true.** `src/__tests__/unit/capabilities/` compares all 36 factory return types against the 10 atoms in both directions at compile time, calls every method of every declared capability against a recording connection to check it issues the request its capability names, and fails if a new factory appears without an entry. Adding a throwing method back to a narrowed handler stops compiling.
 
 One category deliberately remains local, because it is code, not contract:
 

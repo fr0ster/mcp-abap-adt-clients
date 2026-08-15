@@ -127,17 +127,23 @@ describe('AdtMessageClassMessage', () => {
     expect(calls.some((c) => c.method === 'DELETE')).toBe(false);
   });
 
-  it('activate/lock/getVersions throw UNSUPPORTED', async () => {
+  it('carries no method for what a single message cannot do', () => {
+    // These threw ADT_UNSUPPORTED_OPERATION until they were deleted. A message
+    // is created, read, changed and removed through its class's XML; it is not
+    // validated, activated, checked, locked or versioned in its own right.
     const { conn } = recorder();
     const m = new AdtMessageClassMessage(conn, noopLogger);
-    for (const fn of [
-      () => m.activate({ className: 'ZT', msgno: '001' }),
-      () => m.lock({ className: 'ZT', msgno: '001' }),
-      () => m.getVersions({ className: 'ZT', msgno: '001' }),
+    for (const name of [
+      'validate',
+      'activate',
+      'check',
+      'readTransport',
+      'lock',
+      'unlock',
+      'getVersions',
+      'getVersionSource',
     ]) {
-      await expect(fn()).rejects.toMatchObject({
-        code: 'ADT_UNSUPPORTED_OPERATION',
-      });
+      expect(name in m).toBe(false);
     }
   });
 

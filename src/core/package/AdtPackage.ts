@@ -42,7 +42,6 @@ import {
   type LockTracker,
 } from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
-import { throwUnsupportedVersions } from '../shared/versions';
 import { checkPackage } from './check';
 import { createPackage } from './create';
 import { checkPackageDeletion, deletePackage } from './delete';
@@ -573,18 +572,6 @@ export class AdtPackage
   }
 
   /**
-   * Activate package
-   * Note: Packages don't have activate operation - this is a stub
-   *
-   * @deprecated Not part of this handler's capability set; throws. Removed in a later major.
-   */
-  async activate(_config: Partial<IPackageConfig>): Promise<IPackageState> {
-    throw new Error(
-      'Activate operation is not supported for Package objects in ADT',
-    );
-  }
-
-  /**
    * Check package
    */
   async check(
@@ -645,17 +632,5 @@ export class AdtPackage
       unlockResult: result,
       errors: [],
     };
-  }
-
-  /** @deprecated Not part of this handler's capability set; throws. Removed in a later major. */
-  async getVersions(
-    _config: Partial<IPackageConfig>,
-  ): Promise<IObjectVersion[]> {
-    throwUnsupportedVersions('package');
-  }
-
-  /** @deprecated Not part of this handler's capability set; throws. Removed in a later major. */
-  async getVersionSource(_contentUri: string): Promise<string> {
-    throwUnsupportedVersions('package');
   }
 }

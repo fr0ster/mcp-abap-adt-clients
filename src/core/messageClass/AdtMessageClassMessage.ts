@@ -19,8 +19,9 @@ import { beginCriticalSection } from '../../utils/criticalSection';
  *           is the correct mechanism. A message-level DELETE /messages/{no}
  *           returns 423 and is NOT used.)
  *
- * Unsupported: activate, check, validate, lock, unlock, getVersions,
- * getVersionSource, readTransport → throwUnsupportedOperation.
+ * A message is created, read, changed and removed through its class's XML. It
+ * is not validated, activated, checked, locked or versioned in its own right,
+ * and carries no method for any of those.
  *
  * transport: when config.transportRequest is set (transportable package), it is
  * appended as &corrNr= on the class PUT, like the other CRUD object types.
@@ -43,7 +44,6 @@ import {
   safeErrorMessage,
 } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
-import { throwUnsupportedOperation } from '../shared/unsupported';
 import { lockClassForMessage, lockMessage } from './lock';
 import { getMessageClassSource } from './read';
 import type {
@@ -384,60 +384,5 @@ export class AdtMessageClassMessage
       );
     }
     return state;
-  }
-
-  // ── unsupported operations ─────────────────────────────────────────────────
-
-  /** @deprecated Not part of this handler's capability set; throws. Removed in a later major. */
-  async validate(
-    _config: Partial<IMessageClassMessageConfig>,
-  ): Promise<IMessageClassMessageState> {
-    throwUnsupportedOperation('validate', 'message class message');
-  }
-
-  /** @deprecated Not part of this handler's capability set; throws. Removed in a later major. */
-  async activate(
-    _config: Partial<IMessageClassMessageConfig>,
-  ): Promise<IMessageClassMessageState> {
-    throwUnsupportedOperation('activate', 'message class message');
-  }
-
-  /** @deprecated Not part of this handler's capability set; throws. Removed in a later major. */
-  async check(
-    _config: Partial<IMessageClassMessageConfig>,
-  ): Promise<IMessageClassMessageState> {
-    throwUnsupportedOperation('check', 'message class message');
-  }
-
-  /** @deprecated Not part of this handler's capability set; throws. Removed in a later major. */
-  async readTransport(
-    _config: Partial<IMessageClassMessageConfig>,
-  ): Promise<IMessageClassMessageState> {
-    throwUnsupportedOperation('readTransport', 'message class message');
-  }
-
-  /** @deprecated Not part of this handler's capability set; throws. Removed in a later major. */
-  async lock(_config: Partial<IMessageClassMessageConfig>): Promise<string> {
-    throwUnsupportedOperation('lock', 'message class message');
-  }
-
-  /** @deprecated Not part of this handler's capability set; throws. Removed in a later major. */
-  async unlock(
-    _config: Partial<IMessageClassMessageConfig>,
-    _lockHandle: string,
-  ): Promise<IMessageClassMessageState> {
-    throwUnsupportedOperation('unlock', 'message class message');
-  }
-
-  /** @deprecated Not part of this handler's capability set; throws. Removed in a later major. */
-  async getVersions(
-    _config: Partial<IMessageClassMessageConfig>,
-  ): Promise<IObjectVersion[]> {
-    throwUnsupportedOperation('getVersions', 'message class message');
-  }
-
-  /** @deprecated Not part of this handler's capability set; throws. Removed in a later major. */
-  async getVersionSource(_contentUri: string): Promise<string> {
-    throwUnsupportedOperation('getVersionSource', 'message class message');
   }
 }

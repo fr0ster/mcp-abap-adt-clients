@@ -14,7 +14,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { safeErrorMessage } from '../../utils/internalUtils';
 import type { IReadOptions } from '../shared/types';
-import { AdtClass } from './AdtClass';
+import { AdtClassMemberBase } from './AdtClassMemberBase';
 import { checkClassMacros } from './check';
 import { updateClassMacros } from './includes';
 import type { IClassState } from './types';
@@ -22,7 +22,7 @@ import type { IClassState } from './types';
 // Types defined in @mcp-abap-adt/interfaces
 export type { ILocalMacrosConfig } from '@mcp-abap-adt/interfaces';
 
-export class AdtLocalMacros extends AdtClass {
+export class AdtLocalMacros extends AdtClassMemberBase {
   public readonly objectType: string = 'LocalMacros';
 
   /**
@@ -48,90 +48,6 @@ export class AdtLocalMacros extends AdtClass {
       validationResponse: checkResponse,
       errors: [],
     };
-  }
-
-  /**
-   * Create local macros with full operation chain
-   * Requires parent class to be locked
-   */
-  async create(
-    config: Partial<ILocalMacrosConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IClassState> {
-    if (!config.className) {
-      throw new Error('Class name is required');
-    }
-    if (!config.macrosCode) {
-      throw new Error('Macros code is required');
-    }
-
-    let lockHandle: string | undefined;
-    const state: IClassState = {
-      errors: [],
-    };
-
-    try {
-      // 1. Lock parent class (stateful only for lock)
-      this.logger?.info?.('Step 1: Locking parent class');
-      lockHandle = await super.lock({ className: config.className });
-      state.lockHandle = lockHandle;
-      this.logger?.info?.('Parent class locked, handle:', lockHandle);
-
-      // 2. Check local macros code
-      const codeToCheck = options?.sourceCode || config.macrosCode;
-      if (codeToCheck) {
-        this.logger?.info?.('Step 2: Checking local macros code');
-        const checkResponse = await checkClassMacros(
-          this.connection,
-          config.className,
-          codeToCheck,
-          'inactive',
-          this.contentTypes?.sourceArtifactContentType(),
-        );
-        state.checkResult = checkResponse;
-        this.logger?.info?.('Local macros check passed');
-      }
-
-      // 3. Update local macros
-      this.logger?.info?.('Step 3: Creating local macros');
-      const updateResponse = await updateClassMacros(
-        this.connection,
-        config.className,
-        codeToCheck as string,
-        lockHandle,
-        config.transportRequest,
-        this.contentTypes?.sourceArtifactContentType(),
-      );
-      state.updateResult = updateResponse;
-      this.logger?.info?.('Local macros created');
-
-      // 4. Unlock parent class (obligatory stateless after unlock)
-      this.logger?.info?.('Step 4: Unlocking parent class');
-      const unlockState = await super.unlock(
-        { className: config.className },
-        lockHandle,
-      );
-      state.unlockResult = unlockState.unlockResult;
-      lockHandle = undefined;
-
-      return state;
-    } catch (error: unknown) {
-      // Cleanup on error
-      if (lockHandle) {
-        try {
-          this.logger?.warn?.('Unlocking parent class during error cleanup');
-          await super.unlock({ className: config.className }, lockHandle);
-        } catch (unlockError) {
-          this.logger?.warn?.(
-            'Failed to unlock parent class after error:',
-            safeErrorMessage(unlockError),
-          );
-        }
-      }
-
-      this.logger?.error('Create LocalMacros failed:', safeErrorMessage(error));
-      throw error;
-    }
   }
 
   /**
@@ -180,16 +96,15 @@ export class AdtLocalMacros extends AdtClass {
     if (!config.className) {
       throw new Error('Class name is required');
     }
-    if (!config.macrosCode) {
+    // An empty string is source: writing it is how the include is emptied
+    // (see delete()). Only its absence is an error.
+    if (config.macrosCode === undefined && options?.sourceCode === undefined) {
       throw new Error('Macros code is required');
     }
 
     // Low-level mode: if lockHandle is provided, perform only update operation
     if (options?.lockHandle) {
-      const codeToUpdate = options?.sourceCode || config.macrosCode;
-      if (!codeToUpdate) {
-        throw new Error('Macros code is required for update');
-      }
+      const codeToUpdate = options?.sourceCode ?? config.macrosCode ?? '';
 
       this.logger?.info?.(
         'Low-level update: performing update only (lockHandle provided)',
@@ -222,8 +137,9 @@ export class AdtLocalMacros extends AdtClass {
       this.logger?.info?.('Parent class locked, handle:', lockHandle);
 
       // 2. Check local macros code
-      const codeToCheck = options?.sourceCode || config.macrosCode;
-      if (codeToCheck) {
+      // Empty source is a deletion — nothing to syntax-check.
+      const codeToCheck = options?.sourceCode ?? config.macrosCode ?? '';
+      if (codeToCheck !== '') {
         this.logger?.info?.('Step 2: Checking local macros code');
         const checkResponse = await checkClassMacros(
           this.connection,
@@ -241,7 +157,7 @@ export class AdtLocalMacros extends AdtClass {
       const updateResponse = await updateClassMacros(
         this.connection,
         config.className,
-        codeToCheck as string,
+        codeToCheck,
         lockHandle,
         config.transportRequest,
         this.contentTypes?.sourceArtifactContentType(),

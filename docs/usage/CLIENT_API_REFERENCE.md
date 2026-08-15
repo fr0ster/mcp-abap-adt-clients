@@ -166,10 +166,11 @@ await toggle.update(
   },
 );
 
-// --- 8. Unsupported on feature toggles ---
-// readTransport() returns a state with a single error entry rather than
-// throwing — there is no /transport sub-resource for FTG2/FT. Feature-toggle
-// changes bind to transports via the /toggle and /check endpoints instead.
+// --- 8. What a feature toggle does not have ---
+// Since 12.0.0 there is no readTransport(), and no getVersions()/
+// getVersionSource(): ADT gives a toggle no /transport sub-resource and no
+// version history, so the methods are gone rather than refusing. Toggle changes
+// bind to transports through the /toggle and /check endpoints instead.
 ```
 
 ### Feature Toggle — environment-specific behavior
@@ -531,9 +532,14 @@ await client.getMessageClass().delete({ name: 'ZMY_MSG' });
 
 ### Object version history
 
-Every object handler exposes `getVersions(config)` (list the SAP version history)
-and `getVersionSource(contentUri)` (fetch a specific version's source). Identity is
-passed per call, like the other handler methods.
+A handler whose object **has** version history exposes `getVersions(config)` (list it)
+and `getVersionSource(contentUri)` (fetch one version's source). Identity is passed per
+call, like the other handler methods.
+
+Since 12.0.0 a handler whose object has none carries neither method — `getDomain()`,
+`getDataElement()`, `getFunctionGroup()`, `getPackage()`, `getMessageClass()`,
+`getAuthorizationField()`, `getFeatureToggle()`, `getServiceBinding()`, `getRequest()`
+and the unit-test handlers. The call does not compile, rather than throwing at runtime.
 
 ```typescript
 import { AdtObjectErrorCodes, type AdtOperationError } from '@mcp-abap-adt/interfaces';
@@ -550,17 +556,17 @@ if (versions.length > 0) {
 }
 ```
 
-Object types that do not expose a version resource (e.g. packages, transports, or a
-type whose version endpoint is not available on the target system) throw
-`AdtOperationError` with `code === AdtObjectErrorCodes.UNSUPPORTED_OPERATION` — the
-raw HTTP error is never surfaced:
+A type that *does* have version history, on a system where the resource is not
+available, still throws `AdtOperationError` with
+`code === AdtObjectErrorCodes.UNSUPPORTED_OPERATION` — the raw HTTP error is never
+surfaced. That is a fact about the system, not about the contract:
 
 ```typescript
 try {
-  await client.getPackage().getVersions({ packageName: 'ZMY_PKG' });
+  await client.getClass().getVersions({ className: 'ZCL_MY_CLASS' });
 } catch (e) {
   if ((e as AdtOperationError).code === AdtObjectErrorCodes.UNSUPPORTED_OPERATION) {
-    // this object has no version history
+    // this system does not answer the versions resource
   }
 }
 ```

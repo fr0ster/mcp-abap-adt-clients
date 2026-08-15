@@ -92,7 +92,7 @@ describe('FunctionGroup (using AdtClient)', () => {
       hasConfig = true;
 
       tester = new BaseTester(
-        // getFunctionGroup() is narrowed to IAdtNonVersionedObject (no
+        // getFunctionGroup() declares no IAdtVersionable (no
         // getVersions/getVersionSource); cast through the full interface.
         client.getFunctionGroup() as unknown as IAdtObject<
           IFunctionGroupConfig,

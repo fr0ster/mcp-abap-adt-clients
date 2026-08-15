@@ -13,13 +13,19 @@
  * body only exists so jest reports the file.
  */
 import type {
-  IAdtCdsTestRunnable,
   IAdtCreatable,
+  IAdtDeletable,
+  IAdtLockable,
   IAdtReadable,
-  IAdtTestRunnable,
+  IAdtRunnable,
+  IAdtUpdatable,
   IAdtValidatable,
+  ICdsTestDoubleCheckable,
   ICdsUnitTestConfig,
   ICdsUnitTestState,
+  IClassUnitTestDefinition,
+  IClassUnitTestRunOptions,
+  ITestRunInformation,
   IUnitTestConfig,
   IUnitTestState,
 } from '@mcp-abap-adt/interfaces';
@@ -31,8 +37,7 @@ type CdsUnitTestHandler = ReturnType<AdtClient['getCdsUnitTest']>;
 /** Compile error unless `T` is assignable to `Expected`. */
 type Satisfies<T extends Expected, Expected> = T;
 
-// --- What getUnitTest() must keep handing out -------------------------------
-type _RunnableIsExposed = Satisfies<UnitTestHandler, IAdtTestRunnable>;
+// --- Managing the tests: the container class and its testclasses include ----
 type _UnitIsCreatable = Satisfies<
   UnitTestHandler,
   IAdtCreatable<IUnitTestConfig, IUnitTestState>
@@ -41,42 +46,67 @@ type _UnitIsReadable = Satisfies<
   UnitTestHandler,
   IAdtReadable<IUnitTestConfig, IUnitTestState>
 >;
+type _UnitIsUpdatable = Satisfies<
+  UnitTestHandler,
+  IAdtUpdatable<IUnitTestConfig, IUnitTestState>
+>;
+type _UnitIsDeletable = Satisfies<
+  UnitTestHandler,
+  IAdtDeletable<IUnitTestConfig, IUnitTestState>
+>;
 type _UnitIsValidatable = Satisfies<
   UnitTestHandler,
   IAdtValidatable<IUnitTestConfig, IUnitTestState>
 >;
+/** The lock is the container class's — see AdtUnitTest. */
+type _UnitIsLockable = Satisfies<
+  UnitTestHandler,
+  IAdtLockable<IUnitTestConfig, IUnitTestState>
+>;
+
+// --- Running, and asking about a run: two separate capabilities -------------
+type _UnitIsRunnable = Satisfies<
+  UnitTestHandler,
+  IAdtRunnable<IClassUnitTestDefinition[], string, IClassUnitTestRunOptions>
+>;
+type _UnitAnswersAboutRuns = Satisfies<UnitTestHandler, ITestRunInformation>;
 
 // --- And getCdsUnitTest() ---------------------------------------------------
-type _CdsRunnableIsExposed = Satisfies<CdsUnitTestHandler, IAdtCdsTestRunnable>;
 type _CdsIsCreatable = Satisfies<
   CdsUnitTestHandler,
   IAdtCreatable<ICdsUnitTestConfig, ICdsUnitTestState>
 >;
+type _CdsChecksTestDoubles = Satisfies<
+  CdsUnitTestHandler,
+  ICdsTestDoubleCheckable
+>;
+type _CdsAnswersAboutRuns = Satisfies<CdsUnitTestHandler, ITestRunInformation>;
 
 /**
- * The narrowing has to bite, or it is decoration. A test run has no update,
- * delete, activate, check, lock or version resource, so the handed-out type
- * must NOT carry them — otherwise we are back to promising methods that throw.
+ * The narrowing has to bite, or it is decoration. A unit test is not activated,
+ * has no syntax check of its own beyond `validate`, no version history and no
+ * transport — those belong to the container class, reached through
+ * `getClass()`. The handed-out type must not carry them.
  */
-type _NoUpdate = UnitTestHandler extends { update: unknown } ? never : true;
-type _NoDelete = UnitTestHandler extends { delete: unknown } ? never : true;
 type _NoActivate = UnitTestHandler extends { activate: unknown } ? never : true;
-type _NoLock = UnitTestHandler extends { lock: unknown } ? never : true;
+type _NoCheck = UnitTestHandler extends { check: unknown } ? never : true;
 type _NoVersions = UnitTestHandler extends { getVersions: unknown }
+  ? never
+  : true;
+type _NoTransport = UnitTestHandler extends { readTransport: unknown }
   ? never
   : true;
 
 const refusedCapabilitiesStayOut: [
-  _NoUpdate,
-  _NoDelete,
   _NoActivate,
-  _NoLock,
+  _NoCheck,
   _NoVersions,
-] = [true, true, true, true, true];
+  _NoTransport,
+] = [true, true, true, true];
 
 describe('unit-test handler contract conformance', () => {
-  it('exposes the run surface and the honest CRUD subset through AdtClient', () => {
+  it('hands out managing, running and asking — and nothing else', () => {
     // The assertions above are the test; reaching here means they compiled.
-    expect(refusedCapabilitiesStayOut).toEqual([true, true, true, true, true]);
+    expect(refusedCapabilitiesStayOut).toEqual([true, true, true, true]);
   });
 });

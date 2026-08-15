@@ -28,8 +28,12 @@
 
 import type {
   IAbapConnection,
-  IAdtObject,
+  IAdtActivatable,
+  IAdtCreatable,
+  IAdtModifiable,
   IAdtOperationOptions,
+  IAdtReadable,
+  IAdtValidatable,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { LogLevel } from '@mcp-abap-adt/interfaces';
@@ -84,8 +88,24 @@ export interface IBaseTesterSetupOptions {
   testDescription?: string;
 }
 
+/**
+ * What a tester actually needs from a handler.
+ *
+ * It used to demand `IAdtObject`, the full set, which made this helper the last
+ * place insisting every handler can do everything — a feature toggle has no
+ * version history, a service binding has no lock, and neither could be tested
+ * here once their types stopped claiming otherwise. These are the seven methods
+ * the class calls; `activate` is optional because not every object is
+ * activated, and the call site already guards on it.
+ */
+export type TestableObject<TConfig, TState> = IAdtCreatable<TConfig, TState> &
+  IAdtReadable<TConfig, TState> &
+  IAdtModifiable<TConfig, TState> &
+  IAdtValidatable<TConfig, TState> &
+  Partial<IAdtActivatable<TConfig, TState>>;
+
 export class BaseTester<TConfig, TState> {
-  private readonly adtObject: IAdtObject<TConfig, TState>;
+  private readonly adtObject: TestableObject<TConfig, TState>;
   private readonly loggerPrefix: string;
   private readonly testCaseKey: string;
   private readonly testCaseName: string;
@@ -127,7 +147,7 @@ export class BaseTester<TConfig, TState> {
    *                Uses LogLevel enum from @mcp-abap-adt/logger for log level constants
    */
   constructor(
-    adtObject: IAdtObject<TConfig, TState>,
+    adtObject: TestableObject<TConfig, TState>,
     loggerPrefix: string,
     testCaseKey: string,
     testCaseName: string,
@@ -799,8 +819,13 @@ export class BaseTester<TConfig, TState> {
         }
       }
 
-      // 4. Activate (if not activated during create/update)
-      if (!options?.activateOnCreate && !options?.activateOnUpdate) {
+      // 4. Activate (if not activated during create/update, and if this object
+      // is activated at all — a package and a message class are not)
+      if (
+        !options?.activateOnCreate &&
+        !options?.activateOnUpdate &&
+        this.adtObject.activate
+      ) {
         currentStep = 'activate';
         logTestStep(currentStep, this.logger);
         const activateState = await this.adtObject.activate(

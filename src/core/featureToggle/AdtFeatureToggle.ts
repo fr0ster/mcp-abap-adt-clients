@@ -35,7 +35,6 @@ import {
   type LockRegistry,
   type LockTracker,
 } from '../shared/LockRegistry';
-import { throwUnsupportedVersions } from '../shared/versions';
 import { activateFeatureToggle } from './activation';
 import { checkFeatureToggle } from './check';
 import { checkFeatureToggleState } from './checkState';
@@ -672,26 +671,6 @@ export class AdtFeatureToggle implements IFeatureToggleObject {
   }
 
   /**
-   * Read transport info — not supported for feature toggles.
-   */
-  async readTransport(
-    _config: Partial<IFeatureToggleConfig>,
-    _options?: { withLongPolling?: boolean },
-  ): Promise<IFeatureToggleState> {
-    return {
-      errors: [
-        {
-          method: 'readTransport',
-          error: new Error(
-            'readTransport is not supported for feature toggles',
-          ),
-          timestamp: new Date(),
-        },
-      ],
-    };
-  }
-
-  /**
    * Lock feature toggle for modification.
    */
   async lock(config: Partial<IFeatureToggleConfig>): Promise<string> {
@@ -848,15 +827,5 @@ export class AdtFeatureToggle implements IFeatureToggleObject {
       throw new Error('Feature toggle name is required');
     }
     return config.featureToggleName;
-  }
-
-  async getVersions(
-    _config: Partial<IFeatureToggleConfig>,
-  ): Promise<IObjectVersion[]> {
-    throwUnsupportedVersions('feature toggle');
-  }
-
-  async getVersionSource(_contentUri: string): Promise<string> {
-    throwUnsupportedVersions('feature toggle');
   }
 }

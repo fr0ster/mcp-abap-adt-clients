@@ -13,7 +13,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { safeErrorMessage } from '../../utils/internalUtils';
 import type { IReadOptions } from '../shared/types';
-import { AdtClass } from './AdtClass';
+import { AdtClassMemberBase } from './AdtClassMemberBase';
 import { checkClassLocalTestClass } from './check';
 import { updateClassTestInclude } from './testclasses';
 import type { IClassState } from './types';
@@ -21,7 +21,7 @@ import type { IClassState } from './types';
 // Types defined in @mcp-abap-adt/interfaces
 export type { ILocalTestClassConfig } from '@mcp-abap-adt/interfaces';
 
-export class AdtLocalTestClass extends AdtClass {
+export class AdtLocalTestClass extends AdtClassMemberBase {
   public readonly objectType: string = 'LocalTestClass';
 
   /**
@@ -47,105 +47,6 @@ export class AdtLocalTestClass extends AdtClass {
       validationResponse: checkResponse,
       errors: [],
     };
-  }
-
-  /**
-   * Create local test class with full operation chain
-   * Requires parent class to be locked
-   */
-  async create(
-    config: Partial<ILocalTestClassConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IClassState> {
-    if (!config.className) {
-      throw new Error('Class name is required');
-    }
-    if (!config.testClassCode) {
-      throw new Error('Test class code is required');
-    }
-
-    let parentLockHandle: string | undefined;
-    const state: IClassState = {
-      errors: [],
-    };
-
-    try {
-      // 1. Lock parent class (stateful only for lock)
-      // Lock handle from parent class is sufficient for updating testclasses include
-      this.logger?.info?.('Step 1: Locking parent class');
-      parentLockHandle = await this.lock({ className: config.className });
-      state.lockHandle = parentLockHandle;
-      this.logger?.info?.('Parent class locked, handle:', parentLockHandle);
-
-      // 2. Check test class code
-      if (config.testClassCode) {
-        this.logger?.info?.('Step 2: Checking test class code');
-        const checkResponse = await checkClassLocalTestClass(
-          this.connection,
-          config.className,
-          config.testClassCode,
-          'inactive',
-          this.contentTypes?.sourceArtifactContentType(),
-        );
-        state.checkResult = checkResponse;
-        this.logger?.info?.('Test class check passed');
-      }
-
-      // 3. Update test classes (uses parent class lock handle)
-      this.logger?.info?.('Step 3: Creating test class');
-      const updateResponse = await updateClassTestInclude(
-        this.connection,
-        config.className,
-        config.testClassCode as string,
-        parentLockHandle,
-        config.transportRequest,
-        this.contentTypes?.sourceArtifactContentType(),
-      );
-      state.updateResult = updateResponse;
-      this.logger?.info?.('Test class created');
-
-      // 4. Unlock parent class (obligatory stateless after unlock)
-      if (parentLockHandle) {
-        this.logger?.info?.('Step 4: Unlocking parent class');
-        const unlockState = await super.unlock(
-          { className: config.className },
-          parentLockHandle,
-        );
-        state.unlockResult = unlockState.unlockResult;
-        parentLockHandle = undefined;
-      }
-
-      // 5. Activate parent class (if requested)
-      if (options?.activateOnCreate) {
-        this.logger?.info?.('Step 5: Activating parent class');
-        const activateState = await this.activate({
-          className: config.className,
-        });
-        state.activateResult = activateState.activateResult;
-        this.logger?.info?.('Parent class activated');
-      }
-
-      return state;
-    } catch (error: unknown) {
-      // Cleanup on error
-      if (parentLockHandle) {
-        try {
-          this.logger?.warn?.('Unlocking parent class during error cleanup');
-          await super.unlock({ className: config.className }, parentLockHandle);
-        } catch (unlockError) {
-          this.logger?.warn?.(
-            'Failed to unlock parent class after error:',
-            safeErrorMessage(unlockError),
-          );
-        }
-      }
-
-      this.logger?.error(
-        'Create LocalTestClass failed:',
-        safeErrorMessage(error),
-      );
-      throw error;
-    }
   }
 
   /**
@@ -198,16 +99,19 @@ export class AdtLocalTestClass extends AdtClass {
     if (!config.className) {
       throw new Error('Class name is required');
     }
-    if (!config.testClassCode) {
+    // An empty string is source: writing it is how a test class is removed
+    // (see delete()). Only its absence is an error, so this asks whether the
+    // caller gave source at all rather than whether the source is truthy.
+    if (
+      config.testClassCode === undefined &&
+      options?.sourceCode === undefined
+    ) {
       throw new Error('Test class code is required');
     }
 
     // Low-level mode: if lockHandle is provided, perform only update operation
     if (options?.lockHandle) {
-      const codeToUpdate = options?.sourceCode || config.testClassCode;
-      if (!codeToUpdate) {
-        throw new Error('Test class code is required for update');
-      }
+      const codeToUpdate = options?.sourceCode ?? config.testClassCode ?? '';
 
       this.logger?.info?.(
         'Low-level update: performing update only (lockHandle provided)',
@@ -240,9 +144,10 @@ export class AdtLocalTestClass extends AdtClass {
       state.lockHandle = parentLockHandle;
       this.logger?.info?.('Parent class locked, handle:', parentLockHandle);
 
-      // 2. Check test class code
-      const codeToCheck = options?.sourceCode || config.testClassCode;
-      if (codeToCheck) {
+      // 2. Check test class code. Empty source is a deletion — there is nothing
+      // to syntax-check, and ADT rejects an empty body on the check resource.
+      const codeToCheck = options?.sourceCode ?? config.testClassCode ?? '';
+      if (codeToCheck !== '') {
         this.logger?.info?.('Step 2: Checking test class code');
         const checkResponse = await checkClassLocalTestClass(
           this.connection,
@@ -260,7 +165,7 @@ export class AdtLocalTestClass extends AdtClass {
       const updateResponse = await updateClassTestInclude(
         this.connection,
         config.className,
-        codeToCheck as string,
+        codeToCheck,
         parentLockHandle,
         config.transportRequest,
         this.contentTypes?.sourceArtifactContentType(),
@@ -356,14 +261,6 @@ export class AdtLocalTestClass extends AdtClass {
       errors: [],
     };
   }
-
-  // TODO: Investigate lock/unlock/delete operations for local test classes
-  // - Currently uses parent class lock (lockClass) for update operations
-  // - There is a separate lockClassTestClasses() function that locks /includes/testclasses endpoint
-  // - Eclipse ADT logs show parent class lock is used before updating local includes
-  // - Need to verify if /includes/testclasses?_action=LOCK endpoint exists in ADT discovery
-  // - Delete operation currently uses update() with empty code, but validation prevents empty strings
-  // - Consider: Should delete() bypass validation or use a different approach?
 
   getVersions(
     config: Partial<{ className: string }>,

@@ -15,19 +15,24 @@
 
 import type {
   IAbapConnection,
+  IAdtActivatable,
   IAdtCheckable,
   IAdtClientOptions,
   IAdtCreatable,
   IAdtCrud,
+  IAdtDeletable,
   IAdtLockable,
-  IAdtNonVersionedObject,
   IAdtObject,
   IAdtReadable,
+  IAdtRunnable,
   IAdtSourceObject,
-  IAdtTestRunnable,
   IAdtTransportAware,
+  IAdtUpdatable,
   IAdtValidatable,
+  IClassUnitTestDefinition,
+  IClassUnitTestRunOptions,
   ILogger,
+  ITestRunInformation,
 } from '@mcp-abap-adt/interfaces';
 import type { IClassConfig, IClassState } from '../core/class';
 import { AdtClassLegacy } from '../core/class/AdtClassLegacy';
@@ -113,10 +118,15 @@ export class AdtClientLegacy extends AdtClient {
     );
   }
 
-  override getFunctionGroup(): IAdtNonVersionedObject<
+  override getFunctionGroup(): IAdtCrud<
     IFunctionGroupConfig,
     IFunctionGroupState
-  > {
+  > &
+    IAdtValidatable<IFunctionGroupConfig, IFunctionGroupState> &
+    IAdtCheckable<IFunctionGroupConfig, IFunctionGroupState> &
+    IAdtActivatable<IFunctionGroupConfig, IFunctionGroupState> &
+    IAdtLockable<IFunctionGroupConfig, IFunctionGroupState> &
+    IAdtTransportAware<IFunctionGroupConfig, IFunctionGroupState> {
     return new AdtFunctionGroupLegacy(
       this.connection,
       this.logger,
@@ -157,8 +167,12 @@ export class AdtClientLegacy extends AdtClient {
 
   override getUnitTest(): IAdtCreatable<IUnitTestConfig, IUnitTestState> &
     IAdtReadable<IUnitTestConfig, IUnitTestState> &
+    IAdtUpdatable<IUnitTestConfig, IUnitTestState> &
+    IAdtDeletable<IUnitTestConfig, IUnitTestState> &
     IAdtValidatable<IUnitTestConfig, IUnitTestState> &
-    IAdtTestRunnable {
+    IAdtLockable<IUnitTestConfig, IUnitTestState> &
+    IAdtRunnable<IClassUnitTestDefinition[], string, IClassUnitTestRunOptions> &
+    ITestRunInformation {
     return new AdtUnitTestLegacy(this.connection, this.logger);
   }
 

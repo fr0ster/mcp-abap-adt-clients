@@ -89,7 +89,7 @@ describe('Domain (using AdtClient)', () => {
       hasConfig = true;
 
       tester = new BaseTester(
-        // getDomain() is narrowed to IAdtNonVersionedObject (no
+        // getDomain() declares no IAdtVersionable (no
         // getVersions/getVersionSource); cast through the full interface.
         client.getDomain() as unknown as IAdtObject<
           IDomainConfig,

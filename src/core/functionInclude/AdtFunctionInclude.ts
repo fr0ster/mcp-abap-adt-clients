@@ -822,20 +822,6 @@ export class AdtFunctionInclude
   }
 
   /**
-   * Read transport info — not supported for FUGR/I (transport tracked at group level).
-   *
-   * @deprecated Not part of this handler's capability set; throws. Removed in a later major.
-   */
-  async readTransport(): Promise<IFunctionIncludeState> {
-    const error = new Error(
-      'readTransport is not supported for function includes (tracked at function group level)',
-    );
-    return {
-      errors: [{ method: 'readTransport', error, timestamp: new Date() }],
-    };
-  }
-
-  /**
    * Lock function include for modification.
    */
   async lock(config: Partial<IFunctionIncludeConfig>): Promise<string> {

@@ -9,8 +9,9 @@ import { assertDeletable } from '../../utils/deletionCheck';
  * - stateful: only during lock → update/delete → unlock chains
  * - stateless: mandatory after unlock
  *
- * Unsupported operations (message classes are not activatable):
- * - activate, check, getVersions, getVersionSource → throwUnsupportedOperation
+ * What a message class does not have, and therefore has no method for: it is
+ * not activated, has no syntax check, no version history, and no transport of
+ * its own — it travels in its package's.
  *
  * transport: config.transportRequest is sent as corrNr on create/update and as
  * <del:transportNumber> on delete (transportable packages); local packages send none.
@@ -34,7 +35,6 @@ import {
   type LockRegistry,
   type LockTracker,
 } from '../shared/LockRegistry';
-import { throwUnsupportedOperation } from '../shared/unsupported';
 import { createMessageClass } from './create';
 import { checkDeletion, deleteMessageClass } from './delete';
 import { lockMessageClass } from './lock';
@@ -307,21 +307,6 @@ export class AdtMessageClass
   }
 
   /**
-   * Read transport request information.
-   * Transport endpoint is not confirmed for message classes — always throws.
-   *
-   * @deprecated Not part of this handler's capability set; throws. Removed in a later major.
-   */
-  async readTransport(
-    config: Partial<IMessageClassConfig>,
-  ): Promise<IMessageClassState> {
-    throwUnsupportedOperation(
-      'readTransport',
-      `message class ${config.name ?? ''}`,
-    );
-  }
-
-  /**
    * Lock message class for modification (low-level — use when managing lock externally).
    */
   async lock(config: Partial<IMessageClassConfig>): Promise<string> {
@@ -352,49 +337,5 @@ export class AdtMessageClass
     this.connection.setSessionType('stateless');
     this.lockTracker.untrack(config.name);
     return { unlockResult, errors: [] };
-  }
-
-  /**
-   * Message classes are not activated — always throws.
-   * @deprecated Not part of this handler's capability set; throws. Removed in a later major.
-   */
-  async activate(
-    _config: Partial<IMessageClassConfig>,
-  ): Promise<IMessageClassState> {
-    throwUnsupportedOperation(
-      'activate',
-      `message class ${_config.name ?? ''}`,
-    );
-  }
-
-  /**
-   * Syntax check is not applicable to message classes — always throws.
-   * @deprecated Not part of this handler's capability set; throws. Removed in a later major.
-   */
-  async check(
-    _config: Partial<IMessageClassConfig>,
-  ): Promise<IMessageClassState> {
-    throwUnsupportedOperation('check', `message class ${_config.name ?? ''}`);
-  }
-
-  /**
-   * Version history is not supported for message classes — always throws.
-   * @deprecated Not part of this handler's capability set; throws. Removed in a later major.
-   */
-  async getVersions(
-    _config: Partial<IMessageClassConfig>,
-  ): Promise<IObjectVersion[]> {
-    throwUnsupportedOperation(
-      'getVersions',
-      `message class ${_config.name ?? ''}`,
-    );
-  }
-
-  /**
-   * Version source retrieval is not supported for message classes — always throws.
-   * @deprecated Not part of this handler's capability set; throws. Removed in a later major.
-   */
-  async getVersionSource(_contentUri: string): Promise<string> {
-    throwUnsupportedOperation('getVersionSource', 'message class');
   }
 }

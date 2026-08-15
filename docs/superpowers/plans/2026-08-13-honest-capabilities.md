@@ -34,14 +34,14 @@ Per task:
 | 4 release adt-clients 11.1.0 | done — `0bef713` |
 | 5 split `IAdtModifiable`, delete `IAdtNonVersionedObject` | done — `83582ef` |
 | 6 release interfaces 15.0.0 | done — `bf1a9ff`, plus review fixes `2517b03`, `d35f1ab` |
-| 6a take interfaces 15.0.0 | **next** |
-| 7 five handlers lose `create()` — an include is not created | open |
-| 8 narrow the ten handlers | open |
+| 6a take interfaces 16.0.0 | **done** — `95ef1b1` (16.0.0, not 15.0.0: 8a/8a-bis shipped in it) |
+| 7 four handlers lose `create()` — an include is not created | **done** — `c1dd6ac`, corrected by `f21f432`: a message class is not an ABAP class and its messages **are** created, so `AdtMessageClassMessage` keeps `create` |
+| 8 narrow the ten handlers | **8 of 10 done** — `domain`, `dataElement`, `functionGroup`, `package`, `messageClass` (+ its message handler), `authorizationField`, `functionInclude`, `transport`. `featureToggle` and `AdtServiceBinding` need their types narrowed in interfaces — same task, so no release of its own until both sides are done |
 | 8a `IUnitTestConfig` describes the testclasses include — interfaces major | **done, released** — interfaces 16.0.0, PR #36, `027d00e`, tag `v16.0.0` |
 | 8a-bis one `IAdtRunnable`; test-specific runnables deleted | **done, released** — same release; `ITestRunInformation` and `ICdsTestDoubleCheckable` added with it |
-| 8b `AdtUnitTest`'s CRUD half | open |
-| 8c delete unit testing's seven absent methods | open |
-| 9 the guard | open |
+| 8b `AdtUnitTest`'s CRUD half | **done** — `0533d3f`, tests corrected in `8d4b901` |
+| 8c delete unit testing's five absent methods | **done** — nothing to delete; 8b's rewrite carried none of them over, and `095b490` pins the absence |
+| 9 the guard | **done** — `bc7ba93`; 444 assertions, and the first run found three defects the types could not see |
 | 10 release adt-clients — the narrowing | open |
 
 Checkboxes below are ticked for Tasks 1–6 accordingly.
@@ -50,6 +50,19 @@ Checkboxes below are ticked for Tasks 1–6 accordingly.
 
 - All repository artifacts in **English**.
 - Contract types live in `@mcp-abap-adt/interfaces` and are imported; never redefined locally.
+- **A version appears when the work on the task is finished and we are ready to hand it to
+  consumers** — ruled 2026-08-14, and it governs the rest of this plan. Not when a phase ends,
+  not when a branch is green: those are our bookkeeping, and a consumer pays for it in migrations.
+
+  This plan broke that rule and the cost is measurable: interfaces 15.0.0 and 16.0.0 shipped on
+  the same day, both parts of one contract change, and `adt-clients` went straight from `^14.1.0`
+  to `^16.0.0` — **nothing ever resolved 15.0.0**. It was cut because Phase B had ended, while the
+  work it belonged to was still in progress.
+
+  So the remaining interfaces narrowing (`IFeatureToggleObject`, `IAdtServiceBinding`) does **not**
+  become a release of its own. It is the same task: it lands on a branch, adt-clients consumes
+  that branch and goes green, and only then is one version cut on each side.
+
 - **Publish the dependency first.** interfaces must be on npm before adt-clients consumes it.
   No `file:`, no tarball, no `"link": true` — verify after every `npm install`.
 - Claude opens PRs, merges **reviewed** PRs, tags. `npm publish` is the user's, on the user's
@@ -83,7 +96,7 @@ Checkboxes below are ticked for Tasks 1–6 accordingly.
 | handlers with a problem | 16 | the 11 below plus 5 that have no `create` |
 | type/API subtraction | **15** | **10** declaring unsupported atoms + 5 losing `create` |
 | behavioural code | 3 | `transport`, `unitTest.validate`, `functionGroup.activate` |
-| dead-method deletion | 1 | `unitTest` — seven methods; `update`/`delete` are implemented instead |
+| dead-method deletion | 1 | `unitTest` — five methods; `update`/`delete`/`lock`/`unlock` are implemented instead |
 
 **The ten declaring unsupported atoms:** `dataElement`, `domain`, `functionGroup`, `package`,
 `messageClass`, `authorizationField`, `featureToggle`, **`functionInclude`**,
@@ -456,6 +469,27 @@ describes a **test run**. So Phase C carries an `interfaces` round-trip in the m
 8a-bis change those contracts and release them together, and the adt-clients work that depends
 on them waits for npm.
 
+### The order, revised 2026-08-14
+
+**One interfaces major, and it comes late.** Two handlers turned out to need an interfaces change
+(`featureToggle`, `AdtServiceBinding` — see Task 8), and the guard in Task 9 will almost
+certainly surface more: its whole purpose is to compare every getter against every atom in both
+directions, and the types that lose are not all local. Shipping an interfaces major for the two
+known cases now would mean shipping another for what the guard finds next — two majors where one
+will do, which is why the sequence is:
+
+1. **6a** — take interfaces 16.0.0, already on npm;
+2. **8b, 8c** — `AdtUnitTest` under the new contract, then what unit testing does not have;
+3. **9** — the guard, whose **first run is the inventory**: collect every disagreement it names,
+   including the ones that can only be fixed in interfaces;
+4. **one interfaces major** — `IFeatureToggleObject`, `IAdtServiceBinding` and everything from
+   step 3, together;
+5. finish narrowing those two handlers; the guard goes green;
+6. **10** — release adt-clients.
+
+Until step 4, `featureToggle` and `AdtServiceBinding` keep their stubs. They have carried them
+all along; nothing gets worse by their waiting for a release that knows what it contains.
+
 The order below is deliberate. Tasks 7 and 8 need neither `unitTest`'s new config nor the new
 interfaces version, so they proceed while 8a is in review and while its release is being
 published — 8b is the only task blocked on it. Task 7 does touch one `unitTest` **test** file,
@@ -517,9 +551,15 @@ created.** It exists because its class exists; there is no POST that brings a `t
 one. Writing source is `update`. The same holds for a single message inside a message class:
 `AdtMessageClassMessage` merges it into the class's XML and PUTs the class back.
 
-So these five lose `create()` and `IAdtCreatable` — not because their `create` duplicated their
+So these four lose `create()` and `IAdtCreatable` — not because their `create` duplicated their
 `update`, but because there is nothing for a `create` to do that `update` does not already
 describe honestly.
+
+**`AdtMessageClassMessage` is not among them** — ruled 2026-08-14, after this task had briefly
+removed its `create` too. A message class (MSAG) is a different entity from an ABAP class,
+whatever the name suggests, and a message inside one is genuinely created: it does not exist
+until someone adds it, and only then can it be updated. That is the distinction — an include
+exists because its class does; a message does not exist until it is made.
 
 `AdtMessageClass` is **untouched**: a message class *is* created, by a POST, and keeps the atom.
 `AdtUnitTest` **keeps `create()`** and gains a real one in Task 8b — creating a unit test for a
@@ -540,6 +580,16 @@ class that does not exist yet POSTs that class first.
 
 Per handler, replace the declared composite with the exact intersection of atoms it satisfies.
 The spec's cluster tables give the starting point; **read each class** before writing its list.
+
+**Two of the ten cannot be finished in this package.** `featureToggle` declares
+`IFeatureToggleObject` and `AdtServiceBinding` declares `IAdtServiceBinding`, and **both of those
+types live in `@mcp-abap-adt/interfaces` and extend the fat `IAdtObject`** — so narrowing them is
+an interfaces change, not an adt-clients one. Found 2026-08-14 during execution; the table below
+had listed them as if their types were local. They need a second interfaces major (17.0.0),
+narrowing each to the atoms it satisfies plus its own domain methods — `switchOn`/`switchOff`/
+`getRuntimeState`/`checkState`/`readSource` for the toggle, the service-binding operations for the
+binding. Until that ships, their stubs stay: `featureToggle.readTransport` and both handlers'
+version methods.
 
 | handler | drops |
 |---|---|
@@ -841,10 +891,12 @@ Two consequences for this task, and neither is optional:
    class's lock — updating the class and its tests in one window — cannot write the tests
    without the handler taking a second lock on an object it has locked. `create` has no such
    parameter and needs none: it creates the class, so nobody else can be holding its lock.
-2. **`AdtUnitTest` still declares no `IAdtLockable`, and now for a stated reason** rather than
-   by omission: the lock belongs to the container class, so a caller takes it through
-   `getClass().lock()` and hands the handle down. Task 8c deletes the throwing `lock`/`unlock`
-   on that basis.
+2. **`AdtUnitTest` declares `IAdtLockable`, and its lock is the container's** — ruled
+   2026-08-14, reversing an earlier line in this plan that had it deleted. A unit test's subject
+   is the container and its include, and the container is what ADT locks: a global class, or a
+   report once report tests exist. So `lock`/`unlock` are implemented here rather than removed,
+   delegating to the container class's lock, and a caller no longer has to reach for
+   `getClass()` to hold the window its own `update` needs.
 
 **Decide the dead include-lock path while here.** Either it is verified against the trial and
 one copy becomes the live path, or both copies go. Two unreferenced implementations of a lock
@@ -873,38 +925,50 @@ this task (`update` must distinguish "no source given" from "empty source given"
 
 **Files:** `src/core/unitTest/AdtUnitTest.ts`; any test naming them.
 
-Seven methods, implemented but never declared, so nothing in the contract promises them and no
-TypeScript caller can reach them: `activate`, `check`, `lock`, `unlock`, `getVersions`,
-`getVersionSource` — all throwing — plus **`readTransport`**, which does not throw at all: it
-returns an empty state and says in its own comment that a test run has no transport request.
+Five methods, implemented but never declared, so nothing in the contract promises them and no
+TypeScript caller can reach them: `activate`, `check`, `getVersions`, `getVersionSource` — all
+throwing — plus **`readTransport`**, which does not throw at all: it returns an empty state and
+says in its own comment that a test run has no transport request.
+
+**`lock` and `unlock` left this list on 2026-08-14** and moved to Task 8b, where they are
+implemented: the lock is the container's, and the container is the unit test's own subject.
+
+**The same argument may reach `activate` and `readTransport`, and that is not decided here.**
+Both are the container's too — an include is activated by activating its class, and the class is
+what carries a transport. They stay on the deletion list because the ruling named the lock; if it
+extends, they move to 8b as implementations rather than disappearing, and this task shrinks to
+three.
 
 `update` and `delete` are **not** on this list any more; Task 8b implements them.
 
 `check` is deleted rather than implemented even though the include does have a check resource —
 `validate` makes exactly that call, and two names for one request is a duplication this plan is
-removing elsewhere. `lock`/`unlock` go because **the lock is the container class's**: it is
-taken on `/oo/classes/{name}`, not on the include, so a caller that needs to hold it takes it
-through `getClass().lock()` and passes the handle to `update` (Task 8b, "What is locked, and by
-whom"). A `lock` on the unit test would name an object ADT does not lock.
+removing elsewhere.
 
 They sit here rather than in Phase A for two reasons. Deleting a public method is a runtime
 break for JavaScript callers, and Phase A is otherwise additive — no need to force a major for
 it. And the shape guard in Task 9 cannot run while they exist: TypeScript reads shape, not
 intent, so a class carrying `check` satisfies `IAdtCheckable` however little it declares.
 
-- [ ] **Step 1: Confirm the class declares none of the seven**
+**Executed 2026-08-14: there was nothing to delete.** Task 8b rewrote `AdtUnitTest` from its
+capabilities outwards rather than editing the old class, so none of the five was carried over —
+verified on `AdtUnitTest`, `AdtCdsUnitTest` and `AdtUnitTestLegacy`. What the task left behind is
+the assertion instead: a rewrite is not a guarantee, and a class that *carries* a method
+satisfies that atom structurally whatever it declares, which is what Task 9 reads.
+
+- [x] **Step 1: Confirm the class declares none of the five**
 
 ```bash
 sed -n '/^export class AdtUnitTest/,/^{/p' src/core/unitTest/AdtUnitTest.ts
 ```
 
 Expected after Task 8b: `IAdtCreatable`, `IAdtReadable`, `IAdtUpdatable`, `IAdtDeletable`,
-`IAdtValidatable`, `IAdtTestRunnable`. If any of the seven **is** declared, it is a contract change and needs saying
-in the changelog as one.
+`IAdtValidatable`, `IAdtLockable`, `IAdtRunnable`, `ITestRunInformation`. If any of the five
+**is** declared, it is a contract change and needs saying in the changelog as one.
 
 - [ ] **Step 2: Delete them; update any test that calls one.**
 - [ ] **Step 3: Verify** — `npx tsc -p tsconfig.json`, `npm run test:check`, the unit suite.
-- [ ] **Step 4: Commit** with a `BREAKING CHANGE:` footer naming all seven and the runtime
+- [ ] **Step 4: Commit** with a `BREAKING CHANGE:` footer naming all five and the runtime
   consequence: a JavaScript caller moves from a sentence to `TypeError: … is not a function`.
 
 ### Task 9: The guard
@@ -1035,8 +1099,27 @@ check that would have caught `functionGroup`.
 - [ ] **Step 3:** Check 1. Expect it to fail at first and to name real disagreements; fix the
   manifest or the handler, never the check.
 - [ ] **Step 4:** Check 3, atom by atom.
-- [ ] **Step 5:** confirm the target state: no `is not supported` anywhere under
+- [x] **Step 5:** confirm the target state: no `is not supported` anywhere under
   `src/core/*/Adt*.ts`, no `throwUnsupportedVersions`, all three checks green.
+
+**Executed 2026-08-14.** All three checks are green, and the first run of Check 3 found three
+defects no type could have shown:
+
+1. **`localTypes`, `localDefinitions` and `localMacros` could never delete.** `delete` writes
+   empty source and `update` rejected a falsy one, so it threw before issuing a request — the
+   same defect 8b fixed in `AdtLocalTestClass`, present in all three siblings and in the shared
+   low-level guard in `includes.ts`.
+2. **Service binding activation reported success whatever the server said** — `errors: []` with
+   an error-severity `<msg>` in the response, exactly the `functionGroup` defect of Phase A. It
+   now calls `assertActivationSucceeded`.
+3. **`getService()` hands out a service binding**, and the manifest claimed the full set for it.
+   The manifest was wrong, not the code; corrected with the reason recorded in the entry.
+
+**What the target state does not yet include.** Three handlers still carry stubs, and all three
+are blocked on the same interfaces change: `featureToggle` (versions, transport), and
+`serviceBinding`/`service` (versions, lock). They are listed exactly in `KnownDisagreements` in
+`shape.ts`, which is asserted for equality — a new disagreement fails the check, and so does
+fixing one and leaving it listed.
 
 ### Task 10: Release adt-clients — the narrowing
 

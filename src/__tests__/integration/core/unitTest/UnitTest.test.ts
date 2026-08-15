@@ -233,16 +233,16 @@ describe('AdtUnitTest (using AdtClient)', () => {
             testsLogger.info?.('Existing class source updated');
           }
 
-          // Step 3: Create local test class
-          logTestStep('create (test class)', testsLogger);
-          const createTestClassState = await client.getLocalTestClass().create({
+          // Step 3: Write the tests into the container class's include.
+          // An include is not created — it exists because its class does.
+          logTestStep('update (test class)', testsLogger);
+          const writeTestClassState = await client.getLocalTestClass().update({
             className: containerClass,
             testClassCode: testClassSource,
-            testClassName,
             transportRequest,
           });
-          expect(createTestClassState).toBeDefined();
-          testsLogger.info?.('Local test class created');
+          expect(writeTestClassState).toBeDefined();
+          testsLogger.info?.('Local test class written');
 
           // Step 4: Activate class
           logTestStep('activate', testsLogger);
@@ -253,56 +253,46 @@ describe('AdtUnitTest (using AdtClient)', () => {
           expect(activateState).toBeDefined();
           testsLogger.info?.('Class activated');
 
-          // Step 5: Create unit test configuration
-          logTestStep('create (unit test)', testsLogger);
-          const unitTestConfig: IUnitTestConfig = {
-            tests: [
-              {
-                containerClass,
-                testClass: testClassName,
-              },
-            ],
-            options: unitTestOptions,
-          };
-          testsLogger.info?.('Unit test configuration created');
-
-          // Step 6: Update unit test (if needed - for now just prepare)
-          // Note: Unit test runs don't have update step, but we log the preparation
-          logTestStep('update (unit test)', testsLogger);
-          testsLogger.info?.('Unit test configuration prepared');
-
-          // Step 7: Run unit test (start test execution)
-          logTestStep('run (unit test)', testsLogger);
-          // No cast: since interfaces 13.1.0 the run surface is part of the
-          // declared type, so reaching it no longer means escaping the type.
+          // Step 5: Read back the tests that were written into the class
+          logTestStep('read (unit test)', testsLogger);
           const unitTest = client.getUnitTest();
+          const readState = await unitTest.read(
+            { className: containerClass },
+            'active',
+          );
+          expect(readState).toBeDefined();
+          expect(readState?.readResult).toBeDefined();
+          testsLogger.info?.('Tests read back from the container class');
+
+          const metadataState = await unitTest.readMetadata({
+            className: containerClass,
+          });
+          expect(metadataState).toBeDefined();
+          expect(metadataState.metadataResult).toBeDefined();
+
+          // Step 6: Run the tests. Needs no create and no update — they are in
+          // the class already, which is the whole point of the two being apart.
+          logTestStep('run (unit test)', testsLogger);
           const runId = await unitTest.run(
-            unitTestConfig.tests!,
-            unitTestConfig.options,
+            [{ containerClass, testClass: testClassName }],
+            unitTestOptions,
           );
           expect(runId).toBeDefined();
           testsLogger.info?.('Unit test run started, run ID:', runId);
 
-          // Step 8: Read status (with long polling if configured)
-          logTestStep('read (status)', testsLogger);
-          const readConfig: IUnitTestConfig = {
-            runId: runId,
-            status: unitTestStatus,
-          };
-
-          const readState = await unitTest.read(readConfig, 'active');
-          expect(readState).toBeDefined();
-          expect(readState?.runId).toBe(runId);
-          expect(readState?.runStatus).toBeDefined();
-
-          const metadataState = await unitTest.readMetadata(readConfig);
-          expect(metadataState).toBeDefined();
-          expect(metadataState.runId).toBe(runId);
-          expect(metadataState.runStatus).toBeDefined();
+          // Step 7: Ask about the run — a different concern from running it,
+          // and since interfaces 16.0.0 a different interface as well.
+          logTestStep('getStatus (run)', testsLogger);
+          const statusResponse = await unitTest.getStatus(
+            runId,
+            unitTestStatus.with_long_polling ?? true,
+          );
+          expect(statusResponse).toBeDefined();
+          expect(statusResponse.data).toBeDefined();
 
           // Log detailed status information
-          if (readState?.runStatus) {
-            const status = readState.runStatus;
+          if (statusResponse.data) {
+            const status = statusResponse.data;
             if (typeof status === 'string') {
               // Try to parse XML if it's a string
               try {
@@ -336,15 +326,8 @@ describe('AdtUnitTest (using AdtClient)', () => {
             }
           }
 
-          // Step 9: Read result
-          logTestStep('read (result)', testsLogger);
-          const _resultConfig: IUnitTestConfig = {
-            runId: runId,
-            result: unitTestResult,
-          };
-
-          // Use getResult() method to explicitly read the test result
-          // Note: getResult() is not part of IAdtObject interface, so we need to cast
+          // Step 8: Fetch the result document
+          logTestStep('getResult (run)', testsLogger);
           const resultResponse = await unitTest.getResult(runId, {
             withNavigationUris: unitTestResult.with_navigation_uris || false,
             format: unitTestResult.format || 'abapunit',
@@ -386,13 +369,6 @@ describe('AdtUnitTest (using AdtClient)', () => {
                 JSON.stringify(result, null, 2),
               );
             }
-          }
-
-          if (readState?.runResult) {
-            testsLogger.info?.(
-              'Unit test result from read state:',
-              readState.runResult,
-            );
           }
 
           // Step 10: Cleanup - delete class if configured

@@ -1,21 +1,26 @@
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+/**
+ * A package has no version history, and now says so by having no method.
+ *
+ * This test used to assert that `getVersions` threw `ADT_UNSUPPORTED_OPERATION`
+ * without issuing a request — the best that could be asserted while the method
+ * existed. It is gone, so the assertion moves to what replaced it: the class
+ * carries neither version method, and `getPackage()`'s declared type never
+ * offered them.
+ */
+
 import { AdtPackage } from '../../core/package/AdtPackage';
 
 describe('AdtPackage version history (non-source)', () => {
-  it('throws UNSUPPORTED_OPERATION without any HTTP call', async () => {
-    expect.assertions(2);
-    let called = false;
-    const c = {
-      makeAdtRequest: async () => {
-        called = true;
-        return { data: '', status: 200, headers: {} } as any;
-      },
-      setSessionType: () => {},
-    } as unknown as IAbapConnection;
-    const pkg = new AdtPackage(c);
-    await expect(
-      pkg.getVersions({ packageName: 'ZPKG' }),
-    ).rejects.toMatchObject({ code: 'ADT_UNSUPPORTED_OPERATION' });
-    expect(called).toBe(false);
+  it('has no version methods at all', () => {
+    const pkg = new AdtPackage({} as never);
+
+    expect('getVersions' in pkg).toBe(false);
+    expect('getVersionSource' in pkg).toBe(false);
+  });
+
+  it('has no activate either — ADT activates no package', () => {
+    const pkg = new AdtPackage({} as never);
+
+    expect('activate' in pkg).toBe(false);
   });
 });

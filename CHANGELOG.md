@@ -5,6 +5,106 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [12.0.0] - 2026-08-15
+
+Every handler now declares what ADT gives it, and nothing else. This finishes what 8.0.0 began.
+
+### Removed — BREAKING
+
+- **Every method that threw.** Fifteen handlers carried methods refusing at runtime what their
+  type promised; they are deleted rather than narrowed, so the call no longer compiles:
+
+  | handler | gone |
+  |---|---|
+  | `domain`, `dataElement`, `functionGroup` | `getVersions`, `getVersionSource` |
+  | `package` | `activate`, `getVersions`, `getVersionSource` |
+  | `messageClass` | `activate`, `check`, `readTransport`, `getVersions`, `getVersionSource` |
+  | `messageClassMessage` | `validate`, `activate`, `check`, `readTransport`, `lock`, `unlock`, `getVersions`, `getVersionSource` |
+  | `authorizationField` | `readTransport`, `getVersions`, `getVersionSource` |
+  | `functionInclude` | `readTransport` |
+  | `featureToggle` | `readTransport`, `getVersions`, `getVersionSource` |
+  | `serviceBinding` (and `getService()`) | `lock`, `unlock`, `getVersions`, `getVersionSource` |
+  | `transport` | `validate`, `activate`, `check`, `readTransport`, `lock`, `unlock`, `getVersions`, `getVersionSource` |
+  | `unitTest` | `activate`, `check`, `readTransport`, `getVersions`, `getVersionSource` |
+
+  `transport.validate` did not even throw: it checked an argument and returned an empty state,
+  which reads to a caller as success.
+
+- **`create()` on the four class-include handlers** — `getLocalTestClass()`, `getLocalTypes()`,
+  `getLocalDefinitions()`, `getLocalMacros()`. An include is not created: it exists because its
+  class does, and writing source into it is a PUT, which is `update`. **Call `update()`** — the
+  same request, the same chain. `AdtMessageClassMessage` keeps `create`: a message class is not
+  an ABAP class, and a message in one is genuinely added.
+
+- **A dead lock path** — `src/core/unitTest/classTest.ts` entire, and
+  `lockClassTestClasses`/`unlockClassTestClasses` from `class/testclasses.ts`. Nothing called
+  them; ADT locks the class, never the include, and the include is written under the class's
+  handle.
+
+### Changed — BREAKING
+
+- **`unitTest` means something different.** `create()` used to start a run, which is why
+  `update` and `delete` threw — with creation meaning execution there was nothing to update.
+
+  ```typescript
+  // Before
+  const state = await client.getUnitTest().create({ tests: [{ containerClass, testClass }] });
+  const poll  = await client.getUnitTest().read({ runId: state.runId });
+  poll.runStatus; poll.runResult;
+
+  // After
+  await client.getUnitTest().create({ className, packageName, description, classTemplate, testClassSource });
+  const runId  = await client.getUnitTest().run([{ containerClass, testClass }]);
+  const status = await client.getUnitTest().getStatus(runId);
+  const result = await client.getUnitTest().getResult(runId);
+  ```
+
+  `create` POSTs the container class, activates it and writes the tests into its `testclasses`
+  include; `update`/`delete`/`read` manage that include; `lock`/`unlock` take the container's
+  lock, which is what ADT locks. `run` needs no CRUD call — the tests may have been in the class
+  for years. `AdtUnitTestLegacy` no longer overrides `create`; its endpoint sits behind `run`.
+
+- **Narrowed factory return types.** `getDomain()`, `getDataElement()` and `getFunctionGroup()`
+  returned `IAdtNonVersionedObject`, which interfaces 15.0.0 deleted; they now return the
+  intersection they satisfy. `getMessageClassMessage()` no longer returns `IAdtCrud`,
+  `getRequest()`'s handler no longer declares `IAdtObject`, and the four include getters return
+  their honest set instead of `IAdtSourceObject`.
+
+- **Requires `@mcp-abap-adt/interfaces` ^17.0.0.**
+
+### Fixed
+
+- **`delete` on the class includes never worked.** It writes empty source, and `update` rejected
+  a falsy value, so it threw before issuing a request. All four handlers and the shared
+  low-level guard now treat an empty string as source and only a missing argument as an error.
+- **Service binding activation reported success whatever the server said** — `errors: []` with
+  an error-severity `<msg>` in the response, the same defect `functionGroup` had before 11.1.0.
+- **A service binding was deleted without asking ADT first.** It POSTed
+  `/deletion/delete` straight away — alone among the 28 handlers that use the deletion service,
+  every other one of which checks first. A delete the server never approved is one a caller has
+  no reason to believe happened. Found by the capability guard, which requires both halves of
+  the operation.
+- **`unitTest.validate` validated the wrong thing.** It now checks what is about to be born: the
+  container's name only when the class does not exist yet, and the test source whenever there is
+  source to check.
+
+### Added
+
+- **A guard that keeps this true** (`src/__tests__/unit/capabilities/`). A manifest authored from
+  ADT rather than from the code; a compile-time comparison of all 36 factory return types against
+  the 10 atoms **in both directions**; a completeness check over both clients' prototype chains,
+  so a new factory cannot arrive unnoticed; and a behavioural pass calling every method of every
+  claimed capability against a recording connection, asserting it issues the request its
+  capability names — the verb included, and for activation, that an error-severity message
+  reaches the caller.
+
+  Its first runs found three defects nothing else had: the broken include `delete`, the service
+  binding's silent activation, and one wrong entry in the manifest itself.
+
+- **`AdtClassMemberBase`**, shared by `AdtClass` and the four include handlers. The includes no
+  longer extend `AdtClass`, so they no longer inherit its `create` — which would have created a
+  global class from a handler whose subject is an include.
+
 ## [11.1.0] - 2026-08-13
 
 ### Fixed
