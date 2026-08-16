@@ -1,194 +1,239 @@
-# ATC: start a run, then look for the result
+# ATC: start a run, wait for it, read the findings
 
-**Status:** blocked on a probe, 2026-08-15. The shape is agreed and the synchronous contract is
-all but complete — **three** facts nobody has captured still bear on it, and so does the whole
-question of waiting. The traffic table is being re-verified too: one of its rows disagreed with
-#68 and #68 was right, so the probe re-issues the rest rather than trusting a single unrepeatable
-session — and re-verifying it is what turned two of its rows back into open contract questions.
-See "The probes that unblock this". Not implemented.
+**Status:** designed against captured traffic, 2026-08-16. One question is still open —
+`AtcObjectType`, the set of checkable object types, of which two of nine are confirmed. Everything
+else in the contract now rests on a response somebody can re-read
+(`docs/evidence/2026-08-16-atc-trial-probe.md`). Not implemented.
 
 **Scope:** an ATC client in `@mcp-abap-adt/adt-clients`, and the contract it needs in
 `@mcp-abap-adt/interfaces`. The MCP server is a separate consumer and out of scope here.
 
-## Where this comes from
+## What changed on 2026-08-16, and why the whole design moved
 
-Three outside-contributor PRs propose ATC support and none can be merged: they were written in
-July against `adt-clients` ~10.x and `interfaces` ~11.x, and both packages have since gone
-through the capability-narrowing series (interfaces 15.0.0–17.0.0, adt-clients 11.1.0–12.0.0).
+Every revision of this spec up to 2026-08-15 was built on one recorded session from 2026-07-20,
+and on three facts that session was thought to have established. `scripts/probe-atc.ts` re-issued
+them against the trial. **All three were wrong**, and each was wrong in the direction that had
+been used to argue *against* the outside PR:
 
-- `mcp-abap-adt-clients` **#68** — `AdtAtc` + a synchronous ABAP Unit runner. The ATC part is
-  four files, ~740 lines; the rest of its 11k-line diff is merge noise from a migration that has
-  since landed for real.
-- `mcp-abap-adt-interfaces` **#17** — six low-level parameter types.
-- `mcp-abap-adt` **#147** — five MCP tools. Depends on #68 and does not compile against anything
-  released.
+| the spec said | the trial answered |
+|---|---|
+| there is no separate run id; the run echoes the worklist id | `POST /atc/runs?clientWait=false` → **201, empty body**, `Location: /sap/bc/adt/atc/runs/0ABD…6030` — an id that is **not** the worklist id, which 404s at that path |
+| there is no run-status resource; `withLongPolling` has nothing to poll | `GET /atc/runs/{that id}` → **200** `<runs:run runs:status="finished">`, a `backgroundruns` resource |
+| ATC is synchronous on cloud, so waiting cannot be studied there | the worklist read straight after the run is **byte-identical to the bogus-URI control's**; read again once the status said `finished`, it holds the finding. **ATC on cloud is asynchronous** |
 
-What is worth keeping from them is the **ADT traffic** — the URLs, the headers, the payload
-shapes. What is not worth keeping is the API they wrapped it in.
+A fourth, smaller one had already fallen the day before: the traffic table's
+`POST /atc/customizing` is a **405**; `GET` is the verb, as #68 had it.
 
-## The shape: this is profiling, not CRUD
+So `run()` is no longer start-only, `IAtcRunResult` no longer carries what it said, and the
+on-prem probe that was going to "decide whether waiting is designed at all" is no longer the
+gate — waiting is designed here, against a marker that was watched arriving. **#68 was right
+about the mechanism and wrong only about the API it wrapped around it.** What follows keeps its
+traffic and replaces its interface, which was the plan all along; it just turns out the traffic
+was the better-attested half by a wider margin than this spec credited.
 
-**An ATC run is the same shape as a profiled execution** — start a process, then look for the
-result it produces. That is why this is not a CRUD object, and it is the whole of what the
-analogy gives. An earlier draft claimed it also settled whether ATC is synchronous; it does not,
-and the two sections below say why — the analogy breaks exactly where completion is concerned,
-which is why waiting is left undesigned.
+Two lessons are recorded rather than smoothed over, because both were avoidable:
 
-`ClassExecutor.runWithProfiling` (`src/executors/class/ClassExecutor.ts:86-125`) already does
-this. It does **not** poll a status resource, because none exists; it retries fetching the
-**artifact** until the artifact is there:
+- **A single unrepeatable session is not evidence, however carefully it is written down.** This
+  spec argued from one for three weeks, and stated its conclusions as facts that contradicted
+  working code. The moment its provenance was questioned, three of four rows fell.
+- **The control is what made the async finding visible.** An empty worklist after an accepted run
+  reads exactly like a clean check. Only the bogus URI's *identical* worklist showed that the
+  emptiness meant "not yet".
 
-```ts
-// SAP writes traces asynchronously — poll until the trace file appears
-for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-  const result = await this.tryResolveTrace(lookupUris, profilerId, ...);
-  if (result) return result;
-  await delay(retryDelayMs);
-}
+## The shape: this is profiling, and now more closely than before
+
+An ATC run is the same shape as a profiled execution — start a process, then look for the result.
+`ClassExecutor.runWithProfiling` (`src/executors/class/ClassExecutor.ts:86-125`) retries fetching
+the **artifact**, because a trace file does not exist until the run is done, so its appearance is
+the completion signal.
+
+ATC cannot use that rule, and this spec was right about the reason: the worklist is created by a
+request of its own **before** the run, so `GET /atc/worklists/{id}` succeeds immediately and an
+empty answer means either "found nothing" or "not finished". That was reasoning; it is now
+observation. The class worklist read immediately after its run and the bogus URI's worklist are
+the same 2076 bytes, `<atcworklist:objects/>` in both.
+
+What the earlier drafts could not supply was the replacement. It exists, and it is better than
+the profiler's:
+
+```
+POST /atc/runs?worklistId=…&clientWait=false
+  → 201, Location: /sap/bc/adt/atc/runs/{runId}
+
+GET /sap/bc/adt/atc/runs/{runId}
+  → <runs:run runs:status="finished">
+       <atom:link href="/sap/bc/adt/atc/results/{displayId}"  rel="…/results/displayid"/>
+       <atom:link href="/sap/bc/adt/atc/worklists/{worklistId}" rel="…/results/worklistid"/>
+     </runs:run>
 ```
 
-### Where the analogy breaks, and what replaces it
+**`runs:status` is the completion marker.** Not a count, not the artifact's appearance — a status
+attribute on a resource whose whole purpose is to carry it. Polling it is not a race with a
+timeout on it; it is reading the answer the server publishes.
 
-A profiled execution's artifact **does not exist until the run is done**, so its appearance *is*
-the completion signal. An ATC worklist does not work that way: it is created by a request of its
-own **before** the run (`POST /atc/worklists`, then `POST /atc/runs?worklistId=`). So
-`GET /atc/worklists/{id}` succeeds immediately, and an empty answer is ambiguous — it means
-either "the run found nothing" or "the run is not finished". **A clean result and an unfinished
-one are the same bytes**, which makes "retry until the artifact is there" wrong for ATC as
-stated. Raised in review, 2026-08-15.
+The run resource also links to a **third** id, under `/atc/results/{displayId}`. That settles a
+question this spec had listed as unverified: `/atc/results/…` and `/atc/worklists/…` are
+**different resources with different ids**, linked from the same run under different `rel`s — so
+`IAtcLog`, which reads a log by `executionId`, is not a second door onto the worklist.
 
-What replaces it is the server's own count. The run response is
-`<atcworklist:worklistRun>` carrying the worklist id **and `FINDING_STATS`** — a comma triple in
-its `description`, e.g. `0,0,1` (probed on the trial; which position is which severity is
-**not** established). So the run tells you how many findings to expect, and the readiness test is
-not "are there findings" but "does the worklist carry as many as the run said". Zero expected and
-zero present is then a decided answer rather than an ambiguous one.
+### `clientWait` is a second mode, not a flag
 
-Two things must be probed before this is more than a design:
+`clientWait=true` was a lead in earlier drafts. It is now a captured behaviour, and it answers
+with a **different response shape**:
 
-1. **Are `FINDING_STATS` present and populated on a system where the run is asynchronous?** If
-   the count only arrives once the run has finished, it is the readiness marker and nothing else
-   is needed. If it comes back zeroed while work continues, it is not, and the marker has to come
-   from somewhere else — a status attribute on the worklist, or the on-prem run resource.
-2. **`clientWait`.** #68 passes `clientWait=false` (`run.ts`, the runs URL) without saying what
-   `true` does. The name suggests the server holds the request until the run completes, which
-   would remove the question entirely on systems that honour it.
+| | `clientWait=false` | `clientWait=true` |
+|---|---|---|
+| status | 201 | 200 |
+| body | empty | `<atcworklist:worklistRun>` |
+| `Location` | the run id | **absent** |
+| carries | nothing | `worklistId` + `FINDING_STATS` |
+| cost | returns at once | holds the connection until the checks are done |
 
-Until one of those is answered, the retry loop is a guess with a default, and the spec says so
-rather than implying otherwise.
+That explains the 2026-07-20 session completely: it recorded a `clientWait=true` run, which is
+why it saw `<atcworklist:worklistRun>` with `FINDING_STATS` and no run id — and then generalised
+one mode's response into "the run response", which is how "there is no separate run id" became a
+fact for three weeks.
 
-An earlier draft of this spec claimed retrying the fetch "survives both answers" and that no
-status resource is needed. That was wrong for the reason above, and is struck: a retried `GET`
-can see the same empty pre-run worklist every time and prove nothing. Retrying is not a readiness
-rule when the artifact predates the work. Raised in review twice, 2026-08-15 — the second time
-because the paragraph was left standing next to the analysis that refuted it.
+The two modes are not interchangeable, and neither is redundant. `true` is one request instead of
+a poll loop, but yields no run id and holds a connection for as long as the checks take — SAP's
+own `sap-perf-fesrec` puts the waiting run at more than three times the non-waiting one, on a
+single class, and nothing bounds it for a larger object set. `false` returns at once and is the
+only mode that gives something to poll.
 
 ## The contract
 
-Two capabilities, not a CRUD object.
-
-**`run()` starts a run and returns what the server answered. It does not wait.** Two drafts of
-this spec had it waiting, and both were unimplementable for the same reason: waiting needs a
-signal that says "finished", and no such signal has been observed. `FINDING_STATS` is a
-candidate and `clientWait` is a lead, but a contract cannot promise to wait for something nobody
-has watched arrive.
+Three capabilities. Running, asking whether a run is done, and reading findings.
 
 ```ts
 // starting a run — the atom that exists since interfaces 16.0.0
 IAdtRunnable<IAtcRunTarget, IAtcRunResult, IAtcRunOptions>
 
-// reading a worklist — its own interface, as ITestRunInformation is
+interface IAtcRunStatusReadable {
+  /** Status of a run started with `wait: false`. */
+  getRunStatus(runId: string): Promise<IAtcRunStatus>;
+}
+
 interface IAtcFindings {
   getFindings(worklistId: string): Promise<IAdtResponse>;
 }
 ```
 
-- `run(target, options)` creates the worklist, starts the run, and returns `IAtcRunResult` — the
-  worklist id and the `FINDING_STATS` the run response carried. Nothing more: those two are what
-  the server hands back, and both were observed.
-
-**How many findings a run may return.** The payload carries `maximumVerdicts="N"`, so `run()`
-cannot build its request without a number. `IAtcRunOptions.maximumVerdicts` is optional and
-defaults to **100** — the value #68 uses in both its call sites, which is the only number anyone
-has run against a real system. It is a cap on results, not a page size: nothing observed says
-what happens at the boundary, so a caller wanting everything raises it rather than paging, and
-the default being a cap is worth saying in the method's documentation rather than leaving a
-caller to discover a truncated worklist.
-
-**Where the check variant comes from.** `POST /atc/worklists` requires one, so `run()` cannot
-proceed without deciding this. `IAtcRunOptions.checkVariant` is optional; when the caller omits
-it, the client reads `GET /atc/customizing` and uses `systemCheckVariant`. That is not a
-convenience — on the trial `/atc/variants` returns `totalItemCount 0`, so customizing is the only
-observed source of a usable variant, and a contract that demanded the caller supply one would be
-unusable there. The read happens per `run()` call; caching it is an optimisation nobody has
-measured a need for, and a cached variant is wrong the moment the system's default changes.
-
-**The verb here is #68's, not a captured one**, and that makes this paragraph provisional in a
-way the rest of the contract is not. The `GET` comes from code that ran; the `POST` this replaced
-came from the session whose other rows are now being re-read. The probe sends both. If only
-`POST` answers, one word changes here. If **neither** answers — if `systemCheckVariant` is not
-readable on a system — then `checkVariant` cannot be optional at all, because the fallback it
-falls back to does not exist, and `IAtcRunOptions.checkVariant` becomes required. That is a
-change to the published type, not to a sentence, which is why this sits on the blocking list.
-
-**What `IAtcRunResult` carries.** The worklist id, and the finding statistics **as the server
-sent them** — the raw `description` string, e.g. `"0,0,1"`:
+### `IAtcRunResult` is a union, because the server has two answers
 
 ```ts
-interface IAtcRunResult {
-  worklistId: string;
+type IAtcRunResult =
+  | {
+      /** The server returned at once; the checks are still running. */
+      waited: false;
+      worklistId: string;
+      /**
+       * From the `Location` header. Poll `getRunStatus(runId)` until it
+       * reports finished, then read `getFindings(worklistId)`.
+       */
+      runId: string;
+    }
+  | {
+      /** The server held the request until the checks were done. */
+      waited: true;
+      worklistId: string;
+      /**
+       * `FINDING_STATS` verbatim — a comma-separated triple, e.g. `"0,0,1"`.
+       * Not parsed into named counts: see below.
+       */
+      findingStats: string;
+    };
+```
+
+A discriminated union rather than four optional fields, because which fields exist is decided by
+the request and known at the call site. Optional fields would let a caller write
+`result.runId!` and be wrong exactly when they used `wait`. This is the one place in the contract
+where the server genuinely answers two ways, and the type says so.
+
+**`findingStats` stays a raw string.** One data point now bears on the positions: a worklist whose
+single finding carried `atcfinding:priority="3"` produced `FINDING_STATS` `0,0,1`. That is
+consistent with the three positions being priorities 1, 2, 3 — and it is one sample with one
+finding, which says nothing about positions 1 and 2. Parsing it into `{ errors, warnings, infos }`
+would publish two guesses to save a caller one `split(',')`. It is returned as sent, and the
+indication is written down here so the next probe knows what to confirm.
+
+### `IAtcRunStatus`
+
+```ts
+interface IAtcRunStatus {
   /**
-   * `FINDING_STATS` from the run response, verbatim — a comma-separated triple.
-   * Not parsed into named counts: which position is which severity has not been
-   * established, and inventing `{ errors, warnings, infos }` would put three
-   * guesses into a public type. Parse it when a probe says what it means.
+   * `runs:status` verbatim. Only `"finished"` has been observed, so this is a
+   * string and not a union: enumerating the states a server may report, from
+   * one state, is how a caller ends up with a union that silently fails to
+   * match. `isFinished` is the tested question.
    */
-  findingStats: string;
+  status: string;
+  /** True when `status` is `finished`. */
+  isFinished: boolean;
+  /** From the `worklistid` atom link — the worklist to read findings from. */
+  worklistId: string;
+  /** From the `displayid` atom link. A different resource; see `IAtcLog`. */
+  resultId?: string;
 }
 ```
-- `getFindings(worklistId)` reads the worklist. One request, no retry, no options.
+
+**`withLongPolling=true` is not in this contract.** It was sent, and answered **identically** to
+the plain read — but the run had already finished, so that comparison establishes nothing about
+what long polling does while a run is in flight. An option whose one observation was made in the
+condition where it cannot act is not an answered option. It joins the probe list.
+
+### `IAtcRunOptions`
 
 ```ts
 interface IAtcRunOptions {
   /**
-   * The check variant to run. Omitted, the client reads `/atc/customizing` and
-   * uses `systemCheckVariant` — see below.
+   * Have the server hold the request until the checks finish (`clientWait`).
+   * Defaults to **false**: the mode that returns a run id, which is the only
+   * one that can be polled, cancelled by the caller's own timeout, or reported
+   * on while it runs. `true` is one request instead of a loop, at the cost of
+   * a connection held for as long as the checks take — which nothing bounds,
+   * and which grows with the object set.
+   */
+  wait?: boolean;
+  /**
+   * The check variant to run. Omitted, the client reads `GET /atc/customizing`
+   * and uses `systemCheckVariant`.
    */
   checkVariant?: string;
   /**
-   * `maximumVerdicts` in the run payload: a **cap on results**, not a page size.
-   * Defaults to 100. A positive integer — it is serialised straight into an XML
-   * attribute, so `run()` rejects 0, a negative, a fraction and NaN rather than
-   * sending them and letting the server decide. The server's own bounds are
-   * unknown; see the probe.
+   * `maximumVerdicts` in the run payload: a **cap on results**, not a page
+   * size. Defaults to 100. `run()` rejects anything that is not a positive
+   * integer before sending it — the server answers 0 with a 400
+   * (`ExceptionInvalidData`, `XML_PATH atc:run(1)`), and a client that can
+   * name the problem should not spend a round trip to be told.
    */
   maximumVerdicts?: number;
 }
-
 ```
 
-**`getFindings` takes no options**, and there is no `IAtcFindingsOptions`.
+`maximumVerdicts` at 1 and at 100000 were both accepted (201), so the upper bound is not near
+anything a caller would pick, and `run()` does not impose one it cannot justify.
 
-The obvious candidate was `includeExemptedFindings`, and publishing it as a boolean would promise
-that `true` works — while the only request anyone has made carries `false`. That is exactly what
-this package's own rule forbids: **do not publish an option nobody has seen answered.** A
-previous revision stated that rule and broke it in the same breath; caught in review,
-2026-08-15. The request sends `includeExemptedFindings=false`, the observed form, and `true`
-joins the probe list.
+**Where the check variant comes from.** `POST /atc/worklists` requires one, so `run()` cannot
+proceed without deciding this. `GET /atc/customizing` returns `systemCheckVariant`
+(`ABAP_CLOUD_DEVELOPMENT_DEFAULT` on the trial) — captured, under the verb that works;
+`POST` to the same path is a 405. Making `checkVariant` optional is not a convenience: on the
+trial `/atc/variants` returns `totalItemCount 0`, so customizing is the only source of a usable
+variant, and a contract demanding the caller supply one would be unusable there. The read happens
+per `run()` call; a cached variant is wrong the moment the system default changes, and nobody has
+measured a need for the optimisation.
 
-`format` is out for a stronger reason: `checkstyle` was answered with a **406** and one accepted
-type, so the option would offer a choice that does not exist. The timestamp and object-set
-filters ADT documents appear in no captured response here.
+### `getFindings` takes no options
 
-On the only system anyone has probed this is complete: the run returns finished counts, so a
-caller runs and then reads, and gets a correct answer including a correct zero. That is the whole
-of what is known to work, and it is what this spec designs.
+The candidate was `includeExemptedFindings`. `true` **was sent and answered 200** — but the only
+`false` read happened before the run finished and the only `true` read after, so the two differ by
+timing and not by the flag. Its effect is still unobserved. Publishing it now would promise a
+behaviour on the strength of a comparison that was never made, which is the same mistake in a
+smaller font. The request sends `includeExemptedFindings=false`, and the flag joins the probe
+list with a concrete way to settle it: read one finished worklist both ways.
 
-**No retry, no `withLongPolling`, no status method** — not because ATC is known to be
-synchronous everywhere, but because the opposite is unobserved, and a retry loop with no
-readiness rule is a race with a timeout on it. If a probe finds an asynchronous system, waiting
-is added **then**, against whatever marker that probe shows — as an option on `run()` or a
-separate `runAndCollect`, decided on the evidence rather than ahead of it.
+`format` is out for a stronger reason, and this one held up under re-verification: a checkstyle
+`Accept` is answered **406, "Accepted content types: application/atc.worklist.v1+xml"** — one
+type. `AtcFindingsFormat = 'xml' | 'checkstyle'` in #17 offers a choice that does not exist.
 
 ### What the contract must not have
 
@@ -196,72 +241,47 @@ separate `runAndCollect`, decided on the evidence rather than ahead of it.
 (`src/core/atc/AdtAtc.ts:422-457`), plus `getVersions`/`getVersionSource` calling
 `throwUnsupportedVersions` (lines 587-593). That is precisely the pattern adt-clients 12.0.0
 deleted from fifteen handlers. A check run is not created, updated, locked, activated or
-versioned; it is run, and then read.
+versioned. `readTransport()` (lines 444-446) does not even throw — it returns `{ errors: [] }`,
+which reads as success. Three defects of that shape were fixed in 12.0.0.
 
-`readTransport()` there (lines 444-446) does not even throw — it returns `{ errors: [] }`, which
-reads to a caller as success. Three defects of exactly that shape were fixed in 12.0.0.
+This is the one part of #68 that re-verification did **not** rehabilitate, and it is the reason
+the PR still cannot be merged: its traffic was right, its surface is the pattern this package
+spent three releases removing.
 
 ## The ADT traffic
 
-Recorded from the **cloud trial**, 2026-07-20 — one session, and see the correction under it:
+Captured by `scripts/probe-atc.ts` on the **cloud trial**, 2026-08-16, against `ZBASE_PROBE01`
+(one class, `ZOK_CL_CLEANER`). Every row below is quoted in
+`docs/evidence/2026-08-16-atc-trial-probe.md`; raw captures stay out of git.
 
-| step | request |
-|---|---|
-| variant | `GET /sap/bc/adt/atc/customizing` → `systemCheckVariant` (trial: `ABAP_CLOUD_DEVELOPMENT_DEFAULT`) — **verb corrected**, see below |
-| worklist | `POST /sap/bc/adt/atc/worklists?checkVariant=<X>`, `Accept: text/plain` → a bare 32-char id |
-| run | `POST /sap/bc/adt/atc/runs?worklistId=<id>` with `<atc:run maximumVerdicts="N"><objectSets><objectSet kind="inclusive"><adtcore:objectReferences>…` → `<atcworklist:worklistRun>` carrying **the same worklist id** and `FINDING_STATS` |
-| findings | `GET /sap/bc/adt/atc/worklists/<id>`, `Accept: application/atc.worklist.v1+xml` |
+| step | request | answer |
+|---|---|---|
+| variant | `GET /sap/bc/adt/atc/customizing` | `systemCheckVariant` = `ABAP_CLOUD_DEVELOPMENT_DEFAULT`. `POST` → **405** |
+| worklist | `POST /sap/bc/adt/atc/worklists?checkVariant=<X>`, `Accept: text/plain` | 200, a bare 32-char id |
+| run | `POST /sap/bc/adt/atc/runs?worklistId=<id>&clientWait=false`, `Content-Type: application/xml`, body `<atc:run maximumVerdicts="N"><objectSets><objectSet kind="inclusive"><adtcore:objectReferences>…` | **201, empty**, `Location: /sap/bc/adt/atc/runs/<runId>` |
+| status | `GET /sap/bc/adt/atc/runs/<runId>`, `Accept: application/vnd.sap.adt.backgroundrun.v1+xml` | 200 `<runs:run runs:status="finished">` + atom links to worklist and results |
+| run (waiting) | the same POST with `clientWait=true` | 200 `<atcworklist:worklistRun>` with `worklistId` and `FINDING_STATS`, no `Location` |
+| findings | `GET /sap/bc/adt/atc/worklists/<id>`, `Accept: application/atc.worklist.v1+xml` | 200; empty before the run finishes, populated after |
 
-Three things that session recorded, each contradicting something the PRs assume — held as
-recorded, not as established, for the reason under the table:
+`GET /atc/runs/<worklistId>` → **404**: the two ids are not interchangeable.
 
-- **There is no separate run id.** The run response echoes the worklist id. `IGetAtcRunStatusParams
-  { run_id }` in #17, and `extractAtcRunId` reading the `Location` header in #68, describe
-  something the trial does not have.
-- **There is no run-status resource.** `withLongPolling` has nothing to poll.
-- **`checkstyle` is not a format.** `GET /atc/worklists` with a checkstyle `Accept` → **406**,
-  one accepted type. `AtcFindingsFormat = 'xml' | 'checkstyle'` in #17 is half wrong.
+A finding, for the shape:
 
-`/sap/bc/adt/atc/variants` returns `totalItemCount 0` on the trial, so listing variants is not a
-substitute for reading customizing.
-
-**The customizing verb was wrong here until 2026-08-15.** This table read `POST /atc/customizing`;
-#68 sends `GET` (`run.ts`, `getAtcCustomizing`). Both cannot be what was observed, and the table's
-own claim — "each line from a server response" — is what makes the contradiction worth naming
-rather than quietly editing. #68 is the better-attested of the two: it is code that ran against a
-system, while the `POST` was recorded from a session nobody can now re-read. So the spec follows
-`GET`, and the probe sends **both** and keeps whichever answers. If `POST` also works, this note
-is the only thing that needs deleting.
-
-And the consequence is not confined to that row. Every line of this table came from the **same
-2026-07-20 session**, and one of them was wrong. That does not make the other three false — it
-makes them all *one* source, uncorroborated, and "probed live" a weaker phrase here than it
-reads. The three facts below are the ones #68 contradicts, so the probe re-issues each of them
-rather than treating the table as settled:
-
-- no separate run id (vs `extractAtcRunId` from `Location`);
-- no run-status resource (vs polling `/atc/runs/{id}`);
-- `checkstyle` refused with 406 (vs `AtcFindingsFormat`).
-
-#68 asserts the opposite of all three on **on-prem** S/4HANA 2023. Both can be true at once —
-that is the on-prem question, not a contradiction — but only once the cloud half is re-read from
-a response rather than from this table.
-
-**Unverified**: #68 claims an end-to-end run on S/4HANA 2023 (SAP_BASIS 758) with the async
-`/atc/runs/{id}` path. No captured request or response accompanies the diff. The two claims are
-not necessarily in conflict — ATC may differ between cloud and on-prem, as the transport list
-does — but until someone probes on-prem, the async path is a claim, not a fact, and the design
-above deliberately does not depend on which is true.
+```xml
+atcfinding:location="/sap/bc/adt/oo/classes/zok_cl_cleaner/source/main#start=30,0"
+atcfinding:priority="3"
+atcfinding:checkTitle="Extended Program Check (SLIN)"
+atcfinding:messageTitle="Strings without text elements are not translated: |Cleaning item, |"
+```
 
 ## The target: a set, not one object
 
-The run payload nests `<adtcore:objectReferences>` — **plural**, inside an `objectSet` that is
-itself one of `<objectSets>`. A contract taking a single object would impose a limit ADT does not
-have, and would have to be broken later to lift it. Raised in review, 2026-08-15.
+The run payload nests `<adtcore:objectReferences>` — plural, inside an `objectSet` that is itself
+one of `<objectSets>`. A run over two objects was accepted and its worklist listed **both**
+(`ZBASE_PROBE01` and `ZOK_CL_CLEANER`), so the plural is real and not decorative.
 
 ```ts
 interface IAtcObjectRef {
-  /** The kinds whose ADT URI this package can build — see below. */
   objectType: AtcObjectType;
   objectName: string;
 }
@@ -280,237 +300,145 @@ interface IAtcRunTarget {
 ```
 
 Exclusive object sets (`kind` is an attribute, so other values exist) are **not** in this
-contract: nothing has established what they accept, and a field nobody has seen answered is the
-kind of promise this package spent three releases removing.
+contract: nothing has established what they accept.
+
+### `AtcObjectType` — the one open question
 
 ```ts
-// Blocked: the members are what the probe returns, not what #68 inherited.
-type AtcObjectType = /* the confirmed set — see below */ never;
+// Two of nine confirmed. Ship the confirmed set, not the inherited one.
+type AtcObjectType = 'class' | 'package' /* … pending the probe */;
 ```
 
-`AtcObjectType` is the set whose ADT URI can be built, and **it is the one part of the
-synchronous contract that cannot be decided from here.** #68 maps `class`, `interface`,
-`program`, `include`, `function_group`, `package` (`buildAtcObjectUri`); whether that is ATC's
-checkable set, a subset, or partly wrong is unknown, and an object type absent from the map
-cannot be checked at all. It is a contract decision, not an implementation detail — a published
-union is a promise about which objects this package can check.
+Confirmed, at the URI **the client builds** rather than the one ADT returns — which is the thing
+that matters, since the contract takes `objectType` + `objectName`:
 
-Two things already known about that mapping, before any run:
+| type | URI built | evidence |
+|---|---|---|
+| `class` | `/sap/bc/adt/oo/classes/{NAME}` | run accepted; the worklist afterwards carries a finding **on that class** |
+| `package` | `/sap/bc/adt/packages/{NAME}` | run accepted; the multi-object worklist lists the package among its objects |
+
+Unmeasured, for want of a representative object in the probed package: `interface`, `program`,
+`include`, `function_group`, `ddl_source`, `table`, `behavior_definition`. The probe reports each
+by name and exits non-zero rather than implying the set is closed.
+
+Two things about the mapping stand regardless of what the remaining runs say:
 
 - **`include` is mapped two different ways in the two codebases.** #68 sends includes to
   `/sap/bc/adt/programs/programs/{name}`; this library builds `/sap/bc/adt/programs/includes/`
-  for includes everywhere else. They cannot both be the ATC-checkable URI, and picking by
-  preference would be a guess, so the probe runs **both**.
-- **Three of the types the spec wants measured are not in #68 at all.** DDL source, table and
-  behavior definition have no entry in `buildAtcObjectUri`, so they cannot be checked through
-  #68 even if ATC accepts them. The probe proposes the template this library already uses for
-  each and runs it, which is the only way they can join the union.
+  everywhere else. They cannot both be the ATC-checkable URI, and the probe runs both.
+- **DDL source, table and behavior definition are absent from `buildAtcObjectUri` entirely**, so
+  they cannot be checked through #68 even if ATC accepts them. Their templates come from what
+  this library already uses.
 
-**Blocked on the probe below.** Ship the confirmed set, not the inherited one.
+**Acceptance alone will not extend this union.** A URI that cannot exist
+(`/sap/bc/adt/oo/classes/ZZ_NO_SUCH_CLASS_PROBE`) was answered **201**, exactly like a real one.
+A type joins `AtcObjectType` when its object shows up in the finished worklist — that is what
+"confirmed" means in the table above, and it is why the two rows there cite a worklist and not a
+status code.
 
 ## What goes in `interfaces`
 
-- the parameter types from #17, corrected: no `run_id`, no `with_long_polling`, no `checkstyle`;
-- `IAtcRunTarget` / `IAtcObjectRef` / `IAtcRunResult` / `IAtcRunOptions`;
-- `IAtcFindings` — and **nothing** composing it with `IAdtRunnable`: the getter spells that
-  intersection itself.
+- `IAtcRunTarget` / `IAtcObjectRef` / `IAtcRunOptions`;
+- `IAtcRunResult`, the union, and `AtcObjectType`;
+- `IAtcRunStatus` and `IAtcRunStatusReadable`;
+- `IAtcFindings` — and **nothing** composing these three with `IAdtRunnable`: the getter spells
+  that intersection itself.
+
+Nothing from #17 survives as written: `IGetAtcRunStatusParams { run_id }` was right that a run id
+exists but wrong in shape, `with_long_polling` is unmeasured, and `AtcFindingsFormat` offers a
+format the server refuses.
 
 `IAtcLog` already in the package (`runtime/IAtcLog.ts`) is **not** this: it reads a check-failure
-or execution **log** by `executionId`, a diagnostic-log sibling of `IApplicationLog`. Different
-endpoints, no shared field. Whether `/atc/results/{executionId}/log` and `/atc/worklists/{id}`
-are the same resource under two ids is unverified.
+or execution log by `executionId`. The run resource links to `/atc/results/{displayId}` and to
+`/atc/worklists/{worklistId}` as two different resources under two different `rel`s, so the
+question of whether they were the same thing under two ids is answered: they are not.
 
-One release, both packages, cut when the work is done — the rule the last three interfaces
-releases were cut against.
+One release, both packages, cut when the work is done.
 
 ## Which systems this is for
 
-**Everything here was observed on the cloud trial, and nothing on-prem has been captured.** The
-requests are the same either way — the URLs and payloads are not in question — but the *shape of
-the answers* is, and #68 claims an on-prem run response this spec has never seen.
+Everything here was captured on the **cloud trial**. Nothing on-prem has been captured — but the
+on-prem question has shrunk to almost nothing, because what #68 claims for S/4HANA 2023 (async
+runs, a run id from `Location`, a pollable `/atc/runs/{id}`) is exactly what the trial now
+demonstrates. The two systems agreeing is the likely case, and it is no longer this design's
+risk: the design follows the traffic both accounts describe.
 
-The handler does **not** gate on environment. `isCloudEnvironment()` exists, but refusing to run
-where the traffic is probably identical would be a guess in the other direction, and a
-cloud-only ATC is a promise about on-prem that nobody has earned either.
-
-What it does instead is refuse to invent: **`run()` parses the run response, and if the response
-does not carry what it expects, it fails rather than defaulting.** A missing `FINDING_STATS`
-becomes an error naming what was absent — not `findingStats: "0,0,0"`, and not an empty result.
-The dangerous outcome on an unverified system is not an exception; it is a confident zero, which
-is indistinguishable from a clean check. Every silent-success defect this package fixed in
-12.0.0 had that shape.
-
-So: **verified on cloud, unverified on-prem, honest on both** — and the on-prem probe below is
-what would turn the second half of that sentence into a fact.
+The handler does **not** gate on environment. What it does instead is refuse to invent: `run()`
+parses the response, and if the response does not carry what the mode promises — no `Location`
+on a `wait: false` run, no `FINDING_STATS` on a `wait: true` one — it fails with an error naming
+what was absent. It does not default a missing run id to the worklist id, and it does not default
+a missing count to `"0,0,0"`. The dangerous outcome on an unverified system is not an exception;
+it is a confident zero, indistinguishable from a clean check — which is precisely the shape of
+the mistake this spec spent three weeks inside.
 
 ## Where this lives
 
 **`AdtRuntimeClient.getAtc()`, in `src/runtime/atc/`, beside `AtcLog`.** Not `AdtClient`: that
 client hands out per-object CRUD handlers, and a check run is not an ADT object — the same reason
-`getProfiler()`, `getDumps()` and `getAtcLog()` are on the runtime client. Running checks and
-reading findings is runtime analysis, and it belongs where the profiler traces and the ATC
-**logs** already are.
+`getProfiler()`, `getDumps()` and `getAtcLog()` are on the runtime client.
 
-Not an extension of `AtcLog` either: that reads a check-failure or execution log by
-`executionId`, this runs checks and reads a worklist. Same subject, different resources, and one
-handler holding both would have halves with nothing to do with each other.
+Not an extension of `AtcLog` either: that reads a log by `executionId`, this runs checks and reads
+a worklist. The run resource linking to both under different `rel`s confirms they are separate
+resources, so one handler holding both would have halves with nothing to do with each other.
 
-**This decides what the capability guard covers**, which a previous revision got wrong by
-asserting the guard applies. `src/__tests__/unit/capabilities/` walks `AdtClient` and
-`AdtClientLegacy`; it does not know `AdtRuntimeClient` exists, and no runtime handler is in its
-manifest. An ATC handler placed there is **not** covered, and claiming otherwise would have been
-false. Raised in review, 2026-08-15.
-
-The plan picks one of two, with a reason rather than by inheriting this sentence:
+**The capability guard does not cover this.** `src/__tests__/unit/capabilities/` walks `AdtClient`
+and `AdtClientLegacy`; it does not know `AdtRuntimeClient` exists, and no runtime handler is in
+its manifest. The plan picks one of two:
 
 - **extend the completeness check to `AdtRuntimeClient`** — correct, and it immediately demands
   manifest entries for a dozen runtime handlers that have none. A larger job than this feature.
-- **give ATC its own behavioural test in the guard's shape** — every method, the request it
-  makes, method and path. Proportionate, and it leaves the runtime client uncovered as it is
-  today.
+- **give ATC its own behavioural test in the guard's shape** — every method, the request it makes,
+  method and path. Proportionate, and it leaves the runtime client uncovered as it is today.
 
 The second is what this spec expects; the first is worth doing and is not this.
 
 ### What `getAtc()` returns
 
-The intersection, spelled at the getter — no new named composite:
-
 ```ts
-getAtc(): IAdtRunnable<IAtcRunTarget, IAtcRunResult, IAtcRunOptions> & IAtcFindings;
+getAtc(): IAdtRunnable<IAtcRunTarget, IAtcRunResult, IAtcRunOptions> &
+  IAtcRunStatusReadable &
+  IAtcFindings;
 ```
 
-The precedent, counted rather than asserted: of `AdtClient`'s 37 getters, **13 spell an
-intersection and 24 return a single named type** — mostly `IAdtSourceObject`, which names a set
-several handlers share exactly. So the rule is not "always inline"; it is that a composite earns
-a name when more than one handler has that set. ATC's is used by one getter, so a third name over
-two types that already have one would buy nothing. `IAtcLog` beside it is named because it
-declares its own methods, which this does not.
+The intersection, spelled at the getter — no new named composite. The precedent, counted rather
+than asserted: of `AdtClient`'s 37 getters, **13 spell an intersection and 24 return a single
+named type** — mostly `IAdtSourceObject`, which names a set several handlers share exactly. A
+composite earns a name when more than one handler has that set; ATC's is used by one getter.
 
-(An earlier revision said "all 36 getters", which is simply false — corrected in review,
-2026-08-15.)
+That rule is followed here but is **not** yet true of the client as a whole: the same count found
+five kinds of return type across the 37 getters, two of them concrete classes. Making them one is
+[issue #109](https://github.com/fr0ster/mcp-abap-adt-clients/issues/109), a separate breaking pass.
+ATC conforms, so it adds nothing to that pile; it does not clean it either.
 
-That rule is stated here and followed here, but it is **not** yet true of the client as a whole:
-the same count found five different kinds of return type across the 37 getters, two of them
-concrete classes. Making them one is
-[issue #109](https://github.com/fr0ster/mcp-abap-adt-clients/issues/109) — a separate,
-breaking pass with its own spec. ATC conforms to the rule so it adds nothing to that pile; it
-does not clean it either, and this spec does not wait for it.
-
-The concrete class is not the return type. A consumer never names `AdtAtc`, and returning it
-would hand out whatever else the class happens to carry — the exact gap the capability guard
-exists to close on the other client.
+The concrete class is not the return type. A consumer never names `AdtAtc`.
 
 ## Deliberately not in scope
 
 **`runSync()`** — #68 also adds a synchronous ABAP Unit runner: one `POST /abapunit/testruns`
-with `<aunit:runConfiguration>` keyed by object reference, returning the full result. Its
-motivation is that the async `/abapunit/runs` path fails on 7.5x backends. Nothing on `main` can
-reach that endpoint, so it is additive and worth having — but it is a different subject with a
-different endpoint, and mixing it into ATC is what made #68 an 11k-line diff. Its own spec.
+with `<aunit:runConfiguration>` keyed by object reference, returning the full result, because the
+async `/abapunit/runs` path fails on 7.5x backends. Nothing on `main` can reach that endpoint, so
+it is additive and worth having — but it is a different subject with a different endpoint, and
+mixing it into ATC is what made #68 an 11k-line diff. Its own spec.
 
-## What is not designed here
+## What is still open
 
-**Waiting for an asynchronous run.** It needs a completion marker, no marker has been observed,
-and two drafts of this spec tried to reason one into existence — first from the artifact
-appearing, then from a count whose timing is unknown. The third answer is to design for what was
-seen and to leave the rest to a probe. A consumer that needs "run and collect" today composes
-`run()` and `getFindings()` itself, and on the probed system that is correct.
+One blocker and three loose ends. All are trial-answerable; none needs an on-prem system.
 
-## The probes that unblock this
-
-**Two systems, and the trial cannot stand in for the other.** A previous revision claimed one
-session against the trial "answers everything still open"; it cannot. On a system where the run
-comes back finished, `clientWait=true` changes nothing observable, and there is no interval in
-which to catch an unfinished worklist. Waiting can only be studied where the run is actually
-asynchronous — which is on-prem, where it is claimed and unverified. Raised in review,
-2026-08-15.
-
-### On the trial — closes the synchronous contract
-
-Credentials for this exist; the run is synchronous there, which is exactly why it can settle the
-contract and nothing about waiting.
-
-`scripts/probe-atc.ts` runs every ask below in one session and writes each request and response
-to disk verbatim (`--out=atc-probe`). Three things make it a measurement rather than a
-confirmation, each added after review, 2026-08-15:
-
-- **It runs the URI a client would build, not the one ADT handed back.** The contract takes
-  `objectType` + `objectName`, so the client must build the URI — which makes the *template* the
-  thing under test. An earlier version took the package listing's URI, which would have proved a
-  ready-made URI is checkable and said nothing about the mapping. ADT's own URI is run too, but
-  only where it differs from the built one, so the difference gets measured.
-- **The candidate list is required, not discovered.** It probes #68's six plus the three above,
-  and a candidate with no representative object in the package is reported as **unmeasured**,
-  named in the manifest, and exits non-zero. Taking whatever a package happened to contain meant
-  a package with no interface would have finished green with the blocker still open.
-- **It asks the run-id question with the right id.** The disputed claim is #68's separate run id
-  from `Location`, so the probe reads the run response's headers and fetches *that*; a 404 for
-  the worklist id proves nothing about it. Both are fetched, as separate steps.
-
-It also sends a URI that cannot exist **and reads that worklist back like any other**. The read
-is the control, not the send: if the bogus run and a real one both answer 200, only the two
-worklists separate "ATC checked this object" from "ATC accepted anything and checked nothing".
-Raised in review, 2026-08-16 — the control ran without its read until then, which made it a
-gesture.
-
-One ask it can only answer if told where to look: **what the `FINDING_STATS` positions mean**
-needs a run that found something. The probe picks representatives by type, not by being dirty, so
-they may all be clean — and `0,0,0` reads identically in every severity ordering. Pass
-`--known-bad=class:ZCL_SOMETHING_DIRTY` to point it at an object that fails its checks; without
-one the probe reports the positions as undecoded rather than letting three zeroes pass for an
-answer.
-
-**Blocking — each of these decides something the contract already states, so the contract is not
-final until they answer:**
+**Blocking:**
 
 | ask | what it decides |
 |---|---|
-| run one object of **each** kind #68 lists, and the three it does not (DDL source, table, behavior definition), **at the URI a client builds** — plus both `include` templates | `AtcObjectType`, and which include URI ATC takes |
-| `GET` **and** `POST /atc/customizing` | which verb reads the check variant. The contract says `GET`, on #68's authority against a recorded `POST`. If only `POST` answers, the contract is wrong as written — and if neither does, `checkVariant` cannot be optional at all |
-| the run response's **headers**, whole | whether a run has an id of its own. #68 reads one from `Location`; the recorded session says the body echoes the worklist id. If a usable run id exists, `IAtcRunResult` has to carry it, and `run()` returning only a worklist id would be losing something the server gave |
+| run one object of each remaining kind — `interface`, `program`, `include` (both templates), `function_group`, `ddl_source`, `table`, `behavior_definition` — **at the URI a client builds**, and read each worklist **after** its run reports finished | `AtcObjectType`. Needs a package holding those types; `ZBASE_PROBE01` has a class and nothing else |
 
-**Not blocking — improvements that can join the contract once answered:**
+**Not blocking:**
 
 | ask | what it would add |
 |---|---|
-| the run response, captured whole, **with known findings present** | what the `FINDING_STATS` positions mean. The contract returns the triple verbatim precisely so it does not need to know, which is what keeps this off the blocking list — but a clean object answers nothing, so the probe needs a known-bad one (`--known-bad=type:NAME`) |
-| `GET /atc/worklists/{id}?includeExemptedFindings=true` | whether that option exists at all — it stays out of the contract until answered |
-| `maximumVerdicts` at its edges — 0, 1, something enormous | the server's bounds, which nothing states, and so whether `run()` should validate a range |
+| one **finished** worklist read with `includeExemptedFindings=false` and `=true` | whether the flag does anything. The two reads so far differ by timing, not by the flag |
+| `withLongPolling=true` against a run that is **still running** | what long polling does. The one observation was made after the run had finished, where it cannot act |
+| the bogus URI's worklist read **after** its run reports finished | whether ATC ever reports a bad reference. So far it answers 201 and an empty worklist, which is also what an unfinished good run looks like |
+| a worklist with findings at more than one priority | whether the `FINDING_STATS` positions are priorities 1, 2, 3. One finding at priority 3 gave `0,0,1`, which is consistent and not conclusive |
 
-An earlier revision called the object set "the only thing blocking the synchronous contract".
-That stopped being true the moment the traffic table's provenance was downgraded: two of its rows
-are things the contract asserts, and re-verifying them can refute them. Raised in review,
-2026-08-16.
-
-### On an on-prem system — decides whether waiting is designed at all
-
-Nothing here can be answered from the cloud trial, and this machine reaches cloud only, so it
-needs the on-prem route (a run from a machine that reaches one).
-
-| ask | why |
-|---|---|
-| does `POST /atc/runs` return before the checks finish? | the whole premise of waiting. If it does not, waiting is never designed and this spec is complete as written |
-| `GET /atc/runs/{id}` — a real status resource, or 404? | #68 built its polling on this. The trial's recorded 404 does not settle it even for the trial: which id was fetched was never written down, and a 404 for the worklist id says nothing about a run id from `Location` |
-| `POST /atc/runs?...&clientWait=true` | whether the server will simply hold the request, which would answer the question by removing it |
-| a worklist read **between** start and completion | whether an unfinished worklist is distinguishable from an empty result at all — the thing that made two drafts of this spec wrong |
-
-Until that second probe happens, `run()` stays start-only, and that is a decision rather than an
-omission.
-
-## Open questions
-
-Four, and each belongs to one of the probes above rather than to another round of design.
-
-1. **The checkable object set** — `AtcObjectType`. The trial answers it.
-2. **Which verb reads the check variant.** The contract says `GET`; the trial answers it, and can
-   refute it.
-3. **Whether a run has an id of its own.** If it does, `IAtcRunResult` carries it; the trial
-   answers it, from the run response's headers.
-4. **Whether ATC is ever asynchronous, and what marks a run finished.** Decides only whether
-   waiting is designed; needs an on-prem system, and until then `run()` is start-only by
-   decision.
-
-The first three are the synchronous contract, and the trial closes all three in one session.
-
-Everything else this spec once listed here has been decided in the text: the finding statistics,
-`maximumVerdicts`, the target's shape, where the handler lives, and what the accessor returns.
+`scripts/probe-atc.ts` runs all of these. It takes `--package=NAME` for the objects,
+`--known-bad=KEY:NAME` for an object expected to fail its checks, and exits non-zero while any
+candidate type is unmeasured — so an incomplete probe cannot be read as a finished one.
