@@ -120,7 +120,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.4",
-    "@mcp-abap-adt/connection": "^3.0.0",
+    "@mcp-abap-adt/connection": "^4.0.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^25.3.3",
     "dotenv": "^17.3.1",

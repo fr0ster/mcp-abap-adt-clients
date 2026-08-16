@@ -1,9 +1,10 @@
 # ATC: start a run, wait for it, read the findings
 
 **Status:** designed against captured traffic, 2026-08-16. One question is still open —
-`AtcObjectType`, the set of checkable object types, of which two of nine are confirmed. Everything
-else in the contract now rests on a response somebody can re-read
-(`docs/evidence/2026-08-16-atc-trial-probe.md`). Not implemented.
+`AtcObjectType`, the set of checkable object types: **one of nine confirmed**, two refused by the
+system, six accepted but unproven. The criterion for confirming one was itself wrong until
+2026-08-16 and is corrected below. Everything else in the contract rests on a response somebody
+can re-read (`docs/evidence/2026-08-16-atc-trial-probe.md`). Not implemented.
 
 **Scope:** an ATC client in `@mcp-abap-adt/adt-clients`, and the contract it needs in
 `@mcp-abap-adt/interfaces`. The MCP server is a separate consumer and out of scope here.
@@ -305,36 +306,62 @@ contract: nothing has established what they accept.
 ### `AtcObjectType` — the one open question
 
 ```ts
-// Two of nine confirmed. Ship the confirmed set, not the inherited one.
-type AtcObjectType = 'class' | 'package' /* … pending the probe */;
+// One of nine confirmed, two refused by the system, six accepted but unproven.
+type AtcObjectType = 'class' /* … pending dirty representatives */;
 ```
 
-Confirmed, at the URI **the client builds** rather than the one ADT returns — which is the thing
-that matters, since the contract takes `objectType` + `objectName`:
+#### The evidence a type needs, which an earlier draft got wrong
 
-| type | URI built | evidence |
+A draft of this section said a type joins the union when its object **shows up in the finished
+worklist**. That criterion does not work, and the probe run of 2026-08-16 is what showed why:
+
+**a worklist lists only objects that have findings.** The run over `ZBASE_PROBE01` produced a
+worklist holding exactly one object — the one class with real code in it — and exactly one
+finding. Every other object was checked and produced nothing, and a checked-and-clean object is
+absent from the worklist in precisely the same way an unchecked one is. The worklist of a run
+over a freshly made table came back **byte-identical** to the worklist of a run over
+`/sap/bc/adt/oo/classes/ZZ_NO_SUCH_CLASS_PROBE`, a URI that cannot exist.
+
+So this is the same ambiguity the spec already names for an empty worklist, one level down: at
+the level of a single object rather than a whole run. It was missed because the only object with
+content in the probed package was one class somebody had written by hand.
+
+**Acceptance is not evidence either.** The impossible URI is answered **201**, exactly like a
+real one.
+
+**What is left is a finding.** A type is confirmed when ATC reports a finding against an object
+of that type, at the URI the client builds. Which means the representative has to contain
+something ATC objects to — a clean object cannot prove anything about its type, however carefully
+it is made. The fixtures for the first run were clean by construction, so they could not have
+closed this no matter how correct they were.
+
+#### Where it stands
+
+| type | URI the client builds | status |
 |---|---|---|
-| `class` | `/sap/bc/adt/oo/classes/{NAME}` | run accepted; the worklist afterwards carries a finding **on that class** |
-| `package` | `/sap/bc/adt/packages/{NAME}` | run accepted; the multi-object worklist lists the package among its objects |
+| `class` | `/sap/bc/adt/oo/classes/{NAME}` | **confirmed** — a finding at `…/source/main#start=30,0`, `priority="3"`, `FINDING_STATS 0,0,1` |
+| `program` | `/sap/bc/adt/programs/programs/{NAME}` | **not checkable here** — the system refuses to hold one: `403 ExceptionResourceNoAuthorization`, `S_DEVELOP` |
+| `include` | `/sap/bc/adt/programs/includes/{NAME}` | **not checkable here** — same refusal |
+| `interface` | `/sap/bc/adt/oo/interfaces/{NAME}` | run accepted, no finding — unproven |
+| `function_group` | `/sap/bc/adt/functions/groups/{NAME}` | run accepted, no finding — unproven |
+| `package` | `/sap/bc/adt/packages/{NAME}` | run accepted, no finding — unproven |
+| `ddl_source` | `/sap/bc/adt/ddic/ddl/sources/{NAME}` | run accepted, no finding — unproven |
+| `table` | `/sap/bc/adt/ddic/tables/{NAME}` | run accepted, no finding — unproven |
+| `behavior_definition` | `/sap/bc/adt/bo/behaviordefinitions/{NAME}` | no representative was made — unmeasured |
 
-Unmeasured, for want of a representative object in the probed package: `interface`, `program`,
-`include`, `function_group`, `ddl_source`, `table`, `behavior_definition`. The probe reports each
-by name and exits non-zero rather than implying the set is closed.
+"Not checkable here" is a fact about **this system**, not about ATC: a classic program cannot
+exist on ABAP Cloud, so ATC cannot check one on ABAP Cloud. Whether ATC checks them on-prem is a
+separate question and stays open.
 
-Two things about the mapping stand regardless of what the remaining runs say:
+Two things about the mapping stand regardless:
 
 - **`include` is mapped two different ways in the two codebases.** #68 sends includes to
   `/sap/bc/adt/programs/programs/{name}`; this library builds `/sap/bc/adt/programs/includes/`
-  everywhere else. They cannot both be the ATC-checkable URI, and the probe runs both.
+  everywhere else. They cannot both be the ATC-checkable URI, and the probe runs both — though
+  neither can be resolved on a system that will not hold an include at all.
 - **DDL source, table and behavior definition are absent from `buildAtcObjectUri` entirely**, so
   they cannot be checked through #68 even if ATC accepts them. Their templates come from what
   this library already uses.
-
-**Acceptance alone will not extend this union.** A URI that cannot exist
-(`/sap/bc/adt/oo/classes/ZZ_NO_SUCH_CLASS_PROBE`) was answered **201**, exactly like a real one.
-A type joins `AtcObjectType` when its object shows up in the finished worklist — that is what
-"confirmed" means in the table above, and it is why the two rows there cite a worklist and not a
-status code.
 
 ## What goes in `interfaces`
 
@@ -422,13 +449,17 @@ mixing it into ATC is what made #68 an 11k-line diff. Its own spec.
 
 ## What is still open
 
-One blocker and three loose ends. All are trial-answerable; none needs an on-prem system.
+One blocker and four loose ends. All are trial-answerable; none needs an on-prem system.
 
 **Blocking:**
 
 | ask | what it decides |
 |---|---|
-| run one object of each remaining kind — `interface`, `program`, `include` (both templates), `function_group`, `ddl_source`, `table`, `behavior_definition` — **at the URI a client builds**, and read each worklist **after** its run reports finished | `AtcObjectType`. Needs a package holding those types; `ZBASE_PROBE01` has a class and nothing else |
+| run one **deliberately non-conforming** object of each remaining kind — `interface`, `function_group`, `package`, `ddl_source`, `table`, `behavior_definition` — at the URI a client builds, and read the worklist after the run reports finished | `AtcObjectType`. Each representative must contain something ATC objects to; a clean one produces no finding and a worklist without a finding says nothing about whether the object was checked |
+
+`program` and `include` are **not** on that list. The system refuses to hold either
+(`403`, `S_DEVELOP`), so nothing about them can be settled here, and their line in the table
+above is already the answer *for this system*.
 
 **Not blocking:**
 
@@ -438,6 +469,7 @@ One blocker and three loose ends. All are trial-answerable; none needs an on-pre
 | `withLongPolling=true` against a run that is **still running** | what long polling does. The one observation was made after the run had finished, where it cannot act |
 | the bogus URI's worklist read **after** its run reports finished | whether ATC ever reports a bad reference. So far it answers 201 and an empty worklist, which is also what an unfinished good run looks like |
 | a worklist with findings at more than one priority | whether the `FINDING_STATS` positions are priorities 1, 2, 3. One finding at priority 3 gave `0,0,1`, which is consistent and not conclusive |
+| whether ATC checks `program` and `include` on an **on-prem** system | the only part of `AtcObjectType` this trial cannot decide. Not blocking, because a union that omits them is honest on cloud and can be widened later; blocking only if the contract is expected to be complete on-prem from the start |
 
 `scripts/probe-atc.ts` runs all of these. It takes `--package=NAME` for the objects,
 `--known-bad=KEY:NAME` for an object expected to fail its checks, and exits non-zero while any
