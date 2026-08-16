@@ -1,11 +1,11 @@
 # ATC: start a run, then look for the result
 
 **Status:** blocked on a probe, 2026-08-15. The shape is agreed and the synchronous contract is
-all but complete — one part of it, the set of checkable object types, is a fact nobody has
-captured, and so is the whole question of waiting. The traffic table is **being re-verified**
-too: one of its rows disagreed with #68 and #68 was right, so the probe re-issues the rest rather
-than trusting a single unrepeatable session. See "The probes that unblock this". Not
-implemented.
+all but complete — **three** facts nobody has captured still bear on it, and so does the whole
+question of waiting. The traffic table is being re-verified too: one of its rows disagreed with
+#68 and #68 was right, so the probe re-issues the rest rather than trusting a single unrepeatable
+session — and re-verifying it is what turned two of its rows back into open contract questions.
+See "The probes that unblock this". Not implemented.
 
 **Scope:** an ATC client in `@mcp-abap-adt/adt-clients`, and the contract it needs in
 `@mcp-abap-adt/interfaces`. The MCP server is a separate consumer and out of scope here.
@@ -122,6 +122,14 @@ convenience — on the trial `/atc/variants` returns `totalItemCount 0`, so cust
 observed source of a usable variant, and a contract that demanded the caller supply one would be
 unusable there. The read happens per `run()` call; caching it is an optimisation nobody has
 measured a need for, and a cached variant is wrong the moment the system's default changes.
+
+**The verb here is #68's, not a captured one**, and that makes this paragraph provisional in a
+way the rest of the contract is not. The `GET` comes from code that ran; the `POST` this replaced
+came from the session whose other rows are now being re-read. The probe sends both. If only
+`POST` answers, one word changes here. If **neither** answers — if `systemCheckVariant` is not
+readable on a system — then `checkVariant` cannot be optional at all, because the fallback it
+falls back to does not exist, and `IAtcRunOptions.checkVariant` becomes required. That is a
+change to the published type, not to a sentence, which is why this sits on the blocking list.
 
 **What `IAtcRunResult` carries.** The worklist id, and the finding statistics **as the server
 sent them** — the raw `description` string, e.g. `"0,0,1"`:
@@ -439,26 +447,40 @@ confirmation, each added after review, 2026-08-15:
   from `Location`, so the probe reads the run response's headers and fetches *that*; a 404 for
   the worklist id proves nothing about it. Both are fetched, as separate steps.
 
-It also sends a URI that cannot exist, because without that control "the run was accepted" is not
-evidence of anything.
+It also sends a URI that cannot exist **and reads that worklist back like any other**. The read
+is the control, not the send: if the bogus run and a real one both answer 200, only the two
+worklists separate "ATC checked this object" from "ATC accepted anything and checked nothing".
+Raised in review, 2026-08-16 — the control ran without its read until then, which made it a
+gesture.
 
-The check-variant path is not a separate ask: `GET /atc/customizing` returning
-`systemCheckVariant` with a value (`ABAP_CLOUD_DEVELOPMENT_DEFAULT`) is what the contract depends
-on, and step 1 of the probe re-reads it — under both verbs, since the recorded one was wrong. An
-earlier revision listed it as an open question *and* as proven, which was both ways at once; it
-is neither, it is being re-read.
+One ask it can only answer if told where to look: **what the `FINDING_STATS` positions mean**
+needs a run that found something. The probe picks representatives by type, not by being dirty, so
+they may all be clean — and `0,0,0` reads identically in every severity ordering. Pass
+`--known-bad=class:ZCL_SOMETHING_DIRTY` to point it at an object that fails its checks; without
+one the probe reports the positions as undecoded rather than letting three zeroes pass for an
+answer.
 
-| ask | why it blocks something |
+**Blocking — each of these decides something the contract already states, so the contract is not
+final until they answer:**
+
+| ask | what it decides |
 |---|---|
-| run one object of **each** kind #68 lists, and the three it does not (DDL source, table, behavior definition), **at the URI a client builds** — plus both `include` templates | fixes `AtcObjectType` — **the only thing blocking the synchronous contract** — and settles which include URI ATC takes |
-| the run response's **headers**, whole | whether a run has an id of its own. #68 reads one from `Location`; the recorded session says the body echoes the worklist id. Fetching the wrong id would answer neither |
-| the run response, captured whole, with known findings present | what the `FINDING_STATS` positions mean. **Not a blocker**: the contract returns the triple verbatim precisely so it does not need to know. Parsing it into named counts is a later improvement, and it needs this before it can be one |
-| `GET /atc/worklists/{id}?includeExemptedFindings=true` | whether that option exists at all — it stays out of the contract until answered |
-| `maximumVerdicts` at its edges — 0, 1, something enormous | the server's bounds, which nothing states |
+| run one object of **each** kind #68 lists, and the three it does not (DDL source, table, behavior definition), **at the URI a client builds** — plus both `include` templates | `AtcObjectType`, and which include URI ATC takes |
+| `GET` **and** `POST /atc/customizing` | which verb reads the check variant. The contract says `GET`, on #68's authority against a recorded `POST`. If only `POST` answers, the contract is wrong as written — and if neither does, `checkVariant` cannot be optional at all |
+| the run response's **headers**, whole | whether a run has an id of its own. #68 reads one from `Location`; the recorded session says the body echoes the worklist id. If a usable run id exists, `IAtcRunResult` has to carry it, and `run()` returning only a worklist id would be losing something the server gave |
 
-The first row is the blocker. The rest are improvements that would let an option and a validated
-range join the contract, plus the header capture that decides whether the run-id claim survives;
-all cheap on the same connection.
+**Not blocking — improvements that can join the contract once answered:**
+
+| ask | what it would add |
+|---|---|
+| the run response, captured whole, **with known findings present** | what the `FINDING_STATS` positions mean. The contract returns the triple verbatim precisely so it does not need to know, which is what keeps this off the blocking list — but a clean object answers nothing, so the probe needs a known-bad one (`--known-bad=type:NAME`) |
+| `GET /atc/worklists/{id}?includeExemptedFindings=true` | whether that option exists at all — it stays out of the contract until answered |
+| `maximumVerdicts` at its edges — 0, 1, something enormous | the server's bounds, which nothing states, and so whether `run()` should validate a range |
+
+An earlier revision called the object set "the only thing blocking the synchronous contract".
+That stopped being true the moment the traffic table's provenance was downgraded: two of its rows
+are things the contract asserts, and re-verifying them can refute them. Raised in review,
+2026-08-16.
 
 ### On an on-prem system — decides whether waiting is designed at all
 
@@ -477,14 +499,18 @@ omission.
 
 ## Open questions
 
-Two, and each belongs to one of the probes above rather than to another round of design.
+Four, and each belongs to one of the probes above rather than to another round of design.
 
-1. **The checkable object set** — `AtcObjectType`. Blocks the synchronous contract; the trial
-   answers it.
-2. **Whether ATC is ever asynchronous, and what marks a run finished.** Decides only whether
+1. **The checkable object set** — `AtcObjectType`. The trial answers it.
+2. **Which verb reads the check variant.** The contract says `GET`; the trial answers it, and can
+   refute it.
+3. **Whether a run has an id of its own.** If it does, `IAtcRunResult` carries it; the trial
+   answers it, from the run response's headers.
+4. **Whether ATC is ever asynchronous, and what marks a run finished.** Decides only whether
    waiting is designed; needs an on-prem system, and until then `run()` is start-only by
    decision.
 
-Everything else this spec once listed here has been decided in the text: the check variant, the
-finding statistics, `maximumVerdicts`, the target's shape, where the handler lives, and what the
-accessor returns.
+The first three are the synchronous contract, and the trial closes all three in one session.
+
+Everything else this spec once listed here has been decided in the text: the finding statistics,
+`maximumVerdicts`, the target's shape, where the handler lives, and what the accessor returns.

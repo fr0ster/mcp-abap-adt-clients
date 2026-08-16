@@ -8,7 +8,11 @@
  *
  * What it settles, on whichever system `.env` points at:
  *
- *  1. **`AtcObjectType`** — the blocker. Every candidate type is probed from a
+ * Three of these block the contract — the checkable set, the customizing verb,
+ * and whether a run has an id of its own. Each is something the spec already
+ * asserts, so an answer can refute it, not merely fill it in.
+ *
+ *  1. **`AtcObjectType`** — a blocker. Every candidate type is probed from a
  *     **required list**, not from whatever a package happens to contain, and a
  *     candidate with no representative object is reported as **unmeasured**
  *     with a non-zero exit. A probe that quietly checked four types and exited
@@ -26,9 +30,17 @@
  *     read as "no status resource" when it is only "not that resource".
  *  4. **`GET` or `POST /atc/customizing`** — #68 sends GET, the spec's traffic
  *     table recorded POST. Both are sent; whichever answers is the fact.
- *  5. Plural object references, a control URI that cannot exist, and the loose
- *     ends: `includeExemptedFindings=true`, `checkstyle`, `maximumVerdicts` at
- *     its edges, `clientWait=true`.
+ *  5. Plural object references; the loose ends `includeExemptedFindings=true`,
+ *     `checkstyle`, `maximumVerdicts` at its edges and `clientWait=true`; and
+ *     **a control URI that cannot exist, read back like any candidate**. The
+ *     read is the point: if the bogus run and a real one both answer 200, only
+ *     their two worklists separate "ATC checked this" from "ATC accepted
+ *     anything and checked nothing".
+ *  6. **What the `FINDING_STATS` positions mean** — but only if `--known-bad`
+ *     names an object that fails its checks. Representatives are picked by
+ *     type, not by being dirty, so they may all be clean, and `0,0,0` reads the
+ *     same in every severity order. When no non-zero triple is seen the probe
+ *     says so rather than leaving the silence to be read as an answer.
  *
  * Nothing is interpreted here. Every step is recorded with its status and body
  * whether it succeeds or fails, because a 406 and a 404 are results too — three
@@ -46,6 +58,14 @@
  *   --extras         also probe types found in the package that are not
  *                    candidates — off by default, since they answer nothing the
  *                    contract asks
+ *   --known-bad=KEY:NAME
+ *                    an object known to FAIL its checks, e.g.
+ *                    `--known-bad=class:ZCL_ATC_DIRTY`. Without one, every
+ *                    representative may be clean, every FINDING_STATS reads
+ *                    `0,0,0`, and what the three positions mean stays unknown —
+ *                    a triple of zeroes is the one value that tells you nothing
+ *                    about the ordering. KEY is a candidate key (`class`,
+ *                    `program`, …)
  *
  * Exit code is **1 when any candidate went unmeasured**, so an incomplete probe
  * cannot be mistaken for a finished one.
@@ -371,6 +391,24 @@ function parseWorklistId(body: string): string | null {
   return /^[A-Za-z0-9]{20,}$/.test(trimmed) ? trimmed : null;
 }
 
+/**
+ * Pull `FINDING_STATS` out of a run response.
+ *
+ * The spec records it as a comma triple in a `description`, but not which
+ * element carries it, so this keeps a window of the raw text around the match
+ * as well as the triple — a human reading the evidence can then see the shape
+ * even where the extraction misses.
+ */
+function parseFindingStats(
+  body: string,
+): { triple: string | null; context: string } | null {
+  const at = body.indexOf('FINDING_STATS');
+  if (at === -1) return null;
+  const context = body.slice(Math.max(0, at - 200), at + 300);
+  const triple = context.match(/(\d+\s*,\s*\d+\s*,\s*\d+)/);
+  return { triple: triple ? triple[1] : null, context };
+}
+
 /** Header lookup that does not assume the server's capitalisation. */
 function header(
   headers: Record<string, unknown>,
@@ -388,10 +426,16 @@ function parseArgs(argv: string[]) {
     const hit = argv.find((a) => a.startsWith(`--${name}=`));
     return hit ? hit.slice(name.length + 3) : undefined;
   };
+  const knownBad = get('known-bad');
+  const [knownBadType, knownBadName] = knownBad
+    ? knownBad.split(':')
+    : [undefined, undefined];
   return {
     packageName: get('package'),
     outDir: get('out') ?? 'atc-probe',
     extras: argv.includes('--extras'),
+    knownBadType,
+    knownBadName,
   };
 }
 
@@ -549,6 +593,18 @@ async function main(): Promise<void> {
 
   const outcomes: ICandidateOutcome[] = [];
 
+  /**
+   * Every FINDING_STATS this session saw. Collected because the triple's
+   * positions can only be decoded from a run that found something: `0,0,0`
+   * looks identical whichever order the severities are in.
+   */
+  const findingStatsSeen: {
+    step: number;
+    label: string;
+    triple: string | null;
+    context: string;
+  }[] = [];
+
   /** One worklist per run: reusing one would blur whose findings are whose. */
   const newWorklist = async (label: string): Promise<string | null> => {
     const res = await rec.call(
@@ -588,6 +644,15 @@ async function main(): Promise<void> {
       headers: { 'Content-Type': CT_ATC_RUN, Accept: ACCEPT_ATC_RUN_RESPONSE },
       body: runBody(uris, options?.maximumVerdicts ?? 100),
     });
+    const stats = parseFindingStats(run.body);
+    if (stats) {
+      findingStatsSeen.push({
+        step: run.step,
+        label,
+        triple: stats.triple,
+        context: stats.context,
+      });
+    }
     if (options?.readBack !== false) {
       await rec.call(
         `findings-${label}`,
@@ -668,12 +733,40 @@ async function main(): Promise<void> {
     }
   }
 
+  // --- 3b. A known-bad object, if one was named -----------------------------
+  // FINDING_STATS can only be decoded from a run that found something. Every
+  // representative above was picked for its TYPE, not for being dirty, so they
+  // may all be clean — and three zeroes look the same in any severity order.
+  if (args.knownBadType && args.knownBadName) {
+    const candidate = CANDIDATES.find((c) => c.key === args.knownBadType);
+    if (!candidate) {
+      logger.error(
+        `--known-bad names an unknown type "${args.knownBadType}". Known: ${CANDIDATES.map((c) => c.key).join(', ')}`,
+      );
+    } else {
+      const encoded = encodeURIComponent(args.knownBadName).toUpperCase();
+      const uri = candidate.templates[0].build(encoded);
+      await runAt(
+        'known-bad',
+        `An object expected to FAIL its checks (${args.knownBadName}). The only run that can say what the FINDING_STATS positions mean.`,
+        [uri],
+      );
+    }
+  } else {
+    logger.warn(
+      'No --known-bad given: if every representative is clean, FINDING_STATS will read 0,0,0 everywhere and the positions stay undecoded.',
+    );
+  }
+
   // --- 4. The control: a URI that cannot exist ------------------------------
+  // Read back, exactly like a candidate. Without the read the control cannot do
+  // its job: if the bogus POST and a real one both answer 200, only the two
+  // worklists tell "ATC checked this object" apart from "ATC accepted anything
+  // and checked nothing". The comparison IS the control.
   await runAt(
     'control-bogus-uri',
-    'Does ATC reject a URI that cannot exist? If not, "accepted" above is not evidence of anything.',
+    'Does ATC reject a URI that cannot exist? Compare this worklist against a candidate\'s: if they are indistinguishable, "the run was accepted" is not evidence of anything.',
     ['/sap/bc/adt/oo/classes/ZZ_NO_SUCH_CLASS_PROBE'],
-    { readBack: false },
   );
 
   // --- 5. Plural references, and whether a run has an id of its own ---------
@@ -809,14 +902,36 @@ async function main(): Promise<void> {
     ? `INCOMPLETE — ${unmeasured.length} of ${CANDIDATES.length} candidate types unmeasured: ${unmeasured.map((o) => o.key).join(', ')}`
     : `COMPLETE — all ${CANDIDATES.length} candidate types measured`;
 
+  // A non-zero triple somewhere is what makes the positions readable at all.
+  const nonZeroStats = findingStatsSeen.filter(
+    (f) => f.triple && !/^0\s*,\s*0\s*,\s*0$/.test(f.triple),
+  );
+  const findingStatsVerdict =
+    findingStatsSeen.length === 0
+      ? "FINDING_STATS never appeared in any run response — the spec's premise for it is unconfirmed here"
+      : nonZeroStats.length === 0
+        ? 'FINDING_STATS seen but always zero — the positions remain undecoded; re-run with --known-bad=KEY:NAME'
+        : `FINDING_STATS non-zero in ${nonZeroStats.length} run(s) — the positions can be read from those`;
+
   rec.flush({
     system: sapConfig.url,
     checkVariant,
     checkVariantVerb: variantFromGet ? 'GET' : 'POST',
     packageName,
     verdict,
+    findingStatsVerdict,
+    findingStatsSeen,
     candidates: outcomes,
   });
+
+  // Not part of the exit code: the spec keeps FINDING_STATS off the blocking
+  // list on purpose, since the contract returns the triple verbatim. It is
+  // still said out loud, because a silent zero is how it would go unnoticed.
+  if (nonZeroStats.length === 0) {
+    logger.warn(findingStatsVerdict);
+  } else {
+    logger.info(findingStatsVerdict);
+  }
 
   if (unmeasured.length) {
     logger.error(verdict);
