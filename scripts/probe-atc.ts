@@ -6,25 +6,33 @@
  * writes every request and response to disk verbatim, so the spec can quote a
  * response rather than an expectation.
  *
- * It answers, on whichever system `.env` points at:
+ * What it settles, on whichever system `.env` points at:
  *
- *  1. **`AtcObjectType`** — the blocker. Runs a check against one object of
- *     every type found in a real package, using **the URI ADT itself returned**
- *     for that object rather than a hand-written mapping. PR #68 maps six types
- *     from memory; this measures the set instead.
- *  2. **`GET` or `POST /atc/customizing`** — #68 sends GET, the spec's traffic
- *     table records POST. One of them is wrong. Both are sent here.
- *  3. **Plural object references** — one run over every picked object at once,
- *     which is the shape `IAtcRunTarget` promises.
- *  4. **A bogus URI, as a control.** Without it, "the run was accepted" proves
- *     nothing: if ADT accepts a URI that cannot exist, acceptance is not
- *     evidence that a type is checkable.
- *  5. The loose ends: `includeExemptedFindings=true`, `checkstyle`,
- *     `maximumVerdicts` at its edges, `clientWait=true`, `GET /atc/runs/{id}`.
+ *  1. **`AtcObjectType`** — the blocker. Every candidate type is probed from a
+ *     **required list**, not from whatever a package happens to contain, and a
+ *     candidate with no representative object is reported as **unmeasured**
+ *     with a non-zero exit. A probe that quietly checked four types and exited
+ *     0 would leave the blocker open while looking like it had closed it.
+ *  2. **The mapping itself.** The public contract takes `objectType` +
+ *     `objectName`, so the client must *build* the URI — which means the thing
+ *     under test is the template, not the object. Each candidate is run at the
+ *     URI **this probe builds**, and separately at the URI **ADT returned** for
+ *     the same object when the two differ. Running only ADT's URI would prove a
+ *     ready-made URI is checkable and say nothing about the mapping.
+ *  3. **Whether a run has its own id.** The disputed claim is #68's separate run
+ *     id from the `Location` header. So the run response's headers are read, and
+ *     if a `Location` is there, **that** id is fetched. The worklist id is
+ *     fetched too, as a separate step — a 404 for the wrong id would otherwise
+ *     read as "no status resource" when it is only "not that resource".
+ *  4. **`GET` or `POST /atc/customizing`** — #68 sends GET, the spec's traffic
+ *     table recorded POST. Both are sent; whichever answers is the fact.
+ *  5. Plural object references, a control URI that cannot exist, and the loose
+ *     ends: `includeExemptedFindings=true`, `checkstyle`, `maximumVerdicts` at
+ *     its edges, `clientWait=true`.
  *
  * Nothing is interpreted here. Every step is recorded with its status and body
  * whether it succeeds or fails, because a 406 and a 404 are results too — three
- * of the spec's established facts are error responses.
+ * of the spec's recorded facts are error responses.
  *
  * Usage:
  *   npx ts-node scripts/probe-atc.ts
@@ -32,13 +40,19 @@
  *   MCP_ENV_PATH=./trial.env npx ts-node scripts/probe-atc.ts
  *
  * Flags:
- *   --package=NAME   package to take probe objects from
+ *   --package=NAME   package to take representative objects from
  *                    (default: `environment.default_package` from test-config.yaml)
  *   --out=DIR        where to write the evidence (default: atc-probe/)
- *   --max-types=N    probe at most N distinct object types (default: all found)
+ *   --extras         also probe types found in the package that are not
+ *                    candidates — off by default, since they answer nothing the
+ *                    contract asks
  *
- * Writes `DIR/manifest.json` (every step, machine-readable) plus one raw body
- * file per step. Read the raw files — the manifest is an index, not a summary.
+ * Exit code is **1 when any candidate went unmeasured**, so an incomplete probe
+ * cannot be mistaken for a finished one.
+ *
+ * Writes `DIR/manifest.json` (every step, plus the verdict, machine-readable)
+ * and one raw body file per step. Read the raw files — the manifest is an index,
+ * not a summary.
  */
 
 import * as fs from 'node:fs';
@@ -78,6 +92,135 @@ const ACCEPT_ATC_CUSTOMIZING =
 const ATC = '/sap/bc/adt/atc';
 const TIMEOUT = 60_000;
 
+/** A URI template under test, and who proposes it. */
+interface ITemplate {
+  /** How this template is referred to in the manifest and in the spec. */
+  label: string;
+  build: (name: string) => string;
+}
+
+/**
+ * The types `AtcObjectType` might name, each with the template a client would
+ * have to build for it.
+ *
+ * The list is **required**, not discovered: it is #68's six (the set the spec
+ * says must be measured) plus the three the spec adds — DDL source, table and
+ * behavior definition — which #68 does not map at all, and which therefore
+ * cannot be checked through it even if ATC accepts them.
+ *
+ * Every template here is the one this repository already uses for that object
+ * elsewhere. `include` carries **two**: #68 sends includes to
+ * `/programs/programs/`, while the library builds `/programs/includes/`. They
+ * cannot both be right, so both are run.
+ */
+interface ICandidate {
+  key: string;
+  /** ADT type codes a package listing may report for this kind. */
+  typeCodes: string[];
+  templates: ITemplate[];
+  /** Whether #68 maps this type at all. */
+  mappedBy68: boolean;
+}
+
+const CANDIDATES: ICandidate[] = [
+  {
+    key: 'class',
+    typeCodes: ['CLAS/OC'],
+    templates: [
+      { label: 'oo/classes', build: (n) => `/sap/bc/adt/oo/classes/${n}` },
+    ],
+    mappedBy68: true,
+  },
+  {
+    key: 'interface',
+    typeCodes: ['INTF/OI'],
+    templates: [
+      {
+        label: 'oo/interfaces',
+        build: (n) => `/sap/bc/adt/oo/interfaces/${n}`,
+      },
+    ],
+    mappedBy68: true,
+  },
+  {
+    key: 'program',
+    typeCodes: ['PROG/P'],
+    templates: [
+      {
+        label: 'programs/programs',
+        build: (n) => `/sap/bc/adt/programs/programs/${n}`,
+      },
+    ],
+    mappedBy68: true,
+  },
+  {
+    key: 'include',
+    typeCodes: ['PROG/I'],
+    templates: [
+      // #68 sends includes here, to the program URI.
+      {
+        label: 'programs/programs (as #68 builds it)',
+        build: (n) => `/sap/bc/adt/programs/programs/${n}`,
+      },
+      // The library builds this one for includes everywhere else.
+      {
+        label: 'programs/includes (as this library builds it)',
+        build: (n) => `/sap/bc/adt/programs/includes/${n}`,
+      },
+    ],
+    mappedBy68: true,
+  },
+  {
+    key: 'function_group',
+    typeCodes: ['FUGR/F', 'FUGR'],
+    templates: [
+      {
+        label: 'functions/groups',
+        build: (n) => `/sap/bc/adt/functions/groups/${n}`,
+      },
+    ],
+    mappedBy68: true,
+  },
+  {
+    key: 'package',
+    typeCodes: ['DEVC/K', 'DEVC'],
+    templates: [
+      { label: 'packages', build: (n) => `/sap/bc/adt/packages/${n}` },
+    ],
+    mappedBy68: true,
+  },
+  {
+    key: 'ddl_source',
+    typeCodes: ['DDLS/DF'],
+    templates: [
+      {
+        label: 'ddic/ddl/sources',
+        build: (n) => `/sap/bc/adt/ddic/ddl/sources/${n}`,
+      },
+    ],
+    mappedBy68: false,
+  },
+  {
+    key: 'table',
+    typeCodes: ['TABL/DT'],
+    templates: [
+      { label: 'ddic/tables', build: (n) => `/sap/bc/adt/ddic/tables/${n}` },
+    ],
+    mappedBy68: false,
+  },
+  {
+    key: 'behavior_definition',
+    typeCodes: ['BDEF/BDO'],
+    templates: [
+      {
+        label: 'bo/behaviordefinitions',
+        build: (n) => `/sap/bc/adt/bo/behaviordefinitions/${n}`,
+      },
+    ],
+    mappedBy68: false,
+  },
+];
+
 interface IStep {
   n: number;
   step: string;
@@ -95,6 +238,13 @@ interface IStep {
   bodyFile?: string;
   bodyPreview?: string;
   error?: string;
+}
+
+interface ICallResult {
+  status: number | null;
+  body: string;
+  headers: Record<string, unknown>;
+  step: number;
 }
 
 class Recorder {
@@ -121,7 +271,7 @@ class Recorder {
       headers: Record<string, string>;
       body?: string;
     },
-  ): Promise<{ status: number | null; body: string }> {
+  ): Promise<ICallResult> {
     this.n += 1;
     const n = this.n;
     const record: IStep = {
@@ -134,6 +284,7 @@ class Recorder {
     this.logger.info(`[${n}] ${step} — ${req.method} ${req.url}`);
 
     let body = '';
+    let headers: Record<string, unknown> = {};
     try {
       const response = await this.connection.makeAdtRequest({
         url: req.url,
@@ -144,7 +295,8 @@ class Recorder {
       });
       record.status = response.status;
       record.statusText = response.statusText;
-      record.responseHeaders = response.headers as Record<string, unknown>;
+      headers = (response.headers ?? {}) as Record<string, unknown>;
+      record.responseHeaders = headers;
       body =
         typeof response.data === 'string'
           ? response.data
@@ -161,7 +313,8 @@ class Recorder {
       };
       record.status = e.response?.status ?? null;
       record.statusText = e.response?.statusText;
-      record.responseHeaders = e.response?.headers;
+      headers = e.response?.headers ?? {};
+      record.responseHeaders = headers;
       record.error = e.message ?? String(error);
       const data = e.response?.data;
       body = typeof data === 'string' ? data : data ? JSON.stringify(data) : '';
@@ -178,7 +331,7 @@ class Recorder {
     this.logger.info(
       `[${n}] → ${record.status ?? 'no status'}, ${body.length} bytes → ${file}`,
     );
-    return { status: record.status, body };
+    return { status: record.status, body, headers, step: n };
   }
 
   flush(extra: Record<string, unknown>): void {
@@ -218,6 +371,18 @@ function parseWorklistId(body: string): string | null {
   return /^[A-Za-z0-9]{20,}$/.test(trimmed) ? trimmed : null;
 }
 
+/** Header lookup that does not assume the server's capitalisation. */
+function header(
+  headers: Record<string, unknown>,
+  name: string,
+): string | undefined {
+  const key = Object.keys(headers).find(
+    (k) => k.toLowerCase() === name.toLowerCase(),
+  );
+  const value = key ? headers[key] : undefined;
+  return typeof value === 'string' ? value : undefined;
+}
+
 function parseArgs(argv: string[]) {
   const get = (name: string): string | undefined => {
     const hit = argv.find((a) => a.startsWith(`--${name}=`));
@@ -226,7 +391,7 @@ function parseArgs(argv: string[]) {
   return {
     packageName: get('package'),
     outDir: get('out') ?? 'atc-probe',
-    maxTypes: get('max-types') ? Number(get('max-types')) : undefined,
+    extras: argv.includes('--extras'),
   };
 }
 
@@ -243,8 +408,39 @@ function defaultPackageFromTestConfig(logger: ILogger): string | undefined {
   }
 }
 
+/** What the probe managed to establish for one candidate type. */
+interface ICandidateOutcome {
+  key: string;
+  mappedBy68: boolean;
+  representative: { name: string; type: string; adtUri?: string } | null;
+  /** Every URI tried for it, with the step that tried it. */
+  attempts: {
+    template: string;
+    uri: string;
+    step: number;
+    status: number | null;
+  }[];
+  /** ADT's own URI, run only when it differs from every built one. */
+  adtUriAttempt?: {
+    uri: string;
+    step: number;
+    status: number | null;
+  };
+  /**
+   * Whether an answer was obtained — **not** whether ATC accepted the type. A
+   * run rejected with 400 is measured: the rejection is the finding. Only "no
+   * representative object, so nothing was asked" counts as unmeasured, because
+   * that is the state that would leave `AtcObjectType` open while the probe
+   * exited looking finished.
+   */
+  measured: boolean;
+  /** Why it went unmeasured, in the manifest rather than only in the log. */
+  reason?: string;
+}
+
 async function main(): Promise<void> {
-  // A probe that says nothing while it works is unusable; INFO regardless of DEBUG_* flags.
+  // A probe that says nothing while it works is unusable; INFO regardless of
+  // the DEBUG_* flags, which gate the library's own loggers.
   const logger: ILogger = new DefaultLogger(LogLevel.INFO);
   const args = parseArgs(process.argv.slice(2));
 
@@ -262,7 +458,7 @@ async function main(): Promise<void> {
   // --- 1. Where does the check variant come from, and by which verb? --------
   const customizingGet = await rec.call(
     'customizing-GET',
-    'PR #68 sends GET here; the spec records POST. Which one answers?',
+    'PR #68 sends GET here; the spec recorded POST. Which one answers?',
     {
       method: 'GET',
       url: `${ATC}/customizing`,
@@ -293,25 +489,37 @@ async function main(): Promise<void> {
     },
   );
 
+  const variantFromGet = parseSystemCheckVariant(customizingGet.body);
   const checkVariant =
-    parseSystemCheckVariant(customizingGet.body) ??
-    parseSystemCheckVariant(customizingPost.body);
+    variantFromGet ?? parseSystemCheckVariant(customizingPost.body);
   if (!checkVariant) {
     logger.error(
       'No systemCheckVariant in either customizing response. Everything below needs one; stopping here with the evidence written.',
     );
-    rec.flush({ system: sapConfig.url, checkVariant: null });
+    rec.flush({
+      system: sapConfig.url,
+      checkVariant: null,
+      verdict: 'incomplete: no check variant',
+    });
+    process.exitCode = 1;
     return;
   }
-  logger.info(`Check variant: ${checkVariant}`);
+  logger.info(
+    `Check variant: ${checkVariant} (from ${variantFromGet ? 'GET' : 'POST'} /atc/customizing)`,
+  );
 
-  // --- 2. Real objects, with the URIs ADT gave for them ---------------------
+  // --- 2. Representative objects for the required candidate list ------------
   const packageName = args.packageName ?? defaultPackageFromTestConfig(logger);
   if (!packageName) {
     logger.error(
       'No package to probe. Pass --package=NAME or set environment.default_package in test-config.yaml.',
     );
-    rec.flush({ system: sapConfig.url, checkVariant });
+    rec.flush({
+      system: sapConfig.url,
+      checkVariant,
+      verdict: 'incomplete: no package',
+    });
+    process.exitCode = 1;
     return;
   }
 
@@ -320,35 +528,28 @@ async function main(): Promise<void> {
     includeSubpackages: true,
   });
 
-  // One object per ADT type code. `uri` is what ADT returned for that object —
-  // the point of picking this way is that no mapping is being guessed.
-  const byType = new Map<string, { name: string; type: string; uri: string }>();
+  const firstOfType = new Map<
+    string,
+    { name: string; type: string; uri?: string }
+  >();
   for (const item of contents) {
-    if (!item.uri || item.isPackage) continue;
-    if (!byType.has(item.type)) {
-      byType.set(item.type, {
+    if (!firstOfType.has(item.type)) {
+      firstOfType.set(item.type, {
         name: item.name,
         type: item.type,
         uri: item.uri,
       });
     }
   }
-  let picked = [...byType.values()];
-  if (args.maxTypes && picked.length > args.maxTypes) {
-    picked = picked.slice(0, args.maxTypes);
-  }
-  logger.info(
-    `Probing ${picked.length} object types: ${picked.map((p) => `${p.type}:${p.name}`).join(', ')}`,
-  );
-  if (picked.length === 0) {
-    logger.error(
-      `${packageName} contains no objects with URIs. Nothing to check — pass a package that has some.`,
-    );
-    rec.flush({ system: sapConfig.url, checkVariant, packageName });
-    return;
+  // The probed package is its own representative for the `package` candidate:
+  // a package never appears in its own contents listing.
+  if (!firstOfType.has('DEVC/K')) {
+    firstOfType.set('DEVC/K', { name: packageName, type: 'DEVC/K' });
   }
 
-  /** One worklist per run: a worklist is per-run state, and reusing one would blur whose findings are whose. */
+  const outcomes: ICandidateOutcome[] = [];
+
+  /** One worklist per run: reusing one would blur whose findings are whose. */
   const newWorklist = async (label: string): Promise<string | null> => {
     const res = await rec.call(
       `worklist-${label}`,
@@ -364,88 +565,181 @@ async function main(): Promise<void> {
       },
     );
     const id = parseWorklistId(res.body);
-    if (!id)
+    if (!id) {
       logger.warn(
         `No worklist id parsed from ${label}: ${res.body.slice(0, 120)}`,
       );
+    }
     return id;
   };
 
-  // --- 3. The blocker: one run per object type -----------------------------
-  for (const obj of picked) {
-    const label = obj.type.replace(/[^a-z0-9]+/gi, '-');
+  /** Start a run and read the worklist afterwards. Returns the run's own result. */
+  const runAt = async (
+    label: string,
+    answers: string,
+    uris: string[],
+    options?: { readBack?: boolean; maximumVerdicts?: number },
+  ): Promise<{ run: ICallResult; worklistId: string } | null> => {
     const worklistId = await newWorklist(label);
-    if (!worklistId) continue;
-
-    await rec.call(
-      `run-${label}`,
-      `Is ${obj.type} checkable? This is the AtcObjectType blocker — ${obj.name}, at the URI ADT returned.`,
-      {
-        method: 'POST',
-        url: `${ATC}/runs?worklistId=${encodeURIComponent(worklistId)}&clientWait=false`,
-        headers: {
-          'Content-Type': CT_ATC_RUN,
-          Accept: ACCEPT_ATC_RUN_RESPONSE,
+    if (!worklistId) return null;
+    const run = await rec.call(`run-${label}`, answers, {
+      method: 'POST',
+      url: `${ATC}/runs?worklistId=${encodeURIComponent(worklistId)}&clientWait=false`,
+      headers: { 'Content-Type': CT_ATC_RUN, Accept: ACCEPT_ATC_RUN_RESPONSE },
+      body: runBody(uris, options?.maximumVerdicts ?? 100),
+    });
+    if (options?.readBack !== false) {
+      await rec.call(
+        `findings-${label}`,
+        'What the worklist holds after that run — including whether an accepted type produced anything.',
+        {
+          method: 'GET',
+          url: `${ATC}/worklists/${encodeURIComponent(worklistId)}?includeExemptedFindings=false`,
+          headers: { Accept: ACCEPT_ATC_WORKLIST_XML },
         },
-        body: runBody([obj.uri], 100),
-      },
-    );
+      );
+    }
+    return { run, worklistId };
+  };
 
-    await rec.call(
-      `findings-${label}`,
-      'What the worklist holds after that run — including whether an accepted type produced anything.',
-      {
-        method: 'GET',
-        url: `${ATC}/worklists/${encodeURIComponent(worklistId)}?includeExemptedFindings=false`,
-        headers: { Accept: ACCEPT_ATC_WORKLIST_XML },
-      },
-    );
+  // --- 3. The blocker, measured against the required list ------------------
+  for (const candidate of CANDIDATES) {
+    const outcome: ICandidateOutcome = {
+      key: candidate.key,
+      mappedBy68: candidate.mappedBy68,
+      representative: null,
+      attempts: [],
+      measured: false,
+    };
+    outcomes.push(outcome);
+
+    const found = candidate.typeCodes
+      .map((code) => firstOfType.get(code))
+      .find((hit) => hit !== undefined);
+
+    if (!found) {
+      outcome.reason = `no object of ${candidate.typeCodes.join(' / ')} in ${packageName}`;
+      logger.warn(`UNMEASURED ${candidate.key}: ${outcome.reason}`);
+      continue;
+    }
+    outcome.representative = {
+      name: found.name,
+      type: found.type,
+      adtUri: found.uri,
+    };
+
+    // Encoded then uppercased, which is what #68 does (`encodeSapObjectName`
+    // then `.toUpperCase()`). Mirroring it is the point: the URI under test has
+    // to be the one a client would build, quirks included.
+    const encoded = encodeURIComponent(found.name).toUpperCase();
+    for (const template of candidate.templates) {
+      const uri = template.build(encoded);
+      const label = `${candidate.key}-${template.label.replace(/[^a-z0-9]+/gi, '-')}`;
+      const result = await runAt(
+        label,
+        `Is ${candidate.key} checkable at a URI a client BUILDS (${template.label})? This is the AtcObjectType blocker — ${found.name}.`,
+        [uri],
+      );
+      outcome.attempts.push({
+        template: template.label,
+        uri,
+        step: result?.run.step ?? -1,
+        status: result?.run.status ?? null,
+      });
+      if (result) outcome.measured = true;
+    }
+
+    // ADT's own URI, only when no built URI already matched it — otherwise the
+    // two are the same request and running it twice would prove nothing.
+    const builtUris = outcome.attempts.map((a) => a.uri);
+    if (found.uri && !builtUris.includes(found.uri)) {
+      const result = await runAt(
+        `${candidate.key}-adt-uri`,
+        `The URI ADT itself returned for ${found.name}, which differs from every template above — so the difference gets measured rather than assumed away.`,
+        [found.uri],
+      );
+      if (result) {
+        outcome.adtUriAttempt = {
+          uri: found.uri,
+          step: result.run.step,
+          status: result.run.status,
+        };
+      }
+    }
   }
 
   // --- 4. The control: a URI that cannot exist ------------------------------
-  const controlWorklist = await newWorklist('control');
-  if (controlWorklist) {
-    await rec.call(
-      'run-control-bogus-uri',
-      'Does ATC reject a URI that cannot exist? If not, "accepted" above is not evidence of anything.',
-      {
-        method: 'POST',
-        url: `${ATC}/runs?worklistId=${encodeURIComponent(controlWorklist)}&clientWait=false`,
-        headers: {
-          'Content-Type': CT_ATC_RUN,
-          Accept: ACCEPT_ATC_RUN_RESPONSE,
-        },
-        body: runBody(['/sap/bc/adt/oo/classes/ZZ_NO_SUCH_CLASS_PROBE'], 100),
-      },
-    );
-  }
+  await runAt(
+    'control-bogus-uri',
+    'Does ATC reject a URI that cannot exist? If not, "accepted" above is not evidence of anything.',
+    ['/sap/bc/adt/oo/classes/ZZ_NO_SUCH_CLASS_PROBE'],
+    { readBack: false },
+  );
 
-  // --- 5. Plural references, which is the shape the contract promises ------
-  if (picked.length > 1) {
-    const multiWorklist = await newWorklist('multi');
-    if (multiWorklist) {
-      await rec.call(
-        'run-multiple-objects',
-        'IAtcRunTarget takes a set. Does one run accept several object references?',
-        {
-          method: 'POST',
-          url: `${ATC}/runs?worklistId=${encodeURIComponent(multiWorklist)}&clientWait=false`,
-          headers: {
-            'Content-Type': CT_ATC_RUN,
-            Accept: ACCEPT_ATC_RUN_RESPONSE,
+  // --- 5. Plural references, and whether a run has an id of its own ---------
+  const measuredUris = outcomes
+    .filter((o) => o.measured && o.attempts.length > 0)
+    .map((o) => o.attempts[0].uri);
+
+  if (measuredUris.length > 1) {
+    const multi = await runAt(
+      'multiple-objects',
+      'IAtcRunTarget takes a set. Does one run accept several object references?',
+      measuredUris,
+      { readBack: false },
+    );
+    if (multi) {
+      // The disputed claim is #68's separate run id from `Location`. Read the
+      // header first; a 404 for the worklist id would say nothing about it.
+      const location =
+        header(multi.run.headers, 'location') ??
+        header(multi.run.headers, 'content-location');
+      if (location) {
+        const runId = location.split('/').filter(Boolean).pop() ?? location;
+        logger.info(`Run response carried Location: ${location}`);
+        await rec.call(
+          'run-status-by-location-id',
+          `#68 builds its polling on a run id from Location. This fetches THAT id (${runId}), which is the only thing that can confirm or refute a status resource.`,
+          {
+            method: 'GET',
+            url: location.startsWith('/')
+              ? location
+              : `${ATC}/runs/${encodeURIComponent(runId)}`,
+            headers: { Accept: ACCEPT_ATC_RUN_STATUS },
           },
-          body: runBody(
-            picked.map((p) => p.uri),
-            100,
-          ),
+        );
+        await rec.call(
+          'run-status-by-location-id-longpolling',
+          'The same resource with withLongPolling=true, which is what #68 actually sends.',
+          {
+            method: 'GET',
+            url: `${location.startsWith('/') ? location : `${ATC}/runs/${encodeURIComponent(runId)}`}?withLongPolling=true`,
+            headers: { Accept: ACCEPT_ATC_RUN_STATUS },
+          },
+        );
+      } else {
+        logger.info(
+          'Run response carried no Location header — recorded, and the run-id claim fails here rather than at a 404.',
+        );
+      }
+
+      // Separately: the worklist id, which the spec says the run echoes.
+      await rec.call(
+        'run-status-by-worklist-id',
+        'A different question from the one above: is the worklist id usable as a run id? A 404 here is only about this id.',
+        {
+          method: 'GET',
+          url: `${ATC}/runs/${encodeURIComponent(multi.worklistId)}`,
+          headers: { Accept: ACCEPT_ATC_RUN_STATUS },
         },
       );
+
       await rec.call(
         'findings-multi-exempted-true',
         'Does includeExemptedFindings=true exist at all? It stays out of the contract until this answers.',
         {
           method: 'GET',
-          url: `${ATC}/worklists/${encodeURIComponent(multiWorklist)}?includeExemptedFindings=true`,
+          url: `${ATC}/worklists/${encodeURIComponent(multi.worklistId)}?includeExemptedFindings=true`,
           headers: { Accept: ACCEPT_ATC_WORKLIST_XML },
         },
       );
@@ -454,69 +748,88 @@ async function main(): Promise<void> {
         'The spec says checkstyle is answered with 406 and one accepted type. Confirm or refute.',
         {
           method: 'GET',
-          url: `${ATC}/worklists/${encodeURIComponent(multiWorklist)}`,
+          url: `${ATC}/worklists/${encodeURIComponent(multi.worklistId)}`,
           headers: { Accept: ACCEPT_ATC_WORKLIST_CHECKSTYLE },
         },
       );
+    }
+  } else {
+    logger.warn(
+      'Fewer than two measured URIs — skipping the multi-object run and everything that reads its worklist.',
+    );
+  }
+
+  // --- 6. maximumVerdicts at its edges, and clientWait ----------------------
+  const anyUri = measuredUris[0];
+  if (anyUri) {
+    for (const verdicts of [0, 1, 100000]) {
+      await runAt(
+        `maximumVerdicts-${verdicts}`,
+        'The server bounds on maximumVerdicts, which nothing states. Decides whether run() should validate a range.',
+        [anyUri],
+        { readBack: false, maximumVerdicts: verdicts },
+      );
+    }
+
+    const waitWorklist = await newWorklist('clientwait');
+    if (waitWorklist) {
       await rec.call(
-        'run-status-by-worklist-id',
-        'The spec says there is no run resource: GET /atc/runs/{id} → 404. Confirm against the worklist id the run echoed.',
+        'run-clientWait-true',
+        'Does the server hold the request until the run finishes? If it does, waiting is answered by removing the question.',
         {
-          method: 'GET',
-          url: `${ATC}/runs/${encodeURIComponent(multiWorklist)}`,
-          headers: { Accept: ACCEPT_ATC_RUN_STATUS },
+          method: 'POST',
+          url: `${ATC}/runs?worklistId=${encodeURIComponent(waitWorklist)}&clientWait=true`,
+          headers: {
+            'Content-Type': CT_ATC_RUN,
+            Accept: ACCEPT_ATC_RUN_RESPONSE,
+          },
+          body: runBody([anyUri], 100),
         },
       );
     }
   }
 
-  // --- 6. maximumVerdicts at its edges, and clientWait ----------------------
-  const first = picked[0];
-  for (const verdicts of [0, 1, 100000]) {
-    const w = await newWorklist(`verdicts-${verdicts}`);
-    if (!w) continue;
-    await rec.call(
-      `run-maximumVerdicts-${verdicts}`,
-      'The server bounds on maximumVerdicts, which nothing states. Decides whether run() should validate a range.',
-      {
-        method: 'POST',
-        url: `${ATC}/runs?worklistId=${encodeURIComponent(w)}&clientWait=false`,
-        headers: {
-          'Content-Type': CT_ATC_RUN,
-          Accept: ACCEPT_ATC_RUN_RESPONSE,
-        },
-        body: runBody([first.uri], verdicts),
-      },
-    );
+  // --- 7. Extras, only when asked ------------------------------------------
+  if (args.extras) {
+    const candidateCodes = new Set(CANDIDATES.flatMap((c) => c.typeCodes));
+    for (const [code, item] of firstOfType) {
+      if (candidateCodes.has(code) || !item.uri) continue;
+      await runAt(
+        `extra-${code.replace(/[^a-z0-9]+/gi, '-')}`,
+        `Not a candidate type — probed because --extras was passed. ${item.name}, at ADT's own URI.`,
+        [item.uri],
+        { readBack: false },
+      );
+    }
   }
 
-  const waitWorklist = await newWorklist('clientwait');
-  if (waitWorklist) {
-    await rec.call(
-      'run-clientWait-true',
-      'Does the server hold the request until the run finishes? If it does, waiting is answered by removing the question.',
-      {
-        method: 'POST',
-        url: `${ATC}/runs?worklistId=${encodeURIComponent(waitWorklist)}&clientWait=true`,
-        headers: {
-          'Content-Type': CT_ATC_RUN,
-          Accept: ACCEPT_ATC_RUN_RESPONSE,
-        },
-        body: runBody([first.uri], 100),
-      },
-    );
-  }
+  // --- The verdict, stated rather than left to be inferred -----------------
+  const unmeasured = outcomes.filter((o) => !o.measured);
+  const verdict = unmeasured.length
+    ? `INCOMPLETE — ${unmeasured.length} of ${CANDIDATES.length} candidate types unmeasured: ${unmeasured.map((o) => o.key).join(', ')}`
+    : `COMPLETE — all ${CANDIDATES.length} candidate types measured`;
 
   rec.flush({
     system: sapConfig.url,
     checkVariant,
+    checkVariantVerb: variantFromGet ? 'GET' : 'POST',
     packageName,
-    probedTypes: picked.map((p) => ({
-      type: p.type,
-      name: p.name,
-      uri: p.uri,
-    })),
+    verdict,
+    candidates: outcomes,
   });
+
+  if (unmeasured.length) {
+    logger.error(verdict);
+    logger.error(
+      'AtcObjectType is NOT closed by this run. Point --package at a package holding the missing types, or probe them individually.',
+    );
+    for (const o of unmeasured) {
+      logger.error(`  ${o.key}: ${o.reason ?? 'no run completed'}`);
+    }
+    process.exitCode = 1;
+  } else {
+    logger.info(verdict);
+  }
   logger.info(`Evidence written to ${outDir}`);
 }
 
