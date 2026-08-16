@@ -987,6 +987,83 @@ async function main(): Promise<void> {
     );
   }
 
+  // --- 3c. A run that should FAIL -------------------------------------------
+  // "Poll until finished" has no stopping condition unless a failed run reports
+  // something other than finished, and nobody has seen one. --known-bad does
+  // not answer this: an object with findings still produces a run that
+  // succeeds. Raised in review, 2026-08-17.
+  //
+  // The cheapest deliberate failure is a check variant that does not exist. It
+  // may well be refused at worklist creation rather than producing a failed
+  // run — in which case the question stays open, and the manifest says so
+  // instead of the spec claiming a coverage it does not have.
+  const bogusVariant = 'ZZ_NO_SUCH_CHECK_VARIANT_PROBE';
+  const bogusWorklist = await rec.call(
+    'worklist-bogus-variant',
+    'A worklist against a check variant that does not exist — the cheapest way to try to produce a run that fails.',
+    {
+      method: 'POST',
+      url: `${ATC}/worklists?checkVariant=${encodeURIComponent(bogusVariant)}`,
+      headers: {
+        'Content-Type': CT_ATC_WORKLIST_CREATE,
+        Accept: ACCEPT_ATC_WORKLIST_ID,
+      },
+      body: '',
+    },
+  );
+  const bogusWorklistId = parseWorklistId(bogusWorklist.body);
+  if (!bogusWorklistId) {
+    logger.warn(
+      `A bogus check variant was refused at worklist creation (${bogusWorklist.status}), so no run was produced. What a FAILED run reports stays unanswered.`,
+    );
+  } else if (outcomes.some((o) => o.attempted && o.attempts.length > 0)) {
+    const failing = await rec.call(
+      'run-bogus-variant',
+      'A run under a check variant that does not exist. If it is accepted, its status is the terminal-failure state nobody has captured.',
+      {
+        method: 'POST',
+        url: `${ATC}/runs?worklistId=${encodeURIComponent(bogusWorklistId)}&clientWait=false`,
+        headers: {
+          'Content-Type': CT_ATC_RUN,
+          Accept: ACCEPT_ATC_RUN_RESPONSE,
+        },
+        body: runBody(
+          [
+            // biome-ignore lint/style/noNonNullAssertion: guarded by the some() above
+            outcomes.find((o) => o.attempted && o.attempts.length > 0)!
+              .attempts[0].uri,
+          ],
+          100,
+        ),
+      },
+    );
+    const loc =
+      header(failing.headers, 'location') ??
+      header(failing.headers, 'content-location');
+    if (loc) {
+      const url = loc.startsWith('/')
+        ? loc
+        : `${ATC}/runs/${encodeURIComponent(loc)}`;
+      // Deliberately NOT waitForRun: that loops on anything that is not
+      // `finished`, which is exactly what a failed run may be.
+      for (let attempt = 1; attempt <= 5; attempt++) {
+        const st = await rec.call(
+          `status-bogus-variant-${attempt}`,
+          'The status of a run that should not succeed. Anything other than `finished` here is the answer the contract is missing.',
+          { method: 'GET', url, headers: { Accept: ACCEPT_ATC_RUN_STATUS } },
+        );
+        const value = st.body.match(/runs:status="([^"]+)"/)?.[1] ?? null;
+        logger.info(`bogus-variant run status: ${value ?? 'unreadable'}`);
+        if (value && value.trim().toLowerCase() !== 'running') break;
+        await new Promise((r) => setTimeout(r, RUN_POLL_DELAY_MS));
+      }
+    } else {
+      logger.warn(
+        'The bogus-variant run carried no Location, so its status could not be asked for.',
+      );
+    }
+  }
+
   // --- 4. The control: a URI that cannot exist ------------------------------
   // Read back, exactly like a candidate. Without the read the control cannot do
   // its job: if the bogus POST and a real one both answer 200, only the two
@@ -1248,7 +1325,7 @@ async function main(): Promise<void> {
       ? "FINDING_STATS never appeared in any run response — the spec's premise for it is unconfirmed here"
       : nonZeroStats.length === 0
         ? 'FINDING_STATS seen but always zero — the positions remain undecoded; re-run with --known-bad=KEY:NAME'
-        : `FINDING_STATS non-zero in ${nonZeroStats.length} run(s) — the positions can be read from those`;
+        : `FINDING_STATS non-zero in ${nonZeroStats.length} run(s) — evidence collected, NOT decoded. Reading the positions needs the triples correlated with the findings' priorities, and a worklist carrying more than one priority; a single 0,0,1 beside one priority-3 finding is consistent with several orderings`;
 
   rec.flush({
     system: sapConfig.url,

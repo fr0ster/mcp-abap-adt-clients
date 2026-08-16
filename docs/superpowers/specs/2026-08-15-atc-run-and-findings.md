@@ -124,7 +124,13 @@ interface IAtcFindings {
 ```ts
 type IAtcRunResult =
   | {
-      /** The server returned at once; the checks are still running. */
+      /**
+       * The server returned **without waiting**. Not "the checks are still
+       * running": a short run can finish before this result reaches the
+       * caller, and a consumer that read the old wording as a guarantee of a
+       * running state would be relying on something the protocol never said.
+       * Ask `getRunStatus(runId)`. Raised in review, 2026-08-17.
+       */
       waited: false;
       worklistId: string;
       /**
@@ -584,6 +590,20 @@ they exist.
 | a run that **fails** — an object mid-edit, or a check variant that does not exist | what `runs:status` reports for a terminal failure. Until it answers, "poll until finished" has no stopping condition of its own and the bound sits with the caller |
 | whether ATC checks `program` and `include` on an **on-prem** system, and at which URI (`programs/programs` or `programs/includes` for an include) | widens `AtcObjectType` by two members — a **major**, since exhaustive consumers break. Not a v1 blocker, but the one open question that leaves a real capability gap rather than an unanswered curiosity, and what an on-prem consumer waits on |
 
-`scripts/probe-atc.ts` runs all of these. It takes `--package=NAME` for the objects,
-`--known-bad=KEY:NAME` for an object expected to fail its checks, and exits non-zero while any
-candidate type is unmeasured — so an incomplete probe cannot be read as a finished one.
+`scripts/probe-atc.ts` attempts all of these. It takes `--package=NAME` for the objects,
+`--known-bad=KEY:NAME` for an object expected to produce findings, and exits non-zero while any
+**cloud-scope** candidate is unconfirmed — so an incomplete probe cannot be read as a finished
+one.
+
+**Attempts, not runs**, and the difference matters for one row. `--known-bad` names an object
+whose *checks* find something; the run itself still succeeds, so it says nothing about a run that
+*fails*. An earlier version of this sentence claimed the probe covered every row, which it did
+not. Raised in review, 2026-08-17. The probe now tries the cheapest deliberate failure — a check
+variant that does not exist — and reports which of two things happened:
+
+- the worklist creation is refused, so no run exists to have a status, and the question stays
+  open;
+- the run is accepted, and whatever `runs:status` then reports is the terminal state this
+  contract is missing.
+
+Either way the manifest records it, rather than the spec asserting a coverage nobody checked.
