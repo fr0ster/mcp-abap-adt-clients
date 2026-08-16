@@ -1,9 +1,9 @@
 # ATC: start a run, wait for it, read the findings
 
 **Status:** designed against captured traffic, 2026-08-16. One question is still open —
-`AtcObjectType`, the set of checkable object types: **one of nine confirmed**, two refused by the
-system, six accepted but unproven. The criterion for confirming one was itself wrong until
-2026-08-16 and is corrected below. Everything else in the contract rests on a response somebody
+`AtcObjectType`, the set of checkable object types: **two of nine confirmed**, two refused by the
+system, five unmeasured. The criterion for confirming one was wrong twice before it was right,
+and both wrong versions are recorded below with what refuted them. Everything else in the contract rests on a response somebody
 can re-read (`docs/evidence/2026-08-16-atc-trial-probe.md`). Not implemented.
 
 **Scope:** an ATC client in `@mcp-abap-adt/adt-clients`, and the contract it needs in
@@ -170,8 +170,17 @@ interface IAtcRunStatus {
   status: string;
   /** True when `status` is `finished`. */
   isFinished: boolean;
-  /** From the `worklistid` atom link — the worklist to read findings from. */
-  worklistId: string;
+  /**
+   * From the `worklistid` atom link, when the response carries one.
+   *
+   * **Optional on purpose.** The only status response anyone has captured was
+   * already `finished`, and this method exists to be polled — so it will be
+   * called on states nobody has seen. Requiring the link would make the parser
+   * throw at exactly the moment polling matters, on a response that may simply
+   * not have it yet. The caller already has the worklist id from
+   * `IAtcRunResult`; this is a convenience, not the source.
+   */
+  worklistId?: string;
   /** From the `displayid` atom link. A different resource; see `IAtcLog`. */
   resultId?: string;
 }
@@ -278,8 +287,14 @@ atcfinding:messageTitle="Strings without text elements are not translated: |Clea
 ## The target: a set, not one object
 
 The run payload nests `<adtcore:objectReferences>` — plural, inside an `objectSet` that is itself
-one of `<objectSets>`. A run over two objects was accepted and its worklist listed **both**
-(`ZBASE_PROBE01` and `ZOK_CL_CLEANER`), so the plural is real and not decorative.
+one of `<objectSets>`.
+
+Acceptance would prove nothing here — a bogus URI is accepted too. What proves it is the finished
+worklist of a two-object run, which carried **both** objects as separate `<atcobject:object>`
+elements, each with its own findings block: the class with a finding, the package with an empty
+one. Two objects went in and two objects were checked. An earlier draft cited the same run as
+"listed both", which read as the weaker claim after the evidence rule changed; the shape of the
+response is what carries it.
 
 ```ts
 interface IAtcObjectRef {
@@ -307,51 +322,76 @@ contract: nothing has established what they accept.
 
 ```ts
 // One of nine confirmed, two refused by the system, six accepted but unproven.
-type AtcObjectType = 'class' /* … pending dirty representatives */;
+type AtcObjectType = 'class' | 'package' /* … pending the five unmeasured */;
 ```
 
-#### The evidence a type needs, which an earlier draft got wrong
+#### The evidence a type needs, and two wrong answers before it
 
-A draft of this section said a type joins the union when its object **shows up in the finished
-worklist**. That criterion does not work, and the probe run of 2026-08-16 is what showed why:
+**A worklist read after the run reports `finished` lists every object that was checked**, each
+with its own findings block — empty when the object is clean. From the two-object run:
 
-**a worklist lists only objects that have findings.** The run over `ZBASE_PROBE01` produced a
-worklist holding exactly one object — the one class with real code in it — and exactly one
-finding. Every other object was checked and produced nothing, and a checked-and-clean object is
-absent from the worklist in precisely the same way an unchecked one is. The worklist of a run
-over a freshly made table came back **byte-identical** to the worklist of a run over
-`/sap/bc/adt/oo/classes/ZZ_NO_SUCH_CLASS_PROBE`, a URI that cannot exist.
+```xml
+<atcobject:object adtcore:type="DEVC" adtcore:name="ZBASE_PROBE01" …>
+  <atcobject:findings/>                                    <!-- checked, nothing found -->
+</atcobject:object>
+<atcobject:object adtcore:type="CLAS" adtcore:name="ZOK_CL_CLEANER" …>
+  <atcobject:findings>
+    <atcfinding:finding … atcfinding:priority="3"
+      atcfinding:checkTitle="Extended Program Check (SLIN)" …/>
+  </atcobject:findings>
+</atcobject:object>
+```
 
-So this is the same ambiguity the spec already names for an empty worklist, one level down: at
-the level of a single object rather than a whole run. It was missed because the only object with
-content in the probed package was one class somebody had written by hand.
+So a type is confirmed when its object **appears in a finished worklist**, with or without
+findings. Appearing is the evidence; a finding is a bonus.
 
-**Acceptance is not evidence either.** The impossible URI is answered **201**, exactly like a
-real one.
+Two answers were tried before that one, and both are worth keeping because each looked right:
 
-**What is left is a finding.** A type is confirmed when ATC reports a finding against an object
-of that type, at the URI the client builds. Which means the representative has to contain
-something ATC objects to — a clean object cannot prove anything about its type, however carefully
-it is made. The fixtures for the first run were clean by construction, so they could not have
-closed this no matter how correct they were.
+1. **"Acceptance is evidence."** It is not: `/sap/bc/adt/oo/classes/ZZ_NO_SUCH_CLASS_PROBE`, a URI
+   that cannot exist, is answered **201** exactly like a real one.
+2. **"A worklist lists only objects that have findings."** Also wrong, and it was written into
+   this spec on 2026-08-16 after a run where every candidate's worklist came back empty while the
+   one hand-written class produced a finding. The inference was that clean objects are invisible.
+   The block above refutes it — a clean package is listed, with an empty findings element.
+
+   What actually happened is the probe's own defect: `runAt` starts the run with
+   `clientWait=false` and reads the worklist **immediately**, so it was reading before the checks
+   had finished. It systematically manufactured the ambiguity this spec warns about everywhere
+   else, and the one worklist that did hold objects was a run that happened to finish first.
+   Raised in review, 2026-08-16.
+
+   The correction has a practical consequence worth stating, because work was about to be done on
+   the strength of the wrong version: **the fixtures do not need to be non-conforming.** A clean
+   object proves its type. What the probe needs is to wait.
+
+**So the probe must, per candidate:** start the run, take the run id from `Location`, poll
+`GET /atc/runs/{runId}` until `runs:status` reports finished, and only then read the worklist.
+Reading earlier is not a weaker measurement; it is a different one, of nothing.
 
 #### Where it stands
 
 | type | URI the client builds | status |
 |---|---|---|
-| `class` | `/sap/bc/adt/oo/classes/{NAME}` | **confirmed** — a finding at `…/source/main#start=30,0`, `priority="3"`, `FINDING_STATS 0,0,1` |
+| `class` | `/sap/bc/adt/oo/classes/{NAME}` | **confirmed** — listed in a finished worklist, with a finding |
+| `package` | `/sap/bc/adt/packages/{NAME}` | **confirmed** — listed in the same finished worklist, findings empty |
 | `program` | `/sap/bc/adt/programs/programs/{NAME}` | **not checkable here** — the system refuses to hold one: `403 ExceptionResourceNoAuthorization`, `S_DEVELOP` |
 | `include` | `/sap/bc/adt/programs/includes/{NAME}` | **not checkable here** — same refusal |
-| `interface` | `/sap/bc/adt/oo/interfaces/{NAME}` | run accepted, no finding — unproven |
-| `function_group` | `/sap/bc/adt/functions/groups/{NAME}` | run accepted, no finding — unproven |
-| `package` | `/sap/bc/adt/packages/{NAME}` | run accepted, no finding — unproven |
-| `ddl_source` | `/sap/bc/adt/ddic/ddl/sources/{NAME}` | run accepted, no finding — unproven |
-| `table` | `/sap/bc/adt/ddic/tables/{NAME}` | run accepted, no finding — unproven |
-| `behavior_definition` | `/sap/bc/adt/bo/behaviordefinitions/{NAME}` | no representative was made — unmeasured |
+| `interface` | `/sap/bc/adt/oo/interfaces/{NAME}` | **unmeasured** — worklist read before the run finished |
+| `function_group` | `/sap/bc/adt/functions/groups/{NAME}` | **unmeasured** — same |
+| `ddl_source` | `/sap/bc/adt/ddic/ddl/sources/{NAME}` | **unmeasured** — same |
+| `table` | `/sap/bc/adt/ddic/tables/{NAME}` | **unmeasured** — same |
+| `behavior_definition` | `/sap/bc/adt/bo/behaviordefinitions/{NAME}` | **unmeasured** — no representative was made |
 
-"Not checkable here" is a fact about **this system**, not about ATC: a classic program cannot
-exist on ABAP Cloud, so ATC cannot check one on ABAP Cloud. Whether ATC checks them on-prem is a
-separate question and stays open.
+Two confirmed, two refused by the system, five unmeasured. None of the five is a negative result:
+they were asked and the answer was not read.
+
+"Not checkable here" is a fact about **this system**, not about ATC. A classic program cannot
+exist on ABAP Cloud, so ATC cannot check one on ABAP Cloud. That is not a footnote for this
+contract: **ATC is the single control point for checks**, so what it covers has to include
+on-prem, where those objects do exist — while SAP is at the same time dropping them from newer
+systems. The union therefore has to admit types this trial can never confirm, and the honest
+shape is a union that is complete for the objects a system can hold, not one pruned to what one
+cloud tenant happened to allow.
 
 Two things about the mapping stand regardless:
 
@@ -455,11 +495,12 @@ One blocker and four loose ends. All are trial-answerable; none needs an on-prem
 
 | ask | what it decides |
 |---|---|
-| run one **deliberately non-conforming** object of each remaining kind — `interface`, `function_group`, `package`, `ddl_source`, `table`, `behavior_definition` — at the URI a client builds, and read the worklist after the run reports finished | `AtcObjectType`. Each representative must contain something ATC objects to; a clean one produces no finding and a worklist without a finding says nothing about whether the object was checked |
+| run one object of each unmeasured kind — `interface`, `function_group`, `ddl_source`, `table`, `behavior_definition` — at the URI a client builds, **poll `/atc/runs/{runId}` until finished**, then read the worklist | `AtcObjectType`. The objects can be plain: a clean one is listed with an empty findings element, which is the evidence. What was missing was the wait, not the dirt |
 
 `program` and `include` are **not** on that list. The system refuses to hold either
 (`403`, `S_DEVELOP`), so nothing about them can be settled here, and their line in the table
-above is already the answer *for this system*.
+above is already the answer *for this system* — not for ATC, which has to cover on-prem, where
+they exist.
 
 **Not blocking:**
 
