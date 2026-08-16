@@ -539,12 +539,22 @@ interface ICandidateOutcome {
   key: string;
   mappedBy68: boolean;
   representative: { name: string; type: string; adtUri?: string } | null;
-  /** Every URI tried for it, with the step that tried it. */
+  /**
+   * Every URI tried for it, with what that particular attempt established.
+   *
+   * Per attempt, not per candidate: `include` is run at two different
+   * templates, and aggregating would say the type is confirmed without saying
+   * WHICH mapping confirmed it — which is the only thing anyone wants to know
+   * about include. Raised in review, 2026-08-16.
+   */
   attempts: {
     template: string;
     uri: string;
     step: number;
     status: number | null;
+    finished: boolean;
+    objectsListed: { type: string; name: string }[];
+    confirmed: boolean;
   }[];
   /** ADT's own URI, run only when it differs from every built one. */
   adtUriAttempt?: {
@@ -568,8 +578,8 @@ interface ICandidateOutcome {
   attempted: boolean;
   finished: boolean;
   confirmed: boolean;
-  /** What the finished worklist said was checked, for the record. */
-  objectsListed?: { type: string; name: string }[];
+  /** Which template's run produced the confirmation, where one did. */
+  confirmedBy?: string;
   /** Why it was never asked, in the manifest rather than only in the log. */
   reason?: string;
 }
@@ -873,28 +883,34 @@ async function main(): Promise<void> {
         `Is ${candidate.key} checkable at a URI a client BUILDS (${template.label})? This is the AtcObjectType blocker — ${found.name}.`,
         [uri],
       );
+      // The evidence rule: the finished worklist lists an object of THIS type
+      // under THIS name. Both halves, for the reason in objectsIn.
+      const listed =
+        result?.finished === true &&
+        result.objects.some(
+          (o) =>
+            o.name.toUpperCase() === found.name.toUpperCase() &&
+            o.type.toUpperCase() === candidate.worklistTypeCode,
+        );
+
       outcome.attempts.push({
         template: template.label,
         uri,
         step: result?.run.step ?? -1,
         status: result?.run.status ?? null,
+        finished: result?.finished ?? false,
+        objectsListed: result?.objects ?? [],
+        confirmed: listed,
       });
+
       if (result) {
         outcome.attempted = true;
-        if (result.finished) {
-          outcome.finished = true;
-          outcome.objectsListed = result.objects;
-          // The evidence rule: the finished worklist lists an object of THIS
-          // type under THIS name. Both halves, for the reason in objectsIn.
-          if (
-            result.objects.some(
-              (o) =>
-                o.name.toUpperCase() === found.name.toUpperCase() &&
-                o.type.toUpperCase() === candidate.worklistTypeCode,
-            )
-          ) {
-            outcome.confirmed = true;
-          }
+        if (result.finished) outcome.finished = true;
+        if (listed) {
+          outcome.confirmed = true;
+          // The template that did it, so the manifest names the mapping rather
+          // than only the verdict.
+          outcome.confirmedBy = template.label;
         }
       }
     }
@@ -1083,12 +1099,17 @@ async function main(): Promise<void> {
               },
             ),
           ]);
+          // Durations, and no verdict from them. A ratio against one control
+          // read is not a fact about the server: nothing here rules out the
+          // two requests serialising over one connection, there is no absolute
+          // threshold to compare against, and a single pair cannot separate
+          // "held" from "slow". The numbers and both statuses are recorded;
+          // deciding what they mean is a job for a session that repeats this
+          // deliberately. Raised in review, 2026-08-16.
+          const statusOf = (r: ICallResult) =>
+            r.body.match(/runs:status="([^"]+)"/)?.[1] ?? 'unreadable';
           logger.info(
-            `long polling took ${polled.durationMs}ms; the plain read beside it took ${plain.durationMs}ms — ${
-              polled.durationMs > plain.durationMs * 3
-                ? 'the server appears to have HELD the request'
-                : 'no evidence of blocking'
-            }`,
+            `long polling: ${polled.durationMs}ms, status ${statusOf(polled)} | plain read started at the same moment: ${plain.durationMs}ms, status ${statusOf(plain)} — recorded as evidence, not read as a verdict`,
           );
         } else {
           logger.warn(
@@ -1201,7 +1222,7 @@ async function main(): Promise<void> {
   const why = (o: ICandidateOutcome) =>
     o.reason ??
     (o.finished
-      ? `finished, worklist listed [${(o.objectsListed ?? []).map((x) => `${x.type}:${x.name}`).join(', ') || 'nothing'}]`
+      ? `finished; per template: ${o.attempts.map((a) => `${a.template} → [${a.objectsListed.map((x) => `${x.type}:${x.name}`).join(', ') || 'nothing'}]`).join(' | ')}`
       : o.attempted
         ? 'run never reported finished'
         : 'never asked');

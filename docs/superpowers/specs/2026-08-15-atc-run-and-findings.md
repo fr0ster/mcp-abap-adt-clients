@@ -129,7 +129,8 @@ type IAtcRunResult =
       worklistId: string;
       /**
        * From the `Location` header. Poll `getRunStatus(runId)` until it
-       * reports finished, then read `getFindings(worklistId)`.
+       * reports finished — **under a bound of the caller's choosing** — then
+       * read `getFindings(worklistId)`. See "waiting has no failure state".
        */
       runId: string;
     }
@@ -165,10 +166,17 @@ interface IAtcRunStatus {
    * `runs:status` verbatim. Only `"finished"` has been observed, so this is a
    * string and not a union: enumerating the states a server may report, from
    * one state, is how a caller ends up with a union that silently fails to
-   * match. `isFinished` is the tested question.
+   * match.
    */
   status: string;
-  /** True when `status` is `finished`. */
+  /**
+   * True when `status` is exactly `finished`, case-normalised.
+   *
+   * **There is deliberately no `isTerminal` or `isFailed`.** A run that fails
+   * or is cancelled has never been observed, so any state this type named for
+   * it would be invented — and a wrong name is worse here than none, because a
+   * caller would branch on it.
+   */
   isFinished: boolean;
   /**
    * From the `worklistid` atom link, when the response carries one.
@@ -185,6 +193,30 @@ interface IAtcRunStatus {
   resultId?: string;
 }
 ```
+
+#### Waiting has no failure state, and the contract says so rather than pretending
+
+"Poll until finished" is only a complete instruction if every run eventually finishes. Nobody has
+watched one fail. If the server reports `failed`, `cancelled` or anything else terminal, a caller
+following that instruction literally waits for ever. Raised in review, 2026-08-16.
+
+Two ways out, and this contract takes the second:
+
+- **invent the states** — `isTerminal`, or a `outcome: 'finished' | 'failed' | 'cancelled'`. It
+  would be guessing at the names, and a caller branching on a name the server never sends is
+  worse off than one branching on nothing;
+- **bound the wait and hand back what the server said.** `getRunStatus` returns the raw `status`
+  alongside `isFinished`, so a caller that stops after N attempts or T seconds can report the
+  state it last saw. This client offers no `waitForRun` helper in v1 for the same reason: a
+  helper would have to decide when to give up, and that decision belongs to whoever knows how
+  long their checks take.
+
+`scripts/probe-atc.ts` does exactly this — twenty attempts, three seconds apart, and it names the
+last status it saw when it gives up rather than reporting a run as unfinished.
+
+**What would close it:** a run that fails. Deliberately checking an object mid-edit, or against a
+variant that does not exist, and capturing the status. It is on the probe list, and until it
+answers, "poll until finished" carries the bound in the caller's hands and nowhere else.
 
 **`withLongPolling=true` is not in this contract.** It was sent, and answered **identically** to
 the plain read — but the run had already finished, so that comparison establishes nothing about
@@ -549,6 +581,7 @@ they exist.
 | `withLongPolling=true` against a run that is **still running** | what long polling does. The one observation was made after the run had finished, where it cannot act |
 | the bogus URI's worklist read **after** its run reports finished | whether ATC ever reports a bad reference. So far it answers 201 and an empty worklist, which is also what an unfinished good run looks like |
 | a worklist with findings at more than one priority | whether the `FINDING_STATS` positions are priorities 1, 2, 3. One finding at priority 3 gave `0,0,1`, which is consistent and not conclusive |
+| a run that **fails** — an object mid-edit, or a check variant that does not exist | what `runs:status` reports for a terminal failure. Until it answers, "poll until finished" has no stopping condition of its own and the bound sits with the caller |
 | whether ATC checks `program` and `include` on an **on-prem** system, and at which URI (`programs/programs` or `programs/includes` for an include) | widens `AtcObjectType` by two members — a **major**, since exhaustive consumers break. Not a v1 blocker, but the one open question that leaves a real capability gap rather than an unanswered curiosity, and what an on-prem consumer waits on |
 
 `scripts/probe-atc.ts` runs all of these. It takes `--package=NAME` for the objects,
