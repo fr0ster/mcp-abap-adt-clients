@@ -143,14 +143,31 @@ interface ICandidate {
   key: string;
   /** ADT type codes a package listing may report for this kind. */
   typeCodes: string[];
+  /**
+   * The `adtcore:type` a worklist uses for this kind — `CLAS`, not `CLAS/OC`.
+   * Confirmation compares BOTH this and the name: a run at
+   * `/programs/programs/{NAME}` can come back listing a PROG with that name,
+   * and matching on the name alone would then confirm `include` on the
+   * strength of a program. Raised in review, 2026-08-16.
+   */
+  worklistTypeCode: string;
   templates: ITemplate[];
   /** Whether #68 maps this type at all. */
   mappedBy68: boolean;
+  /**
+   * `cloud` — v1 needs this confirmed, and an unconfirmed one fails the probe.
+   * `onprem` — the object cannot exist on ABAP Cloud, so this trial can never
+   * confirm it. Reported, never counted against the run: the spec ships the
+   * cloud-confirmed union and widens it from an on-prem probe.
+   */
+  scope: 'cloud' | 'onprem';
 }
 
 const CANDIDATES: ICandidate[] = [
   {
     key: 'class',
+    worklistTypeCode: 'CLAS',
+    scope: 'cloud',
     typeCodes: ['CLAS/OC'],
     templates: [
       { label: 'oo/classes', build: (n) => `/sap/bc/adt/oo/classes/${n}` },
@@ -159,6 +176,8 @@ const CANDIDATES: ICandidate[] = [
   },
   {
     key: 'interface',
+    worklistTypeCode: 'INTF',
+    scope: 'cloud',
     typeCodes: ['INTF/OI'],
     templates: [
       {
@@ -170,6 +189,8 @@ const CANDIDATES: ICandidate[] = [
   },
   {
     key: 'program',
+    worklistTypeCode: 'PROG',
+    scope: 'onprem',
     typeCodes: ['PROG/P'],
     templates: [
       {
@@ -181,6 +202,8 @@ const CANDIDATES: ICandidate[] = [
   },
   {
     key: 'include',
+    worklistTypeCode: 'PROG',
+    scope: 'onprem',
     typeCodes: ['PROG/I'],
     templates: [
       // #68 sends includes here, to the program URI.
@@ -198,6 +221,8 @@ const CANDIDATES: ICandidate[] = [
   },
   {
     key: 'function_group',
+    worklistTypeCode: 'FUGR',
+    scope: 'cloud',
     typeCodes: ['FUGR/F', 'FUGR'],
     templates: [
       {
@@ -209,6 +234,8 @@ const CANDIDATES: ICandidate[] = [
   },
   {
     key: 'package',
+    worklistTypeCode: 'DEVC',
+    scope: 'cloud',
     typeCodes: ['DEVC/K', 'DEVC'],
     templates: [
       { label: 'packages', build: (n) => `/sap/bc/adt/packages/${n}` },
@@ -217,6 +244,8 @@ const CANDIDATES: ICandidate[] = [
   },
   {
     key: 'ddl_source',
+    worklistTypeCode: 'DDLS',
+    scope: 'cloud',
     typeCodes: ['DDLS/DF'],
     templates: [
       {
@@ -228,6 +257,8 @@ const CANDIDATES: ICandidate[] = [
   },
   {
     key: 'table',
+    worklistTypeCode: 'TABL',
+    scope: 'cloud',
     typeCodes: ['TABL/DT'],
     templates: [
       { label: 'ddic/tables', build: (n) => `/sap/bc/adt/ddic/tables/${n}` },
@@ -236,6 +267,8 @@ const CANDIDATES: ICandidate[] = [
   },
   {
     key: 'behavior_definition',
+    worklistTypeCode: 'BDEF',
+    scope: 'cloud',
     typeCodes: ['BDEF/BDO'],
     templates: [
       {
@@ -519,7 +552,7 @@ interface ICandidateOutcome {
   finished: boolean;
   confirmed: boolean;
   /** What the finished worklist said was checked, for the record. */
-  objectsListed?: string[];
+  objectsListed?: { type: string; name: string }[];
   /** Why it was never asked, in the manifest rather than only in the log. */
   reason?: string;
 }
@@ -667,13 +700,22 @@ async function main(): Promise<void> {
    */
   const acceptedRuns: { run: ICallResult; worklistId: string }[] = [];
 
-  /** Which objects a finished worklist says were checked. */
-  function objectsIn(worklistXml: string): string[] {
-    return [
-      ...worklistXml.matchAll(
-        /<atcobject:object[^>]*adtcore:name="([^"]+)"[^>]*>/g,
-      ),
-    ].map((m) => m[1]);
+  /**
+   * Which objects a finished worklist says were checked, as {type, name}.
+   *
+   * The type is not decoration. A run at `/programs/programs/{NAME}` can come
+   * back listing a `PROG` of that name, and a name-only match would then
+   * confirm `include` on the evidence of a program — which is the one mapping
+   * question this probe exists to settle.
+   */
+  function objectsIn(worklistXml: string): { type: string; name: string }[] {
+    return [...worklistXml.matchAll(/<atcobject:object[^>]*>/g)]
+      .map((m) => m[0])
+      .map((tag) => ({
+        type: tag.match(/adtcore:type="([^"]+)"/)?.[1] ?? '',
+        name: tag.match(/adtcore:name="([^"]+)"/)?.[1] ?? '',
+      }))
+      .filter((o) => o.name);
   }
 
   /**
@@ -734,7 +776,7 @@ async function main(): Promise<void> {
     run: ICallResult;
     worklistId: string;
     finished: boolean;
-    objects: string[];
+    objects: { type: string; name: string }[];
   } | null> => {
     const worklistId = await newWorklist(label);
     if (!worklistId) return null;
@@ -751,7 +793,7 @@ async function main(): Promise<void> {
     }
 
     let finished = false;
-    let objects: string[] = [];
+    let objects: { type: string; name: string }[] = [];
     if (options?.readBack !== false) {
       ({ finished } = await waitForRun(label, run));
       const findings = await rec.call(
@@ -821,10 +863,13 @@ async function main(): Promise<void> {
         if (result.finished) {
           outcome.finished = true;
           outcome.objectsListed = result.objects;
-          // The evidence rule: the object is named in a finished worklist.
+          // The evidence rule: the finished worklist lists an object of THIS
+          // type under THIS name. Both halves, for the reason in objectsIn.
           if (
             result.objects.some(
-              (n) => n.toUpperCase() === found.name.toUpperCase(),
+              (o) =>
+                o.name.toUpperCase() === found.name.toUpperCase() &&
+                o.type.toUpperCase() === candidate.worklistTypeCode,
             )
           ) {
             outcome.confirmed = true;
@@ -922,14 +967,70 @@ async function main(): Promise<void> {
         },
       );
       await rec.call(
-        'run-status-by-location-id-longpolling',
-        'The same resource with withLongPolling=true, which is what #68 actually sends.',
+        'run-status-by-location-id-longpolling-after-finish',
+        'The same resource with withLongPolling=true, on a run that has already finished — where it cannot act. Kept for the comparison, not as the answer.',
         {
           method: 'GET',
           url: `${runUrl}?withLongPolling=true`,
           headers: { Accept: ACCEPT_ATC_RUN_STATUS },
         },
       );
+
+      // The question is what long polling does while a run is IN FLIGHT: does
+      // the server hold the request until the run finishes, or answer at once
+      // with a running status? Asking a finished run answers neither, and
+      // every earlier capture was of a finished run. So: start a fresh run and
+      // ask immediately, before waiting for anything. Raised in review,
+      // 2026-08-16.
+      const inFlight = await newWorklist('longpolling-in-flight');
+      if (inFlight) {
+        const started = await rec.call(
+          'run-for-longpolling-in-flight',
+          'A run started only so its status can be asked while it is still running.',
+          {
+            method: 'POST',
+            url: `${ATC}/runs?worklistId=${encodeURIComponent(inFlight)}&clientWait=false`,
+            headers: {
+              'Content-Type': CT_ATC_RUN,
+              Accept: ACCEPT_ATC_RUN_RESPONSE,
+            },
+            body: runBody(
+              attemptedUris.length ? attemptedUris : [anyRun.worklistId],
+              100,
+            ),
+          },
+        );
+        const freshLocation =
+          header(started.headers, 'location') ??
+          header(started.headers, 'content-location');
+        if (freshLocation) {
+          const freshUrl = freshLocation.startsWith('/')
+            ? freshLocation
+            : `${ATC}/runs/${encodeURIComponent(freshLocation)}`;
+          await rec.call(
+            'run-status-in-flight-longpolling',
+            'withLongPolling=true, asked with no delay after starting the run. Whether it blocks, and what status it reports, is the open question.',
+            {
+              method: 'GET',
+              url: `${freshUrl}?withLongPolling=true`,
+              headers: { Accept: ACCEPT_ATC_RUN_STATUS },
+            },
+          );
+          await rec.call(
+            'run-status-in-flight-plain',
+            'The same resource without long polling, for the comparison the previous step needs to mean anything.',
+            {
+              method: 'GET',
+              url: freshUrl,
+              headers: { Accept: ACCEPT_ATC_RUN_STATUS },
+            },
+          );
+        } else {
+          logger.warn(
+            'The in-flight run carried no Location, so long polling could not be asked about it.',
+          );
+        }
+      }
     } else {
       logger.info(
         'Run response carried no Location header — recorded, and the run-id claim fails here rather than at a 404.',
@@ -1030,16 +1131,27 @@ async function main(): Promise<void> {
   }
 
   // --- The verdict, stated rather than left to be inferred -----------------
-  const confirmed = outcomes.filter((o) => o.confirmed);
-  const unconfirmed = outcomes.filter((o) => !o.confirmed);
+  const scopeOf = (key: string) =>
+    CANDIDATES.find((c) => c.key === key)?.scope ?? 'cloud';
+  const why = (o: ICandidateOutcome) =>
+    o.reason ??
+    (o.finished
+      ? `finished, worklist listed [${(o.objectsListed ?? []).map((x) => `${x.type}:${x.name}`).join(', ') || 'nothing'}]`
+      : o.attempted
+        ? 'run never reported finished'
+        : 'never asked');
+
+  // Only cloud-scope candidates can be decided here. A classic program cannot
+  // exist on ABAP Cloud, so counting it against this run would leave the probe
+  // permanently INCOMPLETE and say nothing about the system. Raised in review,
+  // 2026-08-16.
+  const cloudCandidates = outcomes.filter((o) => scopeOf(o.key) === 'cloud');
+  const onpremCandidates = outcomes.filter((o) => scopeOf(o.key) === 'onprem');
+  const confirmed = cloudCandidates.filter((o) => o.confirmed);
+  const unconfirmed = cloudCandidates.filter((o) => !o.confirmed);
   const verdict = unconfirmed.length
-    ? `INCOMPLETE — ${confirmed.length} of ${CANDIDATES.length} candidate types CONFIRMED (listed in a finished worklist); unconfirmed: ${unconfirmed
-        .map(
-          (o) =>
-            `${o.key} [${o.reason ?? (o.finished ? 'finished but not listed' : o.attempted ? 'run never reported finished' : 'never asked')}]`,
-        )
-        .join(', ')}`
-    : `COMPLETE — all ${CANDIDATES.length} candidate types confirmed`;
+    ? `INCOMPLETE — ${confirmed.length} of ${cloudCandidates.length} cloud candidate types CONFIRMED; unconfirmed: ${unconfirmed.map((o) => `${o.key} [${why(o)}]`).join(', ')}`
+    : `COMPLETE — all ${cloudCandidates.length} cloud candidate types confirmed`;
 
   // A non-zero triple somewhere is what makes the positions readable at all.
   const nonZeroStats = rec.findingStats.filter(
@@ -1078,13 +1190,19 @@ async function main(): Promise<void> {
       'AtcObjectType is NOT closed by this run. A type joins the union when a FINISHED worklist lists its object — not when a run is accepted, which happens for a URI that cannot exist.',
     );
     for (const o of unconfirmed) {
-      logger.error(
-        `  ${o.key}: ${o.reason ?? (o.finished ? `run finished, worklist listed [${(o.objectsListed ?? []).join(', ') || 'nothing'}]` : o.attempted ? 'run never reported finished' : 'never asked')}`,
-      );
+      logger.error(`  ${o.key}: ${why(o)}`);
     }
     process.exitCode = 1;
   } else {
     logger.info(verdict);
+  }
+
+  // Reported, never counted: this system cannot hold these, so nothing here
+  // decides them either way. They widen the union from an on-prem probe.
+  for (const o of onpremCandidates) {
+    logger.info(
+      `on-prem only — ${o.key}: ${why(o)} (not counted against this run)`,
+    );
   }
   logger.info(`Evidence written to ${outDir}`);
 }

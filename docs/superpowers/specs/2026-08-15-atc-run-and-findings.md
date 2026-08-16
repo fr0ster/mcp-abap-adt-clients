@@ -396,11 +396,30 @@ An earlier version of this spec wanted both: a union that covers on-prem, and an
 list saying everything is trial-answerable and on-prem is not needed. Those cannot both hold.
 Raised in review, 2026-08-16. The choice:
 
-**v1 ships the confirmed set, and widening it is additive.** `AtcObjectType` is an *input* type,
-so adding a member is not a breaking change for anyone: existing callers keep passing what they
-passed. A consumer on-prem who needs `program` today is blocked on one probe, not on a redesign —
-which is a materially different cost from shipping a union that names types nobody has watched
-ATC check and finding out later that the URI was wrong.
+**v1 ships the confirmed set, and widening it later is a `major`.**
+
+An earlier draft justified this by saying widening "is not a breaking change for anyone", which
+is false and was the load-bearing claim. Adding a member to an exported union is invisible to a
+caller *passing* a value, and breaking for a caller *exhausting* one:
+
+```ts
+const uri: Record<AtcObjectType, string> = { … };   // stops compiling
+switch (t) { … default: const _: never = t; }        // stops compiling
+```
+
+Raised in review, 2026-08-16. So the honest accounting, and it makes the decision harder rather
+than easier: **deferring the on-prem members costs a major release later.** It is still the right
+trade, for a reason that survives the correction — a union naming `program` on the strength of
+"it must work somewhere" is the promise-without-evidence this package spent three releases
+removing from fifteen handlers, and being wrong about the URI would cost a major *and* a
+migration.
+
+The alternative considered and rejected: an open-ended `AtcObjectType | (string & {})`, which
+makes widening free by making the type stop checking anything. A contract that cannot be wrong
+cannot be relied on either.
+
+The doc comment on the union says which system confirmed each member and that the set is expected
+to grow, so nobody builds an exhaustive `Record` over it without having read that it will change.
 
 That keeps the rule this package spent three releases establishing: **the type states what has
 been seen to work.** A union naming `program` on the strength of "it must work somewhere" is the
@@ -530,7 +549,7 @@ they exist.
 | `withLongPolling=true` against a run that is **still running** | what long polling does. The one observation was made after the run had finished, where it cannot act |
 | the bogus URI's worklist read **after** its run reports finished | whether ATC ever reports a bad reference. So far it answers 201 and an empty worklist, which is also what an unfinished good run looks like |
 | a worklist with findings at more than one priority | whether the `FINDING_STATS` positions are priorities 1, 2, 3. One finding at priority 3 gave `0,0,1`, which is consistent and not conclusive |
-| whether ATC checks `program` and `include` on an **on-prem** system, and at which URI (`programs/programs` or `programs/includes` for an include) | widens `AtcObjectType` by two members. Additive, so not a v1 blocker — but it is the one open question that leaves a real capability gap rather than an unanswered curiosity, and it is what an on-prem consumer waits on |
+| whether ATC checks `program` and `include` on an **on-prem** system, and at which URI (`programs/programs` or `programs/includes` for an include) | widens `AtcObjectType` by two members — a **major**, since exhaustive consumers break. Not a v1 blocker, but the one open question that leaves a real capability gap rather than an unanswered curiosity, and what an on-prem consumer waits on |
 
 `scripts/probe-atc.ts` runs all of these. It takes `--package=NAME` for the objects,
 `--known-bad=KEY:NAME` for an object expected to fail its checks, and exits non-zero while any
