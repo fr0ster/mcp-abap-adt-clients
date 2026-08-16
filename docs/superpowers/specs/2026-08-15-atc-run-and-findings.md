@@ -287,6 +287,17 @@ checkable set, a subset, or partly wrong is unknown, and an object type absent f
 cannot be checked at all. It is a contract decision, not an implementation detail — a published
 union is a promise about which objects this package can check.
 
+Two things already known about that mapping, before any run:
+
+- **`include` is mapped two different ways in the two codebases.** #68 sends includes to
+  `/sap/bc/adt/programs/programs/{name}`; this library builds `/sap/bc/adt/programs/includes/`
+  for includes everywhere else. They cannot both be the ATC-checkable URI, and picking by
+  preference would be a guess, so the probe runs **both**.
+- **Three of the types the spec wants measured are not in #68 at all.** DDL source, table and
+  behavior definition have no entry in `buildAtcObjectUri`, so they cannot be checked through
+  #68 even if ATC accepts them. The probe proposes the template this library already uses for
+  each and runs it, which is the only way they can join the union.
+
 **Blocked on the probe below.** Ship the confirmed set, not the inherited one.
 
 ## What goes in `interfaces`
@@ -412,10 +423,24 @@ Credentials for this exist; the run is synchronous there, which is exactly why i
 contract and nothing about waiting.
 
 `scripts/probe-atc.ts` runs every ask below in one session and writes each request and response
-to disk verbatim (`--out=atc-probe`). It picks its objects out of a real package and uses **the
-URI ADT returned** for each, so the checkable set is measured rather than compared against #68's
-six-type mapping — a mapping is exactly the thing under question. It also sends a URI that cannot
-exist, because without that control "the run was accepted" is not evidence of anything.
+to disk verbatim (`--out=atc-probe`). Three things make it a measurement rather than a
+confirmation, each added after review, 2026-08-15:
+
+- **It runs the URI a client would build, not the one ADT handed back.** The contract takes
+  `objectType` + `objectName`, so the client must build the URI — which makes the *template* the
+  thing under test. An earlier version took the package listing's URI, which would have proved a
+  ready-made URI is checkable and said nothing about the mapping. ADT's own URI is run too, but
+  only where it differs from the built one, so the difference gets measured.
+- **The candidate list is required, not discovered.** It probes #68's six plus the three above,
+  and a candidate with no representative object in the package is reported as **unmeasured**,
+  named in the manifest, and exits non-zero. Taking whatever a package happened to contain meant
+  a package with no interface would have finished green with the blocker still open.
+- **It asks the run-id question with the right id.** The disputed claim is #68's separate run id
+  from `Location`, so the probe reads the run response's headers and fetches *that*; a 404 for
+  the worklist id proves nothing about it. Both are fetched, as separate steps.
+
+It also sends a URI that cannot exist, because without that control "the run was accepted" is not
+evidence of anything.
 
 The check-variant path is not a separate ask: `GET /atc/customizing` returning
 `systemCheckVariant` with a value (`ABAP_CLOUD_DEVELOPMENT_DEFAULT`) is what the contract depends
@@ -425,13 +450,15 @@ is neither, it is being re-read.
 
 | ask | why it blocks something |
 |---|---|
-| run one object of **each** kind #68 lists, and a few it does not (DDL source, table, behavior definition) | fixes `AtcObjectType` — **the only thing blocking the synchronous contract** |
+| run one object of **each** kind #68 lists, and the three it does not (DDL source, table, behavior definition), **at the URI a client builds** — plus both `include` templates | fixes `AtcObjectType` — **the only thing blocking the synchronous contract** — and settles which include URI ATC takes |
+| the run response's **headers**, whole | whether a run has an id of its own. #68 reads one from `Location`; the recorded session says the body echoes the worklist id. Fetching the wrong id would answer neither |
 | the run response, captured whole, with known findings present | what the `FINDING_STATS` positions mean. **Not a blocker**: the contract returns the triple verbatim precisely so it does not need to know. Parsing it into named counts is a later improvement, and it needs this before it can be one |
 | `GET /atc/worklists/{id}?includeExemptedFindings=true` | whether that option exists at all — it stays out of the contract until answered |
 | `maximumVerdicts` at its edges — 0, 1, something enormous | the server's bounds, which nothing states |
 
-The first row is the blocker. The other two are improvements that would let an option and a
-validated range join the contract; they are cheap on the same connection.
+The first row is the blocker. The rest are improvements that would let an option and a validated
+range join the contract, plus the header capture that decides whether the run-id claim survives;
+all cheap on the same connection.
 
 ### On an on-prem system — decides whether waiting is designed at all
 
@@ -441,7 +468,7 @@ needs the on-prem route (a run from a machine that reaches one).
 | ask | why |
 |---|---|
 | does `POST /atc/runs` return before the checks finish? | the whole premise of waiting. If it does not, waiting is never designed and this spec is complete as written |
-| `GET /atc/runs/{id}` — 404 as on the trial, or a real status resource? | #68 built its polling on this; nobody has captured it |
+| `GET /atc/runs/{id}` — a real status resource, or 404? | #68 built its polling on this. The trial's recorded 404 does not settle it even for the trial: which id was fetched was never written down, and a 404 for the worklist id says nothing about a run id from `Location` |
 | `POST /atc/runs?...&clientWait=true` | whether the server will simply hold the request, which would answer the question by removing it |
 | a worklist read **between** start and completion | whether an unfinished worklist is distinguishable from an empty result at all — the thing that made two drafts of this spec wrong |
 
