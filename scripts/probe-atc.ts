@@ -293,6 +293,12 @@ interface IStep {
   };
   status: number | null;
   statusText?: string;
+  /**
+   * Wall-clock milliseconds. Without it "the run was finished when I asked"
+   * cannot be told from "the server held my request until it finished", which
+   * is the whole question long polling asks.
+   */
+  durationMs: number;
   responseHeaders?: Record<string, unknown>;
   bodyFile?: string;
   bodyPreview?: string;
@@ -304,6 +310,7 @@ interface ICallResult {
   body: string;
   headers: Record<string, unknown>;
   step: number;
+  durationMs: number;
 }
 
 class Recorder {
@@ -350,9 +357,11 @@ class Recorder {
       answers,
       request: req,
       status: null,
+      durationMs: 0,
     };
     this.logger.info(`[${n}] ${step} — ${req.method} ${req.url}`);
 
+    const startedAt = Date.now();
     let body = '';
     let headers: Record<string, unknown> = {};
     try {
@@ -408,15 +417,23 @@ class Recorder {
       });
     }
 
+    record.durationMs = Date.now() - startedAt;
+
     const file = `${String(n).padStart(2, '0')}-${step.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.txt`;
     fs.writeFileSync(path.join(this.outDir, file), body, 'utf8');
     record.bodyFile = file;
     record.bodyPreview = body.slice(0, 400);
     this.steps.push(record);
     this.logger.info(
-      `[${n}] → ${record.status ?? 'no status'}, ${body.length} bytes → ${file}`,
+      `[${n}] → ${record.status ?? 'no status'}, ${body.length} bytes, ${record.durationMs}ms → ${file}`,
     );
-    return { status: record.status, body, headers, step: n };
+    return {
+      status: record.status,
+      body,
+      headers,
+      step: n,
+      durationMs: record.durationMs,
+    };
   }
 
   flush(extra: Record<string, unknown>): void {
@@ -752,7 +769,11 @@ async function main(): Promise<void> {
         { method: 'GET', url, headers: { Accept: ACCEPT_ATC_RUN_STATUS } },
       );
       const status = res.body.match(/runs:status="([^"]+)"/)?.[1] ?? null;
-      if (status && /finished/i.test(status)) {
+      // Exact, case-normalised — the same test `IAtcRunStatus.isFinished` will
+      // make. A substring match accepts `unfinished` and `not_finished`, which
+      // would open the worklist early and could confirm a type on a run that
+      // had not run. Raised in review, 2026-08-16.
+      if (status?.trim().toLowerCase() === 'finished') {
         return { finished: true, status };
       }
       logger.info(`${label}: run status ${status ?? 'unreadable'}, waiting…`);
@@ -910,11 +931,39 @@ async function main(): Promise<void> {
     } else {
       const encoded = encodeURIComponent(args.knownBadName).toUpperCase();
       const uri = candidate.templates[0].build(encoded);
-      await runAt(
-        'known-bad',
-        `An object expected to FAIL its checks (${args.knownBadName}). The only run that can say what the FINDING_STATS positions mean.`,
-        [uri],
-      );
+
+      // **clientWait=true, and that is the point.** `clientWait=false` answers
+      // 201 with an EMPTY body — no FINDING_STATS at all — so running the
+      // known-bad object that way could only ever show findings in a worklist,
+      // never the triple whose positions this flag exists to decode. Only the
+      // waiting mode returns `<atcworklist:worklistRun>` with the counts, and
+      // it has to be THIS object: a clean one gives 0,0,0, which reads the
+      // same in any severity order. Raised in review, 2026-08-16.
+      const knownBadWorklist = await newWorklist('known-bad');
+      if (knownBadWorklist) {
+        await rec.call(
+          'run-known-bad-clientWait-true',
+          `An object expected to FAIL its checks (${args.knownBadName}), run in the waiting mode — the only one that answers with FINDING_STATS.`,
+          {
+            method: 'POST',
+            url: `${ATC}/runs?worklistId=${encodeURIComponent(knownBadWorklist)}&clientWait=true`,
+            headers: {
+              'Content-Type': CT_ATC_RUN,
+              Accept: ACCEPT_ATC_RUN_RESPONSE,
+            },
+            body: runBody([uri], 100),
+          },
+        );
+        await rec.call(
+          'findings-known-bad',
+          'The worklist for that same run: the findings whose priorities the triple has to be read against.',
+          {
+            method: 'GET',
+            url: `${ATC}/worklists/${encodeURIComponent(knownBadWorklist)}?includeExemptedFindings=false`,
+            headers: { Accept: ACCEPT_ATC_WORKLIST_XML },
+          },
+        );
+      }
     }
   } else {
     logger.warn(
@@ -1007,23 +1056,39 @@ async function main(): Promise<void> {
           const freshUrl = freshLocation.startsWith('/')
             ? freshLocation
             : `${ATC}/runs/${encodeURIComponent(freshLocation)}`;
-          await rec.call(
-            'run-status-in-flight-longpolling',
-            'withLongPolling=true, asked with no delay after starting the run. Whether it blocks, and what status it reports, is the open question.',
-            {
-              method: 'GET',
-              url: `${freshUrl}?withLongPolling=true`,
-              headers: { Accept: ACCEPT_ATC_RUN_STATUS },
-            },
-          );
-          await rec.call(
-            'run-status-in-flight-plain',
-            'The same resource without long polling, for the comparison the previous step needs to mean anything.',
-            {
-              method: 'GET',
-              url: freshUrl,
-              headers: { Accept: ACCEPT_ATC_RUN_STATUS },
-            },
+          // Both at once, deliberately. Issued in sequence, the plain read
+          // would start only after the long poll returned — by which time the
+          // run may have finished either because the server held the request
+          // or because it simply ended, and the two are indistinguishable.
+          // Started together, the durations answer it: a long poll that
+          // blocked takes materially longer than the plain read beside it.
+          // Raised in review, 2026-08-16.
+          const [polled, plain] = await Promise.all([
+            rec.call(
+              'run-status-in-flight-longpolling',
+              'withLongPolling=true, asked with no delay after starting the run. Whether it BLOCKS is read from its duration against the plain read issued at the same moment.',
+              {
+                method: 'GET',
+                url: `${freshUrl}?withLongPolling=true`,
+                headers: { Accept: ACCEPT_ATC_RUN_STATUS },
+              },
+            ),
+            rec.call(
+              'run-status-in-flight-plain',
+              'The same resource without long polling, started at the same moment. The control the previous step needs to mean anything.',
+              {
+                method: 'GET',
+                url: freshUrl,
+                headers: { Accept: ACCEPT_ATC_RUN_STATUS },
+              },
+            ),
+          ]);
+          logger.info(
+            `long polling took ${polled.durationMs}ms; the plain read beside it took ${plain.durationMs}ms — ${
+              polled.durationMs > plain.durationMs * 3
+                ? 'the server appears to have HELD the request'
+                : 'no evidence of blocking'
+            }`,
           );
         } else {
           logger.warn(
