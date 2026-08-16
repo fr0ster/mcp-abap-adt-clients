@@ -386,12 +386,31 @@ Two confirmed, two refused by the system, five unmeasured. None of the five is a
 they were asked and the answer was not read.
 
 "Not checkable here" is a fact about **this system**, not about ATC. A classic program cannot
-exist on ABAP Cloud, so ATC cannot check one on ABAP Cloud. That is not a footnote for this
-contract: **ATC is the single control point for checks**, so what it covers has to include
-on-prem, where those objects do exist — while SAP is at the same time dropping them from newer
-systems. The union therefore has to admit types this trial can never confirm, and the honest
-shape is a union that is complete for the objects a system can hold, not one pruned to what one
-cloud tenant happened to allow.
+exist on ABAP Cloud, so ATC cannot check one on ABAP Cloud. And that is not a footnote, because
+**ATC is the single control point for checks** — what it covers has to include on-prem, where
+those objects do exist, even as SAP drops them from newer systems.
+
+#### So what ships in v1, and the contradiction that had to be resolved
+
+An earlier version of this spec wanted both: a union that covers on-prem, and an open-questions
+list saying everything is trial-answerable and on-prem is not needed. Those cannot both hold.
+Raised in review, 2026-08-16. The choice:
+
+**v1 ships the confirmed set, and widening it is additive.** `AtcObjectType` is an *input* type,
+so adding a member is not a breaking change for anyone: existing callers keep passing what they
+passed. A consumer on-prem who needs `program` today is blocked on one probe, not on a redesign —
+which is a materially different cost from shipping a union that names types nobody has watched
+ATC check and finding out later that the URI was wrong.
+
+That keeps the rule this package spent three releases establishing: **the type states what has
+been seen to work.** A union naming `program` on the strength of "it must work somewhere" is the
+same promise-without-evidence the capability narrowing removed from fifteen handlers, wearing a
+different hat.
+
+What that costs, stated plainly rather than buried: **until the on-prem probe runs, an on-prem
+caller cannot ask this client to check a program or an include**, and `AtcObjectType` is
+therefore not the whole of what ATC covers. The union is a statement about what this package has
+seen checked, not about what ATC checks in the world, and the doc comment on it says so.
 
 Two things about the mapping stand regardless:
 
@@ -489,7 +508,8 @@ mixing it into ATC is what made #68 an 11k-line diff. Its own spec.
 
 ## What is still open
 
-One blocker and four loose ends. All are trial-answerable; none needs an on-prem system.
+One blocker and four loose ends on the trial, plus one probe that needs an on-prem system and
+does **not** block v1.
 
 **Blocking:**
 
@@ -510,7 +530,7 @@ they exist.
 | `withLongPolling=true` against a run that is **still running** | what long polling does. The one observation was made after the run had finished, where it cannot act |
 | the bogus URI's worklist read **after** its run reports finished | whether ATC ever reports a bad reference. So far it answers 201 and an empty worklist, which is also what an unfinished good run looks like |
 | a worklist with findings at more than one priority | whether the `FINDING_STATS` positions are priorities 1, 2, 3. One finding at priority 3 gave `0,0,1`, which is consistent and not conclusive |
-| whether ATC checks `program` and `include` on an **on-prem** system | the only part of `AtcObjectType` this trial cannot decide. Not blocking, because a union that omits them is honest on cloud and can be widened later; blocking only if the contract is expected to be complete on-prem from the start |
+| whether ATC checks `program` and `include` on an **on-prem** system, and at which URI (`programs/programs` or `programs/includes` for an include) | widens `AtcObjectType` by two members. Additive, so not a v1 blocker — but it is the one open question that leaves a real capability gap rather than an unanswered curiosity, and it is what an on-prem consumer waits on |
 
 `scripts/probe-atc.ts` runs all of these. It takes `--package=NAME` for the objects,
 `--known-bad=KEY:NAME` for an object expected to fail its checks, and exits non-zero while any

@@ -14,9 +14,11 @@
  *
  *  1. **`AtcObjectType`** — a blocker. Every candidate type is probed from a
  *     **required list**, not from whatever a package happens to contain, and a
- *     candidate with no representative object is reported as **unmeasured**
- *     with a non-zero exit. A probe that quietly checked four types and exited
- *     0 would leave the blocker open while looking like it had closed it.
+ *     candidate is **confirmed only when a FINISHED worklist lists its
+ *     object** — not when a run is accepted, which happens for a URI that
+ *     cannot exist too. Anything short of that exits non-zero, naming which of
+ *     the three it got to: never asked, never finished, or finished without
+ *     the object in the list.
  *  2. **The mapping itself.** The public contract takes `objectType` +
  *     `objectName`, so the client must *build* the URI — which means the thing
  *     under test is the template, not the object. Each candidate is run at the
@@ -67,8 +69,8 @@
  *                    about the ordering. KEY is a candidate key (`class`,
  *                    `program`, …)
  *
- * Exit code is **1 when any candidate went unmeasured**, so an incomplete probe
- * cannot be mistaken for a finished one.
+ * Exit code is **1 unless every candidate is confirmed**, so an incomplete
+ * probe cannot be mistaken for a finished one.
  *
  * Writes `DIR/manifest.json` (every step, plus the verdict, machine-readable)
  * and one raw body file per step. Read the raw files — the manifest is an index,
@@ -111,6 +113,10 @@ const ACCEPT_ATC_CUSTOMIZING =
 
 const ATC = '/sap/bc/adt/atc';
 const TIMEOUT = 60_000;
+
+/** How long to wait for a run before giving up and saying so. */
+const RUN_POLL_ATTEMPTS = 20;
+const RUN_POLL_DELAY_MS = 3_000;
 
 /** A URI template under test, and who proposes it. */
 interface ITemplate {
@@ -497,14 +503,24 @@ interface ICandidateOutcome {
     status: number | null;
   };
   /**
-   * Whether an answer was obtained — **not** whether ATC accepted the type. A
-   * run rejected with 400 is measured: the rejection is the finding. Only "no
-   * representative object, so nothing was asked" counts as unmeasured, because
-   * that is the state that would leave `AtcObjectType` open while the probe
-   * exited looking finished.
+   * Three separate facts, because collapsing them is how this probe reported
+   * success for types it had proven nothing about. Raised in review,
+   * 2026-08-16.
+   *
+   * - `attempted`: a run was issued. Says nothing — a URI that cannot exist is
+   *   accepted with 201 too.
+   * - `finished`: the run resource reported finished, so the worklist read
+   *   after it means something.
+   * - `confirmed`: the finished worklist **lists this object**. That is the
+   *   evidence rule, and the only one of the three that extends
+   *   `AtcObjectType`.
    */
-  measured: boolean;
-  /** Why it went unmeasured, in the manifest rather than only in the log. */
+  attempted: boolean;
+  finished: boolean;
+  confirmed: boolean;
+  /** What the finished worklist said was checked, for the record. */
+  objectsListed?: string[];
+  /** Why it was never asked, in the manifest rather than only in the log. */
   reason?: string;
 }
 
@@ -651,13 +667,75 @@ async function main(): Promise<void> {
    */
   const acceptedRuns: { run: ICallResult; worklistId: string }[] = [];
 
-  /** Start a run and read the worklist afterwards. Returns the run's own result. */
+  /** Which objects a finished worklist says were checked. */
+  function objectsIn(worklistXml: string): string[] {
+    return [
+      ...worklistXml.matchAll(
+        /<atcobject:object[^>]*adtcore:name="([^"]+)"[^>]*>/g,
+      ),
+    ].map((m) => m[1]);
+  }
+
+  /**
+   * Poll the run resource until it reports finished.
+   *
+   * This is the whole difference between a measurement and a coin toss.
+   * Reading a worklist before the checks finish returns one that is empty
+   * whatever the object was — the same bytes a run over a URI that cannot
+   * exist produces — so the earlier version of this probe manufactured the
+   * exact ambiguity the spec warns about. Raised in review, 2026-08-16.
+   */
+  const waitForRun = async (
+    label: string,
+    run: ICallResult,
+  ): Promise<{ finished: boolean; status: string | null }> => {
+    const location =
+      header(run.headers, 'location') ??
+      header(run.headers, 'content-location');
+    if (!location) {
+      logger.warn(
+        `${label}: the run carried no Location, so there is no run resource to wait on`,
+      );
+      return { finished: false, status: null };
+    }
+    const runId = location.split('/').filter(Boolean).pop() ?? location;
+    const url = location.startsWith('/')
+      ? location
+      : `${ATC}/runs/${encodeURIComponent(runId)}`;
+
+    for (let attempt = 1; attempt <= RUN_POLL_ATTEMPTS; attempt++) {
+      const res = await rec.call(
+        `status-${label}-${attempt}`,
+        'Has this run finished? The worklist means nothing until it has.',
+        { method: 'GET', url, headers: { Accept: ACCEPT_ATC_RUN_STATUS } },
+      );
+      const status = res.body.match(/runs:status="([^"]+)"/)?.[1] ?? null;
+      if (status && /finished/i.test(status)) {
+        return { finished: true, status };
+      }
+      logger.info(`${label}: run status ${status ?? 'unreadable'}, waiting…`);
+      await new Promise((r) => setTimeout(r, RUN_POLL_DELAY_MS));
+    }
+    return { finished: false, status: 'gave up waiting' };
+  };
+
+  /**
+   * Start a run, wait for it, and read the worklist it wrote into.
+   *
+   * Returns what the evidence rule needs: whether the run finished, and which
+   * objects the finished worklist lists.
+   */
   const runAt = async (
     label: string,
     answers: string,
     uris: string[],
     options?: { readBack?: boolean; maximumVerdicts?: number },
-  ): Promise<{ run: ICallResult; worklistId: string } | null> => {
+  ): Promise<{
+    run: ICallResult;
+    worklistId: string;
+    finished: boolean;
+    objects: string[];
+  } | null> => {
     const worklistId = await newWorklist(label);
     if (!worklistId) return null;
     const run = await rec.call(`run-${label}`, answers, {
@@ -671,18 +749,25 @@ async function main(): Promise<void> {
     if (run.status !== null && run.status >= 200 && run.status < 300) {
       acceptedRuns.push({ run, worklistId });
     }
+
+    let finished = false;
+    let objects: string[] = [];
     if (options?.readBack !== false) {
-      await rec.call(
+      ({ finished } = await waitForRun(label, run));
+      const findings = await rec.call(
         `findings-${label}`,
-        'What the worklist holds after that run — including whether an accepted type produced anything.',
+        finished
+          ? 'The finished worklist: every object it lists was checked, findings or not.'
+          : 'The worklist, read WITHOUT a finished run — recorded, but it proves nothing.',
         {
           method: 'GET',
           url: `${ATC}/worklists/${encodeURIComponent(worklistId)}?includeExemptedFindings=false`,
           headers: { Accept: ACCEPT_ATC_WORKLIST_XML },
         },
       );
+      if (finished) objects = objectsIn(findings.body);
     }
-    return { run, worklistId };
+    return { run, worklistId, finished, objects };
   };
 
   // --- 3. The blocker, measured against the required list ------------------
@@ -692,7 +777,9 @@ async function main(): Promise<void> {
       mappedBy68: candidate.mappedBy68,
       representative: null,
       attempts: [],
-      measured: false,
+      attempted: false,
+      finished: false,
+      confirmed: false,
     };
     outcomes.push(outcome);
 
@@ -729,7 +816,21 @@ async function main(): Promise<void> {
         step: result?.run.step ?? -1,
         status: result?.run.status ?? null,
       });
-      if (result) outcome.measured = true;
+      if (result) {
+        outcome.attempted = true;
+        if (result.finished) {
+          outcome.finished = true;
+          outcome.objectsListed = result.objects;
+          // The evidence rule: the object is named in a finished worklist.
+          if (
+            result.objects.some(
+              (n) => n.toUpperCase() === found.name.toUpperCase(),
+            )
+          ) {
+            outcome.confirmed = true;
+          }
+        }
+      }
     }
 
     // ADT's own URI, only when no built URI already matched it — otherwise the
@@ -794,8 +895,8 @@ async function main(): Promise<void> {
   // reported nothing about the very claim it exists to settle. A run id
   // question must not depend on how many object types a package happens to
   // hold.
-  const measuredUris = outcomes
-    .filter((o) => o.measured && o.attempts.length > 0)
+  const attemptedUris = outcomes
+    .filter((o) => o.attempted && o.attempts.length > 0)
     .map((o) => o.attempts[0].uri);
 
   const anyRun = acceptedRuns[0];
@@ -872,20 +973,20 @@ async function main(): Promise<void> {
   }
 
   // --- 5b. Plural references, which is the shape the contract promises -----
-  if (measuredUris.length > 1) {
+  if (attemptedUris.length > 1) {
     await runAt(
       'multiple-objects',
       'IAtcRunTarget takes a set. Does one run accept several object references?',
-      measuredUris,
+      attemptedUris,
     );
   } else {
     logger.warn(
-      "Fewer than two measured URIs — skipping the multi-object run. IAtcRunTarget's plural shape stays unmeasured.",
+      "Fewer than two URIs to work with — skipping the multi-object run. IAtcRunTarget's plural shape stays unconfirmed.",
     );
   }
 
   // --- 6. maximumVerdicts at its edges, and clientWait ----------------------
-  const anyUri = measuredUris[0];
+  const anyUri = attemptedUris[0];
   if (anyUri) {
     for (const verdicts of [0, 1, 100000]) {
       await runAt(
@@ -929,10 +1030,16 @@ async function main(): Promise<void> {
   }
 
   // --- The verdict, stated rather than left to be inferred -----------------
-  const unmeasured = outcomes.filter((o) => !o.measured);
-  const verdict = unmeasured.length
-    ? `INCOMPLETE — ${unmeasured.length} of ${CANDIDATES.length} candidate types unmeasured: ${unmeasured.map((o) => o.key).join(', ')}`
-    : `COMPLETE — all ${CANDIDATES.length} candidate types measured`;
+  const confirmed = outcomes.filter((o) => o.confirmed);
+  const unconfirmed = outcomes.filter((o) => !o.confirmed);
+  const verdict = unconfirmed.length
+    ? `INCOMPLETE — ${confirmed.length} of ${CANDIDATES.length} candidate types CONFIRMED (listed in a finished worklist); unconfirmed: ${unconfirmed
+        .map(
+          (o) =>
+            `${o.key} [${o.reason ?? (o.finished ? 'finished but not listed' : o.attempted ? 'run never reported finished' : 'never asked')}]`,
+        )
+        .join(', ')}`
+    : `COMPLETE — all ${CANDIDATES.length} candidate types confirmed`;
 
   // A non-zero triple somewhere is what makes the positions readable at all.
   const nonZeroStats = rec.findingStats.filter(
@@ -965,13 +1072,15 @@ async function main(): Promise<void> {
     logger.info(findingStatsVerdict);
   }
 
-  if (unmeasured.length) {
+  if (unconfirmed.length) {
     logger.error(verdict);
     logger.error(
-      'AtcObjectType is NOT closed by this run. Point --package at a package holding the missing types, or probe them individually.',
+      'AtcObjectType is NOT closed by this run. A type joins the union when a FINISHED worklist lists its object — not when a run is accepted, which happens for a URI that cannot exist.',
     );
-    for (const o of unmeasured) {
-      logger.error(`  ${o.key}: ${o.reason ?? 'no run completed'}`);
+    for (const o of unconfirmed) {
+      logger.error(
+        `  ${o.key}: ${o.reason ?? (o.finished ? `run finished, worklist listed [${(o.objectsListed ?? []).join(', ') || 'nothing'}]` : o.attempted ? 'run never reported finished' : 'never asked')}`,
+      );
     }
     process.exitCode = 1;
   } else {
