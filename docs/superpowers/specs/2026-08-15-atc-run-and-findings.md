@@ -2,7 +2,9 @@
 
 **Status:** blocked on a probe, 2026-08-15. The shape is agreed and the synchronous contract is
 all but complete — one part of it, the set of checkable object types, is a fact nobody has
-captured, and so is the whole question of waiting. See "The probes that unblock this". Not
+captured, and so is the whole question of waiting. The traffic table is **being re-verified**
+too: one of its rows disagreed with #68 and #68 was right, so the probe re-issues the rest rather
+than trusting a single unrepeatable session. See "The probes that unblock this". Not
 implemented.
 
 **Scope:** an ATC client in `@mcp-abap-adt/adt-clients`, and the contract it needs in
@@ -115,7 +117,7 @@ caller to discover a truncated worklist.
 
 **Where the check variant comes from.** `POST /atc/worklists` requires one, so `run()` cannot
 proceed without deciding this. `IAtcRunOptions.checkVariant` is optional; when the caller omits
-it, the client reads `POST /atc/customizing` and uses `systemCheckVariant`. That is not a
+it, the client reads `GET /atc/customizing` and uses `systemCheckVariant`. That is not a
 convenience — on the trial `/atc/variants` returns `totalItemCount 0`, so customizing is the only
 observed source of a usable variant, and a contract that demanded the caller supply one would be
 unusable there. The read happens per `run()` call; caching it is an optimisation nobody has
@@ -193,16 +195,17 @@ reads to a caller as success. Three defects of exactly that shape were fixed in 
 
 ## The ADT traffic
 
-Probed live on the **cloud trial**, 2026-07-20 — each line from a server response:
+Recorded from the **cloud trial**, 2026-07-20 — one session, and see the correction under it:
 
 | step | request |
 |---|---|
-| variant | `POST /sap/bc/adt/atc/customizing` → `systemCheckVariant` (trial: `ABAP_CLOUD_DEVELOPMENT_DEFAULT`) |
+| variant | `GET /sap/bc/adt/atc/customizing` → `systemCheckVariant` (trial: `ABAP_CLOUD_DEVELOPMENT_DEFAULT`) — **verb corrected**, see below |
 | worklist | `POST /sap/bc/adt/atc/worklists?checkVariant=<X>`, `Accept: text/plain` → a bare 32-char id |
 | run | `POST /sap/bc/adt/atc/runs?worklistId=<id>` with `<atc:run maximumVerdicts="N"><objectSets><objectSet kind="inclusive"><adtcore:objectReferences>…` → `<atcworklist:worklistRun>` carrying **the same worklist id** and `FINDING_STATS` |
 | findings | `GET /sap/bc/adt/atc/worklists/<id>`, `Accept: application/atc.worklist.v1+xml` |
 
-Three facts established there, each of which contradicts something the PRs assume:
+Three things that session recorded, each contradicting something the PRs assume — held as
+recorded, not as established, for the reason under the table:
 
 - **There is no separate run id.** The run response echoes the worklist id. `IGetAtcRunStatusParams
   { run_id }` in #17, and `extractAtcRunId` reading the `Location` header in #68, describe
@@ -213,6 +216,28 @@ Three facts established there, each of which contradicts something the PRs assum
 
 `/sap/bc/adt/atc/variants` returns `totalItemCount 0` on the trial, so listing variants is not a
 substitute for reading customizing.
+
+**The customizing verb was wrong here until 2026-08-15.** This table read `POST /atc/customizing`;
+#68 sends `GET` (`run.ts`, `getAtcCustomizing`). Both cannot be what was observed, and the table's
+own claim — "each line from a server response" — is what makes the contradiction worth naming
+rather than quietly editing. #68 is the better-attested of the two: it is code that ran against a
+system, while the `POST` was recorded from a session nobody can now re-read. So the spec follows
+`GET`, and the probe sends **both** and keeps whichever answers. If `POST` also works, this note
+is the only thing that needs deleting.
+
+And the consequence is not confined to that row. Every line of this table came from the **same
+2026-07-20 session**, and one of them was wrong. That does not make the other three false — it
+makes them all *one* source, uncorroborated, and "probed live" a weaker phrase here than it
+reads. The three facts below are the ones #68 contradicts, so the probe re-issues each of them
+rather than treating the table as settled:
+
+- no separate run id (vs `extractAtcRunId` from `Location`);
+- no run-status resource (vs polling `/atc/runs/{id}`);
+- `checkstyle` refused with 406 (vs `AtcFindingsFormat`).
+
+#68 asserts the opposite of all three on **on-prem** S/4HANA 2023. Both can be true at once —
+that is the on-prem question, not a contradiction — but only once the cloud half is re-read from
+a response rather than from this table.
 
 **Unverified**: #68 claims an end-to-end run on S/4HANA 2023 (SAP_BASIS 758) with the async
 `/atc/runs/{id}` path. No captured request or response accompanies the diff. The two claims are
@@ -386,11 +411,17 @@ asynchronous — which is on-prem, where it is claimed and unverified. Raised in
 Credentials for this exist; the run is synchronous there, which is exactly why it can settle the
 contract and nothing about waiting.
 
-The check-variant path is **not** among them: `POST /atc/customizing` returning
-`systemCheckVariant` was observed on the trial on 2026-07-20, with a value
-(`ABAP_CLOUD_DEVELOPMENT_DEFAULT`), which is why the contract can depend on it. An earlier
-revision listed it here as well as in the traffic table — proven and unproven at once. It is
-proven, on the trial.
+`scripts/probe-atc.ts` runs every ask below in one session and writes each request and response
+to disk verbatim (`--out=atc-probe`). It picks its objects out of a real package and uses **the
+URI ADT returned** for each, so the checkable set is measured rather than compared against #68's
+six-type mapping — a mapping is exactly the thing under question. It also sends a URI that cannot
+exist, because without that control "the run was accepted" is not evidence of anything.
+
+The check-variant path is not a separate ask: `GET /atc/customizing` returning
+`systemCheckVariant` with a value (`ABAP_CLOUD_DEVELOPMENT_DEFAULT`) is what the contract depends
+on, and step 1 of the probe re-reads it — under both verbs, since the recorded one was wrong. An
+earlier revision listed it as an open question *and* as proven, which was both ways at once; it
+is neither, it is being re-read.
 
 | ask | why it blocks something |
 |---|---|
