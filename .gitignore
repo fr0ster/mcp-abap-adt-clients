@@ -42,3 +42,6 @@ mdd-*.json
 
 # Subagent-driven development scratch (ledger, briefs, review packages)
 .superpowers/
+
+# ATC probe evidence (raw captures; the curated ones live in docs/evidence)
+atc-probe*/

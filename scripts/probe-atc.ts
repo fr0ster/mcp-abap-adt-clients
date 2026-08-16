@@ -270,6 +270,17 @@ interface ICallResult {
 class Recorder {
   private readonly steps: IStep[] = [];
   private n = 0;
+  /**
+   * Every FINDING_STATS this session saw, from any response. The triple's
+   * positions can only be decoded from a run that found something: `0,0,0`
+   * looks identical whichever order the severities are in.
+   */
+  readonly findingStats: {
+    step: number;
+    label: string;
+    triple: string | null;
+    context: string;
+  }[] = [];
 
   constructor(
     private readonly connection: IAbapConnection,
@@ -341,6 +352,21 @@ class Recorder {
       this.logger.warn(
         `[${n}] ${step} → ${record.status ?? 'no status'}: ${record.error}`,
       );
+    }
+
+    // Scanned here rather than at the call sites: the run that actually carried
+    // FINDING_STATS on the trial was `clientWait=true`, which is issued
+    // directly and not through `runAt` — so a scan attached to `runAt` reported
+    // "never appeared" about a response holding it. Caught by running the
+    // probe, 2026-08-16.
+    const stats = parseFindingStats(body);
+    if (stats) {
+      this.findingStats.push({
+        step: n,
+        label: step,
+        triple: stats.triple,
+        context: stats.context,
+      });
     }
 
     const file = `${String(n).padStart(2, '0')}-${step.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.txt`;
@@ -593,18 +619,6 @@ async function main(): Promise<void> {
 
   const outcomes: ICandidateOutcome[] = [];
 
-  /**
-   * Every FINDING_STATS this session saw. Collected because the triple's
-   * positions can only be decoded from a run that found something: `0,0,0`
-   * looks identical whichever order the severities are in.
-   */
-  const findingStatsSeen: {
-    step: number;
-    label: string;
-    triple: string | null;
-    context: string;
-  }[] = [];
-
   /** One worklist per run: reusing one would blur whose findings are whose. */
   const newWorklist = async (label: string): Promise<string | null> => {
     const res = await rec.call(
@@ -629,6 +643,14 @@ async function main(): Promise<void> {
     return id;
   };
 
+  /**
+   * Runs the server accepted, in order. An array rather than a `let`: the push
+   * happens inside `runAt`'s closure, which TypeScript's flow analysis does not
+   * follow, so a nullable variable narrows to `null` at the read below and
+   * makes the whole run-id block unreachable.
+   */
+  const acceptedRuns: { run: ICallResult; worklistId: string }[] = [];
+
   /** Start a run and read the worklist afterwards. Returns the run's own result. */
   const runAt = async (
     label: string,
@@ -644,14 +666,10 @@ async function main(): Promise<void> {
       headers: { 'Content-Type': CT_ATC_RUN, Accept: ACCEPT_ATC_RUN_RESPONSE },
       body: runBody(uris, options?.maximumVerdicts ?? 100),
     });
-    const stats = parseFindingStats(run.body);
-    if (stats) {
-      findingStatsSeen.push({
-        step: run.step,
-        label,
-        triple: stats.triple,
-        context: stats.context,
-      });
+    // The first run the server accepted is the one every id question is asked
+    // against — it does not matter which candidate produced it.
+    if (run.status !== null && run.status >= 200 && run.status < 300) {
+      acceptedRuns.push({ run, worklistId });
     }
     if (options?.readBack !== false) {
       await rec.call(
@@ -769,86 +787,100 @@ async function main(): Promise<void> {
     ['/sap/bc/adt/oo/classes/ZZ_NO_SUCH_CLASS_PROBE'],
   );
 
-  // --- 5. Plural references, and whether a run has an id of its own ---------
+  // --- 5. Whether a run has an id of its own -------------------------------
+  // Gated behind the multi-object run until 2026-08-16, which meant the one
+  // session that DID receive a Location never followed it: the trial had a
+  // single measurable type, so the whole branch was skipped and the probe
+  // reported nothing about the very claim it exists to settle. A run id
+  // question must not depend on how many object types a package happens to
+  // hold.
   const measuredUris = outcomes
     .filter((o) => o.measured && o.attempts.length > 0)
     .map((o) => o.attempts[0].uri);
 
-  if (measuredUris.length > 1) {
-    const multi = await runAt(
-      'multiple-objects',
-      'IAtcRunTarget takes a set. Does one run accept several object references?',
-      measuredUris,
-      { readBack: false },
-    );
-    if (multi) {
-      // The disputed claim is #68's separate run id from `Location`. Read the
-      // header first; a 404 for the worklist id would say nothing about it.
-      const location =
-        header(multi.run.headers, 'location') ??
-        header(multi.run.headers, 'content-location');
-      if (location) {
-        const runId = location.split('/').filter(Boolean).pop() ?? location;
-        logger.info(`Run response carried Location: ${location}`);
-        await rec.call(
-          'run-status-by-location-id',
-          `#68 builds its polling on a run id from Location. This fetches THAT id (${runId}), which is the only thing that can confirm or refute a status resource.`,
-          {
-            method: 'GET',
-            url: location.startsWith('/')
-              ? location
-              : `${ATC}/runs/${encodeURIComponent(runId)}`,
-            headers: { Accept: ACCEPT_ATC_RUN_STATUS },
-          },
-        );
-        await rec.call(
-          'run-status-by-location-id-longpolling',
-          'The same resource with withLongPolling=true, which is what #68 actually sends.',
-          {
-            method: 'GET',
-            url: `${location.startsWith('/') ? location : `${ATC}/runs/${encodeURIComponent(runId)}`}?withLongPolling=true`,
-            headers: { Accept: ACCEPT_ATC_RUN_STATUS },
-          },
-        );
-      } else {
-        logger.info(
-          'Run response carried no Location header — recorded, and the run-id claim fails here rather than at a 404.',
-        );
-      }
-
-      // Separately: the worklist id, which the spec says the run echoes.
+  const anyRun = acceptedRuns[0];
+  if (anyRun) {
+    const location =
+      header(anyRun.run.headers, 'location') ??
+      header(anyRun.run.headers, 'content-location');
+    if (location) {
+      const runId = location.split('/').filter(Boolean).pop() ?? location;
+      const runUrl = location.startsWith('/')
+        ? location
+        : `${ATC}/runs/${encodeURIComponent(runId)}`;
+      logger.info(
+        `Run response carried Location: ${location} (worklist was ${anyRun.worklistId})`,
+      );
       await rec.call(
-        'run-status-by-worklist-id',
-        'A different question from the one above: is the worklist id usable as a run id? A 404 here is only about this id.',
+        'run-status-by-location-id',
+        `#68 builds its polling on a run id from Location. This fetches THAT id (${runId}), which is the only thing that can confirm or refute a status resource.`,
         {
           method: 'GET',
-          url: `${ATC}/runs/${encodeURIComponent(multi.worklistId)}`,
+          url: runUrl,
           headers: { Accept: ACCEPT_ATC_RUN_STATUS },
         },
       );
-
       await rec.call(
-        'findings-multi-exempted-true',
-        'Does includeExemptedFindings=true exist at all? It stays out of the contract until this answers.',
+        'run-status-by-location-id-longpolling',
+        'The same resource with withLongPolling=true, which is what #68 actually sends.',
         {
           method: 'GET',
-          url: `${ATC}/worklists/${encodeURIComponent(multi.worklistId)}?includeExemptedFindings=true`,
-          headers: { Accept: ACCEPT_ATC_WORKLIST_XML },
+          url: `${runUrl}?withLongPolling=true`,
+          headers: { Accept: ACCEPT_ATC_RUN_STATUS },
         },
       );
-      await rec.call(
-        'findings-checkstyle',
-        'The spec says checkstyle is answered with 406 and one accepted type. Confirm or refute.',
-        {
-          method: 'GET',
-          url: `${ATC}/worklists/${encodeURIComponent(multi.worklistId)}`,
-          headers: { Accept: ACCEPT_ATC_WORKLIST_CHECKSTYLE },
-        },
+    } else {
+      logger.info(
+        'Run response carried no Location header — recorded, and the run-id claim fails here rather than at a 404.',
       );
     }
+
+    // Separately: the worklist id, which the recorded session says the run
+    // echoes. A 404 here is only about this id.
+    await rec.call(
+      'run-status-by-worklist-id',
+      'A different question from the one above: is the worklist id usable as a run id?',
+      {
+        method: 'GET',
+        url: `${ATC}/runs/${encodeURIComponent(anyRun.worklistId)}`,
+        headers: { Accept: ACCEPT_ATC_RUN_STATUS },
+      },
+    );
+
+    await rec.call(
+      'findings-exempted-true',
+      'Does includeExemptedFindings=true exist at all? It stays out of the contract until this answers.',
+      {
+        method: 'GET',
+        url: `${ATC}/worklists/${encodeURIComponent(anyRun.worklistId)}?includeExemptedFindings=true`,
+        headers: { Accept: ACCEPT_ATC_WORKLIST_XML },
+      },
+    );
+    await rec.call(
+      'findings-checkstyle',
+      'The recorded session says checkstyle is answered with 406 and one accepted type. Confirm or refute.',
+      {
+        method: 'GET',
+        url: `${ATC}/worklists/${encodeURIComponent(anyRun.worklistId)}`,
+        headers: { Accept: ACCEPT_ATC_WORKLIST_CHECKSTYLE },
+      },
+    );
   } else {
     logger.warn(
-      'Fewer than two measured URIs — skipping the multi-object run and everything that reads its worklist.',
+      'No run was accepted at all — nothing to ask about run ids or worklist reads.',
+    );
+  }
+
+  // --- 5b. Plural references, which is the shape the contract promises -----
+  if (measuredUris.length > 1) {
+    await runAt(
+      'multiple-objects',
+      'IAtcRunTarget takes a set. Does one run accept several object references?',
+      measuredUris,
+    );
+  } else {
+    logger.warn(
+      "Fewer than two measured URIs — skipping the multi-object run. IAtcRunTarget's plural shape stays unmeasured.",
     );
   }
 
@@ -903,11 +935,11 @@ async function main(): Promise<void> {
     : `COMPLETE — all ${CANDIDATES.length} candidate types measured`;
 
   // A non-zero triple somewhere is what makes the positions readable at all.
-  const nonZeroStats = findingStatsSeen.filter(
+  const nonZeroStats = rec.findingStats.filter(
     (f) => f.triple && !/^0\s*,\s*0\s*,\s*0$/.test(f.triple),
   );
   const findingStatsVerdict =
-    findingStatsSeen.length === 0
+    rec.findingStats.length === 0
       ? "FINDING_STATS never appeared in any run response — the spec's premise for it is unconfirmed here"
       : nonZeroStats.length === 0
         ? 'FINDING_STATS seen but always zero — the positions remain undecoded; re-run with --known-bad=KEY:NAME'
@@ -920,7 +952,7 @@ async function main(): Promise<void> {
     packageName,
     verdict,
     findingStatsVerdict,
-    findingStatsSeen,
+    findingStatsSeen: rec.findingStats,
     candidates: outcomes,
   });
 
