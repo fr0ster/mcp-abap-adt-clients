@@ -106,8 +106,17 @@ getAtc(): IAdtRunnable<IAtcRunTarget, IAtcRunResult, IAtcRunOptions> &
 ```
 
 No new named composite: one getter has this set, and a composite earns a name when more than one
-handler does. Export the types from `src/index.ts` — **the interfaces types are not re-exported**;
-consumers import them from `@mcp-abap-adt/interfaces`.
+handler does.
+
+**What this package exports, precisely** — an earlier draft said "export the types from
+`src/index.ts`" and then, in the next clause, that the interfaces types are not re-exported. Both
+cannot hold, and it named the wrong file besides. Raised in review, 2026-08-17.
+
+- `AdtAtc` goes in **`src/index.runtime.ts`**, the runtime barrel, beside the `AtcLog` already
+  there. `src/index.ts` re-exports that barrel wholesale (line 27), so nothing is added to it.
+- **No contract type is exported from here.** `AtcObjectType`, `IAtcRunTarget`, `IAtcRunResult`
+  and the rest come from `@mcp-abap-adt/interfaces`, which consumers import directly. That is the
+  standing rule for this package and the reason the interfaces package exists.
 
 ## Task 6 — Tests
 
@@ -120,22 +129,32 @@ Unit tests, against a recording connection:
 
 1. `run()` with no `checkVariant` reads `/atc/customizing` **with GET**, and uses
    `systemCheckVariant`;
-2. `run()` with `wait: false` returns `{ waited: false, runId }` taken from `Location`;
+2. `run()` with `wait: false` returns `{ waited: false, runId, worklistId }` — the `runId` from
+   `Location` **and** the `worklistId` from the worklist that was created for it, which is a
+   different value from a different response and is what `getFindings` is called with next;
 3. **`run()` with `wait: false` and no `Location` rejects**, naming what was absent — the
    silent-success shape this package removed from fifteen handlers;
-4. `run()` with `wait: true` returns `{ waited: true, findingStats }` verbatim;
+4. `run()` with `wait: true` returns `{ waited: true, findingStats, worklistId }` — the stats
+   verbatim, and the worklist id, which in this mode the run response itself carries;
+   **assert it against the id the worklist creation returned**, since the two must agree and a
+   handler that returned the wrong one would still satisfy the type;
 5. **`run()` with `wait: true` and no `FINDING_STATS` rejects** rather than defaulting to
    `"0,0,0"` — a confident zero is indistinguishable from a clean check;
 6. `getRunStatus` sets `isFinished` for `finished` and **not** for `unfinished` or `not_finished`;
-7. `getRunStatus` on a response without the worklist atom link still resolves, `worklistId`
+7. `getRunStatus` on a response carrying **both** atom links returns both ids, each from its own
+   `rel` — `…/results/worklistid` and `…/results/displayid`. Asserting only the absent case, as an
+   earlier draft did, leaves a parser free to take the first `href` it sees or to swap the two;
+8. `getRunStatus` on a response without the worklist atom link still resolves, `worklistId`
    undefined;
-8. an empty `objects` array rejects before any request;
-9. `maximumVerdicts` of 0, -1, 1.5 and NaN reject before any request;
-10. the seven `AtcObjectType` members build the URIs the evidence confirms — a table test, one
+9. an empty `objects` array rejects before any request;
+10. `maximumVerdicts` of 0, -1, 1.5 and NaN reject before any request;
+11. the seven `AtcObjectType` members build the URIs the evidence confirms — a table test, one
     row per type, so a changed template fails loudly.
 
-Tests 3, 5 and 6 are the ones that keep this honest; 10 is the one that keeps it true to the
-evidence. **Mutation-check each**, one at a time, breaking the thing it pins.
+Tests 3, 5 and 6 keep this honest; 11 keeps it true to the evidence; and 2, 4 and 7 pin the
+`worklistId`, which every one of them needs and none of an earlier draft's tests checked — a
+handler could have lost it, taken it from the wrong response, or returned a different id
+altogether, and the whole suite would have stayed green. **Mutation-check each**, one at a time, breaking the thing it pins.
 
 ## Task 7 — Documentation and release
 
