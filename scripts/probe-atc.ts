@@ -1098,20 +1098,48 @@ async function main(): Promise<void> {
       if (resultsHref) {
         await rec.call(
           'results-bogus-variant',
-          'The run result resource for the bogus-variant run. If a failure is represented anywhere, this and its log are where to look.',
+          'The run result resource for the bogus-variant run — one of four captures a failure could be represented in.',
           {
             method: 'GET',
             url: resultsHref,
             headers: { Accept: 'application/xml' },
           },
         );
+        // The EXECUTION log — one of two, and the client sends a relation
+        // header with it. Omitting the header is itself a way to get a 4xx
+        // that says nothing about whether a failure was recorded.
         await rec.call(
-          'results-log-bogus-variant',
-          'The check-failure log for the same run — the resource IAtcLog reads by execution id.',
+          'results-executionlog-bogus-variant',
+          'The EXECUTION log for this run, as src/runtime/atc/logs.ts getExecutionLog issues it — relation header included.',
           {
             method: 'GET',
             url: `${resultsHref}/log`,
-            headers: { Accept: 'application/xml' },
+            headers: {
+              Accept: 'application/xml',
+              'X-sap-adt-relation':
+                'http://www.sap.com/adt/atc/relations/results/log',
+            },
+          },
+        );
+
+        // The CHECK-FAILURE logs — a different resource entirely, filtered by
+        // displayId. The spec claimed the probe read "the three places a
+        // result could live" while this one was never asked, so a failure
+        // recorded here would have been missed and the 4xx from the other
+        // read as an answer. Raised in review, 2026-08-17.
+        const displayId =
+          resultsHref.split('/').filter(Boolean).pop() ?? resultsHref;
+        await rec.call(
+          'checkfailures-logs-bogus-variant',
+          'The CHECK-FAILURE logs for this run, as getCheckFailureLogs issues them: a separate resource under /atc/checkfailures/logs, filtered by displayId.',
+          {
+            method: 'GET',
+            url: `${ATC}/checkfailures/logs?displayId=${encodeURIComponent(displayId)}`,
+            headers: {
+              Accept: 'application/xml',
+              'X-sap-adt-relation':
+                'http://www.sap.com/adt/atc/relations/checkfailures/logs',
+            },
           },
         );
       } else {

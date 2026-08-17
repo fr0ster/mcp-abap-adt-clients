@@ -496,8 +496,10 @@ Nothing from #17 survives as written: `IGetAtcRunStatusParams { run_id }` was ri
 exists but wrong in shape, `with_long_polling` is unmeasured, and `AtcFindingsFormat` offers a
 format the server refuses.
 
-`IAtcLog` already in the package (`runtime/IAtcLog.ts`) is **not** this: it reads a check-failure
-or execution log by `executionId`. The run resource links to `/atc/results/{displayId}` and to
+`IAtcLog` already in the package (`runtime/IAtcLog.ts`) is **not** this: it reads **two**
+resources — the execution log at `/atc/results/{executionId}/log`, and the check-failure logs at
+`/atc/checkfailures/logs`, filtered by `displayId` among others. Both are separate from a
+worklist, and both take an `X-sap-adt-relation` header. The run resource links to `/atc/results/{displayId}` and to
 `/atc/worklists/{worklistId}` as two different resources under two different `rel`s, so the
 question of whether they were the same thing under two ids is answered: they are not.
 
@@ -611,9 +613,17 @@ variant that does not exist — and reports which of two things happened:
   open;
 - the run is accepted — which by itself proves **nothing**, because the server may fall back to a
   real variant, or run to an end and record the problem somewhere. So the probe samples the status
-  to a fixed bound, records the whole sequence, and then reads the three places a result could
-  live: the worklist, the `/atc/results/{displayId}` resource the run links to, and that
-  resource's `/log`.
+  to a fixed bound, records the whole sequence, and then reads the **four** places a result could
+  live: the worklist, the `/atc/results/{displayId}` resource the run links to, that resource's
+  `/log` — the **execution** log — and `/atc/checkfailures/logs?displayId=…`, which is a separate
+  resource for **check-failure** logs.
+
+  An earlier version read only the first three and called the execution log "the check-failure
+  log". They are two endpoints, and `src/runtime/atc/logs.ts` has been issuing both since before
+  this spec existed (`getExecutionLog`, `getCheckFailureLogs`). Each also carries its own
+  `X-sap-adt-relation` header, which the probe was omitting — so a 4xx from that read would have
+  been the request's fault and could have been mistaken for an answer. Raised in review,
+  2026-08-17.
 
 Two tests are deliberately absent, and both were written and removed:
 
@@ -621,8 +631,9 @@ Two tests are deliberately absent, and both were written and removed:
   unknown — `queued` or `scheduled` would sail through and be recorded as the end of a run.
 - **"`finished`, therefore it did not fail".** `finished` is a **completion** marker, not an
   outcome. A run can finish having done nothing useful, with the reason recorded in the worklist,
-  the result or the log rather than in the status — which is exactly what `IAtcLog` reading a
-  *check-failure* log by execution id implies exists. Concluding success from `finished` was the
+  the result, the execution log or the check-failure logs rather than in the status — and the
+  existence of a resource called *check-failure logs*, distinct from the execution log, is
+  itself the strongest hint that failures are recorded somewhere other than the status. Concluding success from `finished` was the
   same mistake as concluding a type is checkable from a 201. Raised in review, 2026-08-17.
 
 So what the probe can report is bounded and says so: **the run completed; how a failure would be
