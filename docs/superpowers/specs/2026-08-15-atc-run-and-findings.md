@@ -459,23 +459,28 @@ and would otherwise supply a false confirmation for every type at once.
 
 | type | URI the client builds | confirmed by |
 |---|---|---|
-| `class` | `/sap/bc/adt/oo/classes/{NAME}` | `CLAS:ZOK_CL_CLEANER` — probes 5 and 6 |
-| `interface` | `/sap/bc/adt/oo/interfaces/{NAME}` | `INTF:ZOK_IF_PROBE` — probes 5 and 6 |
-| `function_group` | `/sap/bc/adt/functions/groups/{NAME}` | `FUGR:ZOK_FG_PROBE` — probe 5 |
-| `package` | `/sap/bc/adt/packages/{NAME}` | `DEVC:ZBASE_PROBE01` and all five objects in it — probes 5 and 6 |
-| `ddl_source` | `/sap/bc/adt/ddic/ddl/sources/{NAME}` | `DDLS:ZOK_I_PROBE` — probes 5 and 6 |
-| `table` | `/sap/bc/adt/ddic/tables/{NAME}` | `TABL:ZOK_T_PROBE` — probes 5 and 6 |
-| `behavior_definition` | `/sap/bc/adt/bo/behaviordefinitions/{NAME}` | `BDEF:ZOK_I_PROBE` — probe 6 |
+| `class` | `/sap/bc/adt/oo/classes/{NAME}` | `CLAS:ZOK_CL_CLEANER` — sessions 5 and 6 |
+| `interface` | `/sap/bc/adt/oo/interfaces/{NAME}` | `INTF:ZOK_IF_PROBE` — sessions 5 and 6 |
+| `function_group` | `/sap/bc/adt/functions/groups/{NAME}` | `FUGR:ZOK_FG_PROBE` — session 5 |
+| `package` | `/sap/bc/adt/packages/{NAME}` | `DEVC:ZBASE_PROBE01`, and every object in the package beside it — sessions 5 and 6 |
+| `ddl_source` | `/sap/bc/adt/ddic/ddl/sources/{NAME}` | `DDLS:ZOK_I_PROBE` — sessions 5 and 6 |
+| `table` | `/sap/bc/adt/ddic/tables/{NAME}` | `TABL:ZOK_T_PROBE` — sessions 5 and 6 |
+| `behavior_definition` | `/sap/bc/adt/bo/behaviordefinitions/{NAME}` | `BDEF:ZOK_I_PROBE` — session 6 |
 | `program` | `/sap/bc/adt/programs/programs/{NAME}` | **not checkable here** — `403 ExceptionResourceNoAuthorization`, `S_DEVELOP` |
 | `include` | `/sap/bc/adt/programs/includes/{NAME}` | **not checkable here** — same refusal |
 
 Seven confirmed, two refused by the system.
 
-**The evidence spans two runs, and that is not a weakness.** `function_group` was confirmed in
-probe 5; in probe 6 its run request timed out after 60 seconds and never reached a verdict at
-all. `behavior_definition` could only be confirmed in probe 6, because the object did not exist
-until then. Each confirmation is a self-contained capture — a run at a built URI and the finished
-worklist that listed the object — and nothing in the rule says they must share a session.
+**The evidence is seven ATC runs across two probe sessions, and that is not a weakness.** The two
+senses of "run" matter here, in a document where one of them is an API resource: each type has its
+own **ATC run** — its own worklist id and its own run id — and those seven live in the manifests
+of two **probe sessions**. Raised in review, 2026-08-17.
+
+`function_group` was confirmed in the first session; in the second its run request timed out after
+60 seconds and never reached a verdict at all. `behavior_definition` could only be confirmed in
+the second, because the object did not exist until then. Each confirmation is a self-contained
+capture — a run at a built URI and the finished worklist that listed the object — and nothing in
+the rule says they must share a session.
 
 Re-running until one manifest is green would have bought a tidier artefact and cost a real
 observation: that a run request can simply time out, which the probe first reported as "the run

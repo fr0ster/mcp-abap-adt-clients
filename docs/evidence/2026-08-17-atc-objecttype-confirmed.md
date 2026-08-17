@@ -101,6 +101,11 @@ and step 4 answered with:
 
 ```xml
 <atcobject:object adtcore:uri="/sap/bc/adt/atc/objects/R3TR/DEVC/ZBASE_PROBE01" adtcore:type="DEVC" adtcore:name="ZBASE_PROBE01" adtcore:packageName="ZBASE_PROBE01" atcobject:author="CB9980006582" xmlns:atcobject="http://www.sap.com/adt/atc/object" xmlns:adtcore="http://www.sap.com/adt/core">
+<atcobject:object adtcore:uri="/sap/bc/adt/atc/objects/R3TR/CLAS/ZOK_CL_CLEANER" adtcore:type="CLAS" adtcore:name="ZOK_CL_CLEANER" adtcore:packageName="ZBASE_PROBE01" atcobject:author="CB9980006582" atcobject:objectTypeId="CLAS/OC" xmlns:atcobject="http://www.sap.com/adt/atc/object" xmlns:adtcore="http://www.sap.com/adt/core">
+<atcobject:object adtcore:uri="/sap/bc/adt/atc/objects/R3TR/FUGR/ZOK_FG_PROBE" adtcore:type="FUGR" adtcore:name="ZOK_FG_PROBE" adtcore:packageName="ZBASE_PROBE01" atcobject:author="CB9980006582" xmlns:atcobject="http://www.sap.com/adt/atc/object" xmlns:adtcore="http://www.sap.com/adt/core">
+<atcobject:object adtcore:uri="/sap/bc/adt/atc/objects/R3TR/INTF/ZOK_IF_PROBE" adtcore:type="INTF" adtcore:name="ZOK_IF_PROBE" adtcore:packageName="ZBASE_PROBE01" atcobject:author="CB9980006582" xmlns:atcobject="http://www.sap.com/adt/atc/object" xmlns:adtcore="http://www.sap.com/adt/core">
+<atcobject:object adtcore:uri="/sap/bc/adt/atc/objects/R3TR/DDLS/ZOK_I_PROBE" adtcore:type="DDLS" adtcore:name="ZOK_I_PROBE" adtcore:packageName="ZBASE_PROBE01" atcobject:author="CB9980006582" xmlns:atcobject="http://www.sap.com/adt/atc/object" xmlns:adtcore="http://www.sap.com/adt/core">
+<atcobject:object adtcore:uri="/sap/bc/adt/atc/objects/R3TR/TABL/ZOK_T_PROBE" adtcore:type="TABL" adtcore:name="ZOK_T_PROBE" adtcore:packageName="ZBASE_PROBE01" atcobject:author="CB9980006582" xmlns:atcobject="http://www.sap.com/adt/atc/object" xmlns:adtcore="http://www.sap.com/adt/core">
 ```
 
 The run resource links back to the same worklist — `/sap/bc/adt/atc/worklists/6E27F48C3C661FD1A6C5291DD624DD04` — so the chain closes

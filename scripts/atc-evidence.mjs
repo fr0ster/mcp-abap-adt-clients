@@ -116,11 +116,20 @@ for (const key of ORDER) {
   const finished =
     statusSteps.find((s) => statusIn(s.bodyPreview ?? '') === 'finished') ??
     statusSteps.at(-1);
-  const objects = [...body(dir, read.n).matchAll(/<atcobject:object[^>]*>/g)]
-    .map((m) => m[0])
-    .filter((t) =>
-      t.toUpperCase().includes(c.representative.name.toUpperCase()),
-    );
+  const allObjects = [
+    ...body(dir, read.n).matchAll(/<atcobject:object[^>]*>/g),
+  ].map((m) => m[0]);
+  // For `package`, quote every object the worklist listed rather than only the
+  // package itself. The spec's row says the package run confirms the package
+  // AND lists what is inside it, and that second half is also the mechanism it
+  // cites for the weaker "checked in some worklist" fact — so it has to be
+  // visible, not asserted. Raised in review, 2026-08-17.
+  const objects =
+    key === 'package'
+      ? allObjects
+      : allObjects.filter((t) =>
+          t.toUpperCase().includes(c.representative.name.toUpperCase()),
+        );
 
   say(
     `### \`${key}\` — \`${dir}\`, template \`${c.confirmedBy}\``,
@@ -140,7 +149,9 @@ for (const key of ORDER) {
     'and step 4 answered with:',
     '',
     '```xml',
-    ...objects.slice(0, 1).map((t) => t.replace(/\s+/g, ' ')),
+    ...objects
+      .slice(0, key === 'package' ? objects.length : 1)
+      .map((t) => t.replace(/\s+/g, ' ')),
     '```',
     '',
   );
