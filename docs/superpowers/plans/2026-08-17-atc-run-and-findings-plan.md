@@ -109,6 +109,25 @@ evidence confirms. **Not #68's map**: its `include` goes to `/programs/programs/
      silent fall back to the worklist id;
    - `wait: true` → `FINDING_STATS`; a missing one is an error, never `"0,0,0"`.
 
+**Every response this handler depends on is checked, not assumed.** Three of them carry a single
+value the next step cannot work without, and an implementation that shrugs at a missing one
+produces the failure this package keeps removing — a request that looks like it worked. So:
+
+| response | what must be there | when it is not |
+|---|---|---|
+| `POST /atc/worklists` | a bare id, `[A-Za-z0-9]{20,}` | reject naming it — a run against an empty id is a request nobody can interpret |
+| run, `wait: false` | `Location` | reject (above) |
+| run, `wait: true` | `FINDING_STATS` | reject (above) |
+| `GET /atc/runs/{id}` | `runs:status` | reject — `status` is non-optional in `IAtcRunStatus`, and returning `undefined` through it is a lie the type cannot catch |
+
+**And the worklist id in waiting mode.** The run response echoes one. The id this handler returns
+is **the one it created**, because that is the id it controls and the one `getFindings` must be
+called with. The echo is not ignored, though: if it is **present and different**, the run wrote
+into a worklist this caller does not have, so the result is useless and `run()` rejects naming
+both ids. If it is **absent**, that is a malformed response for this mode and `run()` rejects,
+rather than quietly falling back to the created id — the fallback would be right nine times out of
+ten and silent on the tenth. Raised in review, 2026-08-17.
+
 `getRunStatus(runId)` parses `runs:status`, sets `isFinished` on an **exact, case-normalised**
 match, and takes `worklistId`/`resultId` from the atom links when they are there.
 
@@ -149,7 +168,14 @@ exists. So ATC gets its own behavioural test in the guard's shape — every meth
 makes, method and path — rather than the guard being extended to a dozen runtime handlers that
 have no manifest entries. That larger job is worth doing and is not this.
 
-Unit tests, against a recording connection:
+**The wiring gets its own test, in the file that already tests the wiring.**
+`src/__tests__/unit/clients/AdtRuntimeClient.factory.test.ts` asserts, for each of the runtime
+handlers, both that the getter returns the right instance and — in a separate case — that repeated
+calls return **the same** one. `getAtc()` gets both, beside its neighbours. Without them the
+`_atc` field could be forgotten, or a fresh handler built per call, and no request-level test
+would notice. Raised in review, 2026-08-17.
+
+Unit tests for the handler itself, against a recording connection:
 
 1. `run()` with no `checkVariant` reads `/atc/customizing` **with GET**, and uses
    `systemCheckVariant`;
@@ -185,18 +211,28 @@ Unit tests, against a recording connection:
    earlier draft did, leaves a parser free to take the first `href` it sees or to swap the two;
 11. `getRunStatus` on a response without the worklist atom link still resolves, `worklistId`
    undefined;
-12. an empty `objects` array rejects before any request;
-13. `maximumVerdicts` of 0, -1, 1.5 and NaN reject before any request;
-14. the seven `AtcObjectType` members build the URIs the evidence confirms — a table test, one
+12. **`createWorklist` on a response with no usable id rejects**, naming it — an empty body, or a
+    body that is not an id;
+13. **`getRunStatus` on a response with no `runs:status` rejects**, rather than resolving with
+    `status: undefined` through a non-optional field;
+14. **waiting mode with a *different* worklist id in the run response rejects**, naming both ids;
+    and with **no** id in the response it rejects too. A positive test where the two agree cannot
+    distinguish "returns the created id", "trusts the response id" and "never looked" — these two
+    can;
+15. an empty `objects` array rejects before any request;
+16. `maximumVerdicts` of 0, -1, 1.5 and NaN reject before any request;
+17. the seven `AtcObjectType` members build the URIs the evidence confirms — a table test, one
     row per type, so a changed template fails loudly.
 
 Which test guards what, since the list is long enough that the reason gets lost:
 
-- **6, 8, 9** keep it honest — a missing `Location` silently becoming the worklist id, a missing
-  `FINDING_STATS` becoming `"0,0,0"`, a substring match accepting `unfinished`;
+- **6, 8, 9, 12, 13** keep it honest — a missing `Location` silently becoming the worklist id, a
+  missing `FINDING_STATS` becoming `"0,0,0"`, a substring match accepting `unfinished`, an
+  unusable worklist id used anyway, a `status` that is `undefined` through a non-optional field;
+- **14** is the only one that can tell which worklist id the handler actually returns;
 - **4** is the only one that reads the request rather than the answer, and the only one that can
   catch a payload that instructs the server to do something other than what the caller asked;
-- **14** keeps the URI templates tied to the evidence;
+- **17** keeps the URI templates tied to the evidence;
 - **5, 7, 10** pin the `worklistId` and the atom links, which everything downstream needs;
 - **2, 3** pin the branch that decides whether a request happens at all. **Mutation-check each**, one at a time, breaking the thing it pins.
 
