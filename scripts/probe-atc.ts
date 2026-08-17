@@ -1019,7 +1019,7 @@ async function main(): Promise<void> {
   } else if (outcomes.some((o) => o.attempted && o.attempts.length > 0)) {
     const failing = await rec.call(
       'run-bogus-variant',
-      'A run under a check variant that does not exist. If it is accepted, its status is the terminal-failure state nobody has captured.',
+      'A run under a check variant that does not exist. Acceptance proves nothing on its own — the server may fall back to a real variant, or run to an end and record the problem elsewhere. What follows is sampling, not a verdict.',
       {
         method: 'POST',
         url: `${ATC}/runs?worklistId=${encodeURIComponent(bogusWorklistId)}&clientWait=false`,
@@ -1076,7 +1076,7 @@ async function main(): Promise<void> {
       // is still open.
       await rec.call(
         'findings-bogus-variant',
-        'The worklist of the bogus-variant run. If it reads like a normal finished run, the run did not fail and the terminal state is still unobserved.',
+        'The worklist of the bogus-variant run, captured for comparison against a healthy one. Nothing here is classified: `finished` marks completion, not success, so a normal-looking worklist is not proof the run succeeded.',
         {
           method: 'GET',
           url: `${ATC}/worklists/${encodeURIComponent(bogusWorklistId)}?includeExemptedFindings=false`,

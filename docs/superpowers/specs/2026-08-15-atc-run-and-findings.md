@@ -570,8 +570,9 @@ mixing it into ATC is what made #68 an 11k-line diff. Its own spec.
 
 ## What is still open
 
-One blocker and four loose ends on the trial, plus one probe that needs an on-prem system and
-does **not** block v1.
+One blocker and **five** loose ends on the trial, plus one probe that needs an on-prem system and
+does **not** block v1. (Counted against the table below rather than from memory — the number was
+wrong twice.)
 
 **Blocking:**
 
