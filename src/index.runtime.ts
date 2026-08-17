@@ -6,6 +6,7 @@
 export { AdtRuntimeClient } from './clients/AdtRuntimeClient';
 export { AdtRuntimeClientExperimental } from './clients/AdtRuntimeClientExperimental';
 export { ApplicationLog } from './runtime/applicationLog/ApplicationLog';
+export { AdtAtc } from './runtime/atc/AdtAtc';
 export { AtcLog } from './runtime/atc/AtcLog';
 export { DdicActivation } from './runtime/ddic/DdicActivation';
 export { AbapDebugger } from './runtime/debugger/AbapDebugger';

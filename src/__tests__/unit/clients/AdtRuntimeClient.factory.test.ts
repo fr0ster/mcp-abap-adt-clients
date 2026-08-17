@@ -1,6 +1,7 @@
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import { AdtRuntimeClient } from '../../../clients/AdtRuntimeClient';
 import { ApplicationLog } from '../../../runtime/applicationLog/ApplicationLog';
+import { AdtAtc } from '../../../runtime/atc/AdtAtc';
 import { AtcLog } from '../../../runtime/atc/AtcLog';
 import { DdicActivation } from '../../../runtime/ddic/DdicActivation';
 import { AbapDebugger } from '../../../runtime/debugger/AbapDebugger';
@@ -64,6 +65,16 @@ describe('AdtRuntimeClient factory pattern', () => {
     expect(client.getAtcLog()).toBeInstanceOf(AtcLog);
   });
 
+  // Two neighbours with almost the same name reading the same subject from
+  // different resources: getAtc() runs checks, getAtcLog() reads execution logs.
+  // Asserting they are different objects is the cheap way to catch a factory
+  // wired to the wrong cached field.
+  it('getAtc() returns an AdtAtc instance, distinct from getAtcLog()', () => {
+    const { client } = createRuntimeClient();
+    expect(client.getAtc()).toBeInstanceOf(AdtAtc);
+    expect(client.getAtc()).not.toBe(client.getAtcLog());
+  });
+
   it('getDdicActivation() returns a DdicActivation instance', () => {
     const { client } = createRuntimeClient();
     expect(client.getDdicActivation()).toBeInstanceOf(DdicActivation);
@@ -118,6 +129,11 @@ describe('AdtRuntimeClient factory pattern', () => {
     it('getAtcLog() returns the same instance on repeated calls', () => {
       const { client } = createRuntimeClient();
       expect(client.getAtcLog()).toBe(client.getAtcLog());
+    });
+
+    it('getAtc() returns the same instance on repeated calls', () => {
+      const { client } = createRuntimeClient();
+      expect(client.getAtc()).toBe(client.getAtc());
     });
 
     it('getDdicActivation() returns the same instance on repeated calls', () => {
@@ -211,6 +227,16 @@ describe('AdtRuntimeClient factory pattern', () => {
       expect(typeof d.launch).toBe('function');
       expect(typeof d.stop).toBe('function');
       expect(typeof d.getCallStack).toBe('function');
+    });
+
+    // The three capabilities the narrowed return type promises, and nothing
+    // else: no create, no lock, no activate.
+    it('atc has exactly the runnable and reader methods', () => {
+      const { client } = createRuntimeClient();
+      const atc = client.getAtc();
+      expect(typeof atc.run).toBe('function');
+      expect(typeof atc.getRunStatus).toBe('function');
+      expect(typeof atc.getFindings).toBe('function');
     });
 
     it('dumps has expected methods', () => {

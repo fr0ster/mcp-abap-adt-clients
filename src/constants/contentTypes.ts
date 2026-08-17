@@ -267,3 +267,21 @@ export const CT_ABAPGIT_EXTERNAL_REPO_INFO_REQUEST_V2 =
   'application/abapgit.adt.repo.info.ext.request.v2+xml';
 export const ACCEPT_ABAPGIT_EXTERNAL_REPO_INFO_RESPONSE_V2 =
   'application/abapgit.adt.repo.info.ext.response.v2+xml';
+
+// ATC (ABAP Test Cockpit) — captured against a cloud trial, not taken from
+// documentation. Two of these are the resource rather than a detail: the
+// worklist is created and its id read as text/plain where everything around it
+// is XML, and the run resource answers only to the backgroundrun type. A
+// checkstyle Accept on the worklist is refused with 406 naming the one type it
+// will serve, which is why there is no format option and no checkstyle
+// constant here.
+export const CT_ATC_WORKLIST_CREATE = 'text/plain';
+export const ACCEPT_ATC_WORKLIST_ID = 'text/plain';
+export const CT_ATC_RUN = 'application/xml';
+export const ACCEPT_ATC_RUN_RESPONSE = 'application/xml';
+export const ACCEPT_ATC_RUN_STATUS =
+  'application/vnd.sap.adt.backgroundrun.v1+xml';
+export const ACCEPT_ATC_WORKLIST_XML =
+  'application/atc.worklist.v1+xml, application/vnd.sap.atc.worklist.v1+xml';
+export const ACCEPT_ATC_CUSTOMIZING =
+  'application/xml, application/vnd.sap.atc.customizing-v1+xml, application/vnd.sap.atc.customizing-v2+xml';

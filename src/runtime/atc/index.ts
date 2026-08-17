@@ -2,6 +2,7 @@
  * ATC (ABAP Test Cockpit) - Exports
  */
 
+export { AdtAtc } from './AdtAtc';
 export { AtcLog } from './AtcLog';
 export {
   getCheckFailureLogs,
