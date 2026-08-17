@@ -115,18 +115,29 @@ produces the failure this package keeps removing — a request that looks like i
 
 | response | what must be there | when it is not |
 |---|---|---|
-| `POST /atc/worklists` | a bare id, `[A-Za-z0-9]{20,}` | reject naming it — a run against an empty id is a request nobody can interpret |
+| `POST /atc/worklists` | a non-empty id — **and nothing more specific** | reject naming it: a run against an empty id is a request nobody can interpret |
 | run, `wait: false` | `Location` | reject (above) |
 | run, `wait: true` | `FINDING_STATS` | reject (above) |
 | `GET /atc/runs/{id}` | `runs:status` | reject — `status` is non-optional in `IAtcRunStatus`, and returning `undefined` through it is a lie the type cannot catch |
 
-**And the worklist id in waiting mode.** The run response echoes one. The id this handler returns
-is **the one it created**, because that is the id it controls and the one `getFindings` must be
-called with. The echo is not ignored, though: if it is **present and different**, the run wrote
-into a worklist this caller does not have, so the result is useless and `run()` rejects naming
-both ids. If it is **absent**, that is a malformed response for this mode and `run()` rejects,
-rather than quietly falling back to the created id — the fallback would be right nine times out of
-ten and silent on the tenth. Raised in review, 2026-08-17.
+**The worklist id is checked for emptiness and nothing else.** An earlier draft of this plan
+required `[A-Za-z0-9]{20,}`, a shape nobody specified: the evidence shows 32-character hex on one
+system, the contract sets no format, and that regex manages to accept unconfirmed junk *and* to
+risk rejecting a valid id from a backend nobody has probed. A trimmed non-empty scalar is what the
+next request actually needs. Raised in review, 2026-08-17.
+
+**And in waiting mode, the handler returns the id it created.** That is the id it controls and the
+one `getFindings` must be called with, so nothing about the run response can improve on it.
+
+The run response also echoes an id. An earlier draft had `run()` **reject** when that echo was
+absent or different — which is new failure behaviour, invented in a plan, for a contract the spec
+has already been approved against. The spec calls a waiting response malformed when
+`FINDING_STATS` is missing and says nothing about the echo, and turning a usable answer into an
+error is not a detail an implementation plan gets to add. Raised in review, 2026-08-17.
+
+So: a **different** echo is logged at WARN and the created id is returned; an **absent** one is
+not an error at all. If cross-checking the echo is worth a rejection, it goes through the spec
+first, with evidence that the echo is always present and always equal.
 
 `getRunStatus(runId)` parses `runs:status`, sets `isFinished` on an **exact, case-normalised**
 match, and takes `worklistId`/`resultId` from the atom links when they are there.
@@ -211,14 +222,15 @@ Unit tests for the handler itself, against a recording connection:
    earlier draft did, leaves a parser free to take the first `href` it sees or to swap the two;
 11. `getRunStatus` on a response without the worklist atom link still resolves, `worklistId`
    undefined;
-12. **`createWorklist` on a response with no usable id rejects**, naming it — an empty body, or a
-    body that is not an id;
+12. **`createWorklist` on an empty or whitespace-only response rejects**, naming it. Only that:
+    the test must not assert a length or a character class, since no such rule is specified;
 13. **`getRunStatus` on a response with no `runs:status` rejects**, rather than resolving with
     `status: undefined` through a non-optional field;
-14. **waiting mode with a *different* worklist id in the run response rejects**, naming both ids;
-    and with **no** id in the response it rejects too. A positive test where the two agree cannot
-    distinguish "returns the created id", "trusts the response id" and "never looked" — these two
-    can;
+14. **waiting mode returns the id it created**, proven where it matters: a run response echoing a
+    *different* id still yields the created one, and the call **succeeds**. A response with no
+    echo also succeeds. A positive test where the two agree cannot distinguish "returns the
+    created id" from "trusts the response id" — this one can, without inventing a failure the
+    spec does not have;
 15. an empty `objects` array rejects before any request;
 16. `maximumVerdicts` of 0, -1, 1.5 and NaN reject before any request;
 17. the seven `AtcObjectType` members build the URIs the evidence confirms — a table test, one
@@ -227,9 +239,10 @@ Unit tests for the handler itself, against a recording connection:
 Which test guards what, since the list is long enough that the reason gets lost:
 
 - **6, 8, 9, 12, 13** keep it honest — a missing `Location` silently becoming the worklist id, a
-  missing `FINDING_STATS` becoming `"0,0,0"`, a substring match accepting `unfinished`, an
-  unusable worklist id used anyway, a `status` that is `undefined` through a non-optional field;
-- **14** is the only one that can tell which worklist id the handler actually returns;
+  missing `FINDING_STATS` becoming `"0,0,0"`, a substring match accepting `unfinished`, an empty
+  worklist id used anyway, a `status` that is `undefined` through a non-optional field;
+- **14** is the only one that can tell which worklist id the handler actually returns — and it
+  asserts a success, not a rejection, because the spec defines no failure here;
 - **4** is the only one that reads the request rather than the answer, and the only one that can
   catch a payload that instructs the server to do something other than what the caller asked;
 - **17** keeps the URI templates tied to the evidence;
