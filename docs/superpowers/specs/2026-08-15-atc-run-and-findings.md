@@ -447,9 +447,15 @@ Reading earlier is not a weaker measurement; it is a different one, of nothing.
 
 #### Where it stands
 
-Each row below is quoted in `docs/evidence/2026-08-17-atc-objecttype-confirmed.md` — the run's
-URI, and the `<atcobject:object>` element the finished worklist answered with, `adtcore:type`
-included, because the type is what makes it evidence about a type.
+Each row below is quoted in `docs/evidence/2026-08-17-atc-objecttype-confirmed.md` as a **chain**,
+not a summary: the worklist id created for that run, the run request carrying that id and the
+built URI, the `Location` run resource reporting `finished` and linking back to the same worklist,
+and the read of that worklist with the `<atcobject:object>` element it answered — `adtcore:type`
+included, since the type is what makes it evidence about a type.
+
+The worklist id is the join, and it differs per row. Without it a reader cannot tell an object
+listed by *its own* run from one listed by the package run, which lists everything in the package
+and would otherwise supply a false confirmation for every type at once.
 
 | type | URI the client builds | confirmed by |
 |---|---|---|
