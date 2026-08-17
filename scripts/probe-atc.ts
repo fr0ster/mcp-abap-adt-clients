@@ -580,6 +580,16 @@ interface ICandidateOutcome {
   confirmed: boolean;
   /** Which template's run produced the confirmation, where one did. */
   confirmedBy?: string;
+  /**
+   * ATC checked an object of this type in SOME finished worklist — typically
+   * the package run, which lists everything in the package.
+   *
+   * A weaker fact than `confirmed`, and deliberately separate. It says the
+   * type is checkable; it does NOT say the URI this client builds for it is
+   * the right one to submit, which is what `AtcObjectType` promises. Both
+   * matter and they are not the same claim.
+   */
+  seenCheckedInSomeWorklist?: { worklistOf: string; name: string };
   /** Why it was never asked, in the manifest rather than only in the log. */
   reason?: string;
 }
@@ -670,21 +680,59 @@ async function main(): Promise<void> {
   }
 
   logger.info(`Reading contents of ${packageName}`);
-  const contents = await utils.getPackageContentsList(packageName, {
-    includeSubpackages: true,
-  });
 
-  const firstOfType = new Map<
-    string,
-    { name: string; type: string; uri?: string }
-  >();
-  for (const item of contents) {
-    if (!firstOfType.has(item.type)) {
-      firstOfType.set(item.type, {
-        name: item.name,
-        type: item.type,
-        uri: item.uri,
-      });
+  const readContents = async () => {
+    const items = await utils.getPackageContentsList(packageName, {
+      includeSubpackages: true,
+    });
+    const map = new Map<string, { name: string; type: string; uri?: string }>();
+    for (const item of items) {
+      if (!map.has(item.type)) {
+        map.set(item.type, { name: item.name, type: item.type, uri: item.uri });
+      }
+    }
+    return map;
+  };
+
+  /**
+   * Every object any finished worklist named, and which run's it was.
+   *
+   * The package run lists the whole package, so it can show ATC checking a
+   * type whose own run never happened — which is how a run of 2026-08-17
+   * proved FUGR and DDLS checkable while the probe reported them "never
+   * asked". Recorded separately from per-candidate confirmation, because it
+   * proves a different thing.
+   */
+  const everChecked: { worklistOf: string; type: string; name: string }[] = [];
+
+  let firstOfType = await readContents();
+  // Say what was found. The probe used to read the package silently and then
+  // report "no object of X" — which reads as a fact about the package when it
+  // may be a fact about one listing call. A run of 2026-08-17 reported FUGR/F
+  // and DDLS/DF absent while three listings before and after returned both.
+  logger.info(
+    `${packageName} listing: ${[...firstOfType.values()].map((v) => `${v.type}:${v.name}`).join(', ') || '(nothing)'}`,
+  );
+
+  const missingCloud = () =>
+    CANDIDATES.filter(
+      (c) =>
+        c.scope === 'cloud' && !c.typeCodes.some((t) => firstOfType.has(t)),
+    ).map((c) => c.key);
+
+  if (missingCloud().length) {
+    logger.warn(
+      `Listing has no representative for: ${missingCloud().join(', ')} — reading it again before believing that.`,
+    );
+    const second = await readContents();
+    logger.info(
+      `${packageName} listing (2nd): ${[...second.values()].map((v) => `${v.type}:${v.name}`).join(', ') || '(nothing)'}`,
+    );
+    if (second.size > firstOfType.size) {
+      logger.warn(
+        'The second listing returned MORE than the first — the package listing is not reliable in this session, and the larger one is used.',
+      );
+      firstOfType = second;
     }
   }
   // The probed package is its own representative for the `package` candidate:
@@ -838,7 +886,12 @@ async function main(): Promise<void> {
           headers: { Accept: ACCEPT_ATC_WORKLIST_XML },
         },
       );
-      if (finished) objects = objectsIn(findings.body);
+      if (finished) {
+        objects = objectsIn(findings.body);
+        for (const o of objects) {
+          everChecked.push({ worklistOf: label, type: o.type, name: o.name });
+        }
+      }
     }
     return { run, worklistId, finished, objects };
   };
@@ -931,6 +984,26 @@ async function main(): Promise<void> {
           status: result.run.status,
         };
       }
+    }
+  }
+
+  // Cross-reference: a type whose own run never happened may still have been
+  // checked in somebody else's worklist. Weaker evidence, recorded as such.
+  for (const outcome of outcomes) {
+    if (outcome.confirmed) continue;
+    const candidate = CANDIDATES.find((c) => c.key === outcome.key);
+    if (!candidate) continue;
+    const hit = everChecked.find(
+      (e) => e.type.toUpperCase() === candidate.worklistTypeCode,
+    );
+    if (hit) {
+      outcome.seenCheckedInSomeWorklist = {
+        worklistOf: hit.worklistOf,
+        name: hit.name,
+      };
+      logger.info(
+        `${outcome.key}: not confirmed at a built URI, but ATC checked ${hit.type}:${hit.name} in the ${hit.worklistOf} worklist — the TYPE is checkable, the template is still unproven.`,
+      );
     }
   }
 
@@ -1491,7 +1564,10 @@ async function main(): Promise<void> {
       'AtcObjectType is NOT closed by this run. A type joins the union when a FINISHED worklist lists its object — not when a run is accepted, which happens for a URI that cannot exist.',
     );
     for (const o of unconfirmed) {
-      logger.error(`  ${o.key}: ${why(o)}`);
+      const weaker = o.seenCheckedInSomeWorklist
+        ? ` — but ATC checked ${o.key} as ${o.seenCheckedInSomeWorklist.name} in the ${o.seenCheckedInSomeWorklist.worklistOf} worklist, so the TYPE is checkable and only the template is unproven`
+        : '';
+      logger.error(`  ${o.key}: ${why(o)}${weaker}`);
     }
     process.exitCode = 1;
   } else {

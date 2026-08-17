@@ -385,8 +385,26 @@ with its own findings block — empty when the object is clean. From the two-obj
 </atcobject:object>
 ```
 
-So a type is confirmed when its object **appears in a finished worklist**, with or without
-findings. Appearing is the evidence; a finding is a bonus.
+So a type is confirmed when its object appears in a finished worklist, with or without findings.
+Appearing is the evidence; a finding is a bonus.
+
+**But in whose worklist, and that is two different claims.** A run over a *package* lists
+everything in it — so one such worklist can show ATC checking a function group and a CDS view
+without anybody ever submitting those URIs:
+
+- **the type is checkable** — an object of it appears in *some* finished worklist;
+- **the template is right** — a run submitted at the URI *this client builds* for that type came
+  back with the object in its own worklist.
+
+`AtcObjectType` promises the second. It is the set of types a caller can hand to `run()`, and a
+wrong URI fails at submission however checkable the type is. The first is still worth recording,
+because it narrows what remains: a type known checkable with an unproven template needs one run,
+not an investigation.
+
+Both facts are carried separately in the probe's manifest — `confirmed` with the template that
+did it, and `seenCheckedInSomeWorklist` with the run whose worklist showed it. Raised by a run of
+2026-08-17 that proved `function_group` and `ddl_source` checkable in the package's worklist while
+reporting them as never asked. Raised in review the same day.
 
 Two answers were tried before that one, and both are worth keeping because each looked right:
 
