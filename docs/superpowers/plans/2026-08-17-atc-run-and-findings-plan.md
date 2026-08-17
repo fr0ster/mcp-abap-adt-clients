@@ -179,9 +179,30 @@ cannot hold, and it named the wrong file besides. Raised in review, 2026-08-17.
 ## Task 6 — Tests
 
 The capability guard walks `AdtClient` and `AdtClientLegacy`; it does not know `AdtRuntimeClient`
-exists. So ATC gets its own behavioural test in the guard's shape — every method, the request it
-makes, method and path — rather than the guard being extended to a dozen runtime handlers that
-have no manifest entries. That larger job is worth doing and is not this.
+exists. So ATC gets its own behavioural test in the guard's shape — every method, and the request
+it makes — rather than the guard being extended to a dozen runtime handlers that have no manifest
+entries. That larger job is worth doing and is not this.
+
+**"The request" means method, path AND media types**, which is a stronger claim than the guard's
+own and deliberately so. In ATC the header *is* the resource: the same path answers differently by
+`Accept`, a checkstyle `Accept` is refused with **406** naming the one type it will serve, and the
+worklist creation is `text/plain` in both directions where everything around it is XML. A suite
+that pinned only method and path would stay green while the client asked for a media type the
+server refuses. So the request-level test fixes the headers for all five low-level operations:
+
+| operation | headers pinned, exactly as captured |
+|---|---|
+| `getCustomizing` | `Accept: application/xml, application/vnd.sap.atc.customizing-v1+xml, application/vnd.sap.atc.customizing-v2+xml` |
+| `createWorklist` | `Content-Type: text/plain`, `Accept: text/plain` |
+| `startRun` | `Content-Type: application/xml`, `Accept: application/xml` |
+| `getRunStatus` | `Accept: application/vnd.sap.adt.backgroundrun.v1+xml` |
+| `getWorklist` | `Accept: application/atc.worklist.v1+xml, application/vnd.sap.atc.worklist.v1+xml` |
+
+**Verbatim from the captures, not paraphrased.** A first draft of this table wrote the worklist
+`Accept` as one type where the traffic sends two, which is the failure mode the table exists to
+prevent — a header rewritten from memory into something plausible. The server's 406 names
+`application/atc.worklist.v1+xml` as what it will serve, and the request that works offers both;
+neither fact is a licence to send something else. Raised in review, 2026-08-17.
 
 **The wiring gets its own test, in the file that already tests the wiring.**
 `src/__tests__/unit/clients/AdtRuntimeClient.factory.test.ts` asserts, for each of the runtime
@@ -223,8 +244,8 @@ Unit tests for the handler itself, against a recording connection:
 8. `run()` with `wait: true` returns `{ waited: true, findingStats, worklistId }` against an
    ordinary observed response — the stats verbatim, and the created worklist id. It asserts the
    happy path and nothing about where the id came from: an earlier draft had it claiming the
-   response echo "must agree", which contradicts test 14, where a *different* echo is fed in
-   deliberately and the call succeeds. Which id is authoritative is test 14's job. Raised in
+   response echo "must agree", which contradicts test 15, where a *different* echo is fed in
+   deliberately and the call succeeds. Which id is authoritative is test 15's job. Raised in
    review, 2026-08-17;
 9. **`run()` with `wait: true` and no `FINDING_STATS` rejects** rather than defaulting to
    `"0,0,0"` — a confident zero is indistinguishable from a clean check;
@@ -242,7 +263,13 @@ Unit tests for the handler itself, against a recording connection:
     *different* id still yields the created one, and the call **succeeds**. A response with no
     echo also succeeds. A positive test where the two agree cannot distinguish "returns the
     created id" from "trusts the response id" — this one can, without inventing a failure the
-    spec does not have;
+    spec does not have.
+
+    **And it asserts the WARN.** Task 4 says a differing echo is logged; a behaviour that is
+    specified and untested is a behaviour that quietly disappears. The test passes a recording
+    `ILogger` and checks the warning names both ids. If that is not worth asserting, the logging
+    requirement should come out of Task 4 instead — but it should not sit in one and be absent
+    from the other. Raised in review, 2026-08-17;
 16. an empty `objects` array rejects before any request;
 17. `maximumVerdicts` of 0, -1, 1.5 and NaN reject before any request;
 18. the seven `AtcObjectType` members build the URIs the evidence confirms — a table test, one
