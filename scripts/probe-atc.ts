@@ -1083,9 +1083,46 @@ async function main(): Promise<void> {
           headers: { Accept: ACCEPT_ATC_WORKLIST_XML },
         },
       );
+      // The run resource links to a THIRD id under /atc/results/. `IAtcLog`
+      // reads a check-failure log by an execution id, so that link is the
+      // likeliest place a failure is represented — and nothing here has ever
+      // fetched it.
+      const lastStatus = await rec.call(
+        'status-bogus-variant-final',
+        'One more status read, to take the results link out of it.',
+        { method: 'GET', url, headers: { Accept: ACCEPT_ATC_RUN_STATUS } },
+      );
+      const resultsHref = lastStatus.body.match(
+        /href="([^"]*\/atc\/results\/[^"]*)"/,
+      )?.[1];
+      if (resultsHref) {
+        await rec.call(
+          'results-bogus-variant',
+          'The run result resource for the bogus-variant run. If a failure is represented anywhere, this and its log are where to look.',
+          {
+            method: 'GET',
+            url: resultsHref,
+            headers: { Accept: 'application/xml' },
+          },
+        );
+        await rec.call(
+          'results-log-bogus-variant',
+          'The check-failure log for the same run — the resource IAtcLog reads by execution id.',
+          {
+            method: 'GET',
+            url: `${resultsHref}/log`,
+            headers: { Accept: 'application/xml' },
+          },
+        );
+      } else {
+        logger.warn(
+          'No /atc/results/ link in the run status, so the log could not be read.',
+        );
+      }
+
       if (seen.every((v) => v.trim().toLowerCase() === 'finished')) {
         logger.warn(
-          'The bogus-variant run reported `finished` throughout — so it did not fail, and what a FAILED run reports remains unobserved.',
+          'The bogus-variant run reported `finished` throughout. That is a COMPLETION marker, not a success: the run ran to an end, and whether it ended in an error is not something the status says. Read the worklist, the result and the log captured above — how a failure is represented is still unknown.',
         );
       }
     } else {

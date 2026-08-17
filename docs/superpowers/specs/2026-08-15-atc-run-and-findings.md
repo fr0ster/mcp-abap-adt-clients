@@ -178,6 +178,11 @@ interface IAtcRunStatus {
   /**
    * True when `status` is exactly `finished`, case-normalised.
    *
+   * **Completion, not success.** It says the run reached an end, not that the
+   * end was a good one: a run can finish having checked nothing, with the
+   * reason recorded in the worklist, the result resource or its log rather
+   * than in this status.
+   *
    * **There is deliberately no `isTerminal` or `isFailed`.** A run that fails
    * or is cancelled has never been observed, so any state this type named for
    * it would be invented — and a wrong name is worse here than none, because a
@@ -604,13 +609,23 @@ variant that does not exist — and reports which of two things happened:
 - the worklist creation is refused, so no run exists to have a status, and the question stays
   open;
 - the run is accepted — which by itself proves **nothing**, because the server may fall back to a
-  real variant, or finish normally and report the problem as a finding. So the probe samples the
-  status to a fixed bound, records the whole sequence, and reads the worklist afterwards. A value
-  that repeats to the bound and is not `finished` is a **candidate** terminal state; a run that
-  reports `finished` throughout did not fail, and the question is still open.
+  real variant, or run to an end and record the problem somewhere. So the probe samples the status
+  to a fixed bound, records the whole sequence, and then reads the three places a result could
+  live: the worklist, the `/atc/results/{displayId}` resource the run links to, and that
+  resource's `/log`.
 
-There is deliberately no test for "not `running`, therefore terminal". The set of non-terminal
-states is precisely what is unknown — `queued` or `scheduled` would sail through such a test and
-be recorded as the end of a run. Raised in review, 2026-08-17.
+Two tests are deliberately absent, and both were written and removed:
+
+- **"not `running`, therefore terminal".** The set of non-terminal states is precisely what is
+  unknown — `queued` or `scheduled` would sail through and be recorded as the end of a run.
+- **"`finished`, therefore it did not fail".** `finished` is a **completion** marker, not an
+  outcome. A run can finish having done nothing useful, with the reason recorded in the worklist,
+  the result or the log rather than in the status — which is exactly what `IAtcLog` reading a
+  *check-failure* log by execution id implies exists. Concluding success from `finished` was the
+  same mistake as concluding a type is checkable from a 201. Raised in review, 2026-08-17.
+
+So what the probe can report is bounded and says so: **the run completed; how a failure would be
+represented is still unobserved.** Deciding that needs somebody to read the three captures
+against a run known to be healthy and see what differs.
 
 Either way the manifest records it, rather than the spec asserting a coverage nobody checked.
