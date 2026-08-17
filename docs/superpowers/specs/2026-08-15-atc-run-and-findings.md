@@ -636,8 +636,21 @@ Two tests are deliberately absent, and both were written and removed:
   itself the strongest hint that failures are recorded somewhere other than the status. Concluding success from `finished` was the
   same mistake as concluding a type is checkable from a 201. Raised in review, 2026-08-17.
 
-So what the probe can report is bounded and says so: **the run completed; how a failure would be
-represented is still unobserved.** Deciding that needs somebody to read the **four** captures
-against a run known to be healthy and see what differs.
+So what the probe can report is bounded, and it depends on something it may not see. The status
+sequence is eight samples; `finished` may never appear in them, and the probe deliberately does
+not know which of the other values are terminal — that is the whole gap. Two cases, and the run
+must say which one it is in:
+
+- **`finished` was observed.** The run reached an end. Whether that end was a good one is still
+  unobserved, and the four captures are of a completed run — worth comparing against a healthy
+  one.
+- **`finished` was never observed.** Then completion is **not** established either. All that
+  exists is a bounded sequence of states, and the four captures were taken while the run may
+  still have been going: they cannot be read as final, and a difference from a healthy run could
+  as easily be "not finished yet" as "failed".
+
+An earlier version of this paragraph said "the run completed" flatly, which is only true in the
+first case and is exactly the kind of unconditional reading this section was written to remove.
+Raised in review, 2026-08-17.
 
 Either way the manifest records it, rather than the spec asserting a coverage nobody checked.

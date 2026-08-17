@@ -1150,9 +1150,18 @@ async function main(): Promise<void> {
         );
       }
 
-      if (seen.every((v) => v.trim().toLowerCase() === 'finished')) {
+      // Which of two cases this run is in decides what the four captures are
+      // worth, and the sequence may contain no completion marker at all.
+      const sawFinished = seen.some(
+        (v) => v.trim().toLowerCase() === 'finished',
+      );
+      if (sawFinished) {
         logger.warn(
-          'The bogus-variant run reported `finished` throughout. That is a COMPLETION marker, not a success: the run ran to an end, and whether it ended in an error is not something the status says. Read the worklist, the result and the log captured above — how a failure is represented is still unknown.',
+          'The bogus-variant run reached `finished`. That is a COMPLETION marker, not a success: whether it ended in an error is not something the status says. The four captures are of a COMPLETED run — compare them against a healthy one.',
+        );
+      } else {
+        logger.warn(
+          `The bogus-variant run never reported \`finished\` within ${seen.length} samples (${seen.join(' → ')}). Completion is NOT established, and the four captures were taken while it may still have been running — they cannot be read as final.`,
         );
       }
     } else {
