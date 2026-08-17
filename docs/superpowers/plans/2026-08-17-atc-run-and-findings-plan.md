@@ -24,9 +24,33 @@ Current: interfaces 17.0.0, adt-clients 12.0.0 (`^17.0.0`).
 
 ## Task 1 — The contract
 
-New file `src/atc/IAtcRun.ts` (or alongside the existing `runtime/IAtcLog.ts`; the plan does not
-care which, only that `IAtcLog` is not touched — it is a different resource pair and the spec says
-so).
+**File: `src/runtime/IAtcRun.ts`.** Not a choice left to whoever executes this — an earlier draft
+offered two locations and said it did not care, while the location decides the module category and
+which barrel entry the contract appears under. Raised in review, 2026-08-17.
+
+`src/runtime/` is where `IAtcLog.ts` already lives, alongside `IProfiler`, `IRuntimeDumps` and the
+rest of the runtime-analysis contracts — which is what a check run is, and is why the handler goes
+on `AdtRuntimeClient`. `IAtcLog.ts` itself is **not touched**: it is a different pair of resources
+and the spec says so.
+
+**Export, in `src/index.ts`, in the same shape as its neighbours** — an explicit named list, not a
+star:
+
+```ts
+export type {
+  AtcObjectType,
+  IAtcFindings,
+  IAtcObjectRef,
+  IAtcRunOptions,
+  IAtcRunResult,
+  IAtcRunStatus,
+  IAtcRunStatusReadable,
+  IAtcRunTarget,
+} from './runtime/IAtcRun';
+```
+
+placed beside the existing `from './runtime/IAtcLog'` block, so the two ATC contracts read as
+neighbours without one importing the other.
 
 Everything the spec specifies, with its doc comments carried over rather than paraphrased. Three
 of them are load-bearing and must survive review:
@@ -129,32 +153,52 @@ Unit tests, against a recording connection:
 
 1. `run()` with no `checkVariant` reads `/atc/customizing` **with GET**, and uses
    `systemCheckVariant`;
-2. `run()` with `wait: false` returns `{ waited: false, runId, worklistId }` — the `runId` from
+2. `run()` **with** an explicit `checkVariant` does not read `/atc/customizing` at all — assert
+   the request was never made, not merely that the right variant was used;
+3. `run()` with no `checkVariant` and a customizing response carrying **no** `systemCheckVariant`
+   rejects locally, naming what was missing — rather than creating a worklist with `undefined` in
+   the URL and letting the server decide what that means;
+4. **the run payload, at request level** — the one operation whose body carries the whole
+   instruction, and which none of an earlier draft's tests looked at. Assert the XML that
+   `startRun` sends:
+   - **every** object reference in `target.objects` appears, not just the first;
+   - `<objectSet kind="inclusive">`;
+   - `maximumVerdicts` is `100` by default and the caller's value when given;
+   - `clientWait=false` and `clientWait=true` each reach the URL for the matching `wait`.
+
+   A handler that sent only the first object, the wrong `kind`, or a lost `maximumVerdicts` would
+   pass every result-level assertion in this list;
+5. `run()` with `wait: false` returns `{ waited: false, runId, worklistId }` — the `runId` from
    `Location` **and** the `worklistId` from the worklist that was created for it, which is a
    different value from a different response and is what `getFindings` is called with next;
-3. **`run()` with `wait: false` and no `Location` rejects**, naming what was absent — the
+6. **`run()` with `wait: false` and no `Location` rejects**, naming what was absent — the
    silent-success shape this package removed from fifteen handlers;
-4. `run()` with `wait: true` returns `{ waited: true, findingStats, worklistId }` — the stats
+7. `run()` with `wait: true` returns `{ waited: true, findingStats, worklistId }` — the stats
    verbatim, and the worklist id, which in this mode the run response itself carries;
    **assert it against the id the worklist creation returned**, since the two must agree and a
    handler that returned the wrong one would still satisfy the type;
-5. **`run()` with `wait: true` and no `FINDING_STATS` rejects** rather than defaulting to
+8. **`run()` with `wait: true` and no `FINDING_STATS` rejects** rather than defaulting to
    `"0,0,0"` — a confident zero is indistinguishable from a clean check;
-6. `getRunStatus` sets `isFinished` for `finished` and **not** for `unfinished` or `not_finished`;
-7. `getRunStatus` on a response carrying **both** atom links returns both ids, each from its own
+9. `getRunStatus` sets `isFinished` for `finished` and **not** for `unfinished` or `not_finished`;
+10. `getRunStatus` on a response carrying **both** atom links returns both ids, each from its own
    `rel` — `…/results/worklistid` and `…/results/displayid`. Asserting only the absent case, as an
    earlier draft did, leaves a parser free to take the first `href` it sees or to swap the two;
-8. `getRunStatus` on a response without the worklist atom link still resolves, `worklistId`
+11. `getRunStatus` on a response without the worklist atom link still resolves, `worklistId`
    undefined;
-9. an empty `objects` array rejects before any request;
-10. `maximumVerdicts` of 0, -1, 1.5 and NaN reject before any request;
-11. the seven `AtcObjectType` members build the URIs the evidence confirms — a table test, one
+12. an empty `objects` array rejects before any request;
+13. `maximumVerdicts` of 0, -1, 1.5 and NaN reject before any request;
+14. the seven `AtcObjectType` members build the URIs the evidence confirms — a table test, one
     row per type, so a changed template fails loudly.
 
-Tests 3, 5 and 6 keep this honest; 11 keeps it true to the evidence; and 2, 4 and 7 pin the
-`worklistId`, which every one of them needs and none of an earlier draft's tests checked — a
-handler could have lost it, taken it from the wrong response, or returned a different id
-altogether, and the whole suite would have stayed green. **Mutation-check each**, one at a time, breaking the thing it pins.
+Which test guards what, since the list is long enough that the reason gets lost:
+
+- **6, 8, 9** keep it honest — a missing `Location` silently becoming the worklist id, a missing
+  `FINDING_STATS` becoming `"0,0,0"`, a substring match accepting `unfinished`;
+- **4** is the only one that reads the request rather than the answer, and the only one that can
+  catch a payload that instructs the server to do something other than what the caller asked;
+- **14** keeps the URI templates tied to the evidence;
+- **5, 7, 10** pin the `worklistId` and the atom links, which everything downstream needs;
+- **2, 3** pin the branch that decides whether a request happens at all. **Mutation-check each**, one at a time, breaking the thing it pins.
 
 ## Task 7 — Documentation and release
 
