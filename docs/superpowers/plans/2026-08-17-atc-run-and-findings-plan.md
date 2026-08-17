@@ -288,8 +288,11 @@ Which test guards what, since the list is long enough that the reason gets lost:
   worklist id used anyway, a `status` that is `undefined` through a non-optional field;
 - **15** is the only one that can tell which worklist id the handler actually returns — and it
   asserts a success, not a rejection, because the spec defines no failure here;
-- **5** is the only one that reads the request rather than the answer, and the only one that can
-  catch a payload that instructs the server to do something other than what the caller asked;
+- **5** is the only one that reads the **XML payload** — the header table above also reads the
+  request, so "the only one that looks at what was sent" stopped being true when that table was
+  added. 5 remains the only thing standing between a caller's `target` and a body that instructs
+  the server to do something else: a lost object reference, the wrong `objectSet kind`, a dropped
+  `maximumVerdicts`;
 - **18** keeps the URI templates tied to the evidence;
 - **6, 8, 11** pin the `worklistId` and the atom links, which everything downstream needs;
 - **1** is the only one that calls `run()` the way the interface allows and most callers will —
