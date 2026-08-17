@@ -101,9 +101,13 @@ evidence confirms. **Not #68's map**: its `include` goes to `/programs/programs/
 
 `run(target, options)`:
 
-1. resolve the check variant — `options.checkVariant`, else `getCustomizing()`;
+0. **treat `options` as absent, not as `{}`.** `IAdtRunnable` makes the second argument optional,
+   so every read of it is optional-chained with a default: `options?.checkVariant`,
+   `options?.wait ?? false`, `options?.maximumVerdicts ?? 100`. A handler that reads
+   `options.wait` throws on the one-argument call the interface explicitly allows;
+1. resolve the check variant — `options?.checkVariant`, else `getCustomizing()`;
 2. `createWorklist`;
-3. `startRun` with `clientWait` from `options.wait ?? false`;
+3. `startRun` with `clientWait` from `options?.wait ?? false`;
 4. parse **what the mode promises**, and fail if it is absent:
    - `wait: false` → a `Location`; no `Location` is an error naming what was missing, never a
      silent fall back to the worklist id;
@@ -188,14 +192,20 @@ would notice. Raised in review, 2026-08-17.
 
 Unit tests for the handler itself, against a recording connection:
 
-1. `run()` with no `checkVariant` reads `/atc/customizing` **with GET**, and uses
-   `systemCheckVariant`;
-2. `run()` **with** an explicit `checkVariant` does not read `/atc/customizing` at all — assert
+1. **`run(target)` called with no second argument at all.** `IAdtRunnable` makes `options`
+   optional, and the algorithm reads `options.checkVariant` and `options.wait` — so a handler that
+   forgets the optional chaining throws on `undefined`, and a test passing `{}` sails past it
+   because `{}` is not `undefined`. Assert the whole default set from one call: the variant comes
+   from `/atc/customizing`, `clientWait=false` reaches the URL, and the payload carries
+   `maximumVerdicts="100"`. Raised in review, 2026-08-17;
+2. `run()` with no `checkVariant` **in an options object** reads `/atc/customizing` **with GET**,
+   and uses `systemCheckVariant`;
+3. `run()` **with** an explicit `checkVariant` does not read `/atc/customizing` at all — assert
    the request was never made, not merely that the right variant was used;
-3. `run()` with no `checkVariant` and a customizing response carrying **no** `systemCheckVariant`
+4. `run()` with no `checkVariant` and a customizing response carrying **no** `systemCheckVariant`
    rejects locally, naming what was missing — rather than creating a worklist with `undefined` in
    the URL and letting the server decide what that means;
-4. **the run payload, at request level** — the one operation whose body carries the whole
+5. **the run payload, at request level** — the one operation whose body carries the whole
    instruction, and which none of an earlier draft's tests looked at. Assert the XML that
    `startRun` sends:
    - **every** object reference in `target.objects` appears, not just the first;
@@ -205,49 +215,53 @@ Unit tests for the handler itself, against a recording connection:
 
    A handler that sent only the first object, the wrong `kind`, or a lost `maximumVerdicts` would
    pass every result-level assertion in this list;
-5. `run()` with `wait: false` returns `{ waited: false, runId, worklistId }` — the `runId` from
+6. `run()` with `wait: false` returns `{ waited: false, runId, worklistId }` — the `runId` from
    `Location` **and** the `worklistId` from the worklist that was created for it, which is a
    different value from a different response and is what `getFindings` is called with next;
-6. **`run()` with `wait: false` and no `Location` rejects**, naming what was absent — the
+7. **`run()` with `wait: false` and no `Location` rejects**, naming what was absent — the
    silent-success shape this package removed from fifteen handlers;
-7. `run()` with `wait: true` returns `{ waited: true, findingStats, worklistId }` — the stats
-   verbatim, and the worklist id, which in this mode the run response itself carries;
-   **assert it against the id the worklist creation returned**, since the two must agree and a
-   handler that returned the wrong one would still satisfy the type;
-8. **`run()` with `wait: true` and no `FINDING_STATS` rejects** rather than defaulting to
+8. `run()` with `wait: true` returns `{ waited: true, findingStats, worklistId }` against an
+   ordinary observed response — the stats verbatim, and the created worklist id. It asserts the
+   happy path and nothing about where the id came from: an earlier draft had it claiming the
+   response echo "must agree", which contradicts test 14, where a *different* echo is fed in
+   deliberately and the call succeeds. Which id is authoritative is test 14's job. Raised in
+   review, 2026-08-17;
+9. **`run()` with `wait: true` and no `FINDING_STATS` rejects** rather than defaulting to
    `"0,0,0"` — a confident zero is indistinguishable from a clean check;
-9. `getRunStatus` sets `isFinished` for `finished` and **not** for `unfinished` or `not_finished`;
-10. `getRunStatus` on a response carrying **both** atom links returns both ids, each from its own
+10. `getRunStatus` sets `isFinished` for `finished` and **not** for `unfinished` or `not_finished`;
+11. `getRunStatus` on a response carrying **both** atom links returns both ids, each from its own
    `rel` — `…/results/worklistid` and `…/results/displayid`. Asserting only the absent case, as an
    earlier draft did, leaves a parser free to take the first `href` it sees or to swap the two;
-11. `getRunStatus` on a response without the worklist atom link still resolves, `worklistId`
+12. `getRunStatus` on a response without the worklist atom link still resolves, `worklistId`
    undefined;
-12. **`createWorklist` on an empty or whitespace-only response rejects**, naming it. Only that:
+13. **`createWorklist` on an empty or whitespace-only response rejects**, naming it. Only that:
     the test must not assert a length or a character class, since no such rule is specified;
-13. **`getRunStatus` on a response with no `runs:status` rejects**, rather than resolving with
+14. **`getRunStatus` on a response with no `runs:status` rejects**, rather than resolving with
     `status: undefined` through a non-optional field;
-14. **waiting mode returns the id it created**, proven where it matters: a run response echoing a
+15. **waiting mode returns the id it created**, proven where it matters: a run response echoing a
     *different* id still yields the created one, and the call **succeeds**. A response with no
     echo also succeeds. A positive test where the two agree cannot distinguish "returns the
     created id" from "trusts the response id" — this one can, without inventing a failure the
     spec does not have;
-15. an empty `objects` array rejects before any request;
-16. `maximumVerdicts` of 0, -1, 1.5 and NaN reject before any request;
-17. the seven `AtcObjectType` members build the URIs the evidence confirms — a table test, one
+16. an empty `objects` array rejects before any request;
+17. `maximumVerdicts` of 0, -1, 1.5 and NaN reject before any request;
+18. the seven `AtcObjectType` members build the URIs the evidence confirms — a table test, one
     row per type, so a changed template fails loudly.
 
 Which test guards what, since the list is long enough that the reason gets lost:
 
-- **6, 8, 9, 12, 13** keep it honest — a missing `Location` silently becoming the worklist id, a
+- **7, 9, 10, 13, 14** keep it honest — a missing `Location` silently becoming the worklist id, a
   missing `FINDING_STATS` becoming `"0,0,0"`, a substring match accepting `unfinished`, an empty
   worklist id used anyway, a `status` that is `undefined` through a non-optional field;
-- **14** is the only one that can tell which worklist id the handler actually returns — and it
+- **15** is the only one that can tell which worklist id the handler actually returns — and it
   asserts a success, not a rejection, because the spec defines no failure here;
-- **4** is the only one that reads the request rather than the answer, and the only one that can
+- **5** is the only one that reads the request rather than the answer, and the only one that can
   catch a payload that instructs the server to do something other than what the caller asked;
-- **17** keeps the URI templates tied to the evidence;
-- **5, 7, 10** pin the `worklistId` and the atom links, which everything downstream needs;
-- **2, 3** pin the branch that decides whether a request happens at all. **Mutation-check each**, one at a time, breaking the thing it pins.
+- **18** keeps the URI templates tied to the evidence;
+- **6, 8, 11** pin the `worklistId` and the atom links, which everything downstream needs;
+- **1** is the only one that calls `run()` the way the interface allows and most callers will —
+  with one argument;
+- **3, 4** pin the branch that decides whether a request happens at all. **Mutation-check each**, one at a time, breaking the thing it pins.
 
 ## Task 7 — Documentation and release
 
