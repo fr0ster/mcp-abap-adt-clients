@@ -637,7 +637,9 @@ Two tests are deliberately absent, and both were written and removed:
   same mistake as concluding a type is checkable from a 201. Raised in review, 2026-08-17.
 
 So what the probe can report is bounded, and it depends on something it may not see. The status
-sequence is eight samples; `finished` may never appear in them, and the probe deliberately does
+sequence is bounded — a fixed number of polls plus the final read the results link comes from,
+and the probe prints the count it actually used rather than this text asserting one. `finished`
+may never appear in it, and the probe deliberately does
 not know which of the other values are terminal — that is the whole gap. Two cases, and the run
 must say which one it is in:
 

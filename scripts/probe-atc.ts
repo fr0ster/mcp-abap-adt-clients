@@ -1058,7 +1058,11 @@ async function main(): Promise<void> {
       // the sequence. A value that repeats to the bound is a candidate
       // terminal state, not a proven one.
       const seen: string[] = [];
-      for (let attempt = 1; attempt <= 8; attempt++) {
+      // The count lives here and nowhere else: the spec describes the sequence
+      // as bounded rather than naming a number, because every number this
+      // session put in prose drifted from the code that produced it.
+      const STATUS_SAMPLES = 8;
+      for (let attempt = 1; attempt <= STATUS_SAMPLES; attempt++) {
         const st = await rec.call(
           `status-bogus-variant-${attempt}`,
           'The status of a run under a variant that does not exist, sampled to a fixed bound. The SEQUENCE is the evidence; no single value is read as terminal.',
