@@ -83,13 +83,19 @@ on `getRunStatus`, where a caller will actually meet it.
 
 `src/runtime/atc/run.ts`, taking #68's traffic and nothing else from it:
 
+**The headers are part of the request, not decoration** — see the table in Task 6, which is the
+one place they are written verbatim. This table names the paths; where it repeats a header it
+repeats it from there, because an implementation written to a paraphrase here would fail the test
+written to the captures there. That happened once already, with the worklist `Accept`. Raised in
+review, 2026-08-17.
+
 | function | request |
 |---|---|
 | `getCustomizing` | `GET /atc/customizing` — **GET**, the recorded `POST` is a 405 |
-| `createWorklist(checkVariant)` | `POST /atc/worklists?checkVariant=…`, `Content-Type: text/plain`, `Accept: text/plain` → a bare 32-char id |
-| `startRun(worklistId, uris, maximumVerdicts, wait)` | `POST /atc/runs?worklistId=…&clientWait=…` |
-| `getRunStatus(runId)` | `GET /atc/runs/{runId}`, `Accept: application/vnd.sap.adt.backgroundrun.v1+xml` |
-| `getWorklist(worklistId)` | `GET /atc/worklists/{id}?includeExemptedFindings=false`, `Accept: application/atc.worklist.v1+xml` |
+| `createWorklist(checkVariant)` | `POST /atc/worklists?checkVariant=…` → a non-empty id |
+| `startRun(worklistId, uris, maximumVerdicts, wait)` | `POST /atc/runs?worklistId=…&clientWait=…`, body per Task 6 test 5 |
+| `getRunStatus(runId)` | `GET /atc/runs/{runId}` |
+| `getWorklist(worklistId)` | `GET /atc/worklists/{id}?includeExemptedFindings=false` |
 
 `buildAtcObjectUri(objectType, objectName)` maps the seven confirmed types to the templates the
 evidence confirms. **Not #68's map**: its `include` goes to `/programs/programs/`, and neither
