@@ -637,7 +637,7 @@ Two tests are deliberately absent, and both were written and removed:
   same mistake as concluding a type is checkable from a 201. Raised in review, 2026-08-17.
 
 So what the probe can report is bounded and says so: **the run completed; how a failure would be
-represented is still unobserved.** Deciding that needs somebody to read the three captures
+represented is still unobserved.** Deciding that needs somebody to read the **four** captures
 against a run known to be healthy and see what differs.
 
 Either way the manifest records it, rather than the spec asserting a coverage nobody checked.

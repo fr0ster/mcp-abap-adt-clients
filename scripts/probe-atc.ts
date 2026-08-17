@@ -1071,9 +1071,10 @@ async function main(): Promise<void> {
 
       // Independent evidence, because a bogus variant being ACCEPTED does not
       // mean the run failed: the server may fall back to a real variant, or
-      // finish normally and report the problem as a finding. If this worklist
-      // looks like any other finished run's, nothing failed and the question
-      // is still open.
+      // run to an end and record the problem elsewhere. Captured for
+      // comparison against a healthy run — a worklist that looks ordinary is
+      // not proof that nothing failed, since `finished` marks completion
+      // rather than success.
       await rec.call(
         'findings-bogus-variant',
         'The worklist of the bogus-variant run, captured for comparison against a healthy one. Nothing here is classified: `finished` marks completion, not success, so a normal-looking worklist is not proof the run succeeded.',
@@ -1083,10 +1084,11 @@ async function main(): Promise<void> {
           headers: { Accept: ACCEPT_ATC_WORKLIST_XML },
         },
       );
-      // The run resource links to a THIRD id under /atc/results/. `IAtcLog`
-      // reads a check-failure log by an execution id, so that link is the
-      // likeliest place a failure is represented — and nothing here has ever
-      // fetched it.
+      // The run resource links to a THIRD id under /atc/results/. Two log
+      // resources hang off it — the EXECUTION log at /results/{id}/log and the
+      // CHECK-FAILURE logs at /atc/checkfailures/logs — and a failure could be
+      // recorded in either, or in neither. Both are fetched below, the way
+      // src/runtime/atc/logs.ts issues them.
       const lastStatus = await rec.call(
         'status-bogus-variant-final',
         'One more status read, to take the results link out of it.',
@@ -1123,10 +1125,10 @@ async function main(): Promise<void> {
         );
 
         // The CHECK-FAILURE logs — a different resource entirely, filtered by
-        // displayId. The spec claimed the probe read "the three places a
-        // result could live" while this one was never asked, so a failure
-        // recorded here would have been missed and the 4xx from the other
-        // read as an answer. Raised in review, 2026-08-17.
+        // displayId. The spec claimed the probe read every place a result
+        // could live while this one was never asked, so a failure recorded
+        // here would have been missed and the 4xx from the other read as an
+        // answer. Raised in review, 2026-08-17.
         const displayId =
           resultsHref.split('/').filter(Boolean).pop() ?? resultsHref;
         await rec.call(
