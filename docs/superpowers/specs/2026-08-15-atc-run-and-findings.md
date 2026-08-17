@@ -359,7 +359,7 @@ contract: nothing has established what they accept.
 ### `AtcObjectType` — the one open question
 
 ```ts
-// One of nine confirmed, two refused by the system, six accepted but unproven.
+// Two of nine confirmed, two refused by the system, five unmeasured.
 type AtcObjectType = 'class' | 'package' /* … pending the five unmeasured */;
 ```
 
@@ -603,7 +603,14 @@ variant that does not exist — and reports which of two things happened:
 
 - the worklist creation is refused, so no run exists to have a status, and the question stays
   open;
-- the run is accepted, and whatever `runs:status` then reports is the terminal state this
-  contract is missing.
+- the run is accepted — which by itself proves **nothing**, because the server may fall back to a
+  real variant, or finish normally and report the problem as a finding. So the probe samples the
+  status to a fixed bound, records the whole sequence, and reads the worklist afterwards. A value
+  that repeats to the bound and is not `finished` is a **candidate** terminal state; a run that
+  reports `finished` throughout did not fail, and the question is still open.
+
+There is deliberately no test for "not `running`, therefore terminal". The set of non-terminal
+states is precisely what is unknown — `queued` or `scheduled` would sail through such a test and
+be recorded as the end of a run. Raised in review, 2026-08-17.
 
 Either way the manifest records it, rather than the spec asserting a coverage nobody checked.

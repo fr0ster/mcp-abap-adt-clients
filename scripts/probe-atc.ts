@@ -1046,16 +1046,47 @@ async function main(): Promise<void> {
         : `${ATC}/runs/${encodeURIComponent(loc)}`;
       // Deliberately NOT waitForRun: that loops on anything that is not
       // `finished`, which is exactly what a failed run may be.
-      for (let attempt = 1; attempt <= 5; attempt++) {
+      //
+      // And deliberately no early exit on "not running". An earlier version
+      // stopped at the first status other than `running` and called it
+      // terminal — which would mistake `queued`, `scheduled` or any state
+      // nobody has seen for the end of the run. There is no list of
+      // non-terminal states to test against; that list is what is missing.
+      // Raised in review, 2026-08-17.
+      //
+      // So: poll to a fixed bound, record every status, and let a human read
+      // the sequence. A value that repeats to the bound is a candidate
+      // terminal state, not a proven one.
+      const seen: string[] = [];
+      for (let attempt = 1; attempt <= 8; attempt++) {
         const st = await rec.call(
           `status-bogus-variant-${attempt}`,
-          'The status of a run that should not succeed. Anything other than `finished` here is the answer the contract is missing.',
+          'The status of a run under a variant that does not exist, sampled to a fixed bound. The SEQUENCE is the evidence; no single value is read as terminal.',
           { method: 'GET', url, headers: { Accept: ACCEPT_ATC_RUN_STATUS } },
         );
-        const value = st.body.match(/runs:status="([^"]+)"/)?.[1] ?? null;
-        logger.info(`bogus-variant run status: ${value ?? 'unreadable'}`);
-        if (value && value.trim().toLowerCase() !== 'running') break;
+        seen.push(st.body.match(/runs:status="([^"]+)"/)?.[1] ?? 'unreadable');
         await new Promise((r) => setTimeout(r, RUN_POLL_DELAY_MS));
+      }
+      logger.info(`bogus-variant status sequence: ${seen.join(' → ')}`);
+
+      // Independent evidence, because a bogus variant being ACCEPTED does not
+      // mean the run failed: the server may fall back to a real variant, or
+      // finish normally and report the problem as a finding. If this worklist
+      // looks like any other finished run's, nothing failed and the question
+      // is still open.
+      await rec.call(
+        'findings-bogus-variant',
+        'The worklist of the bogus-variant run. If it reads like a normal finished run, the run did not fail and the terminal state is still unobserved.',
+        {
+          method: 'GET',
+          url: `${ATC}/worklists/${encodeURIComponent(bogusWorklistId)}?includeExemptedFindings=false`,
+          headers: { Accept: ACCEPT_ATC_WORKLIST_XML },
+        },
+      );
+      if (seen.every((v) => v.trim().toLowerCase() === 'finished')) {
+        logger.warn(
+          'The bogus-variant run reported `finished` throughout — so it did not fail, and what a FAILED run reports remains unobserved.',
+        );
       }
     } else {
       logger.warn(
