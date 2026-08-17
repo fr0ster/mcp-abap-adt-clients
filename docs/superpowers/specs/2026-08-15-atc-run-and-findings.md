@@ -6,7 +6,9 @@ the URI this client builds whose finished worklist then listed that object. The 
 `program` and `include`, are refused by ABAP Cloud itself and wait on an on-prem probe. The
 criterion for confirming one was wrong twice before it was right, and both wrong versions are
 recorded below with what refuted them. Everything else in the contract rests on a response somebody
-can re-read (`docs/evidence/2026-08-16-atc-trial-probe.md`). Not implemented.
+can re-read: `docs/evidence/2026-08-16-atc-trial-probe.md` for the traffic, and
+`docs/evidence/2026-08-17-atc-objecttype-confirmed.md` for every type in the union, quoted from
+the worklists that confirmed them. Not implemented.
 
 **Scope:** an ATC client in `@mcp-abap-adt/adt-clients`, and the contract it needs in
 `@mcp-abap-adt/interfaces`. The MCP server is a separate consumer and out of scope here.
@@ -307,7 +309,9 @@ spent three releases removing.
 
 Captured by `scripts/probe-atc.ts` on the **cloud trial**, 2026-08-16, against `ZBASE_PROBE01`
 (one class, `ZOK_CL_CLEANER`). Every row below is quoted in
-`docs/evidence/2026-08-16-atc-trial-probe.md`; raw captures stay out of git.
+`docs/evidence/2026-08-16-atc-trial-probe.md`; the type confirmations are in
+`docs/evidence/2026-08-17-atc-objecttype-confirmed.md`. Raw captures stay out of git, so anything
+a claim rests on is quoted into one of those two.
 
 | step | request | answer |
 |---|---|---|
@@ -442,6 +446,10 @@ Two answers were tried before that one, and both are worth keeping because each 
 Reading earlier is not a weaker measurement; it is a different one, of nothing.
 
 #### Where it stands
+
+Each row below is quoted in `docs/evidence/2026-08-17-atc-objecttype-confirmed.md` — the run's
+URI, and the `<atcobject:object>` element the finished worklist answered with, `adtcore:type`
+included, because the type is what makes it evidence about a type.
 
 | type | URI the client builds | confirmed by |
 |---|---|---|
