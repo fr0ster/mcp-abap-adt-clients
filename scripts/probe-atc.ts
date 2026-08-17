@@ -1091,9 +1091,33 @@ async function main(): Promise<void> {
       // src/runtime/atc/logs.ts issues them.
       const lastStatus = await rec.call(
         'status-bogus-variant-final',
-        'One more status read, to take the results link out of it.',
+        'One more status read, to take the results link out of it — and the ninth sample of the status, which counts like the other eight.',
         { method: 'GET', url, headers: { Accept: ACCEPT_ATC_RUN_STATUS } },
       );
+      const finalValue =
+        lastStatus.body.match(/runs:status="([^"]+)"/)?.[1] ?? 'unreadable';
+
+      // This read can be the FIRST to show `finished`, and the worklist above
+      // was taken before it. Left alone that produces a third case the spec
+      // does not describe: completion observed, but only after part of the
+      // evidence was captured. So re-read the worklist here, and every capture
+      // is then on the same side of the marker. Raised in review, 2026-08-17.
+      const finishedOnlyNow =
+        finalValue.trim().toLowerCase() === 'finished' &&
+        !seen.some((v) => v.trim().toLowerCase() === 'finished');
+      if (finishedOnlyNow) {
+        await rec.call(
+          'findings-bogus-variant-after-finished',
+          'The worklist again, now that a `finished` has been seen. The earlier read predates the marker and is kept for the comparison, not as the final state.',
+          {
+            method: 'GET',
+            url: `${ATC}/worklists/${encodeURIComponent(bogusWorklistId)}?includeExemptedFindings=false`,
+            headers: { Accept: ACCEPT_ATC_WORKLIST_XML },
+          },
+        );
+      }
+      seen.push(finalValue);
+
       const resultsHref = lastStatus.body.match(
         /href="([^"]*\/atc\/results\/[^"]*)"/,
       )?.[1];
@@ -1150,8 +1174,11 @@ async function main(): Promise<void> {
         );
       }
 
-      // Which of two cases this run is in decides what the four captures are
-      // worth, and the sequence may contain no completion marker at all.
+      // Which of two cases this run is in decides what the captures are worth,
+      // and the sequence may contain no completion marker at all. `seen` holds
+      // every status read including the last, so a `finished` that appears
+      // only there counts — it used to be checked against the first eight
+      // alone, which called a completed run unestablished.
       const sawFinished = seen.some(
         (v) => v.trim().toLowerCase() === 'finished',
       );

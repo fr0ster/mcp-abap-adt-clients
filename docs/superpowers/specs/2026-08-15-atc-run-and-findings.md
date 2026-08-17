@@ -641,9 +641,15 @@ sequence is eight samples; `finished` may never appear in them, and the probe de
 not know which of the other values are terminal — that is the whole gap. Two cases, and the run
 must say which one it is in:
 
-- **`finished` was observed.** The run reached an end. Whether that end was a good one is still
-  unobserved, and the four captures are of a completed run — worth comparing against a healthy
-  one.
+- **`finished` was observed** — in any of the status reads, the last one included. The run
+  reached an end. Whether that end was a good one is still unobserved, and the captures are of a
+  completed run, worth comparing against a healthy one.
+
+  The last status read is also where the results link comes from, so it can be the *first* to
+  show `finished` — after the worklist has already been taken. The probe re-reads the worklist in
+  that case, so every capture sits on the same side of the marker. Without that there is a third
+  case, "completion observed, but only after part of the evidence", which is a state nobody
+  should have to reason about from a manifest. Raised in review, 2026-08-17.
 - **`finished` was never observed.** Then completion is **not** established either. All that
   exists is a bounded sequence of states, and the four captures were taken while the run may
   still have been going: they cannot be read as final, and a difference from a healthy run could
