@@ -1515,6 +1515,10 @@ async function main(): Promise<void> {
         ? 'run never reported finished'
         : 'never asked');
 
+  /** A request with no status never reached a verdict — a fact about us. */
+  const timedOut = (o: ICandidateOutcome) =>
+    o.attempts.some((a) => a.status === null);
+
   // Only cloud-scope candidates can be decided here. A classic program cannot
   // exist on ABAP Cloud, so counting it against this run would leave the probe
   // permanently INCOMPLETE and say nothing about the system. Raised in review,
@@ -1564,10 +1568,13 @@ async function main(): Promise<void> {
       'AtcObjectType is NOT closed by this run. A type joins the union when a FINISHED worklist lists its object — not when a run is accepted, which happens for a URI that cannot exist.',
     );
     for (const o of unconfirmed) {
+      const transport = timedOut(o)
+        ? ' — the run request got NO ANSWER (timeout), so this says nothing about the type'
+        : '';
       const weaker = o.seenCheckedInSomeWorklist
         ? ` — but ATC checked ${o.key} as ${o.seenCheckedInSomeWorklist.name} in the ${o.seenCheckedInSomeWorklist.worklistOf} worklist, so the TYPE is checkable and only the template is unproven`
         : '';
-      logger.error(`  ${o.key}: ${why(o)}${weaker}`);
+      logger.error(`  ${o.key}: ${why(o)}${transport}${weaker}`);
     }
     process.exitCode = 1;
   } else {

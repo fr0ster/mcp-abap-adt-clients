@@ -1,9 +1,11 @@
 # ATC: start a run, wait for it, read the findings
 
 **Status:** designed against captured traffic, 2026-08-16. One question is still open —
-`AtcObjectType`, the set of checkable object types: **two of nine confirmed**, two refused by the
-system, five unmeasured. The criterion for confirming one was wrong twice before it was right,
-and both wrong versions are recorded below with what refuted them. Everything else in the contract rests on a response somebody
+`AtcObjectType` is **closed for cloud**: seven of nine types confirmed, each by a run submitted at
+the URI this client builds whose finished worklist then listed that object. The remaining two,
+`program` and `include`, are refused by ABAP Cloud itself and wait on an on-prem probe. The
+criterion for confirming one was wrong twice before it was right, and both wrong versions are
+recorded below with what refuted them. Everything else in the contract rests on a response somebody
 can re-read (`docs/evidence/2026-08-16-atc-trial-probe.md`). Not implemented.
 
 **Scope:** an ATC client in `@mcp-abap-adt/adt-clients`, and the contract it needs in
@@ -364,8 +366,18 @@ contract: nothing has established what they accept.
 ### `AtcObjectType` — the one open question
 
 ```ts
-// Two of nine confirmed, two refused by the system, five unmeasured.
-type AtcObjectType = 'class' | 'package' /* … pending the five unmeasured */;
+// Seven of nine confirmed on cloud; two refused by the system, and open until
+// an on-prem probe. Each member was confirmed by a run submitted at the URI
+// this client builds, whose finished worklist then listed that object under
+// that type.
+type AtcObjectType =
+  | 'class'
+  | 'interface'
+  | 'function_group'
+  | 'package'
+  | 'ddl_source'
+  | 'table'
+  | 'behavior_definition';
 ```
 
 #### The evidence a type needs, and two wrong answers before it
@@ -431,20 +443,30 @@ Reading earlier is not a weaker measurement; it is a different one, of nothing.
 
 #### Where it stands
 
-| type | URI the client builds | status |
+| type | URI the client builds | confirmed by |
 |---|---|---|
-| `class` | `/sap/bc/adt/oo/classes/{NAME}` | **confirmed** — listed in a finished worklist, with a finding |
-| `package` | `/sap/bc/adt/packages/{NAME}` | **confirmed** — listed in the same finished worklist, findings empty |
-| `program` | `/sap/bc/adt/programs/programs/{NAME}` | **not checkable here** — the system refuses to hold one: `403 ExceptionResourceNoAuthorization`, `S_DEVELOP` |
+| `class` | `/sap/bc/adt/oo/classes/{NAME}` | `CLAS:ZOK_CL_CLEANER` — probes 5 and 6 |
+| `interface` | `/sap/bc/adt/oo/interfaces/{NAME}` | `INTF:ZOK_IF_PROBE` — probes 5 and 6 |
+| `function_group` | `/sap/bc/adt/functions/groups/{NAME}` | `FUGR:ZOK_FG_PROBE` — probe 5 |
+| `package` | `/sap/bc/adt/packages/{NAME}` | `DEVC:ZBASE_PROBE01` and all five objects in it — probes 5 and 6 |
+| `ddl_source` | `/sap/bc/adt/ddic/ddl/sources/{NAME}` | `DDLS:ZOK_I_PROBE` — probes 5 and 6 |
+| `table` | `/sap/bc/adt/ddic/tables/{NAME}` | `TABL:ZOK_T_PROBE` — probes 5 and 6 |
+| `behavior_definition` | `/sap/bc/adt/bo/behaviordefinitions/{NAME}` | `BDEF:ZOK_I_PROBE` — probe 6 |
+| `program` | `/sap/bc/adt/programs/programs/{NAME}` | **not checkable here** — `403 ExceptionResourceNoAuthorization`, `S_DEVELOP` |
 | `include` | `/sap/bc/adt/programs/includes/{NAME}` | **not checkable here** — same refusal |
-| `interface` | `/sap/bc/adt/oo/interfaces/{NAME}` | **unmeasured** — worklist read before the run finished |
-| `function_group` | `/sap/bc/adt/functions/groups/{NAME}` | **unmeasured** — same |
-| `ddl_source` | `/sap/bc/adt/ddic/ddl/sources/{NAME}` | **unmeasured** — same |
-| `table` | `/sap/bc/adt/ddic/tables/{NAME}` | **unmeasured** — same |
-| `behavior_definition` | `/sap/bc/adt/bo/behaviordefinitions/{NAME}` | **unmeasured** — no representative was made |
 
-Two confirmed, two refused by the system, five unmeasured. None of the five is a negative result:
-they were asked and the answer was not read.
+Seven confirmed, two refused by the system.
+
+**The evidence spans two runs, and that is not a weakness.** `function_group` was confirmed in
+probe 5; in probe 6 its run request timed out after 60 seconds and never reached a verdict at
+all. `behavior_definition` could only be confirmed in probe 6, because the object did not exist
+until then. Each confirmation is a self-contained capture — a run at a built URI and the finished
+worklist that listed the object — and nothing in the rule says they must share a session.
+
+Re-running until one manifest is green would have bought a tidier artefact and cost a real
+observation: that a run request can simply time out, which the probe first reported as "the run
+carried no Location" — a statement about the server, made about a request the server may never
+have seen. Raised in review, 2026-08-17.
 
 "Not checkable here" is a fact about **this system**, not about ATC. A classic program cannot
 exist on ABAP Cloud, so ATC cannot check one on ABAP Cloud. And that is not a footnote, because
@@ -590,20 +612,13 @@ mixing it into ATC is what made #68 an 11k-line diff. Its own spec.
 
 ## What is still open
 
-One blocker and **five** loose ends on the trial, plus one probe that needs an on-prem system and
-does **not** block v1. (Counted against the table below rather than from memory — the number was
-wrong twice.)
+**Nothing blocks v1 any more.** `AtcObjectType` was the one blocker and it is closed for cloud:
+seven types confirmed, the other two refused by the system rather than unmeasured. What remains
+are loose ends that would improve the contract without holding it, and one on-prem probe that
+would widen the union.
 
-**Blocking:**
-
-| ask | what it decides |
-|---|---|
-| run one object of each unmeasured kind — `interface`, `function_group`, `ddl_source`, `table`, `behavior_definition` — at the URI a client builds, **poll `/atc/runs/{runId}` until finished**, then read the worklist | `AtcObjectType`. The objects can be plain: a clean one is listed with an empty findings element, which is the evidence. What was missing was the wait, not the dirt |
-
-`program` and `include` are **not** on that list. The system refuses to hold either
-(`403`, `S_DEVELOP`), so nothing about them can be settled here, and their line in the table
-above is already the answer *for this system* — not for ATC, which has to cover on-prem, where
-they exist.
+(Counted against the table below rather than from memory — the number was wrong twice when it was
+still a count.)
 
 **Not blocking:**
 
