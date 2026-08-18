@@ -17,9 +17,14 @@
 import type { IAbapConnection, IAtcRunTarget } from '@mcp-abap-adt/interfaces';
 import { AdtAtc } from '../../../runtime/atc/AdtAtc';
 
+// The properties as the trial sent them: four of them, and the one this client
+// needs is not the first.
 const CUSTOMIZING = `<?xml version="1.0" encoding="utf-8"?>
 <atc:customizing xmlns:atc="http://www.sap.com/adt/atc"><properties>
+<property name="ciCheckFlavour" value="true"/>
 <property name="systemCheckVariant" value="ABAP_CLOUD_DEVELOPMENT_DEFAULT"/>
+<property name="isCCSTunnelEnabled" value="false"/>
+<property name="isTransportableExemptionTypeUsed" value="true"/>
 </properties></atc:customizing>`;
 
 const WORKLIST_ID = '0ABD945AC5681FE1A6C51EE2E3AB6030';
@@ -469,6 +474,112 @@ describe('AdtAtc — refusing before the request', () => {
     ).rejects.toMatchObject({ code: 'ADT_VALIDATION_FAILED' });
 
     expect(connection.makeAdtRequest).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Two things about an XML document carry no meaning: the order of attributes on
+ * an element, and which prefix a namespace was bound to. Every case here is a
+ * document a server may validly send that differs from the trial's captures in
+ * one of those two ways, and every one of them defeated the pattern-matching
+ * this file's first implementation used.
+ */
+describe('AdtAtc — the documents are read structurally', () => {
+  it('finds the check variant with the attributes the other way round', async () => {
+    const { connection, calls } = connectionFor({
+      customizing: {
+        status: 200,
+        data: '<atc:customizing><properties><property value="ZREVERSED" name="systemCheckVariant"/></properties></atc:customizing>',
+        headers: {},
+      },
+    });
+
+    await new AdtAtc(connection, logger() as never).run(TARGET);
+
+    expect(calls.find((c) => c.url.includes('/atc/worklists?'))?.url).toContain(
+      'checkVariant=ZREVERSED',
+    );
+  });
+
+  it('reads runs:status under any namespace prefix', async () => {
+    const { connection } = connectionFor({
+      status: {
+        status: 200,
+        data: '<r:run r:status="finished" xmlns:r="http://www.sap.com/adt/backgroundruns"/>',
+        headers: {},
+      },
+    });
+
+    const result = await new AdtAtc(connection, logger() as never).getRunStatus(
+      RUN_ID,
+    );
+
+    expect(result).toMatchObject({ status: 'finished', isFinished: true });
+  });
+
+  it('takes each atom link id with rel before href', async () => {
+    const { connection } = connectionFor({
+      status: {
+        status: 200,
+        data: `<runs:run runs:status="finished"><runs:result>
+<atom:link rel="http://www.sap.com/abap/checks/atc/relations/results/worklistid" href="/sap/bc/adt/atc/worklists/${WORKLIST_ID}" type="application/xml"/>
+<atom:link rel="http://www.sap.com/abap/checks/atc/relations/results/displayid" href="/sap/bc/adt/atc/results/RESULT99" type="application/xml"/>
+</runs:result></runs:run>`,
+        headers: {},
+      },
+    });
+
+    const result = await new AdtAtc(connection, logger() as never).getRunStatus(
+      RUN_ID,
+    );
+
+    expect(result.worklistId).toBe(WORKLIST_ID);
+    expect(result.resultId).toBe('RESULT99');
+  });
+
+  it('finds FINDING_STATS past an earlier info and with description first', async () => {
+    const { connection } = connectionFor({
+      run: {
+        status: 200,
+        data: `<atcworklist:worklistRun>
+<atcworklist:worklistId>${WORKLIST_ID}</atcworklist:worklistId>
+<atcworklist:infos>
+<atcinfo:info><atcinfo:type>SOMETHING_ELSE</atcinfo:type><atcinfo:description>9,9,9</atcinfo:description></atcinfo:info>
+<atcinfo:info><atcinfo:description>4,5,6</atcinfo:description><atcinfo:type>FINDING_STATS</atcinfo:type></atcinfo:info>
+</atcworklist:infos></atcworklist:worklistRun>`,
+        headers: {},
+      },
+    });
+
+    await expect(
+      new AdtAtc(connection, logger() as never).run(TARGET, { wait: true }),
+    ).resolves.toMatchObject({ findingStats: '4,5,6' });
+  });
+
+  // An all-digit id is a string, not a number: `String(12345)` would round-trip
+  // but an id with a leading zero, or one long enough to lose precision, would
+  // not — and both are shapes ADT has been seen to send.
+  it('keeps an all-digit worklist id a string', async () => {
+    const digits = '00000000000000000000000000000000';
+    const { connection } = connectionFor({
+      run: {
+        status: 200,
+        data: `<atcworklist:worklistRun><atcworklist:worklistId>${digits}</atcworklist:worklistId>
+<atcworklist:infos><atcinfo:info><atcinfo:type>FINDING_STATS</atcinfo:type><atcinfo:description>0,0,0</atcinfo:description></atcinfo:info></atcworklist:infos>
+</atcworklist:worklistRun>`,
+        headers: {},
+      },
+    });
+    const log = logger();
+
+    const result = await new AdtAtc(connection, log as never).run(TARGET, {
+      wait: true,
+    });
+
+    // The echo differs from the created id, so it is warned about verbatim —
+    // which is where a number would have shown itself.
+    expect(result).toMatchObject({ findingStats: '0,0,0' });
+    expect(log.warn).toHaveBeenCalledWith(expect.stringContaining(digits));
   });
 });
 

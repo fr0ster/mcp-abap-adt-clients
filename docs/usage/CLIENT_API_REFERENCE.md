@@ -897,6 +897,11 @@ refuses to hold either, so nothing there could confirm them.
 **Two modes, two shapes.** `wait` is not a timing flag — it changes what the
 server answers with, and the result is a discriminated union on `waited`.
 
+`run()` is one method with one return type, so **narrowing on `waited` is how
+you reach the rest**. That is the point of the union rather than a nuisance from
+it: with four optional fields on one interface, `result.runId!` would compile and
+be `undefined` exactly when the caller waited.
+
 ```typescript
 const atc = runtime.getAtc();
 
@@ -907,7 +912,11 @@ const started = await atc.run({
     { objectType: 'ddl_source', objectName: 'ZI_MY_VIEW' },
   ],
 });
-// started.waited === false, and it carries { worklistId, runId }
+
+if (!started.waited) {
+  // Narrowed to { waited: false; worklistId: string; runId: string }
+  console.log(started.runId, started.worklistId);
+}
 ```
 
 ```typescript
@@ -916,7 +925,11 @@ const done = await atc.run(
   { objects: [{ objectType: 'class', objectName: 'ZCL_MY_CLASS' }] },
   { wait: true },
 );
-// done.waited === true, and it carries { worklistId, findingStats }
+
+if (done.waited) {
+  // Narrowed to { waited: true; worklistId: string; findingStats: string }
+  console.log(done.findingStats); // "0,0,1"
+}
 ```
 
 `findingStats` is the server's `FINDING_STATS` triple verbatim, for example
@@ -932,19 +945,26 @@ who can decide when to give up — and `status` travels beside `isFinished` so
 they can report the state they last saw.
 
 ```typescript
-const deadline = Date.now() + 5 * 60_000; // yours to choose
-let status = await atc.getRunStatus(started.runId);
+const started = await atc.run({
+  objects: [{ objectType: 'class', objectName: 'ZCL_MY_CLASS' }],
+});
 
-while (!status.isFinished && Date.now() < deadline) {
-  await new Promise((r) => setTimeout(r, 2_000));
-  status = await atc.getRunStatus(started.runId);
+if (!started.waited) {
+  const { runId, worklistId } = started;
+  const deadline = Date.now() + 5 * 60_000; // yours to choose
+  let status = await atc.getRunStatus(runId);
+
+  while (!status.isFinished && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 2_000));
+    status = await atc.getRunStatus(runId);
+  }
+
+  if (!status.isFinished) {
+    throw new Error(`ATC run ${runId} still ${status.status} after 5 min`);
+  }
+
+  const findings = await atc.getFindings(worklistId);
 }
-
-if (!status.isFinished) {
-  throw new Error(`ATC run ${started.runId} still ${status.status} after 5 min`);
-}
-
-const findings = await atc.getFindings(started.worklistId);
 ```
 
 `isFinished` is **completion, not success**: it says the run reached an end, not

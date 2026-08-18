@@ -28,12 +28,16 @@ import {
   type ILogger,
 } from '@mcp-abap-adt/interfaces';
 import {
+  parseRunStatus,
+  parseSystemCheckVariant,
+  parseWaitingRun,
+} from './parse';
+import {
   buildAtcObjectUri,
   createAtcWorklist,
   getAtcCustomizing,
   getAtcRunStatus,
   getAtcWorklist,
-  parseSystemCheckVariant,
   startAtcRun,
 } from './run';
 
@@ -104,9 +108,9 @@ export class AdtAtc
 
   async getRunStatus(runId: string): Promise<IAtcRunStatus> {
     const response = await getAtcRunStatus(this.connection, runId);
-    const body = asText(response.data);
+    const parsed = parseRunStatus(response.data);
 
-    const status = body.match(/runs:status="([^"]+)"/)?.[1];
+    const status = parsed.status;
     if (!status) {
       const error = new AdtOperationError(
         `ATC run ${runId}: the run resource carried no runs:status. IAtcRunStatus.status is not optional, and resolving with undefined through it would be a lie the type cannot catch.`,
@@ -120,8 +124,8 @@ export class AdtAtc
       // Exact and case-normalised. A substring test would accept `unfinished`
       // and `not_finished`, opening the worklist on a run that had not run.
       isFinished: status.trim().toLowerCase() === 'finished',
-      worklistId: this.linkId(body, 'worklistid'),
-      resultId: this.linkId(body, 'displayid'),
+      worklistId: parsed.worklistId,
+      resultId: parsed.resultId,
     };
   }
 
@@ -214,8 +218,8 @@ export class AdtAtc
     response: IAdtResponse,
     worklistId: string,
   ): IAtcRunResult {
-    const body = asText(response.data);
-    const findingStats = this.findingStats(body);
+    const parsed = parseWaitingRun(response.data);
+    const findingStats = parsed.findingStats;
     if (!findingStats) {
       const error = new AdtOperationError(
         'ATC waiting run answered without FINDING_STATS. Defaulting it to "0,0,0" would report a confident zero, which is indistinguishable from a clean check.',
@@ -229,9 +233,7 @@ export class AdtAtc
     // takes — so a differing echo is worth a warning and nothing more. It is
     // not an error: the contract does not make it one, and turning a usable
     // answer into a failure is not a decision an implementation gets to make.
-    const echoed = body.match(
-      /<atcworklist:worklistId>([^<]+)<\/atcworklist:worklistId>/,
-    )?.[1];
+    const echoed = parsed.worklistId;
     if (echoed && echoed !== worklistId) {
       this.logger?.warn?.(
         `ATC run echoed worklist ${echoed} but was started against ${worklistId}; returning the one this client created.`,
@@ -239,22 +241,5 @@ export class AdtAtc
     }
 
     return { waited: true, worklistId, findingStats };
-  }
-
-  private findingStats(body: string): string | undefined {
-    // FINDING_STATS is an <atcinfo:info> whose type says so; the triple is in
-    // the description beside it. Matched as a pair rather than by reaching for
-    // the first description in the document.
-    const info = body.match(
-      /<atcinfo:type>FINDING_STATS<\/atcinfo:type>\s*<atcinfo:description>([^<]*)<\/atcinfo:description>/,
-    );
-    return info?.[1];
-  }
-
-  private linkId(body: string, rel: string): string | undefined {
-    const link = body.match(
-      new RegExp(`href="([^"]+)"[^>]*rel="[^"]*${rel}"`, 'i'),
-    );
-    return link?.[1].replace(/\/+$/, '').split('/').pop();
   }
 }

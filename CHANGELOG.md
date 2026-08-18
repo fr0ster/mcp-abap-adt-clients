@@ -23,11 +23,13 @@ ATC check runs: start one, ask whether it is done, read what it found.
   const started = await atc.run({
     objects: [{ objectType: 'class', objectName: 'ZCL_MY_CLASS' }],
   });
-  // started.waited === false → { worklistId, runId }
 
-  // Poll under a bound you choose, then read the worklist.
-  const status = await atc.getRunStatus(started.runId);
-  if (status.isFinished) await atc.getFindings(started.worklistId);
+  // `waited` is the discriminant — narrowing on it is what yields runId.
+  if (!started.waited) {
+    // Poll under a bound you choose, then read the worklist.
+    const status = await atc.getRunStatus(started.runId);
+    if (status.isFinished) await atc.getFindings(started.worklistId);
+  }
   ```
 
 - **`AdtAtc`** is exported from the package root and from `@mcp-abap-adt/adt-clients/runtime`.

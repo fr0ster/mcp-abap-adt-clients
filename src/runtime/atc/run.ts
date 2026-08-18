@@ -80,14 +80,6 @@ export async function getAtcCustomizing(
   });
 }
 
-/** `systemCheckVariant` out of a customizing response, or null. */
-export function parseSystemCheckVariant(body: unknown): string | null {
-  if (typeof body !== 'string') return null;
-  return (
-    body.match(/name="systemCheckVariant"[^>]*value="([^"]+)"/)?.[1] ?? null
-  );
-}
-
 /**
  * Create the worklist a run writes its findings into.
  *
