@@ -69,6 +69,13 @@ ATC check runs: start one, ask whether it is done, read what it found.
   worklist; the second reads the execution and check-failure logs and takes an execution id.
   Neither accepts the other's identifier.
 
+- **Five questions the trial could not answer** — what a failed run reports, what
+  `withLongPolling` does to a run in flight, whether `includeExemptedFindings` changes a
+  finished worklist, what the `FINDING_STATS` positions mean, and `program`/`include` on an
+  on-prem system — are tracked in
+  [#111](https://github.com/fr0ster/mcp-abap-adt-clients/issues/111). None blocks anything
+  shipped here.
+
 ### Changed
 
 - **`@mcp-abap-adt/interfaces` floor raised to `^17.1.0`**, which is where the ATC contract
