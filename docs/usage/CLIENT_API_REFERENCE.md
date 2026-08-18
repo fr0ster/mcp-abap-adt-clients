@@ -4,7 +4,7 @@ This project exposes the following client classes:
 
 - `AdtClient` - high-level CRUD operations for ADT objects.
 - `AdtClientBatch` - batch mode: multiple read operations in a single HTTP round-trip.
-- `AdtRuntimeClient` - stable runtime operations (ABAP debugger, traces, dumps, logs, feeds, etc.).
+- `AdtRuntimeClient` - stable runtime operations (ABAP debugger, traces, dumps, logs, feeds, ATC check runs, etc.).
 - `AdtRuntimeClientBatch` - batch mode for runtime operations.
 - `AdtRuntimeClientExperimental` - runtime APIs in progress (currently AMDP debugger/data preview).
 
@@ -880,7 +880,104 @@ const logObject = await appLog.getObject('Z_MY_LOG');
 const logSource = await appLog.getSource('Z_MY_LOG');
 ```
 
+### ATC check runs
+
+`runtime.getAtc()` starts a check run, asks whether it is done, and reads what
+it found. Three capabilities and no more — a check run is not created, locked,
+activated or versioned, and the returned handler's type says so.
+
+Objects are named by kind, not by URI: the client builds the URI. The kinds are
+`class`, `interface`, `function_group`, `package`, `ddl_source`, `table` and
+`behavior_definition`. Each was confirmed by a run submitted at the URI this
+client builds whose *finished* worklist then listed that object under that
+type; a run being accepted proves nothing, since a URI that cannot exist is
+answered `201` too. `program` and `include` are absent because ABAP Cloud
+refuses to hold either, so nothing there could confirm them.
+
+**Two modes, two shapes.** `wait` is not a timing flag — it changes what the
+server answers with, and the result is a discriminated union on `waited`.
+
+```typescript
+const atc = runtime.getAtc();
+
+// Default: the server answers at once with a run id to poll.
+const started = await atc.run({
+  objects: [
+    { objectType: 'class', objectName: 'ZCL_MY_CLASS' },
+    { objectType: 'ddl_source', objectName: 'ZI_MY_VIEW' },
+  ],
+});
+// started.waited === false, and it carries { worklistId, runId }
+```
+
+```typescript
+// Or have the server hold the request until the checks finish.
+const done = await atc.run(
+  { objects: [{ objectType: 'class', objectName: 'ZCL_MY_CLASS' }] },
+  { wait: true },
+);
+// done.waited === true, and it carries { worklistId, findingStats }
+```
+
+`findingStats` is the server's `FINDING_STATS` triple verbatim, for example
+`"0,0,1"`. It is not parsed into named counts: which position is which severity
+has been observed once, in a worklist with a single priority-3 finding, which
+fits several orderings.
+
+**Polling under a bound you choose.** There is no `waitForRun` helper, and its
+absence is the design: waiting needs a stopping condition for a run that does
+not finish, no failed or cancelled run has ever been observed, and a helper
+would have to invent one. Whoever knows how long their checks take is the one
+who can decide when to give up — and `status` travels beside `isFinished` so
+they can report the state they last saw.
+
+```typescript
+const deadline = Date.now() + 5 * 60_000; // yours to choose
+let status = await atc.getRunStatus(started.runId);
+
+while (!status.isFinished && Date.now() < deadline) {
+  await new Promise((r) => setTimeout(r, 2_000));
+  status = await atc.getRunStatus(started.runId);
+}
+
+if (!status.isFinished) {
+  throw new Error(`ATC run ${started.runId} still ${status.status} after 5 min`);
+}
+
+const findings = await atc.getFindings(started.worklistId);
+```
+
+`isFinished` is **completion, not success**: it says the run reached an end, not
+that the end was a good one. And read the worklist only once a run reports
+finished — read earlier it is empty whatever happened, which is
+indistinguishable from a run that found nothing.
+
+The worklist lists **every object the run checked**, each with its findings,
+empty for the ones that were clean. `getFindings()` returns the raw
+`IAdtResponse`; no finding model is published, because none has been confirmed
+against more than one system.
+
+Two options beyond `wait`:
+
+- `checkVariant` — omitted, the client reads `systemCheckVariant` from ATC
+  customizing. On a system whose variant list comes back empty, customizing is
+  the only source of a usable one.
+- `maximumVerdicts` — a **cap on results**, not a page size. Defaults to 100; a
+  caller wanting everything raises it rather than paging. Must be a positive
+  integer.
+
+**Nothing here defaults a missing value.** Each response the chain depends on
+carries one thing the next step cannot work without — the check variant, the
+worklist id, the `Location`, `FINDING_STATS`, `runs:status` — and where that
+thing is absent the call rejects naming it (`ATC_NO_CHECK_VARIANT`,
+`ATC_NO_WORKLIST_ID`, `ATC_NO_RUN_LOCATION`, `ATC_NO_FINDING_STATS`,
+`ATC_RUN_STATUS_MISSING`). The dangerous outcome on an unfamiliar system is not
+an exception; it is a confident zero that reads exactly like a clean check.
+
 ### ATC Log
+
+Different resources, same subject: `getAtcLog()` reads the execution log and the
+check-failure logs, and takes an execution id rather than a worklist id.
 
 ```typescript
 const atcLog = runtime.getAtcLog();

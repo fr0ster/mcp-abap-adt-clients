@@ -58,7 +58,7 @@ The package provides the main client classes:
 
 - **AdtClient** - High-level CRUD API with automatic operation chains (recommended)
 - **AdtClientBatch** - Batch mode: multiple read operations in a single HTTP round-trip
-- **AdtRuntimeClient** - Stable runtime operations (ABAP debugger, traces, dumps, logs, feeds)
+- **AdtRuntimeClient** - Stable runtime operations (ABAP debugger, traces, dumps, logs, feeds, ATC check runs)
 - **AdtRuntimeClientBatch** - Batch mode for runtime operations
 - **AdtRuntimeClientExperimental** - Runtime APIs in progress (AMDP debugger/data preview)
 

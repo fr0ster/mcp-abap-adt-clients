@@ -8,7 +8,7 @@ Primary public entry points:
 - `AdtClient` - high-level CRUD-style object operations.
 - `AdtClientLegacy` - extends `AdtClient` for legacy systems (BASIS < 7.50): blocks unsupported types, uses legacy deletion and versionless content types.
 - `createAdtClient()` - factory that auto-detects system version and returns `AdtClient` or `AdtClientLegacy`.
-- `AdtRuntimeClient` - stable runtime operations (debugger, traces, dumps, logs, feeds, DDIC runtime helpers).
+- `AdtRuntimeClient` - stable runtime operations (debugger, traces, dumps, logs, feeds, ATC check runs, DDIC runtime helpers).
 - `AdtRuntimeClientExperimental` - runtime APIs in progress (currently AMDP debugger/data preview).
 - `AdtClientsWS` - WebSocket request/event facade.
 - `AdtExecutor` - execution-oriented facade (currently class execution with optional profiling helpers).
@@ -117,6 +117,14 @@ Runtime clients are facades over pure runtime functions in `src/runtime/*`.
 - `AdtRuntimeClient`: stable APIs.
 - `AdtRuntimeClientExperimental`: extends stable runtime client and adds AMDP-in-progress APIs.
 
+Runtime accessors return handlers narrowed to what the subject actually
+supports, rather than a uniform object interface. `getAtc()` is the clearest
+case: a check run is run and then read, never created, locked, activated or
+versioned, so `AdtAtc` declares `IAdtRunnable` plus `IAtcRunStatusReadable` and
+`IAtcFindings` — three capabilities and no more. `src/runtime/atc/` holds both
+it and `AtcLog`, which reads the execution and check-failure logs: the same
+subject at different resources, and neither takes the other's identifier.
+
 ### 3) `AdtClientsWS`
 
 WebSocket abstraction around `IWebSocketTransport`:
@@ -185,7 +193,7 @@ Common behaviors in implementations:
 
 ## Type System and Exports
 
-**Types are defined once, in `@mcp-abap-adt/interfaces` (`^14.1.0`).** As of 7.5.0 this package declares no type it shares with the contract package. Each `src/core/<object>/types.ts` is a re-export surface:
+**Types are defined once, in `@mcp-abap-adt/interfaces` (`^17.1.0`).** As of 7.5.0 this package declares no type it shares with the contract package. Each `src/core/<object>/types.ts` is a re-export surface:
 
 ```ts
 export type {
