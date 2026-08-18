@@ -13,9 +13,11 @@
  */
 
 import {
+  assertKnownKeys,
   CANDIDATES,
   exitCodeFor,
   requiredKeysFor,
+  verdictFor,
 } from '../../../../scripts/probe-atc';
 
 const silentLogger = () => ({
@@ -107,8 +109,82 @@ describe('probe-atc — what the verdict counts', () => {
     ).toThrow(/programs/);
   });
 
+  // `--require=` and `--require=,,,` both reach here as `[]`, which is truthy,
+  // so they read as an explicit statement. A run required to confirm nothing
+  // confirms it and exits 0 — a clean pass that decided nothing, which is the
+  // bug this whole change exists to remove, reachable by a stray keystroke.
+  it.each([
+    [[] as string[]],
+    [[''] as string[]],
+  ])('an empty --require (%p after trimming) throws rather than requiring nothing', (keys) => {
+    const cleaned = keys.map((k) => k.trim()).filter(Boolean);
+
+    expect(() => assertKnownKeys(cleaned)).toThrow(/no candidate/i);
+    expect(() =>
+      requiredKeysFor(cleaned, false, silentLogger() as never),
+    ).toThrow(/no candidate/i);
+  });
+
   it('the candidate set still holds the two types an on-prem run is for', () => {
     expect(ONPREM_KEYS).toEqual(expect.arrayContaining(['program', 'include']));
+  });
+});
+
+/**
+ * The verdict string is what goes into `manifest.json` and what a person reads.
+ * It needs its own tests because the first pass at this fix gave the exit code
+ * a pure function and left this inline: a refusing run still wrote `COMPLETE`
+ * into the artefact. An exit code does not survive into a file; the string does.
+ */
+describe('probe-atc — the verdict line', () => {
+  const base = {
+    requiredKeys: ['class', 'interface'],
+    source: '--require',
+    confirmed: 2,
+    unconfirmed: [],
+    refuse: false,
+  };
+
+  it('a refusing run is never COMPLETE, even with everything it counted confirmed', () => {
+    const verdict = verdictFor({
+      ...base,
+      source: 'none given',
+      refuse: true,
+    });
+
+    expect(verdict).not.toMatch(/COMPLETE/);
+    expect(verdict).toMatch(/^REFUSED/);
+    // And it says how to get an answer, not merely that it has none.
+    expect(verdict).toContain('--require');
+  });
+
+  it('a refusing run still reports what it did confirm, rather than hiding it', () => {
+    const verdict = verdictFor({
+      ...base,
+      source: 'none given',
+      refuse: true,
+    });
+
+    expect(verdict).toContain('2 of 2 required type(s)');
+  });
+
+  it('COMPLETE names the counted set, so it cannot be read wider than it is', () => {
+    const verdict = verdictFor(base);
+
+    expect(verdict).toMatch(/^COMPLETE/);
+    expect(verdict).toContain('[class, interface]');
+    expect(verdict).toContain('set from --require');
+  });
+
+  it('INCOMPLETE names each unconfirmed candidate and why', () => {
+    const verdict = verdictFor({
+      ...base,
+      confirmed: 1,
+      unconfirmed: [{ key: 'interface', why: 'never asked' }],
+    });
+
+    expect(verdict).toMatch(/^INCOMPLETE/);
+    expect(verdict).toContain('interface [never asked]');
   });
 });
 

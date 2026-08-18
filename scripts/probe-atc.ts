@@ -579,6 +579,15 @@ function parseArgsChecked(argv: string[]) {
  * not cheap to repeat.
  */
 export function assertKnownKeys(keys: string[]): void {
+  // `--require=` and `--require=,,,` both survive split/trim/filter as an empty
+  // array, which is truthy, so it read as an explicit statement — and a run
+  // required to confirm nothing confirms it, exits 0 and decides nothing. A
+  // caller who passes the flag means to name something.
+  if (keys.length === 0) {
+    throw new Error(
+      `--require was given with no candidate in it. Name at least one, or pass --require=all. Known: ${CANDIDATES.map((c) => c.key).join(', ')}`,
+    );
+  }
   const unknown = keys.filter((k) => !CANDIDATES.some((c) => c.key === k));
   if (unknown.length) {
     throw new Error(
@@ -636,6 +645,38 @@ export function exitCodeFor(opts: {
   refuse: boolean;
 }): 0 | 1 {
   return opts.unconfirmed > 0 || opts.refuse ? 1 : 0;
+}
+
+/**
+ * The verdict line — the one written into `manifest.json` and read by people.
+ *
+ * Pure and tested for the same reason `exitCodeFor` is, and it was missed the
+ * first time: the exit code became a value while this stayed inline, so a run
+ * that refused to judge still wrote `COMPLETE` into the manifest and logged it.
+ * The exit code was 1, but `$?` does not survive into an artefact — the string
+ * does, and a reader or a consumer of the manifest takes it at its word.
+ *
+ * So refusal is a verdict of its own, not a footnote under a good one.
+ */
+export function verdictFor(opts: {
+  requiredKeys: string[];
+  source: string;
+  confirmed: number;
+  unconfirmed: { key: string; why: string }[];
+  refuse: boolean;
+}): string {
+  const countedAs = `${opts.requiredKeys.length} required type(s) [${opts.requiredKeys.join(', ')}] — set from ${opts.source}`;
+  const unconfirmed = opts.unconfirmed.length
+    ? `; unconfirmed: ${opts.unconfirmed.map((o) => `${o.key} [${o.why}]`).join(', ')}`
+    : '';
+
+  if (opts.refuse) {
+    return `REFUSED — this run did not say what it must confirm, and this system is not one whose type inventory the probe knows. ${opts.confirmed} of ${countedAs} confirmed${unconfirmed}. Nothing here decides the on-prem-only types; re-run with --require.`;
+  }
+
+  return opts.unconfirmed.length
+    ? `INCOMPLETE — ${opts.confirmed} of ${countedAs}${unconfirmed}`
+    : `COMPLETE — all of ${countedAs}`;
 }
 
 function defaultPackageFromTestConfig(logger: ILogger): string | undefined {
@@ -1662,10 +1703,13 @@ async function main(): Promise<void> {
   // The counted set is named in the verdict itself. A bare "COMPLETE" is what
   // made the previous version dangerous on an on-prem run: it was true about
   // the seven types it counted and silent about the two the run existed for.
-  const countedAs = `${required.keys.length} required type(s) [${required.keys.join(', ')}] — set from ${required.source}`;
-  const verdict = unconfirmed.length
-    ? `INCOMPLETE — ${confirmed.length} of ${countedAs}; unconfirmed: ${unconfirmed.map((o) => `${o.key} [${why(o)}]`).join(', ')}`
-    : `COMPLETE — all of ${countedAs}`;
+  const verdict = verdictFor({
+    requiredKeys: required.keys,
+    source: required.source,
+    confirmed: confirmed.length,
+    unconfirmed: unconfirmed.map((o) => ({ key: o.key, why: why(o) })),
+    refuse: required.refuse,
+  });
 
   // A non-zero triple somewhere is what makes the positions readable at all.
   const nonZeroStats = rec.findingStats.filter(
