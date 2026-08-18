@@ -68,9 +68,18 @@
  *                    a triple of zeroes is the one value that tells you nothing
  *                    about the ordering. KEY is a candidate key (`class`,
  *                    `program`, …)
+ *   --require=KEYS   comma-separated candidate keys this run must confirm, or
+ *                    `all`. **Every candidate is probed either way** — this
+ *                    decides only what the VERDICT counts. Omitted on a cloud
+ *                    system it defaults to the cloud-scope types; omitted on
+ *                    anything else the probe exits non-zero and says so,
+ *                    because it does not know which types that system holds.
  *
- * Exit code is **1 unless every candidate is confirmed**, so an incomplete
- * probe cannot be mistaken for a finished one.
+ * Exit code is **1 unless every required candidate is confirmed**, so an
+ * incomplete probe cannot be mistaken for a finished one. On an on-prem run
+ * that means `--require` is not optional: without it the run cannot decide
+ * `program` and `include`, which are the two types an on-prem probe exists to
+ * settle.
  *
  * Writes `DIR/manifest.json` (every step, plus the verdict, machine-readable)
  * and one raw body file per step. Read the raw files — the manifest is an index,
@@ -90,6 +99,7 @@ import * as dotenv from 'dotenv';
 import { getConfig } from '../src/__tests__/helpers/sessionConfig';
 import { createConnectionLogger } from '../src/__tests__/helpers/testLogger';
 import { AdtUtils } from '../src/core/shared/AdtUtils';
+import { isCloudEnvironment } from '../src/utils/systemInfo';
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../.env');
 if (fs.existsSync(envPath)) {
@@ -163,7 +173,7 @@ interface ICandidate {
   scope: 'cloud' | 'onprem';
 }
 
-const CANDIDATES: ICandidate[] = [
+export const CANDIDATES: ICandidate[] = [
   {
     key: 'class',
     worklistTypeCode: 'CLAS',
@@ -512,13 +522,120 @@ function parseArgs(argv: string[]) {
   const [knownBadType, knownBadName] = knownBad
     ? knownBad.split(':')
     : [undefined, undefined];
+  const require = get('require');
   return {
     packageName: get('package'),
     outDir: get('out') ?? 'atc-probe',
     extras: argv.includes('--extras'),
     knownBadType,
     knownBadName,
+    /**
+     * Which candidate keys this run must confirm, or undefined when the caller
+     * did not say. Undefined is not the same as "the default set": it is the
+     * state in which this probe refuses to report a clean pass on a system it
+     * was not written for. See `requiredKeysFor`.
+     */
+    require:
+      require === undefined
+        ? undefined
+        : require === 'all'
+          ? CANDIDATES.map((c) => c.key)
+          : require
+              .split(',')
+              .map((k) => k.trim())
+              .filter(Boolean),
   };
+}
+
+/** Parse, then reject a bad key before anything connects. */
+function parseArgsChecked(argv: string[]) {
+  const args = parseArgs(argv);
+  if (args.require) assertKnownKeys(args.require);
+  return args;
+}
+
+/**
+ * The candidate keys a run is judged on, and the reason for the choice.
+ *
+ * The verdict used to count cloud-scope candidates and nothing else. On the
+ * trial that was right — a classic program cannot exist on ABAP Cloud, and
+ * counting it would have left the probe permanently INCOMPLETE. Run on an
+ * **on-prem** system it became a trap: `program` and `include` were probed,
+ * reported on a line of their own, and then left out of the verdict, so the
+ * probe printed `COMPLETE` and exited 0 on exactly the run whose purpose was
+ * to settle them.
+ *
+ * The fix is not to infer the set from the system. `isCloudEnvironment()` is a
+ * heuristic over the base URL, and swapping one silent inference for another
+ * would move the trap rather than remove it. **The caller states what must be
+ * confirmed**; detection is used only to refuse a pass that would mislead.
+ */
+/**
+ * Reject a candidate key nobody defines, naming the ones that exist.
+ *
+ * Called at argument-parse time as well as from `requiredKeysFor`, so a typo
+ * costs nothing: on an on-prem system the alternative is connecting, probing,
+ * and only then being told the flag was misspelled — and an on-prem session is
+ * not cheap to repeat.
+ */
+export function assertKnownKeys(keys: string[]): void {
+  const unknown = keys.filter((k) => !CANDIDATES.some((c) => c.key === k));
+  if (unknown.length) {
+    throw new Error(
+      `--require names ${unknown.join(', ')}, which ${unknown.length === 1 ? 'is not a candidate' : 'are not candidates'}. Known: ${CANDIDATES.map((c) => c.key).join(', ')}`,
+    );
+  }
+}
+
+export function requiredKeysFor(
+  explicit: string[] | undefined,
+  isCloud: boolean,
+  logger: ILogger,
+): { keys: string[]; source: string; refuse: boolean } {
+  if (explicit) {
+    assertKnownKeys(explicit);
+    return { keys: explicit, source: '--require', refuse: false };
+  }
+
+  const cloudKeys = CANDIDATES.filter((c) => c.scope === 'cloud').map(
+    (c) => c.key,
+  );
+
+  if (isCloud) {
+    return {
+      keys: cloudKeys,
+      source: 'default for a cloud system',
+      refuse: false,
+    };
+  }
+
+  // Not cloud, and nobody said what to require. The honest answer is that this
+  // probe does not know which types this system can hold — a 7.40 on-prem has
+  // no behaviour definitions, a 7.5x has both those and classic programs — and
+  // guessing produces either a false COMPLETE or a permanent INCOMPLETE.
+  logger.error(
+    'This system does not look like ABAP Cloud, and --require was not given.',
+  );
+  logger.error(
+    `Say what this run must confirm, e.g. --require=${[...cloudKeys, 'program', 'include'].join(',')} on a modern on-prem, or --require=all. Every candidate is probed either way; --require decides what the VERDICT counts.`,
+  );
+  return { keys: cloudKeys, source: 'none given', refuse: true };
+}
+
+/**
+ * The exit code, as a value rather than a side effect.
+ *
+ * Split out because the first version of the refusal was unreachable from a
+ * test: `requiredKeysFor` returned `refuse: true` and `main` acted on it, so
+ * deleting the line that set the exit code broke nothing that anyone checked.
+ * A verdict nobody can act on is the same failure as a verdict that lies —
+ * whatever the log says, `$?` is what a caller and a CI job read.
+ */
+export function exitCodeFor(opts: {
+  unconfirmed: number;
+  refuse: boolean;
+}): 0 | 1 {
+  return opts.unconfirmed > 0 || opts.refuse ? 1 : 0;
 }
 
 function defaultPackageFromTestConfig(logger: ILogger): string | undefined {
@@ -598,7 +715,7 @@ async function main(): Promise<void> {
   // A probe that says nothing while it works is unusable; INFO regardless of
   // the DEBUG_* flags, which gate the library's own loggers.
   const logger: ILogger = new DefaultLogger(LogLevel.INFO);
-  const args = parseArgs(process.argv.slice(2));
+  const args = parseArgsChecked(process.argv.slice(2));
 
   const outDir = path.resolve(process.cwd(), args.outDir);
   fs.mkdirSync(outDir, { recursive: true });
@@ -607,6 +724,22 @@ async function main(): Promise<void> {
   const connection = createAbapConnection(sapConfig, createConnectionLogger());
   await connection.connect();
   logger.info(`Connected to ${sapConfig.url}`);
+
+  // Detection decides nothing on its own; it only lets the probe refuse a pass
+  // that would mislead. A failure to detect is treated as "not cloud", which
+  // errs towards demanding --require rather than towards a clean exit.
+  let isCloud = false;
+  try {
+    isCloud = await isCloudEnvironment(connection);
+  } catch (error) {
+    logger.warn(
+      `Could not tell whether this is a cloud system (${String(error)}) — treating it as not cloud, which asks for --require rather than assuming.`,
+    );
+  }
+  const required = requiredKeysFor(args.require, isCloud, logger);
+  logger.info(
+    `Judged on: ${required.keys.join(', ')} (${required.source}); system looks like ${isCloud ? 'ABAP Cloud' : 'not ABAP Cloud'}.`,
+  );
 
   const rec = new Recorder(connection, outDir, logger);
   const utils = new AdtUtils(connection, logger);
@@ -1519,17 +1652,20 @@ async function main(): Promise<void> {
   const timedOut = (o: ICandidateOutcome) =>
     o.attempts.some((a) => a.status === null);
 
-  // Only cloud-scope candidates can be decided here. A classic program cannot
-  // exist on ABAP Cloud, so counting it against this run would leave the probe
-  // permanently INCOMPLETE and say nothing about the system. Raised in review,
-  // 2026-08-16.
-  const cloudCandidates = outcomes.filter((o) => scopeOf(o.key) === 'cloud');
-  const onpremCandidates = outcomes.filter((o) => scopeOf(o.key) === 'onprem');
-  const confirmed = cloudCandidates.filter((o) => o.confirmed);
-  const unconfirmed = cloudCandidates.filter((o) => !o.confirmed);
+  // What this run is judged on, stated by the caller rather than inferred.
+  const requiredCandidates = outcomes.filter((o) =>
+    required.keys.includes(o.key),
+  );
+  const notCounted = outcomes.filter((o) => !required.keys.includes(o.key));
+  const confirmed = requiredCandidates.filter((o) => o.confirmed);
+  const unconfirmed = requiredCandidates.filter((o) => !o.confirmed);
+  // The counted set is named in the verdict itself. A bare "COMPLETE" is what
+  // made the previous version dangerous on an on-prem run: it was true about
+  // the seven types it counted and silent about the two the run existed for.
+  const countedAs = `${required.keys.length} required type(s) [${required.keys.join(', ')}] — set from ${required.source}`;
   const verdict = unconfirmed.length
-    ? `INCOMPLETE — ${confirmed.length} of ${cloudCandidates.length} cloud candidate types CONFIRMED; unconfirmed: ${unconfirmed.map((o) => `${o.key} [${why(o)}]`).join(', ')}`
-    : `COMPLETE — all ${cloudCandidates.length} cloud candidate types confirmed`;
+    ? `INCOMPLETE — ${confirmed.length} of ${countedAs}; unconfirmed: ${unconfirmed.map((o) => `${o.key} [${why(o)}]`).join(', ')}`
+    : `COMPLETE — all of ${countedAs}`;
 
   // A non-zero triple somewhere is what makes the positions readable at all.
   const nonZeroStats = rec.findingStats.filter(
@@ -1544,6 +1680,9 @@ async function main(): Promise<void> {
 
   rec.flush({
     system: sapConfig.url,
+    looksLikeCloud: isCloud,
+    requiredKeys: required.keys,
+    requiredFrom: required.source,
     checkVariant,
     checkVariantVerb: variantFromGet ? 'GET' : 'POST',
     packageName,
@@ -1576,24 +1715,44 @@ async function main(): Promise<void> {
         : '';
       logger.error(`  ${o.key}: ${why(o)}${transport}${weaker}`);
     }
-    process.exitCode = 1;
   } else {
     logger.info(verdict);
   }
 
-  // Reported, never counted: this system cannot hold these, so nothing here
-  // decides them either way. They widen the union from an on-prem probe.
-  for (const o of onpremCandidates) {
+  // Probed but outside the required set. Said out loud with its status, so a
+  // reader can see what this run touched without counting, rather than having
+  // to infer the gap from the verdict's arithmetic.
+  for (const o of notCounted) {
     logger.info(
-      `on-prem only — ${o.key}: ${why(o)} (not counted against this run)`,
+      `not counted (${scopeOf(o.key)}-scope, not in --require) — ${o.key}: ${why(o)}`,
     );
   }
+
+  // Last, and after the verdict, so it cannot be mistaken for one: a run that
+  // did not say what it required does not get to exit 0, whatever it confirmed.
+  if (required.refuse) {
+    logger.error(
+      'The verdict above counted the default cloud set on a system that is not cloud. Whatever it says, this run did not decide the on-prem-only types. Re-run with --require.',
+    );
+  }
+
+  // One place decides, so the log and `$?` cannot disagree.
+  process.exitCode = exitCodeFor({
+    unconfirmed: unconfirmed.length,
+    refuse: required.refuse,
+  });
+
   logger.info(`Evidence written to ${outDir}`);
 }
 
-main().catch((error) => {
-  // No logger here by design: this is the path where the probe itself broke,
-  // and the process must exit non-zero with the reason visible.
-  process.stderr.write(`probe-atc failed: ${String(error)}\n`);
-  process.exitCode = 1;
-});
+// Guarded so the pure parts of this file can be imported and tested. The
+// verdict is the one thing here that must not lie, and an unimportable module
+// is an untestable one.
+if (require.main === module) {
+  main().catch((error) => {
+    // No logger here by design: this is the path where the probe itself broke,
+    // and the process must exit non-zero with the reason visible.
+    process.stderr.write(`probe-atc failed: ${String(error)}\n`);
+    process.exitCode = 1;
+  });
+}

@@ -2,10 +2,17 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "noEmit": true,
-    "typeRoots": [
-      "./node_modules/@types"
-    ]
+    "rootDir": ".",
+    "typeRoots": ["./node_modules/@types"]
   },
-  "include": ["src/**/*"],
+  "include": [
+    "src/**/*",
+    // probe-atc only. src/__tests__/unit/scripts/ imports its pure parts, so it
+    // has to be in the program. The other scripts are deliberately NOT here:
+    // several no longer compile against current types, and dragging them in
+    // would fail this config for reasons that have nothing to do with tests.
+    // tsconfig.test.integration.json carries the same line — change both.
+    "scripts/probe-atc.ts"
+  ],
   "exclude": ["node_modules", "dist"]
 }
