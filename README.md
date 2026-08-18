@@ -10,7 +10,7 @@ TypeScript clients for SAP ABAP Development Tools (ADT).
   - `AdtClient` – high-level CRUD API with automatic operation chains
   - `AdtClientBatch` – batch mode: multiple read operations in a single HTTP round-trip
   - `AdtExecutor` – execution API via `IExecutor` contracts (class/program, with profiling)
-  - `AdtRuntimeClient` – stable runtime operations (ABAP debugger, traces, logs, dumps)
+  - `AdtRuntimeClient` – stable runtime operations (ABAP debugger, traces, logs, dumps, ATC check runs)
   - `AdtRuntimeClientBatch` – batch mode for runtime operations
   - `AdtRuntimeClientExperimental` – runtime APIs in progress (for example AMDP debugger)
   - `AdtClientsWS` – realtime WebSocket facade for event-driven workflows
@@ -68,7 +68,7 @@ This package is responsible for:
 
 This package interacts with external packages **ONLY through interfaces**:
 
-- **`@mcp-abap-adt/interfaces`** (`^14.1.0`): The contract package — the single definition site for every public type this package exposes (see [Type System](#type-system)). This is the one runtime dependency whose *types* are part of this package's public API.
+- **`@mcp-abap-adt/interfaces`** (`^17.1.0`): The contract package — the single definition site for every public type this package exposes (see [Type System](#type-system)). This is the one runtime dependency whose *types* are part of this package's public API.
 - **`@mcp-abap-adt/connection`**: Uses the `IAbapConnection` interface for HTTP requests — does not know about the concrete connection implementation. It is a **dev** dependency; consumers supply their own implementation.
 - **No other direct package dependencies**: all remaining interactions happen through well-defined interfaces
 
@@ -96,8 +96,9 @@ npm install @mcp-abap-adt/adt-clients
    - Example: `await client.getClass().create({...}, { activateOnCreate: true })`
 
 2. **AdtRuntimeClient**
-   - Stable runtime operations for ABAP debugging, traces, dumps, logs, feeds, and more
-   - Factory accessors: `getProfiler()`, `getCrossTrace()`, `getSt05Trace()`, `getDebugger()`, `getApplicationLog()`, `getAtcLog()`, `getDdicActivation()`, `getDumps()`, `getFeeds()`, `getSystemMessages()`, `getGatewayErrorLog()`
+   - Stable runtime operations for ABAP debugging, traces, dumps, logs, feeds, ATC check runs, and more
+   - Factory accessors: `getProfiler()`, `getCrossTrace()`, `getSt05Trace()`, `getDebugger()`, `getApplicationLog()`, `getAtc()`, `getAtcLog()`, `getDdicActivation()`, `getDumps()`, `getFeeds()`, `getSystemMessages()`, `getGatewayErrorLog()`
+   - `getAtc()` runs ATC checks; `getAtcLog()` reads the execution and check-failure logs. Same subject, different resources — see [ATC check runs](docs/usage/CLIENT_API_REFERENCE.md#atc-check-runs)
    - Example: `await runtimeClient.getDebugger().getAbap().launch()`
 
 3. **AdtExecutor**
@@ -583,7 +584,7 @@ everything else is not.
 
 ### Single Definition Site: `@mcp-abap-adt/interfaces`
 
-Since **7.5.0**, every public type is **defined once**, in `@mcp-abap-adt/interfaces` (`^14.1.0`). This package declares no copies of its own — the low-level `*Params` interfaces, every `IXxxConfig`/`IXxxState` pair, the option/result types and the cross-cutting shared types all live there.
+Since **7.5.0**, every public type is **defined once**, in `@mcp-abap-adt/interfaces` (`^17.1.0`). This package declares no copies of its own — the low-level `*Params` interfaces, every `IXxxConfig`/`IXxxState` pair, the option/result types and the cross-cutting shared types all live there.
 
 **Import them from the package that owns them:**
 
@@ -601,7 +602,7 @@ What this package exports is what it owns: the clients, the handler classes, the
 
 ### Honest capability types (since 8.0.0)
 
-`@mcp-abap-adt/interfaces` (`^17.0.0`) splits the fat `IAdtObject` contract into **capability atoms** — `IAdtCreatable`, `IAdtReadable`, `IAdtUpdatable`, `IAdtDeletable` (and `IAdtModifiable`/`IAdtCrud`, their composites), `IAdtValidatable`, `IAdtCheckable`, `IAdtActivatable`, `IAdtLockable`, `IAdtVersionable`, `IAdtTransportAware`, `IAdtSearchable` — each covering one slice of the lifecycle, plus one named composite, `IAdtSourceObject`. There is no composite for "everything but versions": a vocabulary states what an object supports, never what it lacks. Since interfaces 13.0.0 `IAdtObject` is itself assembled from the atoms, so the atoms are the definitions and the composite cannot drift from them.
+`@mcp-abap-adt/interfaces` (`^17.1.0`) splits the fat `IAdtObject` contract into **capability atoms** — `IAdtCreatable`, `IAdtReadable`, `IAdtUpdatable`, `IAdtDeletable` (and `IAdtModifiable`/`IAdtCrud`, their composites), `IAdtValidatable`, `IAdtCheckable`, `IAdtActivatable`, `IAdtLockable`, `IAdtVersionable`, `IAdtTransportAware`, `IAdtSearchable` — each covering one slice of the lifecycle, plus one named composite, `IAdtSourceObject`. There is no composite for "everything but versions": a vocabulary states what an object supports, never what it lacks. Since interfaces 13.0.0 `IAdtObject` is itself assembled from the atoms, so the atoms are the definitions and the composite cannot drift from them.
 
 Since **8.0.0**, each handler `implements` only the atoms it genuinely supports, and `AdtClient.getXxx()` (and `AdtClientBatch.getXxx()`) return types are narrowed to match:
 
@@ -618,7 +619,9 @@ Since **9.0.0** no accessor returns the wide type, and since **12.0.0** none ret
 
 `getUnitTest()` and `getCdsUnitTest()` changed meaning rather than shape: a unit test's subject is the container class and its `testclasses` include, so `create()` creates that class and writes the tests into it, `update`/`delete`/`read` manage the include, `lock`/`unlock` take the container's lock, and running is `IAdtRunnable` — one method, with `getStatus`/`getResult` on `ITestRunInformation` because asking about a run is not running it.
 
-**A guard keeps this true.** `src/__tests__/unit/capabilities/` compares all 36 factory return types against the 10 atoms in both directions at compile time, calls every method of every declared capability against a recording connection to check it issues the request its capability names, and fails if a new factory appears without an entry. Adding a throwing method back to a narrowed handler stops compiling.
+The runtime client narrows the same way. `AdtRuntimeClient.getAtc()` returns `IAdtRunnable & IAtcRunStatusReadable & IAtcFindings` — a check run is run and then read, never created, locked, activated or versioned, and the type says so rather than offering the rest and throwing.
+
+**A guard keeps this true.** `src/__tests__/unit/capabilities/` compares all 36 factory return types against the 10 atoms in both directions at compile time, calls every method of every declared capability against a recording connection to check it issues the request its capability names, and fails if a new factory appears without an entry. Adding a throwing method back to a narrowed handler stops compiling. The guard walks `AdtClient` and `AdtClientLegacy` only; the runtime accessors are pinned by `src/__tests__/unit/clients/AdtRuntimeClient.factory.test.ts`.
 
 One category deliberately remains local, because it is code, not contract:
 

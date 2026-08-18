@@ -78,6 +78,7 @@ const RUNTIME_EXPORTS = [
   'AbapDebugger',
   'AdtAbapGitClient',
   'AdtAppendStructure',
+  'AdtAtc',
   'AdtClient',
   'AdtClientBatch',
   'AdtClientLegacy',

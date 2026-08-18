@@ -240,7 +240,7 @@ Top-level client classes instantiated directly (not via `AdtClient.getXxx()`). T
 
 ### AdtRuntimeClient
 - Source: `src/clients/AdtRuntimeClient.ts`
-- Public methods: `getApplicationLog`, `getAtcLog`, `getCrossTrace`, `getDdicActivation`, `getDebugger`, `getDumps`, `getFeeds`, `getGatewayErrorLog`, `getProfiler`, `getSt05Trace`, `getSystemMessages`
+- Public methods: `getApplicationLog`, `getAtc`, `getAtcLog`, `getCrossTrace`, `getDdicActivation`, `getDebugger`, `getDumps`, `getFeeds`, `getGatewayErrorLog`, `getProfiler`, `getSt05Trace`, `getSystemMessages`
 
 ### AdtRuntimeClientExperimental
 - Source: `src/clients/AdtRuntimeClientExperimental.ts`

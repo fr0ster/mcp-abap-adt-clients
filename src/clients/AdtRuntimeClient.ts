@@ -7,6 +7,7 @@
  * - getSt05Trace() — ST05 performance traces
  * - getDebugger() — Composite debugger (ABAP, AMDP, memory snapshots)
  * - getApplicationLog() — Application log analysis
+ * - getAtc() — ATC check runs: start one, poll it, read the worklist
  * - getAtcLog() — ATC check failure and execution logs
  * - getDdicActivation() — DDIC activation graph
  * - getDumps() — Runtime dump analysis
@@ -30,14 +31,23 @@
  *
  * // Logs
  * const appLog = await client.getApplicationLog().getObject('Z_MY_LOG');
+ * const started = await client.getAtc().run({
+ *   objects: [{ objectType: 'class', objectName: 'ZCL_MY_CLASS' }],
+ * });
  * const atcLogs = await client.getAtcLog().getCheckFailureLogs();
  * ```
  */
 
 import type {
   IAbapConnection,
+  IAdtRunnable,
   IApplicationLog,
+  IAtcFindings,
   IAtcLog,
+  IAtcRunOptions,
+  IAtcRunResult,
+  IAtcRunStatusReadable,
+  IAtcRunTarget,
   ICrossTrace,
   IDdicActivation,
   IDebugger,
@@ -50,6 +60,7 @@ import type {
   ISystemMessages,
 } from '@mcp-abap-adt/interfaces';
 import { ApplicationLog } from '../runtime/applicationLog/ApplicationLog';
+import { AdtAtc } from '../runtime/atc/AdtAtc';
 import { AtcLog } from '../runtime/atc/AtcLog';
 import { DdicActivation } from '../runtime/ddic/DdicActivation';
 import { Debugger } from '../runtime/debugger/Debugger';
@@ -70,6 +81,7 @@ export class AdtRuntimeClient {
   private _st05Trace?: St05Trace;
   private _debugger?: Debugger;
   private _applicationLog?: ApplicationLog;
+  private _atc?: AdtAtc;
   private _atcLog?: AtcLog;
   private _ddicActivation?: DdicActivation;
   private _dumps?: RuntimeDumps;
@@ -149,6 +161,21 @@ export class AdtRuntimeClient {
       this._applicationLog = new ApplicationLog(this.connection, this.logger);
     }
     return this._applicationLog;
+  }
+
+  /**
+   * ATC check runs.
+   *
+   * The intersection is spelled here rather than given a name: one getter has
+   * this set, and a composite earns a name when more than one handler does.
+   */
+  getAtc(): IAdtRunnable<IAtcRunTarget, IAtcRunResult, IAtcRunOptions> &
+    IAtcRunStatusReadable &
+    IAtcFindings {
+    if (!this._atc) {
+      this._atc = new AdtAtc(this.connection, this.logger);
+    }
+    return this._atc;
   }
 
   getAtcLog(): IAtcLog {

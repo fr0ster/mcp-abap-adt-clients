@@ -5,6 +5,77 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [12.1.0] - 2026-08-18
+
+ATC check runs: start one, ask whether it is done, read what it found.
+
+### Added
+
+- **`AdtRuntimeClient.getAtc()`** — an ATC handler returning
+  `IAdtRunnable<IAtcRunTarget, IAtcRunResult, IAtcRunOptions> & IAtcRunStatusReadable &
+  IAtcFindings`. Three capabilities and no more: a check run is run and then read, never
+  created, locked, activated or versioned, and the type says so rather than offering the rest
+  and throwing.
+
+  ```typescript
+  const atc = runtime.getAtc();
+
+  const started = await atc.run({
+    objects: [{ objectType: 'class', objectName: 'ZCL_MY_CLASS' }],
+  });
+
+  // `waited` is the discriminant — narrowing on it is what yields runId.
+  if (!started.waited) {
+    // Poll under a bound you choose, then read the worklist.
+    const status = await atc.getRunStatus(started.runId);
+    if (status.isFinished) await atc.getFindings(started.worklistId);
+  }
+  ```
+
+- **`AdtAtc`** is exported from the package root and from `@mcp-abap-adt/adt-clients/runtime`.
+
+- **`wait: true`** hands the request to the server until the checks finish. It is not a timing
+  flag: the two modes answer with different shapes, so `IAtcRunResult` is a discriminated union
+  on `waited` — `{ worklistId, runId }` without waiting, `{ worklistId, findingStats }` with.
+
+- **Seven checkable object types** — `class`, `interface`, `function_group`, `package`,
+  `ddl_source`, `table`, `behavior_definition`. Each was confirmed on an ABAP Cloud trial by a
+  run submitted at the URI this client builds whose **finished** worklist then listed that
+  object under that type. A run being *accepted* proves nothing: a URI that cannot exist is
+  answered `201` too. `program` and `include` are absent because ABAP Cloud refuses to hold
+  either (`403`, `S_DEVELOP`), so nothing there could confirm them; adding them later is a
+  major, since the union is exhaustible.
+
+### Notes
+
+- **Nothing here defaults a missing value.** Each response the chain depends on carries one
+  thing the next step cannot work without — the check variant, the worklist id, the `Location`,
+  `FINDING_STATS`, `runs:status` — and where that thing is absent the call rejects naming it
+  (`ATC_NO_CHECK_VARIANT`, `ATC_NO_WORKLIST_ID`, `ATC_NO_RUN_LOCATION`,
+  `ATC_NO_FINDING_STATS`, `ATC_RUN_STATUS_MISSING`). The dangerous outcome on an unfamiliar
+  system is not an exception; it is a confident zero that reads exactly like a clean check.
+
+- **No `waitForRun` helper, deliberately.** Waiting needs a stopping condition for a run that
+  does not finish; no failed or cancelled run has been observed, so a helper would have to
+  invent one. `isFinished` is **completion, not success** — it says the run reached an end, not
+  that the end was a good one — and `status` travels beside it so a caller can report the state
+  they last saw. `docs/usage/CLIENT_API_REFERENCE.md` shows the loop with a caller-chosen bound.
+
+- **`findingStats` is the server's triple verbatim** (`"0,0,1"`), not parsed into named counts:
+  which position is which severity has been seen once, beside a single priority-3 finding,
+  which fits several orderings.
+
+- **`getAtc()` and `getAtcLog()` are different resources.** The first runs checks and reads a
+  worklist; the second reads the execution and check-failure logs and takes an execution id.
+  Neither accepts the other's identifier.
+
+### Changed
+
+- **`@mcp-abap-adt/interfaces` floor raised to `^17.1.0`**, which is where the ATC contract
+  (`AtcObjectType`, `IAtcRunTarget`, `IAtcRunOptions`, `IAtcRunResult`, `IAtcRunStatus`,
+  `IAtcRunStatusReadable`, `IAtcFindings`) is defined. Additive: 17.1.0 adds these and changes
+  nothing that existed in 17.0.0.
+
 ## [12.0.0] - 2026-08-15
 
 Every handler now declares what ADT gives it, and nothing else. This finishes what 8.0.0 began.
