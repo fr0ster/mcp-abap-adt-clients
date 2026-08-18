@@ -16,6 +16,7 @@ import {
   assertKnownKeys,
   CANDIDATES,
   exitCodeFor,
+  looksUnambiguouslyCloud,
   requiredKeysFor,
   verdictFor,
 } from '../../../../scripts/probe-atc';
@@ -34,6 +35,58 @@ const CLOUD_KEYS = CANDIDATES.filter((c) => c.scope === 'cloud').map(
 const ONPREM_KEYS = CANDIDATES.filter((c) => c.scope === 'onprem').map(
   (c) => c.key,
 );
+
+/**
+ * The permissive branch — "this is cloud, so the cloud default is safe" — is
+ * the only way back to a false COMPLETE, so what opens it has to be proof.
+ *
+ * The first version used `isCloudEnvironment()`, which falls back to asking
+ * whether `/sap/bc/adt/core/http/systeminformation` answers. A **modern
+ * on-prem serves that endpoint too**, so a 7.5x system could be taken for
+ * cloud, get the cloud-only default, and hand back COMPLETE with `program` and
+ * `include` uncounted. The detector would have reintroduced the exact bug.
+ */
+describe('probe-atc — what counts as proof of cloud', () => {
+  it.each([
+    'https://abc.abap.eu10.hana.ondemand.com',
+    'https://x.abap.us21.hana.ondemand.com/sap/bc/adt',
+    'https://tenant.abap.cloud.sap',
+  ])('%s is proof', (url) => {
+    expect(looksUnambiguouslyCloud(url)).toBe(true);
+  });
+
+  it.each([
+    // A modern on-prem, which is what makes the endpoint fallback unusable.
+    ['https://e19.corp.example:44300', 'on-prem host'],
+    ['http://sap-dev:8000', 'on-prem host with a port'],
+    // A host that merely *contains* a cloud domain. `includes` would pass it.
+    ['https://hana.ondemand.com.attacker.example', 'suffix only as substring'],
+    ['https://notondemand.com', 'no dot boundary'],
+    ['not a url at all', 'unparseable'],
+    ['', 'empty'],
+  ])('%s is not proof (%s)', (url) => {
+    expect(looksUnambiguouslyCloud(url)).toBe(false);
+  });
+
+  it('no URL at all is not proof', () => {
+    expect(looksUnambiguouslyCloud(undefined)).toBe(false);
+  });
+
+  // The consequence, stated as its own case: not-proof plus no --require is a
+  // refusal, which is what keeps an unrecognised cloud host safe rather than
+  // silently judged.
+  it('an unrecognised host without --require refuses instead of defaulting', () => {
+    const url = 'https://some-new-cloud-host.example';
+
+    const result = requiredKeysFor(
+      undefined,
+      looksUnambiguouslyCloud(url),
+      silentLogger() as never,
+    );
+
+    expect(result.refuse).toBe(true);
+  });
+});
 
 describe('probe-atc — what the verdict counts', () => {
   // The regression. Before the fix this combination produced a clean pass.

@@ -99,7 +99,6 @@ import * as dotenv from 'dotenv';
 import { getConfig } from '../src/__tests__/helpers/sessionConfig';
 import { createConnectionLogger } from '../src/__tests__/helpers/testLogger';
 import { AdtUtils } from '../src/core/shared/AdtUtils';
-import { isCloudEnvironment } from '../src/utils/systemInfo';
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../.env');
 if (fs.existsSync(envPath)) {
@@ -555,21 +554,43 @@ function parseArgsChecked(argv: string[]) {
 }
 
 /**
- * The candidate keys a run is judged on, and the reason for the choice.
+ * Host suffixes that only ABAP Cloud uses. Deliberately short.
  *
- * The verdict used to count cloud-scope candidates and nothing else. On the
- * trial that was right — a classic program cannot exist on ABAP Cloud, and
- * counting it would have left the probe permanently INCOMPLETE. Run on an
- * **on-prem** system it became a trap: `program` and `include` were probed,
- * reported on a line of their own, and then left out of the verdict, so the
- * probe printed `COMPLETE` and exited 0 on exactly the run whose purpose was
- * to settle them.
- *
- * The fix is not to infer the set from the system. `isCloudEnvironment()` is a
- * heuristic over the base URL, and swapping one silent inference for another
- * would move the trap rather than remove it. **The caller states what must be
- * confirmed**; detection is used only to refuse a pass that would mislead.
+ * A name missing from this list costs one `--require` flag. A name wrongly on
+ * it costs a false COMPLETE, which is the failure this whole file is about, so
+ * the list only grows against a system somebody has actually seen.
  */
+const CLOUD_HOST_SUFFIXES = ['.hana.ondemand.com', '.abap.cloud.sap'];
+
+/**
+ * Whether the base URL *proves* this is ABAP Cloud.
+ *
+ * Not `isCloudEnvironment()`, and the difference is the point. That helper
+ * falls back to "does `/sap/bc/adt/core/http/systeminformation` answer" — an
+ * endpoint a **modern on-prem serves too**. Using it here would let a 7.5x
+ * system be taken for cloud, apply the cloud-only default, and hand back
+ * `COMPLETE` with `program` and `include` uncounted: exactly the bug this file
+ * was changed to remove, reintroduced through the detector.
+ *
+ * The asymmetry is deliberate. Refusing on a false negative costs one flag;
+ * passing on a false positive costs a wrong answer that reads like a right one.
+ * So the permissive branch demands proof, and everything else — an unknown
+ * host, an unparseable URL, no URL at all — asks the caller to say what they
+ * require.
+ */
+export function looksUnambiguouslyCloud(baseUrl: string | undefined): boolean {
+  if (!baseUrl) return false;
+  let host: string;
+  try {
+    host = new URL(baseUrl).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  // Suffix on a host boundary, not `includes`: `ondemand.com.example.org` is
+  // somebody else's domain, and a substring test would hand it the cloud path.
+  return CLOUD_HOST_SUFFIXES.some((suffix) => host.endsWith(suffix));
+}
+
 /**
  * Reject a candidate key nobody defines, naming the ones that exist.
  *
@@ -596,6 +617,23 @@ export function assertKnownKeys(keys: string[]): void {
   }
 }
 
+/**
+ * The candidate keys a run is judged on, and the reason for the choice.
+ *
+ * The verdict used to count cloud-scope candidates and nothing else. On the
+ * trial that was right — a classic program cannot exist on ABAP Cloud, and
+ * counting it would have left the probe permanently INCOMPLETE. Run on an
+ * **on-prem** system it became a trap: `program` and `include` were probed,
+ * reported on a line of their own, and then left out of the verdict, so the
+ * probe printed `COMPLETE` and exited 0 on exactly the run whose purpose was
+ * to settle them.
+ *
+ * The fix is not to infer the set from the system. **The caller states what
+ * must be confirmed**, and `isCloud` here means *proven* cloud — see
+ * `looksUnambiguouslyCloud`, and note that the first attempt at this used
+ * `isCloudEnvironment()`, whose endpoint fallback a modern on-prem also
+ * answers, which let the trap back in through the detector.
+ */
 export function requiredKeysFor(
   explicit: string[] | undefined,
   isCloud: boolean,
@@ -623,7 +661,7 @@ export function requiredKeysFor(
   // no behaviour definitions, a 7.5x has both those and classic programs — and
   // guessing produces either a false COMPLETE or a permanent INCOMPLETE.
   logger.error(
-    'This system does not look like ABAP Cloud, and --require was not given.',
+    'The base URL does not prove this is ABAP Cloud, and --require was not given. It may well be a cloud system under a host this probe does not recognise — that is precisely why it will not decide for you.',
   );
   logger.error(
     `Say what this run must confirm, e.g. --require=${[...cloudKeys, 'program', 'include'].join(',')} on a modern on-prem, or --require=all. Every candidate is probed either way; --require decides what the VERDICT counts.`,
@@ -766,20 +804,19 @@ async function main(): Promise<void> {
   await connection.connect();
   logger.info(`Connected to ${sapConfig.url}`);
 
-  // Detection decides nothing on its own; it only lets the probe refuse a pass
-  // that would mislead. A failure to detect is treated as "not cloud", which
-  // errs towards demanding --require rather than towards a clean exit.
+  // Read from the URL, not from an endpoint: see `looksUnambiguouslyCloud`.
+  // Anything short of proof errs towards demanding --require.
   let isCloud = false;
   try {
-    isCloud = await isCloudEnvironment(connection);
+    isCloud = looksUnambiguouslyCloud(await connection.getBaseUrl());
   } catch (error) {
     logger.warn(
-      `Could not tell whether this is a cloud system (${String(error)}) — treating it as not cloud, which asks for --require rather than assuming.`,
+      `Could not read the base URL (${String(error)}) — treating this as not provably cloud, which asks for --require rather than assuming.`,
     );
   }
   const required = requiredKeysFor(args.require, isCloud, logger);
   logger.info(
-    `Judged on: ${required.keys.join(', ')} (${required.source}); system looks like ${isCloud ? 'ABAP Cloud' : 'not ABAP Cloud'}.`,
+    `Judged on: ${required.keys.join(', ')} (${required.source}); host ${isCloud ? 'is provably ABAP Cloud' : 'is NOT provably ABAP Cloud'}.`,
   );
 
   const rec = new Recorder(connection, outDir, logger);
