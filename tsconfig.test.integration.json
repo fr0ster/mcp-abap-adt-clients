@@ -1,9 +1,20 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "noEmit": true
+    "noEmit": true,
+    "rootDir": "."
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "src/__tests__/e2e/**/*", "src/__tests__/examples/**/*"]
+  "include": [
+    "src/**/*",
+    // Kept in step with tsconfig.test.json, which carries the same two lines
+    // for the same reason: src/__tests__/unit/scripts/ imports the probe's pure
+    // parts, and this config compiles all of src. Change one, change the other.
+    "scripts/probe-atc.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src/__tests__/e2e/**/*",
+    "src/__tests__/examples/**/*"
+  ]
 }
-
