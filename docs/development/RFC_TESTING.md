@@ -30,12 +30,18 @@ Set `connection_type: "rfc"` in the environment section:
 
 ```yaml
 environment:
+  system: "onprem"              # Which system. Stated, never inferred
   connection_type: "rfc"        # Use RFC transport instead of HTTP
   default_package: "$TMP"
   default_master_system: "E19"
 ```
 
 When `connection_type` is `"rfc"`, the test session config overrides `authType` to `"rfc"` regardless of `SAP_AUTH_TYPE` in `.env`.
+
+`system` is separate from `connection_type` and both are required: the first says
+which system is on the other end, the second says how to reach it. RFC is an
+on-prem transport, but stating one does not state the other — the helper builds
+the connection from both.
 
 ### .env Files
 

@@ -982,14 +982,16 @@ export class BaseTester<TConfig, TState> {
         logTestStep(currentStep, this.logger);
         try {
           // Close and reopen session to release any lingering locks.
-          // Use close() instead of reset() — reset() doesn't await close()
-          // on RFC connections, so enqueue locks may persist.
+          // close() first, because RFC has only that; disconnect() is the ADT
+          // one, and unlike the reset() it replaced it tells the server the
+          // session is finished instead of dropping the cookie and leaving it
+          // to time out.
           if (cleanupSettings.cleanupSessionAfterTest && this.connection) {
             const conn = this.connection as any;
             if (typeof conn.close === 'function') {
               await conn.close();
-            } else if (typeof conn.reset === 'function') {
-              conn.reset();
+            } else if (typeof conn.disconnect === 'function') {
+              await conn.disconnect();
             }
             if (typeof conn.connect === 'function') {
               await conn.connect();
@@ -1044,14 +1046,16 @@ export class BaseTester<TConfig, TState> {
       if (cleanupSettings.shouldCleanup && this.objectCreated) {
         try {
           // Close and reopen session to release any lingering locks.
-          // Use close() instead of reset() — reset() doesn't await close()
-          // on RFC connections, so enqueue locks may persist.
+          // close() first, because RFC has only that; disconnect() is the ADT
+          // one, and unlike the reset() it replaced it tells the server the
+          // session is finished instead of dropping the cookie and leaving it
+          // to time out.
           if (cleanupSettings.cleanupSessionAfterTest && this.connection) {
             const conn = this.connection as any;
             if (typeof conn.close === 'function') {
               await conn.close();
-            } else if (typeof conn.reset === 'function') {
-              conn.reset();
+            } else if (typeof conn.disconnect === 'function') {
+              await conn.disconnect();
             }
             if (typeof conn.connect === 'function') {
               await conn.connect();
@@ -1097,12 +1101,12 @@ export class BaseTester<TConfig, TState> {
 
   /**
    * Ensure the connection is open, reconnecting if needed.
-   * RFC connections close on reset() — need to reopen before next test.
+   * RFC connections close on close()/disconnect() — reopen before the next test.
    */
   private async ensureConnection(): Promise<void> {
     if (!this.connection) return;
     const conn = this.connection as any;
-    // RFC connections: rfcClient is set to null after reset/close.
+    // RFC connections: rfcClient is set to null after close.
     // Only reconnect if the connection is actually dead.
     const isRfc = conn.rfcClient !== undefined || conn.rfcParams !== undefined;
     if (isRfc) {
@@ -1445,8 +1449,8 @@ export class BaseTester<TConfig, TState> {
         const conn = this.connection as any;
         if (typeof conn.close === 'function') {
           await conn.close();
-        } else if (typeof conn.reset === 'function') {
-          conn.reset();
+        } else if (typeof conn.disconnect === 'function') {
+          await conn.disconnect();
         }
       }
     };

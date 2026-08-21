@@ -8,7 +8,6 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { createAbapConnection } from '@mcp-abap-adt/connection';
 import type {
   IAbapConnection,
   IAdtObject,
@@ -23,8 +22,10 @@ import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
 import {
   createTestAdtClient,
+  createTestConnection,
   getConfig,
   resolveSystemContext,
+  skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
 import {
   createConnectionLogger,
@@ -80,8 +81,7 @@ describe('Package (using AdtClient)', () => {
     try {
       const config = getConfig();
       _connectionConfig = config;
-      connection = createAbapConnection(config, connectionLogger);
-      await (connection as any).connect();
+      connection = await createTestConnection(connectionLogger);
       isCloudSystem = await isCloudEnvironment(connection);
       const systemContext = await resolveSystemContext(
         connection,
@@ -146,18 +146,14 @@ describe('Package (using AdtClient)', () => {
         cleanupObject: async (cfg: IPackageConfig) => {
           // Use a fresh connection so the delete runs in a different ABAP session.
           // A package cannot be deleted from the same session it was created in.
-          const cleanupConn = createAbapConnection(
-            getConfig(),
-            connectionLogger,
-          );
-          await (cleanupConn as any).connect();
+          const cleanupConn = await createTestConnection(connectionLogger);
           try {
             await deletePackage(cleanupConn, {
               package_name: cfg.packageName,
               transport_request: cfg.transportRequest,
             });
           } finally {
-            await (cleanupConn as any).disconnect?.();
+            await cleanupConn.disconnect();
           }
         },
         ensureObjectReady: async (packageName: string) => {
@@ -179,8 +175,10 @@ describe('Package (using AdtClient)', () => {
           }
         },
       });
-    } catch (_error) {
-      hasConfig = false;
+    } catch (error) {
+      // Skips only when there is no SAP here; anything else fails
+      // naming the reason, instead of passing green having run nothing.
+      hasConfig = skipUnlessConfigured(error, testsLogger);
     }
   });
 

@@ -5,8 +5,11 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { createAbapConnection } from '@mcp-abap-adt/connection';
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  ILogger,
+  ISessionLifecycleAware,
+} from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import { AdtExecutor } from '../../../../clients/AdtExecutor';
@@ -21,8 +24,9 @@ import {
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import {
   createTestAdtClient,
-  getConfig,
+  createTestConnection,
   resolveSystemContext,
+  skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
 import {
   createConnectionLogger,
@@ -136,7 +140,7 @@ function resolveRunnableProgramSource(
 }
 
 describe('ProgramExecutor (integration)', () => {
-  let connection: IAbapConnection;
+  let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
   let executor: AdtExecutor;
   let hasConfig = false;
@@ -151,9 +155,7 @@ describe('ProgramExecutor (integration)', () => {
 
   beforeEach(async () => {
     try {
-      const config = getConfig();
-      connection = createAbapConnection(config, connectionLogger);
-      await (connection as any).connect();
+      connection = await createTestConnection(connectionLogger);
       isCloudSystem = await isCloudEnvironment(connection);
       const systemContext = await resolveSystemContext(
         connection,
@@ -167,11 +169,10 @@ describe('ProgramExecutor (integration)', () => {
       hasConfig = true;
       programNameForTest = null;
       transportRequestForCleanup = '';
-    } catch (_error) {
-      testsLogger.warn(
-        '⚠️ Skipping tests: No .env file or SAP configuration found',
-      );
-      hasConfig = false;
+    } catch (error) {
+      // Skips only when there is no SAP here; anything else fails
+      // naming the reason, instead of passing green having run nothing.
+      hasConfig = skipUnlessConfigured(error, testsLogger);
       isCloudSystem = false;
     }
   });
@@ -191,7 +192,7 @@ describe('ProgramExecutor (integration)', () => {
     }
 
     if (connection) {
-      (connection as any).reset();
+      await connection.disconnect();
     }
   });
 

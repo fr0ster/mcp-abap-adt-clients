@@ -7,13 +7,21 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { createAbapConnection, type SapConfig } from '@mcp-abap-adt/connection';
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type { SapConfig } from '@mcp-abap-adt/connection';
+import type {
+  IAbapConnection,
+  ILogger,
+  ISessionLifecycleAware,
+} from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
 import type { AdtSourceObjectType } from '../../../core/shared/types';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
-import { createTestAdtClient, getConfig } from '../../helpers/sessionConfig';
+import {
+  createTestAdtClient,
+  createTestConnection,
+  skipUnlessConfigured,
+} from '../../helpers/sessionConfig';
 import { TestConfigResolver } from '../../helpers/TestConfigResolver';
 import {
   createConnectionLogger,
@@ -35,7 +43,7 @@ const connectionLogger: ILogger = createConnectionLogger();
 const testsLogger: ILogger = createTestsLogger();
 
 describe('Shared - readSource', () => {
-  let connection: IAbapConnection;
+  let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
   let hasConfig = false;
   let isLegacy = false;
@@ -43,26 +51,23 @@ describe('Shared - readSource', () => {
 
   beforeEach(async () => {
     try {
-      const config = getConfig();
-      connection = createAbapConnection(config, connectionLogger);
-      await (connection as any).connect();
+      connection = await createTestConnection(connectionLogger);
       const { client: resolvedClient, isLegacy: legacy } =
         await createTestAdtClient(connection, connectionLogger);
       client = resolvedClient;
       isLegacy = legacy;
       hasConfig = true;
       isCloudSystem = await isCloudEnvironment(connection);
-    } catch (_error) {
-      testsLogger.warn?.(
-        '⚠️ Skipping tests: No .env file or SAP configuration found',
-      );
-      hasConfig = false;
+    } catch (error) {
+      // Skips only when there is no SAP here; anything else fails
+      // naming the reason, instead of passing green having run nothing.
+      hasConfig = skipUnlessConfigured(error, testsLogger);
     }
   });
 
   afterEach(async () => {
     if (connection) {
-      (connection as any).reset();
+      await connection.disconnect();
     }
   });
 

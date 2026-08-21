@@ -12,7 +12,6 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { createAbapConnection } from '@mcp-abap-adt/connection';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
@@ -21,7 +20,7 @@ import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
 import {
   createTestAdtClient,
-  getConfig,
+  createTestConnection,
   resolveSystemContext,
 } from '../../../helpers/sessionConfig';
 import {
@@ -68,9 +67,7 @@ describe('View (using AdtClient)', () => {
 
   beforeAll(async () => {
     try {
-      const config = getConfig();
-      connection = createAbapConnection(config, connectionLogger);
-      await (connection as any).connect();
+      connection = await createTestConnection(connectionLogger);
       const isCloudSystem = await isCloudEnvironment(connection);
       systemContext = await resolveSystemContext(connection, isCloudSystem);
       const { client: resolvedClient, isLegacy: legacy } =

@@ -12,11 +12,11 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { createAbapConnection } from '@mcp-abap-adt/connection';
 import type {
   IAbapConnection,
   IAdtObject,
   ILogger,
+  ISessionLifecycleAware,
 } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
@@ -29,8 +29,9 @@ import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
 import {
   createTestAdtClient,
-  getConfig,
+  createTestConnection,
   resolveSystemContext,
+  skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
 import { TestConfigResolver } from '../../../helpers/TestConfigResolver';
 import {
@@ -72,7 +73,7 @@ const libraryLogger: ILogger = createLibraryLogger();
 const testsLogger: ILogger = createTestsLogger();
 
 describe('AuthorizationField (using AdtClient)', () => {
-  let connection: IAbapConnection;
+  let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
   let hasConfig = false;
   let isLegacy = false;
@@ -80,9 +81,7 @@ describe('AuthorizationField (using AdtClient)', () => {
 
   beforeAll(async () => {
     try {
-      const config = getConfig();
-      connection = createAbapConnection(config, connectionLogger);
-      await (connection as any).connect();
+      connection = await createTestConnection(connectionLogger);
       isCloudSystem = await isCloudEnvironment(connection);
       const systemContext = await resolveSystemContext(
         connection,
@@ -93,17 +92,16 @@ describe('AuthorizationField (using AdtClient)', () => {
       client = resolvedClient;
       isLegacy = legacy;
       hasConfig = true;
-    } catch (_error) {
-      testsLogger.warn?.(
-        '⚠️ Skipping tests: No .env file or SAP configuration found',
-      );
-      hasConfig = false;
+    } catch (error) {
+      // Skips only when there is no SAP here; anything else fails
+      // naming the reason, instead of passing green having run nothing.
+      hasConfig = skipUnlessConfigured(error, testsLogger);
     }
   });
 
   afterAll(async () => {
     if (connection) {
-      (connection as any).reset();
+      await connection.disconnect();
     }
   });
 

@@ -10,11 +10,17 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { createAbapConnection } from '@mcp-abap-adt/connection';
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  ISessionLifecycleAware,
+} from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import { createTestAdtClient, getConfig } from '../../../helpers/sessionConfig';
+import {
+  createTestAdtClient,
+  createTestConnection,
+  skipUnlessConfigured,
+} from '../../../helpers/sessionConfig';
 import { createTestsLogger } from '../../../helpers/testLogger';
 
 const envPath =
@@ -26,24 +32,25 @@ if (fs.existsSync(envPath)) {
 const logger = createTestsLogger();
 
 describe('Object version history', () => {
-  let connection: IAbapConnection;
+  let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
   let hasConfig = false;
 
   beforeAll(async () => {
     try {
-      connection = createAbapConnection(getConfig(), logger);
-      await (connection as any).connect();
+      connection = await createTestConnection(logger);
       const { client: c } = await createTestAdtClient(connection, logger);
       client = c;
       hasConfig = true;
-    } catch {
-      hasConfig = false;
+    } catch (error) {
+      // Skips only when there is no SAP here; anything else fails
+      // naming the reason, instead of passing green having run nothing.
+      hasConfig = skipUnlessConfigured(error, logger);
     }
   }, 60000);
 
   afterAll(async () => {
-    if (connection) (connection as any).reset?.();
+    if (connection) await connection.disconnect();
   });
 
   const cases: Array<{ label: string; list: () => Promise<any[]> }> = [

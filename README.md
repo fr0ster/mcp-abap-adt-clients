@@ -155,13 +155,26 @@ npm install @mcp-abap-adt/adt-clients
 import { createAbapConnection } from '@mcp-abap-adt/connection';
 import { AdtClient } from '@mcp-abap-adt/adt-clients';
 
-const connection = createAbapConnection({
-  url: 'https://your-sap-system.example.com',
-  client: '100',
-  authType: 'basic',
-  username: process.env.SAP_USERNAME!,
-  password: process.env.SAP_PASSWORD!
-}, console);
+const connection = createAbapConnection(
+  {
+    url: 'https://your-sap-system.example.com',
+    client: '100',
+    authType: 'basic',
+    username: process.env.SAP_USERNAME!,
+    password: process.env.SAP_PASSWORD!
+  },
+  console,
+  undefined,
+  undefined,
+  // Which system this is. You say it; nothing is inferred from the URL or the
+  // credential. See @mcp-abap-adt/connection 5.0.0.
+  { system: 'onprem' }   // or 'cloud'
+);
+
+// Required: since connection 5.0.0 a request on a connection nobody opened is
+// refused before it is sent, and connect() fails if the server opened no
+// session — rather than surfacing later as `400 Session not found` mid-edit.
+await connection.connect();
 
 const client = new AdtClient(connection, console);
 

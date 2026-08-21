@@ -25,7 +25,12 @@
  */
 
 import { createAbapConnection } from '@mcp-abap-adt/connection';
-import { ADT_SESSION_ERROR, type ISapConfig } from '@mcp-abap-adt/interfaces';
+import {
+  ADT_SESSION_ERROR,
+  type IAbapConnection,
+  type ISapConfig,
+  type ISessionLifecycleAware,
+} from '@mcp-abap-adt/interfaces';
 import { type AdtStub, startAdtStub } from './adtStubServer';
 
 // These tests talk to a local stub and finish in well under a second. The suite
@@ -58,9 +63,29 @@ describe('connector session contract (real @mcp-abap-adt/connection)', () => {
    */
   const opened: Array<{ disconnect?: () => Promise<unknown> }> = [];
 
-  function connectionTo(baseUrl: string) {
-    const conn = createAbapConnection(configFor(baseUrl), null);
-    opened.push(conn as { disconnect?: () => Promise<unknown> });
+  function connectionTo(
+    baseUrl: string,
+  ): IAbapConnection & ISessionLifecycleAware {
+    // The system is stated, not inferred: the stub hands out
+    // `SAP_SESSIONID_STUB_100` on the ordinary call, which is the ICF
+    // mechanism. Leaving it out would have the factory pick a connector from
+    // `authType` — the deprecated path, and one that would take a cloud
+    // connector for a bearer token against this same stub.
+    //
+    // The cast below is the factory's gap, not a shortcut: every connector it
+    // builds implements ISessionLifecycleAware, but the declared return type is
+    // plain IAbapConnection — so `disconnect()`, which 5.0.0 made the way a
+    // session is released, is invisible to a typed caller.
+    const conn = createAbapConnection(
+      configFor(baseUrl),
+      null,
+      undefined,
+      undefined,
+      {
+        system: 'onprem',
+      },
+    ) as IAbapConnection & ISessionLifecycleAware;
+    opened.push(conn);
     return conn;
   }
 
@@ -129,7 +154,7 @@ describe('connector session contract (real @mcp-abap-adt/connection)', () => {
     }
   });
 
-  it('uses one connection id for the whole connector lifetime, including across reset()', async () => {
+  it('uses one connection id for the whole connector lifetime, including across disconnect()', async () => {
     const conn = connectionTo(stub.baseUrl);
     await conn.connect();
     conn.setSessionType('stateful');
@@ -140,10 +165,10 @@ describe('connector session contract (real @mcp-abap-adt/connection)', () => {
       timeout: 5000,
       data: null,
     });
-    // reset() drops the token, cookies and the axios instance — but the
-    // connection id must survive, otherwise every recovery would present the
-    // server with a different conversation.
-    (conn as unknown as { reset: () => void }).reset();
+    // disconnect() releases the session and drops the token, cookies and the
+    // axios instance — but the connection id must survive, otherwise every
+    // recovery would present the server with a different conversation.
+    await conn.disconnect();
     // Reconnecting is required since 2.0.0, and is the point of the assertion
     // below: a NEW session under the SAME conversation id. Previously the next
     // request did this silently, which is what made a replacement invisible.
@@ -208,7 +233,7 @@ describe('connector session contract (real @mcp-abap-adt/connection)', () => {
    * anyone's behalf. What changed is that failing to do so is now refused
    * loudly, before anything reaches the server, instead of being papered over.
    */
-  it('refuses a request without connect(), and again after reset()', async () => {
+  it('refuses a request without connect(), and again after disconnect()', async () => {
     const conn = connectionTo(stub.baseUrl);
     conn.setSessionType('stateful');
 
@@ -231,7 +256,7 @@ describe('connector session contract (real @mcp-abap-adt/connection)', () => {
     await conn.makeAdtRequest(lock);
     expect(stub.sessionsOpened()).toBe(1);
 
-    (conn as unknown as { reset: () => void }).reset();
+    await conn.disconnect();
 
     // A teardown now stops the connector. Previously this quietly opened a
     // second session and told the caller nothing.

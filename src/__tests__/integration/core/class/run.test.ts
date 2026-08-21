@@ -7,11 +7,16 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { createAbapConnection } from '@mcp-abap-adt/connection';
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  ISessionLifecycleAware,
+} from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import { runClass } from '../../../../core/class/run';
-import { getConfig } from '../../../helpers/sessionConfig';
+import {
+  createTestConnection,
+  skipUnlessConfigured,
+} from '../../../helpers/sessionConfig';
 import {
   createConnectionLogger,
   createTestsLogger,
@@ -30,26 +35,23 @@ const connectionLogger = createConnectionLogger();
 const testsLogger = createTestsLogger();
 
 describe('Class - Run', () => {
-  let connection: IAbapConnection;
+  let connection: IAbapConnection & ISessionLifecycleAware;
   let hasConfig = false;
 
   beforeEach(async () => {
     try {
-      const config = getConfig();
-      connection = createAbapConnection(config, connectionLogger);
-      await (connection as any).connect();
+      connection = await createTestConnection(connectionLogger);
       hasConfig = true;
-    } catch (_error) {
-      testsLogger.warn(
-        '⚠️ Skipping tests: No .env file or SAP configuration found',
-      );
-      hasConfig = false;
+    } catch (error) {
+      // Skips only when there is no SAP here; anything else fails
+      // naming the reason, instead of passing green having run nothing.
+      hasConfig = skipUnlessConfigured(error, testsLogger);
     }
   });
 
   afterEach(async () => {
     if (connection) {
-      (connection as any).reset();
+      await connection.disconnect();
     }
   });
 

@@ -86,6 +86,9 @@ lock_config:
 
 # Environment configuration
 environment:
+  system: "onprem"                            # ← CHANGE: "onprem" or "cloud". Stated, never guessed —
+                                              #   the two manage sessions differently and the server
+                                              #   cannot be asked which it is.
   default_package: "ZADT_TEST"               # ← CHANGE: your dev package (Z*/Y*) or "$TMP" for local
   default_transport: ""                       # ← CHANGE: transport request (leave "" for $TMP/local packages)
   default_master_system: ""                   # ← CHANGE: SAP system ID (on-prem only, cloud gets it automatically)

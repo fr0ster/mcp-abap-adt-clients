@@ -5,6 +5,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+### Changed
+
+- **Tests take the connection from one helper.** `createTestConnection()` reads
+  *where* to connect (`environment.system` — `"onprem"` or `"cloud"`) and *how*
+  to authenticate from configuration, builds the matching connector, opens the
+  session, and returns it ready to use. Eighty-six files used to build their own
+  with `createAbapConnection(config, logger)`, which is eighty-six chances to
+  differ on which system was assumed, which logger was passed, and whether
+  `connect()` was called at all.
+- `environment.system` is now **required** in `test-config.yaml`. It is stated,
+  never inferred: a bearer token against on-prem and a communication user
+  against cloud are both ordinary, so the credential does not say which system
+  it is, and neither does the URL.
+- Dev dependency `@mcp-abap-adt/connection` moved to `^5.0.0`. `reset()` is gone
+  there; every test now ends on `await connection.disconnect()`, which tells the
+  server the session is finished instead of dropping the cookie and leaving it
+  to time out.
+- Documentation examples (`README.md`, `docs/usage/*`) now pass `system` and
+  call `connect()` — without it, connection 5.0.0 refuses the first request.
+
+### Fixed
+
+- **A broken configuration no longer passes as a green run.** Every test file
+  caught whatever its setup threw, warned "No .env file or SAP configuration
+  found", and set `hasConfig = false`; every `it` then returned early and the
+  file reported PASS. So an incomplete `test-config.yaml`, an expired token, or
+  a connector that could not open a session all produced the same thing: a run
+  that tested nothing and explained itself with a sentence that was false. The
+  new `skipUnlessConfigured()` skips only when `SAP_URL` is absent — there is
+  genuinely no system — and fails everything else, naming the reason.
+- The jest preflight built a connection and made a request without connecting,
+  which under connection 5.0.0 is refused before it is sent: it would have
+  reported every system, reachable or not, as unreachable and aborted the suite.
+- `BaseTester` checked for `reset` and called `disconnect` — a branch that could
+  never run, so the session it was meant to release stayed open.
+
 ## [12.1.0] - 2026-08-18
 
 ATC check runs: start one, ask whether it is done, read what it found.

@@ -8,8 +8,11 @@
 
 const { loadTestEnv } = require('./test-helper');
 
-import { createAbapConnection } from '@mcp-abap-adt/connection';
-import { getConfig } from './sessionConfig';
+import {
+  createTestConnection,
+  getConfig,
+  getTargetSystem,
+} from './sessionConfig';
 
 /** Milliseconds the preflight may spend before it gives up. */
 const PREFLIGHT_TIMEOUT_MS = Number(
@@ -105,12 +108,17 @@ export default async function globalSetup(globalConfig?: JestGlobalConfig) {
   }
 
   const config = getConfig();
+  // Which system, asked BEFORE the try. It reads test-config.yaml and throws
+  // when the answer is missing — a configuration fault, and one that must not
+  // arrive dressed as "SAP is unreachable" with a message about checking the
+  // network.
+  const system = getTargetSystem();
   // Says what it is about to wait for and for how long, BEFORE waiting. Silence
   // is what turned a slow host into a bug report against an unrelated test: the
   // suite's testTimeout is 15 minutes, so a wait with no explanation is
   // indistinguishable from a hang.
   say(
-    `[globalSetup] Checking SAP connectivity: ${config.url} ` +
+    `[globalSetup] Checking SAP connectivity: ${config.url} (${system}) ` +
       `(up to ${PREFLIGHT_TIMEOUT_MS}ms; SKIP_SAP_PREFLIGHT=1 to skip, ` +
       `SAP_PREFLIGHT_TIMEOUT_MS to change) ...`,
   );
@@ -122,14 +130,24 @@ export default async function globalSetup(globalConfig?: JestGlobalConfig) {
     // it produces no output for 15 minutes and reads as a hung test.
     await withTimeout(
       (async () => {
-        const connection = createAbapConnection(config);
-        await (connection as any).connect();
-        await connection.makeAdtRequest({
-          url: '/sap/bc/adt/discovery',
-          method: 'GET',
-          headers: { Accept: 'application/atomsvc+xml' },
-          timeout: 15000,
-        });
+        // Through the same helper the tests use, and therefore opening a
+        // session the same way they will. It is also no longer optional: since
+        // connection 5.0.0 a request on a connection nobody opened is refused
+        // before it is sent, so the old build-and-request preflight would have
+        // reported every system, reachable or not, as unreachable.
+        const connection = await createTestConnection();
+        try {
+          await connection.makeAdtRequest({
+            url: '/sap/bc/adt/discovery',
+            method: 'GET',
+            headers: { Accept: 'application/atomsvc+xml' },
+            timeout: 15000,
+          });
+        } finally {
+          // Released, not left to time out: the preflight's session is of no
+          // use to anyone, and the pool it comes from is shared per user.
+          await connection.disconnect();
+        }
       })(),
       PREFLIGHT_TIMEOUT_MS,
     );

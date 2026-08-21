@@ -10,16 +10,20 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { createAbapConnection } from '@mcp-abap-adt/connection';
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  ILogger,
+  ISessionLifecycleAware,
+} from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
 import {
   createTestAdtClient,
-  getConfig,
+  createTestConnection,
   resolveSystemContext,
+  skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
 import {
   createConnectionLogger,
@@ -57,7 +61,7 @@ type ParentClassConfig = {
 };
 
 describe('Class local includes (using BaseTester)', () => {
-  let connection: IAbapConnection;
+  let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
   let hasConfig = false;
   let isCloudSystem = false;
@@ -115,9 +119,7 @@ describe('Class local includes (using BaseTester)', () => {
 
   beforeAll(async () => {
     try {
-      const config = getConfig();
-      connection = createAbapConnection(config, connectionLogger);
-      await (connection as any).connect();
+      connection = await createTestConnection(connectionLogger);
       isCloudSystem = await isCloudEnvironment(connection);
       const systemContext = await resolveSystemContext(
         connection,
@@ -247,19 +249,21 @@ describe('Class local includes (using BaseTester)', () => {
           skipEnsureParentClass: () => isCloudSystem,
         },
       );
-    } catch (_error) {
-      hasConfig = false;
+    } catch (error) {
+      // Skips only when there is no SAP here; anything else fails
+      // naming the reason, instead of passing green having run nothing.
+      hasConfig = skipUnlessConfigured(error, testsLogger);
     }
   });
 
-  afterAll(() => {
+  afterAll(async () => {
     if (definitionsTester) {
-      return definitionsTester.afterAll()();
+      await definitionsTester.afterAll()();
+      return;
     }
     if (connection) {
-      (connection as any).reset();
+      await connection.disconnect();
     }
-    return Promise.resolve();
   });
 
   describe('LocalDefinitions', () => {

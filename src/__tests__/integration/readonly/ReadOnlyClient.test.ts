@@ -12,12 +12,15 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { createAbapConnection } from '@mcp-abap-adt/connection';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
-import { createTestAdtClient, getConfig } from '../../helpers/sessionConfig';
+import {
+  createTestAdtClient,
+  createTestConnection,
+  getConfig,
+} from '../../helpers/sessionConfig';
 import { TestConfigResolver } from '../../helpers/TestConfigResolver';
 import {
   createConnectionLogger,
@@ -63,8 +66,7 @@ describe('AdtClient read operations', () => {
         return;
       }
 
-      connection = createAbapConnection(config, connectionLogger);
-      await (connection as any).connect();
+      connection = await createTestConnection(connectionLogger);
       const { client: resolvedClient, isLegacy: legacy } =
         await createTestAdtClient(connection, connectionLogger);
       client = resolvedClient;

@@ -190,7 +190,15 @@ import { createAbapConnection } from '@mcp-abap-adt/connection';
 import { AdtAbapGitClient } from '@mcp-abap-adt/adt-clients';
 import type { IAdtAbapGitClient } from '@mcp-abap-adt/interfaces';
 
-const connection = createAbapConnection({ /* ... */ });
+const connection = createAbapConnection(
+  { /* ... */ },
+  null,
+  undefined,
+  undefined,
+  { system: 'cloud' },   // abapGit needs cloud or ABAP Platform 2022+
+);
+await connection.connect();
+
 const abapGit: IAdtAbapGitClient = new AdtAbapGitClient(connection);
 
 // Probe a remote repo before linking

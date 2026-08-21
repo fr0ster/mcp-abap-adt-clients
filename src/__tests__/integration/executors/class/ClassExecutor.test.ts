@@ -5,8 +5,11 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { createAbapConnection } from '@mcp-abap-adt/connection';
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  ILogger,
+  ISessionLifecycleAware,
+} from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import { AdtExecutor } from '../../../../clients/AdtExecutor';
@@ -16,7 +19,11 @@ import {
   getTraceStatements,
   type IProfilerTraceParameters,
 } from '../../../../runtime/traces';
-import { createTestAdtClient, getConfig } from '../../../helpers/sessionConfig';
+import {
+  createTestAdtClient,
+  createTestConnection,
+  skipUnlessConfigured,
+} from '../../../helpers/sessionConfig';
 import {
   createConnectionLogger,
   createLibraryLogger,
@@ -174,7 +181,7 @@ function resolveRunnableClassSource(testCase: any, className: string): string {
 }
 
 describe('ClassExecutor (integration)', () => {
-  let connection: IAbapConnection;
+  let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
   let executor: AdtExecutor;
   let hasConfig = false;
@@ -188,9 +195,7 @@ describe('ClassExecutor (integration)', () => {
 
   beforeEach(async () => {
     try {
-      const config = getConfig();
-      connection = createAbapConnection(config, connectionLogger);
-      await (connection as any).connect();
+      connection = await createTestConnection(connectionLogger);
       const { client: resolvedClient, isLegacy: legacy } =
         await createTestAdtClient(connection, libraryLogger);
       client = resolvedClient;
@@ -199,11 +204,10 @@ describe('ClassExecutor (integration)', () => {
       hasConfig = true;
       classNameForTest = null;
       transportRequestForCleanup = '';
-    } catch (_error) {
-      testsLogger.warn(
-        '⚠️ Skipping tests: No .env file or SAP configuration found',
-      );
-      hasConfig = false;
+    } catch (error) {
+      // Skips only when there is no SAP here; anything else fails
+      // naming the reason, instead of passing green having run nothing.
+      hasConfig = skipUnlessConfigured(error, testsLogger);
     }
   });
 
@@ -222,7 +226,7 @@ describe('ClassExecutor (integration)', () => {
     }
 
     if (connection) {
-      (connection as any).reset();
+      await connection.disconnect();
     }
   });
 

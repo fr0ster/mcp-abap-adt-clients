@@ -7,20 +7,21 @@
  * Note: This is a conceptual example. Actual implementation may vary.
  */
 
-import { createAbapConnection } from '@mcp-abap-adt/connection';
+import type {
+  IAbapConnection,
+  ISessionLifecycleAware,
+} from '@mcp-abap-adt/interfaces';
 import { AdtClient } from '../../clients/AdtClient';
-import { getConfig } from '../helpers/sessionConfig';
+import { createTestConnection } from '../helpers/sessionConfig';
 import { createConnectionLogger } from '../helpers/testLogger';
 
 describe('Example: Session Persistence', () => {
-  let connection: any;
+  let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
 
   beforeAll(async () => {
     // Create connection using helper
-    const config = getConfig();
-    connection = createAbapConnection(config, createConnectionLogger());
-    await (connection as any).connect();
+    connection = await createTestConnection(createConnectionLogger());
     client = new AdtClient(connection);
 
     // Session persistence is configured in src/__tests__/helpers/test-config.yaml:
@@ -38,7 +39,7 @@ describe('Example: Session Persistence', () => {
 
   afterAll(async () => {
     if (connection) {
-      (connection as any).reset();
+      await connection.disconnect();
     }
   });
 

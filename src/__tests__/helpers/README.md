@@ -30,10 +30,36 @@ lock_config:
   cleanup_locks_after_test: true
 ```
 
+## Getting a connection
+
+No test builds its own. `createTestConnection()` reads **where** to connect and
+**how** to authenticate from `.env` and `test-config.yaml`, picks the connector
+for the system stated in `environment.system`, opens the session, and hands back
+a connection that is ready to use. A test that constructs a connector names a
+system, and the one it names is the one it was written against — which is how a
+suite comes to run entirely on-prem on a cloud tenant.
+
+```typescript
+import { createTestConnection } from '../helpers/sessionConfig';
+
+connection = await createTestConnection(logger);   // already connected
+// ...
+await connection.disconnect();                     // releases the session
+```
+
+`disconnect()` replaced `reset()` in `@mcp-abap-adt/connection` 5.0.0. The
+difference is not cosmetic: `reset()` dropped the cookie locally and the session
+stayed open on the server until it timed out, and sessions are a shared per-user
+resource.
+
 ## Usage in Tests
 
 ```typescript
-import { setupTestEnvironment, cleanupTestEnvironment } from '../helpers/sessionConfig';
+import {
+  createTestConnection,
+  setupTestEnvironment,
+  cleanupTestEnvironment,
+} from '../helpers/sessionConfig';
 
 describe('My Test', () => {
   let connection;
@@ -41,8 +67,8 @@ describe('My Test', () => {
   let testConfig;
 
   beforeAll(async () => {
-    connection = createAbapConnection(config, logger);
-    
+    connection = await createTestConnection(logger);
+
     // Setup based on test-config.yaml
     const env = await setupTestEnvironment(
       connection,
@@ -56,6 +82,7 @@ describe('My Test', () => {
 
   afterAll(async () => {
     await cleanupTestEnvironment(connection, sessionId, testConfig);
+    await connection.disconnect();
   });
 
   it('should work', async () => {

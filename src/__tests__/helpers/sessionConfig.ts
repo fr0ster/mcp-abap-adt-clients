@@ -8,11 +8,62 @@ import type {
   IAbapConnection,
   IAdtClientOptions,
   ILogger,
+  ISessionLifecycleAware,
 } from '@mcp-abap-adt/interfaces';
 import type { AdtClient } from '../../clients/AdtClient';
 import { AdtClientLegacy } from '../../clients/AdtClientLegacy';
 import { createAdtClient } from '../../clients/createAdtClient';
 import { getSystemInformation } from '../../utils/systemInfo';
+import { createConnectionLogger } from './testLogger';
+
+/**
+ * Whether this machine has SAP configured at all.
+ *
+ * The one legitimate reason a test file may skip its whole suite: a checkout
+ * with no `.env`, where nothing could possibly run. Everything else — a missing
+ * `environment.system`, an unparseable `test-config.yaml`, an expired token, a
+ * host that refuses the session — is a fault, and a fault that skips is a fault
+ * nobody sees.
+ */
+export function sapIsConfigured(): boolean {
+  const url = process.env.SAP_URL?.split('#')[0].trim();
+  return !!url && /^https?:\/\//.test(url);
+}
+
+/**
+ * What a test's `beforeAll` does when setup threw.
+ *
+ * Returns `false` — meaning "no SAP here, skip" — for the one case that is
+ * genuinely a skip, and rethrows everything else.
+ *
+ * This exists because the shape it replaces was a trap. Every test file caught
+ * whatever setup threw, warned "No .env file or SAP configuration found", and
+ * set `hasConfig = false`; every `it` then returned early and the file reported
+ * PASS. So an incomplete configuration, a token that expired mid-run, or a
+ * connector that could not open a session all produced the same thing: a green
+ * run that had tested nothing, explaining itself with a sentence that was false
+ * on a machine where SAP was configured perfectly well.
+ *
+ * A skip is now only ever "there is no SAP here". Anything else fails, loudly,
+ * naming what actually went wrong.
+ */
+export function skipUnlessConfigured(error: unknown, logger: ILogger): false {
+  if (!sapIsConfigured()) {
+    logger.warn?.(
+      '⚠️ Skipping tests: SAP_URL is not set — no system to run against.',
+    );
+    return false;
+  }
+  const reason = error instanceof Error ? error.message : String(error);
+  throw new Error(
+    `Test setup failed against ${process.env.SAP_URL} — this is a failure, not a skip.\n` +
+      `  ${reason}\n\n` +
+      'SAP is configured on this machine, so the setup was expected to work. ' +
+      'Check test-config.yaml (environment.system must be "onprem" or "cloud"), ' +
+      'the credentials in .env, and that the system is reachable.',
+    { cause: error },
+  );
+}
 
 /**
  * Get connection_type from test-config.yaml environment section.
@@ -176,6 +227,53 @@ export function isLegacyEnvironment(): boolean {
   const { loadTestConfig } = require('./test-helper');
   const testConfig = loadTestConfig();
   return testConfig?.environment?.is_legacy === true;
+}
+
+/**
+ * Which system the tests are pointed at, from `environment.system`.
+ *
+ * Stated in the config, never worked out from the URL or the credential: the
+ * two systems do not manage sessions the same way, and asking the server which
+ * it is does not answer — `/sap/bc/adt/core/http/sessions` replies on both, and
+ * its `DELETE` on on-prem leaves the session open while the platform logoff
+ * removes it. Whoever wrote the config knows where it points; nothing else does.
+ */
+export function getTargetSystem(): 'onprem' | 'cloud' {
+  const { getEnvironmentConfig } = require('./test-helper');
+  const stated = getEnvironmentConfig()?.system;
+  if (stated === 'onprem' || stated === 'cloud') return stated;
+  throw new Error(
+    'test-config.yaml: environment.system must be "onprem" or "cloud". ' +
+      'It is not derived from SAP_URL or from the authentication type — a bearer ' +
+      'token against on-prem and a communication user against cloud are both ' +
+      'ordinary, and guessing gets one of them wrong.',
+  );
+}
+
+/**
+ * The one place a test gets a connection.
+ *
+ * Every test used to build its own with `createAbapConnection(config, logger)`,
+ * in eighty-six files, which meant eighty-six chances to differ in which system
+ * was assumed, which logger was passed, and whether `connect()` was called at
+ * all. This takes both from the configuration — where we are dialling, and how
+ * we authenticate — and returns a connection that is already open.
+ *
+ * The logger is the shared one, so every test's connection logs the same way.
+ */
+export async function createTestConnection(
+  logger: ILogger = createConnectionLogger(),
+): Promise<IAbapConnection & ISessionLifecycleAware> {
+  const { createAbapConnection } = require('@mcp-abap-adt/connection');
+  const connection: IAbapConnection & ISessionLifecycleAware =
+    createAbapConnection(getConfig(), logger, undefined, undefined, {
+      ...getConnectionOptions(),
+      system: getTargetSystem(),
+    });
+  // The connector refuses work on a connection nobody opened, and a test that
+  // forgot used to fail somewhere later with something unrelated.
+  await connection.connect();
+  return connection;
 }
 
 /**
