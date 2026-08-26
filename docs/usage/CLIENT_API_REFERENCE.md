@@ -197,9 +197,18 @@ import type { IAdtAbapGitClient } from '@mcp-abap-adt/interfaces';
 // abapGit needs cloud or ABAP Platform 2022+, so the cloud connector and the
 // cloud wire — the one that asks for a session at
 // /sap/bc/adt/core/http/sessions. Handing it the on-prem wire does not compile.
+const config = {
+  url: process.env.SAP_URL!,
+  authType: 'jwt' as const,
+  jwtToken: process.env.SAP_JWT_TOKEN!,
+  client: process.env.SAP_CLIENT,
+};
+
 const connection = new AdtCloudConnector(
   config,
-  new TokenAuthProvider(tokenRefresher),
+  // A refresher, not a bare string, for anything long-lived: the provider
+  // renews on an expiry it can see, on every call that asks for a header.
+  new TokenAuthProvider(config.jwtToken),
   new CloudHttpTransport(() => ({}), null, {
     client: config.client,
     baseUrl: config.url,

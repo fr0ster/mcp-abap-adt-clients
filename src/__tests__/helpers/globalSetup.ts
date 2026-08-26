@@ -14,9 +14,16 @@ import {
   getTargetSystem,
 } from './sessionConfig';
 
-/** Milliseconds the preflight may spend before it gives up. */
+/**
+ * Milliseconds the preflight may spend before it gives up.
+ *
+ * 30s rather than the 10s it was: opening a session is a round trip plus a CSRF
+ * fetch, and a BTP trial answers that in tens of seconds when it is cold. The
+ * old budget was set for a preflight that sent one request and did not connect
+ * — measured on the trial, it aborted every run before the session was open.
+ */
 const PREFLIGHT_TIMEOUT_MS = Number(
-  process.env.SAP_PREFLIGHT_TIMEOUT_MS ?? 10000,
+  process.env.SAP_PREFLIGHT_TIMEOUT_MS ?? 30000,
 );
 
 interface JestGlobalConfig {
@@ -135,19 +142,15 @@ export default async function globalSetup(globalConfig?: JestGlobalConfig) {
         // connection 5.0.0 a request on a connection nobody opened is refused
         // before it is sent, so the old build-and-request preflight would have
         // reported every system, reachable or not, as unreachable.
+        //
+        // Opening the session IS the check. There was a discovery GET here as
+        // well, which proved nothing extra — connect() fetches its CSRF token
+        // from that same document — and cost a second 444KB download on a
+        // system already slow enough to be worth a preflight.
         const connection = await createTestConnection();
-        try {
-          await connection.makeAdtRequest({
-            url: '/sap/bc/adt/discovery',
-            method: 'GET',
-            headers: { Accept: 'application/atomsvc+xml' },
-            timeout: 15000,
-          });
-        } finally {
-          // Released, not left to time out: the preflight's session is of no
-          // use to anyone, and the pool it comes from is shared per user.
-          await connection.disconnect();
-        }
+        // Released, not left to time out: the preflight's session is of no use
+        // to anyone, and the pool it comes from is shared per user.
+        await connection.disconnect();
       })(),
       PREFLIGHT_TIMEOUT_MS,
     );
