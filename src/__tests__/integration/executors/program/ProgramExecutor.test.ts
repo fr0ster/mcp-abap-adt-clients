@@ -153,7 +153,7 @@ describe('ProgramExecutor (integration)', () => {
   const libraryLogger: ILogger = createLibraryLogger();
   const testsLogger: ILogger = createTestsLogger();
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     try {
       connection = await createTestConnection(connectionLogger);
       isCloudSystem = await isCloudEnvironment(connection);
@@ -177,7 +177,7 @@ describe('ProgramExecutor (integration)', () => {
     }
   });
 
-  afterEach(async () => {
+  afterAll(async () => {
     if (connection && programNameForTest) {
       try {
         await client.getProgram().delete({

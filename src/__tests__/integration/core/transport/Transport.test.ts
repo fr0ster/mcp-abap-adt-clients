@@ -116,7 +116,7 @@ describe('AdtRequest', () => {
     let testCase: any = null;
     let skipReason: string | null = null;
 
-    beforeEach(async () => {
+    beforeAll(async () => {
       skipReason = null;
       testCase = null;
 
@@ -141,7 +141,7 @@ describe('AdtRequest', () => {
       // Transports are created dynamically, no cleanup needed
     });
 
-    afterEach(async () => {
+    afterAll(async () => {
       // Transports cannot be deleted, so no cleanup needed
       // Just log if needed
       testsLogger.debug?.(

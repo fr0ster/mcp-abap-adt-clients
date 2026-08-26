@@ -193,7 +193,7 @@ describe('ClassExecutor (integration)', () => {
   const libraryLogger: ILogger = createLibraryLogger();
   const testsLogger: ILogger = createTestsLogger();
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     try {
       connection = await createTestConnection(connectionLogger);
       const { client: resolvedClient, isLegacy: legacy } =
@@ -211,7 +211,7 @@ describe('ClassExecutor (integration)', () => {
     }
   });
 
-  afterEach(async () => {
+  afterAll(async () => {
     if (connection && classNameForTest) {
       try {
         await client.getClass().delete({

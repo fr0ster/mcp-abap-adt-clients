@@ -114,7 +114,7 @@ describe('Group Activation (Shared)', () => {
     let dataElementCreated = false;
     let structureCreated = false;
 
-    beforeEach(async () => {
+    beforeAll(async () => {
       skipReason = null;
       testCase = null;
       domainName = null;
@@ -164,7 +164,7 @@ describe('Group Activation (Shared)', () => {
       structureName = tc.params.structure_name;
     });
 
-    afterEach(async () => {
+    afterAll(async () => {
       // Cleanup: delete objects in reverse order (structure -> data element -> domain)
       const transportRequest = resolveTransportRequest(
         testCase?.params?.transport_request,

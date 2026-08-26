@@ -186,7 +186,7 @@ describe('DataElement (using AdtClient)', () => {
     let domainCreated: boolean = false;
     let skipReason: string | null = null;
 
-    beforeEach(async () => {
+    beforeAll(async () => {
       skipReason = null;
       testCase = null;
       dataElementName = null;
@@ -298,7 +298,7 @@ describe('DataElement (using AdtClient)', () => {
       }
     });
 
-    afterEach(async () => {
+    afterAll(async () => {
       // Cleanup domain if it was created in beforeEach
       // Check cleanup settings: cleanup_after_test (global) and skip_cleanup (test-specific or global)
       const envConfig = getEnvironmentConfig();

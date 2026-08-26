@@ -48,7 +48,7 @@ describe('Shared - getTableContents', () => {
   let isLegacy = false;
   let isCloudSystem = false;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     try {
       connection = await createTestConnection(testsLogger);
       const { client: resolvedClient, isLegacy: legacy } =
@@ -65,7 +65,7 @@ describe('Shared - getTableContents', () => {
     }
   });
 
-  afterEach(async () => {
+  afterAll(async () => {
     if (connection) {
       await connection.disconnect();
     }

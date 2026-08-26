@@ -52,7 +52,7 @@ describe('Program - Run', () => {
   let isCloudSystem = false;
   let isLegacy = false;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     try {
       connection = await createTestConnection(connectionLogger);
       isCloudSystem = await isCloudEnvironment(connection);
@@ -72,7 +72,7 @@ describe('Program - Run', () => {
     }
   });
 
-  afterEach(async () => {
+  afterAll(async () => {
     if (connection) {
       await connection.disconnect();
     }

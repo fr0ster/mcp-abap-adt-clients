@@ -40,7 +40,7 @@ describe('Shared - searchObjects', () => {
   let hasConfig = false;
   let isLegacy = false;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     try {
       connection = await createTestConnection(testsLogger);
       // The connector refuses work on a connection nobody opened; these files
@@ -57,7 +57,7 @@ describe('Shared - searchObjects', () => {
     }
   });
 
-  afterEach(async () => {
+  afterAll(async () => {
     if (connection) {
       await connection.disconnect();
     }

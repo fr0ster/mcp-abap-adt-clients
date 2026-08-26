@@ -42,7 +42,7 @@ describe('Shared - listFunctionGroupIncludes', () => {
   let client: AdtClient;
   let hasConfig = false;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     try {
       connection = await createTestConnection(testsLogger);
       // The connector refuses work on a connection nobody opened; these files
@@ -60,7 +60,7 @@ describe('Shared - listFunctionGroupIncludes', () => {
     }
   });
 
-  afterEach(async () => {
+  afterAll(async () => {
     if (connection) {
       await connection.disconnect();
     }

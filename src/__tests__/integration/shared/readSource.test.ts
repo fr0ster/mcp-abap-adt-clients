@@ -49,7 +49,7 @@ describe('Shared - readSource', () => {
   let isLegacy = false;
   let isCloudSystem = false;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     try {
       connection = await createTestConnection(connectionLogger);
       const { client: resolvedClient, isLegacy: legacy } =
@@ -65,7 +65,7 @@ describe('Shared - readSource', () => {
     }
   });
 
-  afterEach(async () => {
+  afterAll(async () => {
     if (connection) {
       await connection.disconnect();
     }

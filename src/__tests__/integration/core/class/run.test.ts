@@ -38,7 +38,7 @@ describe('Class - Run', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let hasConfig = false;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     try {
       connection = await createTestConnection(connectionLogger);
       hasConfig = true;
@@ -49,7 +49,7 @@ describe('Class - Run', () => {
     }
   });
 
-  afterEach(async () => {
+  afterAll(async () => {
     if (connection) {
       await connection.disconnect();
     }

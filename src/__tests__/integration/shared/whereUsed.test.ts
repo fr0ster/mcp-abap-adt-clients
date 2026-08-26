@@ -40,7 +40,7 @@ describe('Shared - getWhereUsed', () => {
   let isLegacy = false;
   let isCloudSystem = false;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     try {
       connection = await createTestConnection(testsLogger);
       const { client: resolvedClient, isLegacy: legacy } =
@@ -56,7 +56,7 @@ describe('Shared - getWhereUsed', () => {
     }
   });
 
-  afterEach(async () => {
+  afterAll(async () => {
     if (connection) {
       await connection.disconnect();
     }
