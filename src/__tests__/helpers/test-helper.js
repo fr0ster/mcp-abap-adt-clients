@@ -2260,8 +2260,14 @@ async function ensureSharedDependency(client, type, name, logger) {
           logger,
         );
       } catch (updateErr) {
-        logger?.warn?.(
-          `Shared ${type} ${name} exists but update/activate failed: ${updateErr.message}`,
+        // Rethrow, for the reason spelled out in the reconcile branch below: a
+        // shared dependency whose update failed is NOT at the configured state,
+        // and swallowing that returns `{ existed: true }` and caches it as
+        // verified. Every test that later borrows this object then fails
+        // somewhere else, against an object nobody said was wrong — the warning
+        // went to a logger that is silent unless DEBUG_TESTS=true.
+        throw new Error(
+          `Shared ${type} ${name} exists but could not be brought to the configured source: ${updateErr.message}`,
         );
       }
     } else if (ALWAYS_RECONCILE.has(type)) {
