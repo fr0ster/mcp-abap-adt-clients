@@ -2082,6 +2082,17 @@ async function updateAndActivateShared(
         { tableName: name, ddlCode: depConfig.source, transportRequest },
         { activateOnUpdate: true, sourceCode: depConfig.source },
       );
+  } else if (type === 'structures') {
+    // A structure carries its source as `ddlCode`, like a table. Without this
+    // branch it fell to the "no update logic, skipping" line below — so the run
+    // announced "updating source and activating", did neither, and recorded the
+    // object as satisfied. Both shared structures had been in that state.
+    await client
+      .getStructure()
+      .update(
+        { structureName: name, ddlCode: depConfig.source, transportRequest },
+        { activateOnUpdate: true, sourceCode: depConfig.source },
+      );
   } else if (type === 'views') {
     await client
       .getDdl()

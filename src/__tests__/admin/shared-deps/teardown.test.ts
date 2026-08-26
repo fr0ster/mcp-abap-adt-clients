@@ -444,6 +444,6 @@ describe('Admin: Teardown shared dependencies', () => {
 
       expect(failed.length).toBe(0);
     },
-    getTimeout('long'),
+    getTimeout('shared_admin'),
   );
 });

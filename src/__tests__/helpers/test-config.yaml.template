@@ -54,6 +54,9 @@ test_settings:
   timeouts:
     default: 60000
     long: 200000  # Long timeout for complex operations (group deletion, etc.)
+    shared_admin: 3600000  # shared:setup / shared:teardown — ~20 objects, each a
+                           # lock/update/activate chain. Measured at 25+ minutes on a
+                           # BTP trial, and that is before a retry.
     create: 60000
     delay: 3000  # Delay after delete/create operations
   # Operation delays (milliseconds) - time to wait for SAP to commit operations
