@@ -2243,7 +2243,27 @@ async function ensureSharedDependency(client, type, name, logger) {
       exists = result !== undefined;
     }
   } catch (error) {
-    // 404 or similar — object doesn't exist
+    // Absence is `undefined` from read(), which every handler returns on 404.
+    // A THROWN error is not absence — it is "we did not find out", and turning
+    // it into `exists = false` is a guess that then does something irreversible.
+    //
+    // Measured on the BTP trial: reads of ZAC_SHR_GA_DOM and ZAC_SHR_STRU threw
+    // on a flaky link, the blanket catch here called them missing, and the
+    // create that followed came back
+    // `400 ExceptionResourceAlreadyExists: Resource Domain ZAC_SHR_GA_DOM does
+    // already exist` — the objects were there all along. A 403, a 500 or a
+    // timeout would read the same way.
+    //
+    // A status is still honoured if one arrived saying 404, since a handler may
+    // surface that as an error rather than as `undefined`.
+    const status = error?.response?.status ?? error?.status;
+    if (status !== 404) {
+      throw new Error(
+        `Could not determine whether shared ${type} ${name} exists: ${error.message}. ` +
+          'Refusing to assume it is missing — the create that would follow ' +
+          'either fails on an object that exists or writes over one that does.',
+      );
+    }
     exists = false;
   }
 
