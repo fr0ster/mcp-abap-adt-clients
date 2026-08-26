@@ -186,16 +186,24 @@ await toggle.update(
 `AdtAbapGitClient` is a **standalone top-level class**, not a factory on `AdtClient`. `AdtClient` is reserved for `IAdtObject<Config, State>` implementations — separate clients stand on their own and are instantiated directly, same pattern as `AdtClient`, `AdtRuntimeClient`, `AdtExecutor`, and `AdtClientsWS`.
 
 ```typescript
-import { createAbapConnection } from '@mcp-abap-adt/connection';
+import {
+  AdtCloudConnector,
+  CloudHttpTransport,
+  TokenAuthProvider,
+} from '@mcp-abap-adt/connection';
 import { AdtAbapGitClient } from '@mcp-abap-adt/adt-clients';
 import type { IAdtAbapGitClient } from '@mcp-abap-adt/interfaces';
 
-const connection = createAbapConnection(
-  { /* ... */ },
-  null,
-  undefined,
-  undefined,
-  { system: 'cloud' },   // abapGit needs cloud or ABAP Platform 2022+
+// abapGit needs cloud or ABAP Platform 2022+, so the cloud connector and the
+// cloud wire — the one that asks for a session at
+// /sap/bc/adt/core/http/sessions. Handing it the on-prem wire does not compile.
+const connection = new AdtCloudConnector(
+  config,
+  new TokenAuthProvider(tokenRefresher),
+  new CloudHttpTransport(() => ({}), null, {
+    client: config.client,
+    baseUrl: config.url,
+  }),
 );
 await connection.connect();
 

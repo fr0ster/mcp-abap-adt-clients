@@ -3,10 +3,23 @@
  * Provides SAP configuration from environment variables
  */
 
-import type { SapConfig } from '@mcp-abap-adt/connection';
+import type { AgentOptions } from 'node:https';
+import {
+  AdtCloudConnector,
+  AdtOnPremConnector,
+  BasicAuthProvider,
+  CloudHttpTransport,
+  LegacyOnPremHttpTransport,
+  OnPremHttpTransport,
+  RfcTransport,
+  rfcConversationFrom,
+  type SapConfig,
+  TokenAuthProvider,
+} from '@mcp-abap-adt/connection';
 import type {
   IAbapConnection,
   IAdtClientOptions,
+  IAuthProvider,
   ILogger,
   ISessionLifecycleAware,
 } from '@mcp-abap-adt/interfaces';
@@ -264,16 +277,88 @@ export function getTargetSystem(): 'onprem' | 'cloud' {
 export async function createTestConnection(
   logger: ILogger = createConnectionLogger(),
 ): Promise<IAbapConnection & ISessionLifecycleAware> {
-  const { createAbapConnection } = require('@mcp-abap-adt/connection');
+  const config = getConfig();
+  const system = getTargetSystem();
+  const credential = credentialFor(config);
+  // `client` is not decoration: SAP answers `sap-usercontext` with the system
+  // default rather than the client that was asked for, and later requests then
+  // route to a client nobody named.
+  const wire = { client: config.client, baseUrl: config.url };
+
   const connection: IAbapConnection & ISessionLifecycleAware =
-    createAbapConnection(getConfig(), logger, undefined, undefined, {
-      ...getConnectionOptions(),
-      system: getTargetSystem(),
-    });
+    system === 'cloud'
+      ? new AdtCloudConnector(
+          config,
+          credential,
+          new CloudHttpTransport(materialOf(credential), logger, wire),
+          logger,
+        )
+      : new AdtOnPremConnector(
+          config,
+          credential,
+          onPremWire(config, logger, wire),
+          logger,
+        );
+
   // The connector refuses work on a connection nobody opened, and a test that
   // forgot used to fail somewhere later with something unrelated.
   await connection.connect();
   return connection;
+}
+
+/**
+ * The credential, from what the configuration says the authentication is.
+ *
+ * A test names neither the class nor the flow: `.env` says how we authenticate
+ * and this turns that into the provider that does it.
+ */
+function credentialFor(config: SapConfig): IAuthProvider {
+  if (config.authType === 'jwt') {
+    // A bare string, deliberately: the token in `.env` is what a test run has,
+    // and there is nothing behind it to renew from. It is good for the length
+    // of a run — which is why an expired one must fail loudly rather than be
+    // mistaken for "SAP is not configured here".
+    return new TokenAuthProvider(config.jwtToken as string);
+  }
+  return new BasicAuthProvider(
+    config.username as string,
+    config.password as string,
+  );
+}
+
+/**
+ * The TLS material a wire should present, asked for when the wire needs it.
+ *
+ * A thunk rather than a value because the material is loaded during
+ * `connect()`: a wire that read it at construction would read nothing, and
+ * mTLS would silently not happen — the connection builds, the requests go out,
+ * and the server refuses them for a reason that says nothing about the
+ * certificate.
+ */
+function materialOf(credential: IAuthProvider): () => AgentOptions {
+  return () => credential.transportMaterial() as AgentOptions;
+}
+
+/**
+ * Which on-prem wire, from the configuration.
+ *
+ * Three deployments, and the caller states which: ordinary HTTP, the legacy one
+ * (BASIS < 7.50, where the session-type header sends locks to ABAP session
+ * memory instead of the enqueue server — this was the `skipSessionType` flag),
+ * and RFC, for a system where stateful HTTP sessions are not usable at all.
+ */
+function onPremWire(
+  config: SapConfig,
+  logger: ILogger,
+  wire: { client?: string; baseUrl?: string },
+): OnPremHttpTransport | RfcTransport {
+  if (getConnectionType() === 'rfc') {
+    return new RfcTransport(rfcConversationFrom(config), logger);
+  }
+  const material = materialOf(credentialFor(config));
+  return isLegacyEnvironment()
+    ? new LegacyOnPremHttpTransport(material, logger, wire)
+    : new OnPremHttpTransport(material, logger, wire);
 }
 
 /**

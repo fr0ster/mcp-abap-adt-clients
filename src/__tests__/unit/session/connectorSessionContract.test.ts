@@ -24,7 +24,11 @@
  *   npx jest src/__tests__/unit/session
  */
 
-import { createAbapConnection } from '@mcp-abap-adt/connection';
+import {
+  AdtOnPremConnector,
+  BasicAuthProvider,
+  OnPremHttpTransport,
+} from '@mcp-abap-adt/connection';
 import {
   ADT_SESSION_ERROR,
   type IAbapConnection,
@@ -66,25 +70,24 @@ describe('connector session contract (real @mcp-abap-adt/connection)', () => {
   function connectionTo(
     baseUrl: string,
   ): IAbapConnection & ISessionLifecycleAware {
-    // The system is stated, not inferred: the stub hands out
-    // `SAP_SESSIONID_STUB_100` on the ordinary call, which is the ICF
-    // mechanism. Leaving it out would have the factory pick a connector from
-    // `authType` — the deprecated path, and one that would take a cloud
-    // connector for a bearer token against this same stub.
-    //
-    // The cast below is the factory's gap, not a shortcut: every connector it
-    // builds implements ISessionLifecycleAware, but the declared return type is
-    // plain IAbapConnection — so `disconnect()`, which 5.0.0 made the way a
-    // session is released, is invisible to a typed caller.
-    const conn = createAbapConnection(
-      configFor(baseUrl),
+    // System, credential and wire are all stated — there is nothing left to
+    // infer, and since 6.0.0 nothing that could: the factory that used to pick
+    // a connector from `authType` is gone. The on-prem wire is the right one
+    // here because the stub hands out `SAP_SESSIONID_STUB_100` on the ordinary
+    // call, which is the ICF mechanism.
+    const config = configFor(baseUrl);
+    const conn = new AdtOnPremConnector(
+      config,
+      new BasicAuthProvider(
+        config.username as string,
+        config.password as string,
+      ),
+      new OnPremHttpTransport(() => ({}), null, {
+        client: config.client,
+        baseUrl: config.url,
+      }),
       null,
-      undefined,
-      undefined,
-      {
-        system: 'onprem',
-      },
-    ) as IAbapConnection & ISessionLifecycleAware;
+    );
     opened.push(conn);
     return conn;
   }

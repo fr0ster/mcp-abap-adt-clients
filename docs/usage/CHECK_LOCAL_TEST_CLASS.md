@@ -5,21 +5,29 @@ This guide shows how to validate local test classes using `AdtClient`.
 ## Using AdtClient
 
 ```typescript
-import { createAbapConnection } from '@mcp-abap-adt/connection';
+import {
+  AdtOnPremConnector,
+  BasicAuthProvider,
+  OnPremHttpTransport,
+} from '@mcp-abap-adt/connection';
 import { AdtClient } from '@mcp-abap-adt/adt-clients';
 
-const connection = createAbapConnection(
-  {
-    url: process.env.SAP_URL!,
-    authType: 'basic',
-    username: process.env.SAP_USERNAME!,
-    password: process.env.SAP_PASSWORD!,
-    client: process.env.SAP_CLIENT,
-  },
-  null,
-  undefined,
-  undefined,
-  { system: 'onprem' },   // stated, never inferred
+const config = {
+  url: process.env.SAP_URL!,
+  authType: 'basic' as const,
+  username: process.env.SAP_USERNAME!,
+  password: process.env.SAP_PASSWORD!,
+  client: process.env.SAP_CLIENT,
+};
+
+// System, credential and wire — all stated, never inferred.
+const connection = new AdtOnPremConnector(
+  config,
+  new BasicAuthProvider(config.username, config.password),
+  new OnPremHttpTransport(() => ({}), null, {
+    client: config.client,
+    baseUrl: config.url,
+  }),
 );
 await connection.connect();
 

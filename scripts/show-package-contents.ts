@@ -16,17 +16,19 @@
  *   MCP_ENV_PATH - Path to .env file (default: .env in project root)
  */
 
-import * as dotenv from 'dotenv';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { createAbapConnection } from '@mcp-abap-adt/connection';
-import { AdtClient } from '../src/clients/AdtClient';
-import type { IPackageHierarchyNode } from '../src/core/shared/types';
-import { getConfig } from '../src/__tests__/helpers/sessionConfig';
+import * as dotenv from 'dotenv';
+import {
+  createTestConnection,
+  getConfig,
+} from '../src/__tests__/helpers/sessionConfig';
 import {
   createConnectionLogger,
   createLibraryLogger,
 } from '../src/__tests__/helpers/testLogger';
+import { AdtClient } from '../src/clients/AdtClient';
+import type { IPackageHierarchyNode } from '../src/core/shared/types';
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../.env');
 if (fs.existsSync(envPath)) {
@@ -89,7 +91,9 @@ function printTree(
   const descPart = node.description ? ` - ${node.description}` : '';
   const statusIcon = node.restoreStatus === 'ok' ? '' : ' [!]';
 
-  console.log(`${prefix}${connector}${node.name} (${typeLabel})${descPart}${statusIcon}`);
+  console.log(
+    `${prefix}${connector}${node.name} (${typeLabel})${descPart}${statusIcon}`,
+  );
 
   const children = node.children || [];
   const newPrefix = prefix + (isLast ? '    ' : '│   ');
@@ -99,7 +103,10 @@ function printTree(
   }
 }
 
-function countObjects(node: IPackageHierarchyNode): { packages: number; objects: number } {
+function countObjects(node: IPackageHierarchyNode): {
+  packages: number;
+  objects: number;
+} {
   let packages = node.is_package ? 1 : 0;
   let objects = node.is_package ? 0 : 1;
 
@@ -116,25 +123,31 @@ async function run(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
 
   if (!options.packageName) {
-    console.error('Usage: npx ts-node scripts/show-package-contents.ts <PACKAGE_NAME> [OPTIONS]');
+    console.error(
+      'Usage: npx ts-node scripts/show-package-contents.ts <PACKAGE_NAME> [OPTIONS]',
+    );
     console.error('');
     console.error('Options:');
-    console.error('  --depth=N           Max depth for subpackages (default: 5)');
-    console.error('  --no-subpackages    Don\'t recurse into subpackages');
-    console.error('  --no-descriptions   Don\'t include object descriptions');
+    console.error(
+      '  --depth=N           Max depth for subpackages (default: 5)',
+    );
+    console.error("  --no-subpackages    Don't recurse into subpackages");
+    console.error("  --no-descriptions   Don't include object descriptions");
     console.error('  --json              Output as JSON instead of tree view');
     process.exit(1);
   }
 
   const config = getConfig();
-  const connection = createAbapConnection(config, connectionLogger);
+  const connection = await createTestConnection(connectionLogger);
   await (connection as any).connect();
 
   const client = new AdtClient(connection, libraryLogger);
   const utils = client.getUtils();
 
   console.log(`Fetching package hierarchy for: ${options.packageName}`);
-  console.log(`Options: depth=${options.maxDepth}, subpackages=${options.includeSubpackages}, descriptions=${options.includeDescriptions}`);
+  console.log(
+    `Options: depth=${options.maxDepth}, subpackages=${options.includeSubpackages}, descriptions=${options.includeDescriptions}`,
+  );
   console.log('');
 
   try {
@@ -151,10 +164,15 @@ async function run(): Promise<void> {
 
       const counts = countObjects(hierarchy);
       console.log('');
-      console.log(`Total: ${counts.packages} package(s), ${counts.objects} object(s)`);
+      console.log(
+        `Total: ${counts.packages} package(s), ${counts.objects} object(s)`,
+      );
     }
   } catch (error: any) {
-    console.error('Failed to fetch package hierarchy:', error?.message || error);
+    console.error(
+      'Failed to fetch package hierarchy:',
+      error?.message || error,
+    );
     process.exit(1);
   } finally {
     (connection as any).reset();

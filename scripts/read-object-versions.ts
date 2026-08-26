@@ -21,21 +21,23 @@
  *   SAP_TRANSPORT - Optional transport request for update/activate
  */
 
-import * as dotenv from 'dotenv';
+import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { createHash } from 'node:crypto';
-import { createAbapConnection } from '@mcp-abap-adt/connection';
-import { AdtClient } from '../src/clients/AdtClient';
-import type { AdtSourceObjectType } from '../src/core/shared/types';
-import { makeAdtRequestWithAcceptNegotiation } from '../src/utils/acceptNegotiation';
-import { getTimeout } from '../src/utils/timeouts';
-import { getConfig } from '../src/__tests__/helpers/sessionConfig';
+import * as dotenv from 'dotenv';
+import {
+  createTestConnection,
+  getConfig,
+} from '../src/__tests__/helpers/sessionConfig';
 import {
   createBuilderLogger,
   createConnectionLogger,
   createTestsLogger,
 } from '../src/__tests__/helpers/testLogger';
+import { AdtClient } from '../src/clients/AdtClient';
+import type { AdtSourceObjectType } from '../src/core/shared/types';
+import { makeAdtRequestWithAcceptNegotiation } from '../src/utils/acceptNegotiation';
+import { getTimeout } from '../src/utils/timeouts';
 
 const testHelper = require('../src/__tests__/helpers/test-helper');
 const resolveTransportRequest = testHelper.resolveTransportRequest;
@@ -142,7 +144,6 @@ function parseArgs(argv: string[]): Options {
     }
     if (arg.startsWith('--transport=')) {
       transportRequest = arg.slice('--transport='.length).trim();
-      continue;
     }
   }
 
@@ -167,9 +168,12 @@ const options = parseArgs(process.argv.slice(2));
 
 function insertMarker(source: string, marker: string): string {
   const regex = /ENDCLASS\./gi;
-  let match: RegExpExecArray | null;
   let lastIndex = -1;
-  while ((match = regex.exec(source)) !== null) {
+  for (
+    let match = regex.exec(source);
+    match !== null;
+    match = regex.exec(source)
+  ) {
     lastIndex = match.index;
   }
   if (lastIndex === -1) {
@@ -182,7 +186,7 @@ function insertMarker(source: string, marker: string): string {
 
 async function readSource(
   client: AdtClient,
-  connection: ReturnType<typeof createAbapConnection>,
+  connection: IAbapConnection,
   version: 'active' | 'inactive',
   attempts = 10,
   delayMs = 2000,
@@ -302,7 +306,7 @@ async function run(): Promise<void> {
     throw new Error('Object name is required');
   }
   const config = getConfig();
-  const connection = createAbapConnection(config, connectionLogger);
+  const connection = await createTestConnection(connectionLogger);
   await (connection as any).connect();
   const client = new AdtClient(connection, builderLogger);
 
@@ -463,7 +467,11 @@ async function run(): Promise<void> {
     if (updateSucceeded && originalSource) {
       testsLogger.info?.('Restoring original source...');
       await client.getClass().update(
-        { className: options.objectName, transportRequest, sourceCode: originalSource },
+        {
+          className: options.objectName,
+          transportRequest,
+          sourceCode: originalSource,
+        },
         { sourceCode: originalSource },
       );
       await client.getClass().activate({ className: options.objectName });

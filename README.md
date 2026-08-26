@@ -152,28 +152,38 @@ npm install @mcp-abap-adt/adt-clients
 ### Using AdtClient (Recommended - High-Level CRUD API)
 
 ```typescript
-import { createAbapConnection } from '@mcp-abap-adt/connection';
+import {
+  AdtOnPremConnector,
+  BasicAuthProvider,
+  OnPremHttpTransport,
+} from '@mcp-abap-adt/connection';
 import { AdtClient } from '@mcp-abap-adt/adt-clients';
 
-const connection = createAbapConnection(
-  {
-    url: 'https://your-sap-system.example.com',
-    client: '100',
-    authType: 'basic',
-    username: process.env.SAP_USERNAME!,
-    password: process.env.SAP_PASSWORD!
-  },
+const config = {
+  url: 'https://your-sap-system.example.com',
+  client: '100',
+  authType: 'basic' as const,
+  username: process.env.SAP_USERNAME!,
+  password: process.env.SAP_PASSWORD!,
+};
+
+// Three things, all stated by you: which system (the connector), which
+// credential (the provider), and which wire (the transport). Since
+// @mcp-abap-adt/connection 6.0.0 nothing is inferred and there is no factory —
+// for ABAP Cloud take AdtCloudConnector + CloudHttpTransport instead.
+const connection = new AdtOnPremConnector(
+  config,
+  new BasicAuthProvider(config.username, config.password),
+  new OnPremHttpTransport(() => ({}), console, {
+    client: config.client,
+    baseUrl: config.url,
+  }),
   console,
-  undefined,
-  undefined,
-  // Which system this is. You say it; nothing is inferred from the URL or the
-  // credential. See @mcp-abap-adt/connection 5.0.0.
-  { system: 'onprem' }   // or 'cloud'
 );
 
-// Required: since connection 5.0.0 a request on a connection nobody opened is
-// refused before it is sent, and connect() fails if the server opened no
-// session — rather than surfacing later as `400 Session not found` mid-edit.
+// Required: a request on a connection nobody opened is refused before it is
+// sent, and connect() fails if the server opened no session — rather than
+// surfacing later as `400 Session not found` mid-edit.
 await connection.connect();
 
 const client = new AdtClient(connection, console);

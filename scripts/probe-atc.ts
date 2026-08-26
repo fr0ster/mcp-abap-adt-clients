@@ -88,7 +88,6 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { createAbapConnection } from '@mcp-abap-adt/connection';
 import {
   type IAbapConnection,
   type ILogger,
@@ -96,7 +95,10 @@ import {
 } from '@mcp-abap-adt/interfaces';
 import { DefaultLogger } from '@mcp-abap-adt/logger';
 import * as dotenv from 'dotenv';
-import { getConfig } from '../src/__tests__/helpers/sessionConfig';
+import {
+  createTestConnection,
+  getConfig,
+} from '../src/__tests__/helpers/sessionConfig';
 import { createConnectionLogger } from '../src/__tests__/helpers/testLogger';
 import { AdtUtils } from '../src/core/shared/AdtUtils';
 
@@ -800,7 +802,7 @@ async function main(): Promise<void> {
   fs.mkdirSync(outDir, { recursive: true });
 
   const sapConfig = getConfig();
-  const connection = createAbapConnection(sapConfig, createConnectionLogger());
+  const connection = await createTestConnection(createConnectionLogger());
   await connection.connect();
   logger.info(`Connected to ${sapConfig.url}`);
 

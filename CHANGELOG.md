@@ -18,12 +18,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   never inferred: a bearer token against on-prem and a communication user
   against cloud are both ordinary, so the credential does not say which system
   it is, and neither does the URL.
-- Dev dependency `@mcp-abap-adt/connection` moved to `^5.0.0`. `reset()` is gone
+- Dev dependency `@mcp-abap-adt/connection` moved to `^6.0.1`. `reset()` is gone
   there; every test now ends on `await connection.disconnect()`, which tells the
   server the session is finished instead of dropping the cookie and leaving it
   to time out.
-- Documentation examples (`README.md`, `docs/usage/*`) now pass `system` and
-  call `connect()` — without it, connection 5.0.0 refuses the first request.
+- **Runtime dependency `@mcp-abap-adt/interfaces` moved to `^21.0.0`** (from
+  `^17.1.0` — four majors). **The library needed no change at all**: every
+  break in 18–21 was on the credential axis, which lives in the connector.
+  18.0.0 dropped `disconnect({ deadlineMs })`, and nothing here ever passed
+  one; 19–21 moved `renew()`, `prepare()`, `cookies()`, `transportMaterial()`
+  and `fetchCsrfToken()` around `IAuthProvider`, which this package neither
+  implements nor names.
+- **The connector's factory is gone (6.0.0), so the test helper states all
+  three axes**: which system (`AdtOnPremConnector` / `AdtCloudConnector`),
+  which credential (`BasicAuthProvider` / `TokenAuthProvider`), and which wire
+  (`OnPremHttpTransport`, `LegacyOnPremHttpTransport`, `CloudHttpTransport`,
+  `RfcTransport`). All three still come from configuration — `environment.system`,
+  the auth in `.env`, and `connection_type` / `is_legacy`. The legacy wire is
+  what `skipSessionType` used to be, and RFC is now a transport rather than a
+  config flag.
+- `noConsole` is a warning under `scripts/**`, as it already is under tests. A
+  one-off CLI probe prints to stdout because stdout *is* its output and there is
+  no caller to inject a logger into — the same reason `globalSetup` carries a
+  written exemption. The rule stays an error where the reason does not apply:
+  library code. Nothing was silenced that was ever enforced — the pre-commit
+  hook lints staged files, and no commit had staged these before.
+- The thirteen `scripts/*.ts` probes take the same helper instead of building
+  their own connection. They were on the removed factory; only one of them was
+  in a checked tsconfig, so the rest would have failed at runtime.
+- Documentation examples (`README.md`, `docs/usage/*`) rewritten for 6.x: no
+  factory, explicit connector + provider + transport, and `connect()` — without
+  which the first request is refused before it is sent.
 
 ### Fixed
 
