@@ -30,11 +30,13 @@ export {
   type IProfilerTraceHitListOptions,
   type IProfilerTraceParameters,
   type IProfilerTraceStatementsOptions,
+  type ITraceFeedEntry,
   listObjectTypes,
   listProcessTypes,
   listTraceFiles,
   listTraceRequests,
   normalizeProfilerTraceId,
+  parseTraceFeedEntries,
 } from './profiler';
 export { St05Trace } from './St05Trace';
 export {

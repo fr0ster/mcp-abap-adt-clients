@@ -188,6 +188,11 @@ describe('ClassExecutor (integration)', () => {
   let hasConfig = false;
   let isLegacy = false;
   let classNameForTest: string | null = null;
+  // EVERY class this file creates, not just the last. Each test generates a
+  // fresh name and overwrote the single variable, so afterAll deleted the newest
+  // and left the earlier one on the system — once per run. Seen on E19 in SM12
+  // as E_ABAP_GENPH locks accumulating under names nobody would ever revisit.
+  const classesCreated: string[] = [];
   let transportRequestForCleanup = '';
 
   const connectionLogger: ILogger = createConnectionLogger();
@@ -204,6 +209,7 @@ describe('ClassExecutor (integration)', () => {
       executor = new AdtExecutor(connection, libraryLogger);
       hasConfig = true;
       classNameForTest = null;
+      classesCreated.length = 0;
       transportRequestForCleanup = '';
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
@@ -213,15 +219,15 @@ describe('ClassExecutor (integration)', () => {
   });
 
   afterAll(async () => {
-    if (connection && classNameForTest) {
+    for (const className of classesCreated) {
       try {
         await client.getClass().delete({
-          className: classNameForTest,
+          className,
           transportRequest: transportRequestForCleanup,
         });
       } catch (cleanupError) {
         testsLogger.warn?.(
-          `⚠️ Cleanup failed for class ${classNameForTest}: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,
+          `⚠️ Cleanup failed for class ${className}: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,
         );
       }
     }
@@ -248,6 +254,7 @@ describe('ClassExecutor (integration)', () => {
     const sourceCode = resolveRunnableClassSource(testCase, className);
 
     classNameForTest = className;
+    classesCreated.push(classNameForTest);
     transportRequestForCleanup = transportRequest || '';
 
     logTestStep(`create class ${className}`, testsLogger);

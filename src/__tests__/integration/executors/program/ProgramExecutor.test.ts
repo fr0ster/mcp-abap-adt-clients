@@ -145,6 +145,11 @@ describe('ProgramExecutor (integration)', () => {
   let isCloudSystem = false;
   let isLegacy = false;
   let programNameForTest: string | null = null;
+  // EVERY program this file creates, not just the last. Each test generates a
+  // fresh name and overwrote the single variable, so afterAll deleted the newest
+  // and left the earlier one on the system — once per run. Seen on E19 in SM12
+  // as E_ABAP_GENPH locks accumulating under names nobody would ever revisit.
+  const programsCreated: string[] = [];
   let traceUser: string | undefined;
   let transportRequestForCleanup = '';
 
@@ -174,6 +179,7 @@ describe('ProgramExecutor (integration)', () => {
       profiler = runtime.getProfiler() as Profiler;
       hasConfig = true;
       programNameForTest = null;
+      programsCreated.length = 0;
       transportRequestForCleanup = '';
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
@@ -184,15 +190,15 @@ describe('ProgramExecutor (integration)', () => {
   });
 
   afterAll(async () => {
-    if (connection && programNameForTest) {
+    for (const programName of programsCreated) {
       try {
         await client.getProgram().delete({
-          programName: programNameForTest,
+          programName,
           transportRequest: transportRequestForCleanup,
         });
       } catch (cleanupError) {
         testsLogger.warn?.(
-          `⚠️ Cleanup failed for program ${programNameForTest}: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,
+          `⚠️ Cleanup failed for program ${programName}: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,
         );
       }
     }
@@ -220,6 +226,7 @@ describe('ProgramExecutor (integration)', () => {
     const sourceCode = resolveRunnableProgramSource(testCase, programName);
 
     programNameForTest = programName;
+    programsCreated.push(programNameForTest);
     transportRequestForCleanup = transportRequest || '';
 
     logTestStep(`create program ${programName}`, testsLogger);
@@ -365,6 +372,12 @@ describe('ProgramExecutor (integration)', () => {
       try {
         const programName = await ensureRunnableProgram(testCase);
 
+        // What the feed holds BEFORE the run, so the trace this run writes can
+        // be told apart from the ones already there.
+        const tracesBefore = new Set(
+          (await profiler.listTraceIds({ user: traceUser })).map((t) => t.id),
+        );
+
         logTestStep('create trace parameters + run with profiler', testsLogger);
         const result = await executor
           .getProgramExecutor()
@@ -389,8 +402,22 @@ describe('ProgramExecutor (integration)', () => {
         // of 345 bytes while `/runtime/traces/abaptraces` held 95KB of entries
         // owned by this very user — the profiling had worked all along and the
         // test was reading the wrong feed.
-        logTestStep('resolve traceId from the trace files list', testsLogger);
-        const traceId = await profiler.latestTraceId({ user: traceUser });
+        // Poll for a trace that was NOT there before this run, rather than
+        // trusting "the newest one". SAP writes traces asynchronously, so the
+        // trace may not exist the instant the run returns — and a test that
+        // takes whatever the feed offers passes on someone else's trace. This
+        // one did: four consecutive runs resolved the SAME id while each was
+        // creating a new trace of its own. Measured on E19, the difference
+        // shows up on the first or second attempt.
+        logTestStep('poll for the trace this run produced', testsLogger);
+        let traceId: string | undefined;
+        for (let attempt = 1; attempt <= 5 && !traceId; attempt++) {
+          const seenNow = await profiler.listTraceIds({ user: traceUser });
+          traceId = seenNow.find((t) => !tracesBefore.has(t.id))?.id;
+          if (!traceId && attempt < 5) {
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+          }
+        }
         expect(traceId).toBeDefined();
         expect(typeof traceId).toBe('string');
         expect((traceId as string).length).toBeGreaterThan(10);

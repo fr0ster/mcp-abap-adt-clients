@@ -14,7 +14,6 @@ import {
   createTraceParameters,
   DEFAULT_PROFILER_TRACE_PARAMETERS,
   extractProfilerIdFromResponse,
-  extractTraceIdFromTraceFeed,
   getTraceDbAccesses,
   getTraceHitList,
   getTraceParameters,
@@ -26,6 +25,7 @@ import {
   listProcessTypes,
   listTraceFiles,
   listTraceRequests,
+  parseTraceFeedEntries,
 } from './profiler';
 
 export class Profiler implements IProfiler {
@@ -46,15 +46,23 @@ export class Profiler implements IProfiler {
   }
 
   /**
-   * The id of the most recent trace file, or undefined when there is none.
+   * The id of the most RECENTLY WRITTEN trace file, or undefined when the feed
+   * holds none.
    *
-   * The step between "I ran something with the profiler" and "let me read its
-   * hitlist", which every caller needs and each was left to write for itself:
-   * `list()` answers with an Atom feed, and turning that into an id meant a
-   * regex in consumer code while this package already had one.
+   * Newest by timestamp, not by position. `extractTraceIdFromTraceFeed()` takes
+   * the first id in the document, and on E19 that is not the newest: measured,
+   * the feed's first three entries were 06:09:50, 06:10:01 and 06:10:38 while
+   * its last were from eight days earlier, and a trace written minutes before
+   * the call sat somewhere in the middle. Anything that trusted position got a
+   * stale trace and no error to say so.
    *
    * Pass `user` to scope it — on a shared system the newest trace is not
    * necessarily yours.
+   *
+   * This answers "what is newest", which is NOT the same question as "what did
+   * my run just produce". SAP writes traces asynchronously, so a caller that
+   * needs its OWN trace must note the ids it saw before running and poll for
+   * one that is new — see `ClassExecutor.runWithProfiling`.
    *
    * NOTE: not on `IProfiler` yet. The contract lives in
    * `@mcp-abap-adt/interfaces`; until it carries this method, reach it through
@@ -64,7 +72,25 @@ export class Profiler implements IProfiler {
     options?: IProfilerListOptions,
   ): Promise<string | undefined> {
     const response = await this.list(options);
-    return extractTraceIdFromTraceFeed(response);
+    const entries = parseTraceFeedEntries(response);
+    if (entries.length === 0) {
+      return undefined;
+    }
+    return entries.reduce((newest, entry) =>
+      entry.writtenAt > newest.writtenAt ? entry : newest,
+    ).id;
+  }
+
+  /**
+   * Every trace in the feed, with the id and the moment it was written.
+   *
+   * Exposed because "newest" is rarely the real question: a caller that wants
+   * the trace ITS run produced compares this against what it saw beforehand.
+   */
+  async listTraceIds(
+    options?: IProfilerListOptions,
+  ): Promise<Array<{ id: string; writtenAt: string }>> {
+    return parseTraceFeedEntries(await this.list(options));
   }
 
   async getParameters(): Promise<IAdtResponse> {
