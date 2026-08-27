@@ -1,6 +1,6 @@
 # One contract for reading what a run produced
 
-**Status:** design, awaiting approval
+**Status:** design — split and scope approved; typing plan open
 **Packages:** `@mcp-abap-adt/interfaces` (breaking, 22.0.0), `@mcp-abap-adt/adt-clients` (consumer)
 **Supersedes:** fr0ster/mcp-abap-adt-interfaces#45, which adds two members to the bag this dismantles
 
@@ -203,17 +203,32 @@ runWithProfiling(target, options): Promise<IExecutionResult>;
 
 ST05's `getState()` joins them as recording control.
 
-## Scope — one judgement call to confirm
+## Scope — decided
 
 In scope: traces a run produces — `abaptraces`, `crosstrace`, `st05`.
 
-Out of scope, deliberately: `IRuntimeDumps`, `IApplicationLog`, `IGatewayErrorLog`,
-`ISystemMessages`, `IMemorySnapshots`. A dump is arguably the result of a run too, and all five
-have the same listing shape — but they are records the system writes about itself and are read
-without anyone running anything through us. They can adopt `ITraceListing` later without a
-breaking change, and doing them now would make one change into six.
+Out of scope, and not "for now": `IRuntimeDumps`, `IApplicationLog`, `IGatewayErrorLog`,
+`ISystemMessages`, `IMemorySnapshots`.
 
-**This boundary is the one decision in this spec that is a judgement rather than a measurement.**
+The tempting reason to merge them is that they all list and all read by id. That is a shape, not a
+meaning, and the meanings are different in a way that decides who the result belongs to:
+
+- **A profile is asked for.** A user requests the measurement and the same user gets the result.
+  It exists because someone wanted it, and it is theirs.
+- **A dump is not asked for by anyone.** It exists because something went wrong. Nobody scheduled
+  it and nobody owns it in the sense a profile is owned.
+- **A log arises because somebody ran a program or a class** — not necessarily the reader, and not
+  as the point of the run. It is a by-product with a different audience.
+
+Three different entities, so three different contracts, however similar their listings look. A
+contract that covered all three would have to describe "a thing that happened somewhere, to
+someone" — which is a shape with no meaning left in it, and the shape is the part that was never
+the problem.
+
+This also explains why ownership matters so much on the profiler side specifically, and why
+`latestTraceId()` is a trap there: the whole point of a profile is that it is **yours**, so
+"newest" is not good enough. A dump listing has no such requirement, because a dump was never
+yours to begin with.
 
 ## Versioning and order
 
@@ -237,6 +252,9 @@ breaking change, and doing them now would make one change into six.
   needs them.
 - **The schedule-without-running test must go** or become an executor test. It is the only
   producer of orphaned trace requests.
+- **The scope boundary is settled, not deferred.** Dumps and logs are not waiting to be folded in
+  later: they are different entities, and the listing shape they share with traces is not a reason
+  to give them one contract.
 - **ADT can schedule a trace for another session.** Nothing here uses it. If the need appears it
   belongs to whoever owns the running, so it does not change this design — but the contract must
   not be widened for it in advance.
