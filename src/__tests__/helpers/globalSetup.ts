@@ -13,6 +13,7 @@ import {
   getConfig,
   getTargetSystem,
 } from './sessionConfig';
+import { forgetSessionMaterial, publishSessionMaterial } from './sharedSession';
 
 /**
  * Milliseconds the preflight may spend before it gives up.
@@ -99,6 +100,11 @@ export default async function globalSetup(globalConfig?: JestGlobalConfig) {
   loadTestEnv();
 
   // No SAP_URL → skip preflight, tests will self-skip via hasConfig=false
+  // Whatever a previous run left behind. A stale session is worse than none:
+  // every file would adopt cookies the server has long since released and then
+  // fail on a session that is not there.
+  forgetSessionMaterial();
+
   if (!process.env.SAP_URL) {
     say('[globalSetup] SAP_URL not configured — skipping preflight');
     return;
@@ -148,9 +154,15 @@ export default async function globalSetup(globalConfig?: JestGlobalConfig) {
         // from that same document — and cost a second 444KB download on a
         // system already slow enough to be worth a preflight.
         const connection = await createTestConnection();
-        // Released, not left to time out: the preflight's session is of no use
-        // to anyone, and the pool it comes from is shared per user.
-        await connection.disconnect();
+        // KEPT, not released. This is the session the whole run works on: the
+        // material goes to a file, every test file adopts it, and the server
+        // sees one conversation instead of one per file. The trial grants two
+        // at a time, and multiplying them is what makes a loaded system slow
+        // down long before it refuses.
+        publishSessionMaterial(connection.exportSession());
+        say(
+          `[globalSetup] session ${connection.getSessionId()} — shared by every test file`,
+        );
       })(),
       PREFLIGHT_TIMEOUT_MS,
     );

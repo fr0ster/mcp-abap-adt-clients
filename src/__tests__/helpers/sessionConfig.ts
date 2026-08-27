@@ -5,8 +5,6 @@
 
 import type { AgentOptions } from 'node:https';
 import {
-  AdtCloudConnector,
-  AdtOnPremConnector,
   BasicAuthProvider,
   CloudHttpTransport,
   LegacyOnPremHttpTransport,
@@ -27,6 +25,12 @@ import type { AdtClient } from '../../clients/AdtClient';
 import { AdtClientLegacy } from '../../clients/AdtClientLegacy';
 import { createAdtClient } from '../../clients/createAdtClient';
 import { getSystemInformation } from '../../utils/systemInfo';
+import {
+  type ISessionSharing,
+  readSessionMaterial,
+  SharedCloudConnector,
+  SharedOnPremConnector,
+} from './sharedSession';
 import { createConnectionLogger } from './testLogger';
 
 /**
@@ -276,7 +280,7 @@ export function getTargetSystem(): 'onprem' | 'cloud' {
  */
 export async function createTestConnection(
   logger: ILogger = createConnectionLogger(),
-): Promise<IAbapConnection & ISessionLifecycleAware> {
+): Promise<IAbapConnection & ISessionLifecycleAware & ISessionSharing> {
   const config = getConfig();
   const system = getTargetSystem();
   const credential = credentialFor(config);
@@ -285,23 +289,35 @@ export async function createTestConnection(
   // route to a client nobody named.
   const wire = { client: config.client, baseUrl: config.url };
 
-  const connection: IAbapConnection & ISessionLifecycleAware =
+  const connection =
     system === 'cloud'
-      ? new AdtCloudConnector(
+      ? new SharedCloudConnector(
           config,
           credential,
           new CloudHttpTransport(materialOf(credential), logger, wire),
           logger,
         )
-      : new AdtOnPremConnector(
+      : new SharedOnPremConnector(
           config,
           credential,
           onPremWire(config, logger, wire),
           logger,
         );
 
-  // The connector refuses work on a connection nobody opened, and a test that
-  // forgot used to fail somewhere later with something unrelated.
+  // Join the session globalSetup opened, rather than asking for another. The
+  // trial grants two at a time, and a suite that took one per file was already
+  // spending fifty-three of them on work that is one conversation.
+  //
+  // No material means nobody published any — a single file run on its own —
+  // and opening one is then the right thing.
+  const shared = readSessionMaterial();
+  if (shared) connection.adoptSession(shared);
+
+  // Still connect(): adopting the cookies does not make the connection
+  // usable — `isConnected()` is what the connector checks before it sends
+  // anything, and only connect() sets it. With the cookies already in the jar
+  // this lands on the session that exists instead of opening one; measured, the
+  // `SAP_SESSIONID` comes back identical.
   await connection.connect();
   return connection;
 }

@@ -2,6 +2,7 @@ module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
   globalSetup: '<rootDir>/src/__tests__/helpers/globalSetup.ts',
+  globalTeardown: '<rootDir>/src/__tests__/helpers/globalTeardown.ts',
   testMatch: [
     '**/__tests__/**/*.test.[tj]s',
     '**/*.test.[tj]s',
@@ -35,4 +36,3 @@ module.exports = {
   maxConcurrency: 1, // Only run 1 test at a time (even within same file)
   // This ensures tests run one by one, preventing log interleaving
 };
-

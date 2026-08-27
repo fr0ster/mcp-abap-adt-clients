@@ -46,3 +46,4 @@ mdd-*.json
 # ATC probe evidence (raw captures; the curated ones live in docs/evidence)
 atc-probe*/
 shared-setup-verdict.json
+.jest-shared-session.json
