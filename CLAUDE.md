@@ -20,7 +20,8 @@ npm run build:fast      # TypeScript compile only (skip linting)
 
 # Lint & Format (Biome, not ESLint)
 npm run lint            # Lint and auto-fix with Biome
-npm run lint:check      # Lint check only (no fixes)
+npm run lint:check      # Lint check + check:docs (no fixes)
+npm run check:docs      # Every name the docs import must exist
 npm run format          # Format code with Biome
 
 # Test (requires .env with SAP credentials + src/__tests__/helpers/test-config.yaml)
