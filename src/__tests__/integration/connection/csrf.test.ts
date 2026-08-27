@@ -22,6 +22,7 @@ import * as dotenv from 'dotenv';
 import {
   createTestConnection,
   getConfig,
+  releaseTestConnection,
   skipUnlessConfigured,
 } from '../../helpers/sessionConfig';
 import {
@@ -59,7 +60,7 @@ describe('CSRF Token diagnostics', () => {
 
   afterAll(async () => {
     if (connection) {
-      await connection.disconnect();
+      await releaseTestConnection(connection);
     }
   });
 

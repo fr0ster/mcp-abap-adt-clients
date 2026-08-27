@@ -23,7 +23,10 @@ import type {
 import * as dotenv from 'dotenv';
 import { AdtAbapGitClient } from '../../../../clients/AdtAbapGitClient';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
-import { createTestConnection } from '../../../helpers/sessionConfig';
+import {
+  createTestConnection,
+  releaseTestConnection,
+} from '../../../helpers/sessionConfig';
 import {
   createConnectionLogger,
   createLibraryLogger,
@@ -58,7 +61,7 @@ describe('AbapGit (standalone AdtAbapGitClient)', () => {
   }, 120_000);
 
   afterAll(async () => {
-    if (connection) await connection.disconnect();
+    await releaseTestConnection(connection);
   });
 
   // Case definitions resolved at declaration time (test-config is static).

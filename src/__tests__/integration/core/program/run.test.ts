@@ -19,6 +19,7 @@ import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import {
   createTestAdtClient,
   createTestConnection,
+  releaseTestConnection,
   resolveSystemContext,
   skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
@@ -74,7 +75,7 @@ describe('Program - Run', () => {
 
   afterAll(async () => {
     if (connection) {
-      await connection.disconnect();
+      await releaseTestConnection(connection);
     }
   });
 

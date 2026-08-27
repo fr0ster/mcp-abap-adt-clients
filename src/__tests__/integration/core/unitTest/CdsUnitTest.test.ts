@@ -28,6 +28,7 @@ import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import {
   createTestAdtClient,
   createTestConnection,
+  releaseTestConnection,
   resolveSystemContext,
   skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
@@ -98,7 +99,7 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
 
   afterAll(async () => {
     if (connection) {
-      await connection.disconnect();
+      await releaseTestConnection(connection);
     }
   });
 

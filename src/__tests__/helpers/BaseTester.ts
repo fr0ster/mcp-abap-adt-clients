@@ -38,6 +38,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { LogLevel } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
+import { recycleTestSession, releaseTestConnection } from './sessionConfig';
 import { TestConfigResolver } from './TestConfigResolver';
 import {
   getHttpStatusText,
@@ -981,21 +982,12 @@ export class BaseTester<TConfig, TState> {
         currentStep = 'delete (cleanup)';
         logTestStep(currentStep, this.logger);
         try {
-          // Close and reopen session to release any lingering locks.
-          // close() first, because RFC has only that; disconnect() is the ADT
-          // one, and unlike the reset() it replaced it tells the server the
-          // session is finished instead of dropping the cookie and leaving it
-          // to time out.
+          // Close and reopen the session to release any lingering locks, and
+          // publish the replacement: the session is shared by the whole run, so
+          // ending it without saying so leaves every later file adopting a
+          // session that is gone.
           if (cleanupSettings.cleanupSessionAfterTest && this.connection) {
-            const conn = this.connection as any;
-            if (typeof conn.close === 'function') {
-              await conn.close();
-            } else if (typeof conn.disconnect === 'function') {
-              await conn.disconnect();
-            }
-            if (typeof conn.connect === 'function') {
-              await conn.connect();
-            }
+            await recycleTestSession(this.connection);
           }
           await this.adtObject.delete(config as Partial<TConfig>);
           // Delay after delete
@@ -1045,21 +1037,12 @@ export class BaseTester<TConfig, TState> {
       // Cleanup on error if enabled
       if (cleanupSettings.shouldCleanup && this.objectCreated) {
         try {
-          // Close and reopen session to release any lingering locks.
-          // close() first, because RFC has only that; disconnect() is the ADT
-          // one, and unlike the reset() it replaced it tells the server the
-          // session is finished instead of dropping the cookie and leaving it
-          // to time out.
+          // Close and reopen the session to release any lingering locks, and
+          // publish the replacement: the session is shared by the whole run, so
+          // ending it without saying so leaves every later file adopting a
+          // session that is gone.
           if (cleanupSettings.cleanupSessionAfterTest && this.connection) {
-            const conn = this.connection as any;
-            if (typeof conn.close === 'function') {
-              await conn.close();
-            } else if (typeof conn.disconnect === 'function') {
-              await conn.disconnect();
-            }
-            if (typeof conn.connect === 'function') {
-              await conn.connect();
-            }
+            await recycleTestSession(this.connection);
           }
           logTestStep('delete (cleanup)', this.logger);
           await this.adtObject.delete(config as Partial<TConfig>);
@@ -1445,13 +1428,11 @@ export class BaseTester<TConfig, TState> {
   afterAll(): () => Promise<void> {
     return async () => {
       if (this.connection) {
-        this.log(LogLevel.INFO, 'afterAll: Closing connection');
-        const conn = this.connection as any;
-        if (typeof conn.close === 'function') {
-          await conn.close();
-        } else if (typeof conn.disconnect === 'function') {
-          await conn.disconnect();
-        }
+        // Releases only a session this file opened. The run's shared session is
+        // globalTeardown's to end — closing it here ended it for every file
+        // that had not run yet.
+        this.log(LogLevel.INFO, 'afterAll: Releasing connection');
+        await releaseTestConnection(this.connection);
       }
     };
   }

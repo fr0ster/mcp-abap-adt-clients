@@ -15,6 +15,7 @@ import * as dotenv from 'dotenv';
 import { runClass } from '../../../../core/class/run';
 import {
   createTestConnection,
+  releaseTestConnection,
   skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
 import {
@@ -51,7 +52,7 @@ describe('Class - Run', () => {
 
   afterAll(async () => {
     if (connection) {
-      await connection.disconnect();
+      await releaseTestConnection(connection);
     }
   });
 

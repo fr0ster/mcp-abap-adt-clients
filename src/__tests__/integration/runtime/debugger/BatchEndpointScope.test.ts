@@ -26,6 +26,7 @@ import {
 } from '../../../../runtime/debugger/abap';
 import {
   createTestConnection,
+  releaseTestConnection,
   skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
 import {
@@ -98,7 +99,7 @@ describe('Debugger Batch Endpoint Scope', () => {
 
   afterAll(async () => {
     if (connection) {
-      await connection.disconnect();
+      await releaseTestConnection(connection);
     }
   });
 

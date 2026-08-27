@@ -19,6 +19,7 @@ import { isCloudEnvironment } from '../../../utils/systemInfo';
 import {
   createTestAdtClient,
   createTestConnection,
+  releaseTestConnection,
   resolveSystemContext,
   skipUnlessConfigured,
 } from '../../helpers/sessionConfig';
@@ -150,7 +151,7 @@ describe('Shared - read Accept headers (corrected)', () => {
 
   afterAll(async () => {
     if (connection) {
-      await connection.disconnect();
+      await releaseTestConnection(connection);
     }
   });
 

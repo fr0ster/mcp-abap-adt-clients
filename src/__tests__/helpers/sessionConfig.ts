@@ -26,7 +26,9 @@ import { AdtClientLegacy } from '../../clients/AdtClientLegacy';
 import { createAdtClient } from '../../clients/createAdtClient';
 import { getSystemInformation } from '../../utils/systemInfo';
 import {
+  type ISessionMaterial,
   type ISessionSharing,
+  publishSessionMaterial,
   readSessionMaterial,
   SharedCloudConnector,
   SharedOnPremConnector,
@@ -320,6 +322,84 @@ export async function createTestConnection(
   // `SAP_SESSIONID` comes back identical.
   await connection.connect();
   return connection;
+}
+
+/**
+ * What releasing a connection needs of it, and no more.
+ *
+ * Structural rather than an interface from the library: RFC exposes `close()`,
+ * HTTP exposes `disconnect()`, and the harness has always had to handle both
+ * without knowing which it holds.
+ */
+export interface IReleasableConnection {
+  close?: () => Promise<unknown>;
+  disconnect?: () => Promise<unknown>;
+  connect?: () => Promise<unknown>;
+  exportSession?: () => ISessionMaterial;
+}
+
+/** close() first, because RFC has only that; disconnect() is the ADT one. */
+async function endSession(conn: IReleasableConnection): Promise<void> {
+  if (typeof conn.close === 'function') {
+    await conn.close();
+  } else if (typeof conn.disconnect === 'function') {
+    await conn.disconnect();
+  }
+}
+
+/**
+ * Give a connection back at the end of a test file.
+ *
+ * A test file does not own the session it works on. `globalSetup` opens one for
+ * the whole run and publishes it; every file adopts that one. On on-prem
+ * `disconnect()` is the platform logoff — it ends the session for EVERYONE, so
+ * the first file to reach `afterAll` took the session away from every file
+ * after it.
+ *
+ * Measured on E19: `discovery` and `search` each pass alone; run together, the
+ * second one fails `ADT_NOT_CONNECTED` — whichever of the two that is. Remove
+ * both `disconnect()` calls and both pass. Across the full suite it cost 38 red
+ * suites, and worse, some green ones: a dead session sends
+ * `isModernAdtSystem()` into its `catch`, which reports the system as legacy,
+ * so files skipped their tests as "not available for legacy environment" and
+ * reported PASS having run nothing. `sqlQuery.test.ts` passed that way in the
+ * full run and fails when run alone.
+ *
+ * So a file releases only a session it opened itself — the single-file run,
+ * where nobody published shared material and the session would otherwise sit
+ * until the server's idle timeout.
+ */
+export async function releaseTestConnection(
+  connection: IReleasableConnection | undefined | null,
+): Promise<void> {
+  if (!connection) return;
+  // Material on disk means the run owns the session, and `globalTeardown` is
+  // the one place that knows the run is over.
+  if (readSessionMaterial()) return;
+  await endSession(connection);
+}
+
+/**
+ * End the session mid-file and take a fresh one.
+ *
+ * `cleanup_session_after_test` exists to drop locks a failed step left behind,
+ * by ending the session holding them. On a shared session that is still a
+ * logoff for everyone, so the replacement must be published — otherwise the
+ * files that follow adopt the session this just ended, which is the same defect
+ * one level down.
+ */
+export async function recycleTestSession(
+  connection: IReleasableConnection | undefined | null,
+): Promise<void> {
+  if (!connection) return;
+  const wasShared = readSessionMaterial() !== null;
+  await endSession(connection);
+  if (typeof connection.connect === 'function') {
+    await connection.connect();
+  }
+  if (wasShared && typeof connection.exportSession === 'function') {
+    publishSessionMaterial(connection.exportSession());
+  }
 }
 
 /**

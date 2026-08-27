@@ -25,6 +25,7 @@ import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import {
   createTestAdtClient,
   createTestConnection,
+  releaseTestConnection,
   resolveSystemContext,
   skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
@@ -192,7 +193,7 @@ describe('ProgramExecutor (integration)', () => {
     }
 
     if (connection) {
-      await connection.disconnect();
+      await releaseTestConnection(connection);
     }
   });
 

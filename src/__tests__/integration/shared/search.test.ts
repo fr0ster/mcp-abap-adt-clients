@@ -19,6 +19,7 @@ import { parseSearchResults } from '../../../core/shared/search';
 import {
   createTestAdtClient,
   createTestConnection,
+  releaseTestConnection,
   skipUnlessConfigured,
 } from '../../helpers/sessionConfig';
 import { createTestsLogger } from '../../helpers/testLogger';
@@ -59,7 +60,7 @@ describe('Shared - searchObjects', () => {
 
   afterAll(async () => {
     if (connection) {
-      await connection.disconnect();
+      await releaseTestConnection(connection);
     }
   });
 

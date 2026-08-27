@@ -22,6 +22,7 @@ import {
 import {
   createTestAdtClient,
   createTestConnection,
+  releaseTestConnection,
   skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
 import {
@@ -226,7 +227,7 @@ describe('ClassExecutor (integration)', () => {
     }
 
     if (connection) {
-      await connection.disconnect();
+      await releaseTestConnection(connection);
     }
   });
 

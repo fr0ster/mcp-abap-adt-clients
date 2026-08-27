@@ -19,6 +19,7 @@ import type { AdtClient } from '../../../clients/AdtClient';
 import {
   createTestAdtClient,
   createTestConnection,
+  releaseTestConnection,
   skipUnlessConfigured,
 } from '../../helpers/sessionConfig';
 import { createTestsLogger } from '../../helpers/testLogger';
@@ -61,7 +62,7 @@ describe('Shared - listFunctionModules', () => {
 
   afterAll(async () => {
     if (connection) {
-      await connection.disconnect();
+      await releaseTestConnection(connection);
     }
   });
 

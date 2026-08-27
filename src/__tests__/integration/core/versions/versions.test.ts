@@ -19,6 +19,7 @@ import type { AdtClient } from '../../../../clients/AdtClient';
 import {
   createTestAdtClient,
   createTestConnection,
+  releaseTestConnection,
   skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
 import { createTestsLogger } from '../../../helpers/testLogger';
@@ -50,7 +51,7 @@ describe('Object version history', () => {
   }, 60000);
 
   afterAll(async () => {
-    if (connection) await connection.disconnect();
+    if (connection) await releaseTestConnection(connection);
   });
 
   const cases: Array<{ label: string; list: () => Promise<any[]> }> = [

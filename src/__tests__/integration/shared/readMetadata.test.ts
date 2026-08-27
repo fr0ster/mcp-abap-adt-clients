@@ -19,6 +19,7 @@ import { isCloudEnvironment } from '../../../utils/systemInfo';
 import {
   createTestAdtClient,
   createTestConnection,
+  releaseTestConnection,
   skipUnlessConfigured,
 } from '../../helpers/sessionConfig';
 import { TestConfigResolver } from '../../helpers/TestConfigResolver';
@@ -59,7 +60,7 @@ describe('Shared - readMetadata', () => {
 
   afterAll(async () => {
     if (connection) {
-      await connection.disconnect();
+      await releaseTestConnection(connection);
     }
   });
 

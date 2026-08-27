@@ -21,6 +21,7 @@ import * as dotenv from 'dotenv';
 import { AdtRuntimeClient } from '../../../../clients/AdtRuntimeClient';
 import {
   createTestConnection,
+  releaseTestConnection,
   skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
 import {
@@ -72,7 +73,7 @@ describe('GatewayErrorLog (using AdtRuntimeClient)', () => {
 
   afterAll(async () => {
     if (connection) {
-      await connection.disconnect();
+      await releaseTestConnection(connection);
     }
   });
 

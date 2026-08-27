@@ -22,6 +22,7 @@ import { BaseTester } from '../../../helpers/BaseTester';
 import {
   createTestAdtClient,
   createTestConnection,
+  releaseTestConnection,
   resolveSystemContext,
   skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
@@ -262,7 +263,7 @@ describe('Class local includes (using BaseTester)', () => {
       return;
     }
     if (connection) {
-      await connection.disconnect();
+      await releaseTestConnection(connection);
     }
   });
 

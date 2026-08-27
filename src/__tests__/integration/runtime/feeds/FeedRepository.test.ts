@@ -22,6 +22,7 @@ import { AdtRuntimeClient } from '../../../../clients/AdtRuntimeClient';
 import type { FeedRepository } from '../../../../runtime/feeds/FeedRepository';
 import {
   createTestConnection,
+  releaseTestConnection,
   skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
 import {
@@ -73,7 +74,7 @@ describe('FeedRepository (using AdtRuntimeClient)', () => {
 
   afterAll(async () => {
     if (connection) {
-      await connection.disconnect();
+      await releaseTestConnection(connection);
     }
   });
 

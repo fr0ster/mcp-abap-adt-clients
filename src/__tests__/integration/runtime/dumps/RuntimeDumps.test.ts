@@ -26,6 +26,7 @@ import { AdtRuntimeClient } from '../../../../clients/AdtRuntimeClient';
 import { resolveDumpClassName } from '../../../helpers/dumpClassHelper';
 import {
   createTestConnection,
+  releaseTestConnection,
   skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
 import {
@@ -121,7 +122,7 @@ describe('Runtime Dumps (using AdtRuntimeClient)', () => {
 
   afterAll(async () => {
     if (connection) {
-      await connection.disconnect();
+      await releaseTestConnection(connection);
     }
   });
 

@@ -12,6 +12,7 @@ import type {
 import * as dotenv from 'dotenv';
 import {
   createTestConnection,
+  releaseTestConnection,
   skipUnlessConfigured,
 } from '../helpers/sessionConfig';
 import {
@@ -55,7 +56,7 @@ describe('Module - Operation', () => {
     if (connection) {
       // Not reset(): it is gone, and it never told the server anything. This
       // releases the session instead of leaving it to time out.
-      await connection.disconnect();
+      await releaseTestConnection(connection);
     }
   });
 

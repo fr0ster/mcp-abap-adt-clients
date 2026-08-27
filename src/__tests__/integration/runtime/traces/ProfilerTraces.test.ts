@@ -32,6 +32,7 @@ import type { Profiler } from '../../../../runtime/traces/ProfilerDomain';
 import { resolveRunnableClassName } from '../../../helpers/runnableClassHelper';
 import {
   createTestConnection,
+  releaseTestConnection,
   skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
 import {
@@ -101,7 +102,7 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
 
   afterAll(async () => {
     if (connection) {
-      await connection.disconnect();
+      await releaseTestConnection(connection);
     }
   });
 

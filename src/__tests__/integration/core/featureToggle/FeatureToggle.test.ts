@@ -25,6 +25,7 @@ import { BaseTester } from '../../../helpers/BaseTester';
 import {
   createTestAdtClient,
   createTestConnection,
+  releaseTestConnection,
   resolveSystemContext,
   skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
@@ -96,7 +97,7 @@ describe('FeatureToggle (using AdtClient)', () => {
 
   afterAll(async () => {
     if (connection) {
-      await connection.disconnect();
+      await releaseTestConnection(connection);
     }
   });
 
