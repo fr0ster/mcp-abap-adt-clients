@@ -40,23 +40,51 @@ system, and the one it names is the one it was written against — which is how 
 suite comes to run entirely on-prem on a cloud tenant.
 
 ```typescript
-import { createTestConnection } from '../helpers/sessionConfig';
+import {
+  createTestConnection,
+  releaseTestConnection,
+} from '../helpers/sessionConfig';
 
 connection = await createTestConnection(logger);   // already connected
 // ...
-await connection.disconnect();                     // releases the session
+await releaseTestConnection(connection);           // never disconnect() here
 ```
 
-`disconnect()` replaced `reset()` in `@mcp-abap-adt/connection` 5.0.0. The
-difference is not cosmetic: `reset()` dropped the cookie locally and the session
-stayed open on the server until it timed out, and sessions are a shared per-user
-resource.
+## The session belongs to the run, not to your file
+
+`globalSetup` opens **one** ABAP session and publishes it; every file adopts
+that one, and `globalTeardown` gives it back. Sessions are limited per user —
+two at a time on the BTP trial, measured — and multiplying them makes a loaded
+system throttle you long before it refuses.
+
+So a test file must **not** call `connection.disconnect()`. On on-prem that is
+the platform logoff: it ends the session for everyone, and the first file to
+reach `afterAll` takes it away from every file after it. Measured on E19,
+`discovery` and `search` each pass alone and the second one fails
+`ADT_NOT_CONNECTED` when run together; across the suite it cost 38 red suites —
+and some false green ones, because a dead session made `isModernAdtSystem()`
+report a modern system as legacy, so files skipped their tests and reported
+PASS having run nothing.
+
+`releaseTestConnection()` makes that one decision in one place: it ends only a
+session the file opened itself, which is the single-file run where nobody
+published any.
+
+Two exceptions, both deliberate:
+
+- `recycleTestSession(connection)` — for `cleanup_session_after_test`, which
+  drops stuck locks by ending the session holding them. It publishes the
+  replacement, so later files adopt the new session rather than the dead one.
+- `createIsolatedTestConnection(logger)` — a session of its own, for the one
+  case that requires it: a package cannot be deleted from the session it was
+  created in. Whoever opens it owns it and must end it.
 
 ## Usage in Tests
 
 ```typescript
 import {
   createTestConnection,
+  releaseTestConnection,
   setupTestEnvironment,
   cleanupTestEnvironment,
 } from '../helpers/sessionConfig';
@@ -82,7 +110,7 @@ describe('My Test', () => {
 
   afterAll(async () => {
     await cleanupTestEnvironment(connection, sessionId, testConfig);
-    await connection.disconnect();
+    await releaseTestConnection(connection);
   });
 
   it('should work', async () => {

@@ -8,6 +8,7 @@
 
 const { loadTestEnv } = require('./test-helper');
 
+import { ADT_SESSION_ERROR } from '@mcp-abap-adt/interfaces';
 import {
   createTestConnection,
   getConfig,
@@ -56,6 +57,43 @@ function unitOnlyRun(globalConfig?: JestGlobalConfig): boolean {
     patterns.length > 0 &&
     patterns.every((p) => /(^|[/\\])unit([/\\]|$)/.test(p))
   );
+}
+
+/**
+ * Opens the run's session, waiting if the pool is momentarily full.
+ *
+ * Sessions are limited per user — two at a time on the trial — and shared with
+ * everything else logged on as them, including a SAP GUI. One that a previous
+ * run left behind is freed by its own idle timeout, reported by this server as
+ * 1800 seconds, so a refusal now is not a refusal in a minute.
+ *
+ * The connector deliberately does not retry: it says whether to wait is the
+ * caller's to decide, made with what the caller knows. Here we know it — a test
+ * run has nothing to do until it has a session, and the whole suite aborts
+ * without one. So we wait, briefly and out loud, and give up saying so.
+ *
+ * Only a refused SESSION is retried. An unreachable host, a bad credential or a
+ * broken configuration will answer the same way however long we wait.
+ */
+async function openSessionWaitingForOne() {
+  const ATTEMPTS = 4;
+  const PAUSE_MS = 20_000;
+  let last: unknown;
+  for (let n = 1; n <= ATTEMPTS; n++) {
+    try {
+      return await withTimeout(createTestConnection(), PREFLIGHT_TIMEOUT_MS);
+    } catch (error) {
+      last = error;
+      const code = (error as { code?: string })?.code;
+      if (code !== ADT_SESSION_ERROR.NOT_CONNECTED || n === ATTEMPTS) break;
+      say(
+        `[globalSetup] no session available (attempt ${n} of ${ATTEMPTS}) — ` +
+          `waiting ${PAUSE_MS / 1000}s for one to be released`,
+      );
+      await new Promise((resolve) => setTimeout(resolve, PAUSE_MS));
+    }
+  }
+  throw last;
 }
 
 /** Rejects if `work` has not settled within `ms`. The timer never holds the process. */
@@ -137,34 +175,31 @@ export default async function globalSetup(globalConfig?: JestGlobalConfig) {
   );
 
   try {
-    // Bounded as a whole, not per request. connect() carries its own retries, so
-    // a host that accepts a socket and then says nothing can outlast any single
-    // request timeout — and an unbounded preflight is worse than a failing one:
-    // it produces no output for 15 minutes and reads as a hung test.
-    await withTimeout(
-      (async () => {
-        // Through the same helper the tests use, and therefore opening a
-        // session the same way they will. It is also no longer optional: since
-        // connection 5.0.0 a request on a connection nobody opened is refused
-        // before it is sent, so the old build-and-request preflight would have
-        // reported every system, reachable or not, as unreachable.
-        //
-        // Opening the session IS the check. There was a discovery GET here as
-        // well, which proved nothing extra — connect() fetches its CSRF token
-        // from that same document — and cost a second 444KB download on a
-        // system already slow enough to be worth a preflight.
-        const connection = await createTestConnection();
-        // KEPT, not released. This is the session the whole run works on: the
-        // material goes to a file, every test file adopts it, and the server
-        // sees one conversation instead of one per file. The trial grants two
-        // at a time, and multiplying them is what makes a loaded system slow
-        // down long before it refuses.
-        publishSessionMaterial(connection.exportSession());
-        say(
-          `[globalSetup] session ${connection.getSessionId()} — shared by every test file`,
-        );
-      })(),
-      PREFLIGHT_TIMEOUT_MS,
+    // Through the same helper the tests use, and therefore opening a session
+    // the same way they will. It is also no longer optional: since connection
+    // 5.0.0 a request on a connection nobody opened is refused before it is
+    // sent, so the old build-and-request preflight would have reported every
+    // system, reachable or not, as unreachable.
+    //
+    // Opening the session IS the check. There was a discovery GET here as well,
+    // which proved nothing extra — connect() fetches its CSRF token from that
+    // same document — and cost a second 444KB download on a system already slow
+    // enough to be worth a preflight.
+    //
+    // The budget bounds each ATTEMPT, not the waiting between them. Wrapping the
+    // whole thing would have made the timeout cancel the very waiting it was
+    // asked to do, and the run would abort on a pool that frees itself a minute
+    // later — a bound is only useful where it distinguishes a slow answer from
+    // no answer.
+    const connection = await openSessionWaitingForOne();
+    // KEPT, not released. This is the session the whole run works on: the
+    // material goes to a file, every test file adopts it, and the server sees
+    // one conversation instead of one per file. The trial grants two at a time,
+    // and multiplying them is what makes a loaded system slow down long before
+    // it refuses.
+    publishSessionMaterial(connection.exportSession());
+    say(
+      `[globalSetup] session ${connection.getSessionId()} — shared by every test file`,
     );
     say('[globalSetup] SAP connection OK');
   } catch (error) {

@@ -12,7 +12,10 @@ import type {
   ISessionLifecycleAware,
 } from '@mcp-abap-adt/interfaces';
 import { AdtClient } from '../../clients/AdtClient';
-import { createTestConnection } from '../helpers/sessionConfig';
+import {
+  createTestConnection,
+  releaseTestConnection,
+} from '../helpers/sessionConfig';
 import { createConnectionLogger } from '../helpers/testLogger';
 
 describe('Example: Session Persistence', () => {
@@ -39,7 +42,10 @@ describe('Example: Session Persistence', () => {
 
   afterAll(async () => {
     if (connection) {
-      await connection.disconnect();
+      // Not disconnect(): the session belongs to the run, and on on-prem
+      // disconnect() is the platform logoff — it would end it for every file
+      // that follows.
+      await releaseTestConnection(connection);
     }
   });
 

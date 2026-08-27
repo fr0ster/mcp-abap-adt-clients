@@ -280,8 +280,26 @@ export function getTargetSystem(): 'onprem' | 'cloud' {
  *
  * The logger is the shared one, so every test's connection logs the same way.
  */
+/**
+ * A connection on a session of its OWN, not the run's.
+ *
+ * One case needs this and it is not a preference: a package cannot be deleted
+ * from the session it was created in, so that delete has to speak from a
+ * different one. Adoption would hand it the very session it must not use.
+ *
+ * The caller owns what it opened and must end it — `releaseTestConnection()`
+ * will not, because published material means the run owns the shared session
+ * and this connection is not that.
+ */
+export async function createIsolatedTestConnection(
+  logger: ILogger = createConnectionLogger(),
+): Promise<IAbapConnection & ISessionLifecycleAware & ISessionSharing> {
+  return createTestConnection(logger, { joinSharedSession: false });
+}
+
 export async function createTestConnection(
   logger: ILogger = createConnectionLogger(),
+  options?: { joinSharedSession?: boolean },
 ): Promise<IAbapConnection & ISessionLifecycleAware & ISessionSharing> {
   const config = getConfig();
   const system = getTargetSystem();
@@ -312,7 +330,8 @@ export async function createTestConnection(
   //
   // No material means nobody published any — a single file run on its own —
   // and opening one is then the right thing.
-  const shared = readSessionMaterial();
+  const shared =
+    options?.joinSharedSession === false ? null : readSessionMaterial();
   if (shared) connection.adoptSession(shared);
 
   // Still connect(): adopting the cookies does not make the connection

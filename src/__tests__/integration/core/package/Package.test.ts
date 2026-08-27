@@ -21,6 +21,7 @@ import { getPackage } from '../../../../core/package/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
 import {
+  createIsolatedTestConnection,
   createTestAdtClient,
   createTestConnection,
   getConfig,
@@ -144,15 +145,20 @@ describe('Package (using AdtClient)', () => {
           };
         },
         cleanupObject: async (cfg: IPackageConfig) => {
-          // Use a fresh connection so the delete runs in a different ABAP session.
-          // A package cannot be deleted from the same session it was created in.
-          const cleanupConn = await createTestConnection(connectionLogger);
+          // A session of its own, explicitly: a package cannot be deleted from
+          // the session it was created in, and since globalSetup publishes one
+          // for the whole run, an ordinary createTestConnection() would adopt
+          // exactly the session this must not use — and its disconnect would
+          // then end the run's session for every file after this one.
+          const cleanupConn =
+            await createIsolatedTestConnection(connectionLogger);
           try {
             await deletePackage(cleanupConn, {
               package_name: cfg.packageName,
               transport_request: cfg.transportRequest,
             });
           } finally {
+            // This one IS ours to end — nobody else is on it.
             await cleanupConn.disconnect();
           }
         },
