@@ -414,6 +414,8 @@ standard_objects:
   tables:
     - name: "T000"
       description: "Client table"
+      available_in: ["onprem", "cloud"]   # required: resolveStandardObject filters on it,
+                                          # and an entry without it is never selected
 
   tabletypes:
     - name: "STRING_TABLE"

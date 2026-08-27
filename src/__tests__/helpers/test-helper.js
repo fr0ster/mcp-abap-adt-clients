@@ -2367,6 +2367,12 @@ async function ensureSharedDependency(client, type, name, logger) {
       await client.getDomain().update(
         {
           domainName: name,
+          // The update needs the package as much as the create did: measured on
+          // E19, the first-ever setup of a shared domain failed with `Package
+          // name is required for update` and the next run passed, because by
+          // then the object existed and the reconcile branch — which does pass
+          // it — took over. A defect only a fresh system ever sees.
+          packageName,
           description: depConfig.description || 'Shared test domain',
           datatype: depConfig.datatype || 'CHAR',
           length: depConfig.length || 10,
@@ -2386,6 +2392,9 @@ async function ensureSharedDependency(client, type, name, logger) {
       await client.getDataElement().update(
         {
           dataElementName: name,
+          // Same omission as the domain above, and the same fresh-system-only
+          // failure waiting behind it.
+          packageName,
           description: depConfig.description || 'Shared test data element',
           typeKind: depConfig.type_kind || 'domain',
           typeName: depConfig.domain_name,
