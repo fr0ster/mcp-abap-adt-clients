@@ -170,7 +170,7 @@ export class BaseTester<TConfig, TState> {
     shouldCleanup: boolean;
     cleanupSessionAfterTest: boolean;
   } {
-    const { getEnvironmentConfig } = require('./test-helper');
+    const { getEnvironmentConfig, getSessionConfig } = require('./test-helper');
     const envConfig = getEnvironmentConfig();
     const cleanupAfterTest = envConfig.cleanup_after_test !== false; // Default: true if not set
     const globalSkipCleanup = envConfig.skip_cleanup === true;
@@ -179,8 +179,12 @@ export class BaseTester<TConfig, TState> {
         ? testCaseParams.skip_cleanup === true
         : globalSkipCleanup;
     const shouldCleanup = cleanupAfterTest && !skipCleanup;
+    // From the ROOT of the config, where `session_config` actually is. Read off
+    // `environment` — as this did — it was always `undefined`, so `!== false`
+    // answered "recycle" on every cleanup no matter what the file said. That
+    // turned one session per run into an end-and-reopen per deleted object.
     const cleanupSessionAfterTest =
-      envConfig.session_config?.cleanup_session_after_test !== false; // Default: true
+      getSessionConfig().cleanup_session_after_test !== false; // Default: true
 
     return {
       cleanupAfterTest,

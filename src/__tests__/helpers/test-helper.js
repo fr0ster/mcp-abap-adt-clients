@@ -176,6 +176,18 @@ function getTestSettings() {
  * Get environment configuration (default package, transport request, etc.)
  * @returns {object} Environment config with default_package, default_transport, etc.
  */
+/**
+ * The `session_config` block, which lives at the ROOT of test-config.yaml.
+ *
+ * Not under `environment` — reading it from there is how
+ * `cleanup_session_after_test: false` came to be ignored for as long as it has
+ * existed: `getEnvironmentConfig().session_config` is `undefined`, and the
+ * caller's `!== false` then read that as "yes, recycle".
+ */
+function getSessionConfig() {
+  return loadTestConfig().session_config || {};
+}
+
 function getEnvironmentConfig() {
   const config = loadTestConfig();
   if (config.environment) {
@@ -2677,6 +2689,7 @@ function resetSharedDependencyCache() {
 
 module.exports = {
   loadTestConfig,
+  getSessionConfig,
   getEnabledTestCase,
   getAllEnabledTestCases,
   getTestCaseDefinition,
