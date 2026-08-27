@@ -198,7 +198,8 @@ export function getConfig(): SapConfig {
 /**
  * Resolve masterSystem/responsible for AdtClient options.
  * Cloud: from systeminformation endpoint.
- * On-premise: masterSystem from test-config.yaml, responsible from SAP_USERNAME env var.
+ * On-premise: masterSystem from test-config.yaml, responsible from the SAP_USERNAME
+ * env var, upper-cased — the login IS the responsible person here.
  */
 export async function resolveSystemContext(
   connection: IAbapConnection,
@@ -232,7 +233,12 @@ export async function resolveSystemContext(
     : undefined;
   return {
     masterSystem: envConfig.default_master_system,
-    responsible: process.env.SAP_USERNAME,
+    // On-prem the responsible person is simply the logged-on user — cloud is the
+    // one that gets it from the system. Upper-cased because the user master
+    // record stores it that way and ADT validates against it: E19 answered a
+    // package create with `400 Enter a valid user, not okyslytsia, as the person
+    // responsible`, on the same credential it had just authenticated.
+    responsible: process.env.SAP_USERNAME?.split('#')[0].trim().toUpperCase(),
     unicode,
     masterLanguage,
   };

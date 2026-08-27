@@ -147,15 +147,19 @@ describe('Package (using AdtClient)', () => {
           // No session juggling here, because none has been shown to be needed.
           //
           // This used to open a second connection, on the rule that a package
-          // cannot be deleted from the session that created it. That rule is an
-          // on-prem fact and it was never measured here: on the BTP trial the
-          // delete succeeds from the creating session, tested both ways — with
-          // a replacement session and without, same result, package gone.
+          // cannot be deleted from the session that created it. That rule was
+          // stated as an on-prem fact and had only been measured on the BTP
+          // trial, where the delete succeeds from the creating session — tested
+          // both ways, with a replacement session and without, package gone.
           //
-          // So the exception is not carried on an unverified claim. If an
-          // on-prem run shows the delete failing from the creating session, it
-          // comes back as `recycleTestSession(connection)` — replacing the run's
-          // one session, never opening a second beside it.
+          // Measured on on-prem since, which is where the rule was supposed to
+          // bite: E19, one session for the whole run, create and delete both on
+          // it, full workflow green. So the rule does not bite there either and
+          // the exception stays gone.
+          //
+          // If some system does show the delete failing from the creating
+          // session, it comes back as `recycleTestSession(connection)` —
+          // replacing the run's one session, never opening a second beside it.
           await deletePackage(connection, {
             package_name: cfg.packageName,
             transport_request: cfg.transportRequest,
