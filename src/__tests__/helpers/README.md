@@ -70,14 +70,19 @@ PASS having run nothing.
 session the file opened itself, which is the single-file run where nobody
 published any.
 
-Two exceptions, both deliberate:
+One exception, and it replaces the session rather than adding one:
 
-- `recycleTestSession(connection)` — for `cleanup_session_after_test`, which
-  drops stuck locks by ending the session holding them. It publishes the
-  replacement, so later files adopt the new session rather than the dead one.
-- `createIsolatedTestConnection(logger)` — a session of its own, for the one
-  case that requires it: a package cannot be deleted from the session it was
-  created in. Whoever opens it owns it and must end it.
+`recycleTestSession(connection)` ends the session, connects again, and publishes
+the replacement so later files adopt the new one. Two callers need it —
+`cleanup_session_after_test`, which drops stuck locks by ending the session
+holding them, and the package delete, which cannot run in the session that
+created the package.
+
+**Never open a second connection beside the first.** One user on one system is
+one connection: a second held alongside is what makes a loaded system throttle,
+and cloud is not the exception people assume — it tears the session on
+`disconnect()` too. Opening and closing connections in a cycle is worse still;
+a server can read that churn as an attack.
 
 ## Usage in Tests
 

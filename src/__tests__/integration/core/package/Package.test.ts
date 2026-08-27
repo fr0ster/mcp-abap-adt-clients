@@ -21,10 +21,10 @@ import { getPackage } from '../../../../core/package/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
 import {
-  createIsolatedTestConnection,
   createTestAdtClient,
   createTestConnection,
   getConfig,
+  recycleTestSession,
   resolveSystemContext,
   skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
@@ -145,22 +145,21 @@ describe('Package (using AdtClient)', () => {
           };
         },
         cleanupObject: async (cfg: IPackageConfig) => {
-          // A session of its own, explicitly: a package cannot be deleted from
-          // the session it was created in, and since globalSetup publishes one
-          // for the whole run, an ordinary createTestConnection() would adopt
-          // exactly the session this must not use — and its disconnect would
-          // then end the run's session for every file after this one.
-          const cleanupConn =
-            await createIsolatedTestConnection(connectionLogger);
-          try {
-            await deletePackage(cleanupConn, {
-              package_name: cfg.packageName,
-              transport_request: cfg.transportRequest,
-            });
-          } finally {
-            // This one IS ours to end — nobody else is on it.
-            await cleanupConn.disconnect();
-          }
+          // A package cannot be deleted from the session it was created in, so
+          // this needs a DIFFERENT session — but not a SECOND one. One user on
+          // one system is one connection: a second held beside the first is
+          // what makes a loaded system throttle, and it is not made harmless by
+          // being on cloud.
+          //
+          // So the run's single session is replaced rather than supplemented.
+          // recycleTestSession() ends it, connects again, and publishes the
+          // replacement, so the files that follow adopt the new session instead
+          // of the one this just ended.
+          await recycleTestSession(connection);
+          await deletePackage(connection, {
+            package_name: cfg.packageName,
+            transport_request: cfg.transportRequest,
+          });
         },
         ensureObjectReady: async (packageName: string) => {
           if (!connection) return { success: true };
