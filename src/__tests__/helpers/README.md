@@ -73,10 +73,14 @@ published any.
 One exception, and it replaces the session rather than adding one:
 
 `recycleTestSession(connection)` ends the session, connects again, and publishes
-the replacement so later files adopt the new one. Two callers need it —
+the replacement so later files adopt the new one. One caller needs it —
 `cleanup_session_after_test`, which drops stuck locks by ending the session
-holding them, and the package delete, which cannot run in the session that
-created the package.
+holding them.
+
+The package delete used to be a second caller, on the rule that a package cannot
+be deleted from the session that created it. Measured on the BTP trial, it can:
+the delete succeeds either way. The exception is not carried on an unverified
+claim, and comes back only if an on-prem run shows the delete failing.
 
 **Never open a second connection beside the first.** One user on one system is
 one connection: a second held alongside is what makes a loaded system throttle,

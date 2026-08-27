@@ -24,7 +24,6 @@ import {
   createTestAdtClient,
   createTestConnection,
   getConfig,
-  recycleTestSession,
   resolveSystemContext,
   skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
@@ -145,17 +144,18 @@ describe('Package (using AdtClient)', () => {
           };
         },
         cleanupObject: async (cfg: IPackageConfig) => {
-          // A package cannot be deleted from the session it was created in, so
-          // this needs a DIFFERENT session — but not a SECOND one. One user on
-          // one system is one connection: a second held beside the first is
-          // what makes a loaded system throttle, and it is not made harmless by
-          // being on cloud.
+          // No session juggling here, because none has been shown to be needed.
           //
-          // So the run's single session is replaced rather than supplemented.
-          // recycleTestSession() ends it, connects again, and publishes the
-          // replacement, so the files that follow adopt the new session instead
-          // of the one this just ended.
-          await recycleTestSession(connection);
+          // This used to open a second connection, on the rule that a package
+          // cannot be deleted from the session that created it. That rule is an
+          // on-prem fact and it was never measured here: on the BTP trial the
+          // delete succeeds from the creating session, tested both ways — with
+          // a replacement session and without, same result, package gone.
+          //
+          // So the exception is not carried on an unverified claim. If an
+          // on-prem run shows the delete failing from the creating session, it
+          // comes back as `recycleTestSession(connection)` — replacing the run's
+          // one session, never opening a second beside it.
           await deletePackage(connection, {
             package_name: cfg.packageName,
             transport_request: cfg.transportRequest,
