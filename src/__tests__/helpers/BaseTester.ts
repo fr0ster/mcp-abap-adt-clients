@@ -1481,6 +1481,208 @@ export class BaseTester<TConfig, TState> {
    * Uses config from beforeEach
    * Returns undefined if test should be skipped
    */
+  /**
+   * The flow for an object that is never created and never deleted.
+   *
+   * A class include — definitions, types, test classes, macros — is not an
+   * object in its own right. It exists because its class exists, ADT locks and
+   * activates the CLASS, and there is no endpoint that brings one into being or
+   * takes one away. `AdtClient.getLocalTestClass()` and its siblings say so in
+   * their return type: `IAdtReadable & IAdtModifiable & ...`, deliberately
+   * without `IAdtCreatable`.
+   *
+   * Driving one through `flowTest()` therefore died on `this.adtObject.create is
+   * not a function` — four suites, every run, because create is not a step such
+   * an object has. The steps it does have are these: read what is there, write
+   * the new source, activate the container, and read back to prove the write
+   * landed. No cleanup either: deleting an include would mean deleting the class
+   * around it, and the class is the parent test's to manage.
+   */
+  async modifyFlowTest(
+    config: TConfig,
+    testCaseParams?: ITestCaseParams,
+    options?: IFlowTestOptions,
+  ): Promise<TState> {
+    this.objectCreated = false;
+    this.objectLocked = false;
+    this.lockHandle = undefined;
+
+    let currentStep = '';
+    const payloadOf = (data: unknown): string | undefined => {
+      if (typeof data === 'string') return data;
+      if (data === undefined || data === null) return undefined;
+      try {
+        return JSON.stringify(data);
+      } catch {
+        return undefined;
+      }
+    };
+
+    const readInclude = async (
+      version: 'active' | 'inactive' | undefined,
+      label: string,
+    ): Promise<string | undefined> => {
+      currentStep = label;
+      logTestStep(label, this.logger);
+      const state = await this.adtObject.read(
+        config as Partial<TConfig>,
+        version,
+      );
+      const payload = payloadOf((state as any)?.readResult?.data);
+      logTestStep(
+        `${label} length: ${payload?.length || 0} characters`,
+        this.logger,
+      );
+      return payload;
+    };
+
+    try {
+      // 1. Read — an include of a class that exists always answers, with empty
+      //    source when nothing was ever written to it.
+      const before = await readInclude(undefined, 'read initial');
+
+      // 2. Update
+      currentStep = 'update';
+      logTestStep(currentStep, this.logger);
+      const updateOptions: IAdtOperationOptions = {
+        activateOnUpdate: options?.activateOnUpdate || false,
+        sourceCode: options?.sourceCode,
+        xmlContent: options?.xmlContent,
+        timeout: options?.timeout,
+      };
+      const updateState = await this.adtObject.update(
+        { ...config, ...options?.updateConfig } as Partial<TConfig>,
+        updateOptions,
+      );
+      await this.waitDelay(
+        this.getOperationDelay('update', testCaseParams),
+        'update',
+      );
+
+      // 3. Activate — the container class, which is what `activate` on an
+      //    include addresses. Skipped when the update already did it.
+      if (!options?.activateOnUpdate && this.adtObject.activate) {
+        currentStep = 'activate';
+        logTestStep(currentStep, this.logger);
+        const activateState = await this.adtObject.activate(
+          config as Partial<TConfig>,
+        );
+        const activateResponse =
+          (activateState as any)?.activateResponse || activateState;
+        if (
+          activateResponse?.status &&
+          activateResponse.status !== 200 &&
+          activateResponse.status !== 204
+        ) {
+          const errorData =
+            typeof activateResponse?.data === 'string'
+              ? activateResponse.data
+              : JSON.stringify(activateResponse?.data);
+          const error = new Error(
+            `Activation failed (HTTP ${activateResponse.status}): ${errorData}`,
+          );
+          logTestStepError(currentStep, error);
+          throw error;
+        }
+        await this.waitDelay(
+          this.getOperationDelay('activate', testCaseParams),
+          'activate',
+        );
+      }
+
+      // 4. Read back. Without this the test proves the requests were accepted,
+      //    not that the source changed — and an include that silently kept its
+      //    old body is exactly the failure worth catching.
+      const after = await readInclude('active', 'read active (post-update)');
+      if (before !== undefined && after !== undefined && before === after) {
+        this.log(
+          LogLevel.WARN,
+          'Include source is unchanged after update — the write may not have landed',
+        );
+      }
+
+      if (options?.readMetadata && this.adtObject.readMetadata) {
+        currentStep = 'readMetadata';
+        logTestStep(currentStep, this.logger);
+        await this.adtObject.readMetadata(
+          config as Partial<TConfig>,
+          options.readMetadataOptions?.withLongPolling
+            ? { withLongPolling: true }
+            : undefined,
+        );
+      }
+
+      return updateState as TState;
+    } catch (error: any) {
+      if (currentStep) {
+        logTestStepError(currentStep, error);
+      }
+      // The lock is the CLASS's; leaving it held would block every later test
+      // that touches the same class.
+      await this.ensureUnlock(config as Partial<TConfig>);
+
+      const statusText = getHttpStatusText(error);
+      throw statusText !== 'HTTP ?'
+        ? Object.assign(new Error(`[${statusText}] ${error.message}`), {
+            stack: error.stack,
+            response: error.response,
+          })
+        : error;
+    }
+  }
+
+  /**
+   * `modifyFlowTest` with the config and test case `beforeEach()` resolved,
+   * mirroring `flowTestAuto`.
+   */
+  async modifyFlowTestAuto(
+    options?: IFlowTestOptions,
+  ): Promise<TState | undefined> {
+    const testName = `${this.loggerPrefix} - ${this.testDescription}`;
+    const definition = this.getTestCaseDefinition() || {
+      name: this.testCaseKey,
+      params: {},
+    };
+
+    if (this.shouldSkip()) {
+      logTestStart(this.logger, testName, definition);
+      logTestSkip(
+        this.logger,
+        testName,
+        this.skipReason || 'Test case not available',
+      );
+      logTestEnd(this.logger, testName);
+      return undefined;
+    }
+
+    if (!this.config) {
+      logTestStart(this.logger, testName, definition);
+      logTestSkip(
+        this.logger,
+        testName,
+        'Config not available - ensure beforeEach() was called',
+      );
+      logTestEnd(this.logger, testName);
+      return undefined;
+    }
+
+    logTestStart(this.logger, testName, definition);
+    try {
+      const result = await this.modifyFlowTest(
+        this.config,
+        this.testCase?.params,
+        options,
+      );
+      logTestSuccess(this.logger, testName);
+      logTestEnd(this.logger, testName);
+      return result;
+    } catch (error: any) {
+      logTestError(this.logger, testName, error);
+      logTestEnd(this.logger, testName);
+      throw error;
+    }
+  }
+
   async flowTestAuto(options?: IFlowTestOptions): Promise<TState | undefined> {
     const testName = `${this.loggerPrefix} - ${this.testDescription}`;
     const definition = this.getTestCaseDefinition() || {

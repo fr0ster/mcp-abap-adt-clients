@@ -14,6 +14,7 @@ import {
   createTraceParameters,
   DEFAULT_PROFILER_TRACE_PARAMETERS,
   extractProfilerIdFromResponse,
+  extractTraceIdFromTraceFeed,
   getTraceDbAccesses,
   getTraceHitList,
   getTraceParameters,
@@ -42,6 +43,28 @@ export class Profiler implements IProfiler {
   /** @deprecated Use list() instead */
   async listTraceFiles(options?: IProfilerListOptions): Promise<IAdtResponse> {
     return this.list(options);
+  }
+
+  /**
+   * The id of the most recent trace file, or undefined when there is none.
+   *
+   * The step between "I ran something with the profiler" and "let me read its
+   * hitlist", which every caller needs and each was left to write for itself:
+   * `list()` answers with an Atom feed, and turning that into an id meant a
+   * regex in consumer code while this package already had one.
+   *
+   * Pass `user` to scope it — on a shared system the newest trace is not
+   * necessarily yours.
+   *
+   * NOTE: not on `IProfiler` yet. The contract lives in
+   * `@mcp-abap-adt/interfaces`; until it carries this method, reach it through
+   * the concrete `Profiler`, which this package exports.
+   */
+  async latestTraceId(
+    options?: IProfilerListOptions,
+  ): Promise<string | undefined> {
+    const response = await this.list(options);
+    return extractTraceIdFromTraceFeed(response);
   }
 
   async getParameters(): Promise<IAdtResponse> {

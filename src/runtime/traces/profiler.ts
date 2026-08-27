@@ -215,7 +215,19 @@ export function extractProfilerIdFromResponse(
 const TRACE_ID_REGEX =
   /\/sap\/bc\/adt\/runtime\/traces\/abaptraces\/([A-Za-z0-9]{16,})(?=\/|[?&#"'\s]|$)/g;
 
-export function extractTraceIdFromTraceRequestsResponse(
+/**
+ * The trace id out of whatever trace document carries one.
+ *
+ * Named for the FEED, not for "requests", because the two are different
+ * collections and the old name pointed at the wrong one. A trace REQUEST
+ * schedules a measurement and is consumed by the run that fulfils it; the
+ * finished trace lands in `/runtime/traces/abaptraces`. Measured on E19 right
+ * after a profiled run, the requests feed answered 200 with 345 bytes and no
+ * entries while the traces feed held 95KB of them — and a test that paired this
+ * function with `listTraceRequests()`, exactly as the name invited, could never
+ * resolve an id.
+ */
+export function extractTraceIdFromTraceFeed(
   response: IAdtResponse,
 ): string | undefined {
   const headers = response?.headers as
@@ -247,6 +259,10 @@ export function extractTraceIdFromTraceRequestsResponse(
   }
   return undefined;
 }
+
+/** @deprecated Misleading name — use {@link extractTraceIdFromTraceFeed}. */
+export const extractTraceIdFromTraceRequestsResponse =
+  extractTraceIdFromTraceFeed;
 
 /**
  * Get profiler trace hitlist

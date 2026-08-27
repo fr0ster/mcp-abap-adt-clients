@@ -1,5 +1,12 @@
 /**
- * Integration tests for class local includes (AdtClass sub-objects):
+ * Integration tests for class local includes (AdtClass sub-objects).
+ *
+ * These are driven through `modifyFlowTestAuto()`, not `flowTestAuto()`: an
+ * include is not created and not deleted, it is read, written and activated
+ * with its class. See `BaseTester.modifyFlowTest` for why the create step does
+ * not exist here.
+ *
+ * Covers:
  * - LocalDefinitions (definitions include: "data in class"/private types)
  * - LocalTypes (implementations include: local helper class)
  * - LocalTestClass (testclasses include: local ABAP Unit tests)
@@ -323,7 +330,7 @@ describe('Class local includes (using BaseTester)', () => {
           return;
         }
         if (definitionsTester.shouldSkip()) {
-          await definitionsTester.flowTestAuto();
+          await definitionsTester.modifyFlowTestAuto();
           return;
         }
 
@@ -335,7 +342,7 @@ describe('Class local includes (using BaseTester)', () => {
           params.definitionsCode ??
           config?.definitionsCode;
 
-        await definitionsTester.flowTestAuto({
+        await definitionsTester.modifyFlowTestAuto({
           updateConfig: { definitionsCode: updateCode },
           readMetadata: true,
         });
@@ -400,7 +407,7 @@ describe('Class local includes (using BaseTester)', () => {
           return;
         }
         if (localTypesTester.shouldSkip()) {
-          await localTypesTester.flowTestAuto();
+          await localTypesTester.modifyFlowTestAuto();
           return;
         }
 
@@ -412,7 +419,7 @@ describe('Class local includes (using BaseTester)', () => {
           params.localTypesCode ??
           config?.localTypesCode;
 
-        await localTypesTester.flowTestAuto({
+        await localTypesTester.modifyFlowTestAuto({
           updateConfig: { localTypesCode: updateCode },
           readMetadata: true,
         });
@@ -477,7 +484,7 @@ describe('Class local includes (using BaseTester)', () => {
           return;
         }
         if (localTestClassTester.shouldSkip()) {
-          await localTestClassTester.flowTestAuto();
+          await localTestClassTester.modifyFlowTestAuto();
           return;
         }
 
@@ -489,7 +496,7 @@ describe('Class local includes (using BaseTester)', () => {
           params.testClassCode ??
           config?.testClassCode;
 
-        await localTestClassTester.flowTestAuto({
+        await localTestClassTester.modifyFlowTestAuto({
           updateConfig: { testClassCode: updateCode },
           readMetadata: true,
         });
@@ -570,13 +577,13 @@ describe('Class local includes (using BaseTester)', () => {
           return;
         }
         if (localMacrosTester.shouldSkip()) {
-          await localMacrosTester.flowTestAuto();
+          await localMacrosTester.modifyFlowTestAuto();
           return;
         }
 
         const config = localMacrosTester.getConfig();
         if (!config) {
-          await localMacrosTester.flowTestAuto();
+          await localMacrosTester.modifyFlowTestAuto();
           return;
         }
 
@@ -603,7 +610,7 @@ describe('Class local includes (using BaseTester)', () => {
         const params = tc?.params || {};
         const updateCode = params.macrosCode_update ?? params.macrosCode;
 
-        await localMacrosTester.flowTestAuto({
+        await localMacrosTester.modifyFlowTestAuto({
           updateConfig: { macrosCode: updateCode },
           readMetadata: true,
         });

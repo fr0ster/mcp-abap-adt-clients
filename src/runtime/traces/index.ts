@@ -17,6 +17,7 @@ export {
   createTraceParameters,
   DEFAULT_PROFILER_TRACE_PARAMETERS,
   extractProfilerIdFromResponse,
+  extractTraceIdFromTraceFeed,
   extractTraceIdFromTraceRequestsResponse,
   getTraceDbAccesses,
   getTraceHitList,

@@ -13,14 +13,9 @@ import type {
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import { AdtExecutor } from '../../../../clients/AdtExecutor';
-import {
-  extractTraceIdFromTraceRequestsResponse,
-  getTraceDbAccesses,
-  getTraceHitList,
-  getTraceStatements,
-  type IProfilerTraceParameters,
-  listTraceRequests,
-} from '../../../../runtime/traces';
+import { AdtRuntimeClient } from '../../../../clients/AdtRuntimeClient';
+import type { IProfilerTraceParameters } from '../../../../runtime/traces';
+import type { Profiler } from '../../../../runtime/traces/ProfilerDomain';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import {
   createTestAdtClient,
@@ -144,10 +139,13 @@ describe('ProgramExecutor (integration)', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
   let executor: AdtExecutor;
+  let runtime: AdtRuntimeClient;
+  let profiler: Profiler;
   let hasConfig = false;
   let isCloudSystem = false;
   let isLegacy = false;
   let programNameForTest: string | null = null;
+  let traceUser: string | undefined;
   let transportRequestForCleanup = '';
 
   const connectionLogger: ILogger = createConnectionLogger();
@@ -166,7 +164,14 @@ describe('ProgramExecutor (integration)', () => {
         await createTestAdtClient(connection, libraryLogger, systemContext);
       client = resolvedClient;
       isLegacy = legacy;
+      traceUser = systemContext.responsible;
       executor = new AdtExecutor(connection, libraryLogger);
+      runtime = new AdtRuntimeClient(connection, libraryLogger);
+      // `getProfiler()` is typed `IProfiler`, and that contract — which lives in
+      // @mcp-abap-adt/interfaces — does not carry `latestTraceId()` yet. The
+      // implementation is this package's and the class is exported, so the cast
+      // is the seam between the two. It goes when the contract catches up.
+      profiler = runtime.getProfiler() as Profiler;
       hasConfig = true;
       programNameForTest = null;
       transportRequestForCleanup = '';
@@ -377,11 +382,15 @@ describe('ProgramExecutor (integration)', () => {
           testsLogger,
         );
 
-        logTestStep('resolve traceId from trace requests list', testsLogger);
-        const traceRequestsResponse = await listTraceRequests(connection);
-        const traceId = extractTraceIdFromTraceRequestsResponse(
-          traceRequestsResponse,
-        );
+        // The finished trace lives in the TRACES collection, not in the trace
+        // REQUESTS one. A request is what schedules the measurement and it is
+        // consumed by the run: measured on E19 straight after a profiled run,
+        // `/runtime/traces/abaptraces/requests` answered 200 with an empty feed
+        // of 345 bytes while `/runtime/traces/abaptraces` held 95KB of entries
+        // owned by this very user — the profiling had worked all along and the
+        // test was reading the wrong feed.
+        logTestStep('resolve traceId from the trace files list', testsLogger);
+        const traceId = await profiler.latestTraceId({ user: traceUser });
         expect(traceId).toBeDefined();
         expect(typeof traceId).toBe('string');
         expect((traceId as string).length).toBeGreaterThan(10);
@@ -389,29 +398,21 @@ describe('ProgramExecutor (integration)', () => {
         logTestStep(`traceId=${traceId}`, testsLogger);
 
         logTestStep('read trace hitlist', testsLogger);
-        const hitlist = await getTraceHitList(connection, traceId as string, {
+        const hitlist = await profiler.getHitList(traceId as string, {
           withSystemEvents: false,
         });
         expect(hitlist.status).toBe(200);
 
         logTestStep('read trace statements', testsLogger);
-        const statements = await getTraceStatements(
-          connection,
-          traceId as string,
-          {
-            withSystemEvents: false,
-          },
-        );
+        const statements = await profiler.getStatements(traceId as string, {
+          withSystemEvents: false,
+        });
         expect(statements.status).toBe(200);
 
         logTestStep('read trace db accesses', testsLogger);
-        const dbAccesses = await getTraceDbAccesses(
-          connection,
-          traceId as string,
-          {
-            withSystemEvents: false,
-          },
-        );
+        const dbAccesses = await profiler.getDbAccesses(traceId as string, {
+          withSystemEvents: false,
+        });
         expect(dbAccesses.status).toBe(200);
 
         logTestStep(
