@@ -47,3 +47,4 @@ mdd-*.json
 atc-probe*/
 shared-setup-verdict.json
 .jest-shared-session.json
+profiler-probe/
