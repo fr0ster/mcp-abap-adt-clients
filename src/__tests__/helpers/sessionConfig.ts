@@ -33,7 +33,7 @@ import {
   SharedCloudConnector,
   SharedOnPremConnector,
 } from './sharedSession';
-import { createConnectionLogger } from './testLogger';
+import { createConnectionLogger, createRunIntegrityLogger } from './testLogger';
 
 /**
  * Whether this machine has SAP configured at all.
@@ -327,6 +327,37 @@ export async function createTestConnection(
   // this lands on the session that exists instead of opening one; measured, the
   // `SAP_SESSIONID` comes back identical.
   await connection.connect();
+
+  // Say so when the run's session was NOT the one this file ended up on.
+  //
+  // Compared on the `SAP_SESSIONID` cookie, which is the ABAP session — the
+  // thing locks are bound to. NOT on `getSessionId()`: that is our own
+  // conversation id, sent as `sap-adt-connection-id`, and `adoptSession()` sets
+  // it from the material, so comparing it compares a value with itself. A first
+  // version did exactly that and reported a clean run, which proved nothing.
+  //
+  // A session that dies mid-run takes down whichever test is running, and SAP's
+  // `Session Timed Out or Not Found` names the test rather than the cause — so
+  // it reads as that test being broken. Measured on E19: two full runs in seven
+  // lost the session once, with the run continuously busy, the session 3m35s
+  // old, no logoff from this side and no network event. Whatever the cause, the
+  // swap itself should not be silent.
+  const abapSession = (cookies: string | null | undefined) =>
+    /SAP_SESSIONID_[A-Z0-9_]+=([^;]+)/.exec(cookies ?? '')?.[1];
+
+  if (shared) {
+    const before = abapSession(shared.cookies);
+    const after = abapSession(connection.exportSession().cookies);
+    if (before && after && before !== after) {
+      // Not `logger`: the connection logger is `emptyLogger` unless DEBUG_TESTS
+      // is set, and a swap nobody sees is the whole problem.
+      createRunIntegrityLogger().warn?.(
+        `⚠️ Session swapped: the run published ABAP session ${before} but this file is on ${after}. ` +
+          'Anything held against the old one — locks, and writes under them — is gone.',
+      );
+    }
+  }
+
   return connection;
 }
 
