@@ -1,34 +1,4 @@
-# Session and Lock Persistence in Tests
-
-## Overview
-
-Tests can automatically persist HTTP sessions and lock handles based on configuration in `src/__tests__/helpers/test-config.yaml`.
-
-## Configuration
-
-Edit `src/__tests__/helpers/test-config.yaml`:
-
-```yaml
-# Session persistence configuration
-session_config:
-  # Enable session persistence (saves cookies and CSRF tokens)
-  persist_session: true
-  # Directory for session files (relative to project root)
-  sessions_dir: ".sessions"
-  # Session ID format: {test_name}_{timestamp} or custom
-  session_id_format: "auto"
-  # Clean up session after test
-  cleanup_session_after_test: false
-
-# Lock persistence configuration
-lock_config:
-  # Directory for lock files (relative to project root)
-  locks_dir: ".locks"
-  # Track locks in persistent storage
-  persist_locks: true
-  # Auto-cleanup locks after test
-  cleanup_locks_after_test: true
-```
+# Test helpers
 
 ## Getting a connection
 
@@ -94,40 +64,21 @@ a server can read that churn as an attack.
 import {
   createTestConnection,
   releaseTestConnection,
-  setupTestEnvironment,
-  cleanupTestEnvironment,
 } from '../helpers/sessionConfig';
 
 describe('My Test', () => {
   let connection;
-  let sessionId;
-  let testConfig;
 
   beforeAll(async () => {
     connection = await createTestConnection(logger);
-
-    // Setup based on test-config.yaml
-    const env = await setupTestEnvironment(
-      connection,
-      'my_test_name',  // Used in session ID
-      __filename
-    );
-    
-    sessionId = env.sessionId;
-    testConfig = env.testConfig;
   });
 
   afterAll(async () => {
-    await cleanupTestEnvironment(connection, sessionId, testConfig);
     await releaseTestConnection(connection);
-  });
-
-  it('should work', async () => {
-    // Session and locks are automatically managed
-    await createClass(connection, {...});
   });
 });
 ```
+
 
 ## Benefits
 
@@ -203,4 +154,3 @@ Uses Node.js `path` module for cross-platform path handling.
 
 - [Lock State Management](../../LOCK_STATE_MANAGEMENT.md)
 - [Session State Management](../../SESSION_STATE_MANAGEMENT.md)
-- Example: [sessionPersistence.example.ts](../examples/sessionPersistence.example.ts)

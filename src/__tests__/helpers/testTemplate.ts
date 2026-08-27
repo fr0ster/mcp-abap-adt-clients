@@ -1,6 +1,6 @@
 /**
- * Template for test files that use setupTestEnvironment
- * Copy this structure to all test files
+ * Template for integration test files.
+ * Copy this structure; the connection comes from createTestConnection().
  */
 
 import * as fs from 'node:fs';

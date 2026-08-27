@@ -22,7 +22,7 @@ Tests for complete workflows from start to finish.
 ### 📁 `helpers/` - Shared Test Utilities
 Common helpers used across all tests:
 - `sessionConfig.ts` - Load configuration from `.env` and `test-config.yaml`
-- `setupTestEnvironment.ts` - Setup connection and configuration
+- `sessionConfig.ts` - Builds the connection from configuration; `createTestConnection()` / `releaseTestConnection()`
 - Test helper functions
 
 ## Idempotency Principle

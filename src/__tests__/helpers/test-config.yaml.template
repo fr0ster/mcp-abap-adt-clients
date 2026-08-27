@@ -71,13 +71,6 @@ test_settings:
 
 # Session persistence configuration
 session_config:
-  # Enable session persistence (saves cookies and CSRF tokens)
-  persist_session: true
-  # Directory for session files (relative to project root)
-  sessions_dir: ".sessions"
-  # Session ID format: {test_name}_{timestamp} or custom
-  session_id_format: "auto"  # "auto" or custom string
-  # Clean up session after test
   cleanup_session_after_test: false
 
 # Lock persistence configuration
