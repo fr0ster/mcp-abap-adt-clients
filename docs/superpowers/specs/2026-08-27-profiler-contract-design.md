@@ -207,8 +207,23 @@ ST05's `getState()` joins them as recording control.
 
 In scope: traces a run produces — `abaptraces`, `crosstrace`, `st05`.
 
-Out of scope, and not "for now": `IRuntimeDumps`, `IApplicationLog`, `IGatewayErrorLog`,
-`ISystemMessages`, `IMemorySnapshots`.
+Not merged in, and not "for now": `IRuntimeDumps`, `IApplicationLog`, `IGatewayErrorLog`,
+`ISystemMessages`, `IMemorySnapshots`. "Out of scope" would be the wrong words — dumps are not
+unhandled, they have their own contract and keep it. This spec does not touch them.
+
+`IRuntimeDumps` is worth looking at, because it is already the shape proposed here and it is not
+a bag:
+
+```ts
+list(options?: IRuntimeDumpsListOptions): Promise<IAdtResponse>;
+getById(dumpId: string, options?: { view?: 'default' | 'summary' | 'formatted' }): Promise<IAdtResponse>;
+```
+
+A listing and a read-by-id whose view is a named union — two members, no duplicates, nothing that
+cannot succeed. It is evidence that the design works and that keeping the entities apart costs
+nothing: each contract stays small on its own terms. Its one remaining defect is the shared one —
+`TResult` is `IAdtResponse`, so the *view* is typed while the *result* is not. That is additive to
+fix, later, and on its own schedule.
 
 The tempting reason to merge them is that they all list and all read by id. That is a shape, not a
 meaning, and the meanings are different in a way that decides who the result belongs to:
