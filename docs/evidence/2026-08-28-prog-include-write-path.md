@@ -72,7 +72,12 @@ Present on every system checked, distinct from `/sap/bc/adt/programs/validation`
 <app:collection href="/sap/bc/adt/includes/validation"><atom:title>Include Validation</atom:title><atom:category term="validation" scheme="http://www.sap.com/adt/categories/includes"/></app:collection>
 ```
 
-Its query parameters have **not** been measured.
+Its query parameters were measured on 2026-08-28 — see
+[`2026-08-28-profiler-contract-e19.md`](2026-08-28-profiler-contract-e19.md), Task 0.4.
+`POST` with `Accept: application/vnd.sap.as+xml` and `objname`, `objtype`, `packagename`
+required, `description` optional, answering `<CHECK_RESULT>X</CHECK_RESULT>` — **the same
+three `/programs/validation` requires**, so an include needs no validation params type of its
+own.
 
 ## What this library sends today
 
