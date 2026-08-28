@@ -32,6 +32,7 @@ import {
   parseHitList,
   parseStatements,
   parseTraceEntries,
+  recordedAtMs,
 } from './traceParsing';
 
 export class Profiler implements IProfiler {
@@ -139,8 +140,12 @@ export class Profiler implements IProfiler {
     if (entries.length === 0) {
       return undefined;
     }
+    // By time, not by text: `"unexpected"` sorts above any ISO timestamp, and
+    // two valid ones with different offsets do not compare chronologically as
+    // strings. Picking the wrong trace is exactly what this method exists to
+    // prevent.
     return entries.reduce((newest, entry) =>
-      entry.recordedAt > newest.recordedAt ? entry : newest,
+      recordedAtMs(entry) > recordedAtMs(newest) ? entry : newest,
     ).id;
   }
 

@@ -29,6 +29,7 @@ import * as dotenv from 'dotenv';
 import { AdtExecutor } from '../../../../clients/AdtExecutor';
 import { AdtRuntimeClient } from '../../../../clients/AdtRuntimeClient';
 import type { Profiler } from '../../../../runtime/traces/ProfilerDomain';
+import { recordedAtMs } from '../../../../runtime/traces/traceParsing';
 import { resolveRunnableClassName } from '../../../helpers/runnableClassHelper';
 import {
   createTestConnection,
@@ -426,7 +427,7 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
           const discoveredId =
             traces.length > 0
               ? traces.reduce((latest, entry) =>
-                  entry.recordedAt > latest.recordedAt ? entry : latest,
+                  recordedAtMs(entry) > recordedAtMs(latest) ? entry : latest,
                 ).id
               : undefined;
           if (discoveredId) {

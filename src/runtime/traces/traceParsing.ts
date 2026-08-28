@@ -39,8 +39,10 @@
  *    every unrecognised boolean as `false`, or dropping an unreadable number as
  *    though the field were absent, is not a parse failure — it is a statement
  *    about the object, made on the strength of not understanding the document.
- *    See {@link booleanOf} and {@link numberOf}. Two rounds separated those two:
- *    the boolean case was fixed and the numeric one, four lines away, was not.
+ *    See {@link booleanOf}, {@link numberOf} and {@link timestampOf}. Three
+ *    rounds separated those: the boolean case was fixed, the numeric one four
+ *    lines away was not, and the timestamp — the only kind feeding a
+ *    *comparison* — went another round after that.
  *
  * The list is a list, not a running total. Four earlier commits each called the
  * level they had just fixed the last one; a further one turned up every time.
@@ -354,6 +356,49 @@ function numberOf(
   return parsed;
 }
 
+/**
+ * A timestamp, validated but returned as written.
+ *
+ * The contract types these as strings and that stays true — a caller comparing
+ * two of them wants the server's own text back, not a reformatted version. What
+ * changes is that an unparseable one is refused rather than carried: this was
+ * the one value kind with no guard, and it fed a comparison that assumed order.
+ */
+function timestampOf(
+  raw: string | undefined,
+  field: string,
+  what: string,
+  response: IAdtResponse,
+): string | undefined {
+  if (raw === undefined || raw === '') {
+    return undefined;
+  }
+  if (Number.isNaN(Date.parse(raw))) {
+    throw new TraceDocumentError(
+      `Reading ${what}: ${field} is "${raw}", which is not a timestamp. Carrying it would let it be compared against real ones and win.`,
+      bodyOf(response),
+    );
+  }
+  return raw;
+}
+
+/**
+ * A trace's moment as a number, for ordering.
+ *
+ * Exported because comparing `recordedAt` as a **string** is wrong in ways that
+ * look right in a test: `"unexpected"` sorts above any ISO timestamp, and two
+ * valid ones with different UTC offsets — or differing fractional-second
+ * precision — do not sort chronologically. Since `latestTraceId()` exists
+ * precisely to avoid picking a stale trace, ordering it wrongly defeats the one
+ * thing it is for.
+ *
+ * Safe by construction: the parser refuses a timestamp it cannot read, so every
+ * `recordedAt` reaching here is parseable.
+ */
+export function recordedAtMs(entry: { recordedAt: string }): number {
+  return Date.parse(entry.recordedAt);
+}
+
 function attrNum(
   node: Node | undefined,
   name: string,
@@ -479,7 +524,12 @@ export function parseTraceEntries(response: IAdtResponse): ITraceEntry[] {
     return {
       id,
       recordedAt: required(
-        text(entry.published) ?? text(entry.updated),
+        timestampOf(
+          text(entry.published) ?? text(entry.updated),
+          'published',
+          'the trace feed',
+          response,
+        ),
         'a timestamp',
         'entry',
         position,
@@ -507,7 +557,12 @@ export function parseTraceEntries(response: IAdtResponse): ITraceEntry[] {
             },
           }
         : {}),
-      expiresAt: text(field('expiration')) ?? text(field('expires')),
+      expiresAt: timestampOf(
+        text(field('expiration')) ?? text(field('expires')),
+        'expiration',
+        'the trace feed',
+        response,
+      ),
     };
   });
 }
@@ -776,7 +831,12 @@ export function parseTraceRequests(
         response,
       ),
       description: text(extended.description),
-      expiresAt: text(extended.expires),
+      expiresAt: timestampOf(
+        text(extended.expires),
+        'expires',
+        'the trace schedule',
+        response,
+      ),
       // Absence is not `false`. The contract makes this optional, and saying
       // "aggregation was off" because the field was missing is a claim about
       // the run that the document never made.

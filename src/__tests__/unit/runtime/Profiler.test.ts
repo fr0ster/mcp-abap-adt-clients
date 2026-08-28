@@ -37,6 +37,24 @@ describe('Profiler', () => {
     } as any;
   }
 
+  it('latestTraceId() picks the newest by time, not by text', async () => {
+    // The offsets are the point: 09:00Z is later than 10:00+02:00 (08:00Z),
+    // and string comparison says the opposite. Picking the stale one is
+    // exactly what this method exists to prevent.
+    const feed = `<?xml version="1.0"?><atom:feed xmlns:atom="http://www.w3.org/2005/Atom">
+      <atom:entry><atom:id>/sap/bc/adt/runtime/traces/abaptraces/AAAAAAAAAAAAAAAAAAAA</atom:id><atom:published>2026-08-28T10:00:00+02:00</atom:published></atom:entry>
+      <atom:entry><atom:id>/sap/bc/adt/runtime/traces/abaptraces/BBBBBBBBBBBBBBBBBBBB</atom:id><atom:published>2026-08-28T09:00:00Z</atom:published></atom:entry>
+    </atom:feed>`;
+    const connection = {
+      makeAdtRequest: jest
+        .fn()
+        .mockResolvedValue({ status: 200, data: feed, headers: {} }),
+    } as unknown as IAbapConnection;
+
+    const profiler = new Profiler(connection, createLogger());
+    expect(await profiler.latestTraceId()).toBe('BBBBBBBBBBBBBBBBBBBB');
+  });
+
   it('list() delegates to /sap/bc/adt/runtime/traces/abaptraces', async () => {
     const connection = createConnectionMock();
     const profiler = new Profiler(connection, createLogger());

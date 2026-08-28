@@ -19,6 +19,7 @@ import type {
   IProfiler,
   IProfilerListOptions,
 } from '@mcp-abap-adt/interfaces';
+import { recordedAtMs } from '../../runtime/traces/traceParsing';
 
 export interface IWaitForTraceOptions extends IProfilerListOptions {
   /** How many times to look. */
@@ -59,7 +60,7 @@ export async function waitForNewTrace(
     if (fresh.length > 0) {
       // Newest by timestamp, not by position — see the file comment.
       const newest = fresh.reduce((latest, entry) =>
-        entry.recordedAt > latest.recordedAt ? entry : latest,
+        recordedAtMs(entry) > recordedAtMs(latest) ? entry : latest,
       );
       logger?.debug?.('New trace appeared', {
         attempt,

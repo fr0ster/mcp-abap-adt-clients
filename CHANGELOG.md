@@ -130,7 +130,11 @@ Requires `@mcp-abap-adt/interfaces@^22.0.0`.
   the object — `isAggregated` said aggregation was off whenever the field was
   absent, and an unreadable number was dropped as though the field were missing
   — `hitCount="unexpected"` reported a row with no hit count, and `Infinity`
-  passed as a measurement because it is not `NaN`. And the container: a present
+  passed as a measurement because it is not `NaN`. Timestamps are validated too,
+  and `latestTraceId()` now orders by time rather than by text: `"unexpected"`
+  sorts above every ISO timestamp, and two valid ones with different UTC offsets
+  do not compare chronologically as strings — which defeated the one thing that
+  method exists to do. And the container: a present
   `<extendedData/>` that yields none of the fields this parser knows looks
   exactly like optional metadata that happened to be absent, and is not — its
   absence is still fine. A document understood at

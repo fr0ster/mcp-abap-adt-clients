@@ -17,6 +17,7 @@ import {
   parseStatements,
   parseTraceEntries,
   parseTraceRequests,
+  recordedAtMs,
   TraceDocumentError,
 } from '../../../runtime/traces/traceParsing';
 
@@ -505,6 +506,47 @@ describe('trace document parsing', () => {
       );
       expect(parsed.entries[0]?.index).toBe(0);
       expect(parsed.entries[0]?.recursionDepth).toBe(-1);
+    });
+  });
+
+  describe('timestamps are validated, and ordered as time', () => {
+    const feedWith = (published: string) =>
+      response(
+        `<?xml version="1.0"?><atom:feed xmlns:atom="http://www.w3.org/2005/Atom"><atom:entry><atom:id>/sap/bc/adt/runtime/traces/abaptraces/ABCDEF0123456789ABCD</atom:id><atom:published>${published}</atom:published></atom:entry></atom:feed>`,
+      );
+
+    it('refuses a published value that is not a timestamp', () => {
+      // Carried as a string, it would sort above every real ISO timestamp and
+      // be chosen as the newest trace.
+      expect(() => parseTraceEntries(feedWith('unexpected'))).toThrow(
+        /is not a timestamp/,
+      );
+    });
+
+    it('refuses an unparseable expiration', () => {
+      expect(() =>
+        parseTraceEntries(
+          response(
+            '<?xml version="1.0"?><atom:feed xmlns:atom="http://www.w3.org/2005/Atom" xmlns:trc="x"><atom:entry><atom:id>/sap/bc/adt/runtime/traces/abaptraces/ABCDEF0123456789ABCD</atom:id><atom:published>2026-08-28T10:00:00Z</atom:published><trc:expiration>whenever</trc:expiration></atom:entry></atom:feed>',
+          ),
+        ),
+      ).toThrow(TraceDocumentError);
+    });
+
+    it('orders by time, not by text, across UTC offsets', () => {
+      // 09:00Z is LATER than 10:00+02:00 (08:00Z), and the strings say the
+      // opposite. This is why `latestTraceId()` cannot compare them as strings.
+      const earlier = { recordedAt: '2026-08-28T10:00:00+02:00' };
+      const later = { recordedAt: '2026-08-28T09:00:00Z' };
+      expect(later.recordedAt > earlier.recordedAt).toBe(false);
+      expect(recordedAtMs(later)).toBeGreaterThan(recordedAtMs(earlier));
+    });
+
+    it('orders correctly across differing fractional-second precision', () => {
+      const a = { recordedAt: '2026-08-28T10:00:00.9Z' };
+      const b = { recordedAt: '2026-08-28T10:00:00.100Z' };
+      expect(b.recordedAt > a.recordedAt).toBe(false);
+      expect(recordedAtMs(a)).toBeGreaterThan(recordedAtMs(b));
     });
   });
 
