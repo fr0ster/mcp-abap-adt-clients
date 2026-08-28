@@ -83,6 +83,11 @@ Requires `@mcp-abap-adt/interfaces@^22.0.0`.
   Discovery lists the first on every system checked; the second is a
   sub-resource of a group and not a discovery collection at all.
 
+  `IAdtOperationOptions` is honoured: `sourceCode` from options wins over the
+  config's, `lockHandle` means the caller holds the lock (so the handler writes
+  without locking or unlocking), and activation is opt-in via `activateOnCreate`
+  / `activateOnUpdate`, both defaulting to `false` as the contract says.
+
   The return type names only the capabilities an include has — creatable,
   readable, updatable, deletable, validatable, activatable, lockable. Not
   versionable, checkable or transport-aware: nothing measured says it is, and

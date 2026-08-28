@@ -116,14 +116,19 @@ export class AdtInclude
   }
 
   /**
-   * Create, then write the source under a lock, then activate.
+   * Create, then optionally write the source under a lock, then optionally
+   * activate.
    *
-   * Source and activation are conditional: an include with no source is a
-   * legitimate thing to create, and activating an empty one is not.
+   * The source may come from `options.sourceCode` or from the config, options
+   * winning — the same precedence every other handler here uses. Activation
+   * happens only when `options.activateOnCreate` asks for it: the contract
+   * defaults it to `false`, and an earlier version of this method activated
+   * unconditionally whenever a source was present, which is a different
+   * behaviour wearing the same signature.
    */
   async create(
     config: IIncludeConfig,
-    _options?: IAdtOperationOptions,
+    options?: IAdtOperationOptions,
   ): Promise<IIncludeState> {
     const state = emptyState();
     const includeName = requireName(config);
@@ -148,13 +153,14 @@ export class AdtInclude
       return state;
     }
 
-    if (config.sourceCode) {
-      const written = await this.writeSource(config, config.sourceCode);
+    const sourceCode = options?.sourceCode ?? config.sourceCode;
+    if (sourceCode) {
+      const written = await this.writeSource(config, sourceCode, options);
       state.lockHandle = written.lockHandle;
       state.updateResult = written.updateResult;
       state.unlockResult = written.unlockResult;
       state.errors.push(...written.errors);
-      if (written.errors.length === 0) {
+      if (options?.activateOnCreate && written.errors.length === 0) {
         await this.activateInto(state, includeName);
       }
     }
@@ -192,18 +198,32 @@ export class AdtInclude
     return state;
   }
 
-  async update(config: Partial<IIncludeConfig>): Promise<IIncludeState> {
+  /**
+   * Write new source.
+   *
+   * `options.sourceCode` wins over the config's. `options.lockHandle` means the
+   * caller already holds the lock and manages it — this then writes only, and
+   * neither locks nor unlocks. Activation is `options.activateOnUpdate`, which
+   * the contract defaults to `false`.
+   */
+  async update(
+    config: Partial<IIncludeConfig>,
+    options?: IAdtOperationOptions,
+  ): Promise<IIncludeState> {
     const state = emptyState();
-    if (!config.sourceCode) {
-      throw new Error('sourceCode is required to update an include');
+    const sourceCode = options?.sourceCode ?? config.sourceCode;
+    if (!sourceCode) {
+      throw new Error(
+        'sourceCode is required to update an include — pass it in the config or in options',
+      );
     }
 
-    const written = await this.writeSource(config, config.sourceCode);
+    const written = await this.writeSource(config, sourceCode, options);
     state.lockHandle = written.lockHandle;
     state.updateResult = written.updateResult;
     state.unlockResult = written.unlockResult;
     state.errors.push(...written.errors);
-    if (written.errors.length === 0) {
+    if (options?.activateOnUpdate && written.errors.length === 0) {
       await this.activateInto(state, requireName(config));
     }
     return state;
@@ -273,10 +293,17 @@ export class AdtInclude
     return state;
   }
 
-  /** lock → PUT source → unlock, with the handle always released. */
+  /**
+   * lock → PUT source → unlock, with the handle always released.
+   *
+   * When the caller supplies `options.lockHandle` it owns the lock: this writes
+   * under it and does NOT unlock, because releasing somebody else's lock is how
+   * a caller's own next request starts failing.
+   */
   private async writeSource(
     config: Partial<IIncludeConfig>,
     sourceCode: string,
+    options?: IAdtOperationOptions,
   ): Promise<
     Pick<IIncludeState, 'lockHandle' | 'updateResult' | 'unlockResult'> & {
       errors: IncludeError[];
@@ -287,32 +314,41 @@ export class AdtInclude
       IIncludeState,
       'lockHandle' | 'updateResult' | 'unlockResult'
     > & { errors: IncludeError[] } = { errors: [] };
-    let lockHandle: string | undefined;
+
+    // A caller-held lock is used, recorded and NOT released here.
+    const borrowed = options?.lockHandle;
+    let lockHandle: string | undefined = borrowed;
+    let corrNr: string | undefined;
 
     try {
-      this.connection.setSessionType?.('stateful');
-      const locked = await lockInclude(this.connection, includeName);
-      lockHandle = locked.lockHandle;
+      if (!borrowed) {
+        this.connection.setSessionType?.('stateful');
+        const locked = await lockInclude(this.connection, includeName);
+        lockHandle = locked.lockHandle;
+        corrNr = locked.corrNr;
+        config.onLock?.(lockHandle);
+      }
       result.lockHandle = lockHandle;
-      config.onLock?.(lockHandle);
 
       result.updateResult = await uploadIncludeSource(
         this.connection,
         includeName,
         sourceCode,
-        lockHandle,
-        config.transportRequest ?? locked.corrNr,
+        lockHandle as string,
+        config.transportRequest ?? corrNr,
       );
     } catch (error) {
       result.errors.push(asError('update', error));
     } finally {
-      const unlockResult = await this.releaseAndGoStateless(
-        result,
-        includeName,
-        lockHandle,
-      );
-      if (unlockResult) {
-        result.unlockResult = unlockResult;
+      if (!borrowed) {
+        const unlockResult = await this.releaseAndGoStateless(
+          result,
+          includeName,
+          lockHandle,
+        );
+        if (unlockResult) {
+          result.unlockResult = unlockResult;
+        }
       }
     }
     return result;
@@ -328,7 +364,7 @@ export class AdtInclude
         includeName,
       );
     } catch (error) {
-      state.errors.push(asError('releaseLock', error));
+      state.errors.push(asError('activate', error));
     }
   }
 

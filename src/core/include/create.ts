@@ -19,6 +19,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { limitDescription } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
+import { escapeXmlAttr } from '../../utils/xml';
 
 /** Measured on the includes collection; the programs one advertises a different type. */
 export const CT_INCLUDE = 'application/vnd.sap.adt.programs.includes.v2+xml';
@@ -28,18 +29,26 @@ export async function create(
   args: ICreateIncludeParams,
   contentTypes?: IAdtContentTypes,
 ): Promise<IAdtResponse> {
-  const description = limitDescription(args.description || args.includeName);
-  const lang = args.masterLanguage || 'EN';
+  // Every value below is escaped before it reaches an attribute. A description
+  // with an apostrophe or an ampersand — "R&D", "the caller's include" — would
+  // otherwise produce XML the server cannot parse, and the create fails on a
+  // character rather than on anything the caller did wrong.
+  const description = escapeXmlAttr(
+    limitDescription(args.description || args.includeName),
+  );
+  const name = escapeXmlAttr(args.includeName);
+  const pkg = escapeXmlAttr(args.packageName);
+  const lang = escapeXmlAttr(args.masterLanguage || 'EN');
   const masterSystemAttr = args.masterSystem
-    ? ` adtcore:masterSystem="${args.masterSystem}"`
+    ? ` adtcore:masterSystem="${escapeXmlAttr(args.masterSystem)}"`
     : '';
   const responsibleAttr = args.responsible
-    ? ` adtcore:responsible="${args.responsible}"`
+    ? ` adtcore:responsible="${escapeXmlAttr(args.responsible)}"`
     : '';
   const url = `/sap/bc/adt/programs/includes${args.transportRequest ? `?corrNr=${args.transportRequest}` : ''}`;
 
-  const metadataXml = `<?xml version="1.0" encoding="UTF-8"?><include:abapInclude xmlns:include="http://www.sap.com/adt/programs/includes" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="${lang}" adtcore:name="${args.includeName}" adtcore:type="PROG/I" adtcore:masterLanguage="${lang}"${masterSystemAttr}${responsibleAttr}>
-  <adtcore:packageRef adtcore:name="${args.packageName}"/>
+  const metadataXml = `<?xml version="1.0" encoding="UTF-8"?><include:abapInclude xmlns:include="http://www.sap.com/adt/programs/includes" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="${lang}" adtcore:name="${name}" adtcore:type="PROG/I" adtcore:masterLanguage="${lang}"${masterSystemAttr}${responsibleAttr}>
+  <adtcore:packageRef adtcore:name="${pkg}"/>
 </include:abapInclude>`;
 
   const ct = contentTypes?.includeCreate();

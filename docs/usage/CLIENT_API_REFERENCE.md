@@ -188,20 +188,30 @@ include — three different things, two of them easy to confuse:
 ```typescript
 const include = client.getInclude();
 
-await include.create({
-  includeName: 'ZMY_INCLUDE',
-  packageName: 'ZMY_PACKAGE',
-  description: 'Shared form routines',
-  transportRequest: 'DEVK900123',
-  sourceCode: '" shared routines',
-});
+await include.create(
+  {
+    includeName: 'ZMY_INCLUDE',
+    packageName: 'ZMY_PACKAGE',
+    description: 'Shared form routines',
+    transportRequest: 'DEVK900123',
+    sourceCode: '" shared routines',
+  },
+  { activateOnCreate: true },
+);
 
 const source = await include.read({ includeName: 'ZMY_INCLUDE' });
-await include.update({ includeName: 'ZMY_INCLUDE', sourceCode: '" changed' });
+await include.update(
+  { includeName: 'ZMY_INCLUDE' },
+  { sourceCode: '" changed', activateOnUpdate: true },
+);
 await include.delete({ includeName: 'ZMY_INCLUDE' });
 ```
 
 Contract notes:
+- **Activation is opt-in**, as `IAdtOperationOptions` says: `activateOnCreate`
+  and `activateOnUpdate` both default to `false`. `options.sourceCode` wins over
+  the config's, and `options.lockHandle` means you hold the lock — the handler
+  then writes only, and neither locks nor unlocks.
 - **Creating one works on modern on-prem only.** Only there does discovery give
   the includes collection an `app:accept`, and a collection without one is not a
   POST target. Cloud answers `403 S_DEVELOP` for the type.
