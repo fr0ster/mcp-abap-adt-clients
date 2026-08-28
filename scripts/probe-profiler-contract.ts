@@ -147,6 +147,38 @@ async function main() {
       }
     }
 
+    // ---- The three views: the one gap 22.0.0 shipped with.
+    //
+    // `trc:grossTime` and `trc:traceEventNetTime` are typed `unknown` in the
+    // published contract because their attributes were never captured — the
+    // earlier read was summarised into a table and the bodies thrown away.
+    // Raw bodies here, therefore, and no summarising.
+    const feed = await ask(connection, {
+      label: '03-traces-feed',
+      url: '/sap/bc/adt/runtime/traces/abaptraces',
+      accept: 'application/atom+xml;type=feed',
+    });
+    results.push(feed);
+
+    const feedBody = fs.readFileSync(
+      path.join(OUT, '03-traces-feed.xml'),
+      'utf8',
+    );
+    // Any readable trace answers the question; position in a feed is not age,
+    // so this deliberately does not pretend to pick "the latest".
+    const traceId = /abaptraces\/([A-F0-9]{24,})/.exec(feedBody)?.[1];
+    if (traceId) {
+      for (const view of ['hitlist', 'statements', 'dbAccesses']) {
+        results.push(
+          await ask(connection, {
+            label: `03-${view}`,
+            url: `/sap/bc/adt/runtime/traces/abaptraces/${traceId}/${view}`,
+            accept: 'application/xml',
+          }),
+        );
+      }
+    }
+
     // ---- Task 0.1: what a cross trace looks like
     const list = await ask(connection, {
       label: '01-crosstrace-list',
@@ -187,7 +219,7 @@ async function main() {
 
     fs.writeFileSync(
       path.join(OUT, 'summary.json'),
-      `${JSON.stringify({ takenAt: new Date().toISOString(), id, results }, null, 2)}\n`,
+      `${JSON.stringify({ takenAt: new Date().toISOString(), id, traceId, results }, null, 2)}\n`,
     );
   } finally {
     await releaseTestConnection(connection);
