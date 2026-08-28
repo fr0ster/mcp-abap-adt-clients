@@ -147,6 +147,93 @@ describe('AdtInclude', () => {
     });
   });
 
+  describe('an empty source is a value, not an absence', () => {
+    it('clears an include to empty instead of refusing the edit', async () => {
+      const { connection, calls } = createConnection();
+      await new AdtInclude(connection, logger).update({
+        includeName: 'ZMY_INC',
+        sourceCode: '',
+      });
+
+      const put = calls.find((c) => c.method === 'PUT');
+      expect(put).toBeDefined();
+      expect(put?.data).toBe('');
+    });
+
+    it('writes an empty source on create too', async () => {
+      const { connection, calls } = createConnection();
+      await new AdtInclude(connection, logger).create({
+        ...BASE,
+        sourceCode: '',
+      });
+
+      expect(calls.some((c) => c.method === 'PUT')).toBe(true);
+    });
+
+    it('still refuses an update with no source at all', async () => {
+      const { connection } = createConnection();
+      await expect(
+        new AdtInclude(connection, logger).update({ includeName: 'ZMY_INC' }),
+      ).rejects.toThrow(/sourceCode is required/);
+    });
+  });
+
+  describe('deleteOnFailure', () => {
+    /** Metadata POST succeeds; the source write does not. */
+    function createWithFailingUpload() {
+      const { connection, calls } = createConnection();
+      (connection.makeAdtRequest as jest.Mock).mockImplementation(
+        async (request: any) => {
+          calls.push({
+            url: request.url,
+            method: request.method,
+            data: request.data,
+          });
+          if (request.method === 'PUT') {
+            throw new Error('source rejected');
+          }
+          if (String(request.url).includes('_action=LOCK')) {
+            return { status: 200, data: LOCK_XML, headers: {} };
+          }
+          return { status: 200, data: '', headers: {} };
+        },
+      );
+      return { connection, calls };
+    }
+
+    it('removes the half-made include when asked', async () => {
+      const { connection, calls } = createWithFailingUpload();
+      const state = await new AdtInclude(connection, logger).create(
+        { ...BASE, sourceCode: '" code' },
+        { deleteOnFailure: true },
+      );
+
+      expect(calls.some((c) => c.method === 'DELETE')).toBe(true);
+      // The failure that caused the rollback stays the headline.
+      expect(state.errors.map((e) => e.method)).toContain('update');
+    });
+
+    it('leaves it in place when not asked — the contract default is false', async () => {
+      const { connection, calls } = createWithFailingUpload();
+      await new AdtInclude(connection, logger).create({
+        ...BASE,
+        sourceCode: '" code',
+      });
+
+      expect(calls.some((c) => c.method === 'DELETE')).toBe(false);
+    });
+
+    it('does not roll back a create that succeeded', async () => {
+      const { connection, calls } = createConnection();
+      await new AdtInclude(connection, logger).create(
+        { ...BASE, sourceCode: '" code' },
+        { deleteOnFailure: true },
+      );
+
+      expect(calls.some((c) => c.method === 'DELETE')).toBe(false);
+    });
+  });
+
   describe('errors say which operation failed', () => {
     it('names activation, not lock cleanup, when activation fails', async () => {
       const { connection } = createConnection();

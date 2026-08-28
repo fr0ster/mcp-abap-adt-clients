@@ -212,6 +212,13 @@ Contract notes:
   and `activateOnUpdate` both default to `false`. `options.sourceCode` wins over
   the config's, and `options.lockHandle` means you hold the lock — the handler
   then writes only, and neither locks nor unlocks.
+- **An empty source is a source.** `sourceCode: ''` clears an include; only
+  `undefined` means none was given. An empty include is a valid object, so
+  emptiness must be expressible.
+- **`deleteOnFailure`** removes the include again when a step *after* the
+  metadata POST fails — without it a half-made object is left behind under a
+  name your next attempt collides with. The original failure stays the reported
+  one; a rollback that cannot complete is recorded beside it, never instead.
 - **Creating one works on modern on-prem only.** Only there does discovery give
   the includes collection an `app:accept`, and a collection without one is not a
   POST target. Cloud answers `403 S_DEVELOP` for the type.

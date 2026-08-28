@@ -120,11 +120,17 @@ export class AdtInclude
    * activate.
    *
    * The source may come from `options.sourceCode` or from the config, options
-   * winning — the same precedence every other handler here uses. Activation
-   * happens only when `options.activateOnCreate` asks for it: the contract
-   * defaults it to `false`, and an earlier version of this method activated
-   * unconditionally whenever a source was present, which is a different
-   * behaviour wearing the same signature.
+   * winning — the same precedence every other handler here uses. An empty
+   * string is a source; only `undefined` means none was given.
+   *
+   * Activation happens only when `options.activateOnCreate` asks for it: the
+   * contract defaults it to `false`, and an earlier version of this method
+   * activated unconditionally whenever a source was present, which is a
+   * different behaviour wearing the same signature.
+   *
+   * `options.deleteOnFailure` removes the include again if a step after the
+   * metadata POST fails — otherwise a half-made object is left behind under a
+   * name the caller will collide with on its next attempt.
    */
   async create(
     config: IIncludeConfig,
@@ -153,8 +159,11 @@ export class AdtInclude
       return state;
     }
 
+    // `!== undefined`, not truthiness: `''` is a source, and an empty include
+    // is a legitimate object — this class says so two paragraphs up. Treating
+    // the empty string as "no source given" makes one valid value unreachable.
     const sourceCode = options?.sourceCode ?? config.sourceCode;
-    if (sourceCode) {
+    if (sourceCode !== undefined) {
       const written = await this.writeSource(config, sourceCode, options);
       state.lockHandle = written.lockHandle;
       state.updateResult = written.updateResult;
@@ -165,7 +174,37 @@ export class AdtInclude
       }
     }
 
+    // The object exists from here on, so a later failure leaves a half-made
+    // include behind unless the caller asked otherwise.
+    if (options?.deleteOnFailure && state.errors.length > 0) {
+      await this.rollBackCreate(state, config);
+    }
+
     return state;
+  }
+
+  /**
+   * Undo a create whose later steps failed, when `deleteOnFailure` asks.
+   *
+   * The failure that caused this is already in `state.errors` and must stay
+   * the headline: a rollback that cannot complete is recorded beside it, never
+   * in place of it, and never thrown — the caller is already handling one
+   * failure and a second thrown from the cleanup hides the first.
+   */
+  private async rollBackCreate(
+    state: IIncludeState,
+    config: Partial<IIncludeConfig>,
+  ): Promise<void> {
+    this.logger?.warn?.('Deleting include after a failed create', {
+      includeName: config.includeName,
+    });
+    try {
+      const deleted = await this.delete(config);
+      state.deleteResult = deleted.deleteResult;
+      state.errors.push(...deleted.errors);
+    } catch (error) {
+      state.errors.push(asError('deleteOnFailure', error));
+    }
   }
 
   async read(
@@ -211,8 +250,10 @@ export class AdtInclude
     options?: IAdtOperationOptions,
   ): Promise<IIncludeState> {
     const state = emptyState();
+    // Absence, not emptiness: clearing an include to empty is a real edit, and
+    // a truthiness check made it impossible to express.
     const sourceCode = options?.sourceCode ?? config.sourceCode;
-    if (!sourceCode) {
+    if (sourceCode === undefined) {
       throw new Error(
         'sourceCode is required to update an include — pass it in the config or in options',
       );

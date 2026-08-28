@@ -85,8 +85,13 @@ Requires `@mcp-abap-adt/interfaces@^22.0.0`.
 
   `IAdtOperationOptions` is honoured: `sourceCode` from options wins over the
   config's, `lockHandle` means the caller holds the lock (so the handler writes
-  without locking or unlocking), and activation is opt-in via `activateOnCreate`
-  / `activateOnUpdate`, both defaulting to `false` as the contract says.
+  without locking or unlocking), activation is opt-in via `activateOnCreate` /
+  `activateOnUpdate`, both defaulting to `false` as the contract says, and
+  `deleteOnFailure` removes the include again when a step after the metadata
+  POST fails.
+
+  An empty string is a source: `sourceCode: ''` clears an include, and only
+  `undefined` means none was given.
 
   The return type names only the capabilities an include has — creatable,
   readable, updatable, deletable, validatable, activatable, lockable. Not
