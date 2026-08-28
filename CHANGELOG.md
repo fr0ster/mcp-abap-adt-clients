@@ -109,6 +109,15 @@ Requires `@mcp-abap-adt/interfaces@^22.0.0`.
 - `TraceScheduling`, and trace document parsers in
   `src/runtime/traces/traceParsing.ts`.
 
+- `TraceDocumentError`. A trace document that is empty, unparseable, or rooted
+  in something other than what was expected now **throws** instead of becoming
+  an empty result. The distinction matters most exactly where this code is least
+  sure of itself: it states openly that the feed's nesting was never read end to
+  end, so a wrong guess must be audible. An empty body in particular is not an
+  empty trace — ADT answers `200` with nothing when a resource is not ready, and
+  never 404s. A correctly recognised document with no rows is still accepted, so
+  a genuinely empty view reads as empty.
+
 ### Notes on what is and is not verified
 
 The catalogue and the stored trace request were parsed from raw bodies, so

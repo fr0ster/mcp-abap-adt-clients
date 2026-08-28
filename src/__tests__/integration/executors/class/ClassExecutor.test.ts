@@ -497,10 +497,12 @@ describe('ClassExecutor (integration)', () => {
         // Parsed, not a status code: a 200 carrying an unparseable body used to
         // pass here, and the whole point of the typed views is that it no
         // longer can.
-        expect(Array.isArray(hitlist.entries)).toBe(true);
-        expect(Array.isArray(statements.statements)).toBe(true);
-        expect(Array.isArray(dbAccesses.accesses)).toBe(true);
+        // Rows and their fields, not `Array.isArray`: an empty array was
+        // what the parser used to invent from a body it could not read.
         expect(hitlist.entries.length).toBeGreaterThan(0);
+        expect(typeof hitlist.entries[0]?.index).toBe('number');
+        expect(statements.statements.length).toBeGreaterThan(0);
+        expect(Array.isArray(dbAccesses.accesses)).toBe(true);
 
         logTestStep(
           `trace ${traceId}: hitlist=${hitlist.entries.length} rows, statements=${statements.statements.length}, dbAccesses=${dbAccesses.accesses.length}`,

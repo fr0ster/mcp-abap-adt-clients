@@ -13,6 +13,16 @@
  * `state` is worse than one that fails. When the probe returns raw bodies, the
  * tolerance can collapse to whichever branch is real.
  *
+ * **The tolerance stops at the document.** Being unsure which of two nestings
+ * holds a field is not the same as being willing to accept any document at all.
+ * A body that is empty, unparseable, or rooted in something other than what is
+ * expected throws {@link TraceDocumentError} — it does NOT become an empty
+ * result. An earlier version returned `{ entries: [] }` for all three, which a
+ * caller reads as "this trace is empty" and an `Array.isArray` assertion
+ * happily confirms. Since this file admits the exact shape is unverified, a
+ * wrong guess must be loud: it is the one failure most likely to actually
+ * happen here.
+ *
  * Timing elements are handed over as parsed, because
  * {@link import('@mcp-abap-adt/interfaces').ITraceTiming} is `unknown`: their
  * attributes were never captured, and this layer does not invent names the
@@ -46,20 +56,86 @@ const parser = new XMLParser({
 
 type Node = Record<string, unknown>;
 
+/**
+ * A trace document could not be read.
+ *
+ * Thrown rather than absorbed, because the alternative is worse than a crash:
+ * an unreadable body used to become `{ entries: [] }`, which a caller reads as
+ * "this trace is empty" and a test satisfies with `Array.isArray`. A profiler
+ * that silently reports no rows is the failure it exists to detect.
+ */
+export class TraceDocumentError extends Error {
+  constructor(
+    message: string,
+    readonly body: string,
+  ) {
+    super(message);
+    this.name = 'TraceDocumentError';
+  }
+}
+
 function bodyOf(response: IAdtResponse): string {
   return typeof response?.data === 'string' ? response.data : '';
 }
 
-function parseBody(response: IAdtResponse): Node | undefined {
+/** Enough of the body to recognise it, without pasting a 1.3MB view into a log. */
+function excerpt(body: string): string {
+  const flat = body.replace(/\s+/g, ' ').trim();
+  return flat.length > 200 ? `${flat.slice(0, 200)}…` : flat;
+}
+
+/**
+ * The expected root of a trace document, or a thrown explanation.
+ *
+ * Three ways this can fail, and none of them may pass for an empty result:
+ *
+ * - **An empty body.** ADT answers `200` with nothing when an object is not
+ *   ready yet — measured, and it never 404s. An empty *feed* is a document with
+ *   a root and no entries, so emptiness of content is still distinguishable
+ *   from emptiness of body.
+ * - **Unparseable XML.** Truncation, an HTML error page, anything.
+ * - **A document with a different root.** This is the one that matters most
+ *   here: this file admits the traces feed's exact nesting was never read end
+ *   to end, so being wrong is a live possibility rather than a theoretical one.
+ *   If the shape is not what this code expects, the caller must hear about it.
+ */
+function rootOf(response: IAdtResponse, rootName: string, what: string): Node {
   const body = bodyOf(response);
-  if (!body) {
-    return undefined;
+  if (!body.trim()) {
+    throw new TraceDocumentError(
+      `Empty body reading ${what} (HTTP ${response?.status}). ADT answers 200 with an empty body when a resource is not ready — that is not the same as an empty result, so it is reported rather than parsed into one.`,
+      body,
+    );
   }
+
+  let parsed: Node;
   try {
-    return parser.parse(body) as Node;
-  } catch {
-    return undefined;
+    parsed = parser.parse(body) as Node;
+  } catch (error) {
+    throw new TraceDocumentError(
+      `Unparseable XML reading ${what}: ${error instanceof Error ? error.message : String(error)}. Body began: ${excerpt(body)}`,
+      body,
+    );
   }
+
+  // Presence of the key, not truthiness of its value: a self-closing
+  // `<trc:hitlist/>` — a genuinely empty view, which the server does send —
+  // parses to the empty string, and rejecting that would refuse the very
+  // document this check exists to let through.
+  if (!parsed || !(rootName in parsed)) {
+    throw new TraceDocumentError(
+      `Reading ${what}: expected a <${rootName}> document, got ${describeRoots(parsed)}. Body began: ${excerpt(body)}`,
+      body,
+    );
+  }
+  const root = parsed[rootName];
+  return root && typeof root === 'object' ? (root as Node) : {};
+}
+
+/** What the document actually had at the top, for the error to name. */
+function describeRoots(parsed: Node | undefined): string {
+  const names = Object.keys(parsed ?? {}).filter((k) => k !== '?xml');
+  return names.length > 0 ? `<${names.join('>, <')}>` : 'no elements';
 }
 
 /** One node, a list of them, or nothing — always answered as a list. */
@@ -121,8 +197,8 @@ const ID_IN_URI = /abaptraces\/([A-Za-z0-9]{16,})(?:\/|$)/;
  * trace compares against the ids it saw before running.
  */
 export function parseTraceEntries(response: IAdtResponse): ITraceEntry[] {
-  const parsed = parseBody(response);
-  const entries = asList((parsed?.feed as Node | undefined)?.entry);
+  const feed = rootOf(response, 'feed', 'the trace feed');
+  const entries = asList(feed.entry);
 
   return entries
     .map((entry): ITraceEntry | undefined => {
@@ -184,8 +260,7 @@ function programRef(node: unknown): ITraceProgramRef | undefined {
 }
 
 export function parseHitList(response: IAdtResponse): IAbapTraceHitList {
-  const parsed = parseBody(response);
-  const rows = asList((parsed?.hitlist as Node | undefined)?.entry);
+  const rows = asList(rootOf(response, 'hitlist', 'a trace hit list').entry);
 
   return {
     entries: rows.map(
@@ -206,8 +281,9 @@ export function parseHitList(response: IAdtResponse): IAbapTraceHitList {
 }
 
 export function parseStatements(response: IAdtResponse): IAbapTraceStatements {
-  const parsed = parseBody(response);
-  const rows = asList((parsed?.statements as Node | undefined)?.statement);
+  const rows = asList(
+    rootOf(response, 'statements', 'trace statements').statement,
+  );
 
   return {
     statements: rows.map(
@@ -244,8 +320,9 @@ function accessTime(node: unknown): IAbapTraceAccessTime | undefined {
 }
 
 export function parseDbAccesses(response: IAdtResponse): IAbapTraceDbAccesses {
-  const parsed = parseBody(response);
-  const rows = asList((parsed?.dbAccesses as Node | undefined)?.dbAccess);
+  const rows = asList(
+    rootOf(response, 'dbAccesses', 'trace database accesses').dbAccess,
+  );
 
   return {
     accesses: rows.map(
@@ -271,8 +348,9 @@ export function parseDbAccesses(response: IAdtResponse): IAbapTraceDbAccesses {
  * `id`: renaming it here would hide the fact that the two are the same string.
  */
 export function parseNamedItems(response: IAdtResponse): INamedItem[] {
-  const parsed = parseBody(response);
-  const items = asList((parsed?.namedItemList as Node | undefined)?.namedItem);
+  const items = asList(
+    rootOf(response, 'namedItemList', 'a trace catalogue').namedItem,
+  );
 
   return items.map((item) => ({
     name: text(item.name) ?? '',
@@ -289,8 +367,7 @@ export function parseNamedItems(response: IAdtResponse): INamedItem[] {
 export function parseTraceRequests(
   response: IAdtResponse,
 ): ITraceRequestEntry[] {
-  const parsed = parseBody(response);
-  const entries = asList((parsed?.feed as Node | undefined)?.entry);
+  const entries = asList(rootOf(response, 'feed', 'the trace schedule').entry);
 
   return entries.map((entry): ITraceRequestEntry => {
     const extended = (entry.extendedData as Node | undefined) ?? {};

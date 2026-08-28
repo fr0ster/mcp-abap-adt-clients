@@ -507,10 +507,15 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
       try {
         const traceId = resolvedTraceId;
         logTestStep(`read trace hitlist for ${traceId}`, testsLogger);
+        // `Array.isArray` alone is not an assertion here: it was true of the
+        // fallback empty result the parser used to invent from an unreadable
+        // body. A real trace has rows, and a row has the fields the contract
+        // names — that is what proves the document was understood.
         const hitlist = await runtime
           .getProfiler()
           .read(traceId, 'hitlist', { withSystemEvents: false });
-        expect(Array.isArray(hitlist.entries)).toBe(true);
+        expect(hitlist.entries.length).toBeGreaterThan(0);
+        expect(typeof hitlist.entries[0]?.index).toBe('number');
 
         logTestStep(
           `read trace hitlist with system events for ${traceId}`,
@@ -525,7 +530,8 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
         const statements = await runtime
           .getProfiler()
           .read(traceId, 'statements', { withSystemEvents: false });
-        expect(Array.isArray(statements.statements)).toBe(true);
+        expect(statements.statements.length).toBeGreaterThan(0);
+        expect(typeof statements.statements[0]?.id).toBe('string');
 
         logTestStep(`read trace db accesses for ${traceId}`, testsLogger);
         const dbAccesses = await runtime

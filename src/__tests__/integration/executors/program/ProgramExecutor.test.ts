@@ -435,8 +435,11 @@ describe('ProgramExecutor (integration)', () => {
 
         // Parsed rows, not a status code: a 200 with a body nothing could read
         // used to satisfy this.
-        expect(Array.isArray(hitlist.entries)).toBe(true);
-        expect(Array.isArray(statements.statements)).toBe(true);
+        // Rows and their fields, not `Array.isArray`: an empty array was
+        // what the parser used to invent from a body it could not read.
+        expect(hitlist.entries.length).toBeGreaterThan(0);
+        expect(typeof hitlist.entries[0]?.index).toBe('number');
+        expect(statements.statements.length).toBeGreaterThan(0);
         expect(Array.isArray(dbAccesses.accesses)).toBe(true);
 
         logTestStep(
