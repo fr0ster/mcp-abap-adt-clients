@@ -1,0 +1,8 @@
+PinoLogger initialization error: Cannot find module 'pino'
+Require stack:
+- C:\Users\oleksii_kyslytsia\projects\mcp-abap-adt-clients\node_modules\@mcp-abap-adt\logger\dist\pino-logger.js
+- C:\Users\oleksii_kyslytsia\projects\mcp-abap-adt-clients\node_modules\@mcp-abap-adt\logger\dist\index.js
+- C:\Users\oleksii_kyslytsia\projects\mcp-abap-adt-clients\scripts\probe-e19-nodes.ts
+[INFO] ℹ️ === sap-adt-saplb over 12 requests ===
+[INFO] ℹ️   epbyminsd0654_E19_00  ×12
+[INFO] ℹ️ distinct servers: 1

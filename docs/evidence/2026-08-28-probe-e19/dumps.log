@@ -1,0 +1,32 @@
+PinoLogger initialization error: Cannot find module 'pino'
+Require stack:
+- C:\Users\oleksii_kyslytsia\projects\mcp-abap-adt-clients\node_modules\@mcp-abap-adt\logger\dist\pino-logger.js
+- C:\Users\oleksii_kyslytsia\projects\mcp-abap-adt-clients\node_modules\@mcp-abap-adt\logger\dist\index.js
+- C:\Users\oleksii_kyslytsia\projects\mcp-abap-adt-clients\scripts\probe-e19-dumps.ts
+[INFO] ℹ️ status 200, 528888 bytes
+[INFO] ℹ️ entries: 33  (timestamps are UTC; the system runs UTC+3)
+[INFO] ℹ️   2026-08-27T14:39:31Z  Division by 0 (type I or INT8)
+[INFO] ℹ️   2026-08-27T14:28:51Z  Division by 0 (type I or INT8)
+[INFO] ℹ️   2026-08-27T14:17:59Z  Division by 0 (type I or INT8)
+[INFO] ℹ️   2026-08-27T10:53:51Z  Division by 0 (type I or INT8)
+[INFO] ℹ️   2026-08-27T10:18:50Z  Division by 0 (type I or INT8)
+[INFO] ℹ️   2026-08-27T09:52:57Z  Division by 0 (type I or INT8)
+[INFO] ℹ️   2026-08-27T09:13:42Z  Division by 0 (type I or INT8)
+[INFO] ℹ️   2026-08-27T08:20:06Z  Division by 0 (type I or INT8)
+[INFO] ℹ️   2026-08-27T08:03:53Z  Division by 0 (type I or INT8)
+[INFO] ℹ️   2026-08-27T07:34:39Z  Division by 0 (type I or INT8)
+[INFO] ℹ️   2026-08-27T06:09:45Z  Division by 0 (type I or INT8)
+[INFO] ℹ️   2026-08-21T20:47:20Z  Invalid access to a string (offset too large)
+[INFO] ℹ️   2026-08-21T20:47:19Z  Invalid access to a string (offset too large)
+[INFO] ℹ️   2026-08-21T20:47:18Z  Invalid access to a string (offset too large)
+[INFO] ℹ️   2026-08-21T20:47:17Z  Invalid access to a string (offset too large)
+[INFO] ℹ️   2026-08-21T19:32:50Z  Invalid access to a string (offset too large)
+[INFO] ℹ️   2026-08-21T19:32:48Z  Invalid access to a string (offset too large)
+[INFO] ℹ️   2026-08-21T19:32:47Z  Invalid access to a string (offset too large)
+[INFO] ℹ️   2026-08-21T19:32:45Z  Invalid access to a string (offset too large)
+[INFO] ℹ️   2026-08-21T19:13:59Z  Invalid access to a string (offset too large)
+[INFO] ℹ️   2026-08-21T19:13:57Z  Invalid access to a string (offset too large)
+[INFO] ℹ️   2026-08-21T19:13:55Z  Invalid access to a string (offset too large)
+[INFO] ℹ️   2026-08-21T19:13:54Z  Invalid access to a string (offset too large)
+[INFO] ℹ️   2026-08-21T18:37:20Z  Invalid access to a string (offset too large)
+[INFO] ℹ️   2026-08-21T18:37:19Z  Invalid access to a string (offset too large)
