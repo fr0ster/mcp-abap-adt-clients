@@ -5,6 +5,111 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [13.0.0] - 2026-08-28
+
+Requires `@mcp-abap-adt/interfaces@^22.0.0`.
+
+### Changed
+
+- **BREAKING — `Profiler` reads; it no longer configures.**
+
+  `list()` returns parsed `ITraceEntry[]` instead of a raw response, and
+  `read(traceId, view)` replaces `getHitList()` / `getStatements()` /
+  `getDbAccesses()`. Those were one operation under three names, and every
+  caller re-parsed the response by hand. `read` returns the view's own type, so
+  a hit list is a hit list and an unknown view name is a compile error rather
+  than a 404.
+
+  The raw feed is still available as `listTraceFilesResponse()`.
+
+  **Migration.** `p.getHitList(id, o)` → `p.read(id, 'hitlist', o)`, and the
+  same for the other two. `p.list()` no longer has `.status`/`.data`; use
+  `listTraceFilesResponse()` if you want the document.
+
+- **BREAKING — scheduling moved to the executors.** `createParameters`,
+  `listObjectTypes`, `listProcessTypes`, `listRequests` and `getRequestsByUri`
+  are gone from `Profiler`. `IClassExecutor` and `IProgramExecutor` carry them
+  now, with `createParameters` renamed `scheduleTrace()` because it answers with
+  a request id and created nothing readable back — reading the created resource
+  gives `200` with an **empty body**, measured.
+
+  The catalogues return `INamedItem[]` and the schedule returns
+  `ITraceRequestEntry[]`, parsed rather than raw.
+
+- **BREAKING — `getParameters()`, `getParametersForCallstack()` and
+  `getParametersForAmdp()` are deleted.** Three names for one byte-identical
+  call, on a URL measured to answer `405` to `GET` on both platforms. There is
+  no replacement, because there was no operation.
+
+- **BREAKING — `runWithProfiling` no longer returns a `traceId`, and no longer
+  waits for one.**
+
+  It polled five times and then **threw** when it found nothing, turning "SAP
+  has not written the trace yet" — the normal case — into a failed run. Its
+  fallback took the first id in the feed, and position there is not age: it
+  could return a trace from eight days earlier with nothing to say it had.
+
+  `ClassExecutor` lost 107 lines to this. The class and program profiling
+  results are now the same shape, and `traceLookupUris`, `maxTraceAttempts` and
+  `traceRetryDelayMs` are gone from the options.
+
+  **Migration.** Note `profiler.list()` before running, then look for an id
+  that is new. `src/__tests__/helpers/traceHelpers.ts` does exactly that, and
+  is the pattern to copy: only the caller knows how long it is willing to wait.
+
+- **BREAKING — `programType: 'include'` now throws.** It mapped to `'I'` and
+  then posted a `program:abapProgram` document with `adtcore:type="PROG/P"` to
+  the programs collection. That was not a parameter needing correction; it was
+  the wrong object. Use `getInclude()`.
+
+### Added
+
+- **`AdtClient.getInclude()` — standalone `PROG/I` includes.**
+
+  A new `src/core/include/` module: create, read, readMetadata, update, delete,
+  validate, activate, lock, unlock. The chain is transcribed from a captured
+  Eclipse exchange — create, lock, `PUT source/main`, unlock, then the generic
+  `/sap/bc/adt/activation`.
+
+  **This is not the function-group include**, which already existed and stays
+  where it was:
+
+  | | `getInclude()` | `getFunctionInclude()` |
+  |---|---|---|
+  | type | `PROG/I` | `FUGR/I` |
+  | collection | `/sap/bc/adt/programs/includes` | `/sap/bc/adt/functions/groups/{group}/includes` |
+  | belongs to | nothing | its function group |
+
+  Discovery lists the first on every system checked; the second is a
+  sub-resource of a group and not a discovery collection at all.
+
+  The return type names only the capabilities an include has — creatable,
+  readable, updatable, deletable, validatable, activatable, lockable. Not
+  versionable, checkable or transport-aware: nothing measured says it is, and
+  the captured create shows no such call.
+
+  Creating one works on **modern on-prem only** — only there does discovery
+  give the collection an `app:accept`, and a collection without one is not a
+  POST target.
+
+- `AdtContentTypesBase.includeCreate()`, returning the measured
+  `application/vnd.sap.adt.programs.includes.v2+xml`. No `Modern` override: it
+  is the only version any system advertises.
+
+- `TraceScheduling`, and trace document parsers in
+  `src/runtime/traces/traceParsing.ts`.
+
+### Notes on what is and is not verified
+
+The catalogue and the stored trace request were parsed from raw bodies, so
+those are transcription. The traces feed's `trc:` nesting was **not** read end
+to end, so the entry reader looks both directly on the entry and under
+`extendedData` rather than guessing one — a wrong guess yields a silently empty
+`user` and `state`, and a listing that quietly loses fields is worse than one
+that fails. `grossTime` and `traceEventNetTime` are handed over as parsed,
+because the contract types them `unknown`.
+
+
 ### Changed
 
 - **Tests take the connection from one helper.** `createTestConnection()` reads

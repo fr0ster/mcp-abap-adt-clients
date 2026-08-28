@@ -185,6 +185,42 @@ export const HANDLERS = {
     },
     capabilities: FULL,
   },
+  include: {
+    factory: (c: AdtClient) => c.getInclude(),
+    subject: '/sap/bc/adt/programs/includes/ZGUARD_INC',
+    config: {
+      sourceCode: '" guard',
+      includeName: 'ZGUARD_INC',
+      packageName: '$TMP',
+      description: 'guard',
+    },
+    requests: {
+      create: '/sap/bc/adt/programs/includes',
+      read: '/sap/bc/adt/programs/includes/zguard_inc/source/main',
+      readMetadata: '/sap/bc/adt/programs/includes/zguard_inc',
+      update: '/sap/bc/adt/programs/includes/zguard_inc/source/main',
+      delete: '/sap/bc/adt/programs/includes/zguard_inc',
+      validate: '/sap/bc/adt/includes/validation',
+      activate: '/sap/bc/adt/activation',
+      lock: '/sap/bc/adt/programs/includes/zguard_inc',
+      unlock: '/sap/bc/adt/programs/includes/zguard_inc',
+    },
+    why:
+      'A PROG/I include is not versionable, checkable or transport-aware here ' +
+      'because nothing measured says it is. Discovery lists the collection and ' +
+      'a captured Eclipse create shows the whole chain — create, lock, write ' +
+      'source, unlock, activate — and no version, checkrun or transport call ' +
+      'appears in it. Additive the moment one is measured.',
+    capabilities: [
+      'creatable',
+      'readable',
+      'updatable',
+      'deletable',
+      'validatable',
+      'activatable',
+      'lockable',
+    ],
+  },
   program: {
     factory: (c: AdtClient) => c.getProgram(),
     subject: '/sap/bc/adt/programs/programs/ZGUARD',

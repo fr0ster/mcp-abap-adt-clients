@@ -36,6 +36,8 @@ import type {
   ICdsTestDoubleCheckable,
   IClassUnitTestDefinition,
   IClassUnitTestRunOptions,
+  IIncludeConfig,
+  IIncludeState,
   ILogger,
   ISessionLifecycleAware,
   ITestRunInformation,
@@ -114,6 +116,7 @@ import {
   type IFunctionModuleConfig,
   type IFunctionModuleState,
 } from '../core/functionModule';
+import { AdtInclude } from '../core/include';
 import {
   AdtInterface,
   type IInterfaceConfig,
@@ -310,6 +313,25 @@ export class AdtClient {
       this.contentTypes,
       this.lockRegistry,
     );
+  }
+
+  /**
+   * Standalone `PROG/I` includes.
+   *
+   * A different resource from a program and from a function-group include —
+   * see `src/core/include/index.ts` for the three-way comparison. The return
+   * type names only the capabilities an include has: nothing measured says it
+   * is versionable, so it does not claim to be.
+   *
+   * Creatable on modern on-prem only, where discovery gives the includes
+   * collection an `app:accept`.
+   */
+  getInclude(): IAdtCrud<IIncludeConfig, IIncludeState> &
+    IAdtValidatable<IIncludeConfig, IIncludeState> &
+    IAdtActivatable<IIncludeConfig, IIncludeState> &
+    IAdtLockable<IIncludeConfig, IIncludeState> {
+    this.assertConnected();
+    return new AdtInclude(this.connection, this.logger, this.contentTypes);
   }
 
   /**

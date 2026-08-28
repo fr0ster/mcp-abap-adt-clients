@@ -20,6 +20,7 @@
  * ```
  */
 
+export { AdtInclude, CT_INCLUDE } from './core/include';
 export * from './index.abapgit';
 export * from './index.batch';
 export * from './index.core';
