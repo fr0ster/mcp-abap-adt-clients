@@ -7,13 +7,16 @@
   },
   "include": [
     "src/**/*",
-    // probe-atc only. src/__tests__/unit/scripts/ imports its pure parts, so it
-    // has to be in the program. The other scripts are deliberately NOT here:
-    // several no longer compile against current types, and dragging them in
-    // would fail this config for reasons that have nothing to do with tests.
-    // tsconfig.test.integration.json carries the same line — change both.
+    // The three probes, and only those. `probe-atc` has to be here because
+    // src/__tests__/unit/scripts/ imports its pure parts; the other two are
+    // here because a script nothing compiles is how the ones in #114 rotted.
+    // The rest are deliberately NOT: several no longer compile against current
+    // types, and dragging them in would fail this config for reasons that have
+    // nothing to do with tests.
+    // tsconfig.test.integration.json carries the same list — change both.
     "scripts/probe-atc.ts",
-    "scripts/probe-abapunit.ts"
+    "scripts/probe-abapunit.ts",
+    "scripts/probe-profiler-contract.ts"
   ],
   "exclude": ["node_modules", "dist"]
 }

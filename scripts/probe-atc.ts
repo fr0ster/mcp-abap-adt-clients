@@ -106,6 +106,7 @@ import {
   getConfig,
   releaseTestConnection,
 } from '../src/__tests__/helpers/sessionConfig';
+import { refuseWhileRunOwnsSession } from '../src/__tests__/helpers/sharedSession';
 import { createConnectionLogger } from '../src/__tests__/helpers/testLogger';
 import { AdtUtils } from '../src/core/shared/AdtUtils';
 
@@ -813,6 +814,8 @@ interface ICandidateOutcome {
 }
 
 async function main(): Promise<void> {
+  refuseWhileRunOwnsSession();
+
   // A probe that says nothing while it works is unusable; INFO regardless of
   // the DEBUG_* flags, which gate the library's own loggers.
   const logger: ILogger = new DefaultLogger(LogLevel.INFO);

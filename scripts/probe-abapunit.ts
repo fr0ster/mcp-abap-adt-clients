@@ -47,6 +47,7 @@ import {
   getConfig,
   releaseTestConnection,
 } from '../src/__tests__/helpers/sessionConfig';
+import { refuseWhileRunOwnsSession } from '../src/__tests__/helpers/sharedSession';
 import { createConnectionLogger } from '../src/__tests__/helpers/testLogger';
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../.env');
@@ -141,6 +142,8 @@ function parseArgs(argv: string[]): { className?: string; out: string } {
 }
 
 async function main(): Promise<void> {
+  refuseWhileRunOwnsSession();
+
   const logger: ILogger = new DefaultLogger();
   const args = parseArgs(process.argv.slice(2));
   if (!args.className) {

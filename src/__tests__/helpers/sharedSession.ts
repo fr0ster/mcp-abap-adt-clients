@@ -131,6 +131,30 @@ export function readSessionMaterial(): ISessionMaterial | null {
   }
 }
 
+/**
+ * Refuse to start a standalone script while a run owns the session.
+ *
+ * `createTestConnection()` adopts the session a run published, and
+ * `releaseTestConnection()` then deliberately does NOT end it — the run owns
+ * it. A script going through both would take somebody's session and give
+ * nothing back. Probes exhausting a system's pool is not hypothetical: two runs
+ * of the ATC probe did it to E19, and the next four test runs died in
+ * globalSetup with no session available.
+ *
+ * The two cases the file cannot tell apart are both named in the message,
+ * because the right action differs: wait, or delete a file a killed run left
+ * behind.
+ */
+export function refuseWhileRunOwnsSession(): void {
+  if (!fs.existsSync(SHARED_SESSION_FILE)) return;
+  throw new Error(
+    `${SHARED_SESSION_FILE} exists, so either a test run is in flight — in ` +
+      'which case wait, one SAP-touching run at a time — or a previous run ' +
+      'was killed before its teardown. If nothing is running, delete it and ' +
+      'try again.',
+  );
+}
+
 export function forgetSessionMaterial(): void {
   try {
     fs.rmSync(SHARED_SESSION_FILE, { force: true });
