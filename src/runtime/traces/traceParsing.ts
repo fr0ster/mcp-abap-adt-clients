@@ -13,8 +13,12 @@
  * `state` is worse than one that fails. When the probe returns raw bodies, the
  * tolerance can collapse to whichever branch is real.
  *
- * **The tolerance stops at the document.** Being unsure which of two nestings
- * holds a field is not the same as being willing to accept any document at all.
+ * **The tolerance stops at the shape.** Being unsure which of two nestings holds
+ * a field is not the same as being willing to accept any document at all — and
+ * the check runs at two levels, because a wrong guess hides at both. A root
+ * that is not the expected one throws; so does a recognised root whose rows are
+ * named something else, or a feed of entries none of which carries a readable
+ * id. Only a document understood at both levels may report an empty result.
  * A body that is empty, unparseable, or rooted in something other than what is
  * expected throws {@link TraceDocumentError} — it does NOT become an empty
  * result. An earlier version returned `{ entries: [] }` for all three, which a
@@ -132,6 +136,45 @@ function rootOf(response: IAdtResponse, rootName: string, what: string): Node {
   return root && typeof root === 'object' ? (root as Node) : {};
 }
 
+/** Child *elements* of a node — not its attributes, not its text. */
+function childElements(node: Node): string[] {
+  return Object.keys(node).filter(
+    (key) => !key.startsWith('@_') && key !== '#text',
+  );
+}
+
+/**
+ * The rows of a view, or a thrown explanation.
+ *
+ * A recognised root with unrecognised rows is the same defect as an
+ * unrecognised root, one level down, and it hides in the same way: a view whose
+ * children are named something other than what this code expects yields an
+ * empty list that reads as "this trace has no rows". Since the exact row schema
+ * of the three views has never been confirmed against a raw capture, that is
+ * the live risk here rather than a hypothetical one.
+ *
+ * A root with no child elements at all is genuinely empty and passes.
+ */
+function rowsOf(
+  root: Node,
+  rowName: string,
+  what: string,
+  response: IAdtResponse,
+): Node[] {
+  const rows = asList(root[rowName]);
+  if (rows.length > 0) {
+    return rows;
+  }
+  const others = childElements(root).filter((name) => name !== rowName);
+  if (others.length > 0) {
+    throw new TraceDocumentError(
+      `Reading ${what}: expected <${rowName}> rows, found <${others.join('>, <')}>. The document was understood at the root and not below it, so an empty result would be a guess.`,
+      bodyOf(response),
+    );
+  }
+  return rows;
+}
+
 /** What the document actually had at the top, for the error to name. */
 function describeRoots(parsed: Node | undefined): string {
   const names = Object.keys(parsed ?? {}).filter((k) => k !== '?xml');
@@ -198,9 +241,12 @@ const ID_IN_URI = /abaptraces\/([A-Za-z0-9]{16,})(?:\/|$)/;
  */
 export function parseTraceEntries(response: IAdtResponse): ITraceEntry[] {
   const feed = rootOf(response, 'feed', 'the trace feed');
+  // A feed legitimately carries `title`, `updated` and `contributor` with no
+  // entries at all, so the absence of `entry` is emptiness, not a misread. What
+  // is NOT emptiness is entries that are present and unreadable.
   const entries = asList(feed.entry);
 
-  return entries
+  const parsed = entries
     .map((entry): ITraceEntry | undefined => {
       const idText = text(entry.id) ?? '';
       const selfHref =
@@ -235,6 +281,14 @@ export function parseTraceEntries(response: IAdtResponse): ITraceEntry[] {
       };
     })
     .filter((entry): entry is ITraceEntry => entry !== undefined);
+
+  if (entries.length > 0 && parsed.length === 0) {
+    throw new TraceDocumentError(
+      `Reading the trace feed: ${entries.length} entr${entries.length === 1 ? 'y' : 'ies'} present and none carried a recognisable trace id. Returning an empty list here would report a full feed as no traces at all.`,
+      bodyOf(response),
+    );
+  }
+  return parsed;
 }
 
 /** `trc:callingProgram` / `trc:calledProgram`. */
@@ -260,7 +314,13 @@ function programRef(node: unknown): ITraceProgramRef | undefined {
 }
 
 export function parseHitList(response: IAdtResponse): IAbapTraceHitList {
-  const rows = asList(rootOf(response, 'hitlist', 'a trace hit list').entry);
+  const what = 'a trace hit list';
+  const rows = rowsOf(
+    rootOf(response, 'hitlist', what),
+    'entry',
+    what,
+    response,
+  );
 
   return {
     entries: rows.map(
@@ -281,8 +341,12 @@ export function parseHitList(response: IAdtResponse): IAbapTraceHitList {
 }
 
 export function parseStatements(response: IAdtResponse): IAbapTraceStatements {
-  const rows = asList(
-    rootOf(response, 'statements', 'trace statements').statement,
+  const what = 'trace statements';
+  const rows = rowsOf(
+    rootOf(response, 'statements', what),
+    'statement',
+    what,
+    response,
   );
 
   return {
@@ -320,8 +384,12 @@ function accessTime(node: unknown): IAbapTraceAccessTime | undefined {
 }
 
 export function parseDbAccesses(response: IAdtResponse): IAbapTraceDbAccesses {
-  const rows = asList(
-    rootOf(response, 'dbAccesses', 'trace database accesses').dbAccess,
+  const what = 'trace database accesses';
+  const rows = rowsOf(
+    rootOf(response, 'dbAccesses', what),
+    'dbAccess',
+    what,
+    response,
   );
 
   return {
@@ -348,8 +416,12 @@ export function parseDbAccesses(response: IAdtResponse): IAbapTraceDbAccesses {
  * `id`: renaming it here would hide the fact that the two are the same string.
  */
 export function parseNamedItems(response: IAdtResponse): INamedItem[] {
-  const items = asList(
-    rootOf(response, 'namedItemList', 'a trace catalogue').namedItem,
+  const what = 'a trace catalogue';
+  const items = rowsOf(
+    rootOf(response, 'namedItemList', what),
+    'namedItem',
+    what,
+    response,
   );
 
   return items.map((item) => ({
@@ -368,6 +440,14 @@ export function parseTraceRequests(
   response: IAdtResponse,
 ): ITraceRequestEntry[] {
   const entries = asList(rootOf(response, 'feed', 'the trace schedule').entry);
+  // Same rule as the trace feed: an empty schedule is a feed with no entries,
+  // not a feed of entries this code cannot read.
+  if (entries.length > 0 && !entries.some((entry) => text(entry.id))) {
+    throw new TraceDocumentError(
+      `Reading the trace schedule: ${entries.length} entries present and none carried an id.`,
+      bodyOf(response),
+    );
+  }
 
   return entries.map((entry): ITraceRequestEntry => {
     const extended = (entry.extendedData as Node | undefined) ?? {};

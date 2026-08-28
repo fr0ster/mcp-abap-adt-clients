@@ -63,12 +63,88 @@ describe('trace document parsing', () => {
     }
   });
 
+  describe('a recognised root with unrecognised rows is not an empty result', () => {
+    it('throws when a hit list has children under an unexpected name', () => {
+      // The live risk: the row schema of the three views was never confirmed
+      // against a raw capture, so a wrong guess must be audible.
+      expect(() =>
+        parseHitList(
+          response(
+            '<?xml version="1.0"?><trc:hitlist xmlns:trc="x"><trc:row trc:index="1"/></trc:hitlist>',
+          ),
+        ),
+      ).toThrow(/expected <entry> rows, found <row>/);
+    });
+
+    it('throws when statements have children under an unexpected name', () => {
+      expect(() =>
+        parseStatements(
+          response(
+            '<?xml version="1.0"?><trc:statements xmlns:trc="x"><trc:stmt trc:id="1"/></trc:statements>',
+          ),
+        ),
+      ).toThrow(TraceDocumentError);
+    });
+
+    it('throws when db accesses have children under an unexpected name', () => {
+      expect(() =>
+        parseDbAccesses(
+          response(
+            '<?xml version="1.0"?><trc:dbAccesses xmlns:trc="x"><trc:access trc:index="1"/></trc:dbAccesses>',
+          ),
+        ),
+      ).toThrow(TraceDocumentError);
+    });
+
+    it('throws when a catalogue has children under an unexpected name', () => {
+      expect(() =>
+        parseNamedItems(
+          response(
+            '<?xml version="1.0"?><nameditem:namedItemList xmlns:nameditem="x"><nameditem:item/></nameditem:namedItemList>',
+          ),
+        ),
+      ).toThrow(TraceDocumentError);
+    });
+
+    it('throws when a feed has entries whose ids are unreadable', () => {
+      // Reporting a full feed as "no traces" is the failure this prevents.
+      expect(() =>
+        parseTraceEntries(
+          response(
+            '<?xml version="1.0"?><atom:feed xmlns:atom="http://www.w3.org/2005/Atom"><atom:entry><atom:id>urn:something:else</atom:id></atom:entry></atom:feed>',
+          ),
+        ),
+      ).toThrow(/none carried a recognisable trace id/);
+    });
+
+    it('still reads a feed whose entries are recognisable', () => {
+      const entries = parseTraceEntries(
+        response(
+          '<?xml version="1.0"?><atom:feed xmlns:atom="http://www.w3.org/2005/Atom"><atom:entry><atom:id>/sap/bc/adt/runtime/traces/abaptraces/ABCDEF0123456789ABCD</atom:id><atom:published>2026-08-28T10:00:00Z</atom:published></atom:entry></atom:feed>',
+        ),
+      );
+      expect(entries).toHaveLength(1);
+      expect(entries[0]?.recordedAt).toBe('2026-08-28T10:00:00Z');
+    });
+  });
+
   describe('a recognised document may legitimately be empty', () => {
     it('accepts a feed with no entries', () => {
       expect(
         parseTraceEntries(
           response(
             '<?xml version="1.0"?><atom:feed xmlns:atom="http://www.w3.org/2005/Atom"><atom:title>Traces</atom:title></atom:feed>',
+          ),
+        ),
+      ).toEqual([]);
+    });
+
+    it('accepts a feed that carries only its own metadata', () => {
+      // title/updated with no `entry` is an empty feed, not a misread one.
+      expect(
+        parseTraceEntries(
+          response(
+            '<?xml version="1.0"?><atom:feed xmlns:atom="http://www.w3.org/2005/Atom"><atom:title>Traces</atom:title><atom:updated>2026-08-28T10:00:00Z</atom:updated></atom:feed>',
           ),
         ),
       ).toEqual([]);

@@ -115,8 +115,13 @@ Requires `@mcp-abap-adt/interfaces@^22.0.0`.
   sure of itself: it states openly that the feed's nesting was never read end to
   end, so a wrong guess must be audible. An empty body in particular is not an
   empty trace — ADT answers `200` with nothing when a resource is not ready, and
-  never 404s. A correctly recognised document with no rows is still accepted, so
-  a genuinely empty view reads as empty.
+  never 404s.
+
+  The check runs at **two** levels, because a wrong guess hides at both: a
+  recognised root whose rows are named something else, or a feed of entries none
+  of which carries a readable id, also throws. Reporting a full feed as "no
+  traces" is the failure that prevents. A document understood at both levels may
+  still be empty, and then it reads as empty.
 
 ### Notes on what is and is not verified
 
