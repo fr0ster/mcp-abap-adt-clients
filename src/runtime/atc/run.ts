@@ -45,7 +45,7 @@ const ATC = '/sap/bc/adt/atc';
  * everywhere else; neither could be settled on a system that refuses to hold
  * either kind.
  */
-const URI_TEMPLATES: Record<AtcObjectType, string> = {
+const URI_TEMPLATES: Partial<Record<AtcObjectType, string>> = {
   class: '/sap/bc/adt/oo/classes/',
   interface: '/sap/bc/adt/oo/interfaces/',
   function_group: '/sap/bc/adt/functions/groups/',
@@ -55,12 +55,34 @@ const URI_TEMPLATES: Record<AtcObjectType, string> = {
   behavior_definition: '/sap/bc/adt/bo/behaviordefinitions/',
 };
 
-/** The ADT URI ATC checks an object at. */
+/**
+ * The ADT URI ATC checks an object at.
+ *
+ * `Partial`, deliberately. `AtcObjectType` grows when an on-prem system finally
+ * confirms a type — `program` and `include` are the two waiting — and an
+ * exhaustive `Record` here turns that additive change into a compile error in
+ * this package, forcing two repositories to be released in lockstep for
+ * something that breaks nothing. The contract's own comment asks callers not to
+ * build one, and this was one.
+ *
+ * The cost of `Partial` is that a missing entry becomes a runtime question
+ * rather than a compile-time one, so it is answered loudly: a `undefined`
+ * template would otherwise build the string `"undefined/ZCL_FOO"` and ATC would
+ * be asked to check a URI that means nothing.
+ */
 export function buildAtcObjectUri(
   objectType: AtcObjectType,
   objectName: string,
 ): string {
-  return `${URI_TEMPLATES[objectType]}${encodeSapObjectName(objectName).toUpperCase()}`;
+  const template = URI_TEMPLATES[objectType];
+  if (!template) {
+    throw new Error(
+      `No ADT URI is known for ATC object type '${objectType}'. It is declared ` +
+        'in AtcObjectType but has no template here — add one, with the URI ' +
+        'measured against a system that checks that type.',
+    );
+  }
+  return `${template}${encodeSapObjectName(objectName).toUpperCase()}`;
 }
 
 /**
