@@ -27,6 +27,7 @@ import {
   createTestConnection,
   releaseTestConnection,
 } from '../src/__tests__/helpers/sessionConfig';
+import { SHARED_SESSION_FILE } from '../src/__tests__/helpers/sharedSession';
 import { createConnectionLogger } from '../src/__tests__/helpers/testLogger';
 
 // A script has no jest bootstrap to load this for it.
@@ -88,6 +89,23 @@ async function ask(connection: IAbapConnection, probe: Probe) {
 }
 
 async function main() {
+  // Refuse to run alongside a jest run, and say which case it is.
+  //
+  // `createTestConnection()` adopts the session a run published, and
+  // `releaseTestConnection()` then deliberately does NOT end it — the run owns
+  // it. A script going through both would take somebody's session and give
+  // nothing back. Probes exhausting a system's session pool is not
+  // hypothetical: two runs of the ATC probe did it to E19, and the next four
+  // test runs died in globalSetup with no session available.
+  if (fs.existsSync(SHARED_SESSION_FILE)) {
+    throw new Error(
+      `${SHARED_SESSION_FILE} exists, so either a test run is in flight — in ` +
+        'which case wait, one SAP-touching run at a time — or a previous run ' +
+        'was killed before its teardown. If nothing is running, delete it and ' +
+        'try again.',
+    );
+  }
+
   fs.mkdirSync(OUT, { recursive: true });
   const connection = await createTestConnection(createConnectionLogger());
   const results: Array<Record<string, unknown>> = [];
@@ -208,7 +226,18 @@ async function main() {
 }
 
 main().catch((error) => {
+  // The message, not the object. A failed connect against SAP arrives with the
+  // server's whole HTML error page attached — four kilobytes of markup around
+  // the word "401" — and burying the reason is how a probe wastes the time of
+  // the person who ran it.
+  const e = error as { message?: string; response?: { status?: number } };
+  const status = e.response?.status;
   // biome-ignore lint/suspicious/noConsole: a probe reports its own failure
-  console.error(error);
+  console.error(
+    `\n${status ? `HTTP ${status}: ` : ''}${e.message ?? String(error)}\n` +
+      (status === 401
+        ? 'The credential was refused. Refresh it and run again.\n'
+        : ''),
+  );
   process.exit(1);
 });
