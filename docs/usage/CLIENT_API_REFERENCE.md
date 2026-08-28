@@ -173,6 +173,45 @@ await toggle.update(
 // bind to transports through the /toggle and /check endpoints instead.
 ```
 
+### Standalone `PROG/I` includes (`getInclude()`)
+
+Since 13.0.0. An include is **not** a program and **not** a function-group
+include — three different things, two of them easy to confuse:
+
+| | `getInclude()` | `getFunctionInclude()` |
+|---|---|---|
+| type | `PROG/I` | `FUGR/I` |
+| collection | `/sap/bc/adt/programs/includes` | `/sap/bc/adt/functions/groups/{group}/includes` |
+| belongs to | nothing — it stands alone | its function group |
+| validation | `/sap/bc/adt/includes/validation` | none; the parent group is probed |
+
+```typescript
+const include = client.getInclude();
+
+await include.create({
+  includeName: 'ZMY_INCLUDE',
+  packageName: 'ZMY_PACKAGE',
+  description: 'Shared form routines',
+  transportRequest: 'DEVK900123',
+  sourceCode: '" shared routines',
+});
+
+const source = await include.read({ includeName: 'ZMY_INCLUDE' });
+await include.update({ includeName: 'ZMY_INCLUDE', sourceCode: '" changed' });
+await include.delete({ includeName: 'ZMY_INCLUDE' });
+```
+
+Contract notes:
+- **Creating one works on modern on-prem only.** Only there does discovery give
+  the includes collection an `app:accept`, and a collection without one is not a
+  POST target. Cloud answers `403 S_DEVELOP` for the type.
+- The return type offers create/read/update/delete, validate, activate, lock and
+  unlock — and nothing else. It is not versionable, checkable or
+  transport-aware, because nothing measured says an include is.
+- `programType: 'include'` on `getProgram()` now **throws**. It used to map to
+  `'I'` and post a `program:abapProgram` document with `adtcore:type="PROG/P"`
+  to the programs collection — the wrong object, not a wrong parameter.
+
 ### Feature Toggle — environment-specific behavior
 
 | Environment | Create / delete | Update metadata + source | switchOn / switchOff | getRuntimeState / checkState / readSource |
@@ -815,34 +854,58 @@ const runtime = new AdtRuntimeClient(connection, logger);
 
 ### Profiler Traces
 
+Since 13.0.0 the profiler **reads**; configuring a measurement belongs to the
+executors. The two never share a vocabulary: scheduling yields a *request id*,
+reading takes a *trace id*.
+
 ```typescript
 const profiler = runtime.getProfiler();
 
-// List / configure
-const files = await profiler.list();
-const params = await profiler.getParameters();
-const created = await profiler.createParameters({
+// What traces exist — parsed entries, not a raw response.
+const traces = await profiler.list({ user: 'SOMEONE' });
+const newest = traces.reduce((a, b) => (a.recordedAt > b.recordedAt ? a : b));
+
+// What is inside one. The result is the view's own type.
+const hitList = await profiler.read(newest.id, 'hitlist', {
+  withSystemEvents: false,
+});
+const statements = await profiler.read(newest.id, 'statements');
+const dbAccesses = await profiler.read(newest.id, 'dbAccesses');
+
+console.log(hitList.entries.length, dbAccesses.accesses[0]?.accessTime?.total);
+```
+
+Configuring and scheduling live on the executors:
+
+```typescript
+const classExecutor = new AdtExecutor(connection, logger).getClassExecutor();
+
+const objectTypes = await classExecutor.listObjectTypes();   // INamedItem[]
+const processTypes = await classExecutor.listProcessTypes();
+const scheduled = await classExecutor.listRequests();        // ITraceRequestEntry[]
+
+const requestId = await classExecutor.scheduleTrace({
   description: 'CI trace run',
   sqlTrace: true,
   maxTimeForTracing: 1800,
 });
-const traceId = profiler.extractIdFromResponse(created);
-
-// Catalog
-const requests = await profiler.listRequests();
-const byUri = await profiler.getRequestsByUri('/sap/bc/adt/oo/classes/zcl_test');
-const objectTypes = await profiler.listObjectTypes();
-const processTypes = await profiler.listProcessTypes();
-
-// Analysis
-const hitList = await profiler.getHitList(traceId, { withSystemEvents: false });
-const statements = await profiler.getStatements(traceId);
-const dbAccesses = await profiler.getDbAccesses(traceId);
 ```
 
 Contract notes:
-- `extractIdFromResponse()` parses the ADT response to extract the trace ID.
-- Trace-aware methods accept a plain trace ID or a full ADT trace URI.
+- `read()` refuses a view this family does not have — at compile time, not with
+  a 404. The three are `hitlist`, `statements` and `dbAccesses`.
+- **A run does not promise a trace.** SAP writes it asynchronously, so when
+  `runWithProfiling` returns there may be no trace, there may never be one, and
+  you may legitimately read it a week later. To find the one your run produced,
+  note the ids before running and look for a new one — see
+  `src/__tests__/helpers/traceHelpers.ts`.
+- **Position in the feed is not age.** A feed's first entries have been measured
+  minutes old while its last were eight days older, so "the first id in the
+  document" is a trace chosen at random. Compare `recordedAt`.
+- `scheduleTrace()` answers with the request id and nothing else: reading the
+  created parameters resource back gives `200` with an empty body.
+- `grossTime` and `traceEventNetTime` are typed `unknown` — the elements are on
+  every row, but their attributes were never captured, unlike `accessTime`'s.
 
 ### Cross-Trace Analysis
 

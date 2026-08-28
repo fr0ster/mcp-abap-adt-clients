@@ -318,7 +318,11 @@ const runWithProfilingResult = await executor.getProgramExecutor().runWithProfil
   },
 );
 
-console.log(runWithProfilingResult.traceId);
+// The run reports what it did, not what SAP will write afterwards: there is no
+// `traceId` here. Find the trace with `runtime.getProfiler().list()` when you
+// are ready — comparing against the ids you saw before the run, since position
+// in the feed is not age.
+console.log(runWithProfilingResult.profilerId);
 ```
 
 **AdtUtils read type safety:**
