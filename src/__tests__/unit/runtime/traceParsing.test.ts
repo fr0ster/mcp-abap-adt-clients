@@ -248,7 +248,7 @@ describe('trace document parsing', () => {
             '<?xml version="1.0"?><trc:dbAccesses xmlns:trc="x"><trc:dbAccess trc:index="1"><trc:accessTime/></trc:dbAccess></trc:dbAccesses>',
           ),
         ),
-      ).toThrow(/accessTime element is present/);
+      ).toThrow(/<accessTime> element is present/);
     });
 
     it('refuses a state element with no value', () => {
@@ -322,6 +322,73 @@ describe('trace document parsing', () => {
           ),
         ),
       ).toThrow(TraceDocumentError);
+    });
+  });
+
+  describe('the schedule treats nested elements the same way', () => {
+    const scheduled = (extended: string) =>
+      response(
+        '<?xml version="1.0"?><atom:feed xmlns:atom="http://www.w3.org/2005/Atom" xmlns:trc="x"><atom:entry><atom:id>/sap/bc/adt/x/1</atom:id><trc:extendedData>' +
+          extended +
+          '</trc:extendedData></atom:entry></atom:feed>',
+      );
+
+    it('refuses a self-closing <executions/>', () => {
+      expect(() => parseTraceRequests(scheduled('<trc:executions/>'))).toThrow(
+        /<executions> element is present/,
+      );
+    });
+
+    it('refuses <executions> with unexpected children', () => {
+      expect(() =>
+        parseTraceRequests(
+          scheduled('<trc:executions><trc:unexpected/></trc:executions>'),
+        ),
+      ).toThrow(TraceDocumentError);
+    });
+
+    it('refuses a present <processType/> with no id', () => {
+      expect(() => parseTraceRequests(scheduled('<trc:processType/>'))).toThrow(
+        /<processType> element is present/,
+      );
+    });
+
+    it('refuses a present <object/> with no id', () => {
+      expect(() => parseTraceRequests(scheduled('<trc:object/>'))).toThrow(
+        /<object> element is present/,
+      );
+    });
+
+    it('reads them when they carry what they should', () => {
+      const [entry] = parseTraceRequests(
+        scheduled(
+          '<trc:processType trc:processTypeId="/p/any"/><trc:object trc:objectTypeId="/o/any"/><trc:executions trc:maximal="1" trc:completed="1"/>',
+        ),
+      );
+      expect(entry?.processTypeId).toBe('/p/any');
+      expect(entry?.objectTypeId).toBe('/o/any');
+      expect(entry?.executions).toEqual({ maximal: 1, completed: 1 });
+    });
+
+    it('accepts their absence', () => {
+      const [entry] = parseTraceRequests(
+        scheduled('<trc:description>-</trc:description>'),
+      );
+      expect(entry?.processTypeId).toBeUndefined();
+      expect(entry?.objectTypeId).toBeUndefined();
+      expect(entry?.executions).toBeUndefined();
+    });
+
+    it('reads fields under a present-but-empty <extendedData/>', () => {
+      // It parses to the empty string, so every lookup on it used to come back
+      // undefined and the whole container vanished silently.
+      const [entry] = parseTraceRequests(
+        response(
+          '<?xml version="1.0"?><atom:feed xmlns:atom="http://www.w3.org/2005/Atom" xmlns:trc="x"><atom:entry><atom:id>/sap/bc/adt/x/1</atom:id><trc:extendedData/></atom:entry></atom:feed>',
+        ),
+      );
+      expect(entry?.id).toBe('/sap/bc/adt/x/1');
+      expect(entry?.description).toBeUndefined();
     });
   });
 

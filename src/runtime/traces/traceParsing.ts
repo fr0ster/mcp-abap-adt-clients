@@ -37,7 +37,14 @@
  *    document. See {@link booleanOf}.
  *
  * The list is a list, not a running total. Four earlier commits each called the
- * level they had just fixed the last one; a fifth turned up every time.
+ * level they had just fixed the last one; a further one turned up every time.
+ *
+ * **The rules live in helpers so they can be applied by search, not by memory.**
+ * {@link presentNode}, {@link readAll}, {@link required} and {@link booleanOf}
+ * exist because the same defect kept reappearing at a call site the previous
+ * fix had not visited — once in a function written for that very purpose, three
+ * call sites away. Adding a reader here means using them; `as Node | undefined`
+ * and `?? ''` in this file are how the last eight review rounds started.
  *
  * Only a document understood at all three may report an empty result. What
  * stays tolerant is deliberately narrow and named: the two *optional* fields
@@ -203,6 +210,30 @@ function presentNode(value: unknown): Node | undefined {
     return undefined;
   }
   return typeof value === 'object' ? (value as Node) : {};
+}
+
+/**
+ * A present element must yield something, or the document was not understood.
+ *
+ * The counterpart to {@link presentNode}: that one decides whether an element
+ * is there, this one decides whether being there meant anything. Handing back
+ * an object of `undefined`s is how a container nobody could read passes for a
+ * container that happened to be empty.
+ */
+function readAll<T extends Record<string, unknown>>(
+  parsed: T,
+  element: string,
+  members: string,
+  what: string,
+  response: IAdtResponse,
+): T {
+  if (Object.values(parsed).every((value) => value === undefined)) {
+    throw new TraceDocumentError(
+      `Reading ${what}: a <${element}> element is present and carries none of ${members}.`,
+      bodyOf(response),
+    );
+  }
+  return parsed;
 }
 
 /** Child *elements* of a node — not its attributes, not its text. */
@@ -381,7 +412,10 @@ export function parseTraceEntries(response: IAdtResponse): ITraceEntry[] {
 
     // See the file comment: the `trc:` fields may sit directly on the entry
     // or under `trc:extendedData`, and only one of those has been read.
-    const extended = (entry.extendedData as Node | undefined) ?? {};
+    // `?? {}` alone does not do this: a present-but-empty `<extendedData/>`
+    // parses to the empty string, which is not nullish, so every lookup on it
+    // came back undefined and the fields vanished without a word.
+    const extended = presentNode(entry.extendedData) ?? {};
     const field = (name: string): unknown => entry[name] ?? extended[name];
 
     const stateNode = presentNode(field('state'));
@@ -404,8 +438,7 @@ export function parseTraceEntries(response: IAdtResponse): ITraceEntry[] {
         'the trace feed',
         response,
       ),
-      user:
-        text(field('user')) ?? text((entry.author as Node | undefined)?.name),
+      user: text(field('user')) ?? text(presentNode(entry.author)?.name),
       objectName: text(field('objectName')),
       uri: idText || selfHref || undefined,
       // `state` is optional, but its two members are not: an element that is
@@ -553,22 +586,20 @@ function accessTime(
   if (!time) {
     return undefined;
   }
-  const parsed = {
-    total: attrNum(time, 'total'),
-    applicationServer: attrNum(time, 'applicationServer'),
-    database: attrNum(time, 'database'),
-    ratioOfTraceTotal: attrNum(time, 'ratioOfTraceTotal'),
-  };
   // Every member is optional, so none can be required individually — but an
-  // element that yields not one of the four was not understood at all, and
-  // handing back four `undefined`s would present that as a measurement.
-  if (Object.values(parsed).every((value) => value === undefined)) {
-    throw new TraceDocumentError(
-      `Reading ${what}: an accessTime element is present and carries none of total/applicationServer/database/ratioOfTraceTotal.`,
-      bodyOf(response),
-    );
-  }
-  return parsed;
+  // element that yields not one of the four was not understood at all.
+  return readAll(
+    {
+      total: attrNum(time, 'total'),
+      applicationServer: attrNum(time, 'applicationServer'),
+      database: attrNum(time, 'database'),
+      ratioOfTraceTotal: attrNum(time, 'ratioOfTraceTotal'),
+    },
+    'accessTime',
+    'total/applicationServer/database/ratioOfTraceTotal',
+    what,
+    response,
+  );
 }
 
 export function parseDbAccesses(response: IAdtResponse): IAbapTraceDbAccesses {
@@ -650,8 +681,10 @@ export function parseTraceRequests(
 ): ITraceRequestEntry[] {
   const entries = asList(rootOf(response, 'feed', 'the trace schedule').entry);
   return entries.map((entry, position): ITraceRequestEntry => {
-    const extended = (entry.extendedData as Node | undefined) ?? {};
-    const executions = extended.executions as Node | undefined;
+    const extended = presentNode(entry.extendedData) ?? {};
+    const executions = presentNode(extended.executions);
+    const processType = presentNode(extended.processType);
+    const object = presentNode(extended.object);
     const traceUri = asList(entry.link)
       .filter((link) => (attr(link, 'rel') ?? '').endsWith('/tracefile'))
       .map((link) => attr(link, 'href'))
@@ -678,17 +711,36 @@ export function parseTraceRequests(
         'the trace schedule',
         response,
       ),
-      processTypeId: attr(
-        extended.processType as Node | undefined,
-        'processTypeId',
-      ),
-      objectTypeId: attr(extended.object as Node | undefined, 'objectTypeId'),
+      processTypeId: processType
+        ? readAll(
+            { processTypeId: attr(processType, 'processTypeId') },
+            'processType',
+            'processTypeId',
+            'the trace schedule',
+            response,
+          ).processTypeId
+        : undefined,
+      objectTypeId: object
+        ? readAll(
+            { objectTypeId: attr(object, 'objectTypeId') },
+            'object',
+            'objectTypeId',
+            'the trace schedule',
+            response,
+          ).objectTypeId
+        : undefined,
       ...(executions
         ? {
-            executions: {
-              maximal: attrNum(executions, 'maximal'),
-              completed: attrNum(executions, 'completed'),
-            },
+            executions: readAll(
+              {
+                maximal: attrNum(executions, 'maximal'),
+                completed: attrNum(executions, 'completed'),
+              },
+              'executions',
+              'maximal/completed',
+              'the trace schedule',
+              response,
+            ),
           }
         : {}),
       traceUri,
