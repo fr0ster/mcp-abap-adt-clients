@@ -16,6 +16,7 @@ import {
   parseNamedItems,
   parseStatements,
   parseTraceEntries,
+  parseTraceRequests,
   TraceDocumentError,
 } from '../../../runtime/traces/traceParsing';
 
@@ -267,6 +268,60 @@ describe('trace document parsing', () => {
         ),
       );
       expect(entries[0]?.state).toBeUndefined();
+    });
+  });
+
+  describe('a boolean is never invented from silence', () => {
+    const scheduleEntry = (extended: string) =>
+      response(
+        '<?xml version="1.0"?><atom:feed xmlns:atom="http://www.w3.org/2005/Atom" xmlns:trc="x"><atom:entry><atom:id>/sap/bc/adt/x/1</atom:id><trc:extendedData>' +
+          extended +
+          '</trc:extendedData></atom:entry></atom:feed>',
+      );
+
+    it('leaves isAggregated undefined when the field is absent', () => {
+      // `=== 'true'` answered `false`, which claims aggregation was off on the
+      // strength of the document not mentioning it.
+      const [entry] = parseTraceRequests(
+        scheduleEntry('<trc:description>-</trc:description>'),
+      );
+      expect(entry?.isAggregated).toBeUndefined();
+    });
+
+    it('reads both conventions', () => {
+      expect(
+        parseTraceRequests(
+          scheduleEntry('<trc:isAggregated>true</trc:isAggregated>'),
+        )[0]?.isAggregated,
+      ).toBe(true);
+      expect(
+        parseTraceRequests(
+          scheduleEntry('<trc:isAggregated>false</trc:isAggregated>'),
+        )[0]?.isAggregated,
+      ).toBe(false);
+      expect(
+        parseTraceRequests(
+          scheduleEntry('<trc:isAggregated>X</trc:isAggregated>'),
+        )[0]?.isAggregated,
+      ).toBe(true);
+    });
+
+    it('refuses a value that is neither', () => {
+      expect(() =>
+        parseTraceRequests(
+          scheduleEntry('<trc:isAggregated>unexpected</trc:isAggregated>'),
+        ),
+      ).toThrow(/neither a boolean/);
+    });
+
+    it('refuses an unrecognised statement flag rather than reading it as false', () => {
+      expect(() =>
+        parseStatements(
+          response(
+            '<?xml version="1.0"?><trc:statements xmlns:trc="x"><trc:statement trc:id="1" trc:index="1" trc:isProcedureLike="maybe"/></trc:statements>',
+          ),
+        ),
+      ).toThrow(TraceDocumentError);
     });
   });
 

@@ -26,11 +26,18 @@
  *    `?? ''` were one hiding place: they turned `<statement/>` into a
  *    statement with `id: ''` and `index: 0`, a row that was never in the
  *    document and one that `typeof id === 'string'` confirms.
- * 4. **Nested element.** The last one, and the subtlest: a present element that
+ * 4. **Nested element.** A present element that
  *    could not be read was treated as an absent one, because
  *    `<trc:callingProgram/>` parses to the empty *string* and a
  *    `typeof !== 'object'` test called that missing. Absence is the property
  *    not being there; anything else is present. See {@link presentNode}.
+ * 5. **Value.** A recognised field whose *content* is not understood. Reading
+ *    every unrecognised boolean as `false` is not a parse failure — it is a
+ *    statement about the object, made on the strength of not understanding the
+ *    document. See {@link booleanOf}.
+ *
+ * The list is a list, not a running total. Four earlier commits each called the
+ * level they had just fixed the last one; a fifth turned up every time.
  *
  * Only a document understood at all three may report an empty result. What
  * stays tolerant is deliberately narrow and named: the two *optional* fields
@@ -289,9 +296,46 @@ function attrNum(node: Node | undefined, name: string): number | undefined {
   return Number.isNaN(parsed) ? undefined : parsed;
 }
 
-function attrBool(node: Node | undefined, name: string): boolean | undefined {
-  const raw = attr(node, name);
-  return raw === undefined ? undefined : raw === 'true' || raw === 'X';
+/**
+ * A boolean, or a thrown explanation — never a quiet `false`.
+ *
+ * `raw === 'true'` reads every unrecognised value as `false`, which is not a
+ * failure to parse but a *statement about the object*: it says aggregation was
+ * off, or the statement is not procedure-like, on the strength of not
+ * understanding the document. Absence stays absent; an unexpected value is a
+ * document this code does not understand.
+ *
+ * Both conventions are accepted because both appear in ADT: XML booleans
+ * (`true`/`false`) and ABAP flags (`X`/empty).
+ */
+function booleanOf(
+  raw: string | undefined,
+  field: string,
+  what: string,
+  response: IAdtResponse,
+): boolean | undefined {
+  if (raw === undefined) {
+    return undefined;
+  }
+  if (raw === 'true' || raw === 'X') {
+    return true;
+  }
+  if (raw === 'false' || raw === '') {
+    return false;
+  }
+  throw new TraceDocumentError(
+    `Reading ${what}: ${field} is "${raw}", which is neither a boolean (true/false) nor an ABAP flag (X/empty). Reading it as false would state something about the object that the document does not.`,
+    bodyOf(response),
+  );
+}
+
+function attrBool(
+  node: Node | undefined,
+  name: string,
+  what: string,
+  response: IAdtResponse,
+): boolean | undefined {
+  return booleanOf(attr(node, name), name, what, response);
 }
 
 /** A count as text, or nothing. `Number('')` is `0`, so emptiness is checked. */
@@ -491,7 +535,7 @@ export function parseStatements(response: IAdtResponse): IAbapTraceStatements {
         component: attr(row, 'component'),
         componentDescription: attr(row, 'componentDescription'),
         hitlistAnchor: attr(row, 'hitlistAnchor'),
-        isProcedureLike: attrBool(row, 'isProcedureLike'),
+        isProcedureLike: attrBool(row, 'isProcedureLike', what, response),
         callingProgram: programRef(row.callingProgram, what, response),
         grossTime: row.grossTime,
         traceEventNetTime: row.traceEventNetTime,
@@ -625,7 +669,15 @@ export function parseTraceRequests(
       index: numberOf(text(extended.requestIndex)),
       description: text(extended.description),
       expiresAt: text(extended.expires),
-      isAggregated: text(extended.isAggregated) === 'true',
+      // Absence is not `false`. The contract makes this optional, and saying
+      // "aggregation was off" because the field was missing is a claim about
+      // the run that the document never made.
+      isAggregated: booleanOf(
+        text(extended.isAggregated),
+        'isAggregated',
+        'the trace schedule',
+        response,
+      ),
       processTypeId: attr(
         extended.processType as Node | undefined,
         'processTypeId',
