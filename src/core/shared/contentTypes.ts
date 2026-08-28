@@ -31,6 +31,26 @@ export class AdtContentTypesBase implements IAdtContentTypes {
     };
   }
 
+  /**
+   * Standalone `PROG/I` include creation.
+   *
+   * One version only, and no `Modern` override: `…includes.v2+xml` is the sole
+   * type any system advertises for this collection, and only modern on-prem
+   * advertises it at all. On a system that does not, the collection is not a
+   * POST target and the header is moot — the request fails for a reason no
+   * `Accept` can fix.
+   *
+   * Eclipse sends **no** `Accept` on this create, only the content type. We send
+   * one because {@link IAdtHeaders} has the field; the server accepted both in
+   * the captured exchange.
+   */
+  includeCreate(): IAdtHeaders {
+    return {
+      accept: 'application/vnd.sap.adt.programs.includes.v2+xml',
+      contentType: 'application/vnd.sap.adt.programs.includes.v2+xml',
+    };
+  }
+
   programRead(): IAdtHeaders {
     return {
       accept:

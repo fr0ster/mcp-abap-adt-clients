@@ -1,5 +1,6 @@
 import type {
   IAbapConnection,
+  IAbapTraceViews,
   IAdtResponse,
   ILogger,
   IProfiler,
@@ -8,6 +9,9 @@ import type {
   IProfilerTraceHitListOptions,
   IProfilerTraceParameters,
   IProfilerTraceStatementsOptions,
+  ITraceEntry,
+  ViewArgs,
+  ViewResult,
 } from '@mcp-abap-adt/interfaces';
 import {
   buildTraceParametersXml,
@@ -16,17 +20,19 @@ import {
   extractProfilerIdFromResponse,
   getTraceDbAccesses,
   getTraceHitList,
-  getTraceParameters,
-  getTraceParametersForAmdp,
-  getTraceParametersForCallstack,
   getTraceRequestsByUri,
   getTraceStatements,
   listObjectTypes,
   listProcessTypes,
   listTraceFiles,
   listTraceRequests,
-  parseTraceFeedEntries,
 } from './profiler';
+import {
+  parseDbAccesses,
+  parseHitList,
+  parseStatements,
+  parseTraceEntries,
+} from './traceParsing';
 
 export class Profiler implements IProfiler {
   readonly kind = 'profiler' as const;
@@ -36,13 +42,71 @@ export class Profiler implements IProfiler {
     private readonly logger: ILogger,
   ) {}
 
-  async list(options?: IProfilerListOptions): Promise<IAdtResponse> {
+  /**
+   * What traces exist.
+   *
+   * Parsed, not raw: the contract says a listing yields entries. The raw
+   * response is still available through {@link listTraceFilesResponse} for a
+   * caller that wants the document itself.
+   */
+  async list(options?: IProfilerListOptions): Promise<ITraceEntry[]> {
+    return parseTraceEntries(await this.listTraceFilesResponse(options));
+  }
+
+  /** The feed as the server sent it. */
+  async listTraceFilesResponse(
+    options?: IProfilerListOptions,
+  ): Promise<IAdtResponse> {
     return listTraceFiles(this.connection, options);
   }
 
-  /** @deprecated Use list() instead */
+  /** @deprecated Use {@link listTraceFilesResponse} — `list()` now parses. */
   async listTraceFiles(options?: IProfilerListOptions): Promise<IAdtResponse> {
-    return this.list(options);
+    return this.listTraceFilesResponse(options);
+  }
+
+  /**
+   * What is inside one trace.
+   *
+   * One operation, three views. The result type is the view's own — asking for
+   * `hitlist` yields a hit list, and the compiler refuses a view this family
+   * does not have.
+   */
+  async read<K extends keyof IAbapTraceViews>(
+    traceId: string,
+    view: K,
+    ...args: ViewArgs<IAbapTraceViews, K>
+  ): Promise<ViewResult<IAbapTraceViews, K>> {
+    const [options] = args;
+    switch (view) {
+      case 'hitlist':
+        return parseHitList(
+          await getTraceHitList(
+            this.connection,
+            traceId,
+            options as IProfilerTraceHitListOptions | undefined,
+          ),
+        ) as ViewResult<IAbapTraceViews, K>;
+      case 'statements':
+        return parseStatements(
+          await getTraceStatements(
+            this.connection,
+            traceId,
+            options as IProfilerTraceStatementsOptions | undefined,
+          ),
+        ) as ViewResult<IAbapTraceViews, K>;
+      case 'dbAccesses':
+        return parseDbAccesses(
+          await getTraceDbAccesses(
+            this.connection,
+            traceId,
+            options as IProfilerTraceDbAccessesOptions | undefined,
+          ),
+        ) as ViewResult<IAbapTraceViews, K>;
+      default:
+        // Unreachable through the typed surface; reachable from JavaScript.
+        throw new Error(`Unknown trace view: ${String(view)}`);
+    }
   }
 
   /**
@@ -71,13 +135,12 @@ export class Profiler implements IProfiler {
   async latestTraceId(
     options?: IProfilerListOptions,
   ): Promise<string | undefined> {
-    const response = await this.list(options);
-    const entries = parseTraceFeedEntries(response);
+    const entries = await this.list(options);
     if (entries.length === 0) {
       return undefined;
     }
     return entries.reduce((newest, entry) =>
-      entry.writtenAt > newest.writtenAt ? entry : newest,
+      entry.recordedAt > newest.recordedAt ? entry : newest,
     ).id;
   }
 
@@ -90,29 +153,14 @@ export class Profiler implements IProfiler {
   async listTraceIds(
     options?: IProfilerListOptions,
   ): Promise<Array<{ id: string; writtenAt: string }>> {
-    return parseTraceFeedEntries(await this.list(options));
-  }
-
-  async getParameters(): Promise<IAdtResponse> {
-    return getTraceParameters(this.connection);
-  }
-
-  async getParametersForCallstack(): Promise<IAdtResponse> {
-    return getTraceParametersForCallstack(this.connection);
-  }
-
-  async getParametersForAmdp(): Promise<IAdtResponse> {
-    return getTraceParametersForAmdp(this.connection);
+    return (await this.list(options)).map((entry) => ({
+      id: entry.id,
+      writtenAt: entry.recordedAt,
+    }));
   }
 
   buildParametersXml(options?: IProfilerTraceParameters): string {
     return buildTraceParametersXml(options);
-  }
-
-  async createParameters(
-    options?: IProfilerTraceParameters,
-  ): Promise<IAdtResponse> {
-    return createTraceParameters(this.connection, options);
   }
 
   extractIdFromResponse(response: IAdtResponse): string | undefined {
@@ -121,42 +169,5 @@ export class Profiler implements IProfiler {
 
   getDefaultParameters(): Omit<IProfilerTraceParameters, 'description'> {
     return { ...DEFAULT_PROFILER_TRACE_PARAMETERS };
-  }
-
-  async getHitList(
-    traceIdOrUri: string,
-    options?: IProfilerTraceHitListOptions,
-  ): Promise<IAdtResponse> {
-    return getTraceHitList(this.connection, traceIdOrUri, options);
-  }
-
-  async getStatements(
-    traceIdOrUri: string,
-    options?: IProfilerTraceStatementsOptions,
-  ): Promise<IAdtResponse> {
-    return getTraceStatements(this.connection, traceIdOrUri, options);
-  }
-
-  async getDbAccesses(
-    traceIdOrUri: string,
-    options?: IProfilerTraceDbAccessesOptions,
-  ): Promise<IAdtResponse> {
-    return getTraceDbAccesses(this.connection, traceIdOrUri, options);
-  }
-
-  async listRequests(): Promise<IAdtResponse> {
-    return listTraceRequests(this.connection);
-  }
-
-  async getRequestsByUri(uri: string): Promise<IAdtResponse> {
-    return getTraceRequestsByUri(this.connection, uri);
-  }
-
-  async listObjectTypes(): Promise<IAdtResponse> {
-    return listObjectTypes(this.connection);
-  }
-
-  async listProcessTypes(): Promise<IAdtResponse> {
-    return listProcessTypes(this.connection);
   }
 }

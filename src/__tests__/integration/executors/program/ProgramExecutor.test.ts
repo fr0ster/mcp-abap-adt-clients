@@ -37,6 +37,7 @@ import {
   logTestStep,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
+import { traceIdsNow, waitForNewTrace } from '../../../helpers/traceHelpers';
 
 const {
   getEnabledTestCase,
@@ -374,9 +375,7 @@ describe('ProgramExecutor (integration)', () => {
 
         // What the feed holds BEFORE the run, so the trace this run writes can
         // be told apart from the ones already there.
-        const tracesBefore = new Set(
-          (await profiler.listTraceIds({ user: traceUser })).map((t) => t.id),
-        );
+        const tracesBefore = await traceIdsNow(profiler, { user: traceUser });
 
         logTestStep('create trace parameters + run with profiler', testsLogger);
         const result = await executor
@@ -410,40 +409,38 @@ describe('ProgramExecutor (integration)', () => {
         // creating a new trace of its own. Measured on E19, the difference
         // shows up on the first or second attempt.
         logTestStep('poll for the trace this run produced', testsLogger);
-        let traceId: string | undefined;
-        for (let attempt = 1; attempt <= 5 && !traceId; attempt++) {
-          const seenNow = await profiler.listTraceIds({ user: traceUser });
-          traceId = seenNow.find((t) => !tracesBefore.has(t.id))?.id;
-          if (!traceId && attempt < 5) {
-            await new Promise((resolve) => setTimeout(resolve, 2000));
-          }
-        }
+        const traceId = await waitForNewTrace(profiler, tracesBefore, {
+          user: traceUser,
+          attempts: 5,
+          delayMs: 2000,
+          logger: testsLogger,
+        });
         expect(traceId).toBeDefined();
-        expect(typeof traceId).toBe('string');
-        expect((traceId as string).length).toBeGreaterThan(10);
+        if (!traceId) {
+          throw new Error('no new trace appeared after a profiled run');
+        }
 
         logTestStep(`traceId=${traceId}`, testsLogger);
 
-        logTestStep('read trace hitlist', testsLogger);
-        const hitlist = await profiler.getHitList(traceId as string, {
+        logTestStep('read all three views', testsLogger);
+        const hitlist = await profiler.read(traceId, 'hitlist', {
           withSystemEvents: false,
         });
-        expect(hitlist.status).toBe(200);
+        const statements = await profiler.read(traceId, 'statements', {
+          withSystemEvents: false,
+        });
+        const dbAccesses = await profiler.read(traceId, 'dbAccesses', {
+          withSystemEvents: false,
+        });
 
-        logTestStep('read trace statements', testsLogger);
-        const statements = await profiler.getStatements(traceId as string, {
-          withSystemEvents: false,
-        });
-        expect(statements.status).toBe(200);
-
-        logTestStep('read trace db accesses', testsLogger);
-        const dbAccesses = await profiler.getDbAccesses(traceId as string, {
-          withSystemEvents: false,
-        });
-        expect(dbAccesses.status).toBe(200);
+        // Parsed rows, not a status code: a 200 with a body nothing could read
+        // used to satisfy this.
+        expect(Array.isArray(hitlist.entries)).toBe(true);
+        expect(Array.isArray(statements.statements)).toBe(true);
+        expect(Array.isArray(dbAccesses.accesses)).toBe(true);
 
         logTestStep(
-          `trace summary: hitlist=${hitlist.status}, statements=${statements.status}, dbAccesses=${dbAccesses.status}`,
+          `trace ${traceId}: hitlist=${hitlist.entries.length} rows, statements=${statements.statements.length}, dbAccesses=${dbAccesses.accesses.length}`,
           testsLogger,
         );
 

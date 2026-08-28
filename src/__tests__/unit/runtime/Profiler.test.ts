@@ -45,32 +45,32 @@ describe('Profiler', () => {
     );
   });
 
-  it('getParameters() delegates to /sap/bc/adt/runtime/traces/abaptraces/parameters', async () => {
+  it('read() sends the view the caller asked for, not a fixed one', async () => {
     const connection = createConnectionMock();
     const profiler = new Profiler(connection, createLogger());
 
-    await profiler.getParameters();
+    await profiler.read('T1', 'statements', { withDetails: true });
 
     expect(connection.makeAdtRequest).toHaveBeenCalledWith(
       expect.objectContaining({
-        url: '/sap/bc/adt/runtime/traces/abaptraces/parameters',
+        url: expect.stringContaining(
+          '/sap/bc/adt/runtime/traces/abaptraces/T1/statements',
+        ),
         method: 'GET',
       }),
     );
   });
 
-  it('listRequests() delegates to /sap/bc/adt/runtime/traces/abaptraces/requests', async () => {
+  it('read() refuses a view this family does not have', async () => {
     const connection = createConnectionMock();
     const profiler = new Profiler(connection, createLogger());
 
-    await profiler.listRequests();
-
-    expect(connection.makeAdtRequest).toHaveBeenCalledWith(
-      expect.objectContaining({
-        url: '/sap/bc/adt/runtime/traces/abaptraces/requests',
-        method: 'GET',
-      }),
-    );
+    // The compiler rejects this; JavaScript callers reach it, so it throws
+    // rather than silently requesting a URL that cannot answer.
+    await expect(
+      // @ts-expect-error 'callGraph' is not a view of this family
+      profiler.read('T1', 'callGraph'),
+    ).rejects.toThrow(/Unknown trace view/);
   });
 
   it('buildParametersXml() returns XML string with default parameters', () => {

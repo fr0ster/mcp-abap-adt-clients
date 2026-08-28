@@ -13,12 +13,8 @@ import type {
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import { AdtExecutor } from '../../../../clients/AdtExecutor';
-import {
-  getTraceDbAccesses,
-  getTraceHitList,
-  getTraceStatements,
-  type IProfilerTraceParameters,
-} from '../../../../runtime/traces';
+import { AdtRuntimeClient } from '../../../../clients/AdtRuntimeClient';
+import type { IProfilerTraceParameters } from '../../../../runtime/traces';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -38,6 +34,7 @@ import {
   logTestStep,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
+import { traceIdsNow, waitForNewTrace } from '../../../helpers/traceHelpers';
 
 const {
   getEnabledTestCase,
@@ -185,6 +182,7 @@ describe('ClassExecutor (integration)', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
   let executor: AdtExecutor;
+  let runtimeClient: AdtRuntimeClient;
   let hasConfig = false;
   let isLegacy = false;
   let classNameForTest: string | null = null;
@@ -207,6 +205,7 @@ describe('ClassExecutor (integration)', () => {
       client = resolvedClient;
       isLegacy = legacy;
       executor = new AdtExecutor(connection, libraryLogger);
+      runtimeClient = new AdtRuntimeClient(connection, libraryLogger);
       hasConfig = true;
       classNameForTest = null;
       classesCreated.length = 0;
@@ -440,7 +439,13 @@ describe('ClassExecutor (integration)', () => {
         const warmupResponse = await runClassWithReadinessRetry(className);
         expectRunnableRunOutput(String(warmupResponse.data));
 
-        logTestStep('create trace parameters + run with profiler', testsLogger);
+        // What exists BEFORE the run is how a new trace is recognised. The
+        // feed's order is not age, so "the newest entry" is not an answer to
+        // "what did my run produce".
+        const profiler = runtimeClient.getProfiler();
+        const before = await traceIdsNow(profiler);
+
+        logTestStep('schedule a trace + run with profiler', testsLogger);
         let result = await executor
           .getClassExecutor()
           .runWithProfiling({ className }, { profilerParameters });
@@ -461,43 +466,44 @@ describe('ClassExecutor (integration)', () => {
         expect(result.profilerId).toContain(
           '/sap/bc/adt/runtime/traces/abaptraces/parameters/',
         );
-        expect(typeof result.traceId).toBe('string');
-        expect(result.traceId.length).toBeGreaterThan(10);
-        expect(result.traceRequestsResponse.status).toBe(200);
+        // The run promises no trace, so the result must not carry one.
+        expect(result).not.toHaveProperty('traceId');
 
         logTestStep(
-          `run output: ${toShortText(result.response.data)}; traceId=${result.traceId}`,
+          `run output: ${toShortText(result.response.data)}`,
           testsLogger,
         );
 
-        logTestStep('read trace hitlist', testsLogger);
-        const hitlist = await getTraceHitList(connection, result.traceId, {
+        logTestStep('wait for the trace this run produced', testsLogger);
+        const traceId = await waitForNewTrace(profiler, before, {
+          logger: testsLogger,
+        });
+        expect(traceId).toBeDefined();
+        if (!traceId) {
+          throw new Error('no new trace appeared after a profiled run');
+        }
+
+        logTestStep('read all three views', testsLogger);
+        const hitlist = await profiler.read(traceId, 'hitlist', {
           withSystemEvents: false,
         });
-        expect(hitlist.status).toBe(200);
+        const statements = await profiler.read(traceId, 'statements', {
+          withSystemEvents: false,
+        });
+        const dbAccesses = await profiler.read(traceId, 'dbAccesses', {
+          withSystemEvents: false,
+        });
 
-        logTestStep('read trace statements', testsLogger);
-        const statements = await getTraceStatements(
-          connection,
-          result.traceId,
-          {
-            withSystemEvents: false,
-          },
-        );
-        expect(statements.status).toBe(200);
-
-        logTestStep('read trace db accesses', testsLogger);
-        const dbAccesses = await getTraceDbAccesses(
-          connection,
-          result.traceId,
-          {
-            withSystemEvents: false,
-          },
-        );
-        expect(dbAccesses.status).toBe(200);
+        // Parsed, not a status code: a 200 carrying an unparseable body used to
+        // pass here, and the whole point of the typed views is that it no
+        // longer can.
+        expect(Array.isArray(hitlist.entries)).toBe(true);
+        expect(Array.isArray(statements.statements)).toBe(true);
+        expect(Array.isArray(dbAccesses.accesses)).toBe(true);
+        expect(hitlist.entries.length).toBeGreaterThan(0);
 
         logTestStep(
-          `trace summary: hitlist=${hitlist.status}, statements=${statements.status}, dbAccesses=${dbAccesses.status}`,
+          `trace ${traceId}: hitlist=${hitlist.entries.length} rows, statements=${statements.statements.length}, dbAccesses=${dbAccesses.accesses.length}`,
           testsLogger,
         );
 

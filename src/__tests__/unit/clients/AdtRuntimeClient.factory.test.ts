@@ -217,8 +217,7 @@ describe('AdtRuntimeClient factory pattern', () => {
       const { client } = createRuntimeClient();
       const p = client.getProfiler();
       expect(typeof p.list).toBe('function');
-      expect(typeof p.getParameters).toBe('function');
-      expect(typeof p.getHitList).toBe('function');
+      expect(typeof p.read).toBe('function');
     });
 
     it('abap debugger has expected methods', () => {
