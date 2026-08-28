@@ -207,6 +207,69 @@ describe('trace document parsing', () => {
     });
   });
 
+  describe('a present element that cannot be read is not an absent one', () => {
+    it('refuses a self-closing <callingProgram/>', () => {
+      // It parses to the empty string, so a `typeof !== object` test read it as
+      // missing and dropped it without a word.
+      expect(() =>
+        parseHitList(
+          response(
+            '<?xml version="1.0"?><trc:hitlist xmlns:trc="x"><trc:entry trc:index="1"><trc:callingProgram/></trc:entry></trc:hitlist>',
+          ),
+        ),
+      ).toThrow(/program reference is present/);
+    });
+
+    it('refuses a callingProgram whose children are unexpected', () => {
+      expect(() =>
+        parseHitList(
+          response(
+            '<?xml version="1.0"?><trc:hitlist xmlns:trc="x"><trc:entry trc:index="1"><trc:callingProgram><trc:unexpected/></trc:callingProgram></trc:entry></trc:hitlist>',
+          ),
+        ),
+      ).toThrow(TraceDocumentError);
+    });
+
+    it('still accepts a row with no program reference at all', () => {
+      // Absence is the property not being there; that is legitimate.
+      const parsed = parseHitList(
+        response(
+          '<?xml version="1.0"?><trc:hitlist xmlns:trc="x"><trc:entry trc:index="1"/></trc:hitlist>',
+        ),
+      );
+      expect(parsed.entries[0]?.callingProgram).toBeUndefined();
+    });
+
+    it('refuses an accessTime that carries none of its four members', () => {
+      expect(() =>
+        parseDbAccesses(
+          response(
+            '<?xml version="1.0"?><trc:dbAccesses xmlns:trc="x"><trc:dbAccess trc:index="1"><trc:accessTime/></trc:dbAccess></trc:dbAccesses>',
+          ),
+        ),
+      ).toThrow(/accessTime element is present/);
+    });
+
+    it('refuses a state element with no value', () => {
+      expect(() =>
+        parseTraceEntries(
+          response(
+            '<?xml version="1.0"?><atom:feed xmlns:atom="http://www.w3.org/2005/Atom" xmlns:trc="x"><atom:entry><atom:id>/sap/bc/adt/runtime/traces/abaptraces/ABCDEF0123456789ABCD</atom:id><atom:published>2026-08-28T10:00:00Z</atom:published><trc:state/></atom:entry></atom:feed>',
+          ),
+        ),
+      ).toThrow(/state element with no value/);
+    });
+
+    it('still accepts an entry with no state at all', () => {
+      const entries = parseTraceEntries(
+        response(
+          '<?xml version="1.0"?><atom:feed xmlns:atom="http://www.w3.org/2005/Atom"><atom:entry><atom:id>/sap/bc/adt/runtime/traces/abaptraces/ABCDEF0123456789ABCD</atom:id><atom:published>2026-08-28T10:00:00Z</atom:published></atom:entry></atom:feed>',
+        ),
+      );
+      expect(entries[0]?.state).toBeUndefined();
+    });
+  });
+
   describe('a recognised document may legitimately be empty', () => {
     it('accepts a feed with no entries', () => {
       expect(

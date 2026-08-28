@@ -23,9 +23,14 @@
  * 2. **Row.** A recognised root whose children are named something else, and a
  *    feed entry — any entry, not merely all of them — that cannot be read.
  * 3. **Field.** A row missing something the contract requires. `?? 0` and
- *    `?? ''` were the last hiding place: they turned `<statement/>` into a
+ *    `?? ''` were one hiding place: they turned `<statement/>` into a
  *    statement with `id: ''` and `index: 0`, a row that was never in the
  *    document and one that `typeof id === 'string'` confirms.
+ * 4. **Nested element.** The last one, and the subtlest: a present element that
+ *    could not be read was treated as an absent one, because
+ *    `<trc:callingProgram/>` parses to the empty *string* and a
+ *    `typeof !== 'object'` test called that missing. Absence is the property
+ *    not being there; anything else is present. See {@link presentNode}.
  *
  * Only a document understood at all three may report an empty result. What
  * stays tolerant is deliberately narrow and named: the two *optional* fields
@@ -177,6 +182,22 @@ function required<T>(
   return value;
 }
 
+/**
+ * An element that is present, or `undefined` when the property is absent.
+ *
+ * The distinction the parser kept getting wrong: `<trc:callingProgram/>` parses
+ * to the empty **string**, so a `typeof value !== 'object'` test read a present
+ * element as a missing one and dropped it without a word. Absence is the
+ * property not being there at all; everything else is present, and a present
+ * element this code cannot read is a document it does not understand.
+ */
+function presentNode(value: unknown): Node | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  return typeof value === 'object' ? (value as Node) : {};
+}
+
 /** Child *elements* of a node — not its attributes, not its text. */
 function childElements(node: Node): string[] {
   return Object.keys(node).filter(
@@ -319,9 +340,15 @@ export function parseTraceEntries(response: IAdtResponse): ITraceEntry[] {
     const extended = (entry.extendedData as Node | undefined) ?? {};
     const field = (name: string): unknown => entry[name] ?? extended[name];
 
-    const stateNode = field('state');
-    const stateValue = attr(stateNode as Node | undefined, 'value');
-    const stateText = attr(stateNode as Node | undefined, 'text');
+    const stateNode = presentNode(field('state'));
+    const stateValue = attr(stateNode, 'value');
+    const stateText = attr(stateNode, 'text');
+    if (stateNode && stateValue === undefined) {
+      throw new TraceDocumentError(
+        `Reading the trace feed: <entry> at position ${position} has a state element with no value. A trace's lifecycle is what tells "it exists" from "it is readable", so an unreadable state cannot be dropped.`,
+        bodyOf(response),
+      );
+    }
 
     return {
       id,
@@ -372,19 +399,16 @@ function programRef(
   what: string,
   response: IAdtResponse,
 ): ITraceProgramRef | undefined {
-  if (!node || typeof node !== 'object') {
+  const ref = presentNode(node);
+  if (!ref) {
     return undefined;
   }
-  const ref = node as Node;
   const name = attr(ref, 'name');
   const type = attr(ref, 'type');
   const uri = attr(ref, 'uri');
-  if (name === undefined && type === undefined && uri === undefined) {
-    return undefined;
-  }
   if (name === undefined || type === undefined || uri === undefined) {
     throw new TraceDocumentError(
-      `Reading ${what}: a program reference carries only some of name/type/uri (${[name && 'name', type && 'type', uri && 'uri'].filter(Boolean).join(', ')}).`,
+      `Reading ${what}: a program reference is present but carries only some of name/type/uri (${[name && 'name', type && 'type', uri && 'uri'].filter(Boolean).join(', ') || 'none of them'}). An element that is there and unreadable is not the same as one that is absent.`,
       bodyOf(response),
     );
   }
@@ -476,17 +500,31 @@ export function parseStatements(response: IAdtResponse): IAbapTraceStatements {
   };
 }
 
-function accessTime(node: unknown): IAbapTraceAccessTime | undefined {
-  if (!node || typeof node !== 'object') {
+function accessTime(
+  node: unknown,
+  what: string,
+  response: IAdtResponse,
+): IAbapTraceAccessTime | undefined {
+  const time = presentNode(node);
+  if (!time) {
     return undefined;
   }
-  const time = node as Node;
-  return {
+  const parsed = {
     total: attrNum(time, 'total'),
     applicationServer: attrNum(time, 'applicationServer'),
     database: attrNum(time, 'database'),
     ratioOfTraceTotal: attrNum(time, 'ratioOfTraceTotal'),
   };
+  // Every member is optional, so none can be required individually — but an
+  // element that yields not one of the four was not understood at all, and
+  // handing back four `undefined`s would present that as a measurement.
+  if (Object.values(parsed).every((value) => value === undefined)) {
+    throw new TraceDocumentError(
+      `Reading ${what}: an accessTime element is present and carries none of total/applicationServer/database/ratioOfTraceTotal.`,
+      bodyOf(response),
+    );
+  }
+  return parsed;
 }
 
 export function parseDbAccesses(response: IAdtResponse): IAbapTraceDbAccesses {
@@ -514,7 +552,7 @@ export function parseDbAccesses(response: IAdtResponse): IAbapTraceDbAccesses {
         type: attr(row, 'type'),
         totalCount: attrNum(row, 'totalCount'),
         bufferedCount: attrNum(row, 'bufferedCount'),
-        accessTime: accessTime(row.accessTime),
+        accessTime: accessTime(row.accessTime, what, response),
       }),
     ),
   };
