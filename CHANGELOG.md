@@ -117,7 +117,7 @@ Requires `@mcp-abap-adt/interfaces@^22.0.0`.
   empty trace — ADT answers `200` with nothing when a resource is not ready, and
   never 404s.
 
-  The check runs at **five** levels, because a wrong guess hides at every one:
+  The check runs at **six** levels, because a wrong guess hides at every one:
   the document (wrong or unreadable root), the row (children named something
   else, or any unreadable feed entry — not merely all of them), and the field (a
   row missing something the contract requires). `?? 0` and `?? ''` used to turn
@@ -128,8 +128,10 @@ Requires `@mcp-abap-adt/interfaces@^22.0.0`.
   property not being there, and anything else is present. And the value: reading
   an unrecognised boolean as `false` is not a parse failure but a claim about
   the object — `isAggregated` said aggregation was off whenever the field was
-  absent. A document understood at all five levels may still be empty, and then
-  it reads as empty.
+  absent. And the container: a present `<extendedData/>` that yields none of the
+  fields this parser knows looks exactly like optional metadata that happened to
+  be absent, and is not — its absence is still fine. A document understood at
+  all six levels may still be empty, and then it reads as empty.
 
 ### Notes on what is and is not verified
 

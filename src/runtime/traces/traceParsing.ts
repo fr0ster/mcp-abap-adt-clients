@@ -31,7 +31,11 @@
  *    `<trc:callingProgram/>` parses to the empty *string* and a
  *    `typeof !== 'object'` test called that missing. Absence is the property
  *    not being there; anything else is present. See {@link presentNode}.
- * 5. **Value.** A recognised field whose *content* is not understood. Reading
+ * 5. **Container.** A present element that yields none of the members this
+ *    parser knows — `<extendedData/>`, `<executions/>`, `<processType/>`. It
+ *    looks exactly like optional metadata that happened to be absent, and is
+ *    not. See {@link readAll}.
+ * 6. **Value.** A recognised field whose *content* is not understood. Reading
  *    every unrecognised boolean as `false` is not a parse failure — it is a
  *    statement about the object, made on the strength of not understanding the
  *    document. See {@link booleanOf}.
@@ -415,8 +419,29 @@ export function parseTraceEntries(response: IAdtResponse): ITraceEntry[] {
     // `?? {}` alone does not do this: a present-but-empty `<extendedData/>`
     // parses to the empty string, which is not nullish, so every lookup on it
     // came back undefined and the fields vanished without a word.
-    const extended = presentNode(entry.extendedData) ?? {};
+    const extendedNode = presentNode(entry.extendedData);
+    const extended = extendedNode ?? {};
     const field = (name: string): unknown => entry[name] ?? extended[name];
+
+    // A container that is there and yields nothing was not understood. The
+    // check is on the `trc:` fields specifically, not on `user` — that one
+    // falls back to `atom:author`, so it can resolve while `extendedData`
+    // remains a mystery. Fields sitting directly on the entry still satisfy it:
+    // which of the two nestings is real is the one thing this file does not
+    // claim to know, and this must not decide it.
+    if (
+      extendedNode &&
+      field('user') === undefined &&
+      field('objectName') === undefined &&
+      field('state') === undefined &&
+      field('expiration') === undefined &&
+      field('expires') === undefined
+    ) {
+      throw new TraceDocumentError(
+        `Reading the trace feed: <entry> at position ${position} has an <extendedData> element carrying none of user/objectName/state/expiration.`,
+        bodyOf(response),
+      );
+    }
 
     const stateNode = presentNode(field('state'));
     const stateValue = attr(stateNode, 'value');
@@ -681,7 +706,8 @@ export function parseTraceRequests(
 ): ITraceRequestEntry[] {
   const entries = asList(rootOf(response, 'feed', 'the trace schedule').entry);
   return entries.map((entry, position): ITraceRequestEntry => {
-    const extended = presentNode(entry.extendedData) ?? {};
+    const extendedNode = presentNode(entry.extendedData);
+    const extended = extendedNode ?? {};
     const executions = presentNode(extended.executions);
     const processType = presentNode(extended.processType);
     const object = presentNode(extended.object);
@@ -689,6 +715,27 @@ export function parseTraceRequests(
       .filter((link) => (attr(link, 'rel') ?? '').endsWith('/tracefile'))
       .map((link) => attr(link, 'href'))
       .find((href): href is string => Boolean(href));
+
+    // Same rule as the feed: present and yielding nothing is not understood.
+    // Here there is no ambiguity to protect — the schedule entry's shape was
+    // read from a raw capture — so every field this parser knows is checked.
+    if (
+      extendedNode &&
+      [
+        extended.description,
+        extended.expires,
+        extended.isAggregated,
+        extended.requestIndex,
+        extended.processType,
+        extended.object,
+        extended.executions,
+      ].every((value) => value === undefined)
+    ) {
+      throw new TraceDocumentError(
+        `Reading the trace schedule: <entry> at position ${position} has an <extendedData> element carrying none of description/expires/isAggregated/requestIndex/processType/object/executions.`,
+        bodyOf(response),
+      );
+    }
 
     return {
       id: required(

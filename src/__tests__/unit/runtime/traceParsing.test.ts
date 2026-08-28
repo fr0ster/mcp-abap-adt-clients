@@ -379,16 +379,69 @@ describe('trace document parsing', () => {
       expect(entry?.executions).toBeUndefined();
     });
 
-    it('reads fields under a present-but-empty <extendedData/>', () => {
-      // It parses to the empty string, so every lookup on it used to come back
-      // undefined and the whole container vanished silently.
+    it('refuses a present-but-empty <extendedData/>', () => {
+      // This test previously asserted the opposite — that the empty container
+      // parsed fine — while its own comment described the vanishing fields as
+      // the defect. A test that pins the fault it documents is worse than none.
+      expect(() =>
+        parseTraceRequests(
+          response(
+            '<?xml version="1.0"?><atom:feed xmlns:atom="http://www.w3.org/2005/Atom" xmlns:trc="x"><atom:entry><atom:id>/sap/bc/adt/x/1</atom:id><trc:extendedData/></atom:entry></atom:feed>',
+          ),
+        ),
+      ).toThrow(/<extendedData> element carrying none of/);
+    });
+
+    it('refuses an <extendedData> whose children are all unexpected', () => {
+      expect(() =>
+        parseTraceRequests(
+          response(
+            '<?xml version="1.0"?><atom:feed xmlns:atom="http://www.w3.org/2005/Atom" xmlns:trc="x"><atom:entry><atom:id>/sap/bc/adt/x/1</atom:id><trc:extendedData><trc:unexpected/></trc:extendedData></atom:entry></atom:feed>',
+          ),
+        ),
+      ).toThrow(TraceDocumentError);
+    });
+
+    it('accepts an entry with no extendedData at all', () => {
+      // Absence of optional metadata is legitimate; a present container that
+      // says nothing is not.
       const [entry] = parseTraceRequests(
         response(
-          '<?xml version="1.0"?><atom:feed xmlns:atom="http://www.w3.org/2005/Atom" xmlns:trc="x"><atom:entry><atom:id>/sap/bc/adt/x/1</atom:id><trc:extendedData/></atom:entry></atom:feed>',
+          '<?xml version="1.0"?><atom:feed xmlns:atom="http://www.w3.org/2005/Atom"><atom:entry><atom:id>/sap/bc/adt/x/1</atom:id></atom:entry></atom:feed>',
         ),
       );
       expect(entry?.id).toBe('/sap/bc/adt/x/1');
       expect(entry?.description).toBeUndefined();
+    });
+  });
+
+  describe('the trace feed treats extendedData the same way', () => {
+    const feedEntry = (extra: string) =>
+      response(
+        '<?xml version="1.0"?><atom:feed xmlns:atom="http://www.w3.org/2005/Atom" xmlns:trc="x"><atom:entry><atom:id>/sap/bc/adt/runtime/traces/abaptraces/ABCDEF0123456789ABCD</atom:id><atom:published>2026-08-28T10:00:00Z</atom:published>' +
+          extra +
+          '</atom:entry></atom:feed>',
+      );
+
+    it('refuses a present-but-empty <extendedData/>', () => {
+      expect(() => parseTraceEntries(feedEntry('<trc:extendedData/>'))).toThrow(
+        /<extendedData> element carrying none of/,
+      );
+    });
+
+    it('accepts an entry with no extendedData at all', () => {
+      const entries = parseTraceEntries(feedEntry(''));
+      expect(entries).toHaveLength(1);
+      expect(entries[0]?.user).toBeUndefined();
+    });
+
+    it('accepts an empty extendedData when the fields sit on the entry', () => {
+      // Which of the two nestings is real is the one thing this file does not
+      // claim to know, so the check must not decide it.
+      const entries = parseTraceEntries(
+        feedEntry('<trc:extendedData/><trc:user>SOMEONE</trc:user>'),
+      );
+      expect(entries[0]?.user).toBe('SOMEONE');
     });
   });
 
