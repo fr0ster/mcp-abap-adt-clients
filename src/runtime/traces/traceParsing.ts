@@ -15,10 +15,23 @@
  *
  * **The tolerance stops at the shape.** Being unsure which of two nestings holds
  * a field is not the same as being willing to accept any document at all — and
- * the check runs at two levels, because a wrong guess hides at both. A root
- * that is not the expected one throws; so does a recognised root whose rows are
- * named something else, or a feed of entries none of which carries a readable
- * id. Only a document understood at both levels may report an empty result.
+ * the check runs at all three levels, because a wrong guess hides at every one
+ * of them:
+ *
+ * 1. **Document.** A body that is empty, unparseable, or rooted in something
+ *    other than what is expected.
+ * 2. **Row.** A recognised root whose children are named something else, and a
+ *    feed entry — any entry, not merely all of them — that cannot be read.
+ * 3. **Field.** A row missing something the contract requires. `?? 0` and
+ *    `?? ''` were the last hiding place: they turned `<statement/>` into a
+ *    statement with `id: ''` and `index: 0`, a row that was never in the
+ *    document and one that `typeof id === 'string'` confirms.
+ *
+ * Only a document understood at all three may report an empty result. What
+ * stays tolerant is deliberately narrow and named: the two *optional* fields
+ * whose nesting is unverified, `user` and `state`, are looked for in both
+ * places. Optional means a family may not have it; required means the document
+ * is not what this code thinks it is.
  * A body that is empty, unparseable, or rooted in something other than what is
  * expected throws {@link TraceDocumentError} — it does NOT become an empty
  * result. An earlier version returned `{ entries: [] }` for all three, which a
@@ -136,6 +149,34 @@ function rootOf(response: IAdtResponse, rootName: string, what: string): Node {
   return root && typeof root === 'object' ? (root as Node) : {};
 }
 
+/**
+ * A required field, or a thrown explanation.
+ *
+ * `?? 0` and `?? ''` were the last hiding place: a `<statement/>` with nothing
+ * in it came back as a statement with `id: ''` and `index: 0`, which is a
+ * fabricated row wearing the shape of a real one. A test asserting
+ * `typeof id === 'string'` passes on the fabrication, which is how it survived.
+ *
+ * Note that *present and empty* is not missing: an empty element parses to the
+ * empty string, so `description=""` is a value and only absence throws.
+ */
+function required<T>(
+  value: T | undefined,
+  field: string,
+  rowName: string,
+  index: number,
+  what: string,
+  response: IAdtResponse,
+): T {
+  if (value === undefined) {
+    throw new TraceDocumentError(
+      `Reading ${what}: <${rowName}> at position ${index} is missing ${field}, which the contract requires. A default here would hand back a row that was never in the document.`,
+      bodyOf(response),
+    );
+  }
+  return value;
+}
+
 /** Child *elements* of a node — not its attributes, not its text. */
 function childElements(node: Node): string[] {
   return Object.keys(node).filter(
@@ -181,12 +222,24 @@ function describeRoots(parsed: Node | undefined): string {
   return names.length > 0 ? `<${names.join('>, <')}>` : 'no elements';
 }
 
-/** One node, a list of them, or nothing — always answered as a list. */
+/**
+ * One node, a list of them, or nothing — always answered as a list.
+ *
+ * A self-closing element (`<trc:statement/>`) parses to the empty string, not
+ * to an object. Discarding it would drop a row that IS in the document, which
+ * is the silence this file spent five review rounds removing — so it becomes an
+ * empty node, and whatever required fields it lacks are reported by name.
+ */
 function asList(value: unknown): Node[] {
   if (Array.isArray(value)) {
-    return value as Node[];
+    return value.map((item) =>
+      item && typeof item === 'object' ? (item as Node) : {},
+    );
   }
-  return value && typeof value === 'object' ? [value as Node] : [];
+  if (value === undefined || value === null) {
+    return [];
+  }
+  return [typeof value === 'object' ? (value as Node) : {}];
 }
 
 function text(value: unknown): string | undefined {
@@ -246,53 +299,79 @@ export function parseTraceEntries(response: IAdtResponse): ITraceEntry[] {
   // is NOT emptiness is entries that are present and unreadable.
   const entries = asList(feed.entry);
 
-  const parsed = entries
-    .map((entry): ITraceEntry | undefined => {
-      const idText = text(entry.id) ?? '';
-      const selfHref =
-        asList(entry.link)
-          .map((link) => attr(link, 'href') ?? '')
-          .find((href) => ID_IN_URI.test(href)) ?? '';
-      const id = ID_IN_URI.exec(idText)?.[1] ?? ID_IN_URI.exec(selfHref)?.[1];
-      if (!id) {
-        return undefined;
-      }
-
-      // See the file comment: the `trc:` fields may sit directly on the entry
-      // or under `trc:extendedData`, and only one of those has been read.
-      const extended = (entry.extendedData as Node | undefined) ?? {};
-      const field = (name: string): unknown => entry[name] ?? extended[name];
-
-      const stateNode = field('state');
-      const stateValue = attr(stateNode as Node | undefined, 'value');
-      const stateText = attr(stateNode as Node | undefined, 'text');
-
-      return {
-        id,
-        recordedAt: text(entry.published) ?? text(entry.updated) ?? '',
-        user:
-          text(field('user')) ?? text((entry.author as Node | undefined)?.name),
-        objectName: text(field('objectName')),
-        uri: idText || selfHref || undefined,
-        ...(stateValue !== undefined
-          ? { state: { value: stateValue, text: stateText ?? '' } }
-          : {}),
-        expiresAt: text(field('expiration')) ?? text(field('expires')),
-      };
-    })
-    .filter((entry): entry is ITraceEntry => entry !== undefined);
-
-  if (entries.length > 0 && parsed.length === 0) {
-    throw new TraceDocumentError(
-      `Reading the trace feed: ${entries.length} entr${entries.length === 1 ? 'y' : 'ies'} present and none carried a recognisable trace id. Returning an empty list here would report a full feed as no traces at all.`,
-      bodyOf(response),
+  return entries.map((entry, position): ITraceEntry => {
+    const idText = text(entry.id) ?? '';
+    const selfHref =
+      asList(entry.link)
+        .map((link) => attr(link, 'href') ?? '')
+        .find((href) => ID_IN_URI.test(href)) ?? '';
+    const id = required(
+      ID_IN_URI.exec(idText)?.[1] ?? ID_IN_URI.exec(selfHref)?.[1],
+      'a recognisable trace id',
+      'entry',
+      position,
+      'the trace feed',
+      response,
     );
-  }
-  return parsed;
+
+    // See the file comment: the `trc:` fields may sit directly on the entry
+    // or under `trc:extendedData`, and only one of those has been read.
+    const extended = (entry.extendedData as Node | undefined) ?? {};
+    const field = (name: string): unknown => entry[name] ?? extended[name];
+
+    const stateNode = field('state');
+    const stateValue = attr(stateNode as Node | undefined, 'value');
+    const stateText = attr(stateNode as Node | undefined, 'text');
+
+    return {
+      id,
+      recordedAt: required(
+        text(entry.published) ?? text(entry.updated),
+        'a timestamp',
+        'entry',
+        position,
+        'the trace feed',
+        response,
+      ),
+      user:
+        text(field('user')) ?? text((entry.author as Node | undefined)?.name),
+      objectName: text(field('objectName')),
+      uri: idText || selfHref || undefined,
+      // `state` is optional, but its two members are not: an element that is
+      // there with a value and no text is half-understood, and `text: ''` would
+      // present that as a state whose description happens to be blank.
+      ...(stateValue !== undefined
+        ? {
+            state: {
+              value: stateValue,
+              text: required(
+                stateText,
+                'a state text',
+                'entry',
+                position,
+                'the trace feed',
+                response,
+              ),
+            },
+          }
+        : {}),
+      expiresAt: text(field('expiration')) ?? text(field('expires')),
+    };
+  });
 }
 
-/** `trc:callingProgram` / `trc:calledProgram`. */
-function programRef(node: unknown): ITraceProgramRef | undefined {
+/**
+ * `trc:callingProgram` / `trc:calledProgram`.
+ *
+ * Absent entirely is fine — not every row names a program. A program element
+ * that is present but missing one of the three the contract requires is not:
+ * filling the gap with `''` invents a reference to a program called nothing.
+ */
+function programRef(
+  node: unknown,
+  what: string,
+  response: IAdtResponse,
+): ITraceProgramRef | undefined {
   if (!node || typeof node !== 'object') {
     return undefined;
   }
@@ -303,10 +382,16 @@ function programRef(node: unknown): ITraceProgramRef | undefined {
   if (name === undefined && type === undefined && uri === undefined) {
     return undefined;
   }
+  if (name === undefined || type === undefined || uri === undefined) {
+    throw new TraceDocumentError(
+      `Reading ${what}: a program reference carries only some of name/type/uri (${[name && 'name', type && 'type', uri && 'uri'].filter(Boolean).join(', ')}).`,
+      bodyOf(response),
+    );
+  }
   return {
-    name: name ?? '',
-    type: type ?? '',
-    uri: uri ?? '',
+    name,
+    type,
+    uri,
     context: attr(ref, 'context'),
     byteCodeOffset: attrNum(ref, 'byteCodeOffset'),
     objectReferenceQuery: attr(ref, 'objectReferenceQuery'),
@@ -324,16 +409,23 @@ export function parseHitList(response: IAdtResponse): IAbapTraceHitList {
 
   return {
     entries: rows.map(
-      (row): IAbapTraceHitListEntry => ({
+      (row, position): IAbapTraceHitListEntry => ({
         topDownIndex: attrNum(row, 'topDownIndex'),
-        index: attrNum(row, 'index') ?? 0,
+        index: required(
+          attrNum(row, 'index'),
+          'an index',
+          'entry',
+          position,
+          what,
+          response,
+        ),
         hitCount: attrNum(row, 'hitCount'),
         stackCount: attrNum(row, 'stackCount'),
         recursionDepth: attrNum(row, 'recursionDepth'),
         description: attr(row, 'description'),
         proceduralEntryAnchor: attr(row, 'proceduralEntryAnchor'),
-        callingProgram: programRef(row.callingProgram),
-        calledProgram: programRef(row.calledProgram),
+        callingProgram: programRef(row.callingProgram, what, response),
+        calledProgram: programRef(row.calledProgram, what, response),
         grossTime: row.grossTime,
       }),
     ),
@@ -351,9 +443,23 @@ export function parseStatements(response: IAdtResponse): IAbapTraceStatements {
 
   return {
     statements: rows.map(
-      (row): IAbapTraceStatement => ({
-        id: attr(row, 'id') ?? '',
-        index: attrNum(row, 'index') ?? 0,
+      (row, position): IAbapTraceStatement => ({
+        id: required(
+          attr(row, 'id'),
+          'an id',
+          'statement',
+          position,
+          what,
+          response,
+        ),
+        index: required(
+          attrNum(row, 'index'),
+          'an index',
+          'statement',
+          position,
+          what,
+          response,
+        ),
         callLevel: attrNum(row, 'callLevel'),
         text: attr(row, 'text'),
         variable: attr(row, 'variable'),
@@ -362,7 +468,7 @@ export function parseStatements(response: IAdtResponse): IAbapTraceStatements {
         componentDescription: attr(row, 'componentDescription'),
         hitlistAnchor: attr(row, 'hitlistAnchor'),
         isProcedureLike: attrBool(row, 'isProcedureLike'),
-        callingProgram: programRef(row.callingProgram),
+        callingProgram: programRef(row.callingProgram, what, response),
         grossTime: row.grossTime,
         traceEventNetTime: row.traceEventNetTime,
       }),
@@ -394,8 +500,15 @@ export function parseDbAccesses(response: IAdtResponse): IAbapTraceDbAccesses {
 
   return {
     accesses: rows.map(
-      (row): IAbapTraceDbAccess => ({
-        index: attrNum(row, 'index') ?? 0,
+      (row, position): IAbapTraceDbAccess => ({
+        index: required(
+          attrNum(row, 'index'),
+          'an index',
+          'dbAccess',
+          position,
+          what,
+          response,
+        ),
         tableName: attr(row, 'tableName'),
         statement: attr(row, 'statement'),
         type: attr(row, 'type'),
@@ -424,9 +537,23 @@ export function parseNamedItems(response: IAdtResponse): INamedItem[] {
     response,
   );
 
-  return items.map((item) => ({
-    name: text(item.name) ?? '',
-    description: text(item.description) ?? '',
+  return items.map((item, position) => ({
+    name: required(
+      text(item.name),
+      'a name',
+      'namedItem',
+      position,
+      what,
+      response,
+    ),
+    description: required(
+      text(item.description),
+      'a description',
+      'namedItem',
+      position,
+      what,
+      response,
+    ),
   }));
 }
 
@@ -440,16 +567,7 @@ export function parseTraceRequests(
   response: IAdtResponse,
 ): ITraceRequestEntry[] {
   const entries = asList(rootOf(response, 'feed', 'the trace schedule').entry);
-  // Same rule as the trace feed: an empty schedule is a feed with no entries,
-  // not a feed of entries this code cannot read.
-  if (entries.length > 0 && !entries.some((entry) => text(entry.id))) {
-    throw new TraceDocumentError(
-      `Reading the trace schedule: ${entries.length} entries present and none carried an id.`,
-      bodyOf(response),
-    );
-  }
-
-  return entries.map((entry): ITraceRequestEntry => {
+  return entries.map((entry, position): ITraceRequestEntry => {
     const extended = (entry.extendedData as Node | undefined) ?? {};
     const executions = extended.executions as Node | undefined;
     const traceUri = asList(entry.link)
@@ -458,7 +576,14 @@ export function parseTraceRequests(
       .find((href): href is string => Boolean(href));
 
     return {
-      id: text(entry.id) ?? '',
+      id: required(
+        text(entry.id),
+        'an id',
+        'entry',
+        position,
+        'the trace schedule',
+        response,
+      ),
       index: numberOf(text(extended.requestIndex)),
       description: text(extended.description),
       expiresAt: text(extended.expires),

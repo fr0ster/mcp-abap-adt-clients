@@ -117,11 +117,13 @@ Requires `@mcp-abap-adt/interfaces@^22.0.0`.
   empty trace — ADT answers `200` with nothing when a resource is not ready, and
   never 404s.
 
-  The check runs at **two** levels, because a wrong guess hides at both: a
-  recognised root whose rows are named something else, or a feed of entries none
-  of which carries a readable id, also throws. Reporting a full feed as "no
-  traces" is the failure that prevents. A document understood at both levels may
-  still be empty, and then it reads as empty.
+  The check runs at **three** levels, because a wrong guess hides at every one:
+  the document (wrong or unreadable root), the row (children named something
+  else, or any unreadable feed entry — not merely all of them), and the field (a
+  row missing something the contract requires). `?? 0` and `?? ''` used to turn
+  `<statement/>` into a statement with `id: ''` and `index: 0` — a row that was
+  never in the document, and one a `typeof` assertion confirms. A document
+  understood at all three levels may still be empty, and then it reads as empty.
 
 ### Notes on what is and is not verified
 

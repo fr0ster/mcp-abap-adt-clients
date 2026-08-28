@@ -114,7 +114,7 @@ describe('trace document parsing', () => {
             '<?xml version="1.0"?><atom:feed xmlns:atom="http://www.w3.org/2005/Atom"><atom:entry><atom:id>urn:something:else</atom:id></atom:entry></atom:feed>',
           ),
         ),
-      ).toThrow(/none carried a recognisable trace id/);
+      ).toThrow(/is missing a recognisable trace id/);
     });
 
     it('still reads a feed whose entries are recognisable', () => {
@@ -125,6 +125,85 @@ describe('trace document parsing', () => {
       );
       expect(entries).toHaveLength(1);
       expect(entries[0]?.recordedAt).toBe('2026-08-28T10:00:00Z');
+    });
+  });
+
+  describe('a recognised row with a missing required field is not a row', () => {
+    it('refuses an empty <statement/> instead of inventing id and index', () => {
+      // The fabrication that survived every earlier guard: `id: ''`,
+      // `index: 0` — a row that was never in the document, and one that
+      // `typeof id === 'string'` happily confirms.
+      expect(() =>
+        parseStatements(
+          response(
+            '<?xml version="1.0"?><trc:statements xmlns:trc="x"><trc:statement/></trc:statements>',
+          ),
+        ),
+      ).toThrow(/is missing an id/);
+    });
+
+    it('refuses a hit list entry with no index', () => {
+      expect(() =>
+        parseHitList(
+          response(
+            '<?xml version="1.0"?><trc:hitlist xmlns:trc="x"><trc:entry trc:hitCount="3"/></trc:hitlist>',
+          ),
+        ),
+      ).toThrow(TraceDocumentError);
+    });
+
+    it('refuses a db access with no index', () => {
+      expect(() =>
+        parseDbAccesses(
+          response(
+            '<?xml version="1.0"?><trc:dbAccesses xmlns:trc="x"><trc:dbAccess trc:tableName="T000"/></trc:dbAccesses>',
+          ),
+        ),
+      ).toThrow(TraceDocumentError);
+    });
+
+    it('refuses a catalogue item with no description', () => {
+      expect(() =>
+        parseNamedItems(
+          response(
+            '<?xml version="1.0"?><nameditem:namedItemList xmlns:nameditem="x"><nameditem:namedItem><nameditem:name>/x</nameditem:name></nameditem:namedItem></nameditem:namedItemList>',
+          ),
+        ),
+      ).toThrow(TraceDocumentError);
+    });
+
+    it('accepts a present-but-empty value — emptiness is not absence', () => {
+      const items = parseNamedItems(
+        response(
+          '<?xml version="1.0"?><nameditem:namedItemList xmlns:nameditem="x"><nameditem:namedItem><nameditem:name>/x</nameditem:name><nameditem:description/></nameditem:namedItem></nameditem:namedItemList>',
+        ),
+      );
+      expect(items).toEqual([{ name: '/x', description: '' }]);
+    });
+
+    it('drops no entry silently: one unreadable entry among readable ones throws', () => {
+      // Previously only an all-unreadable feed threw, so a feed of ten traces
+      // could come back as nine with nothing said.
+      expect(() =>
+        parseTraceEntries(
+          response(
+            '<?xml version="1.0"?><atom:feed xmlns:atom="http://www.w3.org/2005/Atom">' +
+              '<atom:entry><atom:id>/sap/bc/adt/runtime/traces/abaptraces/ABCDEF0123456789ABCD</atom:id><atom:published>2026-08-28T10:00:00Z</atom:published></atom:entry>' +
+              '<atom:entry><atom:id>urn:not:a:trace</atom:id></atom:entry>' +
+              '</atom:feed>',
+          ),
+        ),
+      ).toThrow(/position 1/);
+    });
+
+    it('refuses a program reference with only some of name/type/uri', () => {
+      expect(() =>
+        parseHitList(
+          response(
+            '<?xml version="1.0"?><trc:hitlist xmlns:trc="x"><trc:entry trc:index="1"><trc:callingProgram adtcore:name="ZX" xmlns:adtcore="y"/></trc:entry></trc:hitlist>',
+          ),
+        ),
+      ).toThrow(/only some of name\/type\/uri/);
     });
   });
 
