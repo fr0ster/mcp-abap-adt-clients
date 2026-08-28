@@ -92,12 +92,17 @@ export class AdtDataElement
     if (!config.dataElementName) {
       throw new Error('Data element name is required for validation');
     }
+    // The endpoint refuses an empty one, so this is a caller error rather
+    // than a 400 to decode later.
+    if (!config.description) {
+      throw new Error('Description is required for validation');
+    }
 
     const validationResponse = await validateDataElementName(
       this.connection,
       config.dataElementName,
-      config.packageName,
       config.description,
+      config.packageName,
     );
 
     return {

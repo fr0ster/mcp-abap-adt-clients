@@ -11,11 +11,18 @@ import { getTimeout } from '../../utils/timeouts';
  * Validate authorization field name against SAP naming rules.
  * Returns raw response — consumer interprets SEVERITY/SHORT_TEXT fields.
  */
+/**
+ * `description` is required by the endpoint **and may not be empty**. Measured
+ * on E19 (`RFCSAPRL 816`) 2026-08-28: sending `description=` answers **400,
+ * "The description is missing for VALIDATION"**, which is why passing
+ * `description || ''` never satisfied it. It moves ahead of the optional
+ * `packageName`, which this endpoint does NOT require. See `docs/evidence/2026-08-28-validation-required-params.md`.
+ */
 export async function validateAuthorizationFieldName(
   connection: IAbapConnection,
   name: string,
+  description: string,
   packageName?: string,
-  description?: string,
 ): Promise<IAdtResponse> {
   if (!name) {
     throw new Error('Authorization field name is required');
@@ -28,7 +35,7 @@ export async function validateAuthorizationFieldName(
   if (packageName) {
     queryParams.append('packagename', packageName);
   }
-  queryParams.append('description', description || '');
+  queryParams.append('description', description);
 
   return connection.makeAdtRequest({
     url: `${url}?${queryParams.toString()}`,

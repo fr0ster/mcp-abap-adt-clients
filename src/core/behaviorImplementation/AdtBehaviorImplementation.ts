@@ -99,6 +99,11 @@ export class AdtBehaviorImplementation
       state.errors.push({ method: 'validate', error, timestamp: new Date() });
       throw error;
     }
+    if (!config.packageName) {
+      const error = new Error('Package name is required for validation');
+      state.errors.push({ method: 'validate', error, timestamp: new Date() });
+      throw error;
+    }
 
     try {
       const response = await validateBehaviorImplementationName(

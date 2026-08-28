@@ -17,11 +17,18 @@ import { getTimeout } from '../../utils/timeouts';
  * - Success: <SEVERITY>OK</SEVERITY>
  * - Error: <SEVERITY>ERROR</SEVERITY> with <SHORT_TEXT> message
  */
+/**
+ * `description` is required by the endpoint **and may not be empty**. Measured
+ * on E19 (`RFCSAPRL 816`) 2026-08-28: sending `description=` answers **400,
+ * "The description is missing for VALIDATION"**, which is why passing
+ * `description || ''` never satisfied it. It moves ahead of the optional
+ * `packageName`, which this endpoint does NOT require. See `docs/evidence/2026-08-28-validation-required-params.md`.
+ */
 export async function validateDataElementName(
   connection: IAbapConnection,
   dataElementName: string,
+  description: string,
   packageName?: string,
-  description?: string,
 ): Promise<IAdtResponse> {
   const url = `/sap/bc/adt/ddic/dataelements/validation`;
   const queryParams = new URLSearchParams({
@@ -33,8 +40,7 @@ export async function validateDataElementName(
     queryParams.append('packagename', packageName);
   }
 
-  // Description is required for data element validation
-  queryParams.append('description', description || '');
+  queryParams.append('description', description);
 
   return connection.makeAdtRequest({
     url: `${url}?${queryParams.toString()}`,

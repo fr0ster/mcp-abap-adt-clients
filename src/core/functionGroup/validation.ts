@@ -20,6 +20,12 @@ import { getTimeout } from '../../utils/timeouts';
  * - Success: <SEVERITY>OK</SEVERITY>
  * - Error: <SEVERITY>ERROR</SEVERITY> with <SHORT_TEXT> message (e.g., "Function group ... already exists")
  */
+/**
+ * `description` is required by the endpoint. Measured on E19 2026-08-28:
+ * omitting it answers **400, "Parameter description could not be found."**, and
+ * an empty value is accepted. `packagename` is genuinely optional here, which
+ * is why it stays conditional. See `docs/evidence/2026-08-28-validation-required-params.md`.
+ */
 export async function validateFunctionGroupName(
   connection: IAbapConnection,
   functionGroupName: string,
@@ -36,13 +42,13 @@ export async function validateFunctionGroupName(
     queryParams.append('packagename', packageName);
   }
 
-  // Description is limited to 60 characters in SAP ADT
-  const limitedDescription = description
-    ? limitDescription(description)
-    : functionGroupName;
-  if (description) {
-    queryParams.append('description', limitedDescription);
-  }
+  // Description is limited to 60 characters in SAP ADT. The fallback to the
+  // group's own name was already computed here and then thrown away by a
+  // condition; the endpoint requires the parameter, so it is always sent.
+  queryParams.append(
+    'description',
+    description ? limitDescription(description) : functionGroupName,
+  );
 
   return connection.makeAdtRequest({
     url: `${url}?${queryParams.toString()}`,

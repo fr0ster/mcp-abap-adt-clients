@@ -19,10 +19,16 @@ import { getTimeout } from '../../utils/timeouts';
  * @param behaviorDefinition - Behavior definition name (root entity)
  * @returns Validation response (returns error response if object already exists)
  */
+/**
+ * `packageName` is required by the endpoint, not optional. Measured on E19
+ * (`RFCSAPRL 816`) 2026-08-28: without `packagename` it answers **400,
+ * "Parameter packagename could not be found."** — see
+ * `docs/evidence/2026-08-28-validation-required-params.md`.
+ */
 export async function validateBehaviorImplementationName(
   connection: IAbapConnection,
   className: string,
-  packageName?: string,
+  packageName: string,
   description?: string,
   behaviorDefinition?: string,
 ): Promise<IAdtResponse> {
@@ -30,11 +36,8 @@ export async function validateBehaviorImplementationName(
   const params = new URLSearchParams({
     objname: className,
     objtype: 'CLAS/OC',
+    packagename: packageName,
   });
-
-  if (packageName) {
-    params.append('packagename', packageName);
-  }
 
   if (description) {
     // Description is limited to 60 characters in SAP ADT

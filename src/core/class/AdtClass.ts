@@ -78,6 +78,9 @@ export class AdtClass
     if (!config.className) {
       throw new Error('Class name is required for validation');
     }
+    if (!config.packageName) {
+      throw new Error('Package name is required for validation');
+    }
 
     try {
       const validationResponse = await validateClassName(

@@ -148,6 +148,12 @@ export class AdtCdsUnitTest
         config.className,
       );
 
+      // The validation endpoint requires `packagename`; without it the server
+      // answers 400, so this cannot be left to the wire.
+      if (!config.packageName) {
+        throw new Error('Package name is required for validation');
+      }
+
       let validationResponse: Awaited<ReturnType<typeof validateClassName>>;
       try {
         validationResponse = await validateClassName(
