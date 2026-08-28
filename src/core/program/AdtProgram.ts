@@ -88,13 +88,19 @@ export class AdtProgram
     if (!config.programName) {
       throw new Error('Program name is required for validation');
     }
+    // The endpoint requires it: without `packagename` it answers 400, so a
+    // missing package is a caller error worth naming here rather than an HTTP
+    // failure to decode later.
+    if (!config.packageName) {
+      throw new Error('Package name is required for validation');
+    }
 
     try {
       const validationResponse = await validateProgramName(
         this.connection,
         config.programName,
-        config.description,
         config.packageName,
+        config.description,
       );
 
       return {
