@@ -9,7 +9,8 @@
     // Kept in step with tsconfig.test.json, which carries the same two lines
     // for the same reason: src/__tests__/unit/scripts/ imports the probe's pure
     // parts, and this config compiles all of src. Change one, change the other.
-    "scripts/probe-atc.ts"
+    "scripts/probe-atc.ts",
+    "scripts/probe-abapunit.ts"
   ],
   "exclude": [
     "node_modules",
