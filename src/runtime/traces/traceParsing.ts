@@ -36,9 +36,11 @@
  *    looks exactly like optional metadata that happened to be absent, and is
  *    not. See {@link readAll}.
  * 6. **Value.** A recognised field whose *content* is not understood. Reading
- *    every unrecognised boolean as `false` is not a parse failure — it is a
- *    statement about the object, made on the strength of not understanding the
- *    document. See {@link booleanOf}.
+ *    every unrecognised boolean as `false`, or dropping an unreadable number as
+ *    though the field were absent, is not a parse failure — it is a statement
+ *    about the object, made on the strength of not understanding the document.
+ *    See {@link booleanOf} and {@link numberOf}. Two rounds separated those two:
+ *    the boolean case was fixed and the numeric one, four lines away, was not.
  *
  * The list is a list, not a running total. Four earlier commits each called the
  * level they had just fixed the last one; a further one turned up every time.
@@ -322,13 +324,43 @@ function attr(node: Node | undefined, name: string): string | undefined {
   return typeof value === 'string' ? value : undefined;
 }
 
-function attrNum(node: Node | undefined, name: string): number | undefined {
-  const raw = attr(node, name);
+/**
+ * A number, or a thrown explanation — never a quietly missing field.
+ *
+ * `Number.isNaN(x) ? undefined : x` reads `hitCount="unexpected"` as "this row
+ * has no hit count", which is a statement about the trace made on the strength
+ * of not understanding it — the same defect {@link booleanOf} was written for,
+ * left in the numeric path because I fixed the case I was shown.
+ *
+ * Non-finite is refused too: `Number('Infinity')` is not `NaN`, so an infinite
+ * hit count would otherwise sail through as a measurement.
+ */
+function numberOf(
+  raw: string | undefined,
+  field: string,
+  what: string,
+  response: IAdtResponse,
+): number | undefined {
   if (raw === undefined || raw === '') {
     return undefined;
   }
   const parsed = Number(raw);
-  return Number.isNaN(parsed) ? undefined : parsed;
+  if (!Number.isFinite(parsed)) {
+    throw new TraceDocumentError(
+      `Reading ${what}: ${field} is "${raw}", which is not a finite number. Dropping the field would report the row as not carrying a value it plainly does.`,
+      bodyOf(response),
+    );
+  }
+  return parsed;
+}
+
+function attrNum(
+  node: Node | undefined,
+  name: string,
+  what: string,
+  response: IAdtResponse,
+): number | undefined {
+  return numberOf(attr(node, name), name, what, response);
 }
 
 /**
@@ -371,15 +403,6 @@ function attrBool(
   response: IAdtResponse,
 ): boolean | undefined {
   return booleanOf(attr(node, name), name, what, response);
-}
-
-/** A count as text, or nothing. `Number('')` is `0`, so emptiness is checked. */
-function numberOf(raw: string | undefined): number | undefined {
-  if (raw === undefined || raw === '') {
-    return undefined;
-  }
-  const parsed = Number(raw);
-  return Number.isNaN(parsed) ? undefined : parsed;
 }
 
 const ID_IN_URI = /abaptraces\/([A-Za-z0-9]{16,})(?:\/|$)/;
@@ -519,7 +542,7 @@ function programRef(
     type,
     uri,
     context: attr(ref, 'context'),
-    byteCodeOffset: attrNum(ref, 'byteCodeOffset'),
+    byteCodeOffset: attrNum(ref, 'byteCodeOffset', what, response),
     objectReferenceQuery: attr(ref, 'objectReferenceQuery'),
   };
 }
@@ -536,18 +559,18 @@ export function parseHitList(response: IAdtResponse): IAbapTraceHitList {
   return {
     entries: rows.map(
       (row, position): IAbapTraceHitListEntry => ({
-        topDownIndex: attrNum(row, 'topDownIndex'),
+        topDownIndex: attrNum(row, 'topDownIndex', what, response),
         index: required(
-          attrNum(row, 'index'),
+          attrNum(row, 'index', what, response),
           'an index',
           'entry',
           position,
           what,
           response,
         ),
-        hitCount: attrNum(row, 'hitCount'),
-        stackCount: attrNum(row, 'stackCount'),
-        recursionDepth: attrNum(row, 'recursionDepth'),
+        hitCount: attrNum(row, 'hitCount', what, response),
+        stackCount: attrNum(row, 'stackCount', what, response),
+        recursionDepth: attrNum(row, 'recursionDepth', what, response),
         description: attr(row, 'description'),
         proceduralEntryAnchor: attr(row, 'proceduralEntryAnchor'),
         callingProgram: programRef(row.callingProgram, what, response),
@@ -579,14 +602,14 @@ export function parseStatements(response: IAdtResponse): IAbapTraceStatements {
           response,
         ),
         index: required(
-          attrNum(row, 'index'),
+          attrNum(row, 'index', what, response),
           'an index',
           'statement',
           position,
           what,
           response,
         ),
-        callLevel: attrNum(row, 'callLevel'),
+        callLevel: attrNum(row, 'callLevel', what, response),
         text: attr(row, 'text'),
         variable: attr(row, 'variable'),
         package: attr(row, 'package'),
@@ -615,10 +638,10 @@ function accessTime(
   // element that yields not one of the four was not understood at all.
   return readAll(
     {
-      total: attrNum(time, 'total'),
-      applicationServer: attrNum(time, 'applicationServer'),
-      database: attrNum(time, 'database'),
-      ratioOfTraceTotal: attrNum(time, 'ratioOfTraceTotal'),
+      total: attrNum(time, 'total', what, response),
+      applicationServer: attrNum(time, 'applicationServer', what, response),
+      database: attrNum(time, 'database', what, response),
+      ratioOfTraceTotal: attrNum(time, 'ratioOfTraceTotal', what, response),
     },
     'accessTime',
     'total/applicationServer/database/ratioOfTraceTotal',
@@ -640,7 +663,7 @@ export function parseDbAccesses(response: IAdtResponse): IAbapTraceDbAccesses {
     accesses: rows.map(
       (row, position): IAbapTraceDbAccess => ({
         index: required(
-          attrNum(row, 'index'),
+          attrNum(row, 'index', what, response),
           'an index',
           'dbAccess',
           position,
@@ -650,8 +673,8 @@ export function parseDbAccesses(response: IAdtResponse): IAbapTraceDbAccesses {
         tableName: attr(row, 'tableName'),
         statement: attr(row, 'statement'),
         type: attr(row, 'type'),
-        totalCount: attrNum(row, 'totalCount'),
-        bufferedCount: attrNum(row, 'bufferedCount'),
+        totalCount: attrNum(row, 'totalCount', what, response),
+        bufferedCount: attrNum(row, 'bufferedCount', what, response),
         accessTime: accessTime(row.accessTime, what, response),
       }),
     ),
@@ -746,7 +769,12 @@ export function parseTraceRequests(
         'the trace schedule',
         response,
       ),
-      index: numberOf(text(extended.requestIndex)),
+      index: numberOf(
+        text(extended.requestIndex),
+        'requestIndex',
+        'the trace schedule',
+        response,
+      ),
       description: text(extended.description),
       expiresAt: text(extended.expires),
       // Absence is not `false`. The contract makes this optional, and saying
@@ -780,8 +808,18 @@ export function parseTraceRequests(
         ? {
             executions: readAll(
               {
-                maximal: attrNum(executions, 'maximal'),
-                completed: attrNum(executions, 'completed'),
+                maximal: attrNum(
+                  executions,
+                  'maximal',
+                  'the trace schedule',
+                  response,
+                ),
+                completed: attrNum(
+                  executions,
+                  'completed',
+                  'the trace schedule',
+                  response,
+                ),
               },
               'executions',
               'maximal/completed',

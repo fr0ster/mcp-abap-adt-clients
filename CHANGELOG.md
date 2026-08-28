@@ -128,9 +128,12 @@ Requires `@mcp-abap-adt/interfaces@^22.0.0`.
   property not being there, and anything else is present. And the value: reading
   an unrecognised boolean as `false` is not a parse failure but a claim about
   the object — `isAggregated` said aggregation was off whenever the field was
-  absent. And the container: a present `<extendedData/>` that yields none of the
-  fields this parser knows looks exactly like optional metadata that happened to
-  be absent, and is not — its absence is still fine. A document understood at
+  absent, and an unreadable number was dropped as though the field were missing
+  — `hitCount="unexpected"` reported a row with no hit count, and `Infinity`
+  passed as a measurement because it is not `NaN`. And the container: a present
+  `<extendedData/>` that yields none of the fields this parser knows looks
+  exactly like optional metadata that happened to be absent, and is not — its
+  absence is still fine. A document understood at
   all six levels may still be empty, and then it reads as empty.
 
 ### Notes on what is and is not verified

@@ -445,6 +445,69 @@ describe('trace document parsing', () => {
     });
   });
 
+  describe('a number is never dropped for being unreadable', () => {
+    it('refuses a non-numeric hitCount instead of reporting no hit count', () => {
+      expect(() =>
+        parseHitList(
+          response(
+            '<?xml version="1.0"?><trc:hitlist xmlns:trc="x"><trc:entry trc:index="1" trc:hitCount="unexpected"/></trc:hitlist>',
+          ),
+        ),
+      ).toThrow(/not a finite number/);
+    });
+
+    it('refuses Infinity, which is not NaN and would otherwise pass', () => {
+      expect(() =>
+        parseHitList(
+          response(
+            '<?xml version="1.0"?><trc:hitlist xmlns:trc="x"><trc:entry trc:index="1" trc:hitCount="Infinity"/></trc:hitlist>',
+          ),
+        ),
+      ).toThrow(TraceDocumentError);
+    });
+
+    it('refuses a partly unreadable <executions>, which readAll alone let pass', () => {
+      // `completed` parses, so the container looked understood; `maximal` did
+      // not, and vanished.
+      expect(() =>
+        parseTraceRequests(
+          response(
+            '<?xml version="1.0"?><atom:feed xmlns:atom="http://www.w3.org/2005/Atom" xmlns:trc="x"><atom:entry><atom:id>/sap/bc/adt/x/1</atom:id><trc:extendedData><trc:executions trc:maximal="unexpected" trc:completed="1"/></trc:extendedData></atom:entry></atom:feed>',
+          ),
+        ),
+      ).toThrow(TraceDocumentError);
+    });
+
+    it('refuses an unreadable requestIndex', () => {
+      expect(() =>
+        parseTraceRequests(
+          response(
+            '<?xml version="1.0"?><atom:feed xmlns:atom="http://www.w3.org/2005/Atom" xmlns:trc="x"><atom:entry><atom:id>/sap/bc/adt/x/1</atom:id><trc:extendedData><trc:requestIndex>unexpected</trc:requestIndex></trc:extendedData></atom:entry></atom:feed>',
+          ),
+        ),
+      ).toThrow(/not a finite number/);
+    });
+
+    it('still treats an absent optional number as absent', () => {
+      const parsed = parseHitList(
+        response(
+          '<?xml version="1.0"?><trc:hitlist xmlns:trc="x"><trc:entry trc:index="1"/></trc:hitlist>',
+        ),
+      );
+      expect(parsed.entries[0]?.hitCount).toBeUndefined();
+    });
+
+    it('reads a negative and a zero, which truthiness checks would lose', () => {
+      const parsed = parseHitList(
+        response(
+          '<?xml version="1.0"?><trc:hitlist xmlns:trc="x"><trc:entry trc:index="0" trc:recursionDepth="-1"/></trc:hitlist>',
+        ),
+      );
+      expect(parsed.entries[0]?.index).toBe(0);
+      expect(parsed.entries[0]?.recursionDepth).toBe(-1);
+    });
+  });
+
   describe('a recognised document may legitimately be empty', () => {
     it('accepts a feed with no entries', () => {
       expect(
