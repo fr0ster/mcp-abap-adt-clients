@@ -289,12 +289,23 @@ export class AdtInclude
         lockHandle,
         config.transportRequest ?? locked.corrNr,
       );
-      // A successful DELETE releases the lock with the object.
-      lockHandle = undefined;
+      // The handle is deliberately NOT cleared here. A successful DELETE was
+      // assumed to release the lock with the object; measured on E19
+      // (`RFCSAPRL 816`) it does not. The object goes, the editing
+      // registration on its name stays, and the next create for that name is
+      // answered **403 ExceptionResourceNoAuthorization, "User … is currently
+      // editing …"** — in the same session, on a name nothing else had
+      // touched. So the unlock below still has to run.
     } catch (error) {
       state.errors.push(asError('delete', error));
     } finally {
-      await this.releaseAndGoStateless(state, includeName, lockHandle);
+      // `quiet`: after a successful DELETE the object no longer exists, so the
+      // unlock may well be refused. That refusal is not a failure of the
+      // delete, and recording it as one would make every cleanup look broken
+      // to a caller that checks `state.errors`.
+      await this.releaseAndGoStateless(state, includeName, lockHandle, {
+        quiet: state.deleteResult !== undefined,
+      });
     }
     return state;
   }
@@ -419,6 +430,7 @@ export class AdtInclude
     state: { errors: IncludeError[] },
     includeName: string,
     lockHandle: string | undefined,
+    options?: { quiet?: boolean },
   ) {
     let unlockResult: Awaited<ReturnType<typeof unlockInclude>> | undefined;
     if (lockHandle) {
@@ -433,7 +445,9 @@ export class AdtInclude
           includeName,
           error: safeErrorMessage(error),
         });
-        state.errors.push(asError('unlock', error));
+        if (!options?.quiet) {
+          state.errors.push(asError('unlock', error));
+        }
       }
     }
     this.connection.setSessionType?.('stateless');
