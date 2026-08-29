@@ -236,21 +236,29 @@ describe('Include (PROG/I, using AdtClient)', () => {
           return;
         }
 
-        const config = tester.getConfig();
-        if (!config?.includeName) {
-          logTestSkip(testsLogger, testName, 'include_name not configured');
+        // A standard, SAP-delivered include, from the same registry every other
+        // suite reads its read-only fixtures out of. Nothing is created: the
+        // question is what the document looks like, and an include that has
+        // always existed answers it without leaving anything behind.
+        const standard = tester.getStandardObject('include');
+        if (!standard?.name) {
+          logTestSkip(
+            testsLogger,
+            testName,
+            'No standard include configured for this environment',
+          );
           return;
         }
 
         logTestStart(testsLogger, testName, {
           name: 'metadata_shape',
-          params: { include_name: config.includeName },
+          params: { include_name: standard.name },
         });
 
         try {
           const state = await client
             .getInclude()
-            .readMetadata({ includeName: config.includeName });
+            .readMetadata({ includeName: standard.name });
           const body = String((state?.readResult as any)?.data ?? '');
 
           // The whole reason this is a separate module: an include answers with

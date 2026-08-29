@@ -365,6 +365,22 @@ shared_dependencies:
       binding_version: "V4"
       binding_variant: "ODATA_V4_WEB_API"
 
+  includes:
+    # SAP-delivered includes, read-only. Used for shape checks that need an
+    # include to exist without creating one — the same reason `domains` names
+    # MANDT rather than making a domain.
+    #
+    # LSVIMTOP is a function-group include by name (`L<fugr>TOP`), and it was
+    # queried anyway because the naming rule turns out not to decide this:
+    # measured on E19, `GET /sap/bc/adt/programs/includes/lsvimtop` answers
+    # `include:abapInclude` with `adtcore:type="PROG/I"`. So FUGR and PROG
+    # includes differ in where they are CREATED and what contains them, not in
+    # the type code a read returns — which is why this fixture serves a shape
+    # check that only asks what the document looks like.
+    - name: "LSVIMTOP"
+      description: "Standard SAP include (table maintenance framework)"
+      available_in: ["onprem"]
+
   programs:
     - name: "ZAC_SHR_PROG"
       description: "Shared program for run tests"

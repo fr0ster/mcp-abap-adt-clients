@@ -529,6 +529,23 @@ export class BaseTester<TConfig, TState> {
       return Boolean(configAny?.className || configAny?.interfaceName);
     };
 
+    /**
+     * Which version the post-create read asks for.
+     *
+     * Measured on E19: for an include the versionless read answered nothing and
+     * the flow died with "Read undefined failed: no response". Classes and
+     * interfaces skip this read entirely for the same underlying reason — a
+     * freshly created object has no ACTIVE version — while the other suites
+     * evidently tolerate the versionless read, so this is narrowed to the type
+     * where the failure was actually seen rather than changed for all.
+     *
+     * Skipping it would cost the pre/post update comparison below, which is the
+     * check that catches an update writing nothing, so the inactive version is
+     * read instead: right after create that IS the object's content.
+     */
+    const initialReadVersion = (): 'inactive' | undefined =>
+      (config as any)?.includeName ? 'inactive' : undefined;
+
     let preUpdateActive: string | undefined;
     let postUpdateInactive: string | undefined;
     let postActivateActive: string | undefined;
@@ -776,11 +793,10 @@ export class BaseTester<TConfig, TState> {
 
       // 3. Update (if updateConfig provided)
       if (options?.updateConfig) {
-        const updateContent =
-          options.sourceCode ||
-          options.xmlContent ||
-          options.updateConfig?.sourceCode ||
-          options.updateConfig?.xmlContent;
+        // (A second `updateContent` used to be resolved here and never read.
+        // It carried the create-source-first order this PR is fixing, so a
+        // reader checking "which content does the update use?" could land on
+        // the dead one and conclude the bug was still there.)
         await readObjectProperties(
           'read object properties (post-create, no version)',
         );
@@ -791,7 +807,7 @@ export class BaseTester<TConfig, TState> {
           );
         } else {
           preUpdateActive = await readVersion(
-            undefined,
+            initialReadVersion(),
             'read initial (post-create, no version)',
             false,
           );
@@ -801,8 +817,14 @@ export class BaseTester<TConfig, TState> {
         logTestStep(currentStep, this.logger);
         const updateOptions: IAdtOperationOptions = {
           activateOnUpdate: options?.activateOnUpdate || false,
-          sourceCode: options?.sourceCode,
-          xmlContent: options?.xmlContent,
+          // The UPDATE content, not the create content. Every handler resolves
+          // `options.sourceCode ?? config.sourceCode` with options winning, so
+          // passing the create source here overwrote the object with what it
+          // already held and the update became a no-op — measured on E19 with
+          // the include suite, where the stored source stayed 52 characters
+          // while `update_source_code` was 62.
+          sourceCode: options?.updateConfig?.sourceCode ?? options?.sourceCode,
+          xmlContent: options?.updateConfig?.xmlContent ?? options?.xmlContent,
           timeout: options?.timeout,
         };
         await this.adtObject.update(
@@ -870,20 +892,30 @@ export class BaseTester<TConfig, TState> {
       }
 
       if (options?.updateConfig) {
+        // Same order as the send above, and for the same reason: what the
+        // update was asked to write is what the read afterwards is checked
+        // against. Reading the create source here made the check compare the
+        // object with its own previous content.
+        // `??`, matching the send exactly. `||` made an intentionally EMPTY
+        // update source fall through to the create source, so clearing an
+        // object — a legitimate edit — wrote empty and was then compared
+        // against the content it had before, reporting a mismatch on a correct
+        // update. Emptiness is a value; only absence is absence.
         const updateContent =
-          options.sourceCode ||
-          options.xmlContent ||
-          options.updateConfig?.sourceCode ||
-          options.updateConfig?.xmlContent;
-        const updateContentKind = options.sourceCode
-          ? 'source'
-          : options.xmlContent
-            ? 'xml'
-            : options.updateConfig?.sourceCode
-              ? 'source'
-              : options.updateConfig?.xmlContent
-                ? 'xml'
-                : 'unknown';
+          options.updateConfig?.sourceCode ??
+          options.updateConfig?.xmlContent ??
+          options.sourceCode ??
+          options.xmlContent;
+        const updateContentKind =
+          options.updateConfig?.sourceCode !== undefined
+            ? 'source'
+            : options.updateConfig?.xmlContent !== undefined
+              ? 'xml'
+              : options.sourceCode !== undefined
+                ? 'source'
+                : options.xmlContent !== undefined
+                  ? 'xml'
+                  : 'unknown';
 
         if (preUpdateActive && postUpdateInactive) {
           if (updateContentKind === 'source') {
