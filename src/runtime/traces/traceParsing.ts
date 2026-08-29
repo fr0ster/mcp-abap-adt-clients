@@ -312,7 +312,9 @@ export function parseTraceEntries(response: IAdtResponse): IAbapTraceEntry[] {
         expiresAt: text(ext.expiration) as string,
 
         system: text(ext.system) as string,
-        // A client is a code, not a count: `010` is not `10`.
+        // Codes, not counts. A client is `010` and an instance is `00`; the
+        // leading zero is significant and `Number('010')` destroys it
+        // irreversibly. Only what is actually counted is a number below.
         client: text(ext.client) as string,
         host: text(ext.host) as string,
 
