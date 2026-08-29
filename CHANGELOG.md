@@ -7,7 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [13.0.0] - 2026-08-28
 
-Requires `@mcp-abap-adt/interfaces@^22.0.0`.
+Requires `@mcp-abap-adt/interfaces@^23.0.0` — `readWith()` arrives there.
 
 ### Changed
 

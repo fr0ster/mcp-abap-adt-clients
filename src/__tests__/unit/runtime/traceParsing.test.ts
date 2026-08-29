@@ -242,6 +242,26 @@ describe('trace document mapping', () => {
       expect(compareRecordedAt(a, b)).toBeGreaterThan(0);
     });
 
+    it('orders past the millisecond, which Date.parse cannot', () => {
+      // Both are 100ms to `Date.parse`, so a comparison through it alone calls
+      // them equal and `latestTraceId()` keeps whichever it saw first. Removing
+      // the RFC 3339 validator took this fix with it once; it is not validation.
+      const earlier = { recordedAt: '2026-08-28T10:00:00.1001Z' };
+      const later = { recordedAt: '2026-08-28T10:00:00.1009Z' };
+      expect(Date.parse(later.recordedAt)).toBe(Date.parse(earlier.recordedAt));
+      expect(compareRecordedAt(later, earlier)).toBeGreaterThan(0);
+      expect(compareRecordedAt(earlier, later)).toBeLessThan(0);
+    });
+
+    it('treats equal instants as equal, however written', () => {
+      expect(
+        compareRecordedAt(
+          { recordedAt: '2026-08-28T10:00:00.100Z' },
+          { recordedAt: '2026-08-28T10:00:00.1000Z' },
+        ),
+      ).toBe(0);
+    });
+
     it('gives an unreadable timestamp a stable place instead of throwing', () => {
       // Ordering is not judgement. NaN compares false both ways, which would
       // otherwise leave the result depending on iteration order.

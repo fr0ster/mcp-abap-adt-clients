@@ -131,19 +131,30 @@ function attrBool(node: Node | undefined, name: string): boolean | undefined {
 
 const ID_IN_URI = /abaptraces\/([A-Za-z0-9]{16,})(?:\/|$)/;
 
+/** The fractional digits beyond the millisecond, or '' when there are none. */
+const SUB_MILLI = /\.(\d+)/;
+
 /**
  * Order two traces by when they were recorded.
  *
- * A comparator, not a validator. Comparing `recordedAt` as a **string** is
- * simply wrong: `2026-08-28T09:00:00Z` is later than
- * `2026-08-28T10:00:00+02:00` and sorts lower as text, so `latestTraceId()` —
- * which exists precisely to avoid taking a stale trace by feed position — would
- * take the stale one. That is a defect in our own logic, independent of what SAP
- * sends.
+ * A comparator, not a validator — this reads the timestamp for our own purpose
+ * rather than judging whether SAP was entitled to send it.
  *
- * An unreadable timestamp sorts first rather than throwing. This is ordering,
- * not judgement, and `NaN` compares false in both directions, which would leave
- * the order depending on iteration sequence.
+ * Two things it must get right, both defects in our own logic and neither about
+ * the wire:
+ *
+ * - **Not as text.** `2026-08-28T09:00:00Z` is later than
+ *   `2026-08-28T10:00:00+02:00` and sorts lower as a string, so
+ *   `latestTraceId()` — which exists to avoid taking a stale trace by feed
+ *   position — would take the stale one.
+ * - **Past the millisecond.** `Date.parse` truncates there, so `…00.1001Z` and
+ *   `…00.1009Z` come back equal and the older of the two is kept. Removing the
+ *   RFC 3339 validator took this fix with it, which it should not have: the
+ *   validator was a claim about SAP, this is arithmetic about our own ordering.
+ *
+ * An unreadable timestamp sorts first rather than throwing. Ordering is not
+ * judgement, and `NaN` compares false in both directions, which would otherwise
+ * leave the result depending on iteration order.
  */
 export function compareRecordedAt(
   a: { recordedAt: string },
@@ -157,7 +168,15 @@ export function compareRecordedAt(
     }
     return Number.isNaN(left) ? -1 : 1;
   }
-  return left - right;
+  if (left !== right) {
+    return left - right;
+  }
+
+  // Same millisecond: only digits `Date.parse` discarded can separate them.
+  const leftSub = SUB_MILLI.exec(a.recordedAt)?.[1].slice(3) ?? '';
+  const rightSub = SUB_MILLI.exec(b.recordedAt)?.[1].slice(3) ?? '';
+  const width = Math.max(leftSub.length, rightSub.length);
+  return leftSub.padEnd(width, '0').localeCompare(rightSub.padEnd(width, '0'));
 }
 
 /**
