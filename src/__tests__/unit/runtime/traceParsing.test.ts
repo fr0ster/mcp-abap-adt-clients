@@ -576,6 +576,33 @@ describe('trace document parsing', () => {
       expect(entries[0]?.recordedAt).toBe('2026-08-28T10:00:00+02:00');
     });
 
+    it.each([
+      ['2026-08-28t10:00:00Z', 'lowercase t'],
+      ['2026-08-28T10:00:00z', 'lowercase z'],
+      ['2026-08-28t10:00:00z', 'both lowercase'],
+      ['1990-12-31T23:59:60Z', 'a leap second in UTC'],
+      ['1990-12-31T15:59:60-08:00', "the RFC's own leap-second example"],
+    ])('accepts %s (%s), which RFC 3339 permits', (raw) => {
+      // Rejecting a legitimate Atom timestamp turns a working read into an
+      // error — the opposite failure to the one this guard exists for.
+      expect(parseTraceEntries(feedWith(raw))).toHaveLength(1);
+    });
+
+    it('still refuses :60 where it is not a leap second', () => {
+      expect(() => parseTraceEntries(feedWith('2026-08-28T10:00:60Z'))).toThrow(
+        /not an RFC 3339 date-time/,
+      );
+    });
+
+    it('orders a leap second before the next minute', () => {
+      expect(
+        compareRecordedAt(
+          { recordedAt: '1991-01-01T00:00:00Z' },
+          { recordedAt: '1990-12-31T23:59:60Z' },
+        ),
+      ).toBeGreaterThan(0);
+    });
+
     it('accepts a leap day that does exist', () => {
       const entries = parseTraceEntries(feedWith('2024-02-29T10:00:00Z'));
       expect(entries).toHaveLength(1);

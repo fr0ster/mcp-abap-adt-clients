@@ -369,13 +369,37 @@ function numberOf(
  * because those are needed to order two traces written within the same
  * millisecond and are exactly what `Date.parse` throws away.
  */
+/**
+ * RFC 3339 as written, not as I first remembered it.
+ *
+ * Two forms the first version rejected, both of which a legitimate Atom feed
+ * may carry — and rejecting them turns a working read into an error, which is
+ * the opposite failure to the one that guard was added for:
+ *
+ * - **Lowercase `t` and `z`.** RFC 3339 §5.6 permits them explicitly.
+ * - **The leap second, `:60`.** Permitted at the end of a UTC month; the RFC's
+ *   own example is `1990-12-31T15:59:60-08:00`, which is 23:59:60Z. So it is
+ *   accepted exactly where the RFC allows it — when the instant, after the
+ *   offset is applied, lands on 23:59 UTC — and refused anywhere else, because
+ *   `10:00:60` is not a time.
+ */
 const RFC3339 =
-  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?(Z|[+-]\d{2}:\d{2})$/;
+  /^(\d{4})-(\d{2})-(\d{2})[Tt](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?([Zz]|[+-]\d{2}:\d{2})$/;
 
 interface IInstant {
   ms: number;
   /** Digits after the millisecond, exactly as written. */
   subMilli: string;
+  /**
+   * Whether the wire said `:60`.
+   *
+   * POSIX time has no leap second, so `1990-12-31T23:59:60Z` and
+   * `1991-01-01T00:00:00Z` are the same number of milliseconds — they would
+   * compare equal, and two distinguishable instants comparing equal is the tie
+   * this comparator exists to avoid. The leap second physically precedes, so
+   * it sorts first.
+   */
+  leap: boolean;
 }
 
 function parseRfc3339(raw: string): IInstant | undefined {
@@ -391,23 +415,24 @@ function parseRfc3339(raw: string): IInstant | undefined {
   const minute = Number(mi);
   const second = Number(sec);
 
+  if (hour > 23 || minute > 59 || second > 60) {
+    return undefined;
+  }
+
   // Calendar validity: `Date.UTC` rolls 30 February into March rather than
   // refusing it, so the only way to catch it is to read the components back.
-  const utc = Date.UTC(year, month - 1, day, hour, minute, second);
-  const check = new Date(utc);
+  const midnight = Date.UTC(year, month - 1, day);
+  const check = new Date(midnight);
   if (
     check.getUTCFullYear() !== year ||
     check.getUTCMonth() !== month - 1 ||
-    check.getUTCDate() !== day ||
-    hour > 23 ||
-    minute > 59 ||
-    second > 59
+    check.getUTCDate() !== day
   ) {
     return undefined;
   }
 
   let offsetMinutes = 0;
-  if (zone !== 'Z') {
+  if (zone !== 'Z' && zone !== 'z') {
     const sign = zone.startsWith('-') ? -1 : 1;
     const offsetHours = Number(zone.slice(1, 3));
     const offsetMins = Number(zone.slice(4, 6));
@@ -417,10 +442,22 @@ function parseRfc3339(raw: string): IInstant | undefined {
     offsetMinutes = sign * (offsetHours * 60 + offsetMins);
   }
 
+  // The minute this instant falls in, in UTC — computed with the seconds left
+  // out so that `:60` does not roll it forward before it can be checked.
+  const minuteStart =
+    midnight + (hour * 60 + minute) * 60_000 - offsetMinutes * 60_000;
+  if (second === 60) {
+    const utc = new Date(minuteStart);
+    if (utc.getUTCHours() !== 23 || utc.getUTCMinutes() !== 59) {
+      return undefined;
+    }
+  }
+
   const milli = Number(fraction.slice(0, 3).padEnd(3, '0') || '0');
   return {
-    ms: utc - offsetMinutes * 60_000 + milli,
+    ms: minuteStart + second * 1000 + milli,
     subMilli: fraction.slice(3),
+    leap: second === 60,
   };
 }
 
@@ -477,9 +514,15 @@ export function compareRecordedAt(
     return left.ms - right.ms;
   }
   const width = Math.max(left.subMilli.length, right.subMilli.length);
-  return left.subMilli
+  const fraction = left.subMilli
     .padEnd(width, '0')
     .localeCompare(right.subMilli.padEnd(width, '0'));
+  if (fraction !== 0) {
+    return fraction;
+  }
+  // Same POSIX millisecond: only a leap second can put two different wire
+  // values here, and it precedes the second that shares its number.
+  return Number(left.leap) - Number(right.leap) === 0 ? 0 : left.leap ? -1 : 1;
 }
 
 function attrNum(

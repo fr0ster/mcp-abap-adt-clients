@@ -134,7 +134,11 @@ Requires `@mcp-abap-adt/interfaces@^22.0.0`.
   **RFC 3339**, as Atom requires, rather than against `Date.parse` — which is
   not a validator: it rolls `2026-02-30` into March, accepts a date with no
   time, and reads a time with no offset in the *process's* timezone, so the same
-  feed parses differently on two machines.
+  feed parses differently on two machines. The validator accepts what the RFC
+  permits and not merely what SAP has been seen to send — lowercase `t`/`z`, and
+  the leap second where the RFC allows it — because rejecting a legitimate Atom
+  timestamp turns a working read into an error, which is the opposite failure to
+  the one this guard exists for.
 
   `latestTraceId()` orders by time rather than by text — `"unexpected"` sorts
   above every ISO timestamp, and two valid ones with different UTC offsets do
