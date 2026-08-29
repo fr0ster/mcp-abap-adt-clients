@@ -9,9 +9,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 Requires `@mcp-abap-adt/interfaces@^24.0.0`.
 
-Everything here follows one raw capture — `docs/evidence/2026-08-29-profiler-probe/`,
-the trace feed and all three views as whole files. It closes the two things
-13.0.0 shipped without.
+Everything here follows one raw capture taken on an on-prem system — the trace
+feed and all three views, whole files rather than logged excerpts. It closes the
+two things 13.0.0 shipped without. The capture is not kept in the tree: what it
+established is stated below and pinned by the parser tests, which are
+transcribed from it.
 
 ### Changed
 
