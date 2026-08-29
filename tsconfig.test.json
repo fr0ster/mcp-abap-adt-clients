@@ -17,6 +17,7 @@
     "scripts/probe-atc.ts",
     "scripts/probe-abapunit.ts",
     "scripts/probe-profiler-contract.ts",
+    "scripts/print-trace-entry.ts",
     "scripts/probe-validation-params.ts"
   ],
   "exclude": ["node_modules", "dist"]

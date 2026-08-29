@@ -36,22 +36,53 @@ const TRACE_ID = 'ABCDEF0123456789ABCD';
 
 describe('trace document mapping', () => {
   describe('the trace feed', () => {
-    it('reads the id out of the atom:id URI, and the moment it was recorded', () => {
-      const entries = parseTraceEntries(
-        FEED(
-          `<atom:entry><atom:id>/sap/bc/adt/runtime/traces/abaptraces/${TRACE_ID}</atom:id><atom:published>2026-08-28T10:00:00Z</atom:published></atom:entry>`,
-        ),
-      );
-      expect(entries).toEqual([
+    /** One entry exactly as E19 sends it, field for field. */
+    const REAL_ENTRY =
+      `<atom:entry><atom:author><atom:name>OKYSLYTSIA</atom:name></atom:author>` +
+      `<atom:id>/sap/bc/adt/runtime/traces/abaptraces/${TRACE_ID}</atom:id>` +
+      `<atom:published>2026-08-28T10:00:00Z</atom:published>` +
+      `<trc:extendedData><trc:host>somehost</trc:host><trc:size>8</trc:size>` +
+      `<trc:runtime>554</trc:runtime><trc:runtimeABAP>553</trc:runtimeABAP>` +
+      `<trc:runtimeSystem>1</trc:runtimeSystem><trc:runtimeDatabase>0</trc:runtimeDatabase>` +
+      `<trc:expiration>2026-09-24T06:09:50Z</trc:expiration><trc:system>ABC</trc:system>` +
+      `<trc:client>100</trc:client><trc:user>OKYSLYTSIA</trc:user>` +
+      `<trc:isAggregated>false</trc:isAggregated>` +
+      `<trc:objectName>ZAC_SHR_RUN01=================CP</trc:objectName>` +
+      `<trc:state value="R" text="Finished"/><trc:amdpFileSize>0</trc:amdpFileSize>` +
+      `</trc:extendedData></atom:entry>`;
+
+    it('reads every field the feed carries', () => {
+      // Transcribed from the raw capture rather than trimmed to what the
+      // parser happened to read: the point is that nothing in the document is
+      // dropped on the floor.
+      expect(parseTraceEntries(FEED(REAL_ENTRY))).toEqual([
         {
           id: TRACE_ID,
           recordedAt: '2026-08-28T10:00:00Z',
-          user: undefined,
-          objectName: undefined,
           uri: `/sap/bc/adt/runtime/traces/abaptraces/${TRACE_ID}`,
-          expiresAt: undefined,
+          user: 'OKYSLYTSIA',
+          objectName: 'ZAC_SHR_RUN01=================CP',
+          state: { value: 'R', text: 'Finished' },
+          expiresAt: '2026-09-24T06:09:50Z',
+          system: 'ABC',
+          client: '100',
+          host: 'somehost',
+          size: 8,
+          runtime: 554,
+          runtimeABAP: 553,
+          runtimeSystem: 1,
+          runtimeDatabase: 0,
+          isAggregated: false,
+          amdpFileSize: 0,
         },
       ]);
+    });
+
+    it('keeps the client as a string, because `010` is not `10`', () => {
+      const entries = parseTraceEntries(
+        FEED(REAL_ENTRY.replace('<trc:client>100<', '<trc:client>010<')),
+      );
+      expect(entries[0]?.client).toBe('010');
     });
 
     it('finds the trc: fields under extendedData', () => {
@@ -68,15 +99,17 @@ describe('trace document mapping', () => {
       });
     });
 
-    it('finds them directly on the entry too', () => {
-      // Which of the two nestings the traces feed really uses has never been
-      // read end to end, so the reader looks in both places.
+    it('reads the trc: fields from extendedData and nowhere else', () => {
+      // The reader used to look on the entry as well, because which nesting was
+      // real had never been read end to end. It has been now: sixty entries,
+      // every `trc:` field inside the container and not one outside it. A
+      // second lookup would be reading for a document nobody has seen.
       const entries = parseTraceEntries(
         FEED(
-          `<atom:entry><atom:id>/sap/bc/adt/runtime/traces/abaptraces/${TRACE_ID}</atom:id><atom:published>2026-08-28T10:00:00Z</atom:published><trc:user>SOMEONE</trc:user></atom:entry>`,
+          `<atom:entry><atom:id>/sap/bc/adt/runtime/traces/abaptraces/${TRACE_ID}</atom:id><atom:published>2026-08-28T10:00:00Z</atom:published><trc:objectName>ON_THE_ENTRY</trc:objectName></atom:entry>`,
         ),
       );
-      expect(entries[0]?.user).toBe('SOMEONE');
+      expect(entries[0]?.objectName).toBeUndefined();
     });
 
     it('falls back to atom:author for the user', () => {
@@ -117,6 +150,30 @@ describe('trace document mapping', () => {
       });
     });
 
+    it('reads the timings as a shape, not as whatever parsed', () => {
+      // `ITraceTiming` was `unknown` through two releases because the elements
+      // had been seen while their attributes never had. Both carry `time` and
+      // `percentage`, in the hit list and the statements alike.
+      const parsed = parseHitList(
+        response(
+          '<?xml version="1.0"?><trc:hitlist xmlns:trc="x"><trc:entry trc:index="1"><trc:grossTime time="243" percentage="43.8628"/></trc:entry></trc:hitlist>',
+        ),
+      );
+      expect(parsed.entries[0]?.grossTime).toEqual({
+        time: 243,
+        percentage: 43.8628,
+      });
+    });
+
+    it('leaves a timing absent when the element is', () => {
+      const parsed = parseHitList(
+        response(
+          '<?xml version="1.0"?><trc:hitlist xmlns:trc="x"><trc:entry trc:index="1"/></trc:hitlist>',
+        ),
+      );
+      expect(parsed.entries[0]?.grossTime).toBeUndefined();
+    });
+
     it('maps a statement, keeping the anchor that links it to the hit list', () => {
       const parsed = parseStatements(
         response(
@@ -129,6 +186,18 @@ describe('trace document mapping', () => {
         callLevel: 3,
         hitlistAnchor: 'A1',
         isProcedureLike: true,
+      });
+    });
+
+    it('reads traceEventNetTime the same way', () => {
+      const parsed = parseStatements(
+        response(
+          '<?xml version="1.0"?><trc:statements xmlns:trc="x"><trc:statement trc:id="7" trc:index="2"><trc:traceEventNetTime time="14" percentage="2.53"/></trc:statement></trc:statements>',
+        ),
+      );
+      expect(parsed.statements[0]?.traceEventNetTime).toEqual({
+        time: 14,
+        percentage: 2.53,
       });
     });
 
