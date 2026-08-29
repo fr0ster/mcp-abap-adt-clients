@@ -529,6 +529,20 @@ export class BaseTester<TConfig, TState> {
       return Boolean(configAny?.className || configAny?.interfaceName);
     };
 
+    /**
+     * Which version the post-create read asks for.
+     *
+     * A freshly created object has no ACTIVE version yet, which is why classes
+     * and interfaces skip this read entirely. An include is in the same
+     * position — measured on E19: the read answered nothing and the flow died
+     * with "Read undefined failed: no response". Skipping it would cost the
+     * pre/post update comparison below, which is the check that catches an
+     * update writing nothing, so the inactive version is read instead: right
+     * after create that IS the object's content.
+     */
+    const initialReadVersion = (): 'inactive' | undefined =>
+      (config as any)?.includeName ? 'inactive' : undefined;
+
     let preUpdateActive: string | undefined;
     let postUpdateInactive: string | undefined;
     let postActivateActive: string | undefined;
@@ -791,7 +805,7 @@ export class BaseTester<TConfig, TState> {
           );
         } else {
           preUpdateActive = await readVersion(
-            undefined,
+            initialReadVersion(),
             'read initial (post-create, no version)',
             false,
           );
@@ -801,8 +815,14 @@ export class BaseTester<TConfig, TState> {
         logTestStep(currentStep, this.logger);
         const updateOptions: IAdtOperationOptions = {
           activateOnUpdate: options?.activateOnUpdate || false,
-          sourceCode: options?.sourceCode,
-          xmlContent: options?.xmlContent,
+          // The UPDATE content, not the create content. Every handler resolves
+          // `options.sourceCode ?? config.sourceCode` with options winning, so
+          // passing the create source here overwrote the object with what it
+          // already held and the update became a no-op — measured on E19 with
+          // the include suite, where the stored source stayed 52 characters
+          // while `update_source_code` was 62.
+          sourceCode: options?.updateConfig?.sourceCode ?? options?.sourceCode,
+          xmlContent: options?.updateConfig?.xmlContent ?? options?.xmlContent,
           timeout: options?.timeout,
         };
         await this.adtObject.update(
@@ -870,18 +890,22 @@ export class BaseTester<TConfig, TState> {
       }
 
       if (options?.updateConfig) {
+        // Same order as the send above, and for the same reason: what the
+        // update was asked to write is what the read afterwards is checked
+        // against. Reading the create source here made the check compare the
+        // object with its own previous content.
         const updateContent =
-          options.sourceCode ||
-          options.xmlContent ||
           options.updateConfig?.sourceCode ||
-          options.updateConfig?.xmlContent;
-        const updateContentKind = options.sourceCode
+          options.updateConfig?.xmlContent ||
+          options.sourceCode ||
+          options.xmlContent;
+        const updateContentKind = options.updateConfig?.sourceCode
           ? 'source'
-          : options.xmlContent
+          : options.updateConfig?.xmlContent
             ? 'xml'
-            : options.updateConfig?.sourceCode
+            : options.sourceCode
               ? 'source'
-              : options.updateConfig?.xmlContent
+              : options.xmlContent
                 ? 'xml'
                 : 'unknown';
 
