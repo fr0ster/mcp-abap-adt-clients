@@ -20,6 +20,20 @@
  * no `?? 0`, no `?? ''`. A field the wire omits arrives as `undefined`, which is
  * the truth about the wire.
  *
+ * **An empty body is not an error here, and this is deliberate.** ADT answers
+ * `200` with nothing when the requested documents are not there; it has 404 and
+ * it has error payloads, and it used neither. Relaying that as an empty result
+ * is a faithful relay, not a fabrication — nothing is invented that the response
+ * did not contain.
+ *
+ * This has been raised more than once, because elsewhere in this repository a
+ * `200` with an empty body IS a hazard: on an editable object it silently
+ * corrupts read-modify-write, since the empty read becomes the basis of a write
+ * that erases what was there. That danger belongs to the *update* path and to
+ * objects one writes back. A trace view is read-only — nobody PUTs a hit list —
+ * so the hazard does not transfer, and importing it here would put our judgement
+ * in the one place we otherwise say the server decides.
+ *
  * The element and attribute names are transcribed from measurement. The one
  * genuine uncertainty is the nesting of the feed's `trc:` fields: on the
  * trace-requests feed they sit under `trc:extendedData`, and the traces feed is
