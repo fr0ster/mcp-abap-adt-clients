@@ -5,6 +5,53 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [14.0.0] - 2026-08-29
+
+Requires `@mcp-abap-adt/interfaces@^24.0.0`.
+
+Everything here follows one raw capture — `docs/evidence/2026-08-29-profiler-probe/`,
+the trace feed and all three views as whole files. It closes the two things
+13.0.0 shipped without.
+
+### Changed
+
+- **BREAKING** — `Profiler.list()` returns `IAbapTraceEntry[]`, not
+  `ITraceEntry[]`.
+
+  Ten fields the feed always carried and this library was throwing away:
+  `system`, `client`, `host`, `size`, `runtime`, `runtimeABAP`, `runtimeSystem`,
+  `runtimeDatabase`, `isAggregated`, `amdpFileSize`. Four more — `user`,
+  `objectName`, `state`, `expiresAt` — are no longer optional, because the
+  measurement found them on all sixty entries.
+
+  `client` is a `string`: a client is a code, and `010` is not `10`. Pinned by a
+  test, since a number is the obvious wrong choice.
+
+  **Migration.** Readers gain fields and lose four optionality checks. Code that
+  declared a variable as `ITraceEntry` still compiles — `IAbapTraceEntry`
+  extends it.
+
+- **BREAKING** — `grossTime` and `traceEventNetTime` are `ITraceTiming`
+  (`{ time, percentage }`) instead of whatever the XML parser produced.
+
+  They were handed through unopened while the contract typed them `unknown`.
+  The capture settles the shape: both attributes, in the hit list and the
+  statements, with no variant. The **unit of `time` is still not named** — the
+  wire gives a figure and no unit.
+
+  **Migration.** `entry.grossTime?.time` is a number; no narrowing needed.
+
+- **The entry reader looks only under `trc:extendedData`.**
+
+  It used to look there *and* directly on the entry, because which nesting was
+  real had never been read end to end. It has been now: sixty entries, every
+  `trc:` field inside the container, not one outside it. The second lookup was a
+  placeholder for a measurement and the measurement arrived, so it is gone —
+  keeping it would be reading for a document nobody has seen.
+
+  A test pins the new behaviour by asserting that a `trc:objectName` placed on
+  the entry is **not** read.
+
 ## [13.0.0] - 2026-08-28
 
 Requires `@mcp-abap-adt/interfaces@^23.0.0` — `readWith()` arrives there.

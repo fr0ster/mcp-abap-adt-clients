@@ -1,5 +1,6 @@
 import type {
   IAbapConnection,
+  IAbapTraceEntry,
   IAbapTraceViews,
   IAdtResponse,
   ILogger,
@@ -9,7 +10,6 @@ import type {
   IProfilerTraceHitListOptions,
   IProfilerTraceParameters,
   IProfilerTraceStatementsOptions,
-  ITraceEntry,
   ViewArgs,
   ViewResult,
 } from '@mcp-abap-adt/interfaces';
@@ -50,7 +50,7 @@ export class Profiler implements IProfiler {
    * response is still available through {@link listTraceFilesResponse} for a
    * caller that wants the document itself.
    */
-  async list(options?: IProfilerListOptions): Promise<ITraceEntry[]> {
+  async list(options?: IProfilerListOptions): Promise<IAbapTraceEntry[]> {
     return parseTraceEntries(await this.listTraceFilesResponse(options));
   }
 

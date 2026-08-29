@@ -45,15 +45,16 @@ import type {
   IAbapTraceAccessTime,
   IAbapTraceDbAccess,
   IAbapTraceDbAccesses,
+  IAbapTraceEntry,
   IAbapTraceHitList,
   IAbapTraceHitListEntry,
   IAbapTraceStatement,
   IAbapTraceStatements,
   IAdtResponse,
   INamedItem,
-  ITraceEntry,
   ITraceProgramRef,
   ITraceRequestEntry,
+  ITraceTiming,
 } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
 
@@ -168,6 +169,27 @@ function attrBool(node: Node | undefined, name: string): boolean | undefined {
   return booleanOf(attr(node, name));
 }
 
+/**
+ * `trc:grossTime` / `trc:traceEventNetTime`.
+ *
+ * Both carry `time` and `percentage` and nothing else — measured across a whole
+ * hit list and a whole statements document. They were handed through as parsed
+ * while the contract typed them `unknown`; now the contract has a shape, so this
+ * reads it.
+ *
+ * The unit of `time` is not ours to name: the wire gives a figure and no unit.
+ */
+function timing(node: unknown): ITraceTiming | undefined {
+  const t = presentNode(node);
+  if (!t) {
+    return undefined;
+  }
+  return {
+    time: attrNum(t, 'time') as number,
+    percentage: attrNum(t, 'percentage') as number,
+  };
+}
+
 const ID_IN_URI = /abaptraces\/([A-Za-z0-9]{16,})(?:\/|$)/;
 
 /** The fractional digits beyond the millisecond, or '' when there are none. */
@@ -255,35 +277,56 @@ export function compareRecordedAt(
  * entries were minutes old while its last were eight days older. A caller that
  * wants the newest uses {@link compareRecordedAt}.
  */
-export function parseTraceEntries(response: IAdtResponse): ITraceEntry[] {
-  return asList(rootOf(response, 'feed').entry).map((entry): ITraceEntry => {
-    const idText = text(entry.id) ?? '';
-    const selfHref =
-      asList(entry.link)
-        .map((link) => attr(link, 'href') ?? '')
-        .find((href) => ID_IN_URI.test(href)) ?? '';
+export function parseTraceEntries(response: IAdtResponse): IAbapTraceEntry[] {
+  return asList(rootOf(response, 'feed').entry).map(
+    (entry): IAbapTraceEntry => {
+      const idText = text(entry.id) ?? '';
+      const selfHref =
+        asList(entry.link)
+          .map((link) => attr(link, 'href') ?? '')
+          .find((href) => ID_IN_URI.test(href)) ?? '';
 
-    // See the file comment: the `trc:` fields may sit directly on the entry or
-    // under `trc:extendedData`, and only one of those has been read.
-    const extended = presentNode(entry.extendedData) ?? {};
-    const field = (name: string): unknown => entry[name] ?? extended[name];
+      // Under `trc:extendedData`, and only there. The reader used to look on
+      // the entry as well, because which of the two nestings was real had never
+      // been read end to end. It has been now: sixty entries, every `trc:` field
+      // inside the container and not one outside it. The tolerance was a
+      // placeholder for a measurement, and the measurement arrived.
+      const ext = presentNode(entry.extendedData) ?? {};
+      const stateNode = presentNode(ext.state);
 
-    const stateNode = presentNode(field('state'));
-    const stateValue = attr(stateNode, 'value');
+      return {
+        id: (ID_IN_URI.exec(idText)?.[1] ??
+          ID_IN_URI.exec(selfHref)?.[1]) as string,
+        recordedAt: (text(entry.published) ?? text(entry.updated)) as string,
+        uri: idText || selfHref || undefined,
 
-    return {
-      id: (ID_IN_URI.exec(idText)?.[1] ??
-        ID_IN_URI.exec(selfHref)?.[1]) as string,
-      recordedAt: (text(entry.published) ?? text(entry.updated)) as string,
-      user: text(field('user')) ?? text(presentNode(entry.author)?.name),
-      objectName: text(field('objectName')),
-      uri: idText || selfHref || undefined,
-      ...(stateValue !== undefined
-        ? { state: { value: stateValue, text: attr(stateNode, 'text') ?? '' } }
-        : {}),
-      expiresAt: text(field('expiration')) ?? text(field('expires')),
-    };
-  });
+        // `atom:author/atom:name` carries the same name and is the fallback the
+        // feed itself offers.
+        user: (text(ext.user) ??
+          text(presentNode(entry.author)?.name)) as string,
+        objectName: text(ext.objectName) as string,
+        state: {
+          value: attr(stateNode, 'value') as string,
+          text: attr(stateNode, 'text') as string,
+        },
+        expiresAt: text(ext.expiration) as string,
+
+        system: text(ext.system) as string,
+        // A client is a code, not a count: `010` is not `10`.
+        client: text(ext.client) as string,
+        host: text(ext.host) as string,
+
+        size: numberOf(text(ext.size)) as number,
+        runtime: numberOf(text(ext.runtime)) as number,
+        runtimeABAP: numberOf(text(ext.runtimeABAP)) as number,
+        runtimeSystem: numberOf(text(ext.runtimeSystem)) as number,
+        runtimeDatabase: numberOf(text(ext.runtimeDatabase)) as number,
+
+        isAggregated: booleanOf(text(ext.isAggregated)) as boolean,
+        amdpFileSize: numberOf(text(ext.amdpFileSize)) as number,
+      };
+    },
+  );
 }
 
 /** `trc:callingProgram` / `trc:calledProgram`. */
@@ -315,7 +358,7 @@ export function parseHitList(response: IAdtResponse): IAbapTraceHitList {
         proceduralEntryAnchor: attr(row, 'proceduralEntryAnchor'),
         callingProgram: programRef(row.callingProgram),
         calledProgram: programRef(row.calledProgram),
-        grossTime: row.grossTime,
+        grossTime: timing(row.grossTime),
       }),
     ),
   };
@@ -336,8 +379,8 @@ export function parseStatements(response: IAdtResponse): IAbapTraceStatements {
         hitlistAnchor: attr(row, 'hitlistAnchor'),
         isProcedureLike: attrBool(row, 'isProcedureLike'),
         callingProgram: programRef(row.callingProgram),
-        grossTime: row.grossTime,
-        traceEventNetTime: row.traceEventNetTime,
+        grossTime: timing(row.grossTime),
+        traceEventNetTime: timing(row.traceEventNetTime),
       }),
     ),
   };

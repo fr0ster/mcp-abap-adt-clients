@@ -937,8 +937,13 @@ Contract notes:
   document" is a trace chosen at random. Compare `recordedAt`.
 - `scheduleTrace()` answers with the request id and nothing else: reading the
   created parameters resource back gives `200` with an empty body.
-- `grossTime` and `traceEventNetTime` are typed `unknown` — the elements are on
-  every row, but their attributes were never captured, unlike `accessTime`'s.
+- `grossTime` and `traceEventNetTime` are `{ time, percentage }` since 14.0.0,
+  measured from a raw capture. The **unit of `time` is not named** — the wire
+  gives a figure and no unit; `percentage` is of the trace total, which is what
+  makes a row comparable without knowing it.
+- A trace entry carries more than an id: `system`, `client`, `host`, `size`,
+  `runtime` and its three parts, `isAggregated`, `amdpFileSize`. `client` is a
+  **string**, because `010` is not `10`.
 - Comparing `recordedAt` as a **string** is wrong: `09:00:00Z` is later than
   `10:00:00+02:00` and sorts lower as text. Use `compareRecordedAt`, which
   `latestTraceId()` does.
