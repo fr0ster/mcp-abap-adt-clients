@@ -6,19 +6,14 @@
     "typeRoots": ["./node_modules/@types"]
   },
   "include": [
-    "src/**/*",
-    // The four probes, and only those. `probe-atc` has to be here because
-    // src/__tests__/unit/scripts/ imports its pure parts; the others are
-    // here because a script nothing compiles is how the ones in #114 rotted.
-    // The rest are deliberately NOT: several no longer compile against current
-    // types, and dragging them in would fail this config for reasons that have
-    // nothing to do with tests.
-    // tsconfig.test.integration.json carries the same list — change both.
-    "scripts/probe-atc.ts",
-    "scripts/probe-abapunit.ts",
-    "scripts/probe-profiler-contract.ts",
-    "scripts/print-trace-entry.ts",
-    "scripts/probe-validation-params.ts"
+    // Every script, not a hand-picked few. They are the tools we point
+    // people at, and one that prints a confidently wrong listing is worse
+    // than one that fails — which is what happened while nothing compiled
+    // them: `is_package` and `adtType` were renamed, the scripts kept the
+    // old names, and at runtime they read `undefined` and took the wrong
+    // branch in silence (#114).
+    "scripts/**/*",
+    "src/**/*"
   ],
   "exclude": ["node_modules", "dist"]
 }

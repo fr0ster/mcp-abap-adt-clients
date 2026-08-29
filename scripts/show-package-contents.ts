@@ -87,7 +87,7 @@ function printTree(
   isLast = true,
 ): void {
   const connector = isLast ? '└── ' : '├── ';
-  const typeLabel = node.type || node.adtType || '';
+  const typeLabel = node.type || node.type || '';
   const descPart = node.description ? ` - ${node.description}` : '';
   const statusIcon = node.restoreStatus === 'ok' ? '' : ' [!]';
 
@@ -107,8 +107,8 @@ function countObjects(node: IPackageHierarchyNode): {
   packages: number;
   objects: number;
 } {
-  let packages = node.is_package ? 1 : 0;
-  let objects = node.is_package ? 0 : 1;
+  let packages = node.isPackage ? 1 : 0;
+  let objects = node.isPackage ? 0 : 1;
 
   for (const child of node.children || []) {
     const childCounts = countObjects(child);

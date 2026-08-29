@@ -19,6 +19,7 @@ import * as path from 'path';
 import {
   createTestConnection,
   getConfig,
+  releaseTestConnection,
 } from '../src/__tests__/helpers/sessionConfig';
 import {
   createBuilderLogger,
@@ -269,7 +270,10 @@ async function testLongPollingRead() {
       }
     }
 
-    connection.reset();
+    // Not `reset()`: it is gone as of connection 5.0.0, and it never told the
+    // server anything — it dropped the cookie locally and left the session open
+    // to time out. This releases it.
+    await releaseTestConnection(connection);
     console.log('✅ All tests completed');
   } catch (error: any) {
     console.error('❌ Script failed:', error);

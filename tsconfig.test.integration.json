@@ -5,15 +5,17 @@
     "rootDir": "."
   },
   "include": [
-    "src/**/*",
+    // Every script, not a hand-picked few. They are the tools we point
+    // people at, and one that prints a confidently wrong listing is worse
+    // than one that fails — which is what happened while nothing compiled
+    // them: `is_package` and `adtType` were renamed, the scripts kept the
+    // old names, and at runtime they read `undefined` and took the wrong
+    // branch in silence (#114).
+    "scripts/**/*",
+    "src/**/*"
     // Kept in step with tsconfig.test.json, which carries the same four lines
     // for the same reason: src/__tests__/unit/scripts/ imports the probe's pure
     // parts, and this config compiles all of src. Change one, change the other.
-    "scripts/probe-atc.ts",
-    "scripts/probe-abapunit.ts",
-    "scripts/probe-profiler-contract.ts",
-    "scripts/print-trace-entry.ts",
-    "scripts/probe-validation-params.ts"
   ],
   "exclude": [
     "node_modules",

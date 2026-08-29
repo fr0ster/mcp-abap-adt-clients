@@ -9,6 +9,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as dotenv from 'dotenv';
 import { createTestConnection } from '../src/__tests__/helpers/sessionConfig';
+import { createConnectionLogger } from '../src/__tests__/helpers/testLogger';
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../.env');
 if (fs.existsSync(envPath)) {

@@ -17,6 +17,7 @@ import * as path from 'node:path';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import { createTestConnection } from '../src/__tests__/helpers/sessionConfig';
+import { createConnectionLogger } from '../src/__tests__/helpers/testLogger';
 import { AdtRuntimeClient } from '../src/clients/AdtRuntimeClient';
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../.env');

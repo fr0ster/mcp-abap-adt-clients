@@ -32,7 +32,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { IAdtObject } from '@mcp-abap-adt/interfaces';
+import type { IAdtReadable } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import {
   createTestConnection,
@@ -141,7 +141,19 @@ function parseArgs(argv: string[]): Options {
   };
 }
 
-function getHandler(client: AdtClient, options: Options): IAdtObject<any, any> {
+/**
+ * The handler for a type, narrowed to what this script uses.
+ *
+ * It was `IAdtObject<any, any>` — the full surface — and stopped compiling when
+ * 8.0.0 made each factory return only the capabilities its object actually has.
+ * The script calls `read()` and `readMetadata()` and nothing else, so
+ * `IAdtReadable` is what it needs; asking for the whole interface was demanding
+ * versioning and transports from types that never had them.
+ */
+function getHandler(
+  client: AdtClient,
+  options: Options,
+): IAdtReadable<any, any> {
   switch (options.objectType) {
     case 'class':
       return client.getClass();
@@ -160,7 +172,8 @@ function getHandler(client: AdtClient, options: Options): IAdtObject<any, any> {
     case 'tabletype':
       return client.getTableType();
     case 'view':
-      return client.getView();
+      // Renamed in 9.0.0: DDL sources are `getDdl()`, not `getView()`.
+      return client.getDdl();
     case 'functiongroup':
       return client.getFunctionGroup();
     case 'functionmodule':
