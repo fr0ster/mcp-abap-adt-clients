@@ -1000,6 +1000,29 @@ create_program:
           REPORT ZAC_PROG01.
           WRITE: / 'Adt test program - updated'.
 
+# Create standalone PROG/I include
+# Modern on-prem only: discovery gives /sap/bc/adt/programs/includes an
+# app:accept there and nowhere else, and a collection without one is not a POST
+# target. Cloud answers 403 S_DEVELOP for the type.
+create_include:
+  test_cases:
+    - name: "adt_include"
+      enabled: true
+      available_in: ["onprem"]
+      description: "Standalone PROG/I include reserved for AdtInclude tests"
+      params:
+        include_name: "ZAC_INCL01"
+        description: "AdtInclude workflow include"
+        # package_name: "ZAC_PKG01"
+        # transport_request: ""
+        source_code: |
+          * Adt test include
+          DATA lv_adt_include TYPE string.
+        update_source_code: |
+          * Adt test include - updated
+          DATA lv_adt_include TYPE string.
+          lv_adt_include = 'updated'.
+
 # Create Table
 create_table:
   test_cases:
