@@ -1,0 +1,23 @@
+
+61 trace(s) in the feed
+
+  id                 "E8EB2802A1DD11F1B5CA0CC47A1E68C1"
+  recordedAt         "2026-08-27T06:09:50Z"
+  uri                "/sap/bc/adt/runtime/traces/abaptraces/E8EB2802A1DD11F1B5CA0CC47A1E68C1"
+  user               "OKYSLYTSIA"
+  objectName         "ZAC_SHR_RUN01=================CP"
+  state              {"value":"R","text":"Finished"}
+  expiresAt          "2026-09-24T06:09:50Z"
+  system             "E19"
+  client             "100"
+  host               "epbyminsd0654"
+  size               8
+  runtime            554
+  runtimeABAP        553
+  runtimeSystem      1
+  runtimeDatabase    0
+  isAggregated       false
+  amdpFileSize       0
+
+Every field the contract declares was present.
+
