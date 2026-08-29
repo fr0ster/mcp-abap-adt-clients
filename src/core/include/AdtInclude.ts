@@ -441,10 +441,19 @@ export class AdtInclude
           lockHandle,
         );
       } catch (error) {
-        this.logger?.debug?.('Failed to unlock include', {
+        // Audible, not debug. A failed unlock is what leaves the editing
+        // registration on the name, and the next create for that name is then
+        // answered `403 ExceptionResourceNoAuthorization, "User … is currently
+        // editing …"` on a name nothing appears to have touched. That cost a
+        // detour once already; a warning nobody sees is the failure it exists
+        // to catch.
+        this.logger?.warn?.('Failed to unlock include', {
           includeName,
           error: safeErrorMessage(error),
         });
+        // `quiet` keeps it out of `state.errors` after a successful DELETE —
+        // the object is gone, so a refused unlock is not a failure of the
+        // delete — but it never makes it silent.
         if (!options?.quiet) {
           state.errors.push(asError('unlock', error));
         }

@@ -532,13 +532,16 @@ export class BaseTester<TConfig, TState> {
     /**
      * Which version the post-create read asks for.
      *
-     * A freshly created object has no ACTIVE version yet, which is why classes
-     * and interfaces skip this read entirely. An include is in the same
-     * position — measured on E19: the read answered nothing and the flow died
-     * with "Read undefined failed: no response". Skipping it would cost the
-     * pre/post update comparison below, which is the check that catches an
-     * update writing nothing, so the inactive version is read instead: right
-     * after create that IS the object's content.
+     * Measured on E19: for an include the versionless read answered nothing and
+     * the flow died with "Read undefined failed: no response". Classes and
+     * interfaces skip this read entirely for the same underlying reason — a
+     * freshly created object has no ACTIVE version — while the other suites
+     * evidently tolerate the versionless read, so this is narrowed to the type
+     * where the failure was actually seen rather than changed for all.
+     *
+     * Skipping it would cost the pre/post update comparison below, which is the
+     * check that catches an update writing nothing, so the inactive version is
+     * read instead: right after create that IS the object's content.
      */
     const initialReadVersion = (): 'inactive' | undefined =>
       (config as any)?.includeName ? 'inactive' : undefined;
@@ -790,11 +793,10 @@ export class BaseTester<TConfig, TState> {
 
       // 3. Update (if updateConfig provided)
       if (options?.updateConfig) {
-        const updateContent =
-          options.sourceCode ||
-          options.xmlContent ||
-          options.updateConfig?.sourceCode ||
-          options.updateConfig?.xmlContent;
+        // (A second `updateContent` used to be resolved here and never read.
+        // It carried the create-source-first order this PR is fixing, so a
+        // reader checking "which content does the update use?" could land on
+        // the dead one and conclude the bug was still there.)
         await readObjectProperties(
           'read object properties (post-create, no version)',
         );
@@ -894,20 +896,26 @@ export class BaseTester<TConfig, TState> {
         // update was asked to write is what the read afterwards is checked
         // against. Reading the create source here made the check compare the
         // object with its own previous content.
+        // `??`, matching the send exactly. `||` made an intentionally EMPTY
+        // update source fall through to the create source, so clearing an
+        // object — a legitimate edit — wrote empty and was then compared
+        // against the content it had before, reporting a mismatch on a correct
+        // update. Emptiness is a value; only absence is absence.
         const updateContent =
-          options.updateConfig?.sourceCode ||
-          options.updateConfig?.xmlContent ||
-          options.sourceCode ||
+          options.updateConfig?.sourceCode ??
+          options.updateConfig?.xmlContent ??
+          options.sourceCode ??
           options.xmlContent;
-        const updateContentKind = options.updateConfig?.sourceCode
-          ? 'source'
-          : options.updateConfig?.xmlContent
-            ? 'xml'
-            : options.sourceCode
-              ? 'source'
-              : options.xmlContent
-                ? 'xml'
-                : 'unknown';
+        const updateContentKind =
+          options.updateConfig?.sourceCode !== undefined
+            ? 'source'
+            : options.updateConfig?.xmlContent !== undefined
+              ? 'xml'
+              : options.sourceCode !== undefined
+                ? 'source'
+                : options.xmlContent !== undefined
+                  ? 'xml'
+                  : 'unknown';
 
         if (preUpdateActive && postUpdateInactive) {
           if (updateContentKind === 'source') {
