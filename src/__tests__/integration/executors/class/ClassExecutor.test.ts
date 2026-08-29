@@ -15,6 +15,7 @@ import type { AdtClient } from '../../../../clients/AdtClient';
 import { AdtExecutor } from '../../../../clients/AdtExecutor';
 import { AdtRuntimeClient } from '../../../../clients/AdtRuntimeClient';
 import type { IProfilerTraceParameters } from '../../../../runtime/traces';
+import { resolveRunnableClassName } from '../../../helpers/runnableClassHelper';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -153,31 +154,6 @@ function buildProfilerParameters(
   };
 }
 
-function generateClassName(baseName: string): string {
-  const base = (baseName || 'ZADT_BLD_CLS_EXE')
-    .toUpperCase()
-    .replace(/[^A-Z0-9_]/g, '');
-  const suffix = Date.now().toString().slice(-4);
-  const maxBaseLen = 30 - suffix.length;
-  return `${base.slice(0, maxBaseLen)}${suffix}`;
-}
-
-function resolveRunnableClassSource(testCase: any, className: string): string {
-  const sourceTemplate = testCase?.params?.source_code;
-  const fallbackSource = buildRunnableClassSource(className);
-
-  if (!sourceTemplate || typeof sourceTemplate !== 'string') {
-    return fallbackSource;
-  }
-
-  const resolved = sourceTemplate.replaceAll('{{CLASS_NAME}}', className);
-  if (hasRunnableContract(resolved)) {
-    return resolved;
-  }
-
-  return fallbackSource;
-}
-
 describe('ClassExecutor (integration)', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
@@ -219,6 +195,9 @@ describe('ClassExecutor (integration)', () => {
     }
   });
 
+  // No object cleanup: this suite creates none now. The class it runs is a
+  // shared, read-only fixture that outlives every run. Traces are the one thing
+  // it still produces, and those it removes.
   afterAll(async () => {
     // Traces this run produced. `delete()` exists since 15.0.0 and this is the
     // first place that needed it: a profiled run wrote a trace and nothing ever
@@ -239,121 +218,46 @@ describe('ClassExecutor (integration)', () => {
         );
       }
     }
-
-    for (const className of classesCreated) {
-      try {
-        await client.getClass().delete({
-          className,
-          transportRequest: transportRequestForCleanup,
-        });
-      } catch (cleanupError) {
-        testsLogger.warn?.(
-          `⚠️ Cleanup failed for class ${className}: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,
-        );
-      }
-    }
-
     if (connection) {
       await releaseTestConnection(connection);
     }
   });
 
-  async function ensureRunnableClass(testCase: any): Promise<string> {
-    const baseClassName = testCase?.params?.class_name || 'ZADT_BLD_CLS_EXE';
-    const packageName = resolvePackageName(testCase?.params?.package_name);
-    const transportRequest = resolveTransportRequest(
-      testCase?.params?.transport_request,
-    );
-
-    if (!packageName) {
-      throw new Error(
-        'package_name is not configured (set params.package_name or environment.default_package)',
-      );
-    }
-
-    const className = generateClassName(baseClassName);
-    const sourceCode = resolveRunnableClassSource(testCase, className);
-
-    classNameForTest = className;
-    classesCreated.push(classNameForTest);
-    transportRequestForCleanup = transportRequest || '';
-
-    logTestStep(`create class ${className}`, testsLogger);
-    await client.getClass().create({
-      className,
-      packageName,
-      transportRequest,
-      description: `ClassExecutor integration ${className}`,
-    });
-
-    logTestStep('update class source', testsLogger);
-    await client.getClass().update(
-      {
-        className,
-        sourceCode,
-        transportRequest,
-      },
-      {
-        activateOnUpdate: true,
-        sourceCode,
-      },
-    );
-
-    const readState = await client
-      .getClass()
-      .read({ className }, 'active', { withLongPolling: true });
-    const activeSource = readState?.readResult?.data;
-    if (!hasRunnableContract(activeSource)) {
-      const fallbackSource = buildRunnableClassSource(className);
-      logTestStep(
-        'active source missing classrun contract, re-applying fallback source',
-        testsLogger,
-      );
-      await client.getClass().update(
-        {
-          className,
-          sourceCode: fallbackSource,
-          transportRequest,
-        },
-        {
-          activateOnUpdate: true,
-          sourceCode: fallbackSource,
-        },
-      );
-    }
-
-    return className;
+  /**
+   * The shared runnable class, not one built for the occasion.
+   *
+   * `ZAC_SHR_RUN01` exists for exactly this — its config entry says "Shared
+   * runnable class (if_oo_adt_classrun) for profiler/executor tests" — and the
+   * profiler suite already uses it. Building a throwaway class here tested
+   * class creation, which `integration/core/class` covers, and paid for it
+   * twice a run: a class pool generated and dropped, and an `E_ABAP_GENPH`
+   * lock left in SM12 on the generated parts, on E19 measured 2026-08-30.
+   *
+   * Shared objects are read-only by contract, so this touches nothing.
+   */
+  function sharedRunnableClass(testCase: any): string {
+    return resolveRunnableClassName(testCase?.params ?? {});
   }
 
+  /**
+   * Re-run, and only that.
+   *
+   * This used to re-activate the class with a fallback source when the run
+   * answered "does not implement if_oo_adt_classrun~main" — a repair for a
+   * class the test had just built itself. The shared class is read-only and
+   * already correct, so a retry that rewrote it would corrupt a fixture every
+   * other suite depends on. If the message appears now it is a real finding,
+   * and the assertions below will say so.
+   */
   async function runClassWithReadinessRetry(
     className: string,
     maxAttempts: number = 3,
   ) {
     let lastResponse: any;
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-      const response = await executor.getClassExecutor().run({ className });
-      lastResponse = response;
-      if (!isMissingClassRunMainMessage(response.data)) {
-        return response;
-      }
-      if (attempt < maxAttempts) {
-        const fallbackSource = buildRunnableClassSource(className);
-        await client.getClass().update(
-          {
-            className,
-            sourceCode: fallbackSource,
-            transportRequest: transportRequestForCleanup || undefined,
-          },
-          {
-            activateOnUpdate: true,
-            sourceCode: fallbackSource,
-          },
-        );
-        await client.getClass().read({ className }, 'active', {
-          withLongPolling: true,
-        });
-        await wait(1000);
-      }
+      lastResponse = await executor.getClassExecutor().run({ className });
+      if (!isMissingClassRunMainMessage(lastResponse.data)) return lastResponse;
+      if (attempt < maxAttempts) await wait(1000);
     }
     return lastResponse;
   }
@@ -391,7 +295,7 @@ describe('ClassExecutor (integration)', () => {
       }
 
       try {
-        const className = await ensureRunnableClass(testCase);
+        const className = sharedRunnableClass(testCase);
         logTestStep('run', testsLogger);
         const response = await runClassWithReadinessRetry(className);
 
@@ -455,7 +359,7 @@ describe('ClassExecutor (integration)', () => {
       );
 
       try {
-        const className = await ensureRunnableClass(testCase);
+        const className = sharedRunnableClass(testCase);
 
         logTestStep('warm-up run before profiling', testsLogger);
         const warmupResponse = await runClassWithReadinessRetry(className);
