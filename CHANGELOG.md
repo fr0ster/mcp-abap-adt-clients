@@ -109,118 +109,44 @@ Requires `@mcp-abap-adt/interfaces@^22.0.0`.
 - `TraceScheduling`, and trace document parsers in
   `src/runtime/traces/traceParsing.ts`.
 
-- `TraceDocumentError`. A trace document that is empty, unparseable, or rooted
-  in something other than what was expected now **throws** instead of becoming
-  an empty result. The distinction matters most exactly where this code is least
-  sure of itself: it states openly that the feed's nesting was never read end to
-  end, so a wrong guess must be audible. An empty body in particular is not an
-  empty trace — ADT answers `200` with nothing when a resource is not ready, and
-  never 404s.
+- **`Profiler.readWith(parse, traceId, view, …)`** — the same read, parsed by
+  the caller, from `@mcp-abap-adt/interfaces@^23.0.0`.
 
-  The check runs at **six** levels, because a wrong guess hides at every one:
-  the document (wrong or unreadable root), the row (children named something
-  else, or any unreadable feed entry — not merely all of them), and the field (a
-  row missing something the contract requires). `?? 0` and `?? ''` used to turn
-  `<statement/>` into a statement with `id: ''` and `index: 0` — a row that was
-  never in the document, and one a `typeof` assertion confirms. And the nested
-  element: a present `<trc:callingProgram/>` parses to the empty *string*, so a
-  `typeof !== 'object'` test read it as absent and dropped it — absence is the
-  property not being there, and anything else is present. And the value: reading
-  an unrecognised boolean as `false` is not a parse failure but a claim about
-  the object — `isAggregated` said aggregation was off whenever the field was
-  absent, and an unreadable number was dropped as though the field were missing
-  — `hitCount="unexpected"` reported a row with no hit count, and `Infinity`
-  passed as a measurement because it is not `NaN`. Timestamps are validated against
-  **RFC 3339**, as Atom requires, rather than against `Date.parse` — which is
-  not a validator: it rolls `2026-02-30` into March, accepts a date with no
-  time, and reads a time with no offset in the *process's* timezone, so the same
-  feed parses differently on two machines. The validator accepts what the RFC
-  permits and not merely what SAP has been seen to send — lowercase `t`/`z`, and
-  the leap second where the RFC allows it — because rejecting a legitimate Atom
-  timestamp turns a working read into an error, which is the opposite failure to
-  the one this guard exists for.
+  `read()` maps the document onto the view's type and does nothing more. A
+  consumer that needs it read differently, or whose system answers in a shape
+  the default mapping does not fit, passes its own reader and keeps a type. Both
+  go through one request path, so they cannot drift on URL or options.
 
-  `latestTraceId()` orders by time rather than by text — `"unexpected"` sorts
-  above every ISO timestamp, and two valid ones with different UTC offsets do
-  not compare chronologically as strings — and it orders past the millisecond,
-  which `Date.parse` cannot: `.1001Z` and `.1009Z` are equal through it, so the
-  older trace could be kept. And the container: a present
-  `<extendedData/>` that yields none of the fields this parser knows looks
-  exactly like optional metadata that happened to be absent, and is not — its
-  absence is still fine. A document understood at
-  all six levels may still be empty, and then it reads as empty.
+  This is the pattern the transport tree already uses on `listNodes()`.
+
+### Not done here, on purpose
+
+The parsers **do not validate**. Judging SAP's own documents is not this
+library's job: the server is the authority on its own responses, and where a
+check is genuinely needed ADT has an endpoint for it — `getInclude().validate()`
+posts to `/includes/validation`.
+
+An earlier version of this branch grew the opposite: a `TraceDocumentError`
+thrown at six levels — document root, rows, fields, nested elements, containers,
+values — plus an RFC 3339 timestamp validator, each added in answer to a review
+finding. Every step had an argument; the sum did not. It asserted things about
+the wire nobody had measured, and it introduced a failure of its own by refusing
+timestamps a legitimate Atom feed may carry. It is gone, and the parser went
+from 1020 lines to 343.
+
+Searching and filtering are likewise not here. They belong to the server, which
+has the endpoints for them.
 
 ### Notes on what is and is not verified
 
-The catalogue and the stored trace request were parsed from raw bodies, so
-those are transcription. The traces feed's `trc:` nesting was **not** read end
-to end, so the entry reader looks both directly on the entry and under
-`extendedData` rather than guessing one — a wrong guess yields a silently empty
-`user` and `state`, and a listing that quietly loses fields is worse than one
-that fails. `grossTime` and `traceEventNetTime` are handed over as parsed,
-because the contract types them `unknown`.
+The catalogue and the stored trace request were parsed from raw bodies, so those
+are transcription. The traces feed's `trc:` nesting was **not** read end to end,
+so the entry reader looks both directly on the entry and under `extendedData`
+rather than guessing one.
 
-
-### Changed
-
-- **Tests take the connection from one helper.** `createTestConnection()` reads
-  *where* to connect (`environment.system` — `"onprem"` or `"cloud"`) and *how*
-  to authenticate from configuration, builds the matching connector, opens the
-  session, and returns it ready to use. Eighty-six files used to build their own
-  with `createAbapConnection(config, logger)`, which is eighty-six chances to
-  differ on which system was assumed, which logger was passed, and whether
-  `connect()` was called at all.
-- `environment.system` is now **required** in `test-config.yaml`. It is stated,
-  never inferred: a bearer token against on-prem and a communication user
-  against cloud are both ordinary, so the credential does not say which system
-  it is, and neither does the URL.
-- Dev dependency `@mcp-abap-adt/connection` moved to `^6.0.1`. `reset()` is gone
-  there; every test now ends on `await connection.disconnect()`, which tells the
-  server the session is finished instead of dropping the cookie and leaving it
-  to time out.
-- **Runtime dependency `@mcp-abap-adt/interfaces` moved to `^21.0.0`** (from
-  `^17.1.0` — four majors). **The library needed no change at all**: every
-  break in 18–21 was on the credential axis, which lives in the connector.
-  18.0.0 dropped `disconnect({ deadlineMs })`, and nothing here ever passed
-  one; 19–21 moved `renew()`, `prepare()`, `cookies()`, `transportMaterial()`
-  and `fetchCsrfToken()` around `IAuthProvider`, which this package neither
-  implements nor names.
-- **The connector's factory is gone (6.0.0), so the test helper states all
-  three axes**: which system (`AdtOnPremConnector` / `AdtCloudConnector`),
-  which credential (`BasicAuthProvider` / `TokenAuthProvider`), and which wire
-  (`OnPremHttpTransport`, `LegacyOnPremHttpTransport`, `CloudHttpTransport`,
-  `RfcTransport`). All three still come from configuration — `environment.system`,
-  the auth in `.env`, and `connection_type` / `is_legacy`. The legacy wire is
-  what `skipSessionType` used to be, and RFC is now a transport rather than a
-  config flag.
-- `noConsole` is a warning under `scripts/**`, as it already is under tests. A
-  one-off CLI probe prints to stdout because stdout *is* its output and there is
-  no caller to inject a logger into — the same reason `globalSetup` carries a
-  written exemption. The rule stays an error where the reason does not apply:
-  library code. Nothing was silenced that was ever enforced — the pre-commit
-  hook lints staged files, and no commit had staged these before.
-- The thirteen `scripts/*.ts` probes take the same helper instead of building
-  their own connection. They were on the removed factory; only one of them was
-  in a checked tsconfig, so the rest would have failed at runtime.
-- Documentation examples (`README.md`, `docs/usage/*`) rewritten for 6.x: no
-  factory, explicit connector + provider + transport, and `connect()` — without
-  which the first request is refused before it is sent.
-
-### Fixed
-
-- **A broken configuration no longer passes as a green run.** Every test file
-  caught whatever its setup threw, warned "No .env file or SAP configuration
-  found", and set `hasConfig = false`; every `it` then returned early and the
-  file reported PASS. So an incomplete `test-config.yaml`, an expired token, or
-  a connector that could not open a session all produced the same thing: a run
-  that tested nothing and explained itself with a sentence that was false. The
-  new `skipUnlessConfigured()` skips only when `SAP_URL` is absent — there is
-  genuinely no system — and fails everything else, naming the reason.
-- The jest preflight built a connection and made a request without connecting,
-  which under connection 5.0.0 is refused before it is sent: it would have
-  reported every system, reachable or not, as unreachable and aborted the suite.
-- `BaseTester` checked for `reset` and called `disconnect` — a branch that could
-  never run, so the session it was meant to release stayed open.
+`grossTime` and `traceEventNetTime` are handed over as parsed, because the
+contract types them `unknown` — the elements are on every row, their attributes
+were never captured, unlike `accessTime`'s.
 
 ## [12.1.0] - 2026-08-18
 

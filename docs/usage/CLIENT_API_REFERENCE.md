@@ -908,9 +908,25 @@ const requestId = await classExecutor.scheduleTrace({
 });
 ```
 
+A consumer that needs the document read differently passes its own reader and
+keeps a type:
+
+```typescript
+const mine = await profiler.readWith(
+  (data) => myParser(data),   // the response body, exactly as it arrived
+  newest.id,
+  'hitlist',
+);
+```
+
 Contract notes:
 - `read()` refuses a view this family does not have — at compile time, not with
   a 404. The three are `hitlist`, `statements` and `dbAccesses`.
+- **The parsers do not validate.** Judging SAP's own documents is not this
+  library's job; the server is the authority on its responses, and where a check
+  is needed ADT has an endpoint (`getInclude().validate()`). A body the default
+  mapping does not recognise yields empty rather than an exception — that is when
+  you want `readWith()`. Searching and filtering belong to the server too.
 - **A run does not promise a trace.** SAP writes it asynchronously, so when
   `runWithProfiling` returns there may be no trace, there may never be one, and
   you may legitimately read it a week later. To find the one your run produced,
@@ -923,6 +939,9 @@ Contract notes:
   created parameters resource back gives `200` with an empty body.
 - `grossTime` and `traceEventNetTime` are typed `unknown` — the elements are on
   every row, but their attributes were never captured, unlike `accessTime`'s.
+- Comparing `recordedAt` as a **string** is wrong: `09:00:00Z` is later than
+  `10:00:00+02:00` and sorts lower as text. Use `compareRecordedAt`, which
+  `latestTraceId()` does.
 
 ### Cross-Trace Analysis
 
