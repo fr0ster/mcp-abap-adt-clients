@@ -215,6 +215,36 @@ describe('trace document mapping', () => {
       });
     });
 
+    it('reads the boolean the same way as an attribute and as an element', () => {
+      // The same field arrives both ways; one mapper, so they cannot disagree.
+      const asElement = parseTraceRequests(
+        FEED(
+          '<atom:entry><atom:id>/x/1</atom:id><trc:extendedData><trc:isAggregated>false</trc:isAggregated></trc:extendedData></atom:entry>',
+        ),
+      );
+      const asAttribute = parseTraceRequests(
+        FEED(
+          '<atom:entry><atom:id>/x/1</atom:id><trc:extendedData trc:isAggregated="false"/></atom:entry>',
+        ),
+      );
+      expect(asElement[0]?.isAggregated).toBe(false);
+      expect(asAttribute[0]?.isAggregated).toBe(false);
+    });
+
+    it('leaves a boolean it does not recognise unread, rather than false', () => {
+      // `false` would be a claim about the run. ABAP's `X` is not this
+      // document's spelling — it belongs to `asx:abap` payloads — so it is not
+      // silently turned into `true` here either.
+      for (const raw of ['X', 'unexpected', '']) {
+        const [entry] = parseTraceRequests(
+          FEED(
+            `<atom:entry><atom:id>/x/1</atom:id><trc:extendedData><trc:isAggregated>${raw}</trc:isAggregated></trc:extendedData></atom:entry>`,
+          ),
+        );
+        expect(entry?.isAggregated).toBeUndefined();
+      }
+    });
+
     it('reads an empty schedule as nothing scheduled', () => {
       // The runs that fulfil requests consume them, so empty is the normal
       // answer — not a broken endpoint.

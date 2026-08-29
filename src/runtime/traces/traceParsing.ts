@@ -135,12 +135,37 @@ function attrNum(node: Node | undefined, name: string): number | undefined {
   return numberOf(attr(node, name));
 }
 
-function attrBool(node: Node | undefined, name: string): boolean | undefined {
-  const raw = attr(node, name);
-  if (raw === undefined) {
-    return undefined;
+/**
+ * The XML boolean these documents use.
+ *
+ * One mapper for both spellings of the same field — an attribute
+ * (`trc:isProcedureLike="true"`) and an element
+ * (`<trc:isAggregated>true</trc:isAggregated>`). They carry the same kind of
+ * value and must not disagree about it; before this they did, and the element
+ * path answered `false` to anything it did not recognise.
+ *
+ * **Not `X`.** ABAP's `X`/blank belongs to `asx:abap` payloads — serialised
+ * ABAP data, like the lock result or `<CHECK_RESULT>X</CHECK_RESULT>`. ADT's own
+ * XML, which these documents are, writes `true`/`false`, and every measured
+ * trace body does. Accepting `X` here was speculation about a wire nobody has
+ * seen, and it is the kind of guess that makes a mapper disagree with itself.
+ *
+ * An unrecognised value reads as `undefined`, not `false`: the field is optional
+ * and `false` would be a claim about the run. Declining to read is not
+ * validation, it is declining to invent.
+ */
+function booleanOf(raw: string | undefined): boolean | undefined {
+  if (raw === 'true') {
+    return true;
   }
-  return raw === 'true' || raw === 'X';
+  if (raw === 'false') {
+    return false;
+  }
+  return undefined;
+}
+
+function attrBool(node: Node | undefined, name: string): boolean | undefined {
+  return booleanOf(attr(node, name));
 }
 
 const ID_IN_URI = /abaptraces\/([A-Za-z0-9]{16,})(?:\/|$)/;
@@ -354,11 +379,11 @@ export function parseTraceRequests(
         index: numberOf(text(extended.requestIndex)),
         description: text(extended.description),
         expiresAt: text(extended.expires),
+        // Attribute or element — the same mapper, so the two spellings of one
+        // field cannot disagree about it.
         isAggregated:
           attrBool(extended, 'isAggregated') ??
-          (text(extended.isAggregated) === undefined
-            ? undefined
-            : text(extended.isAggregated) === 'true'),
+          booleanOf(text(extended.isAggregated)),
         processTypeId: attr(presentNode(extended.processType), 'processTypeId'),
         objectTypeId: attr(presentNode(extended.object), 'objectTypeId'),
         ...(executions
