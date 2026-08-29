@@ -236,38 +236,29 @@ describe('Include (PROG/I, using AdtClient)', () => {
           return;
         }
 
-        const config = tester.getConfig();
-        if (!config?.includeName) {
-          logTestSkip(testsLogger, testName, 'include_name not configured');
+        // A standard, SAP-delivered include, from the same registry every other
+        // suite reads its read-only fixtures out of. Nothing is created: the
+        // question is what the document looks like, and an include that has
+        // always existed answers it without leaving anything behind.
+        const standard = tester.getStandardObject('include');
+        if (!standard?.name) {
+          logTestSkip(
+            testsLogger,
+            testName,
+            'No standard include configured for this environment',
+          );
           return;
         }
 
         logTestStart(testsLogger, testName, {
           name: 'metadata_shape',
-          params: { include_name: config.includeName },
+          params: { include_name: standard.name },
         });
 
-        // Its own object, created here and removed here.
-        //
-        // Reading the workflow test's include instead made this depend on
-        // something that test deletes in its cleanup: run together, the read
-        // answered an empty body and the expectations below failed on `""`
-        // rather than on anything about the document. A distinct name also
-        // keeps the two from colliding whichever order they run in.
-        const include = client.getInclude();
-        const metadataName = `${config.includeName}M`.slice(0, 30);
-
         try {
-          await include.create({
-            includeName: metadataName,
-            packageName: config.packageName,
-            description: 'Include metadata shape probe',
-            sourceCode: '* metadata shape probe',
-          });
-
-          const state = await include.readMetadata({
-            includeName: metadataName,
-          });
+          const state = await client
+            .getInclude()
+            .readMetadata({ includeName: standard.name });
           const body = String((state?.readResult as any)?.data ?? '');
 
           // The whole reason this is a separate module: an include answers with
@@ -282,13 +273,6 @@ describe('Include (PROG/I, using AdtClient)', () => {
           logTestError(testsLogger, testName, error);
           throw error;
         } finally {
-          // Best effort: a leftover include is litter, but a delete that throws
-          // here would replace the real failure with its own.
-          try {
-            await client.getInclude().delete({ includeName: metadataName });
-          } catch {
-            // nothing to remove, or the create never got that far
-          }
           logTestEnd(testsLogger, testName);
         }
       },

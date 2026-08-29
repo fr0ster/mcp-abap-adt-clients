@@ -365,6 +365,14 @@ shared_dependencies:
       binding_version: "V4"
       binding_variant: "ODATA_V4_WEB_API"
 
+  includes:
+    # SAP-delivered includes, read-only. Used for shape checks that need an
+    # include to exist without creating one — the same reason `domains` names
+    # MANDT rather than making a domain.
+    - name: "LSVIMTOP"
+      description: "Standard SAP include (table maintenance framework)"
+      available_in: ["onprem"]
+
   programs:
     - name: "ZAC_SHR_PROG"
       description: "Shared program for run tests"
