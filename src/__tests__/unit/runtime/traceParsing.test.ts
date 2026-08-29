@@ -11,13 +11,13 @@
 
 import type { IAdtResponse } from '@mcp-abap-adt/interfaces';
 import {
+  compareRecordedAt,
   parseDbAccesses,
   parseHitList,
   parseNamedItems,
   parseStatements,
   parseTraceEntries,
   parseTraceRequests,
-  recordedAtMs,
   TraceDocumentError,
 } from '../../../runtime/traces/traceParsing';
 
@@ -519,7 +519,7 @@ describe('trace document parsing', () => {
       // Carried as a string, it would sort above every real ISO timestamp and
       // be chosen as the newest trace.
       expect(() => parseTraceEntries(feedWith('unexpected'))).toThrow(
-        /is not a timestamp/,
+        /not an RFC 3339 date-time/,
       );
     });
 
@@ -539,14 +539,46 @@ describe('trace document parsing', () => {
       const earlier = { recordedAt: '2026-08-28T10:00:00+02:00' };
       const later = { recordedAt: '2026-08-28T09:00:00Z' };
       expect(later.recordedAt > earlier.recordedAt).toBe(false);
-      expect(recordedAtMs(later)).toBeGreaterThan(recordedAtMs(earlier));
+      expect(compareRecordedAt(later, earlier)).toBeGreaterThan(0);
     });
 
     it('orders correctly across differing fractional-second precision', () => {
       const a = { recordedAt: '2026-08-28T10:00:00.9Z' };
       const b = { recordedAt: '2026-08-28T10:00:00.100Z' };
       expect(b.recordedAt > a.recordedAt).toBe(false);
-      expect(recordedAtMs(a)).toBeGreaterThan(recordedAtMs(b));
+      expect(compareRecordedAt(a, b)).toBeGreaterThan(0);
+    });
+
+    it('orders beyond the millisecond, which Date.parse cannot', () => {
+      // Both are 100ms to `Date.parse`, so a comparison through it calls them
+      // equal and keeps whichever was seen first.
+      const earlier = { recordedAt: '2026-08-28T10:00:00.1001Z' };
+      const later = { recordedAt: '2026-08-28T10:00:00.1009Z' };
+      expect(Date.parse(later.recordedAt)).toBe(Date.parse(earlier.recordedAt));
+      expect(compareRecordedAt(later, earlier)).toBeGreaterThan(0);
+    });
+
+    it.each([
+      ['2026-02-30T10:00:00Z', 'a day that does not exist'],
+      ['2026-08-28', 'a date with no time'],
+      ['2026-08-28T10:00:00', 'a time with no offset'],
+      ['August 28, 2026', 'a human-readable date'],
+      ['2026-08-28T25:00:00Z', 'an hour out of range'],
+      ['2026-08-28T10:00:00+99:00', 'an offset out of range'],
+    ])('refuses %s (%s), which Date.parse would accept or roll over', (raw) => {
+      expect(() => parseTraceEntries(feedWith(raw))).toThrow(
+        /not an RFC 3339 date-time/,
+      );
+    });
+
+    it('accepts a real Atom timestamp with an offset', () => {
+      const entries = parseTraceEntries(feedWith('2026-08-28T10:00:00+02:00'));
+      expect(entries[0]?.recordedAt).toBe('2026-08-28T10:00:00+02:00');
+    });
+
+    it('accepts a leap day that does exist', () => {
+      const entries = parseTraceEntries(feedWith('2024-02-29T10:00:00Z'));
+      expect(entries).toHaveLength(1);
     });
   });
 

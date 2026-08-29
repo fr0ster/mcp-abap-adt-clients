@@ -357,12 +357,78 @@ function numberOf(
 }
 
 /**
+ * RFC 3339, as Atom requires — not "whatever `Date.parse` will swallow".
+ *
+ * `Date.parse` is not a validator. It accepts `2026-02-30T10:00:00Z` and
+ * silently rolls it to March 2; it accepts a date with no time, and a time with
+ * **no offset**, which it then reads in the *process's* timezone — so the same
+ * feed would parse differently on two machines. Atom timestamps are RFC 3339
+ * date-times: full date, full time, explicit offset.
+ *
+ * Returns the epoch milliseconds and any fractional digits beyond the third,
+ * because those are needed to order two traces written within the same
+ * millisecond and are exactly what `Date.parse` throws away.
+ */
+const RFC3339 =
+  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?(Z|[+-]\d{2}:\d{2})$/;
+
+interface IInstant {
+  ms: number;
+  /** Digits after the millisecond, exactly as written. */
+  subMilli: string;
+}
+
+function parseRfc3339(raw: string): IInstant | undefined {
+  const match = RFC3339.exec(raw);
+  if (!match) {
+    return undefined;
+  }
+  const [, y, mo, d, h, mi, sec, fraction = '', zone] = match;
+  const year = Number(y);
+  const month = Number(mo);
+  const day = Number(d);
+  const hour = Number(h);
+  const minute = Number(mi);
+  const second = Number(sec);
+
+  // Calendar validity: `Date.UTC` rolls 30 February into March rather than
+  // refusing it, so the only way to catch it is to read the components back.
+  const utc = Date.UTC(year, month - 1, day, hour, minute, second);
+  const check = new Date(utc);
+  if (
+    check.getUTCFullYear() !== year ||
+    check.getUTCMonth() !== month - 1 ||
+    check.getUTCDate() !== day ||
+    hour > 23 ||
+    minute > 59 ||
+    second > 59
+  ) {
+    return undefined;
+  }
+
+  let offsetMinutes = 0;
+  if (zone !== 'Z') {
+    const sign = zone.startsWith('-') ? -1 : 1;
+    const offsetHours = Number(zone.slice(1, 3));
+    const offsetMins = Number(zone.slice(4, 6));
+    if (offsetHours > 23 || offsetMins > 59) {
+      return undefined;
+    }
+    offsetMinutes = sign * (offsetHours * 60 + offsetMins);
+  }
+
+  const milli = Number(fraction.slice(0, 3).padEnd(3, '0') || '0');
+  return {
+    ms: utc - offsetMinutes * 60_000 + milli,
+    subMilli: fraction.slice(3),
+  };
+}
+
+/**
  * A timestamp, validated but returned as written.
  *
  * The contract types these as strings and that stays true — a caller comparing
- * two of them wants the server's own text back, not a reformatted version. What
- * changes is that an unparseable one is refused rather than carried: this was
- * the one value kind with no guard, and it fed a comparison that assumed order.
+ * two of them wants the server's own text back, not a reformatted version.
  */
 function timestampOf(
   raw: string | undefined,
@@ -373,9 +439,9 @@ function timestampOf(
   if (raw === undefined || raw === '') {
     return undefined;
   }
-  if (Number.isNaN(Date.parse(raw))) {
+  if (!parseRfc3339(raw)) {
     throw new TraceDocumentError(
-      `Reading ${what}: ${field} is "${raw}", which is not a timestamp. Carrying it would let it be compared against real ones and win.`,
+      `Reading ${what}: ${field} is "${raw}", which is not an RFC 3339 date-time (Atom requires a full date, a full time and an explicit offset). Carrying it would let it be compared against real ones and win.`,
       bodyOf(response),
     );
   }
@@ -383,20 +449,37 @@ function timestampOf(
 }
 
 /**
- * A trace's moment as a number, for ordering.
+ * Order two traces by when they were recorded.
  *
- * Exported because comparing `recordedAt` as a **string** is wrong in ways that
- * look right in a test: `"unexpected"` sorts above any ISO timestamp, and two
- * valid ones with different UTC offsets — or differing fractional-second
- * precision — do not sort chronologically. Since `latestTraceId()` exists
- * precisely to avoid picking a stale trace, ordering it wrongly defeats the one
- * thing it is for.
+ * A comparator rather than a number, because no single JavaScript number holds
+ * this: epoch milliseconds are ~1.7e12, which leaves a double too few digits
+ * for sub-millisecond fractions. `Date.parse` truncates at the millisecond, so
+ * `…:00.1001Z` and `…:00.1009Z` compare equal through it and `latestTraceId()`
+ * would keep whichever it happened to see first.
  *
- * Safe by construction: the parser refuses a timestamp it cannot read, so every
- * `recordedAt` reaching here is parseable.
+ * Safe by construction: the parser refuses any timestamp it cannot read, so
+ * every `recordedAt` reaching here is a valid RFC 3339 date-time.
  */
-export function recordedAtMs(entry: { recordedAt: string }): number {
-  return Date.parse(entry.recordedAt);
+export function compareRecordedAt(
+  a: { recordedAt: string },
+  b: { recordedAt: string },
+): number {
+  const left = parseRfc3339(a.recordedAt);
+  const right = parseRfc3339(b.recordedAt);
+  if (!left || !right) {
+    // Unreachable through the parser; a direct caller gets a stable order
+    // rather than a silent wrong one.
+    throw new Error(
+      `compareRecordedAt received an unparseable timestamp: "${!left ? a.recordedAt : b.recordedAt}"`,
+    );
+  }
+  if (left.ms !== right.ms) {
+    return left.ms - right.ms;
+  }
+  const width = Math.max(left.subMilli.length, right.subMilli.length);
+  return left.subMilli
+    .padEnd(width, '0')
+    .localeCompare(right.subMilli.padEnd(width, '0'));
 }
 
 function attrNum(

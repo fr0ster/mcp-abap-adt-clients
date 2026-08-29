@@ -28,11 +28,11 @@ import {
   listTraceRequests,
 } from './profiler';
 import {
+  compareRecordedAt,
   parseDbAccesses,
   parseHitList,
   parseStatements,
   parseTraceEntries,
-  recordedAtMs,
 } from './traceParsing';
 
 export class Profiler implements IProfiler {
@@ -145,7 +145,7 @@ export class Profiler implements IProfiler {
     // strings. Picking the wrong trace is exactly what this method exists to
     // prevent.
     return entries.reduce((newest, entry) =>
-      recordedAtMs(entry) > recordedAtMs(newest) ? entry : newest,
+      compareRecordedAt(entry, newest) > 0 ? entry : newest,
     ).id;
   }
 
