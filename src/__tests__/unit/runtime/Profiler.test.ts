@@ -2,9 +2,11 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { Profiler } from '../../../runtime/traces/ProfilerDomain';
 
 describe('Profiler', () => {
-  // A real document, not an empty body: the parsers now refuse an empty body
-  // rather than inventing an empty result from it, so a mock that answers with
-  // nothing is testing the guard instead of the delegation.
+  // Real documents rather than empty bodies, so these cases test the
+  // delegation — which URL, which options — and not what the mapping makes of
+  // nothing. The parsers do not refuse an empty body; an earlier version of
+  // this comment said they did, and stopped being true when that validation was
+  // removed.
   const FEED = `<?xml version="1.0"?><atom:feed xmlns:atom="http://www.w3.org/2005/Atom"><atom:title>Traces</atom:title></atom:feed>`;
   const HITLIST = `<?xml version="1.0"?><trc:hitlist xmlns:trc="x"/>`;
   const STATEMENTS = `<?xml version="1.0"?><trc:statements xmlns:trc="x"/>`;
