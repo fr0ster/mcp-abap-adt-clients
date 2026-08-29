@@ -106,9 +106,10 @@
     "shared:setup": "npx jest --testPathIgnorePatterns node_modules --testPathPatterns admin/shared-deps/setup",
     "shared:teardown": "npx jest --testPathIgnorePatterns node_modules --testPathPatterns admin/shared-deps/teardown",
     "shared:check": "npx jest --testPathIgnorePatterns node_modules --testPathPatterns admin/shared-deps/check",
-    "pretest": "npm run test:check:integration",
+    "pretest": "npm run test:check:integration && npm run --silent check:config",
     "prepublishOnly": "npm run build",
-    "prepare": "husky"
+    "prepare": "husky",
+    "check:config": "node scripts/check-config-drift.js"
   },
   "engines": {
     "node": ">=18.0.0"
