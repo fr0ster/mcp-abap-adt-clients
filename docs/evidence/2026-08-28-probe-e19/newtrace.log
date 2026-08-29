@@ -1,0 +1,32 @@
+PinoLogger initialization error: Cannot find module 'pino'
+Require stack:
+- C:\Users\oleksii_kyslytsia\projects\mcp-abap-adt-clients\node_modules\@mcp-abap-adt\logger\dist\pino-logger.js
+- C:\Users\oleksii_kyslytsia\projects\mcp-abap-adt-clients\node_modules\@mcp-abap-adt\logger\dist\index.js
+- C:\Users\oleksii_kyslytsia\projects\mcp-abap-adt-clients\scripts\probe-e19-newtrace.ts
+[INFO] ℹ️ traces before the run: 59
+[INFO] ℹ️ Creating program
+[INFO] ℹ️ Program created
+[INFO] ℹ️ Step 1: Locking program
+[INFO] ℹ️ Program locked, handle:
+"27BF8749FA910BC97E7E2CE569647B6615FD36CE"
+[INFO] ℹ️ Step 2: Checking inactive version with update content
+[INFO] ℹ️ Check inactive with update content passed
+[INFO] ℹ️ Step 3: Updating program
+[INFO] ℹ️ Program updated
+[INFO] ℹ️ read (wait for object ready after update)
+[INFO] ℹ️ object is ready after update
+[INFO] ℹ️ Step 4: Unlocking program
+[INFO] ℹ️ Program unlocked
+[INFO] ℹ️ Step 5: Final check
+[INFO] ℹ️ Final check passed
+[INFO] ℹ️ Step 6: Activating program
+[INFO] ℹ️ Program activated, status:
+200
+[INFO] ℹ️ read (wait for object ready after activation)
+[INFO] ℹ️ object is ready after activation
+[INFO] ℹ️ ran ZAC_TRPROBE1528, profilerId=/sap/bc/adt/runtime/traces/abaptraces/parameters/0CC47A1E68C11FE1A8DA54B2A23B95CA
+[INFO] ℹ️ attempt 1: 60 traces, 1 new → A59511DDA2D211F1B5CA0CC47A1E68C1
+[INFO] ℹ️ Checking program for deletion
+[INFO] ℹ️ Deletion check passed
+[INFO] ℹ️ Deleting program
+[INFO] ℹ️ Program deleted

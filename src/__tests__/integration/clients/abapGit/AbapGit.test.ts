@@ -15,15 +15,18 @@
  *   DEBUG_ADT_LIBS=true      — library runtime logs
  */
 
-import { createAbapConnection } from '@mcp-abap-adt/connection';
 import type {
   IAbapConnection,
   IAdtAbapGitClient,
+  ISessionLifecycleAware,
 } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import { AdtAbapGitClient } from '../../../../clients/AdtAbapGitClient';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
-import { getConfig } from '../../../helpers/sessionConfig';
+import {
+  createTestConnection,
+  releaseTestConnection,
+} from '../../../helpers/sessionConfig';
 import {
   createConnectionLogger,
   createLibraryLogger,
@@ -39,16 +42,14 @@ const {
 } = require('../../../helpers/test-helper');
 
 describe('AbapGit (standalone AdtAbapGitClient)', () => {
-  let connection: IAbapConnection;
+  let connection: IAbapConnection & ISessionLifecycleAware;
   let abapGit: IAdtAbapGitClient;
   let isCloudSystem = false;
   let hasConfig = false;
 
   beforeAll(async () => {
     try {
-      const config = getConfig();
-      connection = createAbapConnection(config, createConnectionLogger());
-      await (connection as any).connect();
+      connection = await createTestConnection(createConnectionLogger());
       isCloudSystem = await isCloudEnvironment(connection);
       abapGit = new AdtAbapGitClient(connection, createLibraryLogger());
       hasConfig = true;
@@ -60,7 +61,7 @@ describe('AbapGit (standalone AdtAbapGitClient)', () => {
   }, 120_000);
 
   afterAll(async () => {
-    if (connection) await (connection as any).disconnect?.();
+    await releaseTestConnection(connection);
   });
 
   // Case definitions resolved at declaration time (test-config is static).

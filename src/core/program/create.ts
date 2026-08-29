@@ -23,9 +23,21 @@ import type { ICreateProgramParams } from './types';
  * Convert readable program type to SAP internal code
  */
 function convertProgramType(programType?: string): string {
+  if (programType === 'include') {
+    // This mapped to 'I' and then posted a `program:abapProgram` document with
+    // `adtcore:type="PROG/P"` to the programs collection. A standalone include
+    // is a different resource: `include:abapInclude`, its own namespace,
+    // `PROG/I`, its own collection, and a different accepted content type. The
+    // mapping was not a parameter that needed correcting; it was the wrong
+    // object. Measured against a captured Eclipse create.
+    throw new Error(
+      "programType 'include' is not a program. A standalone PROG/I include is " +
+        'a separate resource — use AdtClient.getInclude() (src/core/include).',
+    );
+  }
+
   const typeMap: Record<string, string> = {
     executable: '1',
-    include: 'I',
     module_pool: 'M',
     function_group: 'F',
     class_pool: 'K',
@@ -46,15 +58,6 @@ function _generateProgramTemplate(
   const upperName = programName.toUpperCase();
 
   switch (programType) {
-    case 'I': // Include
-      return `*&---------------------------------------------------------------------*
-*& Include ${upperName}
-*& ${description}
-*&---------------------------------------------------------------------*
-
-" Include program logic here
-`;
-
     case 'M': // Module Pool
       return `*&---------------------------------------------------------------------*
 *& Module Pool ${upperName}

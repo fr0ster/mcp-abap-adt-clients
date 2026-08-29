@@ -131,9 +131,6 @@ lock_recovery_test:
   # Phase 1: Lock object and save session/lock handle
   phase1_lock:
     session_config:
-      persist_session: true
-      sessions_dir: ".sessions"
-      session_id_format: "lock_recovery_session"  # Fixed session ID
       cleanup_session_after_test: false  # Keep session for phase 2
     lock_config:
       locks_dir: ".locks"
@@ -148,9 +145,6 @@ lock_recovery_test:
   # Phase 2: Restore session and unlock object
   phase2_unlock:
     session_config:
-      persist_session: true
-      sessions_dir: ".sessions"
-      session_id_format: "lock_recovery_session"  # Same session ID
       cleanup_session_after_test: true  # Cleanup after successful unlock
     lock_config:
       locks_dir: ".locks"

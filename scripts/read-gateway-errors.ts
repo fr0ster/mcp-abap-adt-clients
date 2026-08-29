@@ -14,9 +14,9 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { createAbapConnection } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
+import { createTestConnection } from '../src/__tests__/helpers/sessionConfig';
 import { AdtRuntimeClient } from '../src/clients/AdtRuntimeClient';
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../.env');
@@ -49,7 +49,7 @@ async function main() {
   const errorId = process.argv[3];
 
   console.error(`Connecting to ${config.url}...`);
-  const connection: IAbapConnection = createAbapConnection(config);
+  const connection = await createTestConnection(createConnectionLogger());
   await (connection as any).connect();
 
   const runtime = new AdtRuntimeClient(connection, undefined, {

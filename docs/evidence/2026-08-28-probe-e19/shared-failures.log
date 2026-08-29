@@ -1,0 +1,66 @@
+PinoLogger initialization error: Cannot find module 'pino'
+Require stack:
+- C:\Users\oleksii_kyslytsia\projects\mcp-abap-adt-clients\node_modules\@mcp-abap-adt\logger\dist\pino-logger.js
+- C:\Users\oleksii_kyslytsia\projects\mcp-abap-adt-clients\node_modules\@mcp-abap-adt\logger\dist\index.js
+- C:\Users\oleksii_kyslytsia\projects\mcp-abap-adt-clients\scripts\probe-e19-shared-failures.ts
+[INFO] ℹ️ Step 1: Locking function module
+[INFO] ℹ️ Function module locked, handle:
+"B0441A494005142DBD41330FECA8E42D0C2F092F"
+[INFO] ℹ️ Step 2: Checking inactive version with update content
+[INFO] ℹ️ Check inactive with update content passed
+[INFO] ℹ️ Step 3: Updating function module
+[INFO] ℹ️ Function module updated
+[INFO] ℹ️ read (wait for object ready after update)
+[INFO] ℹ️ object is ready after update
+[INFO] ℹ️ Step 4: Unlocking function module
+[INFO] ℹ️ Function module unlocked
+[INFO] ℹ️ Step 5: Final check
+[INFO] ℹ️ Final check passed
+[INFO] ℹ️ Step 6: Activating function module
+[INFO] ℹ️ Function module activated, status:
+200
+[INFO] ℹ️ read (wait for object ready after activation)
+[INFO] ℹ️ object is ready after activation
+[INFO] ℹ️ 
+===== A. FM update =====
+SUCCEEDED
+[INFO] ℹ️ 
+===== B. inactive BEFORE =====
+[]
+[INFO] ℹ️ 
+===== B. activate ZAC_SHR_SRVD02 =====
+{
+  "status": 200,
+  "statusText": "OK",
+  "headers": {
+    "content-type": "application/xml; charset=utf-8",
+    "content-length": "212",
+    "sap-authenticated": "true",
+    "sap-adt-saplb": "epbyminsd0654_E19_00",
+    "sap-cache-control": "+0",
+    "sap-isc-uagent": "0",
+    "sap-server": "true",
+    "sap-perf-fesrec": "3802.000000"
+  },
+  "data": "<?xml version=\"1.0\" encoding=\"utf-8\"?><chkl:messages xmlns:chkl=\"http://www.sap.com/abapxml/checklist\"><chkl:properties checkExecuted=\"false\" activationExecuted=\"false\" generationExecuted=\"true\"/></chkl:messages>"
+}
+[INFO] ℹ️ 
+===== B. activate ZAC_SHR_SRVB01 =====
+{
+  "status": 200,
+  "statusText": "OK",
+  "headers": {
+    "content-type": "application/xml; charset=utf-8",
+    "content-length": "212",
+    "sap-authenticated": "true",
+    "sap-adt-saplb": "epbyminsd0654_E19_00",
+    "sap-cache-control": "+0",
+    "sap-isc-uagent": "0",
+    "sap-server": "true",
+    "sap-perf-fesrec": "3360.000000"
+  },
+  "data": "<?xml version=\"1.0\" encoding=\"utf-8\"?><chkl:messages xmlns:chkl=\"http://www.sap.com/abapxml/checklist\"><chkl:properties checkExecuted=\"false\" activationExecuted=\"false\" generationExecuted=\"true\"/></chkl:messages>"
+}
+[INFO] ℹ️ 
+===== B. inactive AFTER =====
+[]

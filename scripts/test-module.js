@@ -51,7 +51,7 @@ const modulePatterns = {
   view: 'view',
   package: 'package',
   transport: 'transport',
-  shared: 'shared'
+  shared: 'shared',
 };
 
 const testPattern = modulePatterns[moduleName];
@@ -70,7 +70,7 @@ console.log('');
 const jestProcess = spawn('npm', ['test', '--', testPattern], {
   stdio: 'inherit',
   shell: true,
-  cwd: path.resolve(__dirname, '..')
+  cwd: path.resolve(__dirname, '..'),
 });
 
 jestProcess.on('close', (code) => {
@@ -81,4 +81,3 @@ jestProcess.on('error', (error) => {
   console.error('Failed to start test process:', error);
   process.exit(1);
 });
-

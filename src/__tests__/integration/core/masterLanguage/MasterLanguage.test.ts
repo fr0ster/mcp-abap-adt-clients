@@ -14,15 +14,13 @@
  */
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { createAbapConnection } from '@mcp-abap-adt/connection';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import {
   createTestAdtClient,
-  getConfig,
-  getConnectionOptions,
+  createTestConnection,
   resolveSystemContext,
 } from '../../../helpers/sessionConfig';
 
@@ -62,15 +60,7 @@ describe('Master language on create (#105)', () => {
       return;
     }
     hasConfig = true;
-    const config = getConfig();
-    connection = createAbapConnection(
-      config,
-      silentLogger,
-      undefined,
-      undefined,
-      getConnectionOptions(),
-    );
-    await (connection as { connect(): Promise<void> }).connect();
+    connection = await createTestConnection(silentLogger);
 
     const isCloud = await isCloudEnvironment(connection);
     const systemContext = await resolveSystemContext(connection, isCloud);

@@ -1,0 +1,13 @@
+PinoLogger initialization error: Cannot find module 'pino'
+Require stack:
+- C:\Users\oleksii_kyslytsia\projects\mcp-abap-adt-clients\node_modules\@mcp-abap-adt\logger\dist\pino-logger.js
+- C:\Users\oleksii_kyslytsia\projects\mcp-abap-adt-clients\node_modules\@mcp-abap-adt\logger\dist\index.js
+- C:\Users\oleksii_kyslytsia\projects\mcp-abap-adt-clients\scripts\probe-e19-traces.ts
+[INFO] ℹ️ 
+===== /sap/bc/adt/runtime/traces/abaptraces/requests =====
+status 200, 345 bytes, 0 entries
+<?xml version="1.0" encoding="utf-8"?><atom:feed xmlns:atom="http://www.w3.org/2005/Atom"><atom:contributor trc:role="orgination" xmlns:trc="http://www.sap.com/adt/runtime/traces/abaptraces"><atom:name>E19</atom:name></atom:contributor><atom:title>ABAP Trace Requests E19</atom:title><atom:updated>2026-08-28T11:21:15Z</atom:updated></atom:feed>
+[INFO] ℹ️ 
+===== /sap/bc/adt/runtime/traces/abaptraces =====
+status 200, 231397 bytes, 58 entries
+<?xml version="1.0" encoding="utf-8"?><atom:feed xmlns:atom="http://www.w3.org/2005/Atom"><atom:author><atom:name>SAP AG</atom:name></atom:author><atom:contributor><atom:name>E19</atom:name></atom:contributor><atom:title>ABAP Traces in E19</atom:title><atom:updated>2026-08-28T11:21:15Z</atom:updated><atom:entry xml:lang="EN"><atom:author><atom:name>OKYSLYTSIA</atom:name><atom:uri>https://people.wdf.sap.corp/#/?phonetic=false&amp;query=sapname:OKYSLYTSIA</atom:uri></atom:author><atom:content type="application/vnd.sap.adt.runtime.traces.abaptraces.hitlist+xml" src="/sap/bc/adt/runtime/traces/abaptraces/E8EB2802A1DD11F1B5CA0CC47A1E68C1/hitlist"/><atom:id>/sap/bc/adt/runtime/traces/abaptraces/E8EB2802A1DD11F1B5CA0CC47A1E68C1</atom:id><atom:link href="/sap/bc/adt/runtime/traces/abaptraces/E8EB2802A1DD11F1B5CA0CC47A1E68C1" rel="self" type="application/atom+xml;type=entry" title="Trace File Self Link"/><atom:link href="/sap/bc/adt/runtime/traces/abaptraces/E8EB2802A1DD11F1B5CA0CC47A1E68C1" rel="alternate" type="application/vnd.sap.sapgui.adt.runtime.traces.abaptraces.satclassic" title="SAT (SAP GUI)"/><atom:link href="/sap/bc/adt/runtime/traces/abaptraces/E8EB2802A1DD11F1B5CA0CC47A1E68C1" rel="related" type="application/vnd.sap.sapgui.adt.runtime.traces.abaptraces.filedisplay" title="Display Original Trace File (SAP GUI)"/><atom:link href="/sap/bc/adt/runtime/traces/abaptraces/E8EB2802A1DD11F1B5CA0CC47A1E68C1" rel="http://www.sap.com/adt/relations/delete" type="text/plain" title="De

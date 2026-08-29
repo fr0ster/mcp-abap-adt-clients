@@ -8,7 +8,6 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { createAbapConnection } from '@mcp-abap-adt/connection';
 import type {
   IAbapConnection,
   IAdtObject,
@@ -23,8 +22,10 @@ import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
 import {
   createTestAdtClient,
+  createTestConnection,
   getConfig,
   resolveSystemContext,
+  skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
 import {
   createConnectionLogger,
@@ -80,8 +81,7 @@ describe('Package (using AdtClient)', () => {
     try {
       const config = getConfig();
       _connectionConfig = config;
-      connection = createAbapConnection(config, connectionLogger);
-      await (connection as any).connect();
+      connection = await createTestConnection(connectionLogger);
       isCloudSystem = await isCloudEnvironment(connection);
       const systemContext = await resolveSystemContext(
         connection,
@@ -144,21 +144,26 @@ describe('Package (using AdtClient)', () => {
           };
         },
         cleanupObject: async (cfg: IPackageConfig) => {
-          // Use a fresh connection so the delete runs in a different ABAP session.
-          // A package cannot be deleted from the same session it was created in.
-          const cleanupConn = createAbapConnection(
-            getConfig(),
-            connectionLogger,
-          );
-          await (cleanupConn as any).connect();
-          try {
-            await deletePackage(cleanupConn, {
-              package_name: cfg.packageName,
-              transport_request: cfg.transportRequest,
-            });
-          } finally {
-            await (cleanupConn as any).disconnect?.();
-          }
+          // No session juggling here, because none has been shown to be needed.
+          //
+          // This used to open a second connection, on the rule that a package
+          // cannot be deleted from the session that created it. That rule was
+          // stated as an on-prem fact and had only been measured on the BTP
+          // trial, where the delete succeeds from the creating session — tested
+          // both ways, with a replacement session and without, package gone.
+          //
+          // Measured on on-prem since, which is where the rule was supposed to
+          // bite: E19, one session for the whole run, create and delete both on
+          // it, full workflow green. So the rule does not bite there either and
+          // the exception stays gone.
+          //
+          // If some system does show the delete failing from the creating
+          // session, it comes back as `recycleTestSession(connection)` —
+          // replacing the run's one session, never opening a second beside it.
+          await deletePackage(connection, {
+            package_name: cfg.packageName,
+            transport_request: cfg.transportRequest,
+          });
         },
         ensureObjectReady: async (packageName: string) => {
           if (!connection) return { success: true };
@@ -179,8 +184,10 @@ describe('Package (using AdtClient)', () => {
           }
         },
       });
-    } catch (_error) {
-      hasConfig = false;
+    } catch (error) {
+      // Skips only when there is no SAP here; anything else fails
+      // naming the reason, instead of passing green having run nothing.
+      hasConfig = skipUnlessConfigured(error, testsLogger);
     }
   });
 

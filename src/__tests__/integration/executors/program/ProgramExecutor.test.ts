@@ -5,24 +5,24 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { createAbapConnection } from '@mcp-abap-adt/connection';
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  ILogger,
+  ISessionLifecycleAware,
+} from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import { AdtExecutor } from '../../../../clients/AdtExecutor';
-import {
-  extractTraceIdFromTraceRequestsResponse,
-  getTraceDbAccesses,
-  getTraceHitList,
-  getTraceStatements,
-  type IProfilerTraceParameters,
-  listTraceRequests,
-} from '../../../../runtime/traces';
+import { AdtRuntimeClient } from '../../../../clients/AdtRuntimeClient';
+import type { IProfilerTraceParameters } from '../../../../runtime/traces';
+import type { Profiler } from '../../../../runtime/traces/ProfilerDomain';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import {
   createTestAdtClient,
-  getConfig,
+  createTestConnection,
+  releaseTestConnection,
   resolveSystemContext,
+  skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
 import {
   createConnectionLogger,
@@ -37,6 +37,7 @@ import {
   logTestStep,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
+import { traceIdsNow, waitForNewTrace } from '../../../helpers/traceHelpers';
 
 const {
   getEnabledTestCase,
@@ -136,24 +137,30 @@ function resolveRunnableProgramSource(
 }
 
 describe('ProgramExecutor (integration)', () => {
-  let connection: IAbapConnection;
+  let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
   let executor: AdtExecutor;
+  let runtime: AdtRuntimeClient;
+  let profiler: Profiler;
   let hasConfig = false;
   let isCloudSystem = false;
   let isLegacy = false;
   let programNameForTest: string | null = null;
+  // EVERY program this file creates, not just the last. Each test generates a
+  // fresh name and overwrote the single variable, so afterAll deleted the newest
+  // and left the earlier one on the system — once per run. Seen on E19 in SM12
+  // as E_ABAP_GENPH locks accumulating under names nobody would ever revisit.
+  const programsCreated: string[] = [];
+  let traceUser: string | undefined;
   let transportRequestForCleanup = '';
 
   const connectionLogger: ILogger = createConnectionLogger();
   const libraryLogger: ILogger = createLibraryLogger();
   const testsLogger: ILogger = createTestsLogger();
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     try {
-      const config = getConfig();
-      connection = createAbapConnection(config, connectionLogger);
-      await (connection as any).connect();
+      connection = await createTestConnection(connectionLogger);
       isCloudSystem = await isCloudEnvironment(connection);
       const systemContext = await resolveSystemContext(
         connection,
@@ -163,35 +170,42 @@ describe('ProgramExecutor (integration)', () => {
         await createTestAdtClient(connection, libraryLogger, systemContext);
       client = resolvedClient;
       isLegacy = legacy;
+      traceUser = systemContext.responsible;
       executor = new AdtExecutor(connection, libraryLogger);
+      runtime = new AdtRuntimeClient(connection, libraryLogger);
+      // `getProfiler()` is typed `IProfiler`, and that contract — which lives in
+      // @mcp-abap-adt/interfaces — does not carry `latestTraceId()` yet. The
+      // implementation is this package's and the class is exported, so the cast
+      // is the seam between the two. It goes when the contract catches up.
+      profiler = runtime.getProfiler() as Profiler;
       hasConfig = true;
       programNameForTest = null;
+      programsCreated.length = 0;
       transportRequestForCleanup = '';
-    } catch (_error) {
-      testsLogger.warn(
-        '⚠️ Skipping tests: No .env file or SAP configuration found',
-      );
-      hasConfig = false;
+    } catch (error) {
+      // Skips only when there is no SAP here; anything else fails
+      // naming the reason, instead of passing green having run nothing.
+      hasConfig = skipUnlessConfigured(error, testsLogger);
       isCloudSystem = false;
     }
   });
 
-  afterEach(async () => {
-    if (connection && programNameForTest) {
+  afterAll(async () => {
+    for (const programName of programsCreated) {
       try {
         await client.getProgram().delete({
-          programName: programNameForTest,
+          programName,
           transportRequest: transportRequestForCleanup,
         });
       } catch (cleanupError) {
         testsLogger.warn?.(
-          `⚠️ Cleanup failed for program ${programNameForTest}: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,
+          `⚠️ Cleanup failed for program ${programName}: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,
         );
       }
     }
 
     if (connection) {
-      (connection as any).reset();
+      await releaseTestConnection(connection);
     }
   });
 
@@ -213,6 +227,7 @@ describe('ProgramExecutor (integration)', () => {
     const sourceCode = resolveRunnableProgramSource(testCase, programName);
 
     programNameForTest = programName;
+    programsCreated.push(programNameForTest);
     transportRequestForCleanup = transportRequest || '';
 
     logTestStep(`create program ${programName}`, testsLogger);
@@ -358,6 +373,10 @@ describe('ProgramExecutor (integration)', () => {
       try {
         const programName = await ensureRunnableProgram(testCase);
 
+        // What the feed holds BEFORE the run, so the trace this run writes can
+        // be told apart from the ones already there.
+        const tracesBefore = await traceIdsNow(profiler, { user: traceUser });
+
         logTestStep('create trace parameters + run with profiler', testsLogger);
         const result = await executor
           .getProgramExecutor()
@@ -375,45 +394,56 @@ describe('ProgramExecutor (integration)', () => {
           testsLogger,
         );
 
-        logTestStep('resolve traceId from trace requests list', testsLogger);
-        const traceRequestsResponse = await listTraceRequests(connection);
-        const traceId = extractTraceIdFromTraceRequestsResponse(
-          traceRequestsResponse,
-        );
+        // The finished trace lives in the TRACES collection, not in the trace
+        // REQUESTS one. A request is what schedules the measurement and it is
+        // consumed by the run: measured on E19 straight after a profiled run,
+        // `/runtime/traces/abaptraces/requests` answered 200 with an empty feed
+        // of 345 bytes while `/runtime/traces/abaptraces` held 95KB of entries
+        // owned by this very user — the profiling had worked all along and the
+        // test was reading the wrong feed.
+        // Poll for a trace that was NOT there before this run, rather than
+        // trusting "the newest one". SAP writes traces asynchronously, so the
+        // trace may not exist the instant the run returns — and a test that
+        // takes whatever the feed offers passes on someone else's trace. This
+        // one did: four consecutive runs resolved the SAME id while each was
+        // creating a new trace of its own. Measured on E19, the difference
+        // shows up on the first or second attempt.
+        logTestStep('poll for the trace this run produced', testsLogger);
+        const traceId = await waitForNewTrace(profiler, tracesBefore, {
+          user: traceUser,
+          attempts: 5,
+          delayMs: 2000,
+          logger: testsLogger,
+        });
         expect(traceId).toBeDefined();
-        expect(typeof traceId).toBe('string');
-        expect((traceId as string).length).toBeGreaterThan(10);
+        if (!traceId) {
+          throw new Error('no new trace appeared after a profiled run');
+        }
 
         logTestStep(`traceId=${traceId}`, testsLogger);
 
-        logTestStep('read trace hitlist', testsLogger);
-        const hitlist = await getTraceHitList(connection, traceId as string, {
+        logTestStep('read all three views', testsLogger);
+        const hitlist = await profiler.read(traceId, 'hitlist', {
           withSystemEvents: false,
         });
-        expect(hitlist.status).toBe(200);
+        const statements = await profiler.read(traceId, 'statements', {
+          withSystemEvents: false,
+        });
+        const dbAccesses = await profiler.read(traceId, 'dbAccesses', {
+          withSystemEvents: false,
+        });
 
-        logTestStep('read trace statements', testsLogger);
-        const statements = await getTraceStatements(
-          connection,
-          traceId as string,
-          {
-            withSystemEvents: false,
-          },
-        );
-        expect(statements.status).toBe(200);
-
-        logTestStep('read trace db accesses', testsLogger);
-        const dbAccesses = await getTraceDbAccesses(
-          connection,
-          traceId as string,
-          {
-            withSystemEvents: false,
-          },
-        );
-        expect(dbAccesses.status).toBe(200);
+        // Parsed rows, not a status code: a 200 with a body nothing could read
+        // used to satisfy this.
+        // Rows and their fields, not `Array.isArray`: an empty array was
+        // what the parser used to invent from a body it could not read.
+        expect(hitlist.entries.length).toBeGreaterThan(0);
+        expect(typeof hitlist.entries[0]?.index).toBe('number');
+        expect(statements.statements.length).toBeGreaterThan(0);
+        expect(Array.isArray(dbAccesses.accesses)).toBe(true);
 
         logTestStep(
-          `trace summary: hitlist=${hitlist.status}, statements=${statements.status}, dbAccesses=${dbAccesses.status}`,
+          `trace ${traceId}: hitlist=${hitlist.entries.length} rows, statements=${statements.statements.length}, dbAccesses=${dbAccesses.accesses.length}`,
           testsLogger,
         );
 

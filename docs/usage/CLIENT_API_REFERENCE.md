@@ -173,6 +173,62 @@ await toggle.update(
 // bind to transports through the /toggle and /check endpoints instead.
 ```
 
+### Standalone `PROG/I` includes (`getInclude()`)
+
+Since 13.0.0. An include is **not** a program and **not** a function-group
+include — three different things, two of them easy to confuse:
+
+| | `getInclude()` | `getFunctionInclude()` |
+|---|---|---|
+| type | `PROG/I` | `FUGR/I` |
+| collection | `/sap/bc/adt/programs/includes` | `/sap/bc/adt/functions/groups/{group}/includes` |
+| belongs to | nothing — it stands alone | its function group |
+| validation | `/sap/bc/adt/includes/validation` | none; the parent group is probed |
+
+```typescript
+const include = client.getInclude();
+
+await include.create(
+  {
+    includeName: 'ZMY_INCLUDE',
+    packageName: 'ZMY_PACKAGE',
+    description: 'Shared form routines',
+    transportRequest: 'DEVK900123',
+    sourceCode: '" shared routines',
+  },
+  { activateOnCreate: true },
+);
+
+const source = await include.read({ includeName: 'ZMY_INCLUDE' });
+await include.update(
+  { includeName: 'ZMY_INCLUDE' },
+  { sourceCode: '" changed', activateOnUpdate: true },
+);
+await include.delete({ includeName: 'ZMY_INCLUDE' });
+```
+
+Contract notes:
+- **Activation is opt-in**, as `IAdtOperationOptions` says: `activateOnCreate`
+  and `activateOnUpdate` both default to `false`. `options.sourceCode` wins over
+  the config's, and `options.lockHandle` means you hold the lock — the handler
+  then writes only, and neither locks nor unlocks.
+- **An empty source is a source.** `sourceCode: ''` clears an include; only
+  `undefined` means none was given. An empty include is a valid object, so
+  emptiness must be expressible.
+- **`deleteOnFailure`** removes the include again when a step *after* the
+  metadata POST fails — without it a half-made object is left behind under a
+  name your next attempt collides with. The original failure stays the reported
+  one; a rollback that cannot complete is recorded beside it, never instead.
+- **Creating one works on modern on-prem only.** Only there does discovery give
+  the includes collection an `app:accept`, and a collection without one is not a
+  POST target. Cloud answers `403 S_DEVELOP` for the type.
+- The return type offers create/read/update/delete, validate, activate, lock and
+  unlock — and nothing else. It is not versionable, checkable or
+  transport-aware, because nothing measured says an include is.
+- `programType: 'include'` on `getProgram()` now **throws**. It used to map to
+  `'I'` and post a `program:abapProgram` document with `adtcore:type="PROG/P"`
+  to the programs collection — the wrong object, not a wrong parameter.
+
 ### Feature Toggle — environment-specific behavior
 
 | Environment | Create / delete | Update metadata + source | switchOn / switchOff | getRuntimeState / checkState / readSource |
@@ -186,11 +242,36 @@ await toggle.update(
 `AdtAbapGitClient` is a **standalone top-level class**, not a factory on `AdtClient`. `AdtClient` is reserved for `IAdtObject<Config, State>` implementations — separate clients stand on their own and are instantiated directly, same pattern as `AdtClient`, `AdtRuntimeClient`, `AdtExecutor`, and `AdtClientsWS`.
 
 ```typescript
-import { createAbapConnection } from '@mcp-abap-adt/connection';
+import {
+  AdtCloudConnector,
+  CloudHttpTransport,
+  TokenAuthProvider,
+} from '@mcp-abap-adt/connection';
 import { AdtAbapGitClient } from '@mcp-abap-adt/adt-clients';
 import type { IAdtAbapGitClient } from '@mcp-abap-adt/interfaces';
 
-const connection = createAbapConnection({ /* ... */ });
+// abapGit needs cloud or ABAP Platform 2022+, so the cloud connector and the
+// cloud wire — the one that asks for a session at
+// /sap/bc/adt/core/http/sessions. Handing it the on-prem wire does not compile.
+const config = {
+  url: process.env.SAP_URL!,
+  authType: 'jwt' as const,
+  jwtToken: process.env.SAP_JWT_TOKEN!,
+  client: process.env.SAP_CLIENT,
+};
+
+const connection = new AdtCloudConnector(
+  config,
+  // A refresher, not a bare string, for anything long-lived: the provider
+  // renews on an expiry it can see, on every call that asks for a header.
+  new TokenAuthProvider(config.jwtToken),
+  new CloudHttpTransport(() => ({}), null, {
+    client: config.client,
+    baseUrl: config.url,
+  }),
+);
+await connection.connect();
+
 const abapGit: IAdtAbapGitClient = new AdtAbapGitClient(connection);
 
 // Probe a remote repo before linking
@@ -790,34 +871,77 @@ const runtime = new AdtRuntimeClient(connection, logger);
 
 ### Profiler Traces
 
+Since 13.0.0 the profiler **reads**; configuring a measurement belongs to the
+executors. The two never share a vocabulary: scheduling yields a *request id*,
+reading takes a *trace id*.
+
 ```typescript
 const profiler = runtime.getProfiler();
 
-// List / configure
-const files = await profiler.list();
-const params = await profiler.getParameters();
-const created = await profiler.createParameters({
+// What traces exist — parsed entries, not a raw response.
+const traces = await profiler.list({ user: 'SOMEONE' });
+const newest = traces.reduce((a, b) => (a.recordedAt > b.recordedAt ? a : b));
+
+// What is inside one. The result is the view's own type.
+const hitList = await profiler.read(newest.id, 'hitlist', {
+  withSystemEvents: false,
+});
+const statements = await profiler.read(newest.id, 'statements');
+const dbAccesses = await profiler.read(newest.id, 'dbAccesses');
+
+console.log(hitList.entries.length, dbAccesses.accesses[0]?.accessTime?.total);
+```
+
+Configuring and scheduling live on the executors:
+
+```typescript
+const classExecutor = new AdtExecutor(connection, logger).getClassExecutor();
+
+const objectTypes = await classExecutor.listObjectTypes();   // INamedItem[]
+const processTypes = await classExecutor.listProcessTypes();
+const scheduled = await classExecutor.listRequests();        // ITraceRequestEntry[]
+
+const requestId = await classExecutor.scheduleTrace({
   description: 'CI trace run',
   sqlTrace: true,
   maxTimeForTracing: 1800,
 });
-const traceId = profiler.extractIdFromResponse(created);
+```
 
-// Catalog
-const requests = await profiler.listRequests();
-const byUri = await profiler.getRequestsByUri('/sap/bc/adt/oo/classes/zcl_test');
-const objectTypes = await profiler.listObjectTypes();
-const processTypes = await profiler.listProcessTypes();
+A consumer that needs the document read differently passes its own reader and
+keeps a type:
 
-// Analysis
-const hitList = await profiler.getHitList(traceId, { withSystemEvents: false });
-const statements = await profiler.getStatements(traceId);
-const dbAccesses = await profiler.getDbAccesses(traceId);
+```typescript
+const mine = await profiler.readWith(
+  (data) => myParser(data),   // the response body, exactly as it arrived
+  newest.id,
+  'hitlist',
+);
 ```
 
 Contract notes:
-- `extractIdFromResponse()` parses the ADT response to extract the trace ID.
-- Trace-aware methods accept a plain trace ID or a full ADT trace URI.
+- `read()` refuses a view this family does not have — at compile time, not with
+  a 404. The three are `hitlist`, `statements` and `dbAccesses`.
+- **The parsers do not validate.** Judging SAP's own documents is not this
+  library's job; the server is the authority on its responses, and where a check
+  is needed ADT has an endpoint (`getInclude().validate()`). A body the default
+  mapping does not recognise yields empty rather than an exception — that is when
+  you want `readWith()`. Searching and filtering belong to the server too.
+- **A run does not promise a trace.** SAP writes it asynchronously, so when
+  `runWithProfiling` returns there may be no trace, there may never be one, and
+  you may legitimately read it a week later. To find the one your run produced,
+  note the ids before running and look for a new one — see
+  `src/__tests__/helpers/traceHelpers.ts`.
+- **Position in the feed is not age.** A feed's first entries have been measured
+  minutes old while its last were eight days older, so "the first id in the
+  document" is a trace chosen at random. Compare `recordedAt`.
+- `scheduleTrace()` answers with the request id and nothing else: reading the
+  created parameters resource back gives `200` with an empty body.
+- `grossTime` and `traceEventNetTime` are typed `unknown` — the elements are on
+  every row, but their attributes were never captured, unlike `accessTime`'s.
+- Comparing `recordedAt` as a **string** is wrong: `09:00:00Z` is later than
+  `10:00:00+02:00` and sorts lower as text. Use `compareRecordedAt`, which
+  `latestTraceId()` does.
 
 ### Cross-Trace Analysis
 

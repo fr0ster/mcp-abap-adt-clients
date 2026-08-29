@@ -12,15 +12,20 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { createAbapConnection } from '@mcp-abap-adt/connection';
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  ILogger,
+  ISessionLifecycleAware,
+} from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import {
   createTestAdtClient,
-  getConfig,
+  createTestConnection,
+  releaseTestConnection,
   resolveSystemContext,
+  skipUnlessConfigured,
 } from '../../helpers/sessionConfig';
 import { TestConfigResolver } from '../../helpers/TestConfigResolver';
 import {
@@ -64,7 +69,7 @@ const _libraryLogger: ILogger = createLibraryLogger();
 const testsLogger: ILogger = createTestsLogger();
 
 describe('Group Activation (Shared)', () => {
-  let connection: IAbapConnection;
+  let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
   let hasConfig = false;
   let isLegacy = false;
@@ -72,9 +77,7 @@ describe('Group Activation (Shared)', () => {
 
   beforeAll(async () => {
     try {
-      const config = getConfig();
-      connection = createAbapConnection(config, connectionLogger);
-      await (connection as any).connect();
+      connection = await createTestConnection(connectionLogger);
       isCloudSystem = await isCloudEnvironment(connection);
       const systemContext = await resolveSystemContext(
         connection,
@@ -85,17 +88,16 @@ describe('Group Activation (Shared)', () => {
       client = resolvedClient;
       isLegacy = legacy;
       hasConfig = true;
-    } catch (_error) {
-      testsLogger.warn?.(
-        '⚠️ Skipping tests: No .env file or SAP configuration found',
-      );
-      hasConfig = false;
+    } catch (error) {
+      // Skips only when there is no SAP here; anything else fails
+      // naming the reason, instead of passing green having run nothing.
+      hasConfig = skipUnlessConfigured(error, testsLogger);
     }
   });
 
   afterAll(async () => {
     if (connection) {
-      (connection as any).reset();
+      await releaseTestConnection(connection);
     }
   });
 
@@ -113,7 +115,7 @@ describe('Group Activation (Shared)', () => {
     let dataElementCreated = false;
     let structureCreated = false;
 
-    beforeEach(async () => {
+    beforeAll(async () => {
       skipReason = null;
       testCase = null;
       domainName = null;
@@ -163,7 +165,7 @@ describe('Group Activation (Shared)', () => {
       structureName = tc.params.structure_name;
     });
 
-    afterEach(async () => {
+    afterAll(async () => {
       // Cleanup: delete objects in reverse order (structure -> data element -> domain)
       const transportRequest = resolveTransportRequest(
         testCase?.params?.transport_request,

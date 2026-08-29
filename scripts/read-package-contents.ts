@@ -18,17 +18,22 @@
  *   MCP_ENV_PATH - Path to .env file (default: .env in project root)
  */
 
-import * as dotenv from 'dotenv';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { createAbapConnection } from '@mcp-abap-adt/connection';
-import { AdtClient } from '../src/clients/AdtClient';
-import type { IPackageContentItem, IPackageHierarchyNode } from '../src/core/shared/types';
-import { getConfig } from '../src/__tests__/helpers/sessionConfig';
+import * as dotenv from 'dotenv';
+import {
+  createTestConnection,
+  getConfig,
+} from '../src/__tests__/helpers/sessionConfig';
 import {
   createConnectionLogger,
   createLibraryLogger,
 } from '../src/__tests__/helpers/testLogger';
+import { AdtClient } from '../src/clients/AdtClient';
+import type {
+  IPackageContentItem,
+  IPackageHierarchyNode,
+} from '../src/core/shared/types';
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../.env');
 if (fs.existsSync(envPath)) {
@@ -88,7 +93,9 @@ function printTable(items: IPackageContentItem[]): void {
   console.log(
     `${'NAME'.padEnd(nameWidth)}  ${'TYPE'.padEnd(typeWidth)}  ${'PACKAGE'.padEnd(pkgWidth)}  DESCRIPTION`,
   );
-  console.log(`${'-'.repeat(nameWidth)}  ${'-'.repeat(typeWidth)}  ${'-'.repeat(pkgWidth)}  ${'-'.repeat(30)}`);
+  console.log(
+    `${'-'.repeat(nameWidth)}  ${'-'.repeat(typeWidth)}  ${'-'.repeat(pkgWidth)}  ${'-'.repeat(30)}`,
+  );
 
   // Print rows
   for (const item of items) {
@@ -101,7 +108,11 @@ function printTable(items: IPackageContentItem[]): void {
   console.log(`Total: ${items.length} object(s)`);
 }
 
-function printTree(node: IPackageHierarchyNode, prefix = '', isLast = true): void {
+function printTree(
+  node: IPackageHierarchyNode,
+  prefix = '',
+  isLast = true,
+): void {
   const connector = isLast ? '└── ' : '├── ';
   const typeLabel = node.adtType || '';
   const descPart = node.description ? ` - ${node.description}` : '';
@@ -116,7 +127,10 @@ function printTree(node: IPackageHierarchyNode, prefix = '', isLast = true): voi
   }
 }
 
-function countObjects(node: IPackageHierarchyNode): { packages: number; objects: number } {
+function countObjects(node: IPackageHierarchyNode): {
+  packages: number;
+  objects: number;
+} {
   let packages = node.is_package ? 1 : 0;
   let objects = node.is_package ? 0 : 1;
 
@@ -133,7 +147,9 @@ async function run(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
 
   if (!options.packageName) {
-    console.error('Usage: npx ts-node scripts/read-package-contents.ts <PACKAGE_NAME> [OPTIONS]');
+    console.error(
+      'Usage: npx ts-node scripts/read-package-contents.ts <PACKAGE_NAME> [OPTIONS]',
+    );
     console.error('');
     console.error('Options:');
     console.error('  --tree         Output as tree structure');
@@ -144,7 +160,7 @@ async function run(): Promise<void> {
   }
 
   const config = getConfig();
-  const connection = createAbapConnection(config, connectionLogger);
+  const connection = await createTestConnection(connectionLogger);
   await (connection as any).connect();
 
   const client = new AdtClient(connection, libraryLogger);
@@ -176,7 +192,9 @@ async function run(): Promise<void> {
         printTree(tree, '', true);
         const counts = countObjects(tree);
         console.log('');
-        console.log(`Total: ${counts.packages} package(s), ${counts.objects} object(s)`);
+        console.log(
+          `Total: ${counts.packages} package(s), ${counts.objects} object(s)`,
+        );
       }
     } else {
       // List mode - use getPackageContentsList

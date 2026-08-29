@@ -54,6 +54,9 @@ test_settings:
   timeouts:
     default: 60000
     long: 200000  # Long timeout for complex operations (group deletion, etc.)
+    shared_admin: 3600000  # shared:setup / shared:teardown — ~20 objects, each a
+                           # lock/update/activate chain. Measured at 25+ minutes on a
+                           # BTP trial, and that is before a retry.
     create: 60000
     delay: 3000  # Delay after delete/create operations
   # Operation delays (milliseconds) - time to wait for SAP to commit operations
@@ -68,13 +71,6 @@ test_settings:
 
 # Session persistence configuration
 session_config:
-  # Enable session persistence (saves cookies and CSRF tokens)
-  persist_session: true
-  # Directory for session files (relative to project root)
-  sessions_dir: ".sessions"
-  # Session ID format: {test_name}_{timestamp} or custom
-  session_id_format: "auto"  # "auto" or custom string
-  # Clean up session after test
   cleanup_session_after_test: false
 
 # Lock persistence configuration
@@ -86,6 +82,9 @@ lock_config:
 
 # Environment configuration
 environment:
+  system: "onprem"                            # ← CHANGE: "onprem" or "cloud". Stated, never guessed —
+                                              #   the two manage sessions differently and the server
+                                              #   cannot be asked which it is.
   default_package: "ZADT_TEST"               # ← CHANGE: your dev package (Z*/Y*) or "$TMP" for local
   default_transport: ""                       # ← CHANGE: transport request (leave "" for $TMP/local packages)
   default_master_system: ""                   # ← CHANGE: SAP system ID (on-prem only, cloud gets it automatically)
@@ -408,6 +407,8 @@ standard_objects:
   tables:
     - name: "T000"
       description: "Client table"
+      available_in: ["onprem", "cloud"]   # required: resolveStandardObject filters on it,
+                                          # and an entry without it is never selected
 
   tabletypes:
     - name: "STRING_TABLE"

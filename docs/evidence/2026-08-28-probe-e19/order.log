@@ -1,0 +1,15 @@
+PinoLogger initialization error: Cannot find module 'pino'
+Require stack:
+- C:\Users\oleksii_kyslytsia\projects\mcp-abap-adt-clients\node_modules\@mcp-abap-adt\logger\dist\pino-logger.js
+- C:\Users\oleksii_kyslytsia\projects\mcp-abap-adt-clients\node_modules\@mcp-abap-adt\logger\dist\index.js
+- C:\Users\oleksii_kyslytsia\projects\mcp-abap-adt-clients\scripts\probe-e19-order.ts
+[INFO] ℹ️ entries: 58
+[INFO] ℹ️ FIRST 3 in document order:
+  E8EB2802A1DD11F1B5CA0CC47A1E68C1  2026-08-27T06:09:50Z
+  F04C755FA1DD11F1B5CA0CC47A1E68C1  2026-08-27T06:10:01Z
+  058A39D9A1DE11F1B5CA0CC47A1E68C1  2026-08-27T06:10:38Z
+[INFO] ℹ️ LAST 3 in document order:
+  54979F7A9BCC11F1B5CA0CC47A1E68C1  2026-08-19T12:48:52Z
+  2E305F189BCD11F1B5CA0CC47A1E68C1  2026-08-19T12:54:57Z
+  3F93C2CF9BCD11F1B5CA0CC47A1E68C1  2026-08-19T12:55:26Z
+[INFO] ℹ️ latestTraceId() → 574B3FA8A2CD11F1B5CA0CC47A1E68C1

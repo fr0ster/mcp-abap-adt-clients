@@ -18,21 +18,24 @@ import { getTimeout } from '../../utils/timeouts';
  * - Success: <CHECK_RESULT>X</CHECK_RESULT>
  * - Error: <exc:exception> with message about existing object or validation failure
  */
+/**
+ * `packageName` is required by the endpoint, not optional. Measured on E19
+ * (`RFCSAPRL 816`) 2026-08-28: without `packagename` it answers **400,
+ * "Parameter packagename could not be found."** — see
+ * `docs/evidence/2026-08-28-validation-required-params.md`.
+ */
 export async function validateInterfaceName(
   connection: IAbapConnection,
   interfaceName: string,
-  packageName?: string,
+  packageName: string,
   description?: string,
 ): Promise<IAdtResponse> {
   // Build query parameters for interface validation (same format as class validation)
   const params = new URLSearchParams({
     objname: interfaceName,
     objtype: 'INTF/OI',
+    packagename: packageName,
   });
-
-  if (packageName) {
-    params.append('packagename', packageName);
-  }
 
   if (description) {
     params.append('description', description);

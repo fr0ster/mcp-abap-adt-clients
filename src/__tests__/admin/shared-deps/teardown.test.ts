@@ -10,15 +10,20 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { createAbapConnection } from '@mcp-abap-adt/connection';
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  ILogger,
+  ISessionLifecycleAware,
+} from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import {
   createTestAdtClient,
-  getConfig,
+  createTestConnection,
+  releaseTestConnection,
   resolveSystemContext,
+  skipUnlessConfigured,
 } from '../../helpers/sessionConfig';
 import {
   createConnectionLogger,
@@ -69,16 +74,14 @@ async function safeDelete(
 }
 
 describe('Admin: Teardown shared dependencies', () => {
-  let connection: IAbapConnection;
+  let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
   let hasConfig = false;
   let envType = 'onprem';
 
   beforeAll(async () => {
     try {
-      const config = getConfig();
-      connection = createAbapConnection(config, connectionLogger);
-      await (connection as any).connect();
+      connection = await createTestConnection(connectionLogger);
       const isCloud = await isCloudEnvironment(connection);
       const systemContext = await resolveSystemContext(connection, isCloud);
       const { client: resolvedClient, isLegacy } = await createTestAdtClient(
@@ -89,15 +92,17 @@ describe('Admin: Teardown shared dependencies', () => {
       client = resolvedClient;
       envType = isCloud ? 'cloud' : isLegacy ? 'legacy' : 'onprem';
       hasConfig = true;
-    } catch (_error) {
-      testsLogger.warn('Skipping: No .env file or SAP configuration found');
-      hasConfig = false;
+    } catch (error) {
+      // Skips only when there is no SAP here; anything else fails naming the
+      // reason. This one builds the shared dependency library — a silent skip
+      // here leaves every test that borrows from it to fail later, elsewhere.
+      hasConfig = skipUnlessConfigured(error, testsLogger);
     }
   });
 
   afterAll(async () => {
     if (connection) {
-      (connection as any).reset();
+      await releaseTestConnection(connection);
     }
   });
 
@@ -440,6 +445,6 @@ describe('Admin: Teardown shared dependencies', () => {
 
       expect(failed.length).toBe(0);
     },
-    getTimeout('long'),
+    getTimeout('shared_admin'),
   );
 });

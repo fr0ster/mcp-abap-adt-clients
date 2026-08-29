@@ -183,11 +183,38 @@ describe('AdtCdsUnitTest.validate()', () => {
     await expect(
       h.validate({
         className: 'BOGUS NAME',
+        // Required since the endpoint was measured to demand it. Without it the
+        // handler's own guard throws first and this test would pass while
+        // proving the opposite of what it is named for: no request would be
+        // sent, and the server's rejection is the thing under test.
+        packageName: 'ZPKG',
         classTemplate: '<template/>',
         testClassSource: 'CLASS ltcl_test DEFINITION FOR TESTING.',
       }),
     ).rejects.toMatchObject({ code: 'ADT_VALIDATION_FAILED', status: 400 });
     expect(calls).toHaveLength(1);
+  });
+
+  /**
+   * The guard added beside it, pinned separately.
+   *
+   * `/oo/validation/objectname` answers `400, Parameter packagename could not
+   * be found.` without it — measured on E19 — so the handler refuses before
+   * sending. That is a caller error with a name rather than a 400 to decode off
+   * the wire, and it must cost no request at all.
+   */
+  it('refuses a missing package before sending anything', async () => {
+    const { conn, calls } = makeConn(() => ({ status: 200, data: '<ok/>' }));
+    const h = new AdtCdsUnitTest(conn, createLibraryLogger());
+
+    await expect(
+      h.validate({
+        className: 'ZCL_X',
+        classTemplate: '<template/>',
+        testClassSource: 'CLASS ltcl_test DEFINITION FOR TESTING.',
+      }),
+    ).rejects.toThrow(/Package name is required/);
+    expect(calls).toHaveLength(0);
   });
 
   it('falls back to the parent check when no class is being generated', async () => {

@@ -3,6 +3,7 @@ import {
   buildTraceParametersXml,
   createTraceParameters,
   extractProfilerIdFromResponse,
+  extractTraceIdFromTraceFeed,
   extractTraceIdFromTraceRequestsResponse,
   getTraceDbAccesses,
   getTraceHitList,
@@ -79,9 +80,9 @@ describe('runtime/traces/profiler', () => {
     ).toBe('/sap/bc/adt/runtime/traces/abaptraces/ID123');
   });
 
-  it('extractTraceIdFromTraceRequestsResponse reads trace id from header or body', () => {
+  it('extractTraceIdFromTraceFeed reads trace id from header or body', () => {
     expect(
-      extractTraceIdFromTraceRequestsResponse({
+      extractTraceIdFromTraceFeed({
         headers: {
           location:
             '/sap/bc/adt/runtime/traces/abaptraces/ABCDEF1234567890/statements',
@@ -90,10 +91,18 @@ describe('runtime/traces/profiler', () => {
     ).toBe('ABCDEF1234567890');
 
     expect(
-      extractTraceIdFromTraceRequestsResponse({
+      extractTraceIdFromTraceFeed({
         data: '<a href="/sap/bc/adt/runtime/traces/abaptraces/A1B2C3D4E5F6G7H8"/>',
       } as any),
     ).toBe('A1B2C3D4E5F6G7H8');
+  });
+
+  it('keeps the old extractor name working as an alias', () => {
+    // Exported from runtime/traces, so anything importing the old name keeps
+    // compiling; the name is the only thing that was wrong with it.
+    expect(extractTraceIdFromTraceRequestsResponse).toBe(
+      extractTraceIdFromTraceFeed,
+    );
   });
 
   it('getTraceHitList/getTraceStatements/getTraceDbAccesses build query params', async () => {

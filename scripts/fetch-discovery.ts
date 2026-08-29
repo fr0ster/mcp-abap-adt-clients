@@ -7,30 +7,29 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { createAbapConnection } from '@mcp-abap-adt/connection';
 import * as dotenv from 'dotenv';
+import { createTestConnection } from '../src/__tests__/helpers/sessionConfig';
 
-const envPath =
-  process.env.MCP_ENV_PATH || path.resolve(__dirname, '../.env');
+const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../.env');
 if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath, quiet: true });
 }
 
 // Re-use the same config helper as tests
-const sessionConfigPath = path.resolve(__dirname, '../src/__tests__/helpers/sessionConfig');
+const sessionConfigPath = path.resolve(
+  __dirname,
+  '../src/__tests__/helpers/sessionConfig',
+);
 const { getConfig } = require(sessionConfigPath);
 
-const ENDPOINTS = [
-  '/sap/bc/adt/core/discovery',
-  '/sap/bc/adt/discovery',
-];
+const ENDPOINTS = ['/sap/bc/adt/core/discovery', '/sap/bc/adt/discovery'];
 
 async function main() {
   const config = getConfig();
 
   console.log(`Connecting to ${config.url} (client ${config.client})...`);
 
-  const connection = createAbapConnection(config);
+  const connection = await createTestConnection(createConnectionLogger());
   await (connection as any).connect();
 
   const systemLabel = process.env.SAP_SYSTEM_LABEL || 'system';
@@ -54,7 +53,9 @@ async function main() {
         fs.writeFileSync(outPath, data, 'utf-8');
         console.log(`  Saved to ${filename} (${data.length} bytes)`);
       } else {
-        console.log(`  Not XML or empty. Content-Type: ${contentType}, length: ${data.length}`);
+        console.log(
+          `  Not XML or empty. Content-Type: ${contentType}, length: ${data.length}`,
+        );
       }
     } catch (error: any) {
       console.log(`  Failed: ${error.message}`);

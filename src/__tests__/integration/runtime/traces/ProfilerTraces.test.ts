@@ -20,14 +20,22 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { createAbapConnection } from '@mcp-abap-adt/connection';
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  ILogger,
+  ISessionLifecycleAware,
+} from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import { AdtExecutor } from '../../../../clients/AdtExecutor';
 import { AdtRuntimeClient } from '../../../../clients/AdtRuntimeClient';
 import type { Profiler } from '../../../../runtime/traces/ProfilerDomain';
+import { compareRecordedAt } from '../../../../runtime/traces/traceParsing';
 import { resolveRunnableClassName } from '../../../helpers/runnableClassHelper';
-import { getConfig } from '../../../helpers/sessionConfig';
+import {
+  createTestConnection,
+  releaseTestConnection,
+  skipUnlessConfigured,
+} from '../../../helpers/sessionConfig';
 import {
   createConnectionLogger,
   createLibraryLogger,
@@ -41,6 +49,7 @@ import {
   logTestStep,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
+import { traceIdsNow, waitForNewTrace } from '../../../helpers/traceHelpers';
 
 const {
   getEnabledTestCase,
@@ -72,7 +81,7 @@ function extractTraceId(payload: unknown): string | undefined {
 }
 
 describe('Profiler Traces (using AdtRuntimeClient)', () => {
-  let connection: IAbapConnection;
+  let connection: IAbapConnection & ISessionLifecycleAware;
   let executor: AdtExecutor;
   let runtime: AdtRuntimeClient;
   let hasConfig = false;
@@ -82,20 +91,20 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
 
   beforeAll(async () => {
     try {
-      const config = getConfig();
-      connection = createAbapConnection(config, connectionLogger);
-      await (connection as any).connect();
+      connection = await createTestConnection(connectionLogger);
       executor = new AdtExecutor(connection, libraryLogger);
       runtime = new AdtRuntimeClient(connection, libraryLogger);
       hasConfig = true;
-    } catch (_error) {
-      hasConfig = false;
+    } catch (error) {
+      // Skips only when there is no SAP here; anything else fails
+      // naming the reason, instead of passing green having run nothing.
+      hasConfig = skipUnlessConfigured(error, testsLogger);
     }
   });
 
   afterAll(async () => {
     if (connection) {
-      await (connection as any).reset();
+      await releaseTestConnection(connection);
     }
   });
 
@@ -128,35 +137,43 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
       }
 
       try {
-        logTestStep('list profiler trace files', testsLogger);
-        const traceFilesResponse = await runtime.getProfiler().list();
-        expect(traceFilesResponse.status).toBeGreaterThanOrEqual(200);
-        expect(traceFilesResponse.status).toBeLessThan(300);
-        expect(traceFilesResponse.data).toBeDefined();
+        logTestStep('list profiler traces', testsLogger);
+        const traces = await runtime.getProfiler().list();
+        expect(Array.isArray(traces)).toBe(true);
+        // Every entry the contract promises: an id and when it was recorded.
+        // A parsed listing that silently yields shapeless objects is the defect
+        // typing it was meant to remove, so this asserts the fields exist.
+        for (const trace of traces) {
+          expect(typeof trace.id).toBe('string');
+          expect(trace.id.length).toBeGreaterThan(0);
+          expect(typeof trace.recordedAt).toBe('string');
+        }
 
-        logTestStep('list profiler trace requests', testsLogger);
-        const traceRequestsResponse = await runtime
-          .getProfiler()
-          .listRequests();
-        expect(traceRequestsResponse.status).toBeGreaterThanOrEqual(200);
-        expect(traceRequestsResponse.status).toBeLessThan(300);
-        expect(traceRequestsResponse.data).toBeDefined();
+        // Scheduling lives on the executors now, not the profiler.
+        const classExecutor = executor.getClassExecutor();
+
+        logTestStep('list trace requests (the schedule)', testsLogger);
+        const requests = await classExecutor.listRequests();
+        // Empty means nothing is scheduled — the runs consume them — NOT that
+        // the endpoint is dead. So this asserts a list, not a length.
+        expect(Array.isArray(requests)).toBe(true);
 
         logTestStep('list profiler object types', testsLogger);
-        const objectTypesResponse = await runtime
-          .getProfiler()
-          .listObjectTypes();
-        expect(objectTypesResponse.status).toBeGreaterThanOrEqual(200);
-        expect(objectTypesResponse.status).toBeLessThan(300);
-        expect(objectTypesResponse.data).toBeDefined();
+        const objectTypes = await classExecutor.listObjectTypes();
+        expect(objectTypes.length).toBeGreaterThan(0);
+        // Measured: the name is a URI, not a short code, and it is the same
+        // string a stored request echoes back as its objectTypeId.
+        expect(objectTypes[0]?.name).toContain(
+          '/sap/bc/adt/runtime/traces/abaptraces/objecttypes/',
+        );
+        expect(typeof objectTypes[0]?.description).toBe('string');
 
         logTestStep('list profiler process types', testsLogger);
-        const processTypesResponse = await runtime
-          .getProfiler()
-          .listProcessTypes();
-        expect(processTypesResponse.status).toBeGreaterThanOrEqual(200);
-        expect(processTypesResponse.status).toBeLessThan(300);
-        expect(processTypesResponse.data).toBeDefined();
+        const processTypes = await classExecutor.listProcessTypes();
+        expect(processTypes.length).toBeGreaterThan(0);
+        expect(processTypes[0]?.name).toContain(
+          '/sap/bc/adt/runtime/traces/abaptraces/processtypes/',
+        );
 
         logTestSuccess(testsLogger, testName);
       } catch (error) {
@@ -223,25 +240,18 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
           'create profiler trace parameters with defaults (POST)',
           testsLogger,
         );
-        const createResponse = await runtime.getProfiler().createParameters({
+        // Scheduling moved to the executors, and it answers with the request
+        // id rather than a response: reading the created resource back gives
+        // `200` with an EMPTY body, measured, so the id is only ever in the
+        // Location header.
+        const requestId = await executor.getClassExecutor().scheduleTrace({
           description: 'adt-clients integration test',
         });
-        expect(createResponse.status).toBeGreaterThanOrEqual(200);
-        expect(createResponse.status).toBeLessThan(300);
 
-        const profilerId = (
-          runtime.getProfiler() as Profiler
-        ).extractIdFromResponse(createResponse);
-        logTestStep(
-          `profiler id from response: ${profilerId || '(none)'}`,
-          testsLogger,
+        logTestStep(`trace request id: ${requestId}`, testsLogger);
+        expect(requestId).toContain(
+          '/sap/bc/adt/runtime/traces/abaptraces/parameters/',
         );
-
-        if (profilerId) {
-          expect(profilerId).toContain(
-            '/sap/bc/adt/runtime/traces/abaptraces/parameters/',
-          );
-        }
 
         logTestSuccess(testsLogger, testName);
       } catch (error) {
@@ -305,6 +315,10 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
       try {
         const className = resolveRunnableClassName(params);
 
+        // What the feed holds before the run, so the trace this run writes can
+        // be told from the ones already there.
+        const tracesBeforeRun = await traceIdsNow(runtime.getProfiler());
+
         logTestStep(
           `run shared class ${className} with profiling`,
           testsLogger,
@@ -323,16 +337,23 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
         expect(result.profilerId).toContain(
           '/sap/bc/adt/runtime/traces/abaptraces/parameters/',
         );
-        expect(typeof result.traceId).toBe('string');
-        expect(result.traceId.length).toBeGreaterThan(10);
+        // A run promises no trace — SAP writes it afterwards.
+        expect(result).not.toHaveProperty('traceId');
 
         logTestStep(
-          `traceId=${result.traceId}, profilerId=${result.profilerId}`,
+          `profilerId=${result.profilerId}; waiting for the trace`,
           testsLogger,
         );
 
-        // Save traceId for subsequent tests
-        resolvedTraceId = result.traceId;
+        // So the caller waits for one that was not there before. This is the
+        // test's job now, not the library's: only the caller knows how long it
+        // is willing to wait.
+        resolvedTraceId = await waitForNewTrace(
+          runtime.getProfiler(),
+          tracesBeforeRun,
+          { logger: testsLogger },
+        );
+        expect(resolvedTraceId).toBeDefined();
 
         logTestSuccess(testsLogger, testName);
       } catch (error) {
@@ -397,12 +418,18 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
           );
           resolvedTraceId = configuredTraceId;
         } else if (!resolvedTraceId) {
-          logTestStep('discover trace id from trace files feed', testsLogger);
-          const traceFilesResponse = await runtime.getProfiler().list();
-          expect(traceFilesResponse.status).toBeGreaterThanOrEqual(200);
-          expect(traceFilesResponse.status).toBeLessThan(300);
+          logTestStep('discover trace id from the trace feed', testsLogger);
+          const traces = await runtime.getProfiler().list();
+          expect(Array.isArray(traces)).toBe(true);
 
-          const discoveredId = extractTraceId(traceFilesResponse.data);
+          // Newest by timestamp. Position in the feed is NOT age — measured,
+          // the first entries were minutes old and the last eight days older.
+          const discoveredId =
+            traces.length > 0
+              ? traces.reduce((latest, entry) =>
+                  compareRecordedAt(entry, latest) > 0 ? entry : latest,
+                ).id
+              : undefined;
           if (discoveredId) {
             logTestStep(
               `discovered trace id: ${discoveredId} (source=trace_files_feed)`,
@@ -481,45 +508,40 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
       try {
         const traceId = resolvedTraceId;
         logTestStep(`read trace hitlist for ${traceId}`, testsLogger);
-        const hitlistResponse = await runtime
+        // `Array.isArray` alone is not an assertion here: it was true of the
+        // fallback empty result the parser used to invent from an unreadable
+        // body. A real trace has rows, and a row has the fields the contract
+        // names — that is what proves the document was understood.
+        const hitlist = await runtime
           .getProfiler()
-          .getHitList(traceId, {
-            withSystemEvents: false,
-          });
-        expect(hitlistResponse.status).toBeGreaterThanOrEqual(200);
-        expect(hitlistResponse.status).toBeLessThan(300);
-        expect(hitlistResponse.data).toBeDefined();
+          .read(traceId, 'hitlist', { withSystemEvents: false });
+        expect(hitlist.entries.length).toBeGreaterThan(0);
+        expect(typeof hitlist.entries[0]?.index).toBe('number');
 
         logTestStep(
           `read trace hitlist with system events for ${traceId}`,
           testsLogger,
         );
-        const hitlistWithEventsResponse = await runtime
+        const hitlistWithEvents = await runtime
           .getProfiler()
-          .getHitList(traceId, {
-            withSystemEvents: true,
-          });
-        expect(hitlistWithEventsResponse.status).toBeGreaterThanOrEqual(200);
-        expect(hitlistWithEventsResponse.status).toBeLessThan(300);
+          .read(traceId, 'hitlist', { withSystemEvents: true });
+        expect(Array.isArray(hitlistWithEvents.entries)).toBe(true);
 
         logTestStep(`read trace statements for ${traceId}`, testsLogger);
-        const statementsResponse = await runtime
+        const statements = await runtime
           .getProfiler()
-          .getStatements(traceId, { withSystemEvents: false });
-        expect(statementsResponse.status).toBeGreaterThanOrEqual(200);
-        expect(statementsResponse.status).toBeLessThan(300);
-        expect(statementsResponse.data).toBeDefined();
+          .read(traceId, 'statements', { withSystemEvents: false });
+        expect(statements.statements.length).toBeGreaterThan(0);
+        expect(typeof statements.statements[0]?.id).toBe('string');
 
         logTestStep(`read trace db accesses for ${traceId}`, testsLogger);
-        const dbAccessesResponse = await runtime
+        const dbAccesses = await runtime
           .getProfiler()
-          .getDbAccesses(traceId, { withSystemEvents: false });
-        expect(dbAccessesResponse.status).toBeGreaterThanOrEqual(200);
-        expect(dbAccessesResponse.status).toBeLessThan(300);
-        expect(dbAccessesResponse.data).toBeDefined();
+          .read(traceId, 'dbAccesses', { withSystemEvents: false });
+        expect(Array.isArray(dbAccesses.accesses)).toBe(true);
 
         logTestStep(
-          `trace details: hitlist=${hitlistResponse.status}, statements=${statementsResponse.status}, dbAccesses=${dbAccessesResponse.status}`,
+          `trace details: hitlist=${hitlist.entries.length} rows (${hitlistWithEvents.entries.length} with system events), statements=${statements.statements.length}, dbAccesses=${dbAccesses.accesses.length}`,
           testsLogger,
         );
 
@@ -589,12 +611,12 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
 
       try {
         logTestStep(`get trace requests by URI: ${objectUri}`, testsLogger);
-        const response = await runtime
-          .getProfiler()
+        const requests = await executor
+          .getClassExecutor()
           .getRequestsByUri(objectUri);
-        expect(response.status).toBeGreaterThanOrEqual(200);
-        expect(response.status).toBeLessThan(300);
-        expect(response.data).toBeDefined();
+        // A list, possibly empty: nothing scheduled for that URI is a normal
+        // answer, not a failure.
+        expect(Array.isArray(requests)).toBe(true);
 
         logTestSuccess(testsLogger, testName);
       } catch (error) {

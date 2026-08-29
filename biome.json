@@ -43,6 +43,17 @@
   },
   "overrides": [
     {
+      "includes": ["scripts/**"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noExplicitAny": "warn",
+            "noConsole": "warn"
+          }
+        }
+      }
+    },
+    {
       "includes": ["**/__tests__/**", "**/*.test.ts", "**/*.spec.ts"],
       "linter": {
         "rules": {

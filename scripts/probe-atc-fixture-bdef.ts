@@ -32,12 +32,14 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { createAbapConnection } from '@mcp-abap-adt/connection';
 import { type ILogger, LogLevel } from '@mcp-abap-adt/interfaces';
 import { DefaultLogger } from '@mcp-abap-adt/logger';
 import * as dotenv from 'dotenv';
 import { BaseTester } from '../src/__tests__/helpers/BaseTester';
-import { getConfig } from '../src/__tests__/helpers/sessionConfig';
+import {
+  createTestConnection,
+  getConfig,
+} from '../src/__tests__/helpers/sessionConfig';
 import { createConnectionLogger } from '../src/__tests__/helpers/testLogger';
 import { AdtClient } from '../src/clients/AdtClient';
 import { AdtUtils } from '../src/core/shared/AdtUtils';
@@ -104,7 +106,7 @@ async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
 
   const sapConfig = getConfig();
-  const connection = createAbapConnection(sapConfig, createConnectionLogger());
+  const connection = await createTestConnection(createConnectionLogger());
   await connection.connect();
   logger.info(`Connected to ${sapConfig.url}`);
 

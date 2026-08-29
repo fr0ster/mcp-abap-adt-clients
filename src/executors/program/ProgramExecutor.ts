@@ -2,26 +2,43 @@ import type {
   IAbapConnection,
   IAdtResponse,
   ILogger,
+  INamedItem,
+  IProfilerTraceParameters,
   IProgramExecuteWithProfilerOptions,
   IProgramExecuteWithProfilingOptions,
   IProgramExecuteWithProfilingResult,
   IProgramExecutionTarget,
   IProgramExecutor,
+  ITraceRequestEntry,
 } from '@mcp-abap-adt/interfaces';
 import { runProgram } from '../../core/program/run';
-import {
-  createTraceParameters,
-  extractProfilerIdFromResponse,
-} from '../../runtime/traces/profiler';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
+import { TraceScheduling } from '../traceScheduling';
 
 export class ProgramExecutor implements IProgramExecutor {
   private readonly connection: IAbapConnection;
+  private readonly scheduling: TraceScheduling;
 
   constructor(connection: IAbapConnection, _logger?: ILogger) {
     this.connection = connection;
+    this.scheduling = new TraceScheduling(connection);
   }
+
+  // --- ITraceScheduling, delegated. Same capability as the class executor,
+  // because a report run fulfils a scheduled request exactly as a class run
+  // does — which is why this lives on both and on neither's base.
+
+  listObjectTypes = (): Promise<INamedItem[]> =>
+    this.scheduling.listObjectTypes();
+  listProcessTypes = (): Promise<INamedItem[]> =>
+    this.scheduling.listProcessTypes();
+  listRequests = (): Promise<ITraceRequestEntry[]> =>
+    this.scheduling.listRequests();
+  getRequestsByUri = (uri: string): Promise<ITraceRequestEntry[]> =>
+    this.scheduling.getRequestsByUri(uri);
+  scheduleTrace = (options?: IProfilerTraceParameters): Promise<string> =>
+    this.scheduling.scheduleTrace(options);
 
   async run(target: IProgramExecutionTarget): Promise<IAdtResponse> {
     if (!target.programName) {
@@ -55,24 +72,16 @@ export class ProgramExecutor implements IProgramExecutor {
       target.programName,
     ).toUpperCase();
 
-    const parametersResponse = await createTraceParameters(
-      this.connection,
-      options.profilerParameters,
-    );
-    const profilerId = extractProfilerIdFromResponse(parametersResponse);
-    if (!profilerId) {
-      throw new Error(
-        'Failed to extract profilerId from trace parameters response',
-      );
-    }
-
+    const profilerId = await this.scheduleTrace(options.profilerParameters);
     const response = await this.runWithProfilerId(
       normalizedProgramName,
       profilerId,
     );
 
-    // Fire-and-forget: SAP writes the trace asynchronously after program completes.
-    // The caller is responsible for polling RuntimeListProfilerTraceFiles to find the trace.
+    // The trace is written asynchronously after the program completes, so this
+    // returns without one — the same thing the class executor now does, and the
+    // reason both results have the same shape. Find it later with
+    // `IProfiler.list()`, comparing against the ids seen before the run.
     return { response, profilerId };
   }
 

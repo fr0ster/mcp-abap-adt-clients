@@ -80,6 +80,9 @@ export class AdtDdl implements IAdtSourceObject<IDdlConfig, IDdlState> {
     if (!config.ddlName) {
       throw new Error('View name is required for validation');
     }
+    if (!config.packageName) {
+      throw new Error('Package name is required for validation');
+    }
 
     const state: IDdlState = { errors: [] };
     try {

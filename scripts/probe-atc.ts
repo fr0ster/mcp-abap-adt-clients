@@ -56,6 +56,12 @@
  * Flags:
  *   --package=NAME   package to take representative objects from
  *                    (default: `environment.default_package` from test-config.yaml)
+ *   --variant=NAME   check variant to run under, overriding the system's
+ *                    `systemCheckVariant`. The variant decides whether anything
+ *                    is found, and a worklist lists only objects that produced
+ *                    findings — so a variant that finds nothing leaves every
+ *                    type unconfirmed for a reason that has nothing to do with
+ *                    the URI templates under test.
  *   --out=DIR        where to write the evidence (default: atc-probe/)
  *   --extras         also probe types found in the package that are not
  *                    candidates — off by default, since they answer nothing the
@@ -88,7 +94,6 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { createAbapConnection } from '@mcp-abap-adt/connection';
 import {
   type IAbapConnection,
   type ILogger,
@@ -96,7 +101,12 @@ import {
 } from '@mcp-abap-adt/interfaces';
 import { DefaultLogger } from '@mcp-abap-adt/logger';
 import * as dotenv from 'dotenv';
-import { getConfig } from '../src/__tests__/helpers/sessionConfig';
+import {
+  createTestConnection,
+  getConfig,
+  releaseTestConnection,
+} from '../src/__tests__/helpers/sessionConfig';
+import { refuseWhileRunOwnsSession } from '../src/__tests__/helpers/sharedSession';
 import { createConnectionLogger } from '../src/__tests__/helpers/testLogger';
 import { AdtUtils } from '../src/core/shared/AdtUtils';
 
@@ -524,6 +534,19 @@ function parseArgs(argv: string[]) {
   const require = get('require');
   return {
     packageName: get('package'),
+    /**
+     * Override the check variant the system nominates.
+     *
+     * Normally the variant comes from `systemCheckVariant` in
+     * `/atc/customizing`, which is the one Eclipse uses and so the right
+     * default. But the variant decides whether anything is *found*, and a
+     * worklist only lists objects that produced findings — so on a system whose
+     * nominated variant finds nothing, or aborts, every candidate reads
+     * "finished → [nothing]" and the type question cannot be settled at all.
+     * Measured on E19, 2026-08-28: `Z_ATC_TEST` aborts every run with
+     * `TOOL_FAILURE: ATC check run aborted, due to missing prerequisites`.
+     */
+    variant: get('variant'),
     outDir: get('out') ?? 'atc-probe',
     extras: argv.includes('--extras'),
     knownBadType,
@@ -791,6 +814,8 @@ interface ICandidateOutcome {
 }
 
 async function main(): Promise<void> {
+  refuseWhileRunOwnsSession();
+
   // A probe that says nothing while it works is unusable; INFO regardless of
   // the DEBUG_* flags, which gate the library's own loggers.
   const logger: ILogger = new DefaultLogger(LogLevel.INFO);
@@ -800,7 +825,7 @@ async function main(): Promise<void> {
   fs.mkdirSync(outDir, { recursive: true });
 
   const sapConfig = getConfig();
-  const connection = createAbapConnection(sapConfig, createConnectionLogger());
+  const connection = await createTestConnection(createConnectionLogger());
   await connection.connect();
   logger.info(`Connected to ${sapConfig.url}`);
 
@@ -857,8 +882,9 @@ async function main(): Promise<void> {
   );
 
   const variantFromGet = parseSystemCheckVariant(customizingGet.body);
-  const checkVariant =
+  const nominatedVariant =
     variantFromGet ?? parseSystemCheckVariant(customizingPost.body);
+  const checkVariant = args.variant ?? nominatedVariant;
   if (!checkVariant) {
     logger.error(
       'No systemCheckVariant in either customizing response. Everything below needs one; stopping here with the evidence written.',
@@ -872,7 +898,9 @@ async function main(): Promise<void> {
     return;
   }
   logger.info(
-    `Check variant: ${checkVariant} (from ${variantFromGet ? 'GET' : 'POST'} /atc/customizing)`,
+    args.variant
+      ? `Check variant: ${checkVariant} (--variant; the system nominates ${nominatedVariant ?? 'none'})`
+      : `Check variant: ${checkVariant} (from ${variantFromGet ? 'GET' : 'POST'} /atc/customizing)`,
   );
 
   // --- 2. Representative objects for the required candidate list ------------
@@ -1765,6 +1793,8 @@ async function main(): Promise<void> {
     requiredKeys: required.keys,
     requiredFrom: required.source,
     checkVariant,
+    checkVariantSource: args.variant ? '--variant' : 'systemCheckVariant',
+    nominatedCheckVariant: nominatedVariant,
     checkVariantVerb: variantFromGet ? 'GET' : 'POST',
     packageName,
     verdict,
@@ -1822,6 +1852,13 @@ async function main(): Promise<void> {
     unconfirmed: unconfirmed.length,
     refuse: required.refuse,
   });
+
+  // The session goes back before the process ends. `disconnect()` alone leaves
+  // the ABAP security session standing until `http/security_session_timeout`,
+  // and the pool is shared with everyone on the system: two runs of this probe
+  // on E19, 2026-08-28, were enough to make the next test run wait through
+  // `globalSetup: no session available` four times over.
+  await releaseTestConnection(connection);
 
   logger.info(`Evidence written to ${outDir}`);
 }

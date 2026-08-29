@@ -45,3 +45,11 @@ mdd-*.json
 
 # ATC probe evidence (raw captures; the curated ones live in docs/evidence)
 atc-probe*/
+atc-e19*/
+abapunit-e19*/
+abapunit-e77*/
+validation-probe*/
+probe-e19-logs/
+shared-setup-verdict.json
+.jest-shared-session.json
+profiler-probe/

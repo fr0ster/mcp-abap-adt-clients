@@ -13,6 +13,12 @@ import { getTimeout } from '../../utils/timeouts';
  *
  * Endpoint: POST /sap/bc/adt/programs/validation
  *
+ * `packageName` is required, not optional. Measured on E19 (`RFCSAPRL 816`) on
+ * 2026-08-28: with `objname` and `objtype` alone the server answers **400,
+ * "Parameter packagename could not be found."**, and with all three it answers
+ * 200. Sending it conditionally produced a request that could only fail — see
+ * `docs/evidence/2026-08-28-profiler-contract-e19.md`, Task 0.4.
+ *
  * Response format:
  * - Success: <CHECK_RESULT>X</CHECK_RESULT>
  * - Error: <exc:exception> with message about existing object or validation failure
@@ -20,18 +26,15 @@ import { getTimeout } from '../../utils/timeouts';
 export async function validateProgramName(
   connection: IAbapConnection,
   programName: string,
+  packageName: string,
   description?: string,
-  packageName?: string,
 ): Promise<IAdtResponse> {
   const url = `/sap/bc/adt/programs/validation`;
   const queryParams = new URLSearchParams({
     objname: programName,
     objtype: 'PROG/P',
+    packagename: packageName,
   });
-
-  if (packageName) {
-    queryParams.append('packagename', packageName);
-  }
 
   if (description) {
     queryParams.append('description', description);

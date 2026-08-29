@@ -7,7 +7,6 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { createAbapConnection } from '@mcp-abap-adt/connection';
 import type {
   IAbapConnection,
   IAdtObject,
@@ -20,7 +19,11 @@ import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import { BaseTester } from '../../helpers/BaseTester';
-import { createTestAdtClient, getConfig } from '../../helpers/sessionConfig';
+import {
+  createTestAdtClient,
+  createTestConnection,
+  skipUnlessConfigured,
+} from '../../helpers/sessionConfig';
 import type { TestConfigResolver } from '../../helpers/TestConfigResolver';
 import {
   createConnectionLogger,
@@ -157,9 +160,7 @@ describe('Shared - getVirtualFoldersContents', () => {
 
   beforeAll(async () => {
     try {
-      const config = getConfig();
-      connection = createAbapConnection(config, connectionLogger);
-      await (connection as any).connect();
+      connection = await createTestConnection(connectionLogger);
       const { client: resolvedClient, isLegacy: legacy } =
         await createTestAdtClient(connection, libraryLogger);
       client = resolvedClient;
@@ -232,8 +233,10 @@ describe('Shared - getVirtualFoldersContents', () => {
         },
         testDescription: 'Fetch contents',
       });
-    } catch (_error) {
-      hasConfig = false;
+    } catch (error) {
+      // Skips only when there is no SAP here; anything else fails
+      // naming the reason, instead of passing green having run nothing.
+      hasConfig = skipUnlessConfigured(error, testsLogger);
     }
   });
 

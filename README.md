@@ -152,16 +152,39 @@ npm install @mcp-abap-adt/adt-clients
 ### Using AdtClient (Recommended - High-Level CRUD API)
 
 ```typescript
-import { createAbapConnection } from '@mcp-abap-adt/connection';
+import {
+  AdtOnPremConnector,
+  BasicAuthProvider,
+  OnPremHttpTransport,
+} from '@mcp-abap-adt/connection';
 import { AdtClient } from '@mcp-abap-adt/adt-clients';
 
-const connection = createAbapConnection({
+const config = {
   url: 'https://your-sap-system.example.com',
   client: '100',
-  authType: 'basic',
+  authType: 'basic' as const,
   username: process.env.SAP_USERNAME!,
-  password: process.env.SAP_PASSWORD!
-}, console);
+  password: process.env.SAP_PASSWORD!,
+};
+
+// Three things, all stated by you: which system (the connector), which
+// credential (the provider), and which wire (the transport). Since
+// @mcp-abap-adt/connection 6.0.0 nothing is inferred and there is no factory —
+// for ABAP Cloud take AdtCloudConnector + CloudHttpTransport instead.
+const connection = new AdtOnPremConnector(
+  config,
+  new BasicAuthProvider(config.username, config.password),
+  new OnPremHttpTransport(() => ({}), console, {
+    client: config.client,
+    baseUrl: config.url,
+  }),
+  console,
+);
+
+// Required: a request on a connection nobody opened is refused before it is
+// sent, and connect() fails if the server opened no session — rather than
+// surfacing later as `400 Session not found` mid-edit.
+await connection.connect();
 
 const client = new AdtClient(connection, console);
 
@@ -295,7 +318,11 @@ const runWithProfilingResult = await executor.getProgramExecutor().runWithProfil
   },
 );
 
-console.log(runWithProfilingResult.traceId);
+// The run reports what it did, not what SAP will write afterwards: there is no
+// `traceId` here. Find the trace with `runtime.getProfiler().list()` when you
+// are ready — comparing against the ids you saw before the run, since position
+// in the feed is not age.
+console.log(runWithProfilingResult.profilerId);
 ```
 
 **AdtUtils read type safety:**

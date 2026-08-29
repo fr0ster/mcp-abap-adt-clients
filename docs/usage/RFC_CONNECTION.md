@@ -53,23 +53,37 @@ The SAP user needs `S_RFC` authorization for function module `SADT_REST_RFC_ENDP
 
 ### Connection Layer (`@mcp-abap-adt/connection`)
 
-Create an RFC connection using `authType: 'rfc'`:
+RFC is a **transport**, not an auth type. `RfcAbapConnection` and
+`connectionType: 'rfc'` were both removed in `@mcp-abap-adt/connection` 6.0.0:
+the wire an on-prem system is reached over is now an argument, because that is
+what it always was.
 
 ```typescript
-import { RfcAbapConnection } from '@mcp-abap-adt/connection';
+import {
+  AdtOnPremConnector,
+  BasicAuthProvider,
+  RfcTransport,
+  rfcConversationFrom,
+} from '@mcp-abap-adt/connection';
 
-const connection = new RfcAbapConnection({
-  url: 'http://saphost:8000',    // hostname and port are used to derive RFC params
-  authType: 'rfc',
+const config = {
+  url: 'http://saphost:8000',   // hostname and port derive the RFC parameters
+  authType: 'basic' as const,
   client: '100',
   username: 'DEVELOPER',
   password: 'secret',
-});
+};
+
+const connection = new AdtOnPremConnector(
+  config,
+  new BasicAuthProvider(config.username, config.password),
+  new RfcTransport(rfcConversationFrom(config)),
+);
 
 await connection.connect();
 ```
 
-Connection parameters are derived from the URL:
+`rfcConversationFrom(config)` derives the connection parameters from the URL:
 - `ashost` — parsed from URL hostname
 - `sysnr` — derived from port (80XX -> XX, e.g. 8000 -> 00, 8001 -> 01)
 - `client`, `user`, `passwd` — from config
@@ -108,7 +122,9 @@ If omitted, the library defaults to `text/plain; charset=utf-8` (unicode). Setti
 
 ## How It Works
 
-1. `RfcAbapConnection.connect()` opens an RFC connection via `@mcp-abap-adt/sap-rfc-lite`
+1. `connect()` opens an RFC conversation via `@mcp-abap-adt/sap-rfc-lite`. The SDK is loaded when
+   the conversation opens, not when `rfcConversationFrom()` is called, so a machine without it
+   fails at `connect()` with a message naming what to install
 2. Each `makeAdtRequest()` call invokes `SADT_REST_RFC_ENDPOINT` FM
 3. The FM proxies HTTP-like requests internally within the ABAP system
 4. The RFC session is inherently stateful — lock handles persist across calls

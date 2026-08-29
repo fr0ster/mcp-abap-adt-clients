@@ -606,4 +606,22 @@ describe('AdtAtc — the confirmed URI templates', () => {
       String(calls.find((c) => c.url.includes('/atc/runs?'))?.data),
     ).toContain(`adtcore:uri="${uri}"`);
   });
+
+  /**
+   * The map is `Partial`, so `AtcObjectType` can grow without breaking this
+   * package — see interfaces#48. The cost is that a type with no template is a
+   * runtime question, and this pins the answer: it must be an error naming the
+   * type, never a URI built from the word `undefined`.
+   */
+  it('refuses a declared type it has no measured URI for', async () => {
+    const { connection } = connectionFor();
+
+    await expect(
+      new AdtAtc(connection, logger() as never).run({
+        // A member the union does not have yet — the shape a future addition
+        // arrives in, before anyone adds its template.
+        objects: [{ objectType: 'program' as never, objectName: 'ZX' }],
+      }),
+    ).rejects.toThrow(/No ADT URI is known for ATC object type 'program'/);
+  });
 });

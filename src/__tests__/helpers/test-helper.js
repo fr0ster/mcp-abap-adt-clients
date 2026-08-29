@@ -176,6 +176,18 @@ function getTestSettings() {
  * Get environment configuration (default package, transport request, etc.)
  * @returns {object} Environment config with default_package, default_transport, etc.
  */
+/**
+ * The `session_config` block, which lives at the ROOT of test-config.yaml.
+ *
+ * Not under `environment` — reading it from there is how
+ * `cleanup_session_after_test: false` came to be ignored for as long as it has
+ * existed: `getEnvironmentConfig().session_config` is `undefined`, and the
+ * caller's `!== false` then read that as "yes, recycle".
+ */
+function getSessionConfig() {
+  return loadTestConfig().session_config || {};
+}
+
 function getEnvironmentConfig() {
   const config = loadTestConfig();
   if (config.environment) {
@@ -2082,6 +2094,17 @@ async function updateAndActivateShared(
         { tableName: name, ddlCode: depConfig.source, transportRequest },
         { activateOnUpdate: true, sourceCode: depConfig.source },
       );
+  } else if (type === 'structures') {
+    // A structure carries its source as `ddlCode`, like a table. Without this
+    // branch it fell to the "no update logic, skipping" line below — so the run
+    // announced "updating source and activating", did neither, and recorded the
+    // object as satisfied. Both shared structures had been in that state.
+    await client
+      .getStructure()
+      .update(
+        { structureName: name, ddlCode: depConfig.source, transportRequest },
+        { activateOnUpdate: true, sourceCode: depConfig.source },
+      );
   } else if (type === 'views') {
     await client
       .getDdl()
@@ -2243,7 +2266,27 @@ async function ensureSharedDependency(client, type, name, logger) {
       exists = result !== undefined;
     }
   } catch (error) {
-    // 404 or similar — object doesn't exist
+    // Absence is `undefined` from read(), which every handler returns on 404.
+    // A THROWN error is not absence — it is "we did not find out", and turning
+    // it into `exists = false` is a guess that then does something irreversible.
+    //
+    // Measured on the BTP trial: reads of ZAC_SHR_GA_DOM and ZAC_SHR_STRU threw
+    // on a flaky link, the blanket catch here called them missing, and the
+    // create that followed came back
+    // `400 ExceptionResourceAlreadyExists: Resource Domain ZAC_SHR_GA_DOM does
+    // already exist` — the objects were there all along. A 403, a 500 or a
+    // timeout would read the same way.
+    //
+    // A status is still honoured if one arrived saying 404, since a handler may
+    // surface that as an error rather than as `undefined`.
+    const status = error?.response?.status ?? error?.status;
+    if (status !== 404) {
+      throw new Error(
+        `Could not determine whether shared ${type} ${name} exists: ${error.message}. ` +
+          'Refusing to assume it is missing — the create that would follow ' +
+          'either fails on an object that exists or writes over one that does.',
+      );
+    }
     exists = false;
   }
 
@@ -2260,8 +2303,14 @@ async function ensureSharedDependency(client, type, name, logger) {
           logger,
         );
       } catch (updateErr) {
-        logger?.warn?.(
-          `Shared ${type} ${name} exists but update/activate failed: ${updateErr.message}`,
+        // Rethrow, for the reason spelled out in the reconcile branch below: a
+        // shared dependency whose update failed is NOT at the configured state,
+        // and swallowing that returns `{ existed: true }` and caches it as
+        // verified. Every test that later borrows this object then fails
+        // somewhere else, against an object nobody said was wrong — the warning
+        // went to a logger that is silent unless DEBUG_TESTS=true.
+        throw new Error(
+          `Shared ${type} ${name} exists but could not be brought to the configured source: ${updateErr.message}`,
         );
       }
     } else if (ALWAYS_RECONCILE.has(type)) {
@@ -2330,6 +2379,12 @@ async function ensureSharedDependency(client, type, name, logger) {
       await client.getDomain().update(
         {
           domainName: name,
+          // The update needs the package as much as the create did: measured on
+          // E19, the first-ever setup of a shared domain failed with `Package
+          // name is required for update` and the next run passed, because by
+          // then the object existed and the reconcile branch — which does pass
+          // it — took over. A defect only a fresh system ever sees.
+          packageName,
           description: depConfig.description || 'Shared test domain',
           datatype: depConfig.datatype || 'CHAR',
           length: depConfig.length || 10,
@@ -2349,6 +2404,9 @@ async function ensureSharedDependency(client, type, name, logger) {
       await client.getDataElement().update(
         {
           dataElementName: name,
+          // Same omission as the domain above, and the same fresh-system-only
+          // failure waiting behind it.
+          packageName,
           description: depConfig.description || 'Shared test data element',
           typeKind: depConfig.type_kind || 'domain',
           typeName: depConfig.domain_name,
@@ -2631,6 +2689,7 @@ function resetSharedDependencyCache() {
 
 module.exports = {
   loadTestConfig,
+  getSessionConfig,
   getEnabledTestCase,
   getAllEnabledTestCases,
   getTestCaseDefinition,

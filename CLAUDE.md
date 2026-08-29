@@ -20,7 +20,8 @@ npm run build:fast      # TypeScript compile only (skip linting)
 
 # Lint & Format (Biome, not ESLint)
 npm run lint            # Lint and auto-fix with Biome
-npm run lint:check      # Lint check only (no fixes)
+npm run lint:check      # Lint check + check:docs (no fixes)
+npm run check:docs      # Every name the docs import must exist
 npm run format          # Format code with Biome
 
 # Test (requires .env with SAP credentials + src/__tests__/helpers/test-config.yaml)
@@ -102,9 +103,10 @@ Error handling in chains: automatic unlock + `setSessionType('stateless')` on an
 
 - All tests are integration tests against real SAP systems (no mocks); unit tests exist but are minimal (`src/__tests__/unit/`)
 - Tests require `.env` with SAP credentials (`SAP_URL`, `SAP_USERNAME`, `SAP_PASSWORD`, `SAP_CLIENT`) and `src/__tests__/helpers/test-config.yaml` with object names and parameters. For non-unicode legacy systems add `SAP_UNICODE=false` (controls `text/plain` vs `text/plain; charset=utf-8` in checkRun payloads)
-- **Test config setup**: `npm run test:init` (or `cp src/__tests__/helpers/test-config.yaml.template src/__tests__/helpers/test-config.yaml`). Template works out of the box — edit only lines marked `# ← CHANGE`: `default_package`, `default_transport`, `default_master_system`, `shared_dependencies.super_package`. On-prem package tests also need `transport_layer`.
+- **Test config setup**: `npm run test:init` (or `cp src/__tests__/helpers/test-config.yaml.template src/__tests__/helpers/test-config.yaml`). Template works out of the box — edit only lines marked `# ← CHANGE`: `system` (`"onprem"` or `"cloud"` — this is what picks the connector, and it is stated, never inferred from `SAP_URL` or the auth type), `default_package`, `default_transport`, `default_master_system`, `shared_dependencies.super_package`. On-prem package tests also need `transport_layer`.
 - **Root package prerequisite**: The package specified in `default_package` (e.g., `ZADT_BLD_PKG03`) must be created manually in the SAP system before running tests. Tests do not create this package — they only create objects inside it.
 - `TestConfigResolver` resolves params with priority: `testCase.params` > `environment.default_*` > `SAP_*` env vars
+- **Tests never build a connection themselves.** `createTestConnection(logger)` from `src/__tests__/helpers/sessionConfig.ts` reads the target system and the authentication from config, picks the connector accordingly, opens the session, and returns it ready to use; `await connection.disconnect()` in `afterAll` releases it. `reset()` is gone as of `@mcp-abap-adt/connection` 5.0.0 — it dropped the cookie locally and left the session open on the server
 - Tests are idempotent: CREATE tests delete existing objects first; other tests create missing objects
 - Only user-defined objects (Z_/Y_ prefix) can be modified in tests
 - Tests run sequentially (`maxWorkers: 1`, `maxConcurrency: 1`) to avoid conflicts with shared SAP objects; timeout is 15 minutes

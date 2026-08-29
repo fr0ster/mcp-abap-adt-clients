@@ -145,6 +145,23 @@ export const emptyLogger: ILogger = {
 };
 
 /**
+ * A logger that speaks whatever the DEBUG_* flags say.
+ *
+ * For the few events that are not diagnostics but facts about the run itself —
+ * the session being swapped out from under it, say. Those must not depend on
+ * someone having thought to switch logging on beforehand: the failure they
+ * explain lands on an innocent test, and without the line it reads as that test
+ * being broken. Every other logger here answers `emptyLogger` by default, which
+ * is right for tracing and wrong for this.
+ *
+ * Use it sparingly. If a message is only interesting while debugging, it is not
+ * this.
+ */
+export function createRunIntegrityLogger(): ILogger {
+  return new DefaultLogger(getLogLevel());
+}
+
+/**
  * Safely log error without exposing credentials from AxiosError.config/request
  * Only logs status, statusText, and response data (limited to 500 chars)
  */

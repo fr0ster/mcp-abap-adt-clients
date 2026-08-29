@@ -28,7 +28,7 @@ const testGroups = [
 
 let totalPassed = 0;
 let totalFailed = 0;
-let failedGroups = [];
+const failedGroups = [];
 
 console.log('🚀 Running test groups sequentially...\n');
 
@@ -41,13 +41,11 @@ for (const group of testGroups) {
     // Run tests for this group with parallel execution within the group
     // E2E tests are directly in e2e/ folder, others are in integration/
     const testPath = group === 'e2e' ? 'e2e' : `integration/${group}`;
-    const result = execSync(
-      `npm test -- ${testPath}`,
-      {
-        stdio: 'inherit',
-        encoding: 'utf-8',
-      }
-    );    console.log(`✅ ${group} tests completed successfully`);
+    const result = execSync(`npm test -- ${testPath}`, {
+      stdio: 'inherit',
+      encoding: 'utf-8',
+    });
+    console.log(`✅ ${group} tests completed successfully`);
     totalPassed++;
   } catch (error) {
     console.error(`❌ ${group} tests failed`);

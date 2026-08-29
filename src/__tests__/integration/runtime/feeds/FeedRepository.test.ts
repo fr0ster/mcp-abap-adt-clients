@@ -12,12 +12,19 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { createAbapConnection } from '@mcp-abap-adt/connection';
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  ILogger,
+  ISessionLifecycleAware,
+} from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import { AdtRuntimeClient } from '../../../../clients/AdtRuntimeClient';
 import type { FeedRepository } from '../../../../runtime/feeds/FeedRepository';
-import { getConfig } from '../../../helpers/sessionConfig';
+import {
+  createTestConnection,
+  releaseTestConnection,
+  skipUnlessConfigured,
+} from '../../../helpers/sessionConfig';
 import {
   createConnectionLogger,
   createLibraryLogger,
@@ -49,25 +56,25 @@ const libraryLogger: ILogger = createLibraryLogger();
 const testsLogger: ILogger = createTestsLogger();
 
 describe('FeedRepository (using AdtRuntimeClient)', () => {
-  let connection: IAbapConnection;
+  let connection: IAbapConnection & ISessionLifecycleAware;
   let runtime: AdtRuntimeClient;
   let hasConfig = false;
 
   beforeAll(async () => {
     try {
-      const config = getConfig();
-      connection = createAbapConnection(config, connectionLogger);
-      await (connection as any).connect();
+      connection = await createTestConnection(connectionLogger);
       runtime = new AdtRuntimeClient(connection, libraryLogger);
       hasConfig = true;
-    } catch (_error) {
-      hasConfig = false;
+    } catch (error) {
+      // Skips only when there is no SAP here; anything else fails
+      // naming the reason, instead of passing green having run nothing.
+      hasConfig = skipUnlessConfigured(error, testsLogger);
     }
   });
 
   afterAll(async () => {
     if (connection) {
-      await (connection as any).reset();
+      await releaseTestConnection(connection);
     }
   });
 

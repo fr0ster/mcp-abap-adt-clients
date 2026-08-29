@@ -1,0 +1,12 @@
+PinoLogger initialization error: Cannot find module 'pino'
+Require stack:
+- C:\Users\oleksii_kyslytsia\projects\mcp-abap-adt-clients\node_modules\@mcp-abap-adt\logger\dist\pino-logger.js
+- C:\Users\oleksii_kyslytsia\projects\mcp-abap-adt-clients\node_modules\@mcp-abap-adt\logger\dist\index.js
+- C:\Users\oleksii_kyslytsia\projects\mcp-abap-adt-clients\scripts\probe-e19-adopt.ts
+[INFO] ℹ️ A  conversation id : 7dd674fb-0577-4fb4-b4a1-8aa80979ad8b
+[INFO] ℹ️ A  ABAP session    : GSkqEv76jPOPzRmrHp-OII5gzEGi0hHxtcoMxHoeaME%3d
+[INFO] ℹ️ B  conversation id : 7dd674fb-0577-4fb4-b4a1-8aa80979ad8b
+[INFO] ℹ️ B  ABAP session    : GSkqEv76jPOPzRmrHp-OII5gzEGi0hHxtcoMxHoeaME%3d
+[INFO] ℹ️ B  after a request : GSkqEv76jPOPzRmrHp-OII5gzEGi0hHxtcoMxHoeaME%3d
+[INFO] ℹ️ 
+>>> SAME ABAP SESSION: YES

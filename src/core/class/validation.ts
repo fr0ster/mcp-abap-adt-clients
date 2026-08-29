@@ -15,10 +15,16 @@ import { getTimeout } from '../../utils/timeouts';
  * Uses ADT validation endpoint: /sap/bc/adt/oo/validation/objectname
  * Returns raw response from ADT - consumer decides how to interpret it
  */
+/**
+ * `packageName` is required by the endpoint, not optional. Measured on E19
+ * (`RFCSAPRL 816`) 2026-08-28: without `packagename` it answers **400,
+ * "Parameter packagename could not be found."** — see
+ * `docs/evidence/2026-08-28-validation-required-params.md`.
+ */
 export async function validateClassName(
   connection: IAbapConnection,
   className: string,
-  packageName?: string,
+  packageName: string,
   description?: string,
   superClass?: string,
 ): Promise<IAdtResponse> {
@@ -26,11 +32,8 @@ export async function validateClassName(
   const params = new URLSearchParams({
     objname: className,
     objtype: 'CLAS/OC',
+    packagename: packageName,
   });
-
-  if (packageName) {
-    params.append('packagename', packageName);
-  }
 
   if (description) {
     params.append('description', description);

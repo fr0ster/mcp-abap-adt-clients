@@ -88,6 +88,9 @@ export class AdtInterface
     if (!config.interfaceName) {
       throw new Error('Interface name is required for validation');
     }
+    if (!config.packageName) {
+      throw new Error('Package name is required for validation');
+    }
 
     const validationResponse = await validateInterfaceName(
       this.connection,

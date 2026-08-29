@@ -5,18 +5,22 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { createAbapConnection } from '@mcp-abap-adt/connection';
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  ILogger,
+  ISessionLifecycleAware,
+} from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import { AdtExecutor } from '../../../../clients/AdtExecutor';
+import { AdtRuntimeClient } from '../../../../clients/AdtRuntimeClient';
+import type { IProfilerTraceParameters } from '../../../../runtime/traces';
 import {
-  getTraceDbAccesses,
-  getTraceHitList,
-  getTraceStatements,
-  type IProfilerTraceParameters,
-} from '../../../../runtime/traces';
-import { createTestAdtClient, getConfig } from '../../../helpers/sessionConfig';
+  createTestAdtClient,
+  createTestConnection,
+  releaseTestConnection,
+  skipUnlessConfigured,
+} from '../../../helpers/sessionConfig';
 import {
   createConnectionLogger,
   createLibraryLogger,
@@ -30,6 +34,7 @@ import {
   logTestStep,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
+import { traceIdsNow, waitForNewTrace } from '../../../helpers/traceHelpers';
 
 const {
   getEnabledTestCase,
@@ -174,55 +179,60 @@ function resolveRunnableClassSource(testCase: any, className: string): string {
 }
 
 describe('ClassExecutor (integration)', () => {
-  let connection: IAbapConnection;
+  let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
   let executor: AdtExecutor;
+  let runtimeClient: AdtRuntimeClient;
   let hasConfig = false;
   let isLegacy = false;
   let classNameForTest: string | null = null;
+  // EVERY class this file creates, not just the last. Each test generates a
+  // fresh name and overwrote the single variable, so afterAll deleted the newest
+  // and left the earlier one on the system — once per run. Seen on E19 in SM12
+  // as E_ABAP_GENPH locks accumulating under names nobody would ever revisit.
+  const classesCreated: string[] = [];
   let transportRequestForCleanup = '';
 
   const connectionLogger: ILogger = createConnectionLogger();
   const libraryLogger: ILogger = createLibraryLogger();
   const testsLogger: ILogger = createTestsLogger();
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     try {
-      const config = getConfig();
-      connection = createAbapConnection(config, connectionLogger);
-      await (connection as any).connect();
+      connection = await createTestConnection(connectionLogger);
       const { client: resolvedClient, isLegacy: legacy } =
         await createTestAdtClient(connection, libraryLogger);
       client = resolvedClient;
       isLegacy = legacy;
       executor = new AdtExecutor(connection, libraryLogger);
+      runtimeClient = new AdtRuntimeClient(connection, libraryLogger);
       hasConfig = true;
       classNameForTest = null;
+      classesCreated.length = 0;
       transportRequestForCleanup = '';
-    } catch (_error) {
-      testsLogger.warn(
-        '⚠️ Skipping tests: No .env file or SAP configuration found',
-      );
-      hasConfig = false;
+    } catch (error) {
+      // Skips only when there is no SAP here; anything else fails
+      // naming the reason, instead of passing green having run nothing.
+      hasConfig = skipUnlessConfigured(error, testsLogger);
     }
   });
 
-  afterEach(async () => {
-    if (connection && classNameForTest) {
+  afterAll(async () => {
+    for (const className of classesCreated) {
       try {
         await client.getClass().delete({
-          className: classNameForTest,
+          className,
           transportRequest: transportRequestForCleanup,
         });
       } catch (cleanupError) {
         testsLogger.warn?.(
-          `⚠️ Cleanup failed for class ${classNameForTest}: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,
+          `⚠️ Cleanup failed for class ${className}: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,
         );
       }
     }
 
     if (connection) {
-      (connection as any).reset();
+      await releaseTestConnection(connection);
     }
   });
 
@@ -243,6 +253,7 @@ describe('ClassExecutor (integration)', () => {
     const sourceCode = resolveRunnableClassSource(testCase, className);
 
     classNameForTest = className;
+    classesCreated.push(classNameForTest);
     transportRequestForCleanup = transportRequest || '';
 
     logTestStep(`create class ${className}`, testsLogger);
@@ -428,7 +439,13 @@ describe('ClassExecutor (integration)', () => {
         const warmupResponse = await runClassWithReadinessRetry(className);
         expectRunnableRunOutput(String(warmupResponse.data));
 
-        logTestStep('create trace parameters + run with profiler', testsLogger);
+        // What exists BEFORE the run is how a new trace is recognised. The
+        // feed's order is not age, so "the newest entry" is not an answer to
+        // "what did my run produce".
+        const profiler = runtimeClient.getProfiler();
+        const before = await traceIdsNow(profiler);
+
+        logTestStep('schedule a trace + run with profiler', testsLogger);
         let result = await executor
           .getClassExecutor()
           .runWithProfiling({ className }, { profilerParameters });
@@ -449,43 +466,46 @@ describe('ClassExecutor (integration)', () => {
         expect(result.profilerId).toContain(
           '/sap/bc/adt/runtime/traces/abaptraces/parameters/',
         );
-        expect(typeof result.traceId).toBe('string');
-        expect(result.traceId.length).toBeGreaterThan(10);
-        expect(result.traceRequestsResponse.status).toBe(200);
+        // The run promises no trace, so the result must not carry one.
+        expect(result).not.toHaveProperty('traceId');
 
         logTestStep(
-          `run output: ${toShortText(result.response.data)}; traceId=${result.traceId}`,
+          `run output: ${toShortText(result.response.data)}`,
           testsLogger,
         );
 
-        logTestStep('read trace hitlist', testsLogger);
-        const hitlist = await getTraceHitList(connection, result.traceId, {
+        logTestStep('wait for the trace this run produced', testsLogger);
+        const traceId = await waitForNewTrace(profiler, before, {
+          logger: testsLogger,
+        });
+        expect(traceId).toBeDefined();
+        if (!traceId) {
+          throw new Error('no new trace appeared after a profiled run');
+        }
+
+        logTestStep('read all three views', testsLogger);
+        const hitlist = await profiler.read(traceId, 'hitlist', {
           withSystemEvents: false,
         });
-        expect(hitlist.status).toBe(200);
+        const statements = await profiler.read(traceId, 'statements', {
+          withSystemEvents: false,
+        });
+        const dbAccesses = await profiler.read(traceId, 'dbAccesses', {
+          withSystemEvents: false,
+        });
 
-        logTestStep('read trace statements', testsLogger);
-        const statements = await getTraceStatements(
-          connection,
-          result.traceId,
-          {
-            withSystemEvents: false,
-          },
-        );
-        expect(statements.status).toBe(200);
-
-        logTestStep('read trace db accesses', testsLogger);
-        const dbAccesses = await getTraceDbAccesses(
-          connection,
-          result.traceId,
-          {
-            withSystemEvents: false,
-          },
-        );
-        expect(dbAccesses.status).toBe(200);
+        // Parsed, not a status code: a 200 carrying an unparseable body used to
+        // pass here, and the whole point of the typed views is that it no
+        // longer can.
+        // Rows and their fields, not `Array.isArray`: an empty array was
+        // what the parser used to invent from a body it could not read.
+        expect(hitlist.entries.length).toBeGreaterThan(0);
+        expect(typeof hitlist.entries[0]?.index).toBe('number');
+        expect(statements.statements.length).toBeGreaterThan(0);
+        expect(Array.isArray(dbAccesses.accesses)).toBe(true);
 
         logTestStep(
-          `trace summary: hitlist=${hitlist.status}, statements=${statements.status}, dbAccesses=${dbAccesses.status}`,
+          `trace ${traceId}: hitlist=${hitlist.entries.length} rows, statements=${statements.statements.length}, dbAccesses=${dbAccesses.accesses.length}`,
           testsLogger,
         );
 

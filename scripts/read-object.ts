@@ -30,17 +30,19 @@
  *   MCP_ENV_PATH - Path to .env file (default: .env in project root)
  */
 
-import * as dotenv from 'dotenv';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { createAbapConnection } from '@mcp-abap-adt/connection';
 import type { IAdtObject } from '@mcp-abap-adt/interfaces';
-import { AdtClient } from '../src/clients/AdtClient';
-import { getConfig } from '../src/__tests__/helpers/sessionConfig';
+import * as dotenv from 'dotenv';
+import {
+  createTestConnection,
+  getConfig,
+} from '../src/__tests__/helpers/sessionConfig';
 import {
   createBuilderLogger,
   createConnectionLogger,
 } from '../src/__tests__/helpers/testLogger';
+import { AdtClient } from '../src/clients/AdtClient';
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../.env');
 if (fs.existsSync(envPath)) {
@@ -99,7 +101,9 @@ function parseArgs(argv: string[]): Options {
       if (value === 'source' || value === 'metadata' || value === 'both') {
         readMode = value;
       } else {
-        throw new Error(`Invalid --read value: ${value}. Use: source, metadata, both`);
+        throw new Error(
+          `Invalid --read value: ${value}. Use: source, metadata, both`,
+        );
       }
     } else if (!arg.startsWith('--') && !objectName) {
       objectName = arg.trim();
@@ -118,7 +122,9 @@ function parseArgs(argv: string[]): Options {
     throw new Error('Object name is required (positional argument)');
   }
   if (objectType === 'functionmodule' && !functionGroupName) {
-    throw new Error('--group=<function_group_name> is required for functionmodule');
+    throw new Error(
+      '--group=<function_group_name> is required for functionmodule',
+    );
   }
   if (objectType === 'enhancement' && !enhancementType) {
     throw new Error(
@@ -135,10 +141,7 @@ function parseArgs(argv: string[]): Options {
   };
 }
 
-function getHandler(
-  client: AdtClient,
-  options: Options,
-): IAdtObject<any, any> {
+function getHandler(client: AdtClient, options: Options): IAdtObject<any, any> {
   switch (options.objectType) {
     case 'class':
       return client.getClass();
@@ -182,7 +185,8 @@ function getHandler(
 }
 
 function buildReadConfig(options: Options): Record<string, string> {
-  const { objectType, objectName, functionGroupName, enhancementType } = options;
+  const { objectType, objectName, functionGroupName, enhancementType } =
+    options;
   switch (objectType) {
     case 'class':
     case 'behaviorimplementation':
@@ -206,7 +210,10 @@ function buildReadConfig(options: Options): Record<string, string> {
     case 'functiongroup':
       return { functionGroupName: objectName };
     case 'functionmodule':
-      return { functionModuleName: objectName, functionGroupName: functionGroupName! };
+      return {
+        functionModuleName: objectName,
+        functionGroupName: functionGroupName!,
+      };
     case 'package':
       return { packageName: objectName };
     case 'accesscontrol':
@@ -276,7 +283,7 @@ async function run(): Promise<void> {
   console.log('');
 
   const sapConfig = getConfig();
-  const connection = createAbapConnection(sapConfig, createConnectionLogger());
+  const connection = await createTestConnection(createConnectionLogger());
   await (connection as any).connect();
 
   const client = new AdtClient(connection, createBuilderLogger());
