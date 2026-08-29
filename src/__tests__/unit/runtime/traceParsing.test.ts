@@ -292,6 +292,20 @@ describe('trace document mapping', () => {
       ).toBe(0);
     });
 
+    it('orders the leap second, which Date.parse calls unreadable', () => {
+      // RFC 3339 permits `:60` and Atom is RFC 3339, but POSIX time has no leap
+      // second, so `Date.parse` answers NaN. Left at that, the newest possible
+      // instant of the minute would have been filed as the oldest.
+      const leap = { recordedAt: '2016-12-31T23:59:60Z' };
+      expect(Number.isNaN(Date.parse(leap.recordedAt))).toBe(true);
+      expect(
+        compareRecordedAt(leap, { recordedAt: '2016-12-31T23:59:59.999Z' }),
+      ).toBeGreaterThan(0);
+      expect(
+        compareRecordedAt(leap, { recordedAt: '2017-01-01T00:00:00.001Z' }),
+      ).toBeLessThan(0);
+    });
+
     it('gives an unreadable timestamp a stable place instead of throwing', () => {
       // Ordering is not judgement. NaN compares false both ways, which would
       // otherwise leave the result depending on iteration order.

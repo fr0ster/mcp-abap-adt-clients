@@ -195,12 +195,42 @@ const SUB_MILLI = /\.(\d+)/;
  * judgement, and `NaN` compares false in both directions, which would otherwise
  * leave the result depending on iteration order.
  */
+/** Seconds field of `60` — the leap second, which POSIX time cannot hold. */
+const LEAP_SECOND = /^(.*T\d{2}:\d{2}:)60(\D.*)?$/;
+
+/**
+ * Milliseconds, with the one legal form `Date.parse` refuses.
+ *
+ * `Date.parse('2016-12-31T23:59:60Z')` is `NaN` in Node, because POSIX time has
+ * no leap second — but RFC 3339 permits `:60` and Atom is RFC 3339. Left alone,
+ * the comparator would file such a trace as unreadable and therefore oldest,
+ * when it is in fact the newest possible instant of that minute.
+ *
+ * So `:60` is ordered as the moment after `:59.999`. This is arithmetic for our
+ * own sorting, not a judgement about the value: nothing here decides whether SAP
+ * was entitled to send it.
+ */
+function millisOf(raw: string): number {
+  const direct = Date.parse(raw);
+  if (!Number.isNaN(direct)) {
+    return direct;
+  }
+  const leap = LEAP_SECOND.exec(raw);
+  if (leap) {
+    const asFiftyNine = Date.parse(`${leap[1]}59${leap[2] ?? ''}`);
+    if (!Number.isNaN(asFiftyNine)) {
+      return asFiftyNine + 1000;
+    }
+  }
+  return Number.NaN;
+}
+
 export function compareRecordedAt(
   a: { recordedAt: string },
   b: { recordedAt: string },
 ): number {
-  const left = Date.parse(a.recordedAt);
-  const right = Date.parse(b.recordedAt);
+  const left = millisOf(a.recordedAt);
+  const right = millisOf(b.recordedAt);
   if (Number.isNaN(left) || Number.isNaN(right)) {
     if (Number.isNaN(left) && Number.isNaN(right)) {
       return 0;
