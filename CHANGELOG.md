@@ -53,13 +53,21 @@ Requires `@mcp-abap-adt/interfaces@^25.0.0`.
   (seven such lines in the docs), then a specifier in double quotes unread, and
   an import wrapped across lines would have been the fourth.
 
-  The extraction is now the TypeScript parser. Each fenced TypeScript block is
-  parsed and the import declarations are read from the syntax tree, so quoting,
-  line breaks, `type` modifiers, aliases and import-looking text inside comments
-  are the parser's problem — and it already knows the answers. The reader lives
-  in `scripts/doc-imports.js` and backs both the gate and the
-  `docsImportsResolve` unit test, which had the identical single-quote hole and
-  no longer has its own copy to drift.
+  The extraction is now done by parsers on both halves. Fences are found by a
+  Markdown parser (`markdown-it`, a new devDependency) and each TypeScript block
+  is parsed by the TypeScript compiler's parser, with the import declarations
+  read from the syntax tree.
+
+  Both halves had to change, and the second was found the same way as the first:
+  after the imports moved to a parser, the fences were still matched by hand, so
+  `~~~typescript` and ```` ```ts title="example" ```` never reached it — valid
+  CommonMark, invisible to the gate. Quoting, line breaks, `type` modifiers,
+  aliases, import-looking text in comments, fence length, tilde fences, info
+  strings and fences nested in list items are now all the parsers' business.
+
+  The reader lives in `scripts/doc-imports.js` and backs both the gate and the
+  `docsImportsResolve` unit test, which had the identical holes and no longer
+  has its own copy to drift.
 
   And it pooled the exports of all three packages into one set, so the specifier
   a name was imported *from* did not matter:

@@ -19,39 +19,41 @@
  * package's export list.
  */
 
+const MarkdownIt = require('markdown-it');
 const ts = require('typescript');
 
-/** Fenced blocks that hold TypeScript, with the line each one starts on. */
-function typescriptBlocks(markdown) {
+const fenceParser = new MarkdownIt();
+
+/** Languages whose fenced blocks are TypeScript for our purposes. */
+const TYPESCRIPT_LANGUAGES = new Set(['ts', 'typescript', 'tsx']);
+
+/**
+ * Fenced blocks that hold TypeScript, with the line each one starts on.
+ *
+ * The fences are found by a Markdown parser, not by matching lines. The
+ * hand-rolled version this replaces read only a backtick fence whose info
+ * string was a bare language word, so `~~~typescript` and
+ * ```` ```ts title="example" ```` never reached the TypeScript parser at all —
+ * the same failure as the import matcher it was written to replace, one line
+ * higher up. CommonMark also allows fences longer than three characters and
+ * indented by up to three spaces, and fences nested in lists and blockquotes;
+ * all of that is the parser's business.
+ *
+ * The info string's first word names the language, per CommonMark, so
+ * `ts title="example"` is TypeScript.
+ */
+function typescriptBlocks(source) {
   const blocks = [];
-  const lines = markdown.split('\n');
-  let inside = null;
 
-  lines.forEach((line, index) => {
-    const fence = /^\s*```+\s*([A-Za-z0-9_-]*)\s*$/.exec(line);
-    if (!fence) {
-      if (inside) inside.body.push(line);
-      return;
-    }
-    if (inside) {
-      blocks.push({
-        text: inside.body.join('\n'),
-        startLine: inside.startLine,
-      });
-      inside = null;
-      return;
-    }
-    const language = fence[1].toLowerCase();
-    if (language === 'ts' || language === 'typescript' || language === 'tsx') {
-      // +2: the fence line itself is 1-based, the body starts after it.
-      inside = { body: [], startLine: index + 2 };
-    }
-  });
-
-  // An unterminated fence still holds code worth checking.
-  if (inside) {
-    blocks.push({ text: inside.body.join('\n'), startLine: inside.startLine });
+  for (const token of fenceParser.parse(source, {})) {
+    if (token.type !== 'fence' || !token.map) continue;
+    const language = token.info.trim().split(/\s+/)[0].toLowerCase();
+    if (!TYPESCRIPT_LANGUAGES.has(language)) continue;
+    // `map[0]` is the 0-based line of the opening fence; the body starts on
+    // the next one, and the report is 1-based.
+    blocks.push({ text: token.content, startLine: token.map[0] + 2 });
   }
+
   return blocks;
 }
 

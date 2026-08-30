@@ -93,20 +93,27 @@ mis-parsed, and an invisible import is a passing one. A fourth was waiting in
 any import wrapped across lines. The same regex had been copied into the
 `docsImportsResolve` unit test, so both had the same blind spots.
 
-**Decided.** Fenced TypeScript blocks are parsed with the TypeScript parser and
-the imports read from the syntax tree. One reader, `scripts/doc-imports.js`,
-used by the gate and the test.
+**Decided.** Both halves are parsed. Fences come from a Markdown parser
+(`markdown-it`), each block from the TypeScript parser, and the imports are read
+from the syntax tree. One reader, `scripts/doc-imports.js`, used by the gate and
+the test.
 
-**Against.** Widening the pattern once more — which would have been the third
-such widening, and cheaper on the day.
+**Against.** Widening the pattern once more — cheaper on the day, and it would
+have been the third such widening.
 
 **Why.** Quoting, line breaks, `type` modifiers, aliases and import-looking text
-inside comments or strings are all decided questions for a parser and open ones
-for a pattern. The failure mode is what makes it worth the change: a pattern
-that does not match reports success, so each hole cost a review round to find
-and left the gate's claim untrue in the meantime.
+inside comments are decided questions for a parser and open ones for a pattern.
+The failure mode is what makes it worth the change: a pattern that does not
+match reports success, so each hole cost a review round to find and left the
+gate's claim untrue in the meantime.
 
-**What would change it.** A document format the parser cannot read. Nothing in
+**The lesson had to be learned twice.** The first fix moved the *imports* to a
+parser and left the *fences* matched by hand, one line above — so `~~~typescript`
+and ```` ```ts title="example" ```` still never reached it. Valid CommonMark,
+invisible to the gate, found by the next review. Replacing one hand-rolled
+matcher with a parser is not the decision; leaving none is.
+
+**What would change it.** A document format neither parser can read. Nothing in
 Markdown is.
 
 ---
