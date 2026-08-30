@@ -73,8 +73,12 @@ Requires `@mcp-abap-adt/interfaces@^25.0.0`.
   so the gate was holding its two halves to different standards.
 
   The one relative import in the documentation is measured too, against the
-  exports of the file it names; when no single file under `src/` matches, the
-  gate prints it as unmeasured instead of passing it.
+  exports of the file it names. **An import that cannot be measured now fails
+  the gate**, in its own section with its own reason — a relative path matching
+  no file is a stale document, a missing first-party package is an incomplete
+  install, and in neither case can the gate do what it claims. It used to print
+  a note and exit `0`, which is the same defect as every other hole here: an
+  unchecked import is indistinguishable from a clean one.
 
   The reader lives in `scripts/doc-imports.js` and backs both the gate and the
   `docsImportsResolve` unit test, which had the identical holes and no longer

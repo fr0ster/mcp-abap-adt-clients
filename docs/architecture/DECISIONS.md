@@ -123,6 +123,11 @@ matcher with a parser is not the decision; leaving none is.
 Then the *exports* were still a pattern, one function below. Each fix removed
 the matcher it was looking at and left the next one standing.
 
+**And the principle outran the code.** This entry said "a pattern that does not
+match reports success" while the gate itself printed unmeasurable imports as a
+footnote and exited `0` — the same thing by another route. An import the gate
+cannot check now fails it. Writing the rule down is not applying it.
+
 **What would change it.** A document format neither parser can read. Nothing in
 Markdown is.
 

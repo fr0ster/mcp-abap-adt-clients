@@ -154,8 +154,17 @@ const SURFACES = new Map([
   }),
 ]);
 
+/** Imports whose names are not exported by what they name. */
 const problems = [];
-/** Imports nothing could be measured against — printed, never passed silently. */
+/**
+ * Imports that could not be measured at all — a failure, not a footnote.
+ *
+ * An unmeasured import is indistinguishable from a clean one in a passing run,
+ * which is the exact defect this gate keeps being fixed for. The two reasons
+ * are kept apart because the fixes differ: a relative path matching no file is
+ * a stale document, while a missing first-party package is an incomplete
+ * install, and the gate cannot do its job either way.
+ */
 const unmeasured = [];
 
 for (const file of docFiles()) {
@@ -198,6 +207,21 @@ if (problems.length > 0) {
   console.error(
     `\n${problems.length} broken import(s). Either the doc is stale, or the export was renamed and the doc was not.`,
   );
+}
+
+if (unmeasured.length > 0) {
+  if (problems.length > 0) console.error('');
+  console.error('Documentation imports that could not be checked:\n');
+  for (const note of unmeasured) console.error(`  ${note}`);
+  console.error(
+    `\n${unmeasured.length} unchecked import(s). Either the document names a ` +
+      'module this repository does not have, or a first-party package is not ' +
+      'installed — and an unchecked import passing quietly is what this gate ' +
+      'exists to prevent.',
+  );
+}
+
+if (problems.length > 0 || unmeasured.length > 0) {
   process.exit(1);
 }
 
@@ -205,6 +229,3 @@ console.log(
   `check:docs — ${docFiles().length} documents, every imported name is exported ` +
     'by the package it is imported from.',
 );
-for (const note of unmeasured) {
-  console.log(`  not measured: ${note}`);
-}
