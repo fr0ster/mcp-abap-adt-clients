@@ -41,7 +41,24 @@ export LD_LIBRARY_PATH=$SAPNWRFC_HOME/lib:$LD_LIBRARY_PATH
 
 ### 2. RFC transport
 
-RFC transport is provided by `@mcp-abap-adt/sap-rfc-lite`, which is pulled in automatically as a dependency of `@mcp-abap-adt/connection`. Nothing needs to be installed manually in this package — `adt-clients` consumes the `IAbapConnection` interface and does not depend on any RFC library directly.
+RFC transport is provided by `@mcp-abap-adt/sap-rfc-lite`, which is pulled in automatically as a dependency of `@mcp-abap-adt/connection`. Nothing needs to be added to `package.json` — `adt-clients` consumes the `IAbapConnection` interface and does not depend on any RFC library directly.
+
+It is an **optional** dependency with a native build, though, so "automatically"
+has a condition: the SAP NW RFC SDK must be visible when dependencies are
+installed. npm drops an optional dependency whose build fails and says nothing,
+which leaves an install that looks complete and an RFC connection that cannot
+start. Install with the same variables the runtime uses:
+
+```bash
+# Windows (Git Bash) — the SDK path is wherever it was unpacked
+SAPNWRFC_HOME='C:\nwrfcsdk\nwrfcsdk' PATH='C:\nwrfcsdk\nwrfcsdk\lib;'"$PATH" npm ci
+
+# macOS
+SAPNWRFC_HOME=~/nwrfcsdk PATH=$SAPNWRFC_HOME/lib:$PATH npm ci
+
+# Linux
+SAPNWRFC_HOME=~/nwrfcsdk PATH=$SAPNWRFC_HOME/lib:$PATH LD_LIBRARY_PATH=$SAPNWRFC_HOME/lib:$LD_LIBRARY_PATH npm ci
+```
 
 `@mcp-abap-adt/sap-rfc-lite` binds to the SAP NW RFC SDK at runtime; the SDK libraries must be on the shared-library path as shown in step 1.
 
