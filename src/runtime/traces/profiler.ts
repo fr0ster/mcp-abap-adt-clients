@@ -343,6 +343,30 @@ export const extractTraceIdFromTraceRequestsResponse =
  * @param options - Optional filters
  * @returns Axios response with trace hitlist
  */
+/**
+ * Delete a trace.
+ *
+ * ADT advertises this on the trace itself: every feed entry carries
+ * `<atom:link rel="http://www.sap.com/adt/relations/delete">` pointing at the
+ * trace URI, beside the links for its three views. Measured on an on-prem
+ * system: the `DELETE` answers `200`.
+ *
+ * Takes an id or a full URI, like every other trace reader here, so a caller
+ * can hand back what `list()` gave it without unpicking the URI first.
+ */
+export async function deleteTrace(
+  connection: IAbapConnection,
+  traceIdOrUri: string,
+): Promise<IAdtResponse> {
+  const traceId = normalizeProfilerTraceId(traceIdOrUri);
+  return connection.makeAdtRequest({
+    url: `/sap/bc/adt/runtime/traces/abaptraces/${encodeURIComponent(traceId)}`,
+    method: 'DELETE',
+    timeout: getTimeout('default'),
+    headers: {},
+  });
+}
+
 export async function getTraceHitList(
   connection: IAbapConnection,
   traceIdOrUri: string,

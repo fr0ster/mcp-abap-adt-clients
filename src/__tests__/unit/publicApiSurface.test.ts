@@ -114,6 +114,8 @@ const RUNTIME_EXPORTS = [
   'SystemMessages',
   'buildDumpIdPrefix',
   'buildRuntimeDumpsUserQuery',
+  // Public since 15.0.0: the replacement for the removed `latestTraceId()`.
+  'compareRecordedAt',
   'createAdtClient',
   'fetchDiscoveryEndpoints',
   'getSystemInformation',

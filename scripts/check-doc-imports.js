@@ -17,6 +17,15 @@
  * Third-party imports are skipped: their exports are not ours to police, and a
  * wrong one there is a different kind of mistake.
  *
+ * For THIS package the check is stricter, since 15.0.0: a name is measured
+ * against what `src/index.ts` reaches through its barrels, not against every
+ * identifier anywhere under `src`. The looser check passed a doc telling
+ * consumers to `import { compareRecordedAt } from '@mcp-abap-adt/adt-clients'`
+ * while the package's entry point did not re-export it — the name existed, and
+ * was unreachable, which is the same broken snippet by a different route. For
+ * relative imports the loose set still applies: those name internal paths on
+ * purpose.
+ *
  * Run: npm run check:docs
  */
 
@@ -94,6 +103,46 @@ function exported() {
   return namesIn(files);
 }
 
+/** `'./x'` → the file it means, or null when it is not ours to follow. */
+function resolveModule(spec, fromFile) {
+  if (!spec.startsWith('.')) return null;
+  const base = path.resolve(path.dirname(fromFile), spec);
+  for (const candidate of [`${base}.ts`, path.join(base, 'index.ts')]) {
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  return null;
+}
+
+/**
+ * What `import { … } from '@mcp-abap-adt/adt-clients'` can actually name.
+ *
+ * Walks the barrels from the entry point, so a module that exports a symbol
+ * without the entry point re-exporting it does not count.
+ */
+function publicNames(entry, seen = new Set()) {
+  const names = new Set();
+  if (seen.has(entry) || !fs.existsSync(entry)) return names;
+  seen.add(entry);
+
+  const text = fs.readFileSync(entry, 'utf8');
+  for (const m of text.matchAll(EXPORT)) names.add(m[1]);
+  for (const m of text.matchAll(/export\s*(?:type\s*)?\{([^}]*)\}/g)) {
+    for (const raw of m[1].split(',')) {
+      const name = raw
+        .trim()
+        .replace(/^type\s+/, '')
+        .split(/\s+as\s+/)
+        .pop();
+      if (name) names.add(name.trim());
+    }
+  }
+  for (const m of text.matchAll(/export\s*\*\s*from\s*'([^']+)'/g)) {
+    const target = resolveModule(m[1], entry);
+    if (target) for (const n of publicNames(target, seen)) names.add(n);
+  }
+  return names;
+}
+
 function docFiles() {
   const out = [];
   for (const entry of DOC_ROOTS) {
@@ -107,20 +156,33 @@ function docFiles() {
 }
 
 const known = exported();
+const publik = publicNames(path.join(ROOT, 'src', 'index.ts'));
 const problems = [];
 
 for (const file of docFiles()) {
   const text = fs.readFileSync(file, 'utf8');
-  for (const m of text.matchAll(/import\s*\{([^}]*)\}\s*from\s*'([^']+)'/g)) {
+  // `import type { … }` counts too: a type-only import names an export just as
+  // a value import does, and it was slipping through unchecked.
+  for (const m of text.matchAll(
+    /import\s*(?:type\s+)?\{([^}]*)\}\s*from\s*'([^']+)'/g,
+  )) {
     const from = m[2];
     const mine = OURS.some((p) => from === p) || from.startsWith('.');
     if (!mine) continue;
+    // Our own package is held to its entry point; everything else to the
+    // loose set, which is all we can see of a dependency's shape.
+    const root = from === OURS[0];
+    const allowed = root ? publik : known;
     for (const raw of m[1].split(',')) {
       const name = raw.trim().replace(/^type\s+/, '');
-      if (name && !known.has(name)) {
+      if (name && !allowed.has(name)) {
         const line = text.slice(0, m.index).split('\n').length;
         problems.push(
-          `${path.relative(ROOT, file)}:${line}  ${name}  (documented as coming from ${from})`,
+          `${path.relative(ROOT, file)}:${line}  ${name}  ${
+            root && known.has(name)
+              ? '(exists, but src/index.ts does not re-export it)'
+              : `(documented as coming from ${from})`
+          }`,
         );
       }
     }
