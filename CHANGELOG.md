@@ -76,8 +76,14 @@ Requires `@mcp-abap-adt/interfaces@^25.0.0`.
   `default` export, none of the first-party packages has one, so such a line is
   always wrong — and it used to be read as binding nothing and pass. The report
   names what the reader wrote rather than the word `default`, and when that name
-  is a named export it says so, because that is the correction. A namespace
-  import (`import * as X`) still names no export and is left alone.
+  is a named export it says so, because that is the correction.
+
+  A namespace import (`import * as X`) and a side-effect import (`import '…'`)
+  name no export, but the module they name still has to exist, so they are
+  checked for that and nothing else. They used to be discarded before any check
+  ran — which, once unmeasurable imports became fatal, made
+  `import * as missing from './does/not/exist'` the one shape that could still
+  walk past it.
 
   The one relative import in the documentation is measured too, against the
   exports of the file it names. **An import that cannot be measured now fails

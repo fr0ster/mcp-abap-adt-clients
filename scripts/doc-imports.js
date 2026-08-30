@@ -66,8 +66,11 @@ function typescriptBlocks(source) {
  * alongside so the report can say what the reader wrote rather than the word
  * `default`.
  *
- * A namespace import (`import * as X`) binds the module itself and names no
- * export, so there is nothing in it to check.
+ * A namespace import (`import * as X`) and a side-effect import (`import '…'`)
+ * name no export, and are still reported — with an empty `names` — because the
+ * module they name has to exist. Dropping them was how
+ * `import * as missing from './does/not/exist'` walked past the check that
+ * fails an import nothing could be measured against.
  *
  * @param {string} markdown
  * @returns {Array<{specifier: string, names: string[], defaultImport?: string, line: number}>}
@@ -89,10 +92,11 @@ function importsIn(markdown) {
     for (const statement of source.statements) {
       if (!ts.isImportDeclaration(statement)) continue;
       if (!ts.isStringLiteral(statement.moduleSpecifier)) continue;
+      // No early exit on "binds nothing": every import declaration names a
+      // module, and the module has to resolve even when nothing is taken from
+      // it. The caller decides what an empty `names` means.
       const clause = statement.importClause;
-      if (!clause) continue;
-
-      const bindings = clause.namedBindings;
+      const bindings = clause?.namedBindings;
       const names =
         bindings && ts.isNamedImports(bindings)
           ? bindings.elements.map((element) =>
@@ -100,10 +104,9 @@ function importsIn(markdown) {
               (element.propertyName ?? element.name).getText(source),
             )
           : [];
-      const defaultImport = clause.name
+      const defaultImport = clause?.name
         ? clause.name.getText(source)
         : undefined;
-      if (names.length === 0 && !defaultImport) continue;
 
       const within = source.getLineAndCharacterOfPosition(
         statement.getStart(source),
