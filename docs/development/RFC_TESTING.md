@@ -30,11 +30,14 @@ Setting them before the tests is not enough — they have to be set when
 dependencies are installed:
 
 ```bash
-SAPNWRFC_HOME='C:
-wrfcsdk
-wrfcsdk' PATH='C:
-wrfcsdk
-wrfcsdklib;'"$PATH" npm ci
+# Windows (Git Bash) — the SDK path is wherever it was unpacked
+SAPNWRFC_HOME='C:\nwrfcsdk\nwrfcsdk' PATH='C:\nwrfcsdk\nwrfcsdk\lib;'"$PATH" npm ci
+
+# macOS
+SAPNWRFC_HOME=~/nwrfcsdk PATH=$SAPNWRFC_HOME/lib:$PATH npm ci
+
+# Linux
+SAPNWRFC_HOME=~/nwrfcsdk PATH=$SAPNWRFC_HOME/lib:$PATH LD_LIBRARY_PATH=$SAPNWRFC_HOME/lib:$LD_LIBRARY_PATH npm ci
 ```
 
 The transport is `@mcp-abap-adt/sap-rfc-lite`, an `optionalDependencies` entry

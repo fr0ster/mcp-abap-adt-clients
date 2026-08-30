@@ -50,11 +50,14 @@ which leaves an install that looks complete and an RFC connection that cannot
 start. Install with the same variables the runtime uses:
 
 ```bash
-SAPNWRFC_HOME='C:
-wrfcsdk
-wrfcsdk' PATH='C:
-wrfcsdk
-wrfcsdklib;'"$PATH" npm ci
+# Windows (Git Bash) — the SDK path is wherever it was unpacked
+SAPNWRFC_HOME='C:\nwrfcsdk\nwrfcsdk' PATH='C:\nwrfcsdk\nwrfcsdk\lib;'"$PATH" npm ci
+
+# macOS
+SAPNWRFC_HOME=~/nwrfcsdk PATH=$SAPNWRFC_HOME/lib:$PATH npm ci
+
+# Linux
+SAPNWRFC_HOME=~/nwrfcsdk PATH=$SAPNWRFC_HOME/lib:$PATH LD_LIBRARY_PATH=$SAPNWRFC_HOME/lib:$LD_LIBRARY_PATH npm ci
 ```
 
 `@mcp-abap-adt/sap-rfc-lite` binds to the SAP NW RFC SDK at runtime; the SDK libraries must be on the shared-library path as shown in step 1.
