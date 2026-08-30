@@ -704,9 +704,9 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
         // `stillListed` would still be `true`. This suite writes progress
         // straight to stdout from a jest worker, and that output reaches the
         // parent through an asynchronous relay which `forceExit: true` does not
-        // wait for. In `docs/evidence/2026-08-30-pr123-onprem/traces-rfc.log`
-        // the line survives but lands *after* jest's own summary, which is what
-        // reordering looks like; in `traces-http.log` it did not arrive at all.
+        // wait for. Measured on an on-prem run: over RFC the line survived but
+        // landed *after* jest's own summary, and over HTTP it did not arrive at
+        // all. See decision 4 in `docs/architecture/DECISIONS.md`.
         let stillListed = true;
         for (let attempt = 1; attempt <= 4 && stillListed; attempt++) {
           const ids = await traceIdsNow(runtime.getProfiler());
