@@ -706,7 +706,7 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
         // parent through an asynchronous relay which `forceExit: true` does not
         // wait for. Measured on an on-prem run: over RFC the line survived but
         // landed *after* jest's own summary, and over HTTP it did not arrive at
-        // all. See decision 4 in `docs/architecture/DECISIONS.md`.
+        // all. See decision 5 in `docs/architecture/DECISIONS.md`.
         let stillListed = true;
         for (let attempt = 1; attempt <= 4 && stillListed; attempt++) {
           const ids = await traceIdsNow(runtime.getProfiler());

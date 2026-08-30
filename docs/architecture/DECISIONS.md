@@ -83,7 +83,35 @@ via a relative import, which is measured against the loose set on purpose.
 
 ---
 
-## 3. Unmeasured behaviour is stated as unmeasured
+## 3. A checker reads code with a parser, not with a pattern
+
+**Problem.** The doc gate read imports with a regular expression, and review
+found three holes in it in a row: `import type { … }` unread, a specifier in
+double quotes unread, and — before those — names measured against a pooled set
+of packages. Every one of them made a line **invisible** rather than
+mis-parsed, and an invisible import is a passing one. A fourth was waiting in
+any import wrapped across lines. The same regex had been copied into the
+`docsImportsResolve` unit test, so both had the same blind spots.
+
+**Decided.** Fenced TypeScript blocks are parsed with the TypeScript parser and
+the imports read from the syntax tree. One reader, `scripts/doc-imports.js`,
+used by the gate and the test.
+
+**Against.** Widening the pattern once more — which would have been the third
+such widening, and cheaper on the day.
+
+**Why.** Quoting, line breaks, `type` modifiers, aliases and import-looking text
+inside comments or strings are all decided questions for a parser and open ones
+for a pattern. The failure mode is what makes it worth the change: a pattern
+that does not match reports success, so each hole cost a review round to find
+and left the gate's claim untrue in the meantime.
+
+**What would change it.** A document format the parser cannot read. Nothing in
+Markdown is.
+
+---
+
+## 4. Unmeasured behaviour is stated as unmeasured
 
 **Problem.** `delete(traceId)` was added against a measured `DELETE` that
 answers `200`. What a **missing** id answers was never measured.
@@ -106,7 +134,7 @@ one that does not claim.
 
 ---
 
-## 4. Assertions are the proof; a run log is not
+## 5. Assertions are the proof; a run log is not
 
 **Problem.** The integration test for `delete()` polls the feed until the id is
 gone, and its verdict lines are missing from the run log — a passing test whose
@@ -134,7 +162,7 @@ after a SAP run dealt with first.
 
 ---
 
-## 5. Only what a run makes is a run's to delete
+## 6. Only what a run makes is a run's to delete
 
 **Problem.** The delete test needs a trace. The suite already resolves one —
 possibly discovered from the feed rather than produced by this run — and these
@@ -154,7 +182,7 @@ assert something about itself.
 
 ---
 
-## 6. A concrete system never stands in for a value
+## 7. A concrete system never stands in for a value
 
 **Problem.** `buildDumpIdPrefix` documented itself with a real hostname and a
 real SID, and two unit tests asserted the resulting string — one specific

@@ -47,10 +47,19 @@ Requires `@mcp-abap-adt/interfaces@^25.0.0`.
   paths deliberately. Proven by removing the new export and watching the gate go
   red on the exact line.
 
-  It also read only `import { … }`, so every `import type { … }` in the docs —
-  seven of them — was unchecked, and a type-export that no longer existed would
-  have passed under a gate whose whole promise is that every documented name
-  exists.
+  It also read documents with a regular expression, and that was wrong three
+  times in a row — each time making a line **invisible** rather than
+  mis-parsing it, which a gate reports as success: `import type { … }` unread
+  (seven such lines in the docs), then a specifier in double quotes unread, and
+  an import wrapped across lines would have been the fourth.
+
+  The extraction is now the TypeScript parser. Each fenced TypeScript block is
+  parsed and the import declarations are read from the syntax tree, so quoting,
+  line breaks, `type` modifiers, aliases and import-looking text inside comments
+  are the parser's problem — and it already knows the answers. The reader lives
+  in `scripts/doc-imports.js` and backs both the gate and the
+  `docsImportsResolve` unit test, which had the identical single-quote hole and
+  no longer has its own copy to drift.
 
   And it pooled the exports of all three packages into one set, so the specifier
   a name was imported *from* did not matter:

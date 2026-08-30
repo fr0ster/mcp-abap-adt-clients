@@ -38,6 +38,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const { importsIn } = require('./doc-imports');
 
 const ROOT = path.resolve(__dirname, '..');
 
@@ -183,7 +184,7 @@ function publicNames(entry, seen = new Set()) {
       if (name) names.add(name.trim());
     }
   }
-  for (const m of text.matchAll(/export\s*\*\s*from\s*'([^']+)'/g)) {
+  for (const m of text.matchAll(/export\s*\*\s*from\s*['"]([^'"]+)['"]/g)) {
     const target = resolveModule(m[1], entry);
     if (target) for (const n of publicNames(target, seen)) names.add(n);
   }
@@ -221,22 +222,17 @@ const problems = [];
 
 for (const file of docFiles()) {
   const text = fs.readFileSync(file, 'utf8');
-  // `import type { … }` counts too: a type-only import names an export just as
-  // a value import does, and it was slipping through unchecked.
-  for (const m of text.matchAll(
-    /import\s*(?:type\s+)?\{([^}]*)\}\s*from\s*'([^']+)'/g,
-  )) {
-    const from = m[2];
+  // Read by the TypeScript parser, not by a pattern over prose — see
+  // `scripts/doc-imports.js` for the three ways the pattern was wrong.
+  for (const { specifier: from, names, line } of importsIn(text)) {
     const relative = from.startsWith('.');
     if (!relative && !OURS.includes(from)) continue;
     // Each package answers for itself; a relative path is measured against the
     // loose set, since it names an internal file deliberately.
     const allowed = relative ? loose : SURFACES.get(from);
     if (!allowed) continue; // dependency not installed — nothing measured
-    for (const raw of m[1].split(',')) {
-      const name = raw.trim().replace(/^type\s+/, '');
-      if (name && !allowed.has(name)) {
-        const line = text.slice(0, m.index).split('\n').length;
+    for (const name of names) {
+      if (!allowed.has(name)) {
         // Saying WHERE it does exist turns "no such name" into the fix.
         const elsewhere = OURS.filter(
           (p) => p !== from && SURFACES.get(p)?.has(name),

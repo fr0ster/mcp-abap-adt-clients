@@ -16,6 +16,19 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import * as ts from 'typescript';
 
+/** One named import, as `scripts/doc-imports.js` reports it. */
+interface DocImport {
+  specifier: string;
+  names: string[];
+  line: number;
+}
+
+// A CommonJS helper, shared with `npm run check:docs` so the gate and this test
+// read documents the same way. Typed here rather than trusted as `any`.
+const { importsIn } = require('../../../scripts/doc-imports') as {
+  importsIn: (markdown: string) => DocImport[];
+};
+
 const REPO_ROOT = resolve(__dirname, '../../..');
 const PACKAGE_NAME = '@mcp-abap-adt/adt-clients';
 
@@ -52,22 +65,18 @@ function markdownFiles(): string[] {
   return found;
 }
 
-/** Imported names, per file, for imports that name this package. */
+/**
+ * Imported names, per file, for imports that name this package.
+ *
+ * Read from the syntax tree, not from a pattern over prose. The pattern this
+ * replaces missed a specifier in double quotes and any import wrapped across
+ * lines — and it missed them silently, which a check reports as a pass. The
+ * same shared reader backs `npm run check:docs`, so the two cannot drift.
+ */
 function importedNames(file: string): string[] {
-  const text = readFileSync(file, 'utf8');
-  const pattern = new RegExp(
-    `import\\s*(?:type\\s*)?\\{([^}]+)\\}\\s*from\\s*'${PACKAGE_NAME}'`,
-    'g',
-  );
-  const names: string[] = [];
-  for (const match of text.matchAll(pattern)) {
-    for (const raw of match[1].split(',')) {
-      // `X as Y` imports X; the local alias is the consumer's business.
-      const name = raw.trim().split(/\s+as\s+/)[0];
-      if (name) names.push(name);
-    }
-  }
-  return names;
+  return importsIn(readFileSync(file, 'utf8'))
+    .filter((entry) => entry.specifier === PACKAGE_NAME)
+    .flatMap((entry) => entry.names);
 }
 
 describe('documented imports resolve against the real public surface', () => {
