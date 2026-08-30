@@ -6,6 +6,7 @@
  * - Run a pre-existing shared class with profiling
  * - Discover traces from trace files feed
  * - Read individual trace (hitlist, statements, dbAccesses)
+ * - Delete the trace this run produced
  *
  * The runnable class (e.g. ZAC_SHR_RUN01) must already exist on the SAP system.
  * The test does NOT create or modify the class.
@@ -88,6 +89,15 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
 
   // Shared state between tests — traceId from profiled run or discovery
   let resolvedTraceId: string | undefined;
+  /**
+   * Only the trace THIS run produced, and never a discovered one.
+   *
+   * `resolvedTraceId` may come from the feed, and on a shared system the newest
+   * trace in the feed belongs to whoever profiled last — deleting that would
+   * take somebody else's measurement away mid-analysis. So deletion is scoped
+   * to what this file made.
+   */
+  let traceIdFromThisRun: string | undefined;
 
   beforeAll(async () => {
     try {
@@ -354,6 +364,7 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
           { logger: testsLogger },
         );
         expect(resolvedTraceId).toBeDefined();
+        traceIdFromThisRun = resolvedTraceId;
 
         logTestSuccess(testsLogger, testName);
       } catch (error) {
@@ -630,6 +641,85 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
             return;
           }
         }
+        logTestError(testsLogger, testName, error);
+        throw error;
+      } finally {
+        logTestEnd(testsLogger, testName);
+      }
+    },
+    getTimeout('test'),
+  );
+
+  it(
+    'should delete the trace this run produced',
+    async () => {
+      const testName = 'Profiler Traces - delete trace';
+      const testCase = getEnabledTestCase(
+        'profiler_traces',
+        'adt_profiler_traces',
+      );
+
+      logTestStart(testsLogger, testName, {
+        name: 'adt_profiler_traces',
+        params: testCase?.params || {},
+      });
+
+      if (!testCase) {
+        logTestSkip(
+          testsLogger,
+          testName,
+          'profiler_traces/adt_profiler_traces not configured or disabled in test-config.yaml',
+        );
+        return;
+      }
+
+      if (!hasConfig || !runtime) {
+        logTestSkip(testsLogger, testName, 'No SAP configuration');
+        return;
+      }
+
+      if (!traceIdFromThisRun) {
+        // Deliberately NOT falling back to `resolvedTraceId`: that one can come
+        // from the feed, and deleting a trace this file did not make is not
+        // this test's business.
+        logTestSkip(
+          testsLogger,
+          testName,
+          'the profiled run produced no trace to delete',
+        );
+        return;
+      }
+
+      try {
+        const traceId = traceIdFromThisRun;
+        logTestStep(`delete trace ${traceId}`, testsLogger);
+        await runtime.getProfiler().delete(traceId);
+
+        // Deleted means gone from the feed. Polled rather than read once,
+        // because how quickly the feed reflects a deletion is not measured —
+        // but the id must disappear, or the call did nothing.
+        let stillListed = true;
+        for (let attempt = 1; attempt <= 4 && stillListed; attempt++) {
+          const ids = await traceIdsNow(runtime.getProfiler());
+          stillListed = ids.has(traceId);
+          logTestStep(
+            `after delete, attempt ${attempt}: trace ${stillListed ? 'still listed' : 'gone from the feed'}`,
+            testsLogger,
+          );
+          if (stillListed && attempt < 4) {
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+          }
+        }
+        expect(stillListed).toBe(false);
+
+        // Nothing left for a later run to trip over.
+        traceIdFromThisRun = undefined;
+        if (resolvedTraceId === traceId) {
+          resolvedTraceId = undefined;
+        }
+
+        logTestSuccess(testsLogger, testName);
+      } catch (error) {
         logTestError(testsLogger, testName, error);
         throw error;
       } finally {

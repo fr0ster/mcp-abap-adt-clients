@@ -5,6 +5,97 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [15.0.0] - 2026-08-30
+
+Requires `@mcp-abap-adt/interfaces@^25.0.0`.
+
+### Added
+
+- **`Profiler.delete(traceId)`** — a trace can be taken back out.
+
+  Every entry in the trace feed carries a delete link beside the links for its
+  three views, and the `DELETE` it points at answers `200` — measured on an
+  on-prem system. Until now a trace could be listed and read and never removed,
+  so every profiled run was permanent: the feed grew 58 → 61 across one
+  afternoon of integration runs.
+
+  Takes an id or a full URI, like every other trace reader here, so a caller can
+  hand back what `list()` gave it without unpicking the URI first.
+
+  **What a missing id does is not measured.** `void` describes the resolved
+  value and says nothing about failure — a `404`, or any transport error,
+  rejects. Code that must tolerate a missing id has to catch until somebody
+  measures a repeat delete.
+
+- **`compareRecordedAt` is now a public export.**
+
+  It already existed, and `src/index.ts` did not re-export it — so the migration
+  below could not have been followed. A replacement a consumer cannot import is
+  no replacement. Sorting a trace listing needs it: `recordedAt` compared as
+  text gets the order wrong across UTC offsets, and every caller would otherwise
+  write that bug by hand.
+
+### Fixed
+
+- **`check:docs` holds this package's own documentation to its entry point.**
+
+  It matched documented imports against every identifier anywhere under `src`,
+  so a snippet naming a real-but-unreachable symbol passed — which is how the
+  `compareRecordedAt` example above got written. Imports from
+  `@mcp-abap-adt/adt-clients` are now resolved through the barrels from
+  `src/index.ts`; relative imports keep the loose set, since those name internal
+  paths deliberately. Proven by removing the new export and watching the gate go
+  red on the exact line.
+
+  It also read only `import { … }`, so every `import type { … }` in the docs —
+  seven of them — was unchecked, and a type-export that no longer existed would
+  have passed under a gate whose whole promise is that every documented name
+  exists. Both holes are proven closed by planting the failure and watching the
+  gate name the exact line.
+
+  Across 29 documents it found nothing else, so this fixes a gap rather than a
+  backlog.
+
+- The worked profiler example in `docs/usage/CLIENT_API_REFERENCE.md` sorted
+  traces with `a.recordedAt > b.recordedAt` — string comparison, which a note
+  further down the same page calls wrong.
+
+### Removed
+
+- **BREAKING** — four methods on `Profiler` that `getProfiler()` never exposed:
+  `latestTraceId()`, `listTraceIds()`, `listTraceFilesResponse()` and the
+  deprecated `listTraceFiles()`.
+
+  `getProfiler()` returns `IProfiler`, so none of them was reachable by a
+  consumer — they were callable only by code inside this package, and only one
+  had a caller. That is how a gap hides: the need looks met because the method
+  exists, and nobody can use it.
+
+  **Migration.** `list()` returns `IAbapTraceEntry[]` with the ids in it.
+  For the newest, reduce with `compareRecordedAt` — which is exported, and which
+  exists because comparing ISO timestamps as strings is wrong across UTC
+  offsets:
+
+  ```ts
+  const traces = await profiler.list();
+  const newest = traces.length
+    ? traces.reduce((a, b) => (compareRecordedAt(a, b) > 0 ? a : b))
+    : undefined;
+  ```
+
+  **Keep the guard.** `latestTraceId()` answered `undefined` when nothing had
+  been profiled yet, and an empty feed is a normal state — while `reduce` with
+  no initial value throws `TypeError` on `[]`. A migration that turns "nothing
+  yet" into a crash is not the same method by another name, so the unit suite
+  pins both halves: the newest across a UTC offset, and `undefined` on an empty
+  feed.
+
+  There is no replacement for `listTraceFilesResponse()`, and deliberately so.
+  The feed is an id and a few identifying fields, measured on two systems that
+  agreed; there is nothing in it to read a second way. A `listWith` was proposed
+  for symmetry with `readWith` and rejected — see decision 11 in the contract's
+  `DECISIONS.md`.
+
 ## [14.0.0] - 2026-08-29
 
 Requires `@mcp-abap-adt/interfaces@^24.0.0`.

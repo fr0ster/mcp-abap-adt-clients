@@ -31,3 +31,11 @@ export { CrossTrace } from './runtime/traces/CrossTraceDomain';
 // Domain objects
 export { Profiler } from './runtime/traces/ProfilerDomain';
 export { St05Trace } from './runtime/traces/St05Trace';
+/**
+ * Public since 15.0.0, because the removal of `latestTraceId()` made it the
+ * replacement — and a replacement a consumer cannot import is no replacement.
+ * Sorting a trace listing needs it: `recordedAt` compared as text gets the
+ * order wrong across UTC offsets, so every caller would otherwise write the
+ * same subtle bug by hand.
+ */
+export { compareRecordedAt } from './runtime/traces/traceParsing';
