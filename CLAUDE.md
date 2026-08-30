@@ -119,7 +119,28 @@ RFC connections are required for legacy SAP systems (BASIS < 7.50) where HTTP st
 
 **Prerequisites:**
 1. SAP NW RFC SDK installed (download from SAP Support Portal, requires S-user)
-2. RFC transport is provided by `@mcp-abap-adt/sap-rfc-lite` (transitive dependency via `@mcp-abap-adt/connection`) — nothing to install in this package
+2. **Install dependencies with the SDK visible** — the RFC transport is
+   `@mcp-abap-adt/sap-rfc-lite`, reached through `@mcp-abap-adt/connection`,
+   and there is nothing to add to `package.json`. But it is an
+   `optionalDependencies` entry with a native build, and **npm drops an optional
+   dependency whose build fails, silently** — so it must be installed with the
+   same variables the test run uses:
+
+   ```bash
+   SAPNWRFC_HOME='C:
+wrfcsdk
+wrfcsdk' PATH='C:
+wrfcsdk
+wrfcsdklib;'"$PATH" npm ci
+   ```
+
+   Measured on the same lockfile: `npm ci` alone installs 1675 packages and no
+   binding; with the variables, 1678, and it lands at
+   `node_modules/@mcp-abap-adt/connection/node_modules/@mcp-abap-adt/sap-rfc-lite`
+   — nested, never at the top level, which is where looking for it misleads.
+   Without it `connection_type: "rfc"` fails in `globalSetup` with
+   `@mcp-abap-adt/sap-rfc-lite is not available … Cannot find module`, which
+   names the package rather than the SDK that was missing at install time.
 3. SAP user has `S_RFC` authorization for `SADT_REST_RFC_ENDPOINT` (SAP Note 3569684)
 
 **Ensure `test-config.yaml` has `connection_type: "rfc"`:**

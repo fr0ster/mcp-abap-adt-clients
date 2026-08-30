@@ -24,6 +24,40 @@ export LD_LIBRARY_PATH=$SAPNWRFC_HOME/lib:$LD_LIBRARY_PATH
 
 > **Important:** `dotenv` does not expand `$PATH`/`%PATH%` or `~`, so these variables cannot be set via `.env` files. They must be set in the shell session before running tests.
 
+### Install with those variables set, too
+
+Setting them before the tests is not enough — they have to be set when
+dependencies are installed:
+
+```bash
+SAPNWRFC_HOME='C:
+wrfcsdk
+wrfcsdk' PATH='C:
+wrfcsdk
+wrfcsdklib;'"$PATH" npm ci
+```
+
+The transport is `@mcp-abap-adt/sap-rfc-lite`, an `optionalDependencies` entry
+of `@mcp-abap-adt/connection` with a native build. **npm drops an optional
+dependency whose build fails and reports nothing**, and the build needs the SDK.
+
+Measured on the same lockfile: `npm ci` alone installs 1675 packages and no
+binding; with the variables, 1678, placed at
+
+```
+node_modules/@mcp-abap-adt/connection/node_modules/@mcp-abap-adt/sap-rfc-lite
+```
+
+Nested — never at the top level, so looking for it there suggests it is absent
+when it is not. Without it every RFC run stops in `globalSetup`:
+
+```
+@mcp-abap-adt/sap-rfc-lite is not available … Cannot find module
+```
+
+which names the package rather than the SDK that was missing an installation
+earlier.
+
 ### test-config.yaml
 
 Set `connection_type: "rfc"` in the environment section:
