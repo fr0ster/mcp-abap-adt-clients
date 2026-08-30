@@ -51,7 +51,7 @@ async function main() {
 
   console.error(`Connecting to ${config.url}...`);
   const connection = await createTestConnection(createConnectionLogger());
-  await (connection as any).connect();
+  // Already open: `createTestConnection` connects before returning.
 
   const runtime = new AdtRuntimeClient(connection, undefined, {
     enableAcceptCorrection: true,

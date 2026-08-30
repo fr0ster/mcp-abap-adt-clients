@@ -31,7 +31,7 @@ async function main() {
   console.log(`Connecting to ${config.url} (client ${config.client})...`);
 
   const connection = await createTestConnection(createConnectionLogger());
-  await (connection as any).connect();
+  // Already open: `createTestConnection` connects before returning.
 
   const systemLabel = process.env.SAP_SYSTEM_LABEL || 'system';
 

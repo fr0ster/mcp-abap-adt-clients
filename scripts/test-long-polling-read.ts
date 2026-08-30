@@ -86,7 +86,7 @@ async function testLongPollingRead() {
     console.log(`  Using package from YAML: ${packageName}`);
 
     const connection = await createTestConnection(connectionLogger);
-    await (connection as any).connect();
+    // Already open: `createTestConnection` connects before returning.
     const client = new AdtClient(connection, builderLogger);
 
     // Test 1: Create a domain and immediately try to read it with long polling

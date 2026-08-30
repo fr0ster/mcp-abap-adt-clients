@@ -24,6 +24,7 @@ import * as dotenv from 'dotenv';
 import {
   createTestConnection,
   getConfig,
+  releaseTestConnection,
 } from '../src/__tests__/helpers/sessionConfig';
 import {
   createConnectionLogger,
@@ -161,7 +162,7 @@ async function run(): Promise<void> {
 
   const config = getConfig();
   const connection = await createTestConnection(connectionLogger);
-  await (connection as any).connect();
+  // Already open: `createTestConnection` connects before returning.
 
   const client = new AdtClient(connection, libraryLogger);
   const utils = client.getUtils();
@@ -214,7 +215,7 @@ async function run(): Promise<void> {
     console.error('Failed to read package contents:', error?.message || error);
     process.exit(1);
   } finally {
-    (connection as any).reset();
+    await releaseTestConnection(connection);
   }
 }
 

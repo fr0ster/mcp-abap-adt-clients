@@ -29,6 +29,7 @@ import * as dotenv from 'dotenv';
 import {
   createTestConnection,
   getConfig,
+  releaseTestConnection,
 } from '../src/__tests__/helpers/sessionConfig';
 import {
   createBuilderLogger,
@@ -308,7 +309,7 @@ async function run(): Promise<void> {
   }
   const config = getConfig();
   const connection = await createTestConnection(connectionLogger);
-  await (connection as any).connect();
+  // Already open: `createTestConnection` connects before returning.
   const client = new AdtClient(connection, builderLogger);
 
   const transportRequest = resolveTransportRequest(
@@ -483,7 +484,7 @@ async function run(): Promise<void> {
       );
     }
 
-    (connection as any).reset();
+    await releaseTestConnection(connection);
   }
 }
 

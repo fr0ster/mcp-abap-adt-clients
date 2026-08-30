@@ -37,6 +37,7 @@ import * as dotenv from 'dotenv';
 import {
   createTestConnection,
   getConfig,
+  releaseTestConnection,
 } from '../src/__tests__/helpers/sessionConfig';
 import {
   createBuilderLogger,
@@ -297,48 +298,52 @@ async function run(): Promise<void> {
 
   const sapConfig = getConfig();
   const connection = await createTestConnection(createConnectionLogger());
-  await (connection as any).connect();
+  // Already open: `createTestConnection` connects before returning.
 
   const client = new AdtClient(connection, createBuilderLogger());
   const handler = getHandler(client, options);
   const readConfig = buildReadConfig(options);
 
-  if (options.readMode === 'source' || options.readMode === 'both') {
-    console.log('--- SOURCE ---');
-    try {
-      const state = await handler.read(readConfig);
-      if (state) {
-        printResult('Source', state);
-      } else {
-        console.log('[Object not found]');
+  try {
+    if (options.readMode === 'source' || options.readMode === 'both') {
+      console.log('--- SOURCE ---');
+      try {
+        const state = await handler.read(readConfig);
+        if (state) {
+          printResult('Source', state);
+        } else {
+          console.log('[Object not found]');
+        }
+      } catch (error: any) {
+        console.error(
+          `[Read failed: HTTP ${error.response?.status || '?'} ${error.message}]`,
+        );
       }
-    } catch (error: any) {
-      console.error(
-        `[Read failed: HTTP ${error.response?.status || '?'} ${error.message}]`,
-      );
     }
-  }
 
-  if (options.readMode === 'metadata' || options.readMode === 'both') {
-    if (options.readMode === 'both') {
-      console.log('');
-    }
-    console.log('--- METADATA ---');
-    try {
-      const state = await handler.readMetadata(readConfig);
-      if (state) {
-        printResult('Metadata', state);
-      } else {
-        console.log('[No metadata returned]');
+    if (options.readMode === 'metadata' || options.readMode === 'both') {
+      if (options.readMode === 'both') {
+        console.log('');
       }
-    } catch (error: any) {
-      console.error(
-        `[Metadata read failed: HTTP ${error.response?.status || '?'} ${error.message}]`,
-      );
+      console.log('--- METADATA ---');
+      try {
+        const state = await handler.readMetadata(readConfig);
+        if (state) {
+          printResult('Metadata', state);
+        } else {
+          console.log('[No metadata returned]');
+        }
+      } catch (error: any) {
+        console.error(
+          `[Metadata read failed: HTTP ${error.response?.status || '?'} ${error.message}]`,
+        );
+      }
     }
+  } finally {
+    // In `finally`: a script that dies mid-read must still give the session
+    // back, or the next run meets a pool holding its leftovers.
+    await releaseTestConnection(connection);
   }
-
-  (connection as any).reset();
 }
 
 run().catch((error) => {
