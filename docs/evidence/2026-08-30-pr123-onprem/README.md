@@ -29,10 +29,28 @@ F132F118A45D11F1B5CA0CC47A1E68C1 present: false
 
 ## One thing the RFC log does not record
 
-The RFC run does not work on a clean `npm ci`: `@mcp-abap-adt/sap-rfc-lite` is
-in `package-lock.json` as an optional dependency nested under `connection`, and
-`npm ci` does not place it — `npm install` then reports `up to date` without
-fixing it. It was installed with `npm install --no-save` for this run, so
-neither `package.json` nor `package-lock.json` changed. Unrelated to this PR,
-but `CLAUDE.md` promises "nothing to install in this package", and on a clean
-checkout that is currently untrue.
+The RFC run needs the SAP NW RFC SDK visible **when dependencies are installed**,
+not only when the tests run. Measured on this machine, same lockfile, twice:
+
+| install | packages | `sap-rfc-lite` |
+|---|---|---|
+| `npm ci` | 1675 | absent |
+| `SAPNWRFC_HOME=… PATH=…lib;… npm ci` | 1678 | present, at `node_modules/@mcp-abap-adt/connection/node_modules/@mcp-abap-adt/sap-rfc-lite` |
+
+`@mcp-abap-adt/connection` declares it under `optionalDependencies`, and the
+lockfile marks it `optional: true` with `hasInstallScript: true` — a native
+binding built by `node-gyp-build`. npm drops an optional dependency whose build
+fails, and says nothing. Without the SDK on the machine at install time the build
+cannot succeed, so the package is skipped; `connection_type: "rfc"` then fails in
+`globalSetup` with
+
+```
+@mcp-abap-adt/sap-rfc-lite is not available … Cannot find module
+```
+
+which reads like a missing package rather than an SDK that was missing an hour
+earlier. For this run it was installed with `npm install --no-save`; neither
+`package.json` nor `package-lock.json` changed.
+
+Unrelated to this PR. But `CLAUDE.md` shows the SDK variables only on the
+`npm test` line, and on a clean checkout that is not enough to get RFC at all.
