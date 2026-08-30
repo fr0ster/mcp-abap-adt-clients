@@ -67,6 +67,15 @@ Requires `@mcp-abap-adt/interfaces@^25.0.0`.
   aliases, import-looking text in comments, fence length, tilde fences, info
   strings and fences nested in list items are now all the parsers' business.
 
+  The export side is the type checker now as well: what a package hands out is
+  asked of `getExportsOfModule`, not matched off `export …` lines. That half had
+  never been reported broken — the sibling test had used the checker all along,
+  so the gate was holding its two halves to different standards.
+
+  The one relative import in the documentation is measured too, against the
+  exports of the file it names; when no single file under `src/` matches, the
+  gate prints it as unmeasured instead of passing it.
+
   The reader lives in `scripts/doc-imports.js` and backs both the gate and the
   `docsImportsResolve` unit test, which had the identical holes and no longer
   has its own copy to drift.

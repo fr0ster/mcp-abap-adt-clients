@@ -93,10 +93,17 @@ mis-parsed, and an invisible import is a passing one. A fourth was waiting in
 any import wrapped across lines. The same regex had been copied into the
 `docsImportsResolve` unit test, so both had the same blind spots.
 
-**Decided.** Both halves are parsed. Fences come from a Markdown parser
-(`markdown-it`), each block from the TypeScript parser, and the imports are read
-from the syntax tree. One reader, `scripts/doc-imports.js`, used by the gate and
-the test.
+**Decided.** No part of the gate reads code with a pattern. Fences come from a
+Markdown parser (`markdown-it`), each block from the TypeScript parser, and what
+a module exports comes from the TypeScript **type checker** — which answers that
+question, rather than describing what the text looks like. One reader,
+`scripts/doc-imports.js`, is shared by the gate and the test.
+
+The export side was the last to go, and it went before review asked: it was
+still matching `export …` lines while the sibling test had used the checker all
+along, so the same gate held its two halves to different standards. The cost is
+runtime — about four seconds against instant — which for a lint step is the
+cheaper half of the trade.
 
 **Against.** Widening the pattern once more — cheaper on the day, and it would
 have been the third such widening.
@@ -107,11 +114,14 @@ The failure mode is what makes it worth the change: a pattern that does not
 match reports success, so each hole cost a review round to find and left the
 gate's claim untrue in the meantime.
 
-**The lesson had to be learned twice.** The first fix moved the *imports* to a
-parser and left the *fences* matched by hand, one line above — so `~~~typescript`
+**The lesson had to be learned three times.** The first fix moved the *imports*
+to a parser and left the *fences* matched by hand, one line above — so `~~~typescript`
 and ```` ```ts title="example" ```` still never reached it. Valid CommonMark,
 invisible to the gate, found by the next review. Replacing one hand-rolled
 matcher with a parser is not the decision; leaving none is.
+
+Then the *exports* were still a pattern, one function below. Each fix removed
+the matcher it was looking at and left the next one standing.
 
 **What would change it.** A document format neither parser can read. Nothing in
 Markdown is.
