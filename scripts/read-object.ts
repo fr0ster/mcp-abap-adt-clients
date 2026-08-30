@@ -32,11 +32,12 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { IAdtObject } from '@mcp-abap-adt/interfaces';
+import type { IAdtReadable } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import {
   createTestConnection,
   getConfig,
+  releaseTestConnection,
 } from '../src/__tests__/helpers/sessionConfig';
 import {
   createBuilderLogger,
@@ -141,7 +142,19 @@ function parseArgs(argv: string[]): Options {
   };
 }
 
-function getHandler(client: AdtClient, options: Options): IAdtObject<any, any> {
+/**
+ * The handler for a type, narrowed to what this script uses.
+ *
+ * It was `IAdtObject<any, any>` — the full surface — and stopped compiling when
+ * 8.0.0 made each factory return only the capabilities its object actually has.
+ * The script calls `read()` and `readMetadata()` and nothing else, so
+ * `IAdtReadable` is what it needs; asking for the whole interface was demanding
+ * versioning and transports from types that never had them.
+ */
+function getHandler(
+  client: AdtClient,
+  options: Options,
+): IAdtReadable<any, any> {
   switch (options.objectType) {
     case 'class':
       return client.getClass();
@@ -160,7 +173,8 @@ function getHandler(client: AdtClient, options: Options): IAdtObject<any, any> {
     case 'tabletype':
       return client.getTableType();
     case 'view':
-      return client.getView();
+      // Renamed in 9.0.0: DDL sources are `getDdl()`, not `getView()`.
+      return client.getDdl();
     case 'functiongroup':
       return client.getFunctionGroup();
     case 'functionmodule':
@@ -284,48 +298,52 @@ async function run(): Promise<void> {
 
   const sapConfig = getConfig();
   const connection = await createTestConnection(createConnectionLogger());
-  await (connection as any).connect();
+  // Already open: `createTestConnection` connects before returning.
 
   const client = new AdtClient(connection, createBuilderLogger());
   const handler = getHandler(client, options);
   const readConfig = buildReadConfig(options);
 
-  if (options.readMode === 'source' || options.readMode === 'both') {
-    console.log('--- SOURCE ---');
-    try {
-      const state = await handler.read(readConfig);
-      if (state) {
-        printResult('Source', state);
-      } else {
-        console.log('[Object not found]');
+  try {
+    if (options.readMode === 'source' || options.readMode === 'both') {
+      console.log('--- SOURCE ---');
+      try {
+        const state = await handler.read(readConfig);
+        if (state) {
+          printResult('Source', state);
+        } else {
+          console.log('[Object not found]');
+        }
+      } catch (error: any) {
+        console.error(
+          `[Read failed: HTTP ${error.response?.status || '?'} ${error.message}]`,
+        );
       }
-    } catch (error: any) {
-      console.error(
-        `[Read failed: HTTP ${error.response?.status || '?'} ${error.message}]`,
-      );
     }
-  }
 
-  if (options.readMode === 'metadata' || options.readMode === 'both') {
-    if (options.readMode === 'both') {
-      console.log('');
-    }
-    console.log('--- METADATA ---');
-    try {
-      const state = await handler.readMetadata(readConfig);
-      if (state) {
-        printResult('Metadata', state);
-      } else {
-        console.log('[No metadata returned]');
+    if (options.readMode === 'metadata' || options.readMode === 'both') {
+      if (options.readMode === 'both') {
+        console.log('');
       }
-    } catch (error: any) {
-      console.error(
-        `[Metadata read failed: HTTP ${error.response?.status || '?'} ${error.message}]`,
-      );
+      console.log('--- METADATA ---');
+      try {
+        const state = await handler.readMetadata(readConfig);
+        if (state) {
+          printResult('Metadata', state);
+        } else {
+          console.log('[No metadata returned]');
+        }
+      } catch (error: any) {
+        console.error(
+          `[Metadata read failed: HTTP ${error.response?.status || '?'} ${error.message}]`,
+        );
+      }
     }
+  } finally {
+    // In `finally`: a script that dies mid-read must still give the session
+    // back, or the next run meets a pool holding its leftovers.
+    await releaseTestConnection(connection);
   }
-
-  (connection as any).reset();
 }
 
 run().catch((error) => {

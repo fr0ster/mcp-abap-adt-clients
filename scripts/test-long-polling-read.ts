@@ -19,6 +19,7 @@ import * as path from 'path';
 import {
   createTestConnection,
   getConfig,
+  releaseTestConnection,
 } from '../src/__tests__/helpers/sessionConfig';
 import {
   createBuilderLogger,
@@ -85,191 +86,198 @@ async function testLongPollingRead() {
     console.log(`  Using package from YAML: ${packageName}`);
 
     const connection = await createTestConnection(connectionLogger);
-    await (connection as any).connect();
-    const client = new AdtClient(connection, builderLogger);
-
-    // Test 1: Create a domain and immediately try to read it with long polling
-    console.log('Test 1: Create domain and read with long polling');
-    // Domain name max 30 chars, use timestamp suffix (13 digits) -> Z_TEST_LP_ + timestamp = 30 chars
-    const timestamp = Date.now().toString().slice(-13); // Last 13 digits
-    const testDomainName = `Z_TEST_LP_${timestamp}`;
 
     try {
-      // Create domain
-      console.log(`  Creating domain: ${testDomainName}`);
-      console.log(`  Using package: ${packageName}`);
-      const createStartTime = Date.now();
-      await client.getDomain().create(
-        {
-          domainName: testDomainName,
-          packageName: packageName,
-          datatype: 'CHAR',
-          length: 10,
-          description: 'Test domain for long polling',
-        },
-        { activateOnCreate: false },
-      );
-      const createTime = Date.now() - createStartTime;
-      console.log(`  ✓ Domain created in ${createTime}ms`);
+      // Already open: `createTestConnection` connects before returning.
+      const client = new AdtClient(connection, builderLogger);
 
-      // Try to read immediately with long polling
-      console.log(`  Reading domain with ?withLongPolling=true...`);
-      const readStartTime = Date.now();
+      // Test 1: Create a domain and immediately try to read it with long polling
+      console.log('Test 1: Create domain and read with long polling');
+      // Domain name max 30 chars, use timestamp suffix (13 digits) -> Z_TEST_LP_ + timestamp = 30 chars
+      const timestamp = Date.now().toString().slice(-13); // Last 13 digits
+      const testDomainName = `Z_TEST_LP_${timestamp}`;
 
-      // Test direct HTTP request with long polling
-      // Use encodeSapObjectName for proper encoding (same as getDomain function)
-      const { encodeSapObjectName } = require('../src/utils/internalUtils');
-      const encodedName = encodeSapObjectName(testDomainName);
-      const url = `/sap/bc/adt/ddic/domains/${encodedName}?withLongPolling=true`;
-
-      const readResponse = await connection.makeAdtRequest({
-        url,
-        method: 'GET',
-        timeout: 30000, // 30 seconds timeout
-        headers: {
-          Accept:
-            'application/vnd.sap.adt.domains.v2+xml, application/vnd.sap.adt.domains.v1+xml',
-        },
-      });
-
-      const readTime = Date.now() - readStartTime;
-      console.log(`  ✓ Domain read completed in ${readTime}ms`);
-      console.log(`  Response status: ${readResponse.status}`);
-      console.log(
-        `  Response headers:`,
-        JSON.stringify(readResponse.headers, null, 2),
-      );
-
-      if (readTime > 1000) {
-        console.log(
-          `  ⚠️  Read took ${readTime}ms - long polling may have blocked until object was ready`,
-        );
-      } else {
-        console.log(
-          `  ℹ️  Read completed quickly - object was already available`,
-        );
-      }
-
-      // Cleanup
-      console.log(`  Cleaning up...`);
-      await client.getDomain().delete({ domainName: testDomainName });
-      console.log(`  ✓ Domain deleted\n`);
-    } catch (error: any) {
-      console.error(`  ✗ Test failed:`, error.message);
-      if (error.response) {
-        console.error(`  Status: ${error.response.status}`);
-        console.error(`  Data:`, error.response.data);
-      }
-
-      // Try cleanup
       try {
-        await client.getDomain().delete({ domainName: testDomainName });
-      } catch (cleanupError) {
-        console.error(`  Failed to cleanup:`, cleanupError);
-      }
-    }
-
-    // Test 2: Compare read with and without long polling
-    console.log('Test 2: Compare read with and without long polling');
-    // Domain name max 30 chars
-    const timestamp2 = Date.now().toString().slice(-12); // Last 12 digits for second test
-    const testDomainName2 = `Z_TEST_LP2_${timestamp2}`;
-
-    try {
-      // Create domain
-      console.log(`  Creating domain: ${testDomainName2}`);
-      console.log(`  Using package: ${packageName}`);
-      const createStartTime2 = Date.now();
-      await client.getDomain().create(
-        {
-          domainName: testDomainName2,
-          packageName: packageName,
-          datatype: 'CHAR',
-          length: 10,
-          description: 'Test domain for long polling comparison',
-        },
-        { activateOnCreate: false },
-      );
-      const createTime2 = Date.now() - createStartTime2;
-      console.log(`  ✓ Domain created in ${createTime2}ms`);
-
-      // Small delay to ensure domain is ready
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // Read without long polling
-      console.log(`  Reading WITHOUT long polling...`);
-      const readWithoutStart = Date.now();
-      const { encodeSapObjectName } = require('../src/utils/internalUtils');
-      const encodedName = encodeSapObjectName(testDomainName2);
-      const urlWithout = `/sap/bc/adt/ddic/domains/${encodedName}`;
-      await connection.makeAdtRequest({
-        url: urlWithout,
-        method: 'GET',
-        timeout: 5000,
-        headers: {
-          Accept:
-            'application/vnd.sap.adt.domains.v2+xml, application/vnd.sap.adt.domains.v1+xml',
-        },
-      });
-      const readWithoutTime = Date.now() - readWithoutStart;
-      console.log(`  ✓ Read without long polling: ${readWithoutTime}ms`);
-
-      // Read with long polling
-      console.log(`  Reading WITH long polling...`);
-      const readWithStart = Date.now();
-      const urlWith = `/sap/bc/adt/ddic/domains/${encodedName}?withLongPolling=true`;
-      await connection.makeAdtRequest({
-        url: urlWith,
-        method: 'GET',
-        timeout: 30000,
-        headers: {
-          Accept:
-            'application/vnd.sap.adt.domains.v2+xml, application/vnd.sap.adt.domains.v1+xml',
-        },
-      });
-      const readWithTime = Date.now() - readWithStart;
-      console.log(`  ✓ Read with long polling: ${readWithTime}ms`);
-
-      console.log(`  Difference: ${readWithTime - readWithoutTime}ms`);
-
-      if (readWithTime > readWithoutTime + 500) {
-        console.log(
-          `  ⚠️  Long polling took significantly longer - it may be blocking until object is ready`,
+        // Create domain
+        console.log(`  Creating domain: ${testDomainName}`);
+        console.log(`  Using package: ${packageName}`);
+        const createStartTime = Date.now();
+        await client.getDomain().create(
+          {
+            domainName: testDomainName,
+            packageName: packageName,
+            datatype: 'CHAR',
+            length: 10,
+            description: 'Test domain for long polling',
+          },
+          { activateOnCreate: false },
         );
-      } else {
-        console.log(
-          `  ℹ️  No significant difference - long polling may not be blocking for this endpoint`,
-        );
-      }
+        const createTime = Date.now() - createStartTime;
+        console.log(`  ✓ Domain created in ${createTime}ms`);
 
-      // Cleanup
-      await client.getDomain().delete({ domainName: testDomainName2 });
-      console.log(`  ✓ Domain deleted\n`);
-    } catch (error: any) {
-      console.error(`  ✗ Test failed:`, error.message);
-      if (error.response) {
-        console.error(`  Status: ${error.response.status}`);
-        console.error(`  StatusText: ${error.response.statusText}`);
-        if (typeof error.response.data === 'string') {
-          console.error(
-            `  Data (first 500 chars):`,
-            error.response.data.substring(0, 500),
+        // Try to read immediately with long polling
+        console.log(`  Reading domain with ?withLongPolling=true...`);
+        const readStartTime = Date.now();
+
+        // Test direct HTTP request with long polling
+        // Use encodeSapObjectName for proper encoding (same as getDomain function)
+        const { encodeSapObjectName } = require('../src/utils/internalUtils');
+        const encodedName = encodeSapObjectName(testDomainName);
+        const url = `/sap/bc/adt/ddic/domains/${encodedName}?withLongPolling=true`;
+
+        const readResponse = await connection.makeAdtRequest({
+          url,
+          method: 'GET',
+          timeout: 30000, // 30 seconds timeout
+          headers: {
+            Accept:
+              'application/vnd.sap.adt.domains.v2+xml, application/vnd.sap.adt.domains.v1+xml',
+          },
+        });
+
+        const readTime = Date.now() - readStartTime;
+        console.log(`  ✓ Domain read completed in ${readTime}ms`);
+        console.log(`  Response status: ${readResponse.status}`);
+        console.log(
+          `  Response headers:`,
+          JSON.stringify(readResponse.headers, null, 2),
+        );
+
+        if (readTime > 1000) {
+          console.log(
+            `  ⚠️  Read took ${readTime}ms - long polling may have blocked until object was ready`,
           );
         } else {
-          console.error(
-            `  Data:`,
-            JSON.stringify(error.response.data).substring(0, 500),
+          console.log(
+            `  ℹ️  Read completed quickly - object was already available`,
           );
         }
-      }
-      try {
-        await client.getDomain().delete({ domainName: testDomainName2 });
-      } catch (cleanupError) {
-        console.error(`  Failed to cleanup:`, cleanupError);
-      }
-    }
 
-    connection.reset();
+        // Cleanup
+        console.log(`  Cleaning up...`);
+        await client.getDomain().delete({ domainName: testDomainName });
+        console.log(`  ✓ Domain deleted\n`);
+      } catch (error: any) {
+        console.error(`  ✗ Test failed:`, error.message);
+        if (error.response) {
+          console.error(`  Status: ${error.response.status}`);
+          console.error(`  Data:`, error.response.data);
+        }
+
+        // Try cleanup
+        try {
+          await client.getDomain().delete({ domainName: testDomainName });
+        } catch (cleanupError) {
+          console.error(`  Failed to cleanup:`, cleanupError);
+        }
+      }
+
+      // Test 2: Compare read with and without long polling
+      console.log('Test 2: Compare read with and without long polling');
+      // Domain name max 30 chars
+      const timestamp2 = Date.now().toString().slice(-12); // Last 12 digits for second test
+      const testDomainName2 = `Z_TEST_LP2_${timestamp2}`;
+
+      try {
+        // Create domain
+        console.log(`  Creating domain: ${testDomainName2}`);
+        console.log(`  Using package: ${packageName}`);
+        const createStartTime2 = Date.now();
+        await client.getDomain().create(
+          {
+            domainName: testDomainName2,
+            packageName: packageName,
+            datatype: 'CHAR',
+            length: 10,
+            description: 'Test domain for long polling comparison',
+          },
+          { activateOnCreate: false },
+        );
+        const createTime2 = Date.now() - createStartTime2;
+        console.log(`  ✓ Domain created in ${createTime2}ms`);
+
+        // Small delay to ensure domain is ready
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+
+        // Read without long polling
+        console.log(`  Reading WITHOUT long polling...`);
+        const readWithoutStart = Date.now();
+        const { encodeSapObjectName } = require('../src/utils/internalUtils');
+        const encodedName = encodeSapObjectName(testDomainName2);
+        const urlWithout = `/sap/bc/adt/ddic/domains/${encodedName}`;
+        await connection.makeAdtRequest({
+          url: urlWithout,
+          method: 'GET',
+          timeout: 5000,
+          headers: {
+            Accept:
+              'application/vnd.sap.adt.domains.v2+xml, application/vnd.sap.adt.domains.v1+xml',
+          },
+        });
+        const readWithoutTime = Date.now() - readWithoutStart;
+        console.log(`  ✓ Read without long polling: ${readWithoutTime}ms`);
+
+        // Read with long polling
+        console.log(`  Reading WITH long polling...`);
+        const readWithStart = Date.now();
+        const urlWith = `/sap/bc/adt/ddic/domains/${encodedName}?withLongPolling=true`;
+        await connection.makeAdtRequest({
+          url: urlWith,
+          method: 'GET',
+          timeout: 30000,
+          headers: {
+            Accept:
+              'application/vnd.sap.adt.domains.v2+xml, application/vnd.sap.adt.domains.v1+xml',
+          },
+        });
+        const readWithTime = Date.now() - readWithStart;
+        console.log(`  ✓ Read with long polling: ${readWithTime}ms`);
+
+        console.log(`  Difference: ${readWithTime - readWithoutTime}ms`);
+
+        if (readWithTime > readWithoutTime + 500) {
+          console.log(
+            `  ⚠️  Long polling took significantly longer - it may be blocking until object is ready`,
+          );
+        } else {
+          console.log(
+            `  ℹ️  No significant difference - long polling may not be blocking for this endpoint`,
+          );
+        }
+
+        // Cleanup
+        await client.getDomain().delete({ domainName: testDomainName2 });
+        console.log(`  ✓ Domain deleted\n`);
+      } catch (error: any) {
+        console.error(`  ✗ Test failed:`, error.message);
+        if (error.response) {
+          console.error(`  Status: ${error.response.status}`);
+          console.error(`  StatusText: ${error.response.statusText}`);
+          if (typeof error.response.data === 'string') {
+            console.error(
+              `  Data (first 500 chars):`,
+              error.response.data.substring(0, 500),
+            );
+          } else {
+            console.error(
+              `  Data:`,
+              JSON.stringify(error.response.data).substring(0, 500),
+            );
+          }
+        }
+        try {
+          await client.getDomain().delete({ domainName: testDomainName2 });
+        } catch (cleanupError) {
+          console.error(`  Failed to cleanup:`, cleanupError);
+        }
+      }
+    } finally {
+      // In `finally`. A probe that throws part way through still owes the
+      // session back: it was released on the success path only, so exactly the
+      // run that fails — the one worth repeating — left one behind.
+
+      await releaseTestConnection(connection);
+    }
     console.log('✅ All tests completed');
   } catch (error: any) {
     console.error('❌ Script failed:', error);

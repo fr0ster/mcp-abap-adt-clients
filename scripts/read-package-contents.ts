@@ -24,6 +24,7 @@ import * as dotenv from 'dotenv';
 import {
   createTestConnection,
   getConfig,
+  releaseTestConnection,
 } from '../src/__tests__/helpers/sessionConfig';
 import {
   createConnectionLogger,
@@ -86,7 +87,7 @@ function printTable(items: IPackageContentItem[]): void {
 
   // Calculate column widths
   const nameWidth = Math.max(4, ...items.map((o) => o.name.length));
-  const typeWidth = Math.max(4, ...items.map((o) => o.adtType.length));
+  const typeWidth = Math.max(4, ...items.map((o) => o.type.length));
   const pkgWidth = Math.max(7, ...items.map((o) => o.packageName.length));
 
   // Print header
@@ -100,7 +101,7 @@ function printTable(items: IPackageContentItem[]): void {
   // Print rows
   for (const item of items) {
     console.log(
-      `${item.name.padEnd(nameWidth)}  ${item.adtType.padEnd(typeWidth)}  ${item.packageName.padEnd(pkgWidth)}  ${item.description || ''}`,
+      `${item.name.padEnd(nameWidth)}  ${item.type.padEnd(typeWidth)}  ${item.packageName.padEnd(pkgWidth)}  ${item.description || ''}`,
     );
   }
 
@@ -114,7 +115,7 @@ function printTree(
   isLast = true,
 ): void {
   const connector = isLast ? '└── ' : '├── ';
-  const typeLabel = node.adtType || '';
+  const typeLabel = node.type || '';
   const descPart = node.description ? ` - ${node.description}` : '';
 
   console.log(`${prefix}${connector}${node.name} (${typeLabel})${descPart}`);
@@ -131,8 +132,8 @@ function countObjects(node: IPackageHierarchyNode): {
   packages: number;
   objects: number;
 } {
-  let packages = node.is_package ? 1 : 0;
-  let objects = node.is_package ? 0 : 1;
+  let packages = node.isPackage ? 1 : 0;
+  let objects = node.isPackage ? 0 : 1;
 
   for (const child of node.children || []) {
     const childCounts = countObjects(child);
@@ -161,7 +162,7 @@ async function run(): Promise<void> {
 
   const config = getConfig();
   const connection = await createTestConnection(connectionLogger);
-  await (connection as any).connect();
+  // Already open: `createTestConnection` connects before returning.
 
   const client = new AdtClient(connection, libraryLogger);
   const utils = client.getUtils();
@@ -212,9 +213,10 @@ async function run(): Promise<void> {
     }
   } catch (error: any) {
     console.error('Failed to read package contents:', error?.message || error);
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   } finally {
-    (connection as any).reset();
+    await releaseTestConnection(connection);
   }
 }
 

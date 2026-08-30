@@ -15,7 +15,11 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
-import { createTestConnection } from '../src/__tests__/helpers/sessionConfig';
+import {
+  createTestConnection,
+  releaseTestConnection,
+} from '../src/__tests__/helpers/sessionConfig';
+import { createConnectionLogger } from '../src/__tests__/helpers/testLogger';
 import { AdtRuntimeClient } from '../src/clients/AdtRuntimeClient';
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../.env');
@@ -35,38 +39,45 @@ async function main() {
 
   console.log(`Connecting to ${config.url}...`);
   const connection = await createTestConnection(createConnectionLogger());
-  await (connection as any).connect();
+  // Already open: `createTestConnection` connects before returning.
+  try {
+    const runtime = new AdtRuntimeClient(connection, undefined, {
+      enableAcceptCorrection: true,
+    });
+    const sm = runtime.getSystemMessages();
 
-  const runtime = new AdtRuntimeClient(connection, undefined, {
-    enableAcceptCorrection: true,
-  });
-  const sm = runtime.getSystemMessages();
+    if (!messageId) {
+      const options = {
+        user: process.env.SM_USER || undefined,
+        maxResults: process.env.SM_MAX
+          ? Number.parseInt(process.env.SM_MAX, 10)
+          : 10,
+      };
 
-  if (!messageId) {
-    const options = {
-      user: process.env.SM_USER || undefined,
-      maxResults: process.env.SM_MAX
-        ? Number.parseInt(process.env.SM_MAX, 10)
-        : 10,
-    };
+      console.log(
+        `\n=== System Messages (user=${options.user || 'all'}, max=${options.maxResults}) ===\n`,
+      );
+      const response = await sm.list(options);
+      const xml = String(response.data);
+      console.log(xml.slice(0, 5000));
+      if (xml.length > 5000) {
+        console.log('\n... (truncated)');
+      }
+      return;
+    }
 
-    console.log(
-      `\n=== System Messages (user=${options.user || 'all'}, max=${options.maxResults}) ===\n`,
-    );
-    const response = await sm.list(options);
-    const xml = String(response.data);
-    console.log(xml.slice(0, 5000));
-    if (xml.length > 5000) {
+    console.log(`\n=== System Message: ${messageId} ===\n`);
+    const response = await sm.getById(messageId);
+    console.log(String(response.data).slice(0, 5000));
+    if (String(response.data).length > 5000) {
       console.log('\n... (truncated)');
     }
-    return;
-  }
-
-  console.log(`\n=== System Message: ${messageId} ===\n`);
-  const response = await sm.getById(messageId);
-  console.log(String(response.data).slice(0, 5000));
-  if (String(response.data).length > 5000) {
-    console.log('\n... (truncated)');
+  } finally {
+    // In `finally`, and the session given back rather than left to time out.
+    // A small pool is easy to exhaust — two concurrent sessions is the measured
+    // ceiling on the trial — and a script that leaks one on every run locks the
+    // next person out for no visible reason.
+    await releaseTestConnection(connection);
   }
 }
 

@@ -826,170 +826,509 @@ async function main(): Promise<void> {
 
   const sapConfig = getConfig();
   const connection = await createTestConnection(createConnectionLogger());
-  await connection.connect();
-  logger.info(`Connected to ${sapConfig.url}`);
-
-  // Read from the URL, not from an endpoint: see `looksUnambiguouslyCloud`.
-  // Anything short of proof errs towards demanding --require.
-  let isCloud = false;
   try {
-    isCloud = looksUnambiguouslyCloud(await connection.getBaseUrl());
-  } catch (error) {
-    logger.warn(
-      `Could not read the base URL (${String(error)}) — treating this as not provably cloud, which asks for --require rather than assuming.`,
-    );
-  }
-  const required = requiredKeysFor(args.require, isCloud, logger);
-  logger.info(
-    `Judged on: ${required.keys.join(', ')} (${required.source}); host ${isCloud ? 'is provably ABAP Cloud' : 'is NOT provably ABAP Cloud'}.`,
-  );
+    await connection.connect();
+    logger.info(`Connected to ${sapConfig.url}`);
 
-  const rec = new Recorder(connection, outDir, logger);
-  const utils = new AdtUtils(connection, logger);
-
-  // --- 1. Where does the check variant come from, and by which verb? --------
-  const customizingGet = await rec.call(
-    'customizing-GET',
-    'PR #68 sends GET here; the spec recorded POST. Which one answers?',
-    {
-      method: 'GET',
-      url: `${ATC}/customizing`,
-      headers: { Accept: ACCEPT_ATC_CUSTOMIZING },
-    },
-  );
-  const customizingPost = await rec.call(
-    'customizing-POST',
-    'The other half of the same contradiction.',
-    {
-      method: 'POST',
-      url: `${ATC}/customizing`,
-      headers: {
-        Accept: ACCEPT_ATC_CUSTOMIZING,
-        'Content-Type': 'application/xml',
-      },
-      body: '',
-    },
-  );
-
-  await rec.call(
-    'variants',
-    'The spec claims totalItemCount 0 on the trial — i.e. customizing is the only source of a variant.',
-    {
-      method: 'GET',
-      url: `${ATC}/variants?maxItemCount=500&name=*`,
-      headers: { Accept: ACCEPT_ATC_VARIANTS },
-    },
-  );
-
-  const variantFromGet = parseSystemCheckVariant(customizingGet.body);
-  const nominatedVariant =
-    variantFromGet ?? parseSystemCheckVariant(customizingPost.body);
-  const checkVariant = args.variant ?? nominatedVariant;
-  if (!checkVariant) {
-    logger.error(
-      'No systemCheckVariant in either customizing response. Everything below needs one; stopping here with the evidence written.',
-    );
-    rec.flush({
-      system: sapConfig.url,
-      checkVariant: null,
-      verdict: 'incomplete: no check variant',
-    });
-    process.exitCode = 1;
-    return;
-  }
-  logger.info(
-    args.variant
-      ? `Check variant: ${checkVariant} (--variant; the system nominates ${nominatedVariant ?? 'none'})`
-      : `Check variant: ${checkVariant} (from ${variantFromGet ? 'GET' : 'POST'} /atc/customizing)`,
-  );
-
-  // --- 2. Representative objects for the required candidate list ------------
-  const packageName = args.packageName ?? defaultPackageFromTestConfig(logger);
-  if (!packageName) {
-    logger.error(
-      'No package to probe. Pass --package=NAME or set environment.default_package in test-config.yaml.',
-    );
-    rec.flush({
-      system: sapConfig.url,
-      checkVariant,
-      verdict: 'incomplete: no package',
-    });
-    process.exitCode = 1;
-    return;
-  }
-
-  logger.info(`Reading contents of ${packageName}`);
-
-  const readContents = async () => {
-    const items = await utils.getPackageContentsList(packageName, {
-      includeSubpackages: true,
-    });
-    const map = new Map<string, { name: string; type: string; uri?: string }>();
-    for (const item of items) {
-      if (!map.has(item.type)) {
-        map.set(item.type, { name: item.name, type: item.type, uri: item.uri });
-      }
-    }
-    return map;
-  };
-
-  /**
-   * Every object any finished worklist named, and which run's it was.
-   *
-   * The package run lists the whole package, so it can show ATC checking a
-   * type whose own run never happened — which is how a run of 2026-08-17
-   * proved FUGR and DDLS checkable while the probe reported them "never
-   * asked". Recorded separately from per-candidate confirmation, because it
-   * proves a different thing.
-   */
-  const everChecked: { worklistOf: string; type: string; name: string }[] = [];
-
-  let firstOfType = await readContents();
-  // Say what was found. The probe used to read the package silently and then
-  // report "no object of X" — which reads as a fact about the package when it
-  // may be a fact about one listing call. A run of 2026-08-17 reported FUGR/F
-  // and DDLS/DF absent while three listings before and after returned both.
-  logger.info(
-    `${packageName} listing: ${[...firstOfType.values()].map((v) => `${v.type}:${v.name}`).join(', ') || '(nothing)'}`,
-  );
-
-  const missingCloud = () =>
-    CANDIDATES.filter(
-      (c) =>
-        c.scope === 'cloud' && !c.typeCodes.some((t) => firstOfType.has(t)),
-    ).map((c) => c.key);
-
-  if (missingCloud().length) {
-    logger.warn(
-      `Listing has no representative for: ${missingCloud().join(', ')} — reading it again before believing that.`,
-    );
-    const second = await readContents();
-    logger.info(
-      `${packageName} listing (2nd): ${[...second.values()].map((v) => `${v.type}:${v.name}`).join(', ') || '(nothing)'}`,
-    );
-    if (second.size > firstOfType.size) {
+    // Read from the URL, not from an endpoint: see `looksUnambiguouslyCloud`.
+    // Anything short of proof errs towards demanding --require.
+    let isCloud = false;
+    try {
+      isCloud = looksUnambiguouslyCloud(await connection.getBaseUrl());
+    } catch (error) {
       logger.warn(
-        'The second listing returned MORE than the first — the package listing is not reliable in this session, and the larger one is used.',
+        `Could not read the base URL (${String(error)}) — treating this as not provably cloud, which asks for --require rather than assuming.`,
       );
-      firstOfType = second;
     }
-  }
-  // The probed package is its own representative for the `package` candidate:
-  // a package never appears in its own contents listing.
-  if (!firstOfType.has('DEVC/K')) {
-    firstOfType.set('DEVC/K', { name: packageName, type: 'DEVC/K' });
-  }
+    const required = requiredKeysFor(args.require, isCloud, logger);
+    logger.info(
+      `Judged on: ${required.keys.join(', ')} (${required.source}); host ${isCloud ? 'is provably ABAP Cloud' : 'is NOT provably ABAP Cloud'}.`,
+    );
 
-  const outcomes: ICandidateOutcome[] = [];
+    const rec = new Recorder(connection, outDir, logger);
+    const utils = new AdtUtils(connection, logger);
 
-  /** One worklist per run: reusing one would blur whose findings are whose. */
-  const newWorklist = async (label: string): Promise<string | null> => {
-    const res = await rec.call(
-      `worklist-${label}`,
-      'Creates the worklist the following run writes into.',
+    // --- 1. Where does the check variant come from, and by which verb? --------
+    const customizingGet = await rec.call(
+      'customizing-GET',
+      'PR #68 sends GET here; the spec recorded POST. Which one answers?',
+      {
+        method: 'GET',
+        url: `${ATC}/customizing`,
+        headers: { Accept: ACCEPT_ATC_CUSTOMIZING },
+      },
+    );
+    const customizingPost = await rec.call(
+      'customizing-POST',
+      'The other half of the same contradiction.',
       {
         method: 'POST',
-        url: `${ATC}/worklists?checkVariant=${encodeURIComponent(checkVariant)}`,
+        url: `${ATC}/customizing`,
+        headers: {
+          Accept: ACCEPT_ATC_CUSTOMIZING,
+          'Content-Type': 'application/xml',
+        },
+        body: '',
+      },
+    );
+
+    await rec.call(
+      'variants',
+      'The spec claims totalItemCount 0 on the trial — i.e. customizing is the only source of a variant.',
+      {
+        method: 'GET',
+        url: `${ATC}/variants?maxItemCount=500&name=*`,
+        headers: { Accept: ACCEPT_ATC_VARIANTS },
+      },
+    );
+
+    const variantFromGet = parseSystemCheckVariant(customizingGet.body);
+    const nominatedVariant =
+      variantFromGet ?? parseSystemCheckVariant(customizingPost.body);
+    const checkVariant = args.variant ?? nominatedVariant;
+    if (!checkVariant) {
+      logger.error(
+        'No systemCheckVariant in either customizing response. Everything below needs one; stopping here with the evidence written.',
+      );
+      rec.flush({
+        system: sapConfig.url,
+        checkVariant: null,
+        verdict: 'incomplete: no check variant',
+      });
+      process.exitCode = 1;
+      return;
+    }
+    logger.info(
+      args.variant
+        ? `Check variant: ${checkVariant} (--variant; the system nominates ${nominatedVariant ?? 'none'})`
+        : `Check variant: ${checkVariant} (from ${variantFromGet ? 'GET' : 'POST'} /atc/customizing)`,
+    );
+
+    // --- 2. Representative objects for the required candidate list ------------
+    const packageName =
+      args.packageName ?? defaultPackageFromTestConfig(logger);
+    if (!packageName) {
+      logger.error(
+        'No package to probe. Pass --package=NAME or set environment.default_package in test-config.yaml.',
+      );
+      rec.flush({
+        system: sapConfig.url,
+        checkVariant,
+        verdict: 'incomplete: no package',
+      });
+      process.exitCode = 1;
+      return;
+    }
+
+    logger.info(`Reading contents of ${packageName}`);
+
+    const readContents = async () => {
+      const items = await utils.getPackageContentsList(packageName, {
+        includeSubpackages: true,
+      });
+      const map = new Map<
+        string,
+        { name: string; type: string; uri?: string }
+      >();
+      for (const item of items) {
+        if (!map.has(item.type)) {
+          map.set(item.type, {
+            name: item.name,
+            type: item.type,
+            uri: item.uri,
+          });
+        }
+      }
+      return map;
+    };
+
+    /**
+     * Every object any finished worklist named, and which run's it was.
+     *
+     * The package run lists the whole package, so it can show ATC checking a
+     * type whose own run never happened — which is how a run of 2026-08-17
+     * proved FUGR and DDLS checkable while the probe reported them "never
+     * asked". Recorded separately from per-candidate confirmation, because it
+     * proves a different thing.
+     */
+    const everChecked: { worklistOf: string; type: string; name: string }[] =
+      [];
+
+    let firstOfType = await readContents();
+    // Say what was found. The probe used to read the package silently and then
+    // report "no object of X" — which reads as a fact about the package when it
+    // may be a fact about one listing call. A run of 2026-08-17 reported FUGR/F
+    // and DDLS/DF absent while three listings before and after returned both.
+    logger.info(
+      `${packageName} listing: ${[...firstOfType.values()].map((v) => `${v.type}:${v.name}`).join(', ') || '(nothing)'}`,
+    );
+
+    const missingCloud = () =>
+      CANDIDATES.filter(
+        (c) =>
+          c.scope === 'cloud' && !c.typeCodes.some((t) => firstOfType.has(t)),
+      ).map((c) => c.key);
+
+    if (missingCloud().length) {
+      logger.warn(
+        `Listing has no representative for: ${missingCloud().join(', ')} — reading it again before believing that.`,
+      );
+      const second = await readContents();
+      logger.info(
+        `${packageName} listing (2nd): ${[...second.values()].map((v) => `${v.type}:${v.name}`).join(', ') || '(nothing)'}`,
+      );
+      if (second.size > firstOfType.size) {
+        logger.warn(
+          'The second listing returned MORE than the first — the package listing is not reliable in this session, and the larger one is used.',
+        );
+        firstOfType = second;
+      }
+    }
+    // The probed package is its own representative for the `package` candidate:
+    // a package never appears in its own contents listing.
+    if (!firstOfType.has('DEVC/K')) {
+      firstOfType.set('DEVC/K', { name: packageName, type: 'DEVC/K' });
+    }
+
+    const outcomes: ICandidateOutcome[] = [];
+
+    /** One worklist per run: reusing one would blur whose findings are whose. */
+    const newWorklist = async (label: string): Promise<string | null> => {
+      const res = await rec.call(
+        `worklist-${label}`,
+        'Creates the worklist the following run writes into.',
+        {
+          method: 'POST',
+          url: `${ATC}/worklists?checkVariant=${encodeURIComponent(checkVariant)}`,
+          headers: {
+            'Content-Type': CT_ATC_WORKLIST_CREATE,
+            Accept: ACCEPT_ATC_WORKLIST_ID,
+          },
+          body: '',
+        },
+      );
+      const id = parseWorklistId(res.body);
+      if (!id) {
+        logger.warn(
+          `No worklist id parsed from ${label}: ${res.body.slice(0, 120)}`,
+        );
+      }
+      return id;
+    };
+
+    /**
+     * Runs the server accepted, in order. An array rather than a `let`: the push
+     * happens inside `runAt`'s closure, which TypeScript's flow analysis does not
+     * follow, so a nullable variable narrows to `null` at the read below and
+     * makes the whole run-id block unreachable.
+     */
+    const acceptedRuns: { run: ICallResult; worklistId: string }[] = [];
+
+    /**
+     * Which objects a finished worklist says were checked, as {type, name}.
+     *
+     * The type is not decoration. A run at `/programs/programs/{NAME}` can come
+     * back listing a `PROG` of that name, and a name-only match would then
+     * confirm `include` on the evidence of a program — which is the one mapping
+     * question this probe exists to settle.
+     */
+    function objectsIn(worklistXml: string): { type: string; name: string }[] {
+      return [...worklistXml.matchAll(/<atcobject:object[^>]*>/g)]
+        .map((m) => m[0])
+        .map((tag) => ({
+          type: tag.match(/adtcore:type="([^"]+)"/)?.[1] ?? '',
+          name: tag.match(/adtcore:name="([^"]+)"/)?.[1] ?? '',
+        }))
+        .filter((o) => o.name);
+    }
+
+    /**
+     * Poll the run resource until it reports finished.
+     *
+     * This is the whole difference between a measurement and a coin toss.
+     * Reading a worklist before the checks finish returns one that is empty
+     * whatever the object was — the same bytes a run over a URI that cannot
+     * exist produces — so the earlier version of this probe manufactured the
+     * exact ambiguity the spec warns about. Raised in review, 2026-08-16.
+     */
+    const waitForRun = async (
+      label: string,
+      run: ICallResult,
+    ): Promise<{ finished: boolean; status: string | null }> => {
+      const location =
+        header(run.headers, 'location') ??
+        header(run.headers, 'content-location');
+      if (!location) {
+        logger.warn(
+          `${label}: the run carried no Location, so there is no run resource to wait on`,
+        );
+        return { finished: false, status: null };
+      }
+      const runId = location.split('/').filter(Boolean).pop() ?? location;
+      const url = location.startsWith('/')
+        ? location
+        : `${ATC}/runs/${encodeURIComponent(runId)}`;
+
+      for (let attempt = 1; attempt <= RUN_POLL_ATTEMPTS; attempt++) {
+        const res = await rec.call(
+          `status-${label}-${attempt}`,
+          'Has this run finished? The worklist means nothing until it has.',
+          { method: 'GET', url, headers: { Accept: ACCEPT_ATC_RUN_STATUS } },
+        );
+        const status = res.body.match(/runs:status="([^"]+)"/)?.[1] ?? null;
+        // Exact, case-normalised — the same test `IAtcRunStatus.isFinished` will
+        // make. A substring match accepts `unfinished` and `not_finished`, which
+        // would open the worklist early and could confirm a type on a run that
+        // had not run. Raised in review, 2026-08-16.
+        if (status?.trim().toLowerCase() === 'finished') {
+          return { finished: true, status };
+        }
+        logger.info(`${label}: run status ${status ?? 'unreadable'}, waiting…`);
+        await new Promise((r) => setTimeout(r, RUN_POLL_DELAY_MS));
+      }
+      return { finished: false, status: 'gave up waiting' };
+    };
+
+    /**
+     * Start a run, wait for it, and read the worklist it wrote into.
+     *
+     * Returns what the evidence rule needs: whether the run finished, and which
+     * objects the finished worklist lists.
+     */
+    const runAt = async (
+      label: string,
+      answers: string,
+      uris: string[],
+      options?: { readBack?: boolean; maximumVerdicts?: number },
+    ): Promise<{
+      run: ICallResult;
+      worklistId: string;
+      finished: boolean;
+      objects: { type: string; name: string }[];
+    } | null> => {
+      const worklistId = await newWorklist(label);
+      if (!worklistId) return null;
+      const run = await rec.call(`run-${label}`, answers, {
+        method: 'POST',
+        url: `${ATC}/runs?worklistId=${encodeURIComponent(worklistId)}&clientWait=false`,
+        headers: {
+          'Content-Type': CT_ATC_RUN,
+          Accept: ACCEPT_ATC_RUN_RESPONSE,
+        },
+        body: runBody(uris, options?.maximumVerdicts ?? 100),
+      });
+      // The first run the server accepted is the one every id question is asked
+      // against — it does not matter which candidate produced it.
+      if (run.status !== null && run.status >= 200 && run.status < 300) {
+        acceptedRuns.push({ run, worklistId });
+      }
+
+      let finished = false;
+      let objects: { type: string; name: string }[] = [];
+      if (options?.readBack !== false) {
+        ({ finished } = await waitForRun(label, run));
+        const findings = await rec.call(
+          `findings-${label}`,
+          finished
+            ? 'The finished worklist: every object it lists was checked, findings or not.'
+            : 'The worklist, read WITHOUT a finished run — recorded, but it proves nothing.',
+          {
+            method: 'GET',
+            url: `${ATC}/worklists/${encodeURIComponent(worklistId)}?includeExemptedFindings=false`,
+            headers: { Accept: ACCEPT_ATC_WORKLIST_XML },
+          },
+        );
+        if (finished) {
+          objects = objectsIn(findings.body);
+          for (const o of objects) {
+            everChecked.push({ worklistOf: label, type: o.type, name: o.name });
+          }
+        }
+      }
+      return { run, worklistId, finished, objects };
+    };
+
+    // --- 3. The blocker, measured against the required list ------------------
+    for (const candidate of CANDIDATES) {
+      const outcome: ICandidateOutcome = {
+        key: candidate.key,
+        mappedBy68: candidate.mappedBy68,
+        representative: null,
+        attempts: [],
+        attempted: false,
+        finished: false,
+        confirmed: false,
+      };
+      outcomes.push(outcome);
+
+      const found = candidate.typeCodes
+        .map((code) => firstOfType.get(code))
+        .find((hit) => hit !== undefined);
+
+      if (!found) {
+        outcome.reason = `no object of ${candidate.typeCodes.join(' / ')} in ${packageName}`;
+        logger.warn(`UNMEASURED ${candidate.key}: ${outcome.reason}`);
+        continue;
+      }
+      outcome.representative = {
+        name: found.name,
+        type: found.type,
+        adtUri: found.uri,
+      };
+
+      // Encoded then uppercased, which is what #68 does (`encodeSapObjectName`
+      // then `.toUpperCase()`). Mirroring it is the point: the URI under test has
+      // to be the one a client would build, quirks included.
+      const encoded = encodeURIComponent(found.name).toUpperCase();
+      for (const template of candidate.templates) {
+        const uri = template.build(encoded);
+        const label = `${candidate.key}-${template.label.replace(/[^a-z0-9]+/gi, '-')}`;
+        const result = await runAt(
+          label,
+          `Is ${candidate.key} checkable at a URI a client BUILDS (${template.label})? This is the AtcObjectType blocker — ${found.name}.`,
+          [uri],
+        );
+        // The evidence rule: the finished worklist lists an object of THIS type
+        // under THIS name. Both halves, for the reason in objectsIn.
+        const listed =
+          result?.finished === true &&
+          result.objects.some(
+            (o) =>
+              o.name.toUpperCase() === found.name.toUpperCase() &&
+              o.type.toUpperCase() === candidate.worklistTypeCode,
+          );
+
+        outcome.attempts.push({
+          template: template.label,
+          uri,
+          step: result?.run.step ?? -1,
+          status: result?.run.status ?? null,
+          finished: result?.finished ?? false,
+          objectsListed: result?.objects ?? [],
+          confirmed: listed,
+        });
+
+        if (result) {
+          outcome.attempted = true;
+          if (result.finished) outcome.finished = true;
+          if (listed) {
+            outcome.confirmed = true;
+            // The template that did it, so the manifest names the mapping rather
+            // than only the verdict.
+            outcome.confirmedBy = template.label;
+          }
+        }
+      }
+
+      // ADT's own URI, only when no built URI already matched it — otherwise the
+      // two are the same request and running it twice would prove nothing.
+      const builtUris = outcome.attempts.map((a) => a.uri);
+      if (found.uri && !builtUris.includes(found.uri)) {
+        const result = await runAt(
+          `${candidate.key}-adt-uri`,
+          `The URI ADT itself returned for ${found.name}, which differs from every template above — so the difference gets measured rather than assumed away.`,
+          [found.uri],
+        );
+        if (result) {
+          outcome.adtUriAttempt = {
+            uri: found.uri,
+            step: result.run.step,
+            status: result.run.status,
+          };
+        }
+      }
+    }
+
+    // Cross-reference: a type whose own run never happened may still have been
+    // checked in somebody else's worklist. Weaker evidence, recorded as such.
+    for (const outcome of outcomes) {
+      if (outcome.confirmed) continue;
+      const candidate = CANDIDATES.find((c) => c.key === outcome.key);
+      if (!candidate) continue;
+      const hit = everChecked.find(
+        (e) => e.type.toUpperCase() === candidate.worklistTypeCode,
+      );
+      if (hit) {
+        outcome.seenCheckedInSomeWorklist = {
+          worklistOf: hit.worklistOf,
+          name: hit.name,
+        };
+        logger.info(
+          `${outcome.key}: not confirmed at a built URI, but ATC checked ${hit.type}:${hit.name} in the ${hit.worklistOf} worklist — the TYPE is checkable, the template is still unproven.`,
+        );
+      }
+    }
+
+    // --- 3b. A known-bad object, if one was named -----------------------------
+    // FINDING_STATS can only be decoded from a run that found something. Every
+    // representative above was picked for its TYPE, not for being dirty, so they
+    // may all be clean — and three zeroes look the same in any severity order.
+    if (args.knownBadType && args.knownBadName) {
+      const candidate = CANDIDATES.find((c) => c.key === args.knownBadType);
+      if (!candidate) {
+        logger.error(
+          `--known-bad names an unknown type "${args.knownBadType}". Known: ${CANDIDATES.map((c) => c.key).join(', ')}`,
+        );
+      } else {
+        const encoded = encodeURIComponent(args.knownBadName).toUpperCase();
+        const uri = candidate.templates[0].build(encoded);
+
+        // **clientWait=true, and that is the point.** `clientWait=false` answers
+        // 201 with an EMPTY body — no FINDING_STATS at all — so running the
+        // known-bad object that way could only ever show findings in a worklist,
+        // never the triple whose positions this flag exists to decode. Only the
+        // waiting mode returns `<atcworklist:worklistRun>` with the counts, and
+        // it has to be THIS object: a clean one gives 0,0,0, which reads the
+        // same in any severity order. Raised in review, 2026-08-16.
+        const knownBadWorklist = await newWorklist('known-bad');
+        if (knownBadWorklist) {
+          await rec.call(
+            'run-known-bad-clientWait-true',
+            `An object expected to FAIL its checks (${args.knownBadName}), run in the waiting mode — the only one that answers with FINDING_STATS.`,
+            {
+              method: 'POST',
+              url: `${ATC}/runs?worklistId=${encodeURIComponent(knownBadWorklist)}&clientWait=true`,
+              headers: {
+                'Content-Type': CT_ATC_RUN,
+                Accept: ACCEPT_ATC_RUN_RESPONSE,
+              },
+              body: runBody([uri], 100),
+            },
+          );
+          await rec.call(
+            'findings-known-bad',
+            'The worklist for that same run: the findings whose priorities the triple has to be read against.',
+            {
+              method: 'GET',
+              url: `${ATC}/worklists/${encodeURIComponent(knownBadWorklist)}?includeExemptedFindings=false`,
+              headers: { Accept: ACCEPT_ATC_WORKLIST_XML },
+            },
+          );
+        }
+      }
+    } else {
+      logger.warn(
+        'No --known-bad given: if every representative is clean, FINDING_STATS will read 0,0,0 everywhere and the positions stay undecoded.',
+      );
+    }
+
+    // --- 3c. A run that should FAIL -------------------------------------------
+    // "Poll until finished" has no stopping condition unless a failed run reports
+    // something other than finished, and nobody has seen one. --known-bad does
+    // not answer this: an object with findings still produces a run that
+    // succeeds. Raised in review, 2026-08-17.
+    //
+    // The cheapest deliberate failure is a check variant that does not exist. It
+    // may well be refused at worklist creation rather than producing a failed
+    // run — in which case the question stays open, and the manifest says so
+    // instead of the spec claiming a coverage it does not have.
+    const bogusVariant = 'ZZ_NO_SUCH_CHECK_VARIANT_PROBE';
+    const bogusWorklist = await rec.call(
+      'worklist-bogus-variant',
+      'A worklist against a check variant that does not exist — the cheapest way to try to produce a run that fails.',
+      {
+        method: 'POST',
+        url: `${ATC}/worklists?checkVariant=${encodeURIComponent(bogusVariant)}`,
         headers: {
           'Content-Type': CT_ATC_WORKLIST_CREATE,
           Accept: ACCEPT_ATC_WORKLIST_ID,
@@ -997,868 +1336,549 @@ async function main(): Promise<void> {
         body: '',
       },
     );
-    const id = parseWorklistId(res.body);
-    if (!id) {
+    const bogusWorklistId = parseWorklistId(bogusWorklist.body);
+    if (!bogusWorklistId) {
       logger.warn(
-        `No worklist id parsed from ${label}: ${res.body.slice(0, 120)}`,
+        `A bogus check variant was refused at worklist creation (${bogusWorklist.status}), so no run was produced. What a FAILED run reports stays unanswered.`,
       );
-    }
-    return id;
-  };
-
-  /**
-   * Runs the server accepted, in order. An array rather than a `let`: the push
-   * happens inside `runAt`'s closure, which TypeScript's flow analysis does not
-   * follow, so a nullable variable narrows to `null` at the read below and
-   * makes the whole run-id block unreachable.
-   */
-  const acceptedRuns: { run: ICallResult; worklistId: string }[] = [];
-
-  /**
-   * Which objects a finished worklist says were checked, as {type, name}.
-   *
-   * The type is not decoration. A run at `/programs/programs/{NAME}` can come
-   * back listing a `PROG` of that name, and a name-only match would then
-   * confirm `include` on the evidence of a program — which is the one mapping
-   * question this probe exists to settle.
-   */
-  function objectsIn(worklistXml: string): { type: string; name: string }[] {
-    return [...worklistXml.matchAll(/<atcobject:object[^>]*>/g)]
-      .map((m) => m[0])
-      .map((tag) => ({
-        type: tag.match(/adtcore:type="([^"]+)"/)?.[1] ?? '',
-        name: tag.match(/adtcore:name="([^"]+)"/)?.[1] ?? '',
-      }))
-      .filter((o) => o.name);
-  }
-
-  /**
-   * Poll the run resource until it reports finished.
-   *
-   * This is the whole difference between a measurement and a coin toss.
-   * Reading a worklist before the checks finish returns one that is empty
-   * whatever the object was — the same bytes a run over a URI that cannot
-   * exist produces — so the earlier version of this probe manufactured the
-   * exact ambiguity the spec warns about. Raised in review, 2026-08-16.
-   */
-  const waitForRun = async (
-    label: string,
-    run: ICallResult,
-  ): Promise<{ finished: boolean; status: string | null }> => {
-    const location =
-      header(run.headers, 'location') ??
-      header(run.headers, 'content-location');
-    if (!location) {
-      logger.warn(
-        `${label}: the run carried no Location, so there is no run resource to wait on`,
-      );
-      return { finished: false, status: null };
-    }
-    const runId = location.split('/').filter(Boolean).pop() ?? location;
-    const url = location.startsWith('/')
-      ? location
-      : `${ATC}/runs/${encodeURIComponent(runId)}`;
-
-    for (let attempt = 1; attempt <= RUN_POLL_ATTEMPTS; attempt++) {
-      const res = await rec.call(
-        `status-${label}-${attempt}`,
-        'Has this run finished? The worklist means nothing until it has.',
-        { method: 'GET', url, headers: { Accept: ACCEPT_ATC_RUN_STATUS } },
-      );
-      const status = res.body.match(/runs:status="([^"]+)"/)?.[1] ?? null;
-      // Exact, case-normalised — the same test `IAtcRunStatus.isFinished` will
-      // make. A substring match accepts `unfinished` and `not_finished`, which
-      // would open the worklist early and could confirm a type on a run that
-      // had not run. Raised in review, 2026-08-16.
-      if (status?.trim().toLowerCase() === 'finished') {
-        return { finished: true, status };
-      }
-      logger.info(`${label}: run status ${status ?? 'unreadable'}, waiting…`);
-      await new Promise((r) => setTimeout(r, RUN_POLL_DELAY_MS));
-    }
-    return { finished: false, status: 'gave up waiting' };
-  };
-
-  /**
-   * Start a run, wait for it, and read the worklist it wrote into.
-   *
-   * Returns what the evidence rule needs: whether the run finished, and which
-   * objects the finished worklist lists.
-   */
-  const runAt = async (
-    label: string,
-    answers: string,
-    uris: string[],
-    options?: { readBack?: boolean; maximumVerdicts?: number },
-  ): Promise<{
-    run: ICallResult;
-    worklistId: string;
-    finished: boolean;
-    objects: { type: string; name: string }[];
-  } | null> => {
-    const worklistId = await newWorklist(label);
-    if (!worklistId) return null;
-    const run = await rec.call(`run-${label}`, answers, {
-      method: 'POST',
-      url: `${ATC}/runs?worklistId=${encodeURIComponent(worklistId)}&clientWait=false`,
-      headers: { 'Content-Type': CT_ATC_RUN, Accept: ACCEPT_ATC_RUN_RESPONSE },
-      body: runBody(uris, options?.maximumVerdicts ?? 100),
-    });
-    // The first run the server accepted is the one every id question is asked
-    // against — it does not matter which candidate produced it.
-    if (run.status !== null && run.status >= 200 && run.status < 300) {
-      acceptedRuns.push({ run, worklistId });
-    }
-
-    let finished = false;
-    let objects: { type: string; name: string }[] = [];
-    if (options?.readBack !== false) {
-      ({ finished } = await waitForRun(label, run));
-      const findings = await rec.call(
-        `findings-${label}`,
-        finished
-          ? 'The finished worklist: every object it lists was checked, findings or not.'
-          : 'The worklist, read WITHOUT a finished run — recorded, but it proves nothing.',
+    } else if (outcomes.some((o) => o.attempted && o.attempts.length > 0)) {
+      const failing = await rec.call(
+        'run-bogus-variant',
+        'A run under a check variant that does not exist. Acceptance proves nothing on its own — the server may fall back to a real variant, or run to an end and record the problem elsewhere. What follows is sampling, not a verdict.',
         {
-          method: 'GET',
-          url: `${ATC}/worklists/${encodeURIComponent(worklistId)}?includeExemptedFindings=false`,
-          headers: { Accept: ACCEPT_ATC_WORKLIST_XML },
-        },
-      );
-      if (finished) {
-        objects = objectsIn(findings.body);
-        for (const o of objects) {
-          everChecked.push({ worklistOf: label, type: o.type, name: o.name });
-        }
-      }
-    }
-    return { run, worklistId, finished, objects };
-  };
-
-  // --- 3. The blocker, measured against the required list ------------------
-  for (const candidate of CANDIDATES) {
-    const outcome: ICandidateOutcome = {
-      key: candidate.key,
-      mappedBy68: candidate.mappedBy68,
-      representative: null,
-      attempts: [],
-      attempted: false,
-      finished: false,
-      confirmed: false,
-    };
-    outcomes.push(outcome);
-
-    const found = candidate.typeCodes
-      .map((code) => firstOfType.get(code))
-      .find((hit) => hit !== undefined);
-
-    if (!found) {
-      outcome.reason = `no object of ${candidate.typeCodes.join(' / ')} in ${packageName}`;
-      logger.warn(`UNMEASURED ${candidate.key}: ${outcome.reason}`);
-      continue;
-    }
-    outcome.representative = {
-      name: found.name,
-      type: found.type,
-      adtUri: found.uri,
-    };
-
-    // Encoded then uppercased, which is what #68 does (`encodeSapObjectName`
-    // then `.toUpperCase()`). Mirroring it is the point: the URI under test has
-    // to be the one a client would build, quirks included.
-    const encoded = encodeURIComponent(found.name).toUpperCase();
-    for (const template of candidate.templates) {
-      const uri = template.build(encoded);
-      const label = `${candidate.key}-${template.label.replace(/[^a-z0-9]+/gi, '-')}`;
-      const result = await runAt(
-        label,
-        `Is ${candidate.key} checkable at a URI a client BUILDS (${template.label})? This is the AtcObjectType blocker — ${found.name}.`,
-        [uri],
-      );
-      // The evidence rule: the finished worklist lists an object of THIS type
-      // under THIS name. Both halves, for the reason in objectsIn.
-      const listed =
-        result?.finished === true &&
-        result.objects.some(
-          (o) =>
-            o.name.toUpperCase() === found.name.toUpperCase() &&
-            o.type.toUpperCase() === candidate.worklistTypeCode,
-        );
-
-      outcome.attempts.push({
-        template: template.label,
-        uri,
-        step: result?.run.step ?? -1,
-        status: result?.run.status ?? null,
-        finished: result?.finished ?? false,
-        objectsListed: result?.objects ?? [],
-        confirmed: listed,
-      });
-
-      if (result) {
-        outcome.attempted = true;
-        if (result.finished) outcome.finished = true;
-        if (listed) {
-          outcome.confirmed = true;
-          // The template that did it, so the manifest names the mapping rather
-          // than only the verdict.
-          outcome.confirmedBy = template.label;
-        }
-      }
-    }
-
-    // ADT's own URI, only when no built URI already matched it — otherwise the
-    // two are the same request and running it twice would prove nothing.
-    const builtUris = outcome.attempts.map((a) => a.uri);
-    if (found.uri && !builtUris.includes(found.uri)) {
-      const result = await runAt(
-        `${candidate.key}-adt-uri`,
-        `The URI ADT itself returned for ${found.name}, which differs from every template above — so the difference gets measured rather than assumed away.`,
-        [found.uri],
-      );
-      if (result) {
-        outcome.adtUriAttempt = {
-          uri: found.uri,
-          step: result.run.step,
-          status: result.run.status,
-        };
-      }
-    }
-  }
-
-  // Cross-reference: a type whose own run never happened may still have been
-  // checked in somebody else's worklist. Weaker evidence, recorded as such.
-  for (const outcome of outcomes) {
-    if (outcome.confirmed) continue;
-    const candidate = CANDIDATES.find((c) => c.key === outcome.key);
-    if (!candidate) continue;
-    const hit = everChecked.find(
-      (e) => e.type.toUpperCase() === candidate.worklistTypeCode,
-    );
-    if (hit) {
-      outcome.seenCheckedInSomeWorklist = {
-        worklistOf: hit.worklistOf,
-        name: hit.name,
-      };
-      logger.info(
-        `${outcome.key}: not confirmed at a built URI, but ATC checked ${hit.type}:${hit.name} in the ${hit.worklistOf} worklist — the TYPE is checkable, the template is still unproven.`,
-      );
-    }
-  }
-
-  // --- 3b. A known-bad object, if one was named -----------------------------
-  // FINDING_STATS can only be decoded from a run that found something. Every
-  // representative above was picked for its TYPE, not for being dirty, so they
-  // may all be clean — and three zeroes look the same in any severity order.
-  if (args.knownBadType && args.knownBadName) {
-    const candidate = CANDIDATES.find((c) => c.key === args.knownBadType);
-    if (!candidate) {
-      logger.error(
-        `--known-bad names an unknown type "${args.knownBadType}". Known: ${CANDIDATES.map((c) => c.key).join(', ')}`,
-      );
-    } else {
-      const encoded = encodeURIComponent(args.knownBadName).toUpperCase();
-      const uri = candidate.templates[0].build(encoded);
-
-      // **clientWait=true, and that is the point.** `clientWait=false` answers
-      // 201 with an EMPTY body — no FINDING_STATS at all — so running the
-      // known-bad object that way could only ever show findings in a worklist,
-      // never the triple whose positions this flag exists to decode. Only the
-      // waiting mode returns `<atcworklist:worklistRun>` with the counts, and
-      // it has to be THIS object: a clean one gives 0,0,0, which reads the
-      // same in any severity order. Raised in review, 2026-08-16.
-      const knownBadWorklist = await newWorklist('known-bad');
-      if (knownBadWorklist) {
-        await rec.call(
-          'run-known-bad-clientWait-true',
-          `An object expected to FAIL its checks (${args.knownBadName}), run in the waiting mode — the only one that answers with FINDING_STATS.`,
-          {
-            method: 'POST',
-            url: `${ATC}/runs?worklistId=${encodeURIComponent(knownBadWorklist)}&clientWait=true`,
-            headers: {
-              'Content-Type': CT_ATC_RUN,
-              Accept: ACCEPT_ATC_RUN_RESPONSE,
-            },
-            body: runBody([uri], 100),
+          method: 'POST',
+          url: `${ATC}/runs?worklistId=${encodeURIComponent(bogusWorklistId)}&clientWait=false`,
+          headers: {
+            'Content-Type': CT_ATC_RUN,
+            Accept: ACCEPT_ATC_RUN_RESPONSE,
           },
-        );
-        await rec.call(
-          'findings-known-bad',
-          'The worklist for that same run: the findings whose priorities the triple has to be read against.',
-          {
-            method: 'GET',
-            url: `${ATC}/worklists/${encodeURIComponent(knownBadWorklist)}?includeExemptedFindings=false`,
-            headers: { Accept: ACCEPT_ATC_WORKLIST_XML },
-          },
-        );
-      }
-    }
-  } else {
-    logger.warn(
-      'No --known-bad given: if every representative is clean, FINDING_STATS will read 0,0,0 everywhere and the positions stay undecoded.',
-    );
-  }
-
-  // --- 3c. A run that should FAIL -------------------------------------------
-  // "Poll until finished" has no stopping condition unless a failed run reports
-  // something other than finished, and nobody has seen one. --known-bad does
-  // not answer this: an object with findings still produces a run that
-  // succeeds. Raised in review, 2026-08-17.
-  //
-  // The cheapest deliberate failure is a check variant that does not exist. It
-  // may well be refused at worklist creation rather than producing a failed
-  // run — in which case the question stays open, and the manifest says so
-  // instead of the spec claiming a coverage it does not have.
-  const bogusVariant = 'ZZ_NO_SUCH_CHECK_VARIANT_PROBE';
-  const bogusWorklist = await rec.call(
-    'worklist-bogus-variant',
-    'A worklist against a check variant that does not exist — the cheapest way to try to produce a run that fails.',
-    {
-      method: 'POST',
-      url: `${ATC}/worklists?checkVariant=${encodeURIComponent(bogusVariant)}`,
-      headers: {
-        'Content-Type': CT_ATC_WORKLIST_CREATE,
-        Accept: ACCEPT_ATC_WORKLIST_ID,
-      },
-      body: '',
-    },
-  );
-  const bogusWorklistId = parseWorklistId(bogusWorklist.body);
-  if (!bogusWorklistId) {
-    logger.warn(
-      `A bogus check variant was refused at worklist creation (${bogusWorklist.status}), so no run was produced. What a FAILED run reports stays unanswered.`,
-    );
-  } else if (outcomes.some((o) => o.attempted && o.attempts.length > 0)) {
-    const failing = await rec.call(
-      'run-bogus-variant',
-      'A run under a check variant that does not exist. Acceptance proves nothing on its own — the server may fall back to a real variant, or run to an end and record the problem elsewhere. What follows is sampling, not a verdict.',
-      {
-        method: 'POST',
-        url: `${ATC}/runs?worklistId=${encodeURIComponent(bogusWorklistId)}&clientWait=false`,
-        headers: {
-          'Content-Type': CT_ATC_RUN,
-          Accept: ACCEPT_ATC_RUN_RESPONSE,
-        },
-        body: runBody(
-          [
-            // biome-ignore lint/style/noNonNullAssertion: guarded by the some() above
-            outcomes.find((o) => o.attempted && o.attempts.length > 0)!
-              .attempts[0].uri,
-          ],
-          100,
-        ),
-      },
-    );
-    const loc =
-      header(failing.headers, 'location') ??
-      header(failing.headers, 'content-location');
-    if (loc) {
-      const url = loc.startsWith('/')
-        ? loc
-        : `${ATC}/runs/${encodeURIComponent(loc)}`;
-      // Deliberately NOT waitForRun: that loops on anything that is not
-      // `finished`, which is exactly what a failed run may be.
-      //
-      // And deliberately no early exit on "not running". An earlier version
-      // stopped at the first status other than `running` and called it
-      // terminal — which would mistake `queued`, `scheduled` or any state
-      // nobody has seen for the end of the run. There is no list of
-      // non-terminal states to test against; that list is what is missing.
-      // Raised in review, 2026-08-17.
-      //
-      // So: poll to a fixed bound, record every status, and let a human read
-      // the sequence. A value that repeats to the bound is a candidate
-      // terminal state, not a proven one.
-      const seen: string[] = [];
-      // The count lives here and nowhere else: the spec describes the sequence
-      // as bounded rather than naming a number, because every number this
-      // session put in prose drifted from the code that produced it.
-      const STATUS_SAMPLES = 8;
-      for (let attempt = 1; attempt <= STATUS_SAMPLES; attempt++) {
-        const st = await rec.call(
-          `status-bogus-variant-${attempt}`,
-          'The status of a run under a variant that does not exist, sampled to a fixed bound. The SEQUENCE is the evidence; no single value is read as terminal.',
-          { method: 'GET', url, headers: { Accept: ACCEPT_ATC_RUN_STATUS } },
-        );
-        seen.push(st.body.match(/runs:status="([^"]+)"/)?.[1] ?? 'unreadable');
-        await new Promise((r) => setTimeout(r, RUN_POLL_DELAY_MS));
-      }
-      logger.info(`bogus-variant status sequence: ${seen.join(' → ')}`);
-
-      // Independent evidence, because a bogus variant being ACCEPTED does not
-      // mean the run failed: the server may fall back to a real variant, or
-      // run to an end and record the problem elsewhere. Captured for
-      // comparison against a healthy run — a worklist that looks ordinary is
-      // not proof that nothing failed, since `finished` marks completion
-      // rather than success.
-      await rec.call(
-        'findings-bogus-variant',
-        'The worklist of the bogus-variant run, captured for comparison against a healthy one. Nothing here is classified: `finished` marks completion, not success, so a normal-looking worklist is not proof the run succeeded.',
-        {
-          method: 'GET',
-          url: `${ATC}/worklists/${encodeURIComponent(bogusWorklistId)}?includeExemptedFindings=false`,
-          headers: { Accept: ACCEPT_ATC_WORKLIST_XML },
+          body: runBody(
+            [
+              // biome-ignore lint/style/noNonNullAssertion: guarded by the some() above
+              outcomes.find((o) => o.attempted && o.attempts.length > 0)!
+                .attempts[0].uri,
+            ],
+            100,
+          ),
         },
       );
-      // The run resource links to a THIRD id under /atc/results/. Two log
-      // resources hang off it — the EXECUTION log at /results/{id}/log and the
-      // CHECK-FAILURE logs at /atc/checkfailures/logs — and a failure could be
-      // recorded in either, or in neither. Both are fetched below, the way
-      // src/runtime/atc/logs.ts issues them.
-      const lastStatus = await rec.call(
-        'status-bogus-variant-final',
-        'One more status read, to take the results link out of it — and the ninth sample of the status, which counts like the other eight.',
-        { method: 'GET', url, headers: { Accept: ACCEPT_ATC_RUN_STATUS } },
-      );
-      const finalValue =
-        lastStatus.body.match(/runs:status="([^"]+)"/)?.[1] ?? 'unreadable';
+      const loc =
+        header(failing.headers, 'location') ??
+        header(failing.headers, 'content-location');
+      if (loc) {
+        const url = loc.startsWith('/')
+          ? loc
+          : `${ATC}/runs/${encodeURIComponent(loc)}`;
+        // Deliberately NOT waitForRun: that loops on anything that is not
+        // `finished`, which is exactly what a failed run may be.
+        //
+        // And deliberately no early exit on "not running". An earlier version
+        // stopped at the first status other than `running` and called it
+        // terminal — which would mistake `queued`, `scheduled` or any state
+        // nobody has seen for the end of the run. There is no list of
+        // non-terminal states to test against; that list is what is missing.
+        // Raised in review, 2026-08-17.
+        //
+        // So: poll to a fixed bound, record every status, and let a human read
+        // the sequence. A value that repeats to the bound is a candidate
+        // terminal state, not a proven one.
+        const seen: string[] = [];
+        // The count lives here and nowhere else: the spec describes the sequence
+        // as bounded rather than naming a number, because every number this
+        // session put in prose drifted from the code that produced it.
+        const STATUS_SAMPLES = 8;
+        for (let attempt = 1; attempt <= STATUS_SAMPLES; attempt++) {
+          const st = await rec.call(
+            `status-bogus-variant-${attempt}`,
+            'The status of a run under a variant that does not exist, sampled to a fixed bound. The SEQUENCE is the evidence; no single value is read as terminal.',
+            { method: 'GET', url, headers: { Accept: ACCEPT_ATC_RUN_STATUS } },
+          );
+          seen.push(
+            st.body.match(/runs:status="([^"]+)"/)?.[1] ?? 'unreadable',
+          );
+          await new Promise((r) => setTimeout(r, RUN_POLL_DELAY_MS));
+        }
+        logger.info(`bogus-variant status sequence: ${seen.join(' → ')}`);
 
-      // This read can be the FIRST to show `finished`, and the worklist above
-      // was taken before it. Left alone that produces a third case the spec
-      // does not describe: completion observed, but only after part of the
-      // evidence was captured. So re-read the worklist here, and every capture
-      // is then on the same side of the marker. Raised in review, 2026-08-17.
-      const finishedOnlyNow =
-        finalValue.trim().toLowerCase() === 'finished' &&
-        !seen.some((v) => v.trim().toLowerCase() === 'finished');
-      if (finishedOnlyNow) {
+        // Independent evidence, because a bogus variant being ACCEPTED does not
+        // mean the run failed: the server may fall back to a real variant, or
+        // run to an end and record the problem elsewhere. Captured for
+        // comparison against a healthy run — a worklist that looks ordinary is
+        // not proof that nothing failed, since `finished` marks completion
+        // rather than success.
         await rec.call(
-          'findings-bogus-variant-after-finished',
-          'The worklist again, now that a `finished` has been seen. The earlier read predates the marker and is kept for the comparison, not as the final state.',
+          'findings-bogus-variant',
+          'The worklist of the bogus-variant run, captured for comparison against a healthy one. Nothing here is classified: `finished` marks completion, not success, so a normal-looking worklist is not proof the run succeeded.',
           {
             method: 'GET',
             url: `${ATC}/worklists/${encodeURIComponent(bogusWorklistId)}?includeExemptedFindings=false`,
             headers: { Accept: ACCEPT_ATC_WORKLIST_XML },
           },
         );
-      }
-      seen.push(finalValue);
+        // The run resource links to a THIRD id under /atc/results/. Two log
+        // resources hang off it — the EXECUTION log at /results/{id}/log and the
+        // CHECK-FAILURE logs at /atc/checkfailures/logs — and a failure could be
+        // recorded in either, or in neither. Both are fetched below, the way
+        // src/runtime/atc/logs.ts issues them.
+        const lastStatus = await rec.call(
+          'status-bogus-variant-final',
+          'One more status read, to take the results link out of it — and the ninth sample of the status, which counts like the other eight.',
+          { method: 'GET', url, headers: { Accept: ACCEPT_ATC_RUN_STATUS } },
+        );
+        const finalValue =
+          lastStatus.body.match(/runs:status="([^"]+)"/)?.[1] ?? 'unreadable';
 
-      const resultsHref = lastStatus.body.match(
-        /href="([^"]*\/atc\/results\/[^"]*)"/,
-      )?.[1];
-      if (resultsHref) {
-        await rec.call(
-          'results-bogus-variant',
-          'The run result resource for the bogus-variant run — one of four captures a failure could be represented in.',
-          {
-            method: 'GET',
-            url: resultsHref,
-            headers: { Accept: 'application/xml' },
-          },
-        );
-        // The EXECUTION log — one of two, and the client sends a relation
-        // header with it. Omitting the header is itself a way to get a 4xx
-        // that says nothing about whether a failure was recorded.
-        await rec.call(
-          'results-executionlog-bogus-variant',
-          'The EXECUTION log for this run, as src/runtime/atc/logs.ts getExecutionLog issues it — relation header included.',
-          {
-            method: 'GET',
-            url: `${resultsHref}/log`,
-            headers: {
-              Accept: 'application/xml',
-              'X-sap-adt-relation':
-                'http://www.sap.com/adt/atc/relations/results/log',
+        // This read can be the FIRST to show `finished`, and the worklist above
+        // was taken before it. Left alone that produces a third case the spec
+        // does not describe: completion observed, but only after part of the
+        // evidence was captured. So re-read the worklist here, and every capture
+        // is then on the same side of the marker. Raised in review, 2026-08-17.
+        const finishedOnlyNow =
+          finalValue.trim().toLowerCase() === 'finished' &&
+          !seen.some((v) => v.trim().toLowerCase() === 'finished');
+        if (finishedOnlyNow) {
+          await rec.call(
+            'findings-bogus-variant-after-finished',
+            'The worklist again, now that a `finished` has been seen. The earlier read predates the marker and is kept for the comparison, not as the final state.',
+            {
+              method: 'GET',
+              url: `${ATC}/worklists/${encodeURIComponent(bogusWorklistId)}?includeExemptedFindings=false`,
+              headers: { Accept: ACCEPT_ATC_WORKLIST_XML },
             },
-          },
-        );
+          );
+        }
+        seen.push(finalValue);
 
-        // The CHECK-FAILURE logs — a different resource entirely, filtered by
-        // displayId. The spec claimed the probe read every place a result
-        // could live while this one was never asked, so a failure recorded
-        // here would have been missed and the 4xx from the other read as an
-        // answer. Raised in review, 2026-08-17.
-        const displayId =
-          resultsHref.split('/').filter(Boolean).pop() ?? resultsHref;
-        await rec.call(
-          'checkfailures-logs-bogus-variant',
-          'The CHECK-FAILURE logs for this run, as getCheckFailureLogs issues them: a separate resource under /atc/checkfailures/logs, filtered by displayId.',
-          {
-            method: 'GET',
-            url: `${ATC}/checkfailures/logs?displayId=${encodeURIComponent(displayId)}`,
-            headers: {
-              Accept: 'application/xml',
-              'X-sap-adt-relation':
-                'http://www.sap.com/adt/atc/relations/checkfailures/logs',
+        const resultsHref = lastStatus.body.match(
+          /href="([^"]*\/atc\/results\/[^"]*)"/,
+        )?.[1];
+        if (resultsHref) {
+          await rec.call(
+            'results-bogus-variant',
+            'The run result resource for the bogus-variant run — one of four captures a failure could be represented in.',
+            {
+              method: 'GET',
+              url: resultsHref,
+              headers: { Accept: 'application/xml' },
             },
-          },
+          );
+          // The EXECUTION log — one of two, and the client sends a relation
+          // header with it. Omitting the header is itself a way to get a 4xx
+          // that says nothing about whether a failure was recorded.
+          await rec.call(
+            'results-executionlog-bogus-variant',
+            'The EXECUTION log for this run, as src/runtime/atc/logs.ts getExecutionLog issues it — relation header included.',
+            {
+              method: 'GET',
+              url: `${resultsHref}/log`,
+              headers: {
+                Accept: 'application/xml',
+                'X-sap-adt-relation':
+                  'http://www.sap.com/adt/atc/relations/results/log',
+              },
+            },
+          );
+
+          // The CHECK-FAILURE logs — a different resource entirely, filtered by
+          // displayId. The spec claimed the probe read every place a result
+          // could live while this one was never asked, so a failure recorded
+          // here would have been missed and the 4xx from the other read as an
+          // answer. Raised in review, 2026-08-17.
+          const displayId =
+            resultsHref.split('/').filter(Boolean).pop() ?? resultsHref;
+          await rec.call(
+            'checkfailures-logs-bogus-variant',
+            'The CHECK-FAILURE logs for this run, as getCheckFailureLogs issues them: a separate resource under /atc/checkfailures/logs, filtered by displayId.',
+            {
+              method: 'GET',
+              url: `${ATC}/checkfailures/logs?displayId=${encodeURIComponent(displayId)}`,
+              headers: {
+                Accept: 'application/xml',
+                'X-sap-adt-relation':
+                  'http://www.sap.com/adt/atc/relations/checkfailures/logs',
+              },
+            },
+          );
+        } else {
+          logger.warn(
+            'No /atc/results/ link in the run status, so the log could not be read.',
+          );
+        }
+
+        // Which of two cases this run is in decides what the captures are worth,
+        // and the sequence may contain no completion marker at all. `seen` holds
+        // every status read including the last, so a `finished` that appears
+        // only there counts — it used to be checked against the first eight
+        // alone, which called a completed run unestablished.
+        const sawFinished = seen.some(
+          (v) => v.trim().toLowerCase() === 'finished',
         );
+        if (sawFinished) {
+          logger.warn(
+            'The bogus-variant run reached `finished`. That is a COMPLETION marker, not a success: whether it ended in an error is not something the status says. The four captures are of a COMPLETED run — compare them against a healthy one.',
+          );
+        } else {
+          logger.warn(
+            `The bogus-variant run never reported \`finished\` within ${seen.length} samples (${seen.join(' → ')}). Completion is NOT established, and the four captures were taken while it may still have been running — they cannot be read as final.`,
+          );
+        }
       } else {
         logger.warn(
-          'No /atc/results/ link in the run status, so the log could not be read.',
+          'The bogus-variant run carried no Location, so its status could not be asked for.',
+        );
+      }
+    }
+
+    // --- 4. The control: a URI that cannot exist ------------------------------
+    // Read back, exactly like a candidate. Without the read the control cannot do
+    // its job: if the bogus POST and a real one both answer 200, only the two
+    // worklists tell "ATC checked this object" apart from "ATC accepted anything
+    // and checked nothing". The comparison IS the control.
+    await runAt(
+      'control-bogus-uri',
+      'Does ATC reject a URI that cannot exist? Compare this worklist against a candidate\'s: if they are indistinguishable, "the run was accepted" is not evidence of anything.',
+      ['/sap/bc/adt/oo/classes/ZZ_NO_SUCH_CLASS_PROBE'],
+    );
+
+    // --- 5. Whether a run has an id of its own -------------------------------
+    // Gated behind the multi-object run until 2026-08-16, which meant the one
+    // session that DID receive a Location never followed it: the trial had a
+    // single measurable type, so the whole branch was skipped and the probe
+    // reported nothing about the very claim it exists to settle. A run id
+    // question must not depend on how many object types a package happens to
+    // hold.
+    const attemptedUris = outcomes
+      .filter((o) => o.attempted && o.attempts.length > 0)
+      .map((o) => o.attempts[0].uri);
+
+    const anyRun = acceptedRuns[0];
+    if (anyRun) {
+      const location =
+        header(anyRun.run.headers, 'location') ??
+        header(anyRun.run.headers, 'content-location');
+      if (location) {
+        const runId = location.split('/').filter(Boolean).pop() ?? location;
+        const runUrl = location.startsWith('/')
+          ? location
+          : `${ATC}/runs/${encodeURIComponent(runId)}`;
+        logger.info(
+          `Run response carried Location: ${location} (worklist was ${anyRun.worklistId})`,
+        );
+        await rec.call(
+          'run-status-by-location-id',
+          `#68 builds its polling on a run id from Location. This fetches THAT id (${runId}), which is the only thing that can confirm or refute a status resource.`,
+          {
+            method: 'GET',
+            url: runUrl,
+            headers: { Accept: ACCEPT_ATC_RUN_STATUS },
+          },
+        );
+        await rec.call(
+          'run-status-by-location-id-longpolling-after-finish',
+          'The same resource with withLongPolling=true, on a run that has already finished — where it cannot act. Kept for the comparison, not as the answer.',
+          {
+            method: 'GET',
+            url: `${runUrl}?withLongPolling=true`,
+            headers: { Accept: ACCEPT_ATC_RUN_STATUS },
+          },
+        );
+
+        // The question is what long polling does while a run is IN FLIGHT: does
+        // the server hold the request until the run finishes, or answer at once
+        // with a running status? Asking a finished run answers neither, and
+        // every earlier capture was of a finished run. So: start a fresh run and
+        // ask immediately, before waiting for anything. Raised in review,
+        // 2026-08-16.
+        const inFlight = await newWorklist('longpolling-in-flight');
+        if (inFlight) {
+          const started = await rec.call(
+            'run-for-longpolling-in-flight',
+            'A run started only so its status can be asked while it is still running.',
+            {
+              method: 'POST',
+              url: `${ATC}/runs?worklistId=${encodeURIComponent(inFlight)}&clientWait=false`,
+              headers: {
+                'Content-Type': CT_ATC_RUN,
+                Accept: ACCEPT_ATC_RUN_RESPONSE,
+              },
+              body: runBody(
+                attemptedUris.length ? attemptedUris : [anyRun.worklistId],
+                100,
+              ),
+            },
+          );
+          const freshLocation =
+            header(started.headers, 'location') ??
+            header(started.headers, 'content-location');
+          if (freshLocation) {
+            const freshUrl = freshLocation.startsWith('/')
+              ? freshLocation
+              : `${ATC}/runs/${encodeURIComponent(freshLocation)}`;
+            // Both at once, deliberately. Issued in sequence, the plain read
+            // would start only after the long poll returned — by which time the
+            // run may have finished either because the server held the request
+            // or because it simply ended, and the two are indistinguishable.
+            // Started together, the durations answer it: a long poll that
+            // blocked takes materially longer than the plain read beside it.
+            // Raised in review, 2026-08-16.
+            const [polled, plain] = await Promise.all([
+              rec.call(
+                'run-status-in-flight-longpolling',
+                'withLongPolling=true, asked with no delay after starting the run. Whether it BLOCKS is read from its duration against the plain read issued at the same moment.',
+                {
+                  method: 'GET',
+                  url: `${freshUrl}?withLongPolling=true`,
+                  headers: { Accept: ACCEPT_ATC_RUN_STATUS },
+                },
+              ),
+              rec.call(
+                'run-status-in-flight-plain',
+                'The same resource without long polling, started at the same moment. The control the previous step needs to mean anything.',
+                {
+                  method: 'GET',
+                  url: freshUrl,
+                  headers: { Accept: ACCEPT_ATC_RUN_STATUS },
+                },
+              ),
+            ]);
+            // Durations, and no verdict from them. A ratio against one control
+            // read is not a fact about the server: nothing here rules out the
+            // two requests serialising over one connection, there is no absolute
+            // threshold to compare against, and a single pair cannot separate
+            // "held" from "slow". The numbers and both statuses are recorded;
+            // deciding what they mean is a job for a session that repeats this
+            // deliberately. Raised in review, 2026-08-16.
+            const statusOf = (r: ICallResult) =>
+              r.body.match(/runs:status="([^"]+)"/)?.[1] ?? 'unreadable';
+            logger.info(
+              `long polling: ${polled.durationMs}ms, status ${statusOf(polled)} | plain read started at the same moment: ${plain.durationMs}ms, status ${statusOf(plain)} — recorded as evidence, not read as a verdict`,
+            );
+          } else {
+            logger.warn(
+              'The in-flight run carried no Location, so long polling could not be asked about it.',
+            );
+          }
+        }
+      } else {
+        logger.info(
+          'Run response carried no Location header — recorded, and the run-id claim fails here rather than at a 404.',
         );
       }
 
-      // Which of two cases this run is in decides what the captures are worth,
-      // and the sequence may contain no completion marker at all. `seen` holds
-      // every status read including the last, so a `finished` that appears
-      // only there counts — it used to be checked against the first eight
-      // alone, which called a completed run unestablished.
-      const sawFinished = seen.some(
-        (v) => v.trim().toLowerCase() === 'finished',
+      // Separately: the worklist id, which the recorded session says the run
+      // echoes. A 404 here is only about this id.
+      await rec.call(
+        'run-status-by-worklist-id',
+        'A different question from the one above: is the worklist id usable as a run id?',
+        {
+          method: 'GET',
+          url: `${ATC}/runs/${encodeURIComponent(anyRun.worklistId)}`,
+          headers: { Accept: ACCEPT_ATC_RUN_STATUS },
+        },
       );
-      if (sawFinished) {
-        logger.warn(
-          'The bogus-variant run reached `finished`. That is a COMPLETION marker, not a success: whether it ended in an error is not something the status says. The four captures are of a COMPLETED run — compare them against a healthy one.',
-        );
-      } else {
-        logger.warn(
-          `The bogus-variant run never reported \`finished\` within ${seen.length} samples (${seen.join(' → ')}). Completion is NOT established, and the four captures were taken while it may still have been running — they cannot be read as final.`,
-        );
-      }
+
+      await rec.call(
+        'findings-exempted-true',
+        'Does includeExemptedFindings=true exist at all? It stays out of the contract until this answers.',
+        {
+          method: 'GET',
+          url: `${ATC}/worklists/${encodeURIComponent(anyRun.worklistId)}?includeExemptedFindings=true`,
+          headers: { Accept: ACCEPT_ATC_WORKLIST_XML },
+        },
+      );
+      await rec.call(
+        'findings-checkstyle',
+        'The recorded session says checkstyle is answered with 406 and one accepted type. Confirm or refute.',
+        {
+          method: 'GET',
+          url: `${ATC}/worklists/${encodeURIComponent(anyRun.worklistId)}`,
+          headers: { Accept: ACCEPT_ATC_WORKLIST_CHECKSTYLE },
+        },
+      );
     } else {
       logger.warn(
-        'The bogus-variant run carried no Location, so its status could not be asked for.',
+        'No run was accepted at all — nothing to ask about run ids or worklist reads.',
       );
     }
-  }
 
-  // --- 4. The control: a URI that cannot exist ------------------------------
-  // Read back, exactly like a candidate. Without the read the control cannot do
-  // its job: if the bogus POST and a real one both answer 200, only the two
-  // worklists tell "ATC checked this object" apart from "ATC accepted anything
-  // and checked nothing". The comparison IS the control.
-  await runAt(
-    'control-bogus-uri',
-    'Does ATC reject a URI that cannot exist? Compare this worklist against a candidate\'s: if they are indistinguishable, "the run was accepted" is not evidence of anything.',
-    ['/sap/bc/adt/oo/classes/ZZ_NO_SUCH_CLASS_PROBE'],
-  );
-
-  // --- 5. Whether a run has an id of its own -------------------------------
-  // Gated behind the multi-object run until 2026-08-16, which meant the one
-  // session that DID receive a Location never followed it: the trial had a
-  // single measurable type, so the whole branch was skipped and the probe
-  // reported nothing about the very claim it exists to settle. A run id
-  // question must not depend on how many object types a package happens to
-  // hold.
-  const attemptedUris = outcomes
-    .filter((o) => o.attempted && o.attempts.length > 0)
-    .map((o) => o.attempts[0].uri);
-
-  const anyRun = acceptedRuns[0];
-  if (anyRun) {
-    const location =
-      header(anyRun.run.headers, 'location') ??
-      header(anyRun.run.headers, 'content-location');
-    if (location) {
-      const runId = location.split('/').filter(Boolean).pop() ?? location;
-      const runUrl = location.startsWith('/')
-        ? location
-        : `${ATC}/runs/${encodeURIComponent(runId)}`;
-      logger.info(
-        `Run response carried Location: ${location} (worklist was ${anyRun.worklistId})`,
+    // --- 5b. Plural references, which is the shape the contract promises -----
+    if (attemptedUris.length > 1) {
+      await runAt(
+        'multiple-objects',
+        'IAtcRunTarget takes a set. Does one run accept several object references?',
+        attemptedUris,
       );
-      await rec.call(
-        'run-status-by-location-id',
-        `#68 builds its polling on a run id from Location. This fetches THAT id (${runId}), which is the only thing that can confirm or refute a status resource.`,
-        {
-          method: 'GET',
-          url: runUrl,
-          headers: { Accept: ACCEPT_ATC_RUN_STATUS },
-        },
+    } else {
+      logger.warn(
+        "Fewer than two URIs to work with — skipping the multi-object run. IAtcRunTarget's plural shape stays unconfirmed.",
       );
-      await rec.call(
-        'run-status-by-location-id-longpolling-after-finish',
-        'The same resource with withLongPolling=true, on a run that has already finished — where it cannot act. Kept for the comparison, not as the answer.',
-        {
-          method: 'GET',
-          url: `${runUrl}?withLongPolling=true`,
-          headers: { Accept: ACCEPT_ATC_RUN_STATUS },
-        },
-      );
+    }
 
-      // The question is what long polling does while a run is IN FLIGHT: does
-      // the server hold the request until the run finishes, or answer at once
-      // with a running status? Asking a finished run answers neither, and
-      // every earlier capture was of a finished run. So: start a fresh run and
-      // ask immediately, before waiting for anything. Raised in review,
-      // 2026-08-16.
-      const inFlight = await newWorklist('longpolling-in-flight');
-      if (inFlight) {
-        const started = await rec.call(
-          'run-for-longpolling-in-flight',
-          'A run started only so its status can be asked while it is still running.',
+    // --- 6. maximumVerdicts at its edges, and clientWait ----------------------
+    const anyUri = attemptedUris[0];
+    if (anyUri) {
+      for (const verdicts of [0, 1, 100000]) {
+        await runAt(
+          `maximumVerdicts-${verdicts}`,
+          'The server bounds on maximumVerdicts, which nothing states. Decides whether run() should validate a range.',
+          [anyUri],
+          { readBack: false, maximumVerdicts: verdicts },
+        );
+      }
+
+      const waitWorklist = await newWorklist('clientwait');
+      if (waitWorklist) {
+        await rec.call(
+          'run-clientWait-true',
+          'Does the server hold the request until the run finishes? If it does, waiting is answered by removing the question.',
           {
             method: 'POST',
-            url: `${ATC}/runs?worklistId=${encodeURIComponent(inFlight)}&clientWait=false`,
+            url: `${ATC}/runs?worklistId=${encodeURIComponent(waitWorklist)}&clientWait=true`,
             headers: {
               'Content-Type': CT_ATC_RUN,
               Accept: ACCEPT_ATC_RUN_RESPONSE,
             },
-            body: runBody(
-              attemptedUris.length ? attemptedUris : [anyRun.worklistId],
-              100,
-            ),
+            body: runBody([anyUri], 100),
           },
         );
-        const freshLocation =
-          header(started.headers, 'location') ??
-          header(started.headers, 'content-location');
-        if (freshLocation) {
-          const freshUrl = freshLocation.startsWith('/')
-            ? freshLocation
-            : `${ATC}/runs/${encodeURIComponent(freshLocation)}`;
-          // Both at once, deliberately. Issued in sequence, the plain read
-          // would start only after the long poll returned — by which time the
-          // run may have finished either because the server held the request
-          // or because it simply ended, and the two are indistinguishable.
-          // Started together, the durations answer it: a long poll that
-          // blocked takes materially longer than the plain read beside it.
-          // Raised in review, 2026-08-16.
-          const [polled, plain] = await Promise.all([
-            rec.call(
-              'run-status-in-flight-longpolling',
-              'withLongPolling=true, asked with no delay after starting the run. Whether it BLOCKS is read from its duration against the plain read issued at the same moment.',
-              {
-                method: 'GET',
-                url: `${freshUrl}?withLongPolling=true`,
-                headers: { Accept: ACCEPT_ATC_RUN_STATUS },
-              },
-            ),
-            rec.call(
-              'run-status-in-flight-plain',
-              'The same resource without long polling, started at the same moment. The control the previous step needs to mean anything.',
-              {
-                method: 'GET',
-                url: freshUrl,
-                headers: { Accept: ACCEPT_ATC_RUN_STATUS },
-              },
-            ),
-          ]);
-          // Durations, and no verdict from them. A ratio against one control
-          // read is not a fact about the server: nothing here rules out the
-          // two requests serialising over one connection, there is no absolute
-          // threshold to compare against, and a single pair cannot separate
-          // "held" from "slow". The numbers and both statuses are recorded;
-          // deciding what they mean is a job for a session that repeats this
-          // deliberately. Raised in review, 2026-08-16.
-          const statusOf = (r: ICallResult) =>
-            r.body.match(/runs:status="([^"]+)"/)?.[1] ?? 'unreadable';
-          logger.info(
-            `long polling: ${polled.durationMs}ms, status ${statusOf(polled)} | plain read started at the same moment: ${plain.durationMs}ms, status ${statusOf(plain)} — recorded as evidence, not read as a verdict`,
-          );
-        } else {
-          logger.warn(
-            'The in-flight run carried no Location, so long polling could not be asked about it.',
-          );
-        }
+      }
+    }
+
+    // --- 7. Extras, only when asked ------------------------------------------
+    if (args.extras) {
+      const candidateCodes = new Set(CANDIDATES.flatMap((c) => c.typeCodes));
+      for (const [code, item] of firstOfType) {
+        if (candidateCodes.has(code) || !item.uri) continue;
+        await runAt(
+          `extra-${code.replace(/[^a-z0-9]+/gi, '-')}`,
+          `Not a candidate type — probed because --extras was passed. ${item.name}, at ADT's own URI.`,
+          [item.uri],
+          { readBack: false },
+        );
+      }
+    }
+
+    // --- The verdict, stated rather than left to be inferred -----------------
+    const scopeOf = (key: string) =>
+      CANDIDATES.find((c) => c.key === key)?.scope ?? 'cloud';
+    const why = (o: ICandidateOutcome) =>
+      o.reason ??
+      (o.finished
+        ? `finished; per template: ${o.attempts.map((a) => `${a.template} → [${a.objectsListed.map((x) => `${x.type}:${x.name}`).join(', ') || 'nothing'}]`).join(' | ')}`
+        : o.attempted
+          ? 'run never reported finished'
+          : 'never asked');
+
+    /** A request with no status never reached a verdict — a fact about us. */
+    const timedOut = (o: ICandidateOutcome) =>
+      o.attempts.some((a) => a.status === null);
+
+    // What this run is judged on, stated by the caller rather than inferred.
+    const requiredCandidates = outcomes.filter((o) =>
+      required.keys.includes(o.key),
+    );
+    const notCounted = outcomes.filter((o) => !required.keys.includes(o.key));
+    const confirmed = requiredCandidates.filter((o) => o.confirmed);
+    const unconfirmed = requiredCandidates.filter((o) => !o.confirmed);
+    // The counted set is named in the verdict itself. A bare "COMPLETE" is what
+    // made the previous version dangerous on an on-prem run: it was true about
+    // the seven types it counted and silent about the two the run existed for.
+    const verdict = verdictFor({
+      requiredKeys: required.keys,
+      source: required.source,
+      confirmed: confirmed.length,
+      unconfirmed: unconfirmed.map((o) => ({ key: o.key, why: why(o) })),
+      refuse: required.refuse,
+    });
+
+    // A non-zero triple somewhere is what makes the positions readable at all.
+    const nonZeroStats = rec.findingStats.filter(
+      (f) => f.triple && !/^0\s*,\s*0\s*,\s*0$/.test(f.triple),
+    );
+    const findingStatsVerdict =
+      rec.findingStats.length === 0
+        ? "FINDING_STATS never appeared in any run response — the spec's premise for it is unconfirmed here"
+        : nonZeroStats.length === 0
+          ? 'FINDING_STATS seen but always zero — the positions remain undecoded; re-run with --known-bad=KEY:NAME'
+          : `FINDING_STATS non-zero in ${nonZeroStats.length} run(s) — evidence collected, NOT decoded. Reading the positions needs the triples correlated with the findings' priorities, and a worklist carrying more than one priority; a single 0,0,1 beside one priority-3 finding is consistent with several orderings`;
+
+    rec.flush({
+      system: sapConfig.url,
+      looksLikeCloud: isCloud,
+      requiredKeys: required.keys,
+      requiredFrom: required.source,
+      checkVariant,
+      checkVariantSource: args.variant ? '--variant' : 'systemCheckVariant',
+      nominatedCheckVariant: nominatedVariant,
+      checkVariantVerb: variantFromGet ? 'GET' : 'POST',
+      packageName,
+      verdict,
+      findingStatsVerdict,
+      findingStatsSeen: rec.findingStats,
+      candidates: outcomes,
+    });
+
+    // Not part of the exit code: the spec keeps FINDING_STATS off the blocking
+    // list on purpose, since the contract returns the triple verbatim. It is
+    // still said out loud, because a silent zero is how it would go unnoticed.
+    if (nonZeroStats.length === 0) {
+      logger.warn(findingStatsVerdict);
+    } else {
+      logger.info(findingStatsVerdict);
+    }
+
+    if (unconfirmed.length) {
+      logger.error(verdict);
+      logger.error(
+        'AtcObjectType is NOT closed by this run. A type joins the union when a FINISHED worklist lists its object — not when a run is accepted, which happens for a URI that cannot exist.',
+      );
+      for (const o of unconfirmed) {
+        const transport = timedOut(o)
+          ? ' — the run request got NO ANSWER (timeout), so this says nothing about the type'
+          : '';
+        const weaker = o.seenCheckedInSomeWorklist
+          ? ` — but ATC checked ${o.key} as ${o.seenCheckedInSomeWorklist.name} in the ${o.seenCheckedInSomeWorklist.worklistOf} worklist, so the TYPE is checkable and only the template is unproven`
+          : '';
+        logger.error(`  ${o.key}: ${why(o)}${transport}${weaker}`);
       }
     } else {
+      logger.info(verdict);
+    }
+
+    // Probed but outside the required set. Said out loud with its status, so a
+    // reader can see what this run touched without counting, rather than having
+    // to infer the gap from the verdict's arithmetic.
+    for (const o of notCounted) {
       logger.info(
-        'Run response carried no Location header — recorded, and the run-id claim fails here rather than at a 404.',
+        `not counted (${scopeOf(o.key)}-scope, not in --require) — ${o.key}: ${why(o)}`,
       );
     }
 
-    // Separately: the worklist id, which the recorded session says the run
-    // echoes. A 404 here is only about this id.
-    await rec.call(
-      'run-status-by-worklist-id',
-      'A different question from the one above: is the worklist id usable as a run id?',
-      {
-        method: 'GET',
-        url: `${ATC}/runs/${encodeURIComponent(anyRun.worklistId)}`,
-        headers: { Accept: ACCEPT_ATC_RUN_STATUS },
-      },
-    );
-
-    await rec.call(
-      'findings-exempted-true',
-      'Does includeExemptedFindings=true exist at all? It stays out of the contract until this answers.',
-      {
-        method: 'GET',
-        url: `${ATC}/worklists/${encodeURIComponent(anyRun.worklistId)}?includeExemptedFindings=true`,
-        headers: { Accept: ACCEPT_ATC_WORKLIST_XML },
-      },
-    );
-    await rec.call(
-      'findings-checkstyle',
-      'The recorded session says checkstyle is answered with 406 and one accepted type. Confirm or refute.',
-      {
-        method: 'GET',
-        url: `${ATC}/worklists/${encodeURIComponent(anyRun.worklistId)}`,
-        headers: { Accept: ACCEPT_ATC_WORKLIST_CHECKSTYLE },
-      },
-    );
-  } else {
-    logger.warn(
-      'No run was accepted at all — nothing to ask about run ids or worklist reads.',
-    );
-  }
-
-  // --- 5b. Plural references, which is the shape the contract promises -----
-  if (attemptedUris.length > 1) {
-    await runAt(
-      'multiple-objects',
-      'IAtcRunTarget takes a set. Does one run accept several object references?',
-      attemptedUris,
-    );
-  } else {
-    logger.warn(
-      "Fewer than two URIs to work with — skipping the multi-object run. IAtcRunTarget's plural shape stays unconfirmed.",
-    );
-  }
-
-  // --- 6. maximumVerdicts at its edges, and clientWait ----------------------
-  const anyUri = attemptedUris[0];
-  if (anyUri) {
-    for (const verdicts of [0, 1, 100000]) {
-      await runAt(
-        `maximumVerdicts-${verdicts}`,
-        'The server bounds on maximumVerdicts, which nothing states. Decides whether run() should validate a range.',
-        [anyUri],
-        { readBack: false, maximumVerdicts: verdicts },
+    // Last, and after the verdict, so it cannot be mistaken for one: a run that
+    // did not say what it required does not get to exit 0, whatever it confirmed.
+    if (required.refuse) {
+      logger.error(
+        'The verdict above counted the default cloud set on a system that is not cloud. Whatever it says, this run did not decide the on-prem-only types. Re-run with --require.',
       );
     }
 
-    const waitWorklist = await newWorklist('clientwait');
-    if (waitWorklist) {
-      await rec.call(
-        'run-clientWait-true',
-        'Does the server hold the request until the run finishes? If it does, waiting is answered by removing the question.',
-        {
-          method: 'POST',
-          url: `${ATC}/runs?worklistId=${encodeURIComponent(waitWorklist)}&clientWait=true`,
-          headers: {
-            'Content-Type': CT_ATC_RUN,
-            Accept: ACCEPT_ATC_RUN_RESPONSE,
-          },
-          body: runBody([anyUri], 100),
-        },
-      );
-    }
+    // One place decides, so the log and `$?` cannot disagree.
+    process.exitCode = exitCodeFor({
+      unconfirmed: unconfirmed.length,
+      refuse: required.refuse,
+    });
+  } finally {
+    // In `finally`, because it used to be on the success path only — so the run
+    // that failed, the one worth repeating, was exactly the one that left a
+    // session behind.
+    //
+    // `disconnect()` alone would not do: it leaves the ABAP security session
+    // standing until `http/security_session_timeout`, and the pool is shared
+    // with everyone on the system. Two runs of this probe on an on-prem system
+    // were enough to make the next test run wait through
+    // `globalSetup: no session available` four times over.
+    await releaseTestConnection(connection);
   }
-
-  // --- 7. Extras, only when asked ------------------------------------------
-  if (args.extras) {
-    const candidateCodes = new Set(CANDIDATES.flatMap((c) => c.typeCodes));
-    for (const [code, item] of firstOfType) {
-      if (candidateCodes.has(code) || !item.uri) continue;
-      await runAt(
-        `extra-${code.replace(/[^a-z0-9]+/gi, '-')}`,
-        `Not a candidate type — probed because --extras was passed. ${item.name}, at ADT's own URI.`,
-        [item.uri],
-        { readBack: false },
-      );
-    }
-  }
-
-  // --- The verdict, stated rather than left to be inferred -----------------
-  const scopeOf = (key: string) =>
-    CANDIDATES.find((c) => c.key === key)?.scope ?? 'cloud';
-  const why = (o: ICandidateOutcome) =>
-    o.reason ??
-    (o.finished
-      ? `finished; per template: ${o.attempts.map((a) => `${a.template} → [${a.objectsListed.map((x) => `${x.type}:${x.name}`).join(', ') || 'nothing'}]`).join(' | ')}`
-      : o.attempted
-        ? 'run never reported finished'
-        : 'never asked');
-
-  /** A request with no status never reached a verdict — a fact about us. */
-  const timedOut = (o: ICandidateOutcome) =>
-    o.attempts.some((a) => a.status === null);
-
-  // What this run is judged on, stated by the caller rather than inferred.
-  const requiredCandidates = outcomes.filter((o) =>
-    required.keys.includes(o.key),
-  );
-  const notCounted = outcomes.filter((o) => !required.keys.includes(o.key));
-  const confirmed = requiredCandidates.filter((o) => o.confirmed);
-  const unconfirmed = requiredCandidates.filter((o) => !o.confirmed);
-  // The counted set is named in the verdict itself. A bare "COMPLETE" is what
-  // made the previous version dangerous on an on-prem run: it was true about
-  // the seven types it counted and silent about the two the run existed for.
-  const verdict = verdictFor({
-    requiredKeys: required.keys,
-    source: required.source,
-    confirmed: confirmed.length,
-    unconfirmed: unconfirmed.map((o) => ({ key: o.key, why: why(o) })),
-    refuse: required.refuse,
-  });
-
-  // A non-zero triple somewhere is what makes the positions readable at all.
-  const nonZeroStats = rec.findingStats.filter(
-    (f) => f.triple && !/^0\s*,\s*0\s*,\s*0$/.test(f.triple),
-  );
-  const findingStatsVerdict =
-    rec.findingStats.length === 0
-      ? "FINDING_STATS never appeared in any run response — the spec's premise for it is unconfirmed here"
-      : nonZeroStats.length === 0
-        ? 'FINDING_STATS seen but always zero — the positions remain undecoded; re-run with --known-bad=KEY:NAME'
-        : `FINDING_STATS non-zero in ${nonZeroStats.length} run(s) — evidence collected, NOT decoded. Reading the positions needs the triples correlated with the findings' priorities, and a worklist carrying more than one priority; a single 0,0,1 beside one priority-3 finding is consistent with several orderings`;
-
-  rec.flush({
-    system: sapConfig.url,
-    looksLikeCloud: isCloud,
-    requiredKeys: required.keys,
-    requiredFrom: required.source,
-    checkVariant,
-    checkVariantSource: args.variant ? '--variant' : 'systemCheckVariant',
-    nominatedCheckVariant: nominatedVariant,
-    checkVariantVerb: variantFromGet ? 'GET' : 'POST',
-    packageName,
-    verdict,
-    findingStatsVerdict,
-    findingStatsSeen: rec.findingStats,
-    candidates: outcomes,
-  });
-
-  // Not part of the exit code: the spec keeps FINDING_STATS off the blocking
-  // list on purpose, since the contract returns the triple verbatim. It is
-  // still said out loud, because a silent zero is how it would go unnoticed.
-  if (nonZeroStats.length === 0) {
-    logger.warn(findingStatsVerdict);
-  } else {
-    logger.info(findingStatsVerdict);
-  }
-
-  if (unconfirmed.length) {
-    logger.error(verdict);
-    logger.error(
-      'AtcObjectType is NOT closed by this run. A type joins the union when a FINISHED worklist lists its object — not when a run is accepted, which happens for a URI that cannot exist.',
-    );
-    for (const o of unconfirmed) {
-      const transport = timedOut(o)
-        ? ' — the run request got NO ANSWER (timeout), so this says nothing about the type'
-        : '';
-      const weaker = o.seenCheckedInSomeWorklist
-        ? ` — but ATC checked ${o.key} as ${o.seenCheckedInSomeWorklist.name} in the ${o.seenCheckedInSomeWorklist.worklistOf} worklist, so the TYPE is checkable and only the template is unproven`
-        : '';
-      logger.error(`  ${o.key}: ${why(o)}${transport}${weaker}`);
-    }
-  } else {
-    logger.info(verdict);
-  }
-
-  // Probed but outside the required set. Said out loud with its status, so a
-  // reader can see what this run touched without counting, rather than having
-  // to infer the gap from the verdict's arithmetic.
-  for (const o of notCounted) {
-    logger.info(
-      `not counted (${scopeOf(o.key)}-scope, not in --require) — ${o.key}: ${why(o)}`,
-    );
-  }
-
-  // Last, and after the verdict, so it cannot be mistaken for one: a run that
-  // did not say what it required does not get to exit 0, whatever it confirmed.
-  if (required.refuse) {
-    logger.error(
-      'The verdict above counted the default cloud set on a system that is not cloud. Whatever it says, this run did not decide the on-prem-only types. Re-run with --require.',
-    );
-  }
-
-  // One place decides, so the log and `$?` cannot disagree.
-  process.exitCode = exitCodeFor({
-    unconfirmed: unconfirmed.length,
-    refuse: required.refuse,
-  });
-
-  // The session goes back before the process ends. `disconnect()` alone leaves
-  // the ABAP security session standing until `http/security_session_timeout`,
-  // and the pool is shared with everyone on the system: two runs of this probe
-  // on E19, 2026-08-28, were enough to make the next test run wait through
-  // `globalSetup: no session available` four times over.
-  await releaseTestConnection(connection);
 
   logger.info(`Evidence written to ${outDir}`);
 }

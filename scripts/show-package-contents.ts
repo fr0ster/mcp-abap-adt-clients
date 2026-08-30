@@ -22,6 +22,7 @@ import * as dotenv from 'dotenv';
 import {
   createTestConnection,
   getConfig,
+  releaseTestConnection,
 } from '../src/__tests__/helpers/sessionConfig';
 import {
   createConnectionLogger,
@@ -87,7 +88,7 @@ function printTree(
   isLast = true,
 ): void {
   const connector = isLast ? '└── ' : '├── ';
-  const typeLabel = node.type || node.adtType || '';
+  const typeLabel = node.type || node.type || '';
   const descPart = node.description ? ` - ${node.description}` : '';
   const statusIcon = node.restoreStatus === 'ok' ? '' : ' [!]';
 
@@ -107,8 +108,8 @@ function countObjects(node: IPackageHierarchyNode): {
   packages: number;
   objects: number;
 } {
-  let packages = node.is_package ? 1 : 0;
-  let objects = node.is_package ? 0 : 1;
+  let packages = node.isPackage ? 1 : 0;
+  let objects = node.isPackage ? 0 : 1;
 
   for (const child of node.children || []) {
     const childCounts = countObjects(child);
@@ -139,7 +140,7 @@ async function run(): Promise<void> {
 
   const config = getConfig();
   const connection = await createTestConnection(connectionLogger);
-  await (connection as any).connect();
+  // Already open: `createTestConnection` connects before returning.
 
   const client = new AdtClient(connection, libraryLogger);
   const utils = client.getUtils();
@@ -173,9 +174,10 @@ async function run(): Promise<void> {
       'Failed to fetch package hierarchy:',
       error?.message || error,
     );
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   } finally {
-    (connection as any).reset();
+    await releaseTestConnection(connection);
   }
 }
 
