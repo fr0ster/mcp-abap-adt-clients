@@ -69,12 +69,12 @@ describe('RuntimeDumps', () => {
 
     const prefix = dumps.buildIdPrefix(
       '20260331215347',
-      'epbyminsd0654',
-      'E19',
+      'HOSTNAME',
+      'SID',
       '00',
     );
 
-    expect(prefix).toBe('20260331215347epbyminsd0654_E19_00');
+    expect(prefix).toBe('20260331215347HOSTNAME_SID_00');
   });
 
   it('buildUserQuery() returns undefined when user is empty', () => {

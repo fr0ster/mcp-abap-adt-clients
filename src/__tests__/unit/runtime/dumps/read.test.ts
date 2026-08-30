@@ -15,9 +15,9 @@ describe('runtime/dumps/read', () => {
   }
 
   it('buildDumpIdPrefix composes prefix from components', () => {
-    expect(
-      buildDumpIdPrefix('20260331215347', 'epbyminsd0654', 'E19', '00'),
-    ).toBe('20260331215347epbyminsd0654_E19_00');
+    expect(buildDumpIdPrefix('20260331215347', 'HOSTNAME', 'SID', '00')).toBe(
+      '20260331215347HOSTNAME_SID_00',
+    );
   });
 
   it('buildRuntimeDumpsUserQuery returns undefined when user is not provided', () => {

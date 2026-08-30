@@ -55,8 +55,8 @@ function appendIfDefined(
  * All fields except `seq` are typically available from external sources (e.g. CALM events).
  * Use this prefix with `from`/`to` time-range filtering to locate the exact dump entry.
  *
- * @example buildDumpIdPrefix('20260331215347', 'epbyminsd0654', 'E19', '00')
- *          // => '20260331215347epbyminsd0654_E19_00'
+ * @example buildDumpIdPrefix('20260331215347', 'HOSTNAME', 'SID', '00')
+ *          // => '20260331215347HOSTNAME_SID_00'
  */
 export function buildDumpIdPrefix(
   datetime: string,
