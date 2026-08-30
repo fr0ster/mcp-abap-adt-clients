@@ -698,6 +698,15 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
         // Deleted means gone from the feed. Polled rather than read once,
         // because how quickly the feed reflects a deletion is not measured —
         // but the id must disappear, or the call did nothing.
+        //
+        // These lines are the ones the log tends not to show, and their absence
+        // does NOT mean the loop was skipped: a passing test proves it ran, or
+        // `stillListed` would still be `true`. This suite writes progress
+        // straight to stdout from a jest worker, and that output reaches the
+        // parent through an asynchronous relay which `forceExit: true` does not
+        // wait for. In `docs/evidence/2026-08-30-pr123-onprem/traces-rfc.log`
+        // the line survives but lands *after* jest's own summary, which is what
+        // reordering looks like; in `traces-http.log` it did not arrive at all.
         let stillListed = true;
         for (let attempt = 1; attempt <= 4 && stillListed; attempt++) {
           const ids = await traceIdsNow(runtime.getProfiler());

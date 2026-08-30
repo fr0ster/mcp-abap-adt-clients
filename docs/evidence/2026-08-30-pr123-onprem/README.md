@@ -13,11 +13,30 @@ Six of those seven existed before; the seventh is this PR's `delete trace`.
 
 ## What the logs do not show, and how it was checked instead
 
-Both runs end with `Force exiting Jest`, and the last test's trailing output is
-lost to it: `→ delete trace <id>` is there, but the `after delete, attempt N:
-trace gone from the feed` lines the test writes are not. That is precisely the
-assertion the test exists for, so it was confirmed a second way — reading the
-feed through the library after the HTTP run:
+Both runs end with `Force exiting Jest`, and the last test's trailing output
+goes missing with it: `→ delete trace <id>` is there, but in `traces-http.log`
+the `after delete, attempt N: trace gone from the feed` line the test writes is
+not.
+
+**It is a reordering, not a plain truncation** — `traces-rfc.log` shows the
+mechanism, because there the line *does* survive and lands **after** jest's own
+`Ran all test suites` summary:
+
+```
+Ran all test suites matching integration/runtime/traces.
+  → after delete, attempt 1: trace gone from the feed
+[7] ✓ PASS Profiler Traces - delete trace (0.3s)
+```
+
+The suite writes progress straight to stdout from a jest worker, and that output
+reaches the parent through an asynchronous relay that `forceExit: true` does not
+wait for. So it is a race the last test loses, not our process buffering: a
+direct probe on this platform showed `process.stdout.write` followed by
+`process.exit()` losing nothing at all, to a pipe or to a file.
+
+Either way that is precisely the assertion the test exists for, so it was
+confirmed a second way — reading the feed through the library after the HTTP
+run:
 
 ```
 traces in feed: 69

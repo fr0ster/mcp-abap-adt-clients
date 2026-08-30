@@ -8,6 +8,7 @@ import * as path from 'node:path';
 import type {
   IAbapConnection,
   ILogger,
+  IProfiler,
   ISessionLifecycleAware,
 } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
@@ -15,7 +16,6 @@ import type { AdtClient } from '../../../../clients/AdtClient';
 import { AdtExecutor } from '../../../../clients/AdtExecutor';
 import { AdtRuntimeClient } from '../../../../clients/AdtRuntimeClient';
 import type { IProfilerTraceParameters } from '../../../../runtime/traces';
-import type { Profiler } from '../../../../runtime/traces/ProfilerDomain';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import {
   createTestAdtClient,
@@ -141,7 +141,7 @@ describe('ProgramExecutor (integration)', () => {
   let client: AdtClient;
   let executor: AdtExecutor;
   let runtime: AdtRuntimeClient;
-  let profiler: Profiler;
+  let profiler: IProfiler;
   let hasConfig = false;
   let isCloudSystem = false;
   let isLegacy = false;
@@ -173,11 +173,9 @@ describe('ProgramExecutor (integration)', () => {
       traceUser = systemContext.responsible;
       executor = new AdtExecutor(connection, libraryLogger);
       runtime = new AdtRuntimeClient(connection, libraryLogger);
-      // `getProfiler()` is typed `IProfiler`, and that contract — which lives in
-      // @mcp-abap-adt/interfaces — does not carry `latestTraceId()` yet. The
-      // implementation is this package's and the class is exported, so the cast
-      // is the seam between the two. It goes when the contract catches up.
-      profiler = runtime.getProfiler() as Profiler;
+      // No cast since 15.0.0: it reached `latestTraceId()`, which is gone, and
+      // this file only ever needed what `IProfiler` already declares.
+      profiler = runtime.getProfiler();
       hasConfig = true;
       programNameForTest = null;
       programsCreated.length = 0;

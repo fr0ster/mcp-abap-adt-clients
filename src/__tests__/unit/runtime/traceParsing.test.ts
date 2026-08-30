@@ -326,8 +326,8 @@ describe('trace document mapping', () => {
   describe('ordering, which is ours to get right', () => {
     it('orders by time, not by text, across UTC offsets', () => {
       // 09:00Z is LATER than 10:00+02:00, and the strings say the opposite.
-      // `latestTraceId()` exists to avoid taking a stale trace; comparing as
-      // text would make it do exactly that.
+      // This is why the comparator is exported: a caller reducing a listing to
+      // its newest entry with `>` would pick the stale one.
       const earlier = { recordedAt: '2026-08-28T10:00:00+02:00' };
       const later = { recordedAt: '2026-08-28T09:00:00Z' };
       expect(later.recordedAt > earlier.recordedAt).toBe(false);
@@ -343,8 +343,8 @@ describe('trace document mapping', () => {
 
     it('orders past the millisecond, which Date.parse cannot', () => {
       // Both are 100ms to `Date.parse`, so a comparison through it alone calls
-      // them equal and `latestTraceId()` keeps whichever it saw first. Removing
-      // the RFC 3339 validator took this fix with it once; it is not validation.
+      // them equal and a reduce keeps whichever it saw first. Removing the RFC
+      // 3339 validator took this fix with it once; it is not validation.
       const earlier = { recordedAt: '2026-08-28T10:00:00.1001Z' };
       const later = { recordedAt: '2026-08-28T10:00:00.1009Z' };
       expect(Date.parse(later.recordedAt)).toBe(Date.parse(earlier.recordedAt));
