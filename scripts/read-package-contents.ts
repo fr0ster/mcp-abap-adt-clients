@@ -213,7 +213,8 @@ async function run(): Promise<void> {
     }
   } catch (error: any) {
     console.error('Failed to read package contents:', error?.message || error);
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   } finally {
     await releaseTestConnection(connection);
   }

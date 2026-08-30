@@ -174,7 +174,8 @@ async function run(): Promise<void> {
       'Failed to fetch package hierarchy:',
       error?.message || error,
     );
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   } finally {
     await releaseTestConnection(connection);
   }

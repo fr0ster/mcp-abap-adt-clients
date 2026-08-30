@@ -17,7 +17,10 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
-import { createTestConnection } from '../src/__tests__/helpers/sessionConfig';
+import {
+  createTestConnection,
+  releaseTestConnection,
+} from '../src/__tests__/helpers/sessionConfig';
 import { createConnectionLogger } from '../src/__tests__/helpers/testLogger';
 import { AdtRuntimeClient } from '../src/clients/AdtRuntimeClient';
 
@@ -46,82 +49,90 @@ async function main() {
   console.log(`Connecting to ${config.url}...`);
   const connection = await createTestConnection(createConnectionLogger());
   // Already open: `createTestConnection` connects before returning.
+  try {
+    const runtime = new AdtRuntimeClient(connection, undefined, {
+      enableAcceptCorrection: true,
+    });
+    const feeds = runtime.getFeeds();
 
-  const runtime = new AdtRuntimeClient(connection, undefined, {
-    enableAcceptCorrection: true,
-  });
-  const feeds = runtime.getFeeds();
-
-  if (!topic) {
-    console.log('\n=== Feed Catalog ===\n');
-    const catalog = await feeds.list();
-    for (const entry of catalog) {
-      console.log(`  ${entry.title}`);
-      console.log(`    url: ${entry.url}`);
-      if (entry.category) console.log(`    category: ${entry.category}`);
-      console.log();
-    }
-    return;
-  }
-
-  if (topic === 'dumps') {
-    console.log(
-      `\n=== Dumps Feed (user=${options.user || 'all'}, max=${options.maxResults}) ===\n`,
-    );
-    const entries = await feeds.dumps(options);
-    console.log(`Found ${entries.length} entries:\n`);
-    for (const entry of entries) {
-      console.log(`  [${entry.updated}] ${entry.title}`);
-      if (entry.link) console.log(`    link: ${entry.link}`);
-      if (entry.author) console.log(`    author: ${entry.author}`);
-      if (entry.content) {
-        const preview = String(entry.content).slice(0, 120);
-        console.log(
-          `    content: ${preview}${entry.content.length > 120 ? '...' : ''}`,
-        );
+    if (!topic) {
+      console.log('\n=== Feed Catalog ===\n');
+      const catalog = await feeds.list();
+      for (const entry of catalog) {
+        console.log(`  ${entry.title}`);
+        console.log(`    url: ${entry.url}`);
+        if (entry.category) console.log(`    category: ${entry.category}`);
+        console.log();
       }
-      console.log();
+      return;
     }
-    return;
-  }
 
-  if (topic === 'systemMessages') {
-    console.log(
-      `\n=== System Messages Feed (user=${options.user || 'all'}, max=${options.maxResults}) ===\n`,
-    );
-    const entries = await feeds.systemMessages(options);
-    console.log(`Found ${entries.length} entries:\n`);
-    for (const entry of entries) {
-      console.log(`  [${entry.id}] ${entry.title}`);
-      console.log(`    severity: ${entry.severity}`);
-      console.log(`    text: ${entry.text}`);
-      console.log(`    created by: ${entry.createdBy}`);
-      console.log(`    valid: ${entry.validFrom} — ${entry.validTo}`);
-      console.log();
+    if (topic === 'dumps') {
+      console.log(
+        `\n=== Dumps Feed (user=${options.user || 'all'}, max=${options.maxResults}) ===\n`,
+      );
+      const entries = await feeds.dumps(options);
+      console.log(`Found ${entries.length} entries:\n`);
+      for (const entry of entries) {
+        console.log(`  [${entry.updated}] ${entry.title}`);
+        if (entry.link) console.log(`    link: ${entry.link}`);
+        if (entry.author) console.log(`    author: ${entry.author}`);
+        if (entry.content) {
+          const preview = String(entry.content).slice(0, 120);
+          console.log(
+            `    content: ${preview}${entry.content.length > 120 ? '...' : ''}`,
+          );
+        }
+        console.log();
+      }
+      return;
     }
-    return;
-  }
 
-  if (topic === 'gatewayErrors') {
-    console.log(
-      `\n=== Gateway Errors Feed (user=${options.user || 'all'}, max=${options.maxResults}) ===\n`,
-    );
-    const entries = await feeds.gatewayErrors(options);
-    console.log(`Found ${entries.length} entries:\n`);
-    for (const entry of entries) {
-      console.log(`  [${entry.type}] ${entry.shortText}`);
-      console.log(`    dateTime: ${entry.dateTime}`);
-      console.log(`    username: ${entry.username}`);
-      console.log(`    requestKind: ${entry.requestKind}`);
-      console.log(`    transactionId: ${entry.transactionId}`);
-      console.log();
+    if (topic === 'systemMessages') {
+      console.log(
+        `\n=== System Messages Feed (user=${options.user || 'all'}, max=${options.maxResults}) ===\n`,
+      );
+      const entries = await feeds.systemMessages(options);
+      console.log(`Found ${entries.length} entries:\n`);
+      for (const entry of entries) {
+        console.log(`  [${entry.id}] ${entry.title}`);
+        console.log(`    severity: ${entry.severity}`);
+        console.log(`    text: ${entry.text}`);
+        console.log(`    created by: ${entry.createdBy}`);
+        console.log(`    valid: ${entry.validFrom} — ${entry.validTo}`);
+        console.log();
+      }
+      return;
     }
-    return;
-  }
 
-  console.error(`Unknown topic: ${topic}`);
-  console.error('Available: dumps, systemMessages, gatewayErrors');
-  process.exit(1);
+    if (topic === 'gatewayErrors') {
+      console.log(
+        `\n=== Gateway Errors Feed (user=${options.user || 'all'}, max=${options.maxResults}) ===\n`,
+      );
+      const entries = await feeds.gatewayErrors(options);
+      console.log(`Found ${entries.length} entries:\n`);
+      for (const entry of entries) {
+        console.log(`  [${entry.type}] ${entry.shortText}`);
+        console.log(`    dateTime: ${entry.dateTime}`);
+        console.log(`    username: ${entry.username}`);
+        console.log(`    requestKind: ${entry.requestKind}`);
+        console.log(`    transactionId: ${entry.transactionId}`);
+        console.log();
+      }
+      return;
+    }
+
+    console.error(`Unknown topic: ${topic}`);
+    console.error('Available: dumps, systemMessages, gatewayErrors');
+    process.exitCode = 1;
+    return;
+  } finally {
+    // In `finally`, and the session given back rather than left to time out.
+    // A small pool is easy to exhaust — two concurrent sessions is the measured
+    // ceiling on the trial — and a script that leaks one on every run locks the
+    // next person out for no visible reason.
+    await releaseTestConnection(connection);
+  }
 }
 
 main().catch((err) => {

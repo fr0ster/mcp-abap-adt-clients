@@ -299,62 +299,71 @@ async function main(): Promise<void> {
 
   const sapConfig = getConfig();
   const connection = await createTestConnection(createConnectionLogger());
-  await connection.connect();
-  logger.info(`Connected to ${sapConfig.url}; package ${pkg}`);
+  try {
+    await connection.connect();
+    logger.info(`Connected to ${sapConfig.url}; package ${pkg}`);
 
-  const attempts: IAttempt[] = [];
-  let n = 0;
+    const attempts: IAttempt[] = [];
+    let n = 0;
 
-  for (const c of cases(pkg)) {
-    logger.info(`${c.module} — POST ${c.url}`);
-    n += 1;
-    const full = await ask(connection, outDir, n, c, null, logger);
-    attempts.push(full);
-    for (const key of Object.keys(c.params)) {
+    for (const c of cases(pkg)) {
+      logger.info(`${c.module} — POST ${c.url}`);
       n += 1;
-      attempts.push(await ask(connection, outDir, n, c, key, logger));
+      const full = await ask(connection, outDir, n, c, null, logger);
+      attempts.push(full);
+      for (const key of Object.keys(c.params)) {
+        n += 1;
+        attempts.push(await ask(connection, outDir, n, c, key, logger));
+      }
+      // Sent, but empty. Three modules pass `description || ''` rather than
+      // omitting it, so this — not the omission above — is the request a caller
+      // who gave no description actually produces.
+      if ('description' in c.params) {
+        n += 1;
+        attempts.push(
+          await ask(connection, outDir, n, c, null, logger, {
+            description: '',
+          }),
+        );
+      }
     }
-    // Sent, but empty. Three modules pass `description || ''` rather than
-    // omitting it, so this — not the omission above — is the request a caller
-    // who gave no description actually produces.
-    if ('description' in c.params) {
-      n += 1;
-      attempts.push(
-        await ask(connection, outDir, n, c, null, logger, {
-          description: '',
-        }),
+
+    fs.writeFileSync(
+      path.join(outDir, 'manifest.json'),
+      JSON.stringify(
+        { system: sapConfig.url, package: pkg, attempts },
+        null,
+        2,
+      ),
+      'utf8',
+    );
+
+    // The matrix, which is the point. A parameter is required when leaving it out
+    // stops the endpoint answering the way the full set did.
+    logger.info('');
+    logger.info('module                          required parameters');
+    for (const c of cases(pkg)) {
+      const mine = attempts.filter((a) => a.module === c.module);
+      const control = mine.find((a) => a.omitted === null);
+      const required = mine
+        .filter((a) => a.omitted !== null && a.status !== control?.status)
+        .map((a) => a.omitted);
+      logger.info(
+        `${c.module.padEnd(31)} ${
+          control?.status === 200
+            ? required.length
+              ? required.join(', ')
+              : '(none — all optional)'
+            : `control did not succeed (${control?.status}) — case proves nothing`
+        }`,
       );
     }
+  } finally {
+    // In `finally`. A probe that throws part way through still owes the
+    // session back: it was released on the success path only, so exactly the
+    // run that fails — the one worth repeating — left one behind.
+    await releaseTestConnection(connection);
   }
-
-  fs.writeFileSync(
-    path.join(outDir, 'manifest.json'),
-    JSON.stringify({ system: sapConfig.url, package: pkg, attempts }, null, 2),
-    'utf8',
-  );
-
-  // The matrix, which is the point. A parameter is required when leaving it out
-  // stops the endpoint answering the way the full set did.
-  logger.info('');
-  logger.info('module                          required parameters');
-  for (const c of cases(pkg)) {
-    const mine = attempts.filter((a) => a.module === c.module);
-    const control = mine.find((a) => a.omitted === null);
-    const required = mine
-      .filter((a) => a.omitted !== null && a.status !== control?.status)
-      .map((a) => a.omitted);
-    logger.info(
-      `${c.module.padEnd(31)} ${
-        control?.status === 200
-          ? required.length
-            ? required.join(', ')
-            : '(none — all optional)'
-          : `control did not succeed (${control?.status}) — case proves nothing`
-      }`,
-    );
-  }
-
-  await releaseTestConnection(connection);
   logger.info(`Evidence written to ${outDir}`);
 }
 

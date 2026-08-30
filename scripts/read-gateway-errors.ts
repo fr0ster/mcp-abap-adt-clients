@@ -16,7 +16,10 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
-import { createTestConnection } from '../src/__tests__/helpers/sessionConfig';
+import {
+  createTestConnection,
+  releaseTestConnection,
+} from '../src/__tests__/helpers/sessionConfig';
 import { createConnectionLogger } from '../src/__tests__/helpers/testLogger';
 import { AdtRuntimeClient } from '../src/clients/AdtRuntimeClient';
 
@@ -52,39 +55,47 @@ async function main() {
   console.error(`Connecting to ${config.url}...`);
   const connection = await createTestConnection(createConnectionLogger());
   // Already open: `createTestConnection` connects before returning.
+  try {
+    const runtime = new AdtRuntimeClient(connection, undefined, {
+      enableAcceptCorrection: true,
+    });
+    const gw = runtime.getGatewayErrorLog();
 
-  const runtime = new AdtRuntimeClient(connection, undefined, {
-    enableAcceptCorrection: true,
-  });
-  const gw = runtime.getGatewayErrorLog();
+    if (!errorType) {
+      const options = {
+        user: process.env.GW_USER || undefined,
+        maxResults: process.env.GW_MAX
+          ? Number.parseInt(process.env.GW_MAX, 10)
+          : 10,
+      };
 
-  if (!errorType) {
-    const options = {
-      user: process.env.GW_USER || undefined,
-      maxResults: process.env.GW_MAX
-        ? Number.parseInt(process.env.GW_MAX, 10)
-        : 10,
-    };
+      console.error(
+        `Gateway Error Log (user=${options.user || 'all'}, max=${options.maxResults})`,
+      );
+      const response = await gw.list(options);
+      const xml = String(response.data);
+      printXml(xml);
+      return;
+    }
 
-    console.error(
-      `Gateway Error Log (user=${options.user || 'all'}, max=${options.maxResults})`,
-    );
-    const response = await gw.list(options);
-    const xml = String(response.data);
-    printXml(xml);
-    return;
+    if (!errorId) {
+      console.error(
+        'Usage: npx ts-node scripts/read-gateway-errors.ts "<errorType>" <errorId>',
+      );
+      process.exitCode = 1;
+      return;
+    }
+
+    console.error(`Gateway Error: ${errorType} / ${errorId}`);
+    const response = await gw.getById(errorType, errorId);
+    printXml(String(response.data));
+  } finally {
+    // In `finally`, and the session given back rather than left to time out.
+    // A small pool is easy to exhaust — two concurrent sessions is the measured
+    // ceiling on the trial — and a script that leaks one on every run locks the
+    // next person out for no visible reason.
+    await releaseTestConnection(connection);
   }
-
-  if (!errorId) {
-    console.error(
-      'Usage: npx ts-node scripts/read-gateway-errors.ts "<errorType>" <errorId>',
-    );
-    process.exit(1);
-  }
-
-  console.error(`Gateway Error: ${errorType} / ${errorId}`);
-  const response = await gw.getById(errorType, errorId);
-  printXml(String(response.data));
 }
 
 main().catch((err) => {

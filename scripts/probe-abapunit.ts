@@ -161,112 +161,116 @@ async function main(): Promise<void> {
 
   const sapConfig = getConfig();
   const connection = await createTestConnection(createConnectionLogger());
-  await connection.connect();
-  logger.info(`Connected to ${sapConfig.url}; object set is ${classUri}`);
+  try {
+    await connection.connect();
+    logger.info(`Connected to ${sapConfig.url}; object set is ${classUri}`);
 
-  const steps: IStep[] = [];
-  let n = 0;
+    const steps: IStep[] = [];
+    let n = 0;
 
-  for (const variant of [V4, GENERIC]) {
-    n += 1;
-    const headers = {
-      'Content-Type': variant.contentType,
-      Accept: variant.accept,
-    };
-    const record: IStep = {
-      n,
-      label: variant.label,
-      answers: variant.answers,
-      request: { method: 'POST', url: TESTRUNS_URL, headers, body: xml },
-      status: null,
-      durationMs: 0,
-    };
-    logger.info(
-      `[${n}] ${variant.label} — POST ${TESTRUNS_URL} (${variant.contentType})`,
-    );
-
-    const startedAt = Date.now();
-    let body = '';
-    let responseHeaders: Record<string, unknown> = {};
-    try {
-      const response = await connection.makeAdtRequest({
-        url: TESTRUNS_URL,
-        method: 'POST',
-        timeout: TIMEOUT,
-        data: xml,
-        headers,
-      });
-      record.status = response.status;
-      record.statusText = response.statusText;
-      responseHeaders = (response.headers ?? {}) as Record<string, unknown>;
-      body =
-        typeof response.data === 'string'
-          ? response.data
-          : String(response.data ?? '');
-    } catch (error: unknown) {
-      const e = error as {
-        message?: string;
-        response?: {
-          status?: number;
-          statusText?: string;
-          headers?: Record<string, unknown>;
-          data?: unknown;
-        };
+    for (const variant of [V4, GENERIC]) {
+      n += 1;
+      const headers = {
+        'Content-Type': variant.contentType,
+        Accept: variant.accept,
       };
-      record.status = e.response?.status ?? null;
-      record.statusText = e.response?.statusText;
-      responseHeaders = e.response?.headers ?? {};
-      record.error = e.message ?? String(error);
-      const data = e.response?.data;
-      body = typeof data === 'string' ? data : data ? JSON.stringify(data) : '';
-      logger.warn(
-        `[${n}] ${variant.label} → ${record.status ?? 'no status'}: ${record.error}`,
+      const record: IStep = {
+        n,
+        label: variant.label,
+        answers: variant.answers,
+        request: { method: 'POST', url: TESTRUNS_URL, headers, body: xml },
+        status: null,
+        durationMs: 0,
+      };
+      logger.info(
+        `[${n}] ${variant.label} — POST ${TESTRUNS_URL} (${variant.contentType})`,
+      );
+
+      const startedAt = Date.now();
+      let body = '';
+      let responseHeaders: Record<string, unknown> = {};
+      try {
+        const response = await connection.makeAdtRequest({
+          url: TESTRUNS_URL,
+          method: 'POST',
+          timeout: TIMEOUT,
+          data: xml,
+          headers,
+        });
+        record.status = response.status;
+        record.statusText = response.statusText;
+        responseHeaders = (response.headers ?? {}) as Record<string, unknown>;
+        body =
+          typeof response.data === 'string'
+            ? response.data
+            : String(response.data ?? '');
+      } catch (error: unknown) {
+        const e = error as {
+          message?: string;
+          response?: {
+            status?: number;
+            statusText?: string;
+            headers?: Record<string, unknown>;
+            data?: unknown;
+          };
+        };
+        record.status = e.response?.status ?? null;
+        record.statusText = e.response?.statusText;
+        responseHeaders = e.response?.headers ?? {};
+        record.error = e.message ?? String(error);
+        const data = e.response?.data;
+        body =
+          typeof data === 'string' ? data : data ? JSON.stringify(data) : '';
+        logger.warn(
+          `[${n}] ${variant.label} → ${record.status ?? 'no status'}: ${record.error}`,
+        );
+      }
+
+      record.durationMs = Date.now() - startedAt;
+      record.responseHeaders = responseHeaders;
+      record.location =
+        (responseHeaders.location as string | undefined) ??
+        (responseHeaders.Location as string | undefined) ??
+        null;
+      record.rootElement = rootElement(body);
+
+      const file = `${String(n).padStart(2, '0')}-${variant.label}.xml`;
+      fs.writeFileSync(path.join(outDir, file), body, 'utf8');
+      record.bodyFile = file;
+      record.bodyPreview = body.slice(0, 400);
+      steps.push(record);
+
+      logger.info(
+        `[${n}] → ${record.status ?? 'no status'}, ${body.length} bytes, ${record.durationMs}ms, ` +
+          `root <${record.rootElement ?? 'none'}>, Location ${record.location ?? 'absent'} → ${file}`,
+      );
+      // Headers whole, in the log as well as the manifest: a `Location` nobody
+      // scrolled to is the same as one nobody recorded.
+      logger.info(
+        `[${n}] response headers: ${JSON.stringify(responseHeaders, null, 2)}`,
       );
     }
 
-    record.durationMs = Date.now() - startedAt;
-    record.responseHeaders = responseHeaders;
-    record.location =
-      (responseHeaders.location as string | undefined) ??
-      (responseHeaders.Location as string | undefined) ??
-      null;
-    record.rootElement = rootElement(body);
-
-    const file = `${String(n).padStart(2, '0')}-${variant.label}.xml`;
-    fs.writeFileSync(path.join(outDir, file), body, 'utf8');
-    record.bodyFile = file;
-    record.bodyPreview = body.slice(0, 400);
-    steps.push(record);
-
-    logger.info(
-      `[${n}] → ${record.status ?? 'no status'}, ${body.length} bytes, ${record.durationMs}ms, ` +
-        `root <${record.rootElement ?? 'none'}>, Location ${record.location ?? 'absent'} → ${file}`,
+    fs.writeFileSync(
+      path.join(outDir, 'manifest.json'),
+      JSON.stringify(
+        {
+          url: sapConfig.url,
+          classUri,
+          requestBody: xml,
+          steps,
+        },
+        null,
+        2,
+      ),
+      'utf8',
     );
-    // Headers whole, in the log as well as the manifest: a `Location` nobody
-    // scrolled to is the same as one nobody recorded.
-    logger.info(
-      `[${n}] response headers: ${JSON.stringify(responseHeaders, null, 2)}`,
-    );
+  } finally {
+    // In `finally`. A probe that throws part way through still owes the
+    // session back: it was released on the success path only, so exactly the
+    // run that fails — the one worth repeating — left one behind.
+    await releaseTestConnection(connection);
   }
-
-  fs.writeFileSync(
-    path.join(outDir, 'manifest.json'),
-    JSON.stringify(
-      {
-        url: sapConfig.url,
-        classUri,
-        requestBody: xml,
-        steps,
-      },
-      null,
-      2,
-    ),
-    'utf8',
-  );
-
-  // The session goes back. A probe that leaves one behind costs the pool the
-  // same as a test run does, and the pool is shared.
-  await releaseTestConnection(connection);
   logger.info(`Evidence written to ${outDir}`);
 }
 
