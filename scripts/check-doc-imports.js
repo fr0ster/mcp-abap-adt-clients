@@ -169,7 +169,9 @@ const unmeasured = [];
 
 for (const file of docFiles()) {
   const text = fs.readFileSync(file, 'utf8');
-  for (const { specifier: from, names, line } of importsIn(text)) {
+  for (const { specifier: from, names, defaultImport, line } of importsIn(
+    text,
+  )) {
     const relative = from.startsWith('.');
     if (!relative && !OURS.includes(from)) continue;
 
@@ -182,6 +184,16 @@ for (const file of docFiles()) {
         : 'package not installed';
       unmeasured.push(`${where}  ${from}  (${why})`);
       continue;
+    }
+
+    if (defaultImport && !allowed.has('default')) {
+      // Report what the reader wrote, not the word `default` — and if that name
+      // is a named export, say so, because that is the correction.
+      const named = allowed.has(defaultImport);
+      problems.push(
+        `${where}  ${defaultImport}  (default import, but ${from} has no ` +
+          `default export${named ? ` — ${defaultImport} is a named export` : ''})`,
+      );
     }
 
     for (const name of names) {

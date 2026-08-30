@@ -72,6 +72,13 @@ Requires `@mcp-abap-adt/interfaces@^25.0.0`.
   never been reported broken — the sibling test had used the checker all along,
   so the gate was holding its two halves to different standards.
 
+  A default import is checked as well. `import X from '…'` binds the module's
+  `default` export, none of the first-party packages has one, so such a line is
+  always wrong — and it used to be read as binding nothing and pass. The report
+  names what the reader wrote rather than the word `default`, and when that name
+  is a named export it says so, because that is the correction. A namespace
+  import (`import * as X`) still names no export and is left alone.
+
   The one relative import in the documentation is measured too, against the
   exports of the file it names. **An import that cannot be measured now fails
   the gate**, in its own section with its own reason — a relative path matching

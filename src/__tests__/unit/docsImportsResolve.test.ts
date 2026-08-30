@@ -20,6 +20,8 @@ import * as ts from 'typescript';
 interface DocImport {
   specifier: string;
   names: string[];
+  /** Local name of `import X from '…'`, which binds the `default` export. */
+  defaultImport?: string;
   line: number;
 }
 
@@ -76,7 +78,11 @@ function markdownFiles(): string[] {
 function importedNames(file: string): string[] {
   return importsIn(readFileSync(file, 'utf8'))
     .filter((entry) => entry.specifier === PACKAGE_NAME)
-    .flatMap((entry) => entry.names);
+    .flatMap((entry) =>
+      // `import X from '…'` binds `default`, so that is the name to look for —
+      // this package has none, which is why such a line is always wrong.
+      entry.defaultImport ? [...entry.names, 'default'] : entry.names,
+    );
 }
 
 describe('documented imports resolve against the real public surface', () => {

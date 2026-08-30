@@ -58,10 +58,19 @@ function typescriptBlocks(source) {
 }
 
 /**
- * Every named import in a document.
+ * Every import in a document that binds a name worth checking.
+ *
+ * Named bindings, and the default import — `import X from 'p'` binds `p`'s
+ * `default` export, which none of the first-party packages here has, so such a
+ * line is always wrong and used to pass unread. The local name is carried
+ * alongside so the report can say what the reader wrote rather than the word
+ * `default`.
+ *
+ * A namespace import (`import * as X`) binds the module itself and names no
+ * export, so there is nothing in it to check.
  *
  * @param {string} markdown
- * @returns {Array<{specifier: string, names: string[], line: number}>}
+ * @returns {Array<{specifier: string, names: string[], defaultImport?: string, line: number}>}
  */
 function importsIn(markdown) {
   const found = [];
@@ -80,15 +89,21 @@ function importsIn(markdown) {
     for (const statement of source.statements) {
       if (!ts.isImportDeclaration(statement)) continue;
       if (!ts.isStringLiteral(statement.moduleSpecifier)) continue;
+      const clause = statement.importClause;
+      if (!clause) continue;
 
-      const bindings = statement.importClause?.namedBindings;
-      if (!bindings || !ts.isNamedImports(bindings)) continue;
-
-      const names = bindings.elements.map((element) =>
-        // `X as Y` imports X; the local alias is the consumer's business.
-        (element.propertyName ?? element.name).getText(source),
-      );
-      if (names.length === 0) continue;
+      const bindings = clause.namedBindings;
+      const names =
+        bindings && ts.isNamedImports(bindings)
+          ? bindings.elements.map((element) =>
+              // `X as Y` imports X; the local alias is the consumer's business.
+              (element.propertyName ?? element.name).getText(source),
+            )
+          : [];
+      const defaultImport = clause.name
+        ? clause.name.getText(source)
+        : undefined;
+      if (names.length === 0 && !defaultImport) continue;
 
       const within = source.getLineAndCharacterOfPosition(
         statement.getStart(source),
@@ -96,6 +111,7 @@ function importsIn(markdown) {
       found.push({
         specifier: statement.moduleSpecifier.text,
         names,
+        defaultImport,
         line: block.startLine + within,
       });
     }
