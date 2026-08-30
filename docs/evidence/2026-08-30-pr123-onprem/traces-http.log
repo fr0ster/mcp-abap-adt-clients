@@ -1,0 +1,64 @@
+
+> @mcp-abap-adt/adt-clients@15.0.0 pretest
+> npm run test:check:integration && npm run --silent check:config
+
+
+> @mcp-abap-adt/adt-clients@15.0.0 test:check:integration
+> npx tsc --noEmit --project tsconfig.test.integration.json
+
+check:config — test-config.yaml carries all 78 sections the template does.
+
+> @mcp-abap-adt/adt-clients@15.0.0 test
+> npx jest --runInBand integration/runtime/traces
+
+[globalSetup] Checking SAP connectivity: http://epbyminsd0654.epam.com:8000 (onprem) (up to 30000ms; SKIP_SAP_PREFLIGHT=1 to skip, SAP_PREFLIGHT_TIMEOUT_MS to change) ...
+[globalSetup] session 628a0a62-72c8-46e1-a98d-5ec56790d2a2 — shared by every test file
+[globalSetup] SAP connection OK
+[1] ▶ START Profiler Traces - list endpoints :: adt_profiler_traces
+  → list profiler traces
+  → list trace requests (the schedule)
+  → list profiler object types
+  → list profiler process types
+[1] ✓ PASS Profiler Traces - list endpoints (0.6s)
+[1] ✓ END Profiler Traces - list endpoints
+
+[2] ▶ START Profiler Traces - create parameters :: adt_profiler_traces
+  → create profiler trace parameters with defaults (POST)
+  → trace request id: /sap/bc/adt/runtime/traces/abaptraces/parameters/0CC47A1E68C11FE1A98BBE265E2275CA
+[2] ✓ PASS Profiler Traces - create parameters (0.1s)
+[2] ✓ END Profiler Traces - create parameters
+
+[3] ▶ START Profiler Traces - run with profiling :: adt_profiler_traces
+  → run shared class ZAC_SHR_RUN01 with profiling
+  → run output: Hello World 1 Hello World 2 Hello World 3 Hello World 4 Hello World 5
+  → profilerId=/sap/bc/adt/runtime/traces/abaptraces/parameters/0CC47A1E68C11FE1A98BBE265E22D5CA; waiting for the trace
+[3] ✓ PASS Profiler Traces - run with profiling (0.6s)
+[3] ✓ END Profiler Traces - run with profiling
+
+[4] ▶ START Profiler Traces - discover traces :: adt_profiler_traces
+  → using trace id from profiled run: F132F118A45D11F1B5CA0CC47A1E68C1
+[4] ✓ PASS Profiler Traces - discover traces (0.0s)
+[4] ✓ END Profiler Traces - discover traces
+
+[5] ▶ START Profiler Traces - read trace details :: adt_profiler_traces
+  → read trace hitlist for F132F118A45D11F1B5CA0CC47A1E68C1
+  → read trace hitlist with system events for F132F118A45D11F1B5CA0CC47A1E68C1
+  → read trace statements for F132F118A45D11F1B5CA0CC47A1E68C1
+  → read trace db accesses for F132F118A45D11F1B5CA0CC47A1E68C1
+  → trace details: hitlist=10 rows (10 with system events), statements=8, dbAccesses=2
+[5] ✓ PASS Profiler Traces - read trace details (0.5s)
+[5] ✓ END Profiler Traces - read trace details
+
+[6] ▶ START Profiler Traces - requests by URI :: adt_profiler_traces
+[6] ⏭ SKIP Profiler Traces - requests by URI – object_uri not configured in test-config.yaml params
+[7] ▶ START Profiler Traces - delete trace :: adt_profiler_traces
+  → delete trace F132F118A45D11F1B5CA0CC47A1E68C1
+PASS src/__tests__/integration/runtime/traces/ProfilerTraces.test.ts
+
+Test Suites: 1 passed, 1 total
+Tests:       7 passed, 7 total
+Snapshots:   0 total
+Time:        3.952 s
+Ran all test suites matching integration/runtime/traces.
+[globalTeardown] shared session released
+Force exiting Jest: Have you considered using `--detectOpenHandles` to detect async operations that kept running after all tests finished?
