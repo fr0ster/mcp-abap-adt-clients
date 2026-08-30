@@ -54,7 +54,9 @@ Requires `@mcp-abap-adt/interfaces@^25.0.0`.
   an import wrapped across lines would have been the fourth.
 
   The extraction is now done by parsers on both halves. Fences are found by a
-  Markdown parser (`markdown-it`, a new devDependency) and each TypeScript block
+  Markdown parser (`markdown-it@^14.1.0`, a new devDependency — v15 pulls
+  `entities@8`, which requires Node 20.19 and would have contradicted this
+  package's `engines: node >=18`) and each TypeScript block
   is parsed by the TypeScript compiler's parser, with the import declarations
   read from the syntax tree.
 
