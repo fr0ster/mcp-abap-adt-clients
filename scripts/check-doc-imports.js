@@ -17,14 +17,21 @@
  * Third-party imports are skipped: their exports are not ours to police, and a
  * wrong one there is a different kind of mistake.
  *
- * For THIS package the check is stricter, since 15.0.0: a name is measured
- * against what `src/index.ts` reaches through its barrels, not against every
- * identifier anywhere under `src`. The looser check passed a doc telling
- * consumers to `import { compareRecordedAt } from '@mcp-abap-adt/adt-clients'`
- * while the package's entry point did not re-export it — the name existed, and
- * was unreachable, which is the same broken snippet by a different route. For
- * relative imports the loose set still applies: those name internal paths on
- * purpose.
+ * Since 15.0.0 each module specifier answers for itself, and the check is
+ * stricter for this package. Two holes closed, both of which let a broken
+ * snippet pass:
+ *
+ * - One pooled set across all three packages meant
+ *   `import { AdtClient } from '@mcp-abap-adt/interfaces'` passed, because
+ *   `AdtClient` is real *here*. The reader would still be told to import from a
+ *   package that has no such export.
+ * - Measuring this package against every identifier under `src` passed
+ *   `import { compareRecordedAt } from '@mcp-abap-adt/adt-clients'` while the
+ *   entry point did not re-export it: real, and unreachable.
+ *
+ * So: this package is measured against what `src/index.ts` reaches through its
+ * barrels, each dependency against its own `types` entry, and relative imports
+ * against the loose set — those name internal paths on purpose.
  *
  * Run: npm run check:docs
  */
@@ -89,28 +96,68 @@ function namesIn(files) {
   return names;
 }
 
-function exported() {
-  const files = [
-    ...walk(path.join(ROOT, 'src')).filter(
+/**
+ * Every identifier under `src`, regardless of whether anything exports it on.
+ *
+ * Only relative imports are measured against this: a doc writing `from './x'`
+ * is naming an internal path on purpose, and the entry point has no opinion
+ * about it.
+ */
+function looseSrcNames() {
+  return namesIn(
+    walk(path.join(ROOT, 'src')).filter(
       (f) => f.endsWith('.ts') || f.endsWith('.js'),
     ),
-  ];
-  for (const pkg of OURS.slice(1)) {
-    const dist = path.join(ROOT, 'node_modules', pkg, 'dist');
-    if (fs.existsSync(dist))
-      files.push(...walk(dist).filter((f) => f.endsWith('.d.ts')));
-  }
-  return namesIn(files);
+  );
 }
 
 /** `'./x'` → the file it means, or null when it is not ours to follow. */
 function resolveModule(spec, fromFile) {
   if (!spec.startsWith('.')) return null;
   const base = path.resolve(path.dirname(fromFile), spec);
-  for (const candidate of [`${base}.ts`, path.join(base, 'index.ts')]) {
+  const candidates = [
+    `${base}.ts`,
+    `${base}.d.ts`,
+    path.join(base, 'index.ts'),
+    path.join(base, 'index.d.ts'),
+  ];
+  for (const candidate of candidates) {
     if (fs.existsSync(candidate)) return candidate;
   }
   return null;
+}
+
+/**
+ * What an installed dependency hands out, from its own type entry point.
+ *
+ * Per package, never pooled. One shared set across all three packages let
+ * `import { AdtClient } from '@mcp-abap-adt/interfaces'` pass: the name is real
+ * in this repository, and `interfaces` does not export it — the doc would still
+ * be telling a reader to import from a package that has no such thing.
+ *
+ * Falls back to every name in `dist` when the entry cannot be resolved, which
+ * is looser but still confined to that one package.
+ */
+function dependencyNames(pkg) {
+  const root = path.join(ROOT, 'node_modules', pkg);
+  if (!fs.existsSync(root)) return null;
+
+  let entry;
+  try {
+    const manifest = JSON.parse(
+      fs.readFileSync(path.join(root, 'package.json'), 'utf8'),
+    );
+    const types = manifest.types || manifest.typings;
+    if (types) entry = path.join(root, types);
+  } catch {
+    // Unreadable manifest: fall through to the dist scan.
+  }
+
+  if (entry && fs.existsSync(entry)) return publicNames(entry);
+
+  const dist = path.join(root, 'dist');
+  if (!fs.existsSync(dist)) return null;
+  return namesIn(walk(dist).filter((f) => f.endsWith('.d.ts')));
 }
 
 /**
@@ -155,8 +202,21 @@ function docFiles() {
   return out;
 }
 
-const known = exported();
-const publik = publicNames(path.join(ROOT, 'src', 'index.ts'));
+const loose = looseSrcNames();
+
+/**
+ * One surface per module specifier — the whole point of the check.
+ *
+ * A package absent from `node_modules` maps to `null`, and names imported from
+ * it are skipped rather than reported: an uninstalled dependency is a missing
+ * measurement, not a broken document.
+ */
+const SURFACES = new Map([
+  [OURS[0], publicNames(path.join(ROOT, 'src', 'index.ts'))],
+  ...OURS.slice(1).map((pkg) => [pkg, dependencyNames(pkg)]),
+]);
+
+const unmeasured = OURS.filter((p) => SURFACES.get(p) === null);
 const problems = [];
 
 for (const file of docFiles()) {
@@ -167,22 +227,27 @@ for (const file of docFiles()) {
     /import\s*(?:type\s+)?\{([^}]*)\}\s*from\s*'([^']+)'/g,
   )) {
     const from = m[2];
-    const mine = OURS.some((p) => from === p) || from.startsWith('.');
-    if (!mine) continue;
-    // Our own package is held to its entry point; everything else to the
-    // loose set, which is all we can see of a dependency's shape.
-    const root = from === OURS[0];
-    const allowed = root ? publik : known;
+    const relative = from.startsWith('.');
+    if (!relative && !OURS.includes(from)) continue;
+    // Each package answers for itself; a relative path is measured against the
+    // loose set, since it names an internal file deliberately.
+    const allowed = relative ? loose : SURFACES.get(from);
+    if (!allowed) continue; // dependency not installed — nothing measured
     for (const raw of m[1].split(',')) {
       const name = raw.trim().replace(/^type\s+/, '');
       if (name && !allowed.has(name)) {
         const line = text.slice(0, m.index).split('\n').length;
+        // Saying WHERE it does exist turns "no such name" into the fix.
+        const elsewhere = OURS.filter(
+          (p) => p !== from && SURFACES.get(p)?.has(name),
+        );
+        const detail = elsewhere.length
+          ? `(not exported by ${from} — it is in ${elsewhere.join(', ')})`
+          : loose.has(name) && from === OURS[0]
+            ? '(exists, but src/index.ts does not re-export it)'
+            : `(documented as coming from ${from})`;
         problems.push(
-          `${path.relative(ROOT, file)}:${line}  ${name}  ${
-            root && known.has(name)
-              ? '(exists, but src/index.ts does not re-export it)'
-              : `(documented as coming from ${from})`
-          }`,
+          `${path.relative(ROOT, file)}:${line}  ${name}  ${detail}`,
         );
       }
     }
@@ -199,5 +264,12 @@ if (problems.length > 0) {
 }
 
 console.log(
-  `check:docs — ${docFiles().length} documents, every imported name exists.`,
+  `check:docs — ${docFiles().length} documents, every imported name is exported ` +
+    'by the package it is imported from.',
 );
+if (unmeasured.length > 0) {
+  // Never silently: a skipped package looks exactly like a clean one.
+  console.log(
+    `  not measured, package not installed: ${unmeasured.join(', ')}`,
+  );
+}

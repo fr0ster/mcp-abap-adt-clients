@@ -50,7 +50,26 @@ Requires `@mcp-abap-adt/interfaces@^25.0.0`.
   It also read only `import { … }`, so every `import type { … }` in the docs —
   seven of them — was unchecked, and a type-export that no longer existed would
   have passed under a gate whose whole promise is that every documented name
-  exists. Both holes are proven closed by planting the failure and watching the
+  exists.
+
+  And it pooled the exports of all three packages into one set, so the specifier
+  a name was imported *from* did not matter:
+  `import { AdtClient } from '@mcp-abap-adt/interfaces'` passed, because
+  `AdtClient` is real here — while a reader following that line would be told to
+  import from a package that has no such export. Each specifier now answers for
+  itself: this package against its entry point, each dependency against its own
+  `types` entry, relative imports against the loose set. When a name is real but
+  lives elsewhere the gate says where, so the report is the fix:
+
+  ```
+  README.md:232  AdtClient  (not exported by @mcp-abap-adt/interfaces
+                              — it is in @mcp-abap-adt/adt-clients)
+  ```
+
+  A package that is not installed is reported as unmeasured rather than passed
+  in silence, since a skipped package otherwise looks exactly like a clean one.
+
+  All three holes are proven closed by planting the failure and watching the
   gate name the exact line.
 
   Across 29 documents it found nothing else, so this fixes a gap rather than a
