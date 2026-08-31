@@ -18,6 +18,9 @@ System: E19, `http://epbyminsd0654.epam.com:8000`, client 100,
 | `e19-shared-setup.log` | http | `shared:setup` — updates `ZAC_SHR_RUN01`, creates `ZAC_SHR_RUNPROG` | 1 passed | 35 s |
 | `e19-http-executors-shared.log` | http | `integration/executors` + `runtime/traces` on shared fixtures | 10 passed | 6.1 s |
 | `e19-rfc-executors-shared.log` | rfc | the same three suites | 10 passed | 7.7 s |
+| `e19-http-full-verify.log` | http | full suite, this branch | **1286 passed, 0 failed**, 2 skipped | 724 s |
+| `e19-rfc-full-verify.log` | rfc | full suite, this branch | 1285 passed, 1 failed, 2 skipped | 758 s |
+| `e19-rfc-messageclass-trace.log` | rfc | `messageClass` with `DEBUG_ADT_LIBS` | 1 failed | 38 s |
 
 RFC was run with the SDK on the path:
 
