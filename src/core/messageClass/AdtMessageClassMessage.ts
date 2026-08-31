@@ -9,12 +9,12 @@ import { beginCriticalSection } from '../../utils/criticalSection';
  * - read:   GET class XML → find message by msgno → return state.message
  * - create/update: GET class → merge message → stateful → lockMessage (MH) +
  *           lockClassForMessage (CH) → PUT full class XML (message with
- *           mc:lockhandle=MH, lockHandle=CH) → unlockAllMessages →
- *           unlock class (CH) → stateless
+ *           mc:lockhandle=MH, lockHandle=CH) → unlock class (CH) →
+ *           unlockAllMessages → stateless
  * - delete: GET class → stateful → lockMessage (MH) + lockClassForMessage (CH)
  *           → PUT class XML with target message as <mc:deletedmessages
  *           mc:lockhandle=MH>, all other messages as <mc:messages> →
- *           unlockAllMessages → unlock class (CH) → stateless.
+ *           unlock class (CH) → unlockAllMessages → stateless.
  *           (SAP does NOT delete omitted messages on PUT — <mc:deletedmessages>
  *           is the correct mechanism. A message-level DELETE /messages/{no}
  *           returns 423 and is NOT used.)
@@ -212,16 +212,19 @@ export class AdtMessageClassMessage
         headers: { 'Content-Type': MESSAGE_CLASS_UPDATE_CONTENT_TYPE },
       });
 
-      // 6. Release the message lock first, then unlock the whole class last —
-      //    the class edit-lock must be the final release of the process.
-      this.logger?.info?.('upsertMessage: unlockAllMessages');
-      await unlockAllMessages(this.connection, name, no);
-      messageLockHandle = undefined;
-
-      // 7. Unlock the whole class (final release)
+      // 6. Unlock the class first, then release the message locks — the order
+      //    Eclipse uses. Captured on E19 2026-08-31 editing a message in
+      //    ZADT_MSGX01: UNLOCK on the class at 15:17:15.085, UNLOCK_ALL on the
+      //    message at 15:17:15.202. This file used to do the reverse and said
+      //    the class lock "must be the final release", which the trace refutes.
       this.logger?.info?.('upsertMessage: unlock class');
       await unlockMessageClass(this.connection, name, classLockHandle);
       classLockHandle = undefined;
+
+      // 7. Release the message locks
+      this.logger?.info?.('upsertMessage: unlockAllMessages');
+      await unlockAllMessages(this.connection, name, no);
+      messageLockHandle = undefined;
 
       // 8. Back to stateless
       this.connection.setSessionType('stateless');
@@ -229,24 +232,24 @@ export class AdtMessageClassMessage
 
       return { updateResult, errors: [] };
     } catch (error: unknown) {
-      // Always clean up locks and reset session on failure — release the
-      // message lock first, then the class (final release), mirroring the happy path.
-      if (messageLockHandle) {
-        try {
-          await unlockAllMessages(this.connection, name, no);
-        } catch (ue) {
-          this.logger?.warn?.(
-            'Failed to unlock messages during cleanup:',
-            safeErrorMessage(ue),
-          );
-        }
-      }
+      // Always clean up locks and reset session on failure — class first,
+      // then the message locks, mirroring the happy path.
       if (classLockHandle) {
         try {
           await unlockMessageClass(this.connection, name, classLockHandle);
         } catch (ue) {
           this.logger?.warn?.(
             'Failed to unlock class during cleanup:',
+            safeErrorMessage(ue),
+          );
+        }
+      }
+      if (messageLockHandle) {
+        try {
+          await unlockAllMessages(this.connection, name, no);
+        } catch (ue) {
+          this.logger?.warn?.(
+            'Failed to unlock messages during cleanup:',
             safeErrorMessage(ue),
           );
         }
@@ -271,8 +274,8 @@ export class AdtMessageClassMessage
    *
    * Chain: GET class → stateful → lockMessage (MH) + lockClassForMessage (CH)
    * → PUT class XML with target in <mc:deletedmessages mc:lockhandle=MH>,
-   * remaining messages in <mc:messages> → unlockAllMessages →
-   * unlock class (CH) → stateless.
+   * remaining messages in <mc:messages> → unlock class (CH) →
+   * unlockAllMessages → stateless.
    */
   async delete(
     config: Partial<IMessageClassMessageConfig>,
@@ -327,38 +330,39 @@ export class AdtMessageClassMessage
         headers: { 'Content-Type': MESSAGE_CLASS_UPDATE_CONTENT_TYPE },
       });
 
-      // 5. Release the message lock first, then unlock the whole class last.
-      this.logger?.info?.('deleteMessage: unlockAllMessages');
-      await unlockAllMessages(this.connection, name, no);
-      messageLockHandle = undefined;
-
-      // 6. Unlock the whole class (final release)
+      // 5. Unlock the class first, then release the message locks — the order
+      //    Eclipse uses; see the note in _upsertMessage.
       this.logger?.info?.('deleteMessage: unlock class');
       await unlockMessageClass(this.connection, name, classLockHandle);
       classLockHandle = undefined;
+
+      // 6. Release the message locks
+      this.logger?.info?.('deleteMessage: unlockAllMessages');
+      await unlockAllMessages(this.connection, name, no);
+      messageLockHandle = undefined;
 
       this.connection.setSessionType('stateless');
       this.logger?.info?.('deleteMessage: done');
 
       return { deleteResult, errors: [] };
     } catch (error: unknown) {
-      // Release the message lock first, then the class (final release).
-      if (messageLockHandle) {
-        try {
-          await unlockAllMessages(this.connection, name, no);
-        } catch (ue) {
-          this.logger?.warn?.(
-            'Failed to unlock messages during cleanup:',
-            safeErrorMessage(ue),
-          );
-        }
-      }
+      // Class first, then the message locks, mirroring the happy path.
       if (classLockHandle) {
         try {
           await unlockMessageClass(this.connection, name, classLockHandle);
         } catch (ue) {
           this.logger?.warn?.(
             'Failed to unlock class during cleanup:',
+            safeErrorMessage(ue),
+          );
+        }
+      }
+      if (messageLockHandle) {
+        try {
+          await unlockAllMessages(this.connection, name, no);
+        } catch (ue) {
+          this.logger?.warn?.(
+            'Failed to unlock messages during cleanup:',
             safeErrorMessage(ue),
           );
         }

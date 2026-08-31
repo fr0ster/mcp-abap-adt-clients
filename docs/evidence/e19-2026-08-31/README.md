@@ -55,11 +55,9 @@ The probe object was deleted afterwards (`GET` → 404). The two after-fix logs
 above are the suite passing over both transports.
 
 **`MessageClass` — full workflow — rfc only.** `lockMessage` returns HTTP 403,
-`User OKYSLYTSIA is currently editing ZADT_MSGX01 001`. The same suite passed
-in the http run that ran first, and a standalone re-run
-(`e19-rfc-messageclass-retry.log`) fails the same way — so this is a stale
-enqueue lock left on the server for message `ZADT_MSGX01 001`, not a defect in
-the RFC path. Clear it in SM12 before reading the next run of this suite.
+`User OKYSLYTSIA is currently editing ZADT_MSGX01 001`. This first read as a
+stale enqueue to clear in SM12. It is not — see "The remaining red line" below,
+which is what the probes actually established.
 
 ## What the pair shows
 
@@ -67,8 +65,8 @@ RFC reaches parity with http on this system: 1279 of the same 1283 tests, and
 wall-clock within 1.4% of the http run. Running both was what placed the
 `AuthorizationField` failure — a defect that reproduces identically on two
 transports is in the payload, not the pipe. The one RFC-only failure went the
-other way: it did not reproduce on http and it survives a standalone re-run, so
-it is server state.
+other way: it does not reproduce on http at all, and that asymmetry is itself the
+finding — it is the rfc session model, not server state.
 
 ## The executor suites no longer build what they run
 
@@ -102,3 +100,64 @@ The 30-minute rows in the system's session list are the documented
 a run opens, and every log here ends with `shared session released`. The extra
 sessions in that window came from manual `curl` probes, each opened with its own
 cookie jar and never logged off. Probe with one jar and log off.
+
+## The remaining red line: `MessageClass` over rfc
+
+http on this branch is green end to end — 1286 passed, nothing failed. Over rfc
+one suite stays red, at the first `LOCK_MSG` on `ZADT_MSGX01 001`:
+`403 ExceptionResourceNoAccess`, "User OKYSLYTSIA is currently editing".
+
+Probed on E19, each step in its own process so no session can carry state:
+
+| Probe (rfc) | Result |
+| --- | --- |
+| bare `LOCK_MSG`, nothing before it | **200**, and `lockClassForMessage` after it also 200; both released |
+| `delete` alone | 200 |
+| `create` alone, then `LOCK_MSG` | **403** |
+| `create`, then `LOCK_MSG` on 001 / 002 / 003 | **403 on all three** |
+| `create`, then a plain class `LOCK` | **403** |
+| `create`, then `UNLOCK_ALL`, then `LOCK_MSG` | `UNLOCK_ALL` 200, `LOCK_MSG` still **403** |
+
+So it is `create` — not `delete`, not the suite's earlier steps — and it is not
+tied to a message number: after a create, nothing in that session can be locked.
+Three consecutive rfc runs with no http in between fail identically, and the
+moment a run ends the object is free again (`LOCK_MSG` from a fresh session
+answers 200), so the blocker lives and dies with the run's session.
+
+The constraint underneath, measured in one stateful http session: the class lock
+and the message lock are mutually exclusive **for the same user in the same
+session** — class `LOCK` → 200 then `LOCK_MSG` → 403, and `LOCK_MSG` → 200 then
+class `LOCK` → 403. ADT registers one lock per session per object and refuses the
+second, reporting it as "user is currently editing".
+
+`AdtMessageClass.create` is a plain POST that takes no lock of its own; the server
+takes one inside the call. Over http that request's session ends when it returns
+and the registration goes with it. Over rfc it does not: `RfcTransport` states
+that an RFC conversation is inherently stateful — one ABAP session — and that the
+only thing which drops its state is `close()`. `setSessionType('stateless')`
+cannot release it, and nothing reachable from inside the session does either, per
+the table above.
+
+**So this one is not fixable in this package.** It belongs where the session
+lives: over rfc, `setSessionType('stateless')` has to recycle the ABAP
+conversation the way an http stateless request does.
+
+## The unlock order, corrected against Eclipse
+
+Separate from the 403, and fixed here. An Eclipse trace of a message being edited
+in `ZADT_MSGX01` on E19 shows the release order plainly, session 155 throughout:
+
+```
+15:17:15.085  POST /messageclass/zadt_msgx01?_action=UNLOCK&lockHandle=16DC…  200
+15:17:15.202  POST /messageclass/zadt_msgx01/messages/002?_action=UNLOCK_ALL  200
+```
+
+The class first, then the messages. `AdtMessageClassMessage` did the reverse in
+all four release paths — both happy paths and both cleanup blocks — and carried a
+comment asserting the class lock "must be the final release of the process",
+which the trace refutes. The lock order was already right and matches the same
+trace, including `lockClassForMessage`'s `?_action=LOCK&…&msgNo=002&onSave=X`.
+
+This does not fix the 403 — that failure happens before either lock is taken —
+but the order was wrong on the evidence, so it is corrected. `messageClass` still
+passes over http in 2.6 s with the new order.

@@ -7,6 +7,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ### Fixed
 
+- `AdtMessageClassMessage` released its two locks in the wrong order.
+
+  A trace of Eclipse editing a message shows the class `UNLOCK` first and the
+  message `UNLOCK_ALL` second. All four release paths here did the reverse —
+  both happy paths and both cleanup blocks — behind a comment claiming the class
+  lock "must be the final release of the process". The lock order was already
+  right; only the release was inverted.
+
 - `AuthorizationField` create and update sent the wrong root element, and every
   write against `/sap/bc/adt/aps/iam/auth` failed with HTTP 500.
 
