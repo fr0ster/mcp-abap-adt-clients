@@ -169,8 +169,38 @@ The Eclipse trace shows the same separation — locks on one stateful session
 marked `enqueue` (155), every GET and the PUT on their own stateless sessions
 (156–160). Nothing that is not a lock shares the enqueue session.
 
-**Unresolved, and a design call rather than a bug to patch:** at the moment
-create finishes, no lock handle is being held, so the session could be discarded
-there without losing anything rfc came for. Whether to do that, or to treat
-create-then-lock-in-one-session as unsupported over rfc and gate the suite the
-way `available_in` already gates others, is not decided here.
+### It is MSAG, not a rule about sessions
+
+The tempting conclusion — "an ABAP session that created an object cannot then
+lock it" — is wrong. Three creates followed immediately by a lock, all in **one**
+rfc session on one run:
+
+| Type | `create` → `lock` |
+| --- | --- |
+| domain | **OK** |
+| class | **OK** |
+| message class | **403** on the class lock *and* on `LOCK_MSG` |
+
+Domain and class do not care. Only MSAG does. So this is a property of the ADT
+message-class create, not of the session model, and the other 26 core types are
+unaffected.
+
+### What was done about it
+
+The suite is gated off for rfc, with the reason stated at the skip. Not a
+workaround for a bug in this package — there is nothing here to fix. Creating a
+message class and locking one of its messages cannot happen in the same ABAP
+session, and an rfc conversation has exactly one for its whole life. That is what
+rfc is, and why it is here: lock handles have to survive on BASIS < 7.50, where
+stateful http does not work. Eclipse never meets this because its create runs on
+a stateless http session (209 in the capture) while its locks live on a separate
+stateful one (155) — a separation http gives away and rfc cannot express.
+
+Building a second rfc conversation to imitate it was considered and dropped: one
+MSAG flow does not pay for doubling the ABAP sessions every run opens, and this
+run already showed what stray sessions cost.
+
+What *was* taken from the Eclipse capture, and applies to both transports, is in
+`AdtMessageClassMessage`: the class lock is released before the message locks,
+the save runs outside the lock session, and a 403 on the message-scoped class
+lock falls back to the plain one instead of being fatal.
