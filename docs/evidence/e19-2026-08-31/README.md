@@ -228,18 +228,35 @@ Recorded because each looked promising and cost a run:
 - **Eclipse's exact header shape over rfc** — never marking a request stateful.
   Still 403.
 
-## Left open: `Package` over rfc alternates
+## Left open: `Package` over rfc, and a suite that passes without testing
 
 The one red line remaining in `e19-rfc-full-fixed.log` is
 `Package - Full workflow: HTTP 400, Package TEST_INNER_PKG02 is already locked`.
 
-Run on its own, nothing else, four times over rfc: **FAIL, PASS, FAIL, PASS**. A
-successful run appears to leave `TEST_INNER_PKG02` locked; the next one trips on
-it and, in tripping, clears it. Over http the suite is stable.
+It first looked intermittent — run alone over rfc it goes FAIL, PASS, FAIL, PASS.
+Reading the steps rather than the verdict says otherwise:
 
-It reproduces in isolation, so it is independent of anything on this branch, and
-it is a `400` rather than a `403` — a business-level "package is locked" state
-rather than an enqueue, which is why it survives the end of a session where the
-MessageClass lock did not. Not chased here, and deliberately not re-run until
-green: a suite that passes on the second attempt is the thing this evidence set
-exists to catch.
+```
+run 1:  → delete (pre-existing object cleanup)                    ← nothing else ran
+run 2:  → validate → create → read → update ✗ 400 "already locked"
+```
+
+What alternates is not the outcome but whether the suite does anything. When the
+previous run left the package behind, `ensureObjectReady` deletes it and the
+tester returns early — reporting **PASS having run neither create nor update**.
+When there is no leftover, the workflow runs and fails.
+
+So `update` immediately after `create` over rfc fails **every time it is
+actually attempted**. It is the shape that broke `MessageClass`: an operation on
+an object in the same ABAP session that created it, which http never meets
+because its create goes out on a session of its own.
+
+Two separate things to fix, and neither is done here:
+
+1. **The package chain over rfc.** Unlike MSAG there is no second lock variant to
+   fall back on — `/sap/bc/adt/packages/…?_action=LOCK&accessMode=MODIFY` is the
+   only one. What the server will accept after a create in the same session is
+   not yet measured.
+2. **A suite that reports green without testing.** A leftover object silently
+   turns the package lifecycle into a no-op that passes. That is what hid this
+   failure on every second run, and it is not specific to packages.
