@@ -125,6 +125,23 @@ export class BaseTester<TConfig, TState> {
     testCase: any,
     resolver?: TestConfigResolver,
   ) => TConfig;
+  /**
+   * A failure to put the system into the state the test needs.
+   *
+   * Kept apart from `skipReason` because the two mean opposite things and were
+   * being reported the same way. `skipReason` says the test does not apply here
+   * — no SAP configured, `available_in` excludes this system, the case is
+   * disabled. Nothing ran and nothing should have.
+   *
+   * This says the test does apply and the run could not get far enough to try:
+   * a leftover object that would not delete, most often. Routed through
+   * `skipReason` it printed SKIP and jest counted it green, so a suite that
+   * tested nothing was indistinguishable from one that passed — measured on
+   * E19, where a package left behind by a failed delete made the next run
+   * report success having executed neither create nor update.
+   */
+  private setupError: string | null = null;
+
   private ensureObjectReadyFn?: (
     objectName: string,
   ) => Promise<{ success: boolean; reason?: string; objectExists?: boolean }>;
@@ -1343,6 +1360,7 @@ export class BaseTester<TConfig, TState> {
   beforeEach(): () => Promise<void> {
     return async () => {
       this.skipReason = null;
+      this.setupError = null;
       this.testCase = null;
       this.config = null;
       this.configResolver = null;
@@ -1438,9 +1456,9 @@ export class BaseTester<TConfig, TState> {
         if (objectName) {
           const cleanup = await this.ensureObjectReadyFn(objectName);
           if (!cleanup.success) {
-            this.skipReason =
+            this.setupError =
               cleanup.reason || 'Failed to cleanup object before test';
-            this.log(LogLevel.WARN, `beforeEach: ${this.skipReason}`);
+            this.log(LogLevel.ERROR, `beforeEach: ${this.setupError}`);
             // If object exists, mark it for post-test cleanup (config stays for delete)
             if (cleanup.objectExists) {
               this.objectCreated = true;
@@ -1680,6 +1698,8 @@ export class BaseTester<TConfig, TState> {
       params: {},
     };
 
+    this.raiseIfSetupFailed(testName, definition);
+
     if (this.shouldSkip()) {
       logTestStart(this.logger, testName, definition);
       logTestSkip(
@@ -1719,12 +1739,33 @@ export class BaseTester<TConfig, TState> {
     }
   }
 
+  /**
+   * A setup that failed is a red test, not a skipped one.
+   *
+   * Called before `shouldSkip()` in both auto entry points so it cannot be
+   * mistaken for "does not apply here".
+   */
+  // biome-ignore lint/suspicious/noExplicitAny: logTestStart's own parameter
+  private raiseIfSetupFailed(testName: string, definition: any): void {
+    if (!this.setupError) return;
+    logTestStart(this.logger, testName, definition);
+    const error = new Error(
+      `Test could not be set up: ${this.setupError}. The system was not in a ` +
+        'state this test could run against, so nothing was verified.',
+    );
+    logTestError(this.logger, testName, error);
+    logTestEnd(this.logger, testName);
+    throw error;
+  }
+
   async flowTestAuto(options?: IFlowTestOptions): Promise<TState | undefined> {
     const testName = `${this.loggerPrefix} - ${this.testDescription}`;
     const definition = this.getTestCaseDefinition() || {
       name: this.testCaseKey,
       params: {},
     };
+
+    this.raiseIfSetupFailed(testName, definition);
 
     if (this.shouldSkip()) {
       logTestStart(this.logger, testName, definition);
