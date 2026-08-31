@@ -42,19 +42,38 @@ jobs:
         id: version
         run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
-      - name: Create Release
+      # A release for this tag may already exist, written by hand before the tag
+      # was pushed. Its notes are the ones worth keeping — the workflow's are a
+      # fallback, not an improvement on them.
+      - name: Is there already a release for this tag?
+        id: existing
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo 'exists=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'exists=false' >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Attach the package and touch nothing else. `--clobber` replaces the
+      # asset rather than failing on a second run, so a rerun changes nothing.
+      - name: Attach the package to the existing release
+        if: steps.existing.outputs.exists == 'true'
+        run: gh release upload "$GITHUB_REF_NAME" "${{ steps.package.outputs.filename }}" --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Only when nobody wrote one: then there are no notes to protect, and the
+      # generated changelog is better than an empty release.
+      - name: Create the release
+        if: steps.existing.outputs.exists == 'false'
         uses: softprops/action-gh-release@v3
         with:
           files: ${{ steps.package.outputs.filename }}
           generate_release_notes: true
           draft: false
           prerelease: false
-          # Appends instead of replacing. Without this, `body` overwrites — and
-          # a release written by hand before the tag was pushed lost its notes
-          # on v13.0.0, v14.0.0 and v15.0.0, each time silently, each time
-          # restored by hand afterwards. The action's own documentation:
-          # "append_body — Append to existing body instead of overwriting it".
-          append_body: true
           body: |
             ## Installation
 
