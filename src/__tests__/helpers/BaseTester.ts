@@ -1078,7 +1078,7 @@ export class BaseTester<TConfig, TState> {
           // TEST_INNER_PKG02. A cleanup that fails is a red test.
           throw new Error(
             `Test body passed but cleanup failed: ${detail}. ` +
-              `${String((config as Record<string, unknown>).name ?? '')} is left on the system, ` +
+              `${this.objectNameOf(config)} is left on the system, ` +
               'and the next run will not start from a clean state.',
           );
         }
@@ -1756,6 +1756,25 @@ export class BaseTester<TConfig, TState> {
       logTestEnd(this.logger, testName);
       throw error;
     }
+  }
+
+  /**
+   * The object's name as the config spells it.
+   *
+   * Every module names its own key — `packageName`, `className`, `domainName` —
+   * and a message that reached for `name` alone printed an empty string for all
+   * of them but the few that happen to use it.
+   */
+  private objectNameOf(config: unknown): string {
+    const c = (config ?? {}) as Record<string, unknown>;
+    const camelPrefix =
+      this.loggerPrefix.charAt(0).toLowerCase() + this.loggerPrefix.slice(1);
+    const value =
+      c[`${camelPrefix}Name`] ??
+      c[`${this.loggerPrefix.toLowerCase()}Name`] ??
+      c.name ??
+      c.objectName;
+    return value ? String(value) : `the ${this.loggerPrefix} object`;
   }
 
   /**
