@@ -141,52 +141,36 @@ The same sequence over **http**, inside one session carrying
 | --- | --- |
 | `POST /deletion/delete` on the class | 200 |
 | `POST /messageclass` (create) | 201 |
-| `POST /messageclass/zadt_msgx01/messages/001?_action=LOCK_MSG` | **403, "User OKYSLYTSIA is currently editing ZADT_MSGX01 001"** |
+| `POST …?_action=LOCK&accessMode=MODIFY` (class lock) | **refused — no handle** |
+| `POST …/messages/001?_action=LOCK_MSG` | **403, "User OKYSLYTSIA is currently editing ZADT_MSGX01 001"** |
 
-So the server behaves identically on both transports. The rule is
-transport-independent: **a message class created inside a stateful session leaves
-that session owning the object, and the next lock in that session is refused.**
+Identical to rfc, step for step. The rule is transport-independent: **once
+`create` has run, that ABAP session can no longer lock the object at all** — not
+the message, not even the class. The create answers `201` with
+`content-length: 0` and only a `location` header, so no handle comes back to
+release with, and a fresh `LOCK` that would yield one is refused. Nothing inside
+that session can undo it. The only escape is a different ABAP session.
 
-`AdtMessageClass.create` is a plain POST that takes no lock of its own and gets
-no handle back — the create answers `201` with `content-length: 0` and only a
-`location` header, so there is nothing to release with. The server takes the lock
-inside the call and keeps it for the session.
+Which is where the two transports part company, and it is not a defect in either:
 
-http passes by accident, not by design: our create is sent stateless, so its
-session ends when the request returns and the registration dies with it. rfc has
-no such accident — one conversation, one ABAP session, by design and for a
-reason: rfc is here precisely so lock handles survive on BASIS < 7.50 where
-stateful http does not work. Making `setSessionType('stateless')` tear that
-session down would defeat what rfc is for.
+- Over http our create is sent stateless. The ABAP session that ran it is rolled
+  out when the request returns, and the lock dies with the roll area. The next
+  request gets a fresh session and locks happily.
+- Over rfc there is no stateless. One conversation is one ABAP session whose roll
+  area persists across calls — that is what rfc *is*, and it is the reason rfc is
+  here: lock handles have to survive on BASIS < 7.50 where stateful http does not
+  work. `setSessionType('stateless')` correctly does nothing there.
 
-The Eclipse trace above points at the shape of the real fix. Eclipse segregates:
-the lock calls run on one stateful session marked `enqueue` (155), while every
-GET and the PUT run on their own stateless sessions (156–160). Nothing that is
-not a lock shares the enqueue session. This library does not segregate — over rfc
-everything shares one conversation.
+So http was never handling this correctly; it was being cleaned up after. The
+dependency is ours: the create path leaves an ABAP lock it cannot release and
+relies on the roll area being torn down for it.
 
-**Open question, not yet measured:** whether Eclipse's *create* also goes on a
-stateless session. A trace of creating a message class and then adding a message
-to it would settle it, and would say whether the fix is "issue create outside the
-stateful conversation" (needing a second rfc conversation for non-lock calls) or
-something ADT offers explicitly.
+The Eclipse trace shows the same separation — locks on one stateful session
+marked `enqueue` (155), every GET and the PUT on their own stateless sessions
+(156–160). Nothing that is not a lock shares the enqueue session.
 
-## The unlock order, corrected against Eclipse
-
-Separate from the 403, and fixed here. An Eclipse trace of a message being edited
-in `ZADT_MSGX01` on E19 shows the release order plainly, session 155 throughout:
-
-```
-15:17:15.085  POST /messageclass/zadt_msgx01?_action=UNLOCK&lockHandle=16DC…  200
-15:17:15.202  POST /messageclass/zadt_msgx01/messages/002?_action=UNLOCK_ALL  200
-```
-
-The class first, then the messages. `AdtMessageClassMessage` did the reverse in
-all four release paths — both happy paths and both cleanup blocks — and carried a
-comment asserting the class lock "must be the final release of the process",
-which the trace refutes. The lock order was already right and matches the same
-trace, including `lockClassForMessage`'s `?_action=LOCK&…&msgNo=002&onSave=X`.
-
-This does not fix the 403 — that failure happens before either lock is taken —
-but the order was wrong on the evidence, so it is corrected. `messageClass` still
-passes over http in 2.6 s with the new order.
+**Unresolved, and a design call rather than a bug to patch:** at the moment
+create finishes, no lock handle is being held, so the session could be discarded
+there without losing anything rfc came for. Whether to do that, or to treat
+create-then-lock-in-one-session as unsupported over rfc and gate the suite the
+way `available_in` already gates others, is not decided here.
