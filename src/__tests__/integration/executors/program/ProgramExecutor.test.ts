@@ -12,11 +12,11 @@ import type {
   ISessionLifecycleAware,
 } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
-import type { AdtClient } from '../../../../clients/AdtClient';
 import { AdtExecutor } from '../../../../clients/AdtExecutor';
 import { AdtRuntimeClient } from '../../../../clients/AdtRuntimeClient';
 import type { IProfilerTraceParameters } from '../../../../runtime/traces';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { resolveRunnableProgramName } from '../../../helpers/runnableProgramHelper';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -42,8 +42,6 @@ import { traceIdsNow, waitForNewTrace } from '../../../helpers/traceHelpers';
 const {
   getEnabledTestCase,
   getTimeout,
-  resolvePackageName,
-  resolveTransportRequest,
 } = require('../../../helpers/test-helper');
 
 const envPath =
@@ -111,50 +109,17 @@ function buildProfilerParameters(
   };
 }
 
-function generateProgramName(baseName: string): string {
-  const base = (baseName || 'ZADT_BLD_PROG_EXE')
-    .toUpperCase()
-    .replace(/[^A-Z0-9_]/g, '');
-  const suffix = Date.now().toString().slice(-4);
-  const maxBaseLen = 30 - suffix.length;
-  return `${base.slice(0, maxBaseLen)}${suffix}`;
-}
-
-function resolveRunnableProgramSource(
-  testCase: any,
-  programName: string,
-): string {
-  const sourceTemplate = testCase?.params?.source_code;
-  if (sourceTemplate && typeof sourceTemplate === 'string') {
-    return sourceTemplate.replaceAll('{{PROGRAM_NAME}}', programName);
-  }
-
-  return [
-    `REPORT ${programName}.`,
-    "WRITE: / 'PROGRAM_EXECUTOR_RUN_PROBE( ) = 1'.",
-    '',
-  ].join('\n');
-}
-
 describe('ProgramExecutor (integration)', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
-  let client: AdtClient;
   let executor: AdtExecutor;
   let runtime: AdtRuntimeClient;
   let profiler: IProfiler;
   let hasConfig = false;
   let isCloudSystem = false;
   let isLegacy = false;
-  let programNameForTest: string | null = null;
-  // EVERY program this file creates, not just the last. Each test generates a
-  // fresh name and overwrote the single variable, so afterAll deleted the newest
-  // and left the earlier one on the system — once per run. Seen on E19 in SM12
-  // as E_ABAP_GENPH locks accumulating under names nobody would ever revisit.
-  const programsCreated: string[] = [];
   /** Trace ids this file produced — an array for the reason above. */
   const tracesCreated: string[] = [];
   let traceUser: string | undefined;
-  let transportRequestForCleanup = '';
 
   const connectionLogger: ILogger = createConnectionLogger();
   const libraryLogger: ILogger = createLibraryLogger();
@@ -168,9 +133,13 @@ describe('ProgramExecutor (integration)', () => {
         connection,
         isCloudSystem,
       );
-      const { client: resolvedClient, isLegacy: legacy } =
-        await createTestAdtClient(connection, libraryLogger, systemContext);
-      client = resolvedClient;
+      // Only for `isLegacy` now — this suite runs a shared program and owns
+      // no object, so it has nothing to ask an AdtClient for.
+      const { isLegacy: legacy } = await createTestAdtClient(
+        connection,
+        libraryLogger,
+        systemContext,
+      );
       isLegacy = legacy;
       traceUser = systemContext.responsible;
       executor = new AdtExecutor(connection, libraryLogger);
@@ -179,9 +148,6 @@ describe('ProgramExecutor (integration)', () => {
       // this file only ever needed what `IProfiler` already declares.
       profiler = runtime.getProfiler();
       hasConfig = true;
-      programNameForTest = null;
-      programsCreated.length = 0;
-      transportRequestForCleanup = '';
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
       // naming the reason, instead of passing green having run nothing.
@@ -190,6 +156,9 @@ describe('ProgramExecutor (integration)', () => {
     }
   });
 
+  // No object cleanup: this suite creates none now. The program it runs is a
+  // shared, read-only fixture that outlives every run. Traces are the one thing
+  // it still produces, and those it removes.
   afterAll(async () => {
     // Traces this run produced. `delete()` exists since 15.0.0 and this is the
     // first place that needed it: a profiled run wrote a trace and nothing ever
@@ -208,68 +177,25 @@ describe('ProgramExecutor (integration)', () => {
         );
       }
     }
-
-    for (const programName of programsCreated) {
-      try {
-        await client.getProgram().delete({
-          programName,
-          transportRequest: transportRequestForCleanup,
-        });
-      } catch (cleanupError) {
-        testsLogger.warn?.(
-          `⚠️ Cleanup failed for program ${programName}: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,
-        );
-      }
-    }
-
     if (connection) {
       await releaseTestConnection(connection);
     }
   });
 
-  async function ensureRunnableProgram(testCase: any): Promise<string> {
-    const baseProgramName =
-      testCase?.params?.program_name || 'ZADT_BLD_PROG_EXE';
-    const packageName = resolvePackageName(testCase?.params?.package_name);
-    const transportRequest = resolveTransportRequest(
-      testCase?.params?.transport_request,
-    );
-
-    if (!packageName) {
-      throw new Error(
-        'package_name is not configured (set params.package_name or environment.default_package)',
-      );
-    }
-
-    const programName = generateProgramName(baseProgramName);
-    const sourceCode = resolveRunnableProgramSource(testCase, programName);
-
-    programNameForTest = programName;
-    programsCreated.push(programNameForTest);
-    transportRequestForCleanup = transportRequest || '';
-
-    logTestStep(`create program ${programName}`, testsLogger);
-    await client.getProgram().create({
-      programName,
-      packageName,
-      transportRequest,
-      description: `ProgramExecutor integration ${programName}`,
-    });
-
-    logTestStep('update program source', testsLogger);
-    await client.getProgram().update(
-      {
-        programName,
-        sourceCode,
-        transportRequest,
-      },
-      {
-        activateOnUpdate: true,
-        sourceCode,
-      },
-    );
-
-    return programName;
+  /**
+   * The shared runnable program, not one built for the occasion.
+   *
+   * `ZAC_SHR_RUNPROG` exists for exactly this, the way `ZAC_SHR_RUN01` does for
+   * the class side. Building a throwaway REPORT here tested program creation,
+   * which `integration/core/program` covers, and paid for it twice a run: a
+   * program generated and dropped, and an `E_ABAP_GENPH` lock left in SM12 on
+   * the generated parts, on E19 measured 2026-08-30. Two suites doing that
+   * against one system also race each other for those locks.
+   *
+   * Shared objects are read-only by contract, so this touches nothing.
+   */
+  function sharedRunnableProgram(testCase: any): string {
+    return resolveRunnableProgramName(testCase?.params ?? {});
   }
 
   it(
@@ -314,7 +240,7 @@ describe('ProgramExecutor (integration)', () => {
       }
 
       try {
-        const programName = await ensureRunnableProgram(testCase);
+        const programName = sharedRunnableProgram(testCase);
         logTestStep('run', testsLogger);
         const response = await executor
           .getProgramExecutor()
@@ -389,7 +315,7 @@ describe('ProgramExecutor (integration)', () => {
       );
 
       try {
-        const programName = await ensureRunnableProgram(testCase);
+        const programName = sharedRunnableProgram(testCase);
 
         // What the feed holds BEFORE the run, so the trace this run writes can
         // be told apart from the ones already there.

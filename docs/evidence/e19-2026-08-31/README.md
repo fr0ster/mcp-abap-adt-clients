@@ -15,6 +15,9 @@ System: E19, `http://epbyminsd0654.epam.com:8000`, client 100,
 | `e19-rfc-messageclass-retry.log` | rfc | `integration/core/messageClass` re-run | 1 failed | 40 s |
 | `e19-http-authfield-after-fix.log` | http | `integration/core/authorizationField` after the fix | 1 passed | 22 s |
 | `e19-rfc-authfield-after-fix.log` | rfc | `integration/core/authorizationField` after the fix | 1 passed | 24 s |
+| `e19-shared-setup.log` | http | `shared:setup` — updates `ZAC_SHR_RUN01`, creates `ZAC_SHR_RUNPROG` | 1 passed | 35 s |
+| `e19-http-executors-shared.log` | http | `integration/executors` + `runtime/traces` on shared fixtures | 10 passed | 6.1 s |
+| `e19-rfc-executors-shared.log` | rfc | the same three suites | 10 passed | 7.7 s |
 
 RFC was run with the SDK on the path:
 
@@ -63,3 +66,36 @@ wall-clock within 1.4% of the http run. Running both was what placed the
 transports is in the payload, not the pipe. The one RFC-only failure went the
 other way: it did not reproduce on http and it survives a standalone re-run, so
 it is server state.
+
+## The executor suites no longer build what they run
+
+Separate from the fix above, and the reason `E_ABAP_GENPH` locks kept coming
+back on E19.
+
+`ClassExecutor` and `ProgramExecutor` each created, activated, ran and deleted a
+freshly named object per test — four create/activate cycles per full run. The
+object was deleted, but the enqueue on its generated parts belongs to the
+session, not to the object, so the locks outlived it; two suites doing this
+against one system also race each other for them. Creation is already covered by
+`integration/core/class` and `integration/core/program`, so the executor suites
+were paying for coverage they duplicate.
+
+Both now run a shared read-only fixture, the way the profiler suite already did:
+`ZAC_SHR_RUN01` for the class, and `ZAC_SHR_RUNPROG` — added here — for the
+program. The assertions were not weakened to fit: `ZAC_SHR_RUN01` gained the
+`run_probe` method so the existing `run_probe( )` assertion still means
+something, and `ZAC_SHR_RUNPROG` carries the `PROGRAM_EXECUTOR_RUN_PROBE( ) = 1`
+line the program suite already looked for. `e19-shared-setup.log` is the run that
+brought both to that state on E19.
+
+The three suites create nothing now — the logs contain no `create program` or
+`create class` step — and they run in 6.1 s where the two executor suites alone
+took 26.2 s in `e19-http.log`.
+
+## A note on the sessions those runs left behind
+
+The 30-minute rows in the system's session list are the documented
+`inactivityTimeout: 1800`, not a leak — `globalTeardown` releases the one session
+a run opens, and every log here ends with `shared session released`. The extra
+sessions in that window came from manual `curl` probes, each opened with its own
+cookie jar and never logged off. Probe with one jar and log off.

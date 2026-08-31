@@ -40,8 +40,6 @@ import { traceIdsNow, waitForNewTrace } from '../../../helpers/traceHelpers';
 const {
   getEnabledTestCase,
   getTimeout,
-  resolvePackageName,
-  resolveTransportRequest,
 } = require('../../../helpers/test-helper');
 
 const envPath =
@@ -78,34 +76,6 @@ function isMissingClassRunMainMessage(value: unknown): boolean {
 
 async function wait(ms: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function buildRunnableClassSource(className: string): string {
-  return `CLASS ${className} DEFINITION PUBLIC FINAL CREATE PUBLIC.
-  PUBLIC SECTION.
-    INTERFACES if_oo_adt_classrun.
-    METHODS run_probe RETURNING VALUE(rv_result) TYPE i.
-ENDCLASS.
-
-CLASS ${className} IMPLEMENTATION.
-  METHOD run_probe.
-    rv_result = 42.
-  ENDMETHOD.
-
-  METHOD if_oo_adt_classrun~main.
-    out->write( |${className}=>run_probe( ) = { run_probe( ) }| ).
-  ENDMETHOD.
-ENDCLASS.
-`;
-}
-
-function hasRunnableContract(value: unknown): boolean {
-  const text = String(value ?? '');
-  return (
-    /interfaces\s+if_oo_adt_classrun\b/i.test(text) &&
-    (/method\s+if_oo_adt_classrun~main\b/i.test(text) ||
-      /if_oo_adt_classrun~main\s*\./i.test(text))
-  );
 }
 
 function expectRunnableRunOutput(runOutput: string): void {
@@ -161,15 +131,8 @@ describe('ClassExecutor (integration)', () => {
   let runtimeClient: AdtRuntimeClient;
   let hasConfig = false;
   let isLegacy = false;
-  let classNameForTest: string | null = null;
-  // EVERY class this file creates, not just the last. Each test generates a
-  // fresh name and overwrote the single variable, so afterAll deleted the newest
-  // and left the earlier one on the system — once per run. Seen on E19 in SM12
-  // as E_ABAP_GENPH locks accumulating under names nobody would ever revisit.
-  const classesCreated: string[] = [];
   /** Trace ids this file produced, deleted at teardown. */
   const tracesCreated: string[] = [];
-  let transportRequestForCleanup = '';
 
   const connectionLogger: ILogger = createConnectionLogger();
   const libraryLogger: ILogger = createLibraryLogger();
@@ -185,9 +148,6 @@ describe('ClassExecutor (integration)', () => {
       executor = new AdtExecutor(connection, libraryLogger);
       runtimeClient = new AdtRuntimeClient(connection, libraryLogger);
       hasConfig = true;
-      classNameForTest = null;
-      classesCreated.length = 0;
-      transportRequestForCleanup = '';
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
       // naming the reason, instead of passing green having run nothing.

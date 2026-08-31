@@ -279,13 +279,21 @@ shared_dependencies:
         CLASS zac_shr_run01 DEFINITION PUBLIC FINAL CREATE PUBLIC.
           PUBLIC SECTION.
             INTERFACES if_oo_adt_classrun.
+            METHODS run_probe RETURNING VALUE(rv_result) TYPE i.
         ENDCLASS.
 
         CLASS zac_shr_run01 IMPLEMENTATION.
+          METHOD run_probe.
+            rv_result = 1.
+          ENDMETHOD.
+
           METHOD if_oo_adt_classrun~main.
+            " The loop gives the profiler something to measure; the probe line
+            " is what the executor suite asserts on.
             DO 5 TIMES.
               out->write( |Hello World { sy-index }| ).
             ENDDO.
+            out->write( |ZAC_SHR_RUN01=>run_probe( ) = { run_probe( ) }| ).
           ENDMETHOD.
         ENDCLASS.
 
@@ -388,6 +396,13 @@ shared_dependencies:
       source: |
         REPORT ZAC_SHR_PROG.
         WRITE: / 'Shared test program'.
+
+    - name: "ZAC_SHR_RUNPROG"
+      description: "Shared runnable program for executor/profiler run tests"
+      available_in: ["onprem", "legacy"]
+      source: |
+        REPORT ZAC_SHR_RUNPROG.
+        WRITE: / 'PROGRAM_EXECUTOR_RUN_PROBE( ) = 1'.
 
 # Standard objects registry for read-only tests
 # Uses shared dependencies (ZAC_SHR_*) where possible to avoid ABAP version dependencies.
@@ -2067,23 +2082,9 @@ execute_class:
       available_in: ["onprem", "cloud"]
       description: "Run class via AdtExecutor (with and without profiling)"
       params:
-        class_name: "ZAC_CLS023"
-        source_code: |
-          CLASS {{CLASS_NAME}} DEFINITION PUBLIC FINAL CREATE PUBLIC.
-            PUBLIC SECTION.
-              INTERFACES if_oo_adt_classrun.
-              METHODS run_probe RETURNING VALUE(rv_result) TYPE i.
-          ENDCLASS.
-
-          CLASS {{CLASS_NAME}} IMPLEMENTATION.
-            METHOD run_probe.
-              rv_result = 1.
-            ENDMETHOD.
-
-            METHOD if_oo_adt_classrun~main.
-              out->write( |{{CLASS_NAME}}=>run_probe( ) = { run_probe( ) }| ).
-            ENDMETHOD.
-          ENDCLASS.
+        # The shared fixture, not a class built per run. The suite runs it and
+        # never writes to it — creation is integration/core/class's job.
+        class_name: "ZAC_SHR_RUN01"
         profiling:
           enabled: true
           parameters:
@@ -2146,11 +2147,9 @@ execute_program:
       available_in: ["onprem"]
       description: "Run program via AdtExecutor (with and without profiling)"
       params:
-        program_name: "ZAC_PROG023"
-        source_code: |
-          REPORT {{PROGRAM_NAME}}.
-
-          WRITE: / 'PROGRAM_EXECUTOR_RUN_PROBE( ) = 1'.
+        # The shared fixture, not a program built per run. The suite runs it and
+        # never writes to it — creation is integration/core/program's job.
+        program_name: "ZAC_SHR_RUNPROG"
         profiling:
           enabled: true
           parameters:
