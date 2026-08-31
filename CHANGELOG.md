@@ -22,6 +22,14 @@ Requires `@mcp-abap-adt/interfaces@^25.0.0`.
   Takes an id or a full URI, like every other trace reader here, so a caller can
   hand back what `list()` gave it without unpicking the URI first.
 
+  **And the integration suites now use it.** Three files run something with
+  profiling; before this release none of them could remove what the run wrote,
+  which is where the 58 → 61 came from. Each now deletes at teardown, so a red
+  test cleans up too, and only ids resolved by `waitForNewTrace` are deleted —
+  provably this run's, being the newest entry absent before it. Nothing sweeps
+  the feed by diffing it again at the end: on a shared system a trace that
+  appeared in between belongs to somebody else.
+
   **What a missing id does is not measured.** `void` describes the resolved
   value and says nothing about failure — a `404`, or any transport error,
   rejects. Code that must tolerate a missing id has to catch until somebody

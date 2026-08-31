@@ -191,6 +191,8 @@ describe('ClassExecutor (integration)', () => {
   // and left the earlier one on the system — once per run. Seen on E19 in SM12
   // as E_ABAP_GENPH locks accumulating under names nobody would ever revisit.
   const classesCreated: string[] = [];
+  /** Trace ids this file produced, deleted at teardown. */
+  const tracesCreated: string[] = [];
   let transportRequestForCleanup = '';
 
   const connectionLogger: ILogger = createConnectionLogger();
@@ -218,6 +220,26 @@ describe('ClassExecutor (integration)', () => {
   });
 
   afterAll(async () => {
+    // Traces this run produced. `delete()` exists since 15.0.0 and this is the
+    // first place that needed it: a profiled run wrote a trace and nothing ever
+    // removed it, so the feed grew by one per run forever.
+    //
+    // Only ids resolved by `waitForNewTrace` are deleted — they are provably
+    // ours, being the newest entry absent before the run. Nothing is swept by
+    // diffing the feed again at teardown: on a shared system a trace that
+    // appeared in between belongs to somebody else. The retry path can leave a
+    // trace from its first attempt untracked, and that is the trade taken
+    // knowingly rather than risk deleting a stranger's.
+    for (const traceId of tracesCreated) {
+      try {
+        await runtimeClient.getProfiler().delete(traceId);
+      } catch (cleanupError) {
+        testsLogger.warn?.(
+          `⚠️ Cleanup failed for trace ${traceId}: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,
+        );
+      }
+    }
+
     for (const className of classesCreated) {
       try {
         await client.getClass().delete({
@@ -482,6 +504,7 @@ describe('ClassExecutor (integration)', () => {
         if (!traceId) {
           throw new Error('no new trace appeared after a profiled run');
         }
+        tracesCreated.push(traceId);
 
         logTestStep('read all three views', testsLogger);
         const hitlist = await profiler.read(traceId, 'hitlist', {

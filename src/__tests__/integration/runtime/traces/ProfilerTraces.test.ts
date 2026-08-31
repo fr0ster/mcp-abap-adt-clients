@@ -113,6 +113,19 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
   });
 
   afterAll(async () => {
+    // The delete test clears this on success, so this only fires when the test
+    // failed before removing the trace it made — otherwise a red run leaves the
+    // very thing this suite exists to clean up.
+    if (traceIdFromThisRun && runtime) {
+      try {
+        await runtime.getProfiler().delete(traceIdFromThisRun);
+      } catch (cleanupError) {
+        testsLogger.warn?.(
+          `⚠️ Cleanup failed for trace ${traceIdFromThisRun}: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,
+        );
+      }
+    }
+
     if (connection) {
       await releaseTestConnection(connection);
     }

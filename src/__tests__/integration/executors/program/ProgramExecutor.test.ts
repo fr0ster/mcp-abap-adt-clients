@@ -151,6 +151,8 @@ describe('ProgramExecutor (integration)', () => {
   // and left the earlier one on the system — once per run. Seen on E19 in SM12
   // as E_ABAP_GENPH locks accumulating under names nobody would ever revisit.
   const programsCreated: string[] = [];
+  /** Trace ids this file produced — an array for the reason above. */
+  const tracesCreated: string[] = [];
   let traceUser: string | undefined;
   let transportRequestForCleanup = '';
 
@@ -189,6 +191,24 @@ describe('ProgramExecutor (integration)', () => {
   });
 
   afterAll(async () => {
+    // Traces this run produced. `delete()` exists since 15.0.0 and this is the
+    // first place that needed it: a profiled run wrote a trace and nothing ever
+    // removed it, so the feed grew by one per run forever.
+    //
+    // Only ids resolved by `waitForNewTrace` are deleted — they are provably
+    // ours, being the newest entry absent before the run. Nothing is swept by
+    // diffing the feed again at teardown: on a shared system a trace that
+    // appeared in between belongs to somebody else.
+    for (const traceId of tracesCreated) {
+      try {
+        await runtime.getProfiler().delete(traceId);
+      } catch (cleanupError) {
+        testsLogger.warn?.(
+          `⚠️ Cleanup failed for trace ${traceId}: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,
+        );
+      }
+    }
+
     for (const programName of programsCreated) {
       try {
         await client.getProgram().delete({
@@ -417,6 +437,7 @@ describe('ProgramExecutor (integration)', () => {
         if (!traceId) {
           throw new Error('no new trace appeared after a profiled run');
         }
+        tracesCreated.push(traceId);
 
         logTestStep(`traceId=${traceId}`, testsLogger);
 

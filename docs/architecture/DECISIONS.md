@@ -194,7 +194,10 @@ tests run against systems other people are using.
 profiled run, never to the discovered id. When the run produced nothing, the
 test skips.
 
-**Against.** Reusing the id the reading tests already resolved.
+**Against.** Reusing the id the reading tests already resolved, and — in the
+executor suites — sweeping at teardown everything that appeared since the run
+started, which would have collected the retry path's untracked first trace along
+with any stranger's.
 
 **Why.** On a shared system the newest trace in the feed belongs to whoever
 profiled last. Taking it away mid-analysis is a test damaging someone's work to
