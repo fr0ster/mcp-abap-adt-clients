@@ -554,7 +554,13 @@ export async function getTraceParametersForAmdp(
 }
 
 /**
- * List trace requests
+ * List trace requests.
+ *
+ * Serves `application/atom+xml;type=feed` and nothing else. Asking for
+ * `application/xml` answers **400 `acceptHeaderMissing`** — "Accept header
+ * missing" for an Accept that was sent and simply is not served. Measured;
+ * recorded because the message points away from the cause and cost a detour
+ * once already.
  *
  * @param connection - ABAP connection
  * @returns Axios response with list of trace requests

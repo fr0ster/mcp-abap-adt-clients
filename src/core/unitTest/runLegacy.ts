@@ -21,6 +21,18 @@ const ACCEPT_XML = 'application/xml';
  * Start ABAP Unit test run on legacy systems
  * Uses /sap/bc/adt/abapunit/testruns endpoint with aunit:runConfiguration format
  *
+ * **Reading the result: `kind` carries the distinction, `severity` does not.** A
+ * failed assertion and an uncaught exception both come back
+ * `severity="critical"`, measured on one release — so a parser classifying on
+ * severity reports a short dump as a failed test. The field that separates them
+ * is `kind`: `failedAssertion`, `exception`, `noTestClasses`.
+ *
+ * Also measured: this endpoint is **synchronous** on both a modern and a legacy
+ * on-prem system, over HTTP and over RFC — `<aunit:runResult>` with no
+ * `Location`, and the typed and `application/xml` bodies byte-identical. The
+ * legacy system ignores the typed `Accept` altogether and answers
+ * `application/xml` either way.
+ *
  * Legacy format differs from modern:
  * - Root element: aunit:runConfiguration (not aunit:run)
  * - Namespace: http://www.sap.com/adt/aunit (not http://www.sap.com/adt/api/aunit)
