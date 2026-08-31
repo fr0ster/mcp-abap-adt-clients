@@ -1,0 +1,30 @@
+  → read active (post-activate) length: 2597 characters
+  → delete (cleanup)
+[1] ✓ PASS Domain - Full workflow (20.6s)
+[1] ✓ END Domain - Full workflow
+
+[2] ▶ START Domain - read standard object :: read_standard
+  → read
+  → readMetadata
+PASS src/__tests__/integration/core/domain/Domain.test.ts (26.509 s)
+[2] ✓ PASS Domain - read standard object (0.3s)
+[2] ✓ END Domain - read standard object
+
+[1] ▶ START Session lock registry - unlockAll across object types :: session_unlock_all
+[1] ✓ PASS Session lock registry - unlockAll across object types (1.1s)
+[1] ✓ END Session lock registry - unlockAll across object types
+
+PASS src/__tests__/integration/core/domain/SessionLockRegistry.test.ts
+[1] ▶ START Domain - lock registry final unlock :: lock_registry_final_unlock
+[1] ✓ PASS Domain - lock registry final unlock (0.5s)
+[1] ✓ END Domain - lock registry final unlock
+
+PASS src/__tests__/integration/core/domain/DomainLockRegistry.test.ts
+
+Test Suites: 3 passed, 3 total
+Tests:       4 passed, 4 total
+Snapshots:   0 total
+Time:        32.504 s
+Ran all test suites matching integration/core/domain.
+[globalTeardown] shared session released
+Force exiting Jest: Have you considered using `--detectOpenHandles` to detect async operations that kept running after all tests finished?

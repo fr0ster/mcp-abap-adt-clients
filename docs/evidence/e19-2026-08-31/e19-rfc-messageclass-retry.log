@@ -1,0 +1,20 @@
+     [90m 182 |[39m     })[33m;[39m[0m
+
+      at RfcTransport.send (node_modules/@mcp-abap-adt/connection/dist/connection/RfcTransport.js:263:27)
+      at SharedOnPremConnector.performRequest (node_modules/@mcp-abap-adt/connection/dist/connection/AbstractAbapConnection.js:813:30)
+      at SharedOnPremConnector.makeAdtRequest (node_modules/@mcp-abap-adt/connection/dist/connection/AbstractAbapConnection.js:708:20)
+      at makeAdtRequestWithAcceptNegotiation (src/utils/acceptNegotiation.ts:179:12)
+      at lockMessage (src/core/messageClass/lock.ts:69:20)
+      at AdtMessageClassMessage._upsertMessage (src/core/messageClass/AdtMessageClassMessage.ts:192:27)
+      at Object.<anonymous> (src/__tests__/integration/core/messageClass/messageClass.test.ts:274:23)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 1 total
+Snapshots:   0 total
+Time:        40.298 s
+Ran all test suites matching integration/core/messageClass.
+[1] ✗ FAIL MessageClass - Full workflow (34.0s): HTTP 403 Forbidden: User OKYSLYTSIA is currently editing ZADT_MSGX01 001
+[1] ✓ END MessageClass - Full workflow
+
+[globalTeardown] shared session released
+Force exiting Jest: Have you considered using `--detectOpenHandles` to detect async operations that kept running after all tests finished?

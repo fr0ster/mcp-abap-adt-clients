@@ -1,0 +1,1401 @@
+
+> @mcp-abap-adt/adt-clients@14.0.0 pretest
+> npm run test:check:integration && npm run --silent check:config
+
+
+> @mcp-abap-adt/adt-clients@14.0.0 test:check:integration
+> npx tsc --noEmit --project tsconfig.test.integration.json
+
+check:config — test-config.yaml carries all 78 sections the template does.
+
+> @mcp-abap-adt/adt-clients@14.0.0 test
+> npx jest --runInBand
+
+[globalSetup] Checking SAP connectivity: http://epbyminsd0654.epam.com:8000 (onprem) (up to 30000ms; SKIP_SAP_PREFLIGHT=1 to skip, SAP_PREFLIGHT_TIMEOUT_MS to change) ...
+[globalSetup] session 64b28be4-e8c2-4a1f-b355-d3c7e8ecc742 — shared by every test file
+[globalSetup] SAP connection OK
+[1] ▶ START AuthorizationField - full workflow :: adt_authorization_field
+  → validate
+  → create
+FAIL src/__tests__/integration/core/authorizationField/AuthorizationField.test.ts (5.059 s)
+  ● AuthorizationField (using AdtClient) › Full workflow › should execute full workflow and store all results
+
+    AxiosError: Request failed with status code 500
+
+    [0m [90m 177 |[39m   [36mconst[39m baseRequest [33m=[39m getBaseRequest(connection)[33m;[39m
+     [90m 178 |[39m   [36mtry[39m {
+    [31m[1m>[22m[39m[90m 179 |[39m     [36mreturn[39m [36mawait[39m baseRequest({
+     [90m     |[39m            [31m[1m^[22m[39m
+     [90m 180 |[39m       [33m...[39mrequest[33m,[39m
+     [90m 181 |[39m       headers[33m,[39m
+     [90m 182 |[39m     })[33m;[39m[0m
+
+      at settle (node_modules/axios/dist/node/axios.cjs:2216:12)
+      at IncomingMessage.handleStreamEnd (node_modules/axios/dist/node/axios.cjs:4062:11)
+      at Axios.request (node_modules/axios/dist/node/axios.cjs:5517:41)
+      at OnPremHttpTransport.dispatch (node_modules/@mcp-abap-adt/connection/dist/connection/HttpTransport.js:378:26)
+      at SharedOnPremConnector.performRequest (node_modules/@mcp-abap-adt/connection/dist/connection/AbstractAbapConnection.js:813:30)
+      at SharedOnPremConnector.makeAdtRequest (node_modules/@mcp-abap-adt/connection/dist/connection/AbstractAbapConnection.js:708:20)
+      at makeAdtRequestWithAcceptNegotiation (src/utils/acceptNegotiation.ts:179:12)
+      at AdtAuthorizationField.create (src/core/authorizationField/AdtAuthorizationField.ts:178:30)
+      at BaseTester.flowTest (src/__tests__/helpers/BaseTester.ts:773:7)
+      at Object.<anonymous> (src/__tests__/integration/core/authorizationField/AuthorizationField.test.ts:316:11)
+
+  ✗ create FAILED (HTTP 500): System expected the element '{http://www.sap.com/iam/auth}auth'
+[1] ✗ FAIL AuthorizationField - full workflow (3.3s): HTTP 500 Internal Server Error: System expected the element '{http://www.sap.com/iam/auth}auth'
+[1] ✓ END AuthorizationField - full workflow
+
+[1] ▶ START Class - LocalDefinitions - full workflow :: local_definitions
+  → read initial
+  → read initial length: 165 characters
+  → update
+  → activate
+  → read active (post-update)
+  → read active (post-update) length: 135 characters
+  → readMetadata
+[1] ✓ PASS Class - LocalDefinitions - full workflow (7.1s)
+[1] ✓ END Class - LocalDefinitions - full workflow
+
+[2] ▶ START Class - LocalTypes - full workflow :: local_types
+  → read initial
+  → read initial length: 143 characters
+  → update
+  → activate
+  → read active (post-update)
+  → read active (post-update) length: 228 characters
+  → readMetadata
+[2] ✓ PASS Class - LocalTypes - full workflow (7.1s)
+[2] ✓ END Class - LocalTypes - full workflow
+
+[3] ▶ START Class - LocalTestClass - full workflow :: local_testclass
+  → read initial
+  → read initial length: 58 characters
+  → update
+  → activate
+  → read active (post-update)
+  → read active (post-update) length: 302 characters
+  → readMetadata
+[3] ✓ PASS Class - LocalTestClass - full workflow (7.1s)
+[3] ✓ END Class - LocalTestClass - full workflow
+
+[4] ▶ START Class - LocalMacros - full workflow :: local_macros
+  → read initial
+  → read initial length: 106 characters
+  → update
+  → activate
+  → read active (post-update)
+  → read active (post-update) length: 56 characters
+  → readMetadata
+[4] ✓ PASS Class - LocalMacros - full workflow (7.1s)
+[4] ✓ END Class - LocalMacros - full workflow
+
+PASS src/__tests__/integration/core/class/LocalIncludes.test.ts (43.45 s)
+[1] ▶ START BehaviorImplementation - Full workflow :: adt_behavior_implementation
+  → validate
+  → create
+  → read (wait for object ready)
+  → read object properties (post-create, no version)
+  → read object properties (post-create, no version) length: 2640 characters
+  → read initial (post-create, no version) skipped for class
+  → update
+  → read inactive (post-update)
+  → read inactive (post-update) length: 166 characters
+  → activate
+  → read active (post-activate)
+  → read active (post-activate) length: 166 characters
+  → readMetadata
+  → delete (cleanup)
+PASS src/__tests__/integration/core/behaviorImplementation/BehaviorImplementation.test.ts (31.01 s)
+[1] ✓ PASS BehaviorImplementation - Full workflow (24.2s)
+[1] ✓ END BehaviorImplementation - Full workflow
+
+[1] ▶ START Group Activation - full workflow :: adt_group_activation
+  → validate domain
+  → create data element
+  → validate structure
+  → create structure
+  → update structure
+  → group activation
+[1] ✓ PASS Group Activation - full workflow (14.9s)
+[1] ✓ END Group Activation - full workflow
+
+  → cleanup: delete structure
+  → cleanup: delete data element
+PASS src/__tests__/integration/shared/groupActivation.test.ts (23.371 s)
+[1] ▶ START BehaviorDefinition - Full workflow :: adt_behavior_definition
+  → validate
+  → create
+  → read (wait for object ready)
+  → read initial (post-create, no version)
+  → read initial (post-create, no version) length: 326 characters
+  → update
+  → read inactive (post-update)
+  → read inactive (post-update) length: 224 characters
+  → activate
+  → read active (post-activate)
+  → read active (post-activate) length: 224 characters
+  → readMetadata
+  → delete (cleanup)
+PASS src/__tests__/integration/core/behaviorDefinition/BehaviorDefinition.test.ts (25.899 s)
+[1] ✓ PASS BehaviorDefinition - Full workflow (20.8s)
+[1] ✓ END BehaviorDefinition - Full workflow
+
+[1] ▶ START View - Full workflow :: adt_view
+  → validate
+  → create
+  → read (wait for object ready)
+  → read object properties (post-create, no version)
+  → read object properties (post-create, no version) length: 2607 characters
+  → read initial (post-create, no version)
+  → read initial (post-create, no version) length: 0 characters
+  → update
+  → read inactive (post-update)
+  → read inactive (post-update) length: 195 characters
+  → activate
+  → read active (post-activate)
+  → read active (post-activate) length: 195 characters
+  → delete (cleanup)
+PASS src/__tests__/integration/core/ddl/Ddl.test.ts (24.87 s)
+[1] ✓ PASS View - Full workflow (22.1s)
+[1] ✓ END View - Full workflow
+
+[1] ▶ START Class - Full workflow :: adt_class
+  → validate
+  → create
+  → read (wait for object ready)
+  → read object properties (post-create, no version)
+  → read object properties (post-create, no version) length: 2586 characters
+  → read initial (post-create, no version) skipped for class
+  → update
+  → read inactive (post-update)
+  → read inactive (post-update) length: 1156 characters
+  → activate
+  → read active (post-activate)
+  → read active (post-activate) length: 1156 characters
+  → delete (cleanup)
+[1] ✓ PASS Class - Full workflow (24.0s)
+[1] ✓ END Class - Full workflow
+
+[2] ▶ START Class - read standard object :: read_standard
+  → read
+  → readMetadata
+PASS src/__tests__/integration/core/class/Class.test.ts (24.938 s)
+[2] ✓ PASS Class - read standard object (0.3s)
+[2] ✓ END Class - read standard object
+
+[3] ▶ START Class - read transport request :: read_transport
+[3] ⏭ SKIP Class - read transport request – transport_request not configured in test-config.yaml (required for transport read test)
+[1] ▶ START Table - Full workflow :: adt_table
+  → validate
+  → create
+  → read (wait for object ready)
+  → read object properties (post-create, no version)
+  → read object properties (post-create, no version) length: 2575 characters
+  → read initial (post-create, no version)
+  → read initial (post-create, no version) length: 265 characters
+  → update
+  → read inactive (post-update)
+  → read inactive (post-update) length: 420 characters
+  → activate
+  → read active (post-activate)
+  → read active (post-activate) length: 420 characters
+  → delete (cleanup)
+[1] ✓ PASS Table - Full workflow (22.0s)
+[1] ✓ END Table - Full workflow
+
+[2] ▶ START Table - read standard object :: read_standard
+  → read
+  → readMetadata
+PASS src/__tests__/integration/core/table/Table.test.ts (22.883 s)
+[2] ✓ PASS Table - read standard object (0.3s)
+[2] ✓ END Table - read standard object
+
+[1] ▶ START Program - Full workflow :: adt_program
+  → validate
+  → create
+  → read (wait for object ready)
+  → read object properties (post-create, no version)
+  → read object properties (post-create, no version) length: 2577 characters
+  → read initial (post-create, no version)
+  → read initial (post-create, no version) length: 266 characters
+  → update
+  → read inactive (post-update)
+  → read inactive (post-update) length: 58 characters
+  → activate
+  → read active (post-activate)
+  → read active (post-activate) length: 58 characters
+  → delete (cleanup)
+[1] ✓ PASS Program - Full workflow (20.8s)
+[1] ✓ END Program - Full workflow
+
+[2] ▶ START Program - read standard object :: read_standard
+  → read
+  → readMetadata
+PASS src/__tests__/integration/core/program/Program.test.ts (21.656 s)
+[2] ✓ PASS Program - read standard object (0.2s)
+[2] ✓ END Program - read standard object
+
+[3] ▶ START Program - read transport request :: read_transport
+[3] ⏭ SKIP Program - read transport request – transport_request not configured in test-config.yaml (required for transport read test)
+[1] ▶ START Structure - Full workflow :: adt_structure
+  → validate
+  → create
+  → read (wait for object ready)
+  → read object properties (post-create, no version)
+  → read object properties (post-create, no version) length: 2600 characters
+  → read initial (post-create, no version)
+  → read initial (post-create, no version) length: 184 characters
+  → update
+  → read inactive (post-update)
+  → read inactive (post-update) length: 184 characters
+  → activate
+  → read active (post-activate)
+  → read active (post-activate) length: 184 characters
+  → delete (cleanup)
+[1] ✓ PASS Structure - Full workflow (21.7s)
+[1] ✓ END Structure - Full workflow
+
+[2] ▶ START Structure - read standard object :: read_standard
+  → read
+  → readMetadata
+PASS src/__tests__/integration/core/structure/Structure.test.ts (22.561 s)
+[2] ✓ PASS Structure - read standard object (0.3s)
+[2] ✓ END Structure - read standard object
+
+[1] ▶ START FunctionModule - Full workflow :: adt_function_module
+  → validate
+  → create
+  → read (wait for object ready)
+  → read object properties (post-create, no version)
+  → read object properties (post-create, no version) length: 2939 characters
+  → read initial (post-create, no version)
+  → read initial (post-create, no version) length: 129 characters
+  → update
+  → read inactive (post-update)
+  → read inactive (post-update) length: 171 characters
+  → activate
+  → read active (post-activate)
+  → read active (post-activate) length: 171 characters
+  → delete (cleanup)
+PASS src/__tests__/integration/core/functionModule/FunctionModule.test.ts (21.853 s)
+[1] ✓ PASS FunctionModule - Full workflow (21.0s)
+[1] ✓ END FunctionModule - Full workflow
+
+[2] ▶ START FunctionModule - read standard object :: read_standard
+[2] ⏭ SKIP FunctionModule - read standard object – Standard function module not configured for on-premise environment
+[1] ▶ START TableType - Full workflow :: adt_tabletype
+  → validate
+  → create
+  → read (wait for object ready)
+  → read object properties (post-create, no version)
+  → read object properties (post-create, no version) length: 2599 characters
+  → read initial (post-create, no version)
+  → read initial (post-create, no version) length: 5409 characters
+  → update
+  → read inactive (post-update)
+  → read inactive (post-update) length: 5432 characters
+  → activate
+  → read active (post-activate)
+  → read active (post-activate) length: 5435 characters
+  → delete (cleanup)
+[1] ✓ PASS TableType - Full workflow (21.1s)
+[1] ✓ END TableType - Full workflow
+
+[2] ▶ START TableType - read standard object :: read_standard
+  → read
+  → readMetadata
+PASS src/__tests__/integration/core/tabletype/TableType.test.ts (21.944 s)
+[2] ✓ PASS TableType - read standard object (0.2s)
+[2] ✓ END TableType - read standard object
+
+[1] ▶ START DataElement - full workflow :: adt_data_element
+  → validate
+  → create
+  → read (wait for object ready)
+  → read initial (post-create, no version)
+  → read initial (post-create, no version) length: 2957 characters
+  → update
+  → read inactive (post-update)
+  → read inactive (post-update) length: 3121 characters
+  → activate
+  → read active (post-activate)
+  → read active (post-activate) length: 3348 characters
+  → delete (cleanup)
+[1] ✓ PASS DataElement - full workflow (21.2s)
+[1] ✓ END DataElement - full workflow
+
+[2] ▶ START DataElement - read standard object :: read_standard
+  → read
+  → readMetadata
+PASS src/__tests__/integration/core/dataElement/DataElement.test.ts (21.955 s)
+[2] ✓ PASS DataElement - read standard object (0.2s)
+[2] ✓ END DataElement - read standard object
+
+[1] ▶ START MetadataExtension - Full workflow :: adt_metadata_extension
+  → validate
+  → create
+  → read (wait for object ready)
+  → read initial (post-create, no version)
+  → read initial (post-create, no version) length: 0 characters
+  → update
+  → read inactive (post-update)
+  → read inactive (post-update) length: 146 characters
+  → activate
+  → read active (post-activate)
+  → read active (post-activate) length: 146 characters
+  → readMetadata
+  → delete (cleanup)
+PASS src/__tests__/integration/core/metadataExtension/MetadataExtension.test.ts (21.305 s)
+[1] ✓ PASS MetadataExtension - Full workflow (20.9s)
+[1] ✓ END MetadataExtension - Full workflow
+
+[1] ▶ START ServiceDefinition - Full workflow :: adt_service_definition
+  → validate
+  → create
+  → read (wait for object ready)
+  → read initial (post-create, no version)
+  → read initial (post-create, no version) length: 0 characters
+  → update
+  → read inactive (post-update)
+  → read inactive (post-update) length: 130 characters
+  → activate
+  → read active (post-activate)
+  → read active (post-activate) length: 130 characters
+  → delete (cleanup)
+[1] ✓ PASS ServiceDefinition - Full workflow (20.4s)
+[1] ✓ END ServiceDefinition - Full workflow
+
+[2] ▶ START ServiceDefinition - read standard object :: read_standard
+  → read
+  → readMetadata
+PASS src/__tests__/integration/core/serviceDefinition/ServiceDefinition.test.ts (21.196 s)
+[2] ✓ PASS ServiceDefinition - read standard object (0.2s)
+[2] ✓ END ServiceDefinition - read standard object
+
+[1] ▶ START Domain - Full workflow :: adt_domain
+  → validate
+  → create
+  → read (wait for object ready)
+  → read initial (post-create, no version)
+  → read initial (post-create, no version) length: 2352 characters
+  → update
+  → read inactive (post-update)
+  → read inactive (post-update) length: 2371 characters
+  → activate
+  → read active (post-activate)
+  → read active (post-activate) length: 2597 characters
+  → delete (cleanup)
+[1] ✓ PASS Domain - Full workflow (20.7s)
+[1] ✓ END Domain - Full workflow
+
+[2] ▶ START Domain - read standard object :: read_standard
+  → read
+  → readMetadata
+PASS src/__tests__/integration/core/domain/Domain.test.ts (21.466 s)
+[2] ✓ PASS Domain - read standard object (0.2s)
+[2] ✓ END Domain - read standard object
+
+[1] ▶ START FunctionGroup - Full workflow :: adt_function_group
+  → validate
+  → create
+  → read (wait for object ready)
+  → read initial (post-create, no version)
+  → read initial (post-create, no version) length: 3436 characters
+  → update
+  → read inactive (post-update)
+  → read inactive (post-update) length: 3668 characters
+  → activate
+  → read active (post-activate)
+  → read active (post-activate) length: 3436 characters
+  → delete (cleanup)
+PASS src/__tests__/integration/core/functionGroup/FunctionGroup.test.ts (21.721 s)
+[1] ✓ PASS FunctionGroup - Full workflow (21.1s)
+[1] ✓ END FunctionGroup - Full workflow
+
+[2] ▶ START FunctionGroup - read standard object :: read_standard
+[2] ⏭ SKIP FunctionGroup - read standard object – Standard function group not configured for on-premise environment
+[1] ▶ START Include - Full workflow :: adt_include
+  → validate
+  → create
+  → read (wait for object ready)
+  → read initial (post-create, no version)
+  → read initial (post-create, no version) length: 52 characters
+  → update
+  → read inactive (post-update)
+  → read inactive (post-update) length: 91 characters
+  → activate
+  → read active (post-activate)
+  → read active (post-activate) length: 91 characters
+  → delete (cleanup)
+PASS src/__tests__/integration/core/include/Include.test.ts (20.628 s)
+[1] ✓ PASS Include - Full workflow (20.1s)
+[1] ✓ END Include - Full workflow
+
+[1] ⏭ SKIP Include - metadata shape – No standard include configured for this environment
+[1] ▶ START Interface - Full workflow :: adt_interface
+  → validate
+  → create
+  → read (wait for object ready)
+  → read object properties (post-create, no version)
+  → read object properties (post-create, no version) length: 2598 characters
+  → read initial (post-create, no version) skipped for class
+  → update
+  → read inactive (post-update)
+  → read inactive (post-update) length: 70 characters
+  → activate
+  → read active (post-activate)
+  → read active (post-activate) length: 70 characters
+  → delete (cleanup)
+PASS src/__tests__/integration/core/interface/Interface.test.ts (21.256 s)
+[1] ✓ PASS Interface - Full workflow (20.7s)
+[1] ✓ END Interface - Full workflow
+
+[2] ▶ START Interface - read standard object :: read_standard
+[2] ⏭ SKIP Interface - read standard object – Standard interface not configured for on-premise environment
+[1] ▶ START AccessControl - Full workflow :: adt_access_control
+  → validate
+  → create
+  → read (wait for object ready)
+  → read initial (post-create, no version)
+  → read initial (post-create, no version) length: 0 characters
+  → update
+  → read inactive (post-update)
+  → read inactive (post-update) length: 237 characters
+  → activate
+  → read active (post-activate)
+  → read active (post-activate) length: 237 characters
+  → delete (cleanup)
+[1] ✓ PASS AccessControl - Full workflow (20.2s)
+[1] ✓ END AccessControl - Full workflow
+
+[2] ▶ START AccessControl - read standard object :: read_standard
+  → read
+  → readMetadata
+PASS src/__tests__/integration/core/accessControl/AccessControl.test.ts (21.179 s)
+[2] ✓ PASS AccessControl - read standard object (0.2s)
+[2] ✓ END AccessControl - read standard object
+
+  → update publication state: published :: serviceType=odatav4, serviceName=ZAC_SRVD01, serviceVersion=0001
+[1] ▶ START ServiceBinding - Full workflow :: adt_service_binding
+  → validate
+  → create
+  → read (wait for object ready)
+  → read initial (post-create, no version)
+  → read initial (post-create, no version) length: 3337 characters
+  → update
+  → read inactive (post-update)
+  → read inactive (post-update) length: 3337 characters
+  → delete (cleanup)
+[1] ✓ PASS ServiceBinding - Full workflow (19.8s)
+[1] ✓ END ServiceBinding - Full workflow
+
+[2] ▶ START ServiceBinding - read standard object :: read_standard
+  → read
+  → readMetadata
+PASS src/__tests__/integration/core/serviceBinding/ServiceBinding.test.ts (21.548 s)
+[2] ✓ PASS ServiceBinding - read standard object (0.3s)
+[2] ✓ END ServiceBinding - read standard object
+
+PASS src/__tests__/integration/core/masterLanguage/MasterLanguage.test.ts (19.731 s)
+  ● Console
+
+    console.warn
+      Could not read back metadata for ZCL_AC_MASTERLANG_IT — persistence check skipped (wire language was "EN")
+
+    [0m [90m 136 |[39m           expect(persisted)[33m.[39mtoBe(expectedLang)[33m;[39m
+     [90m 137 |[39m         } [36melse[39m {
+    [31m[1m>[22m[39m[90m 138 |[39m           console[33m.[39mwarn(
+     [90m     |[39m                   [31m[1m^[22m[39m
+     [90m 139 |[39m             [32m`Could not read back metadata for ${className} — persistence check skipped (wire language was "${sentLang}")`[39m[33m,[39m
+     [90m 140 |[39m           )[33m;[39m
+     [90m 141 |[39m         }[0m
+
+      at Object.<anonymous> (src/__tests__/integration/core/masterLanguage/MasterLanguage.test.ts:138:19)
+
+[1] ▶ START Package - Full workflow :: adt_package
+  → validate
+  → create
+  → read (wait for object ready)
+  → read initial (post-create, no version)
+  → read initial (post-create, no version) length: 4122 characters
+  → update
+  → delete (cleanup)
+[1] ✓ PASS Package - Full workflow (14.1s)
+[1] ✓ END Package - Full workflow
+
+[2] ▶ START Package - read standard object :: read_standard
+  → read
+  → readMetadata
+PASS src/__tests__/integration/core/package/Package.test.ts (15.486 s)
+[2] ✓ PASS Package - read standard object (0.3s)
+[2] ✓ END Package - read standard object
+
+[1] ▶ START ClassExecutor - run :: run
+  → create class ZAC_CLS0230344
+  → update class source
+  → run
+  → run output: ZAC_CLS0230344=>run_probe( ) = 1
+[1] ✓ PASS ClassExecutor - run (5.2s)
+[1] ✓ END ClassExecutor - run
+
+[2] ▶ START ClassExecutor - runWithProfiling :: run_with_profiling
+  → create class ZAC_CLS0235512
+  → update class source
+  → warm-up run before profiling
+  → schedule a trace + run with profiler
+  → run output: ZAC_CLS0235512=>run_probe( ) = 1
+  → wait for the trace this run produced
+  → read all three views
+  → trace 543D7AF4A51B11F1B5CA0CC47A1E68C1: hitlist=11 rows, statements=9, dbAccesses=2
+[2] ✓ PASS ClassExecutor - runWithProfiling (6.9s)
+[2] ✓ END ClassExecutor - runWithProfiling
+
+PASS src/__tests__/integration/executors/class/ClassExecutor.test.ts (19.117 s)
+[1] ▶ START CdsUnitTest - create CDS unit test class :: create_cds_unit_test
+  → checkCdsTestDoubles
+  → create
+  → activate
+  → read
+  → run (unit test)
+  → getStatus (run)
+  → getResult (run)
+  → delete (cleanup)
+PASS src/__tests__/integration/core/unitTest/CdsUnitTest.test.ts (12.294 s)
+[1] ✓ PASS CdsUnitTest - create CDS unit test class (11.3s)
+[1] ✓ END CdsUnitTest - create CDS unit test class
+
+[1] ▶ START ScalarFunctionImplementation - full workflow :: ZADT_SCALAR_FUNC_SQL
+PASS src/__tests__/integration/core/scalarFunctionImplementation/ScalarFunctionImplementation.test.ts (13.132 s)
+[1] ✓ PASS ScalarFunctionImplementation - full workflow (11.8s)
+[1] ✓ END ScalarFunctionImplementation - full workflow
+
+[1] ▶ START UnitTest - run unit test :: run_unit_test
+  → validate
+  → create
+  → update (test class)
+  → activate
+  → read (unit test)
+  → run (unit test)
+  → getStatus (run)
+  → getResult (run)
+  → delete (cleanup)
+PASS src/__tests__/integration/core/unitTest/UnitTest.test.ts (6.184 s)
+[1] ✓ PASS UnitTest - run unit test (5.4s)
+[1] ✓ END UnitTest - run unit test
+
+[1] ▶ START Runtime Dumps - read :: adt_runtime_dumps
+  → list runtime dumps
+  → list runtime dumps with from/to filter
+  → list runtime dumps by user
+  → list runtime dumps by user with from/to filter
+  → run shared dump class ZAC_SHR_DMP01 (division by zero)
+  → discover generated dump attempt 1/8
+  → generated dump found: 20260831120742epbyminsd0654_E19_00%20%20%20%20%20%20%20%20%20%20%20%20OKYSLYTSIA%20%20100%20%20%20%20%20%20%2015
+  → selected dump id: 20260831120742epbyminsd0654_E19_00%20%20%20%20%20%20%20%20%20%20%20%20OKYSLYTSIA%20%20100%20%20%20%20%20%20%2015 (source=forced_class_failure)
+  → read via getRuntimeDumpById (endpoint=/sap/bc/adt/runtime/dump/{id})
+  → read runtime dump by id: 20260831120742epbyminsd0654_E19_00%20%20%20%20%20%20%20%20%20%20%20%20OKYSLYTSIA%20%20100%20%20%20%20%20%20%2015
+  → read via getRuntimeDumpById(view=summary) (endpoint=/sap/bc/adt/runtime/dump/{id}/summary)
+  → read runtime dump summary by id: 20260831120742epbyminsd0654_E19_00%20%20%20%20%20%20%20%20%20%20%20%20OKYSLYTSIA%20%20100%20%20%20%20%20%20%2015
+  → read via getRuntimeDumpById(view=formatted) (endpoint=/sap/bc/adt/runtime/dump/{id}/formatted)
+  → read runtime dump formatted by id: 20260831120742epbyminsd0654_E19_00%20%20%20%20%20%20%20%20%20%20%20%20OKYSLYTSIA%20%20100%20%20%20%20%20%20%2015
+PASS src/__tests__/integration/runtime/dumps/RuntimeDumps.test.ts (5.689 s)
+[1] ✓ PASS Runtime Dumps - read (4.5s)
+[1] ✓ END Runtime Dumps - read
+
+[1] ▶ START ProgramExecutor - run :: run
+  → create program ZAC_PROG0236723
+  → update program source
+  → run
+  → run output: 31.08.2026 ProgramExecutor integration ZAC_PROG0236723 1 -----------------------------------------------------------------------------------...
+[1] ✓ PASS ProgramExecutor - run (1.6s)
+[1] ✓ END ProgramExecutor - run
+
+[2] ▶ START ProgramExecutor - runWithProfiling :: run_with_profiling
+  → create program ZAC_PROG0238321
+  → update program source
+  → create trace parameters + run with profiler
+  → run output: 31.08.2026 ProgramExecutor integration ZAC_PROG0238321 1 -----------------------------------------------------------------------------------...; profilerId=/sap/bc/adt/runtime/traces/abaptraces/parameters/0CC47A1E68C11FE1A9A36E0812D135CA
+  → poll for the trace this run produced
+  → traceId=7040968AA51B11F1B5CA0CC47A1E68C1
+  → read all three views
+  → trace 7040968AA51B11F1B5CA0CC47A1E68C1: hitlist=32 rows, statements=28, dbAccesses=2
+[2] ✓ PASS ProgramExecutor - runWithProfiling (2.7s)
+[2] ✓ END ProgramExecutor - runWithProfiling
+
+PASS src/__tests__/integration/executors/program/ProgramExecutor.test.ts (7.134 s)
+[1] ▶ START AdtClient - readProgram :: readonly_read_program
+  → read active
+  → active length: 53
+  → read inactive
+  → inactive length: 53
+  → read metadata (active)
+  → metadata active length: 3182
+  → read metadata (inactive)
+  → metadata inactive length: 3182
+[1] ✓ PASS AdtClient - readProgram (0.5s)
+[1] ✓ END AdtClient - readProgram
+
+[2] ▶ START AdtClient - readClass :: readonly_read_class
+  → read active
+  → active length: 303
+  → read inactive
+  → inactive length: 303
+  → read metadata (active)
+  → metadata active length: 8702
+  → read metadata (inactive)
+  → metadata inactive length: 8702
+[2] ✓ PASS AdtClient - readClass (0.5s)
+[2] ✓ END AdtClient - readClass
+
+[3] ▶ START AdtClient - readInterface :: readonly_read_interface
+[3] ⏭ SKIP AdtClient - readInterface – Standard interface not configured for on-premise environment
+[4] ▶ START AdtClient - readDomain :: readonly_read_domain
+  → read active
+  → active length: 2454
+  → read inactive
+  → inactive length: 2454
+  → read metadata (active)
+  → metadata active length: 2454
+  → read metadata (inactive)
+  → metadata inactive length: 2454
+[4] ✓ PASS AdtClient - readDomain (0.6s)
+[4] ✓ END AdtClient - readDomain
+
+[5] ▶ START AdtClient - readDataElement :: readonly_read_dataElement
+  → read active
+  → active length: 2997
+  → read inactive
+  → inactive length: 2997
+  → read metadata (active)
+  → metadata active length: 2997
+  → read metadata (inactive)
+  → metadata inactive length: 2997
+[5] ✓ PASS AdtClient - readDataElement (0.6s)
+[5] ✓ END AdtClient - readDataElement
+
+[6] ▶ START AdtClient - readStructure :: readonly_read_structure
+  → read active
+  → active length: 3895
+  → read inactive
+  → inactive length: 3895
+  → read metadata (active)
+  → metadata active length: 2166
+  → read metadata (inactive)
+  → metadata inactive length: 2166
+[6] ✓ PASS AdtClient - readStructure (0.7s)
+[6] ✓ END AdtClient - readStructure
+
+[7] ▶ START AdtClient - readTable :: readonly_read_table
+  → read active
+  → active length: 1190
+  → read inactive
+  → inactive length: 1190
+  → read metadata (active)
+  → metadata active length: 2588
+  → read metadata (inactive)
+  → metadata inactive length: 2588
+[7] ✓ PASS AdtClient - readTable (0.6s)
+[7] ✓ END AdtClient - readTable
+
+[8] ▶ START AdtClient - readView :: readonly_read_view
+[8] ⏭ SKIP AdtClient - readView – Standard view not configured for on-premise environment
+[9] ▶ START AdtClient - readFunctionGroup :: readonly_read_function_group
+[9] ⏭ SKIP AdtClient - readFunctionGroup – Standard function_group not configured for on-premise environment
+[10] ▶ START AdtClient - readFunctionModule :: readonly_read_function_module
+[10] ⏭ SKIP AdtClient - readFunctionModule – Standard function_module not configured for on-premise environment
+[11] ▶ START AdtClient - readPackage :: readonly_read_package
+  → read active
+  → active length: 18264
+  → read inactive
+  → inactive length: 18264
+  → read metadata (active)
+  → metadata active length: 18264
+  → read metadata (inactive)
+  → metadata inactive length: 18264
+[11] ✓ PASS AdtClient - readPackage (0.6s)
+[11] ✓ END AdtClient - readPackage
+
+[12] ▶ START AdtClient - readServiceDefinition :: readonly_read_serviceDefinition
+  → read active
+  → active length: 111
+  → read inactive
+  → inactive length: 111
+  → read metadata (active)
+  → metadata active length: 2068
+  → read metadata (inactive)
+PASS src/__tests__/integration/readonly/ReadOnlyClient.test.ts (6.003 s)
+  → metadata inactive length: 2068
+[12] ✓ PASS AdtClient - readServiceDefinition (0.6s)
+[12] ✓ END AdtClient - readServiceDefinition
+
+[13] ▶ START AdtClient - readTransport :: readonly_read_transport
+[13] ⏭ SKIP AdtClient - readTransport – Transport request not configured in test-config.yaml (required for transport read test)
+[1] ▶ START PackageHierarchy - fetch :: get_package_hierarchy
+  → read
+PASS src/__tests__/integration/shared/packageHierarchy.test.ts (5.7 s)
+[1] ✓ PASS PackageHierarchy - fetch (4.5s)
+[1] ✓ END PackageHierarchy - fetch
+
+  → read class source
+  → read local definitions
+  → read local types
+  → read local test classes
+  → read local macros
+  → read program source
+  → read domain
+  → read data element
+  → read structure source
+  → read table source
+  → read table type
+  → read package
+  → read service definition
+PASS src/__tests__/integration/shared/readAcceptCorrected.test.ts (5.076 s)
+[1] ▶ START Profiler Traces - list endpoints :: adt_profiler_traces
+  → list profiler traces
+  → list trace requests (the schedule)
+  → list profiler object types
+  → list profiler process types
+[1] ✓ PASS Profiler Traces - list endpoints (0.6s)
+[1] ✓ END Profiler Traces - list endpoints
+
+[2] ▶ START Profiler Traces - create parameters :: adt_profiler_traces
+  → create profiler trace parameters with defaults (POST)
+  → trace request id: /sap/bc/adt/runtime/traces/abaptraces/parameters/0CC47A1E68C11FE1A9A36FAC5D7F95CA
+[2] ✓ PASS Profiler Traces - create parameters (0.1s)
+[2] ✓ END Profiler Traces - create parameters
+
+[3] ▶ START Profiler Traces - run with profiling :: adt_profiler_traces
+  → run shared class ZAC_SHR_RUN01 with profiling
+  → run output: Hello World 1 Hello World 2 Hello World 3 Hello World 4 Hello World 5
+  → profilerId=/sap/bc/adt/runtime/traces/abaptraces/parameters/0CC47A1E68C11FE1A9A36FAC5D7FF5CA; waiting for the trace
+[3] ✓ PASS Profiler Traces - run with profiling (0.7s)
+[3] ✓ END Profiler Traces - run with profiling
+
+[4] ▶ START Profiler Traces - discover traces :: adt_profiler_traces
+  → using trace id from profiled run: 7D62EC01A51B11F1B5CA0CC47A1E68C1
+[4] ✓ PASS Profiler Traces - discover traces (0.0s)
+[4] ✓ END Profiler Traces - discover traces
+
+[5] ▶ START Profiler Traces - read trace details :: adt_profiler_traces
+  → read trace hitlist for 7D62EC01A51B11F1B5CA0CC47A1E68C1
+  → read trace hitlist with system events for 7D62EC01A51B11F1B5CA0CC47A1E68C1
+  → read trace statements for 7D62EC01A51B11F1B5CA0CC47A1E68C1
+  → read trace db accesses for 7D62EC01A51B11F1B5CA0CC47A1E68C1
+PASS src/__tests__/integration/runtime/traces/ProfilerTraces.test.ts
+  → trace details: hitlist=10 rows (10 with system events), statements=8, dbAccesses=2
+[5] ✓ PASS Profiler Traces - read trace details (0.5s)
+[5] ✓ END Profiler Traces - read trace details
+
+[6] ▶ START Profiler Traces - requests by URI :: adt_profiler_traces
+[6] ⏭ SKIP Profiler Traces - requests by URI – object_uri not configured in test-config.yaml params
+  → read class source
+  → read local definitions
+  → read local types
+  → read local test classes
+  → read local macros
+  → read program source
+  → read domain
+  → read data element
+  → read structure source
+  → read table source
+  → read table type
+  → read package
+  → read service definition
+PASS src/__tests__/integration/shared/readAccept.test.ts (5.014 s)
+  → where-used with default scope
+  → where-used with ALL types enabled
+  → get where-used for table
+  → validate error if object name is missing
+  → validate error if object type is missing
+  → get where-used list with parsed results
+  → get where-used list with raw XML
+  → where-used: ALL types (baseline)
+  → where-used: ONLY [DDLS/DF] (present)
+  → where-used: ONLY [CLAS/OC] (absent)
+PASS src/__tests__/integration/shared/whereUsed.test.ts
+PASS src/__tests__/integration/core/versions/versions.test.ts
+(node:28352) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 error listeners added to [Socket]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(Use `node --trace-warnings ...` to show where the warning was created)
+  → search objects by name pattern
+  → search objects with object type filter
+  → search objects with default maxResults
+PASS src/__tests__/integration/shared/search.test.ts
+[1] ▶ START AdtRequest - full workflow :: transport
+  → create
+[1] ✓ PASS AdtRequest - full workflow (0.3s)
+  → read
+[1] ✓ END AdtRequest - full workflow
+
+[2] ▶ START AdtRequest - list transports :: list_transports
+  → create (discriminator transport)
+  → list
+PASS src/__tests__/integration/core/transport/Transport.test.ts
+  → requests returned: 66
+  → known-request case: expecting E19K906668 in the list body
+[2] ✓ PASS AdtRequest - list transports (1.3s)
+[2] ✓ END AdtRequest - list transports
+
+PASS src/__tests__/unit/docsImportsResolve.test.ts
+[1] ▶ START ScalarFunction - full workflow :: ZADT_SCALAR_FUNC
+PASS src/__tests__/integration/core/scalarFunction/ScalarFunction.test.ts
+[1] ✓ PASS ScalarFunction - full workflow (2.6s)
+[1] ✓ END ScalarFunction - full workflow
+
+[2] ▶ START ScalarFunction - read standard object :: read_standard
+[2] ⏭ SKIP ScalarFunction - read standard object – Test case not defined in test-config.yaml
+PASS src/__tests__/integration/core/program/run.test.ts
+[1] ▶ START VirtualFoldersContents - fetch contents :: fetch_virtual_folders_contents
+  → read
+PASS src/__tests__/integration/shared/virtualFoldersContents.test.ts
+[1] ✓ PASS VirtualFoldersContents - fetch contents (0.7s)
+[1] ✓ END VirtualFoldersContents - fetch contents
+
+  → get table contents
+  → get table contents with default max_rows
+PASS src/__tests__/integration/shared/tableContents.test.ts
+  → validate error if table name is missing
+  → read class metadata
+  → metadata active size: 8702 bytes
+  → metadata inactive size: 8702 bytes
+  → read domain metadata
+  → metadata size: 2454 bytes
+  → read table metadata
+PASS src/__tests__/integration/shared/readMetadata.test.ts
+  → validate error for unsupported object type
+[1] ▶ START Batch - class + program readMetadata :: batch_read_class_program
+  → recording readMetadata for class ZAC_SHR_RUN01
+  → recording readMetadata for program ZAC_SHR_PROG
+  → executing batch (2 requests)
+  → batch returned 2 response(s)
+  → class metadata length: 8702
+  → program metadata length: 3182
+[1] ✓ PASS Batch - class + program readMetadata (0.2s)
+[1] ✓ END Batch - class + program readMetadata
+
+[1] ⏭ SKIP Batch - class + interface readMetadata – Standard class or interface not configured for on-premise
+[2] ▶ START Batch - domain + dataElement + structure readMetadata :: batch_read_ddic
+  → recording readMetadata for domain MANDT
+  → recording readMetadata for data element MANDT
+  → recording readMetadata for structure SYST
+  → executing batch (3 requests)
+  → batch returned 3 response(s)
+  → domain metadata length: 2454
+  → data element metadata length: 2997
+  → structure metadata length: 2166
+[2] ✓ PASS Batch - domain + dataElement + structure readMetadata (0.2s)
+[2] ✓ END Batch - domain + dataElement + structure readMetadata
+
+[3] ▶ START Batch - reset without execute :: batch_reset
+  → recorded 1 request
+  → reset — 0 requests
+  → batchExecute on empty returned []
+[3] ✓ PASS Batch - reset without execute (0.0s)
+[3] ✓ END Batch - reset without execute
+
+[4] ▶ START Batch - sequential executions :: batch_sequential
+  → batch 1: readMetadata class ZAC_SHR_RUN01
+  → batch 1: class metadata length 8702
+  → batch 2: readMetadata domain MANDT
+PASS src/__tests__/integration/batch/BatchClient.test.ts
+  → batch 2: domain metadata length 2454
+[4] ✓ PASS Batch - sequential executions (0.3s)
+[4] ✓ END Batch - sequential executions
+
+  → listFunctionModules(ZAC_SHR_FUGR)
+  → listFunctionModules(zac_shr_fugr)
+PASS src/__tests__/integration/shared/functionModulesList.test.ts
+  → execute SQL query
+  → execute SQL query with default row_number
+PASS src/__tests__/integration/shared/sqlQuery.test.ts
+  → validate error if SQL query is missing
+[1] ▶ START Batch POST - validate class name :: batch_post_validate
+  → parts returned: 1
+  → validate status: 400 Bad Request
+[1] ✓ PASS Batch POST - validate class name (0.1s)
+[1] ✓ END Batch POST - validate class name
+
+[2] ▶ START Batch mixed - GET read + POST validate :: batch_mixed_get_post
+  → parts returned: 2
+  → GET read status: 200 OK
+  → POST validate status: 400 Bad Request
+[2] ✓ PASS Batch mixed - GET read + POST validate (0.1s)
+[2] ✓ END Batch mixed - GET read + POST validate
+
+[3] ▶ START Batch POST - check run with XML body :: batch_post_check_body
+  → parts returned: 1
+  → check run status: 415 Unsupported Media Type
+[3] ✓ PASS Batch POST - check run with XML body (0.1s)
+[3] ✓ END Batch POST - check run with XML body
+
+[4] ▶ START Batch POST - validate + check combined :: batch_post_validate_check
+PASS src/__tests__/integration/batch/BatchPostOperations.test.ts
+  → parts returned: 2
+  → validate status: 400 Bad Request
+  → check run status: 415 Unsupported Media Type
+[4] ✓ PASS Batch POST - validate + check combined (0.1s)
+[4] ✓ END Batch POST - validate + check combined
+
+  → check if object type supports source code
+  → read class source code
+  → read class source code (inactive version)
+  → read class source code (active and inactive versions)
+  → read class source (active)
+  → active source length: 303 characters
+  → read class source (inactive)
+PASS src/__tests__/integration/shared/readSource.test.ts
+  → inactive source length: 303 characters
+  → validate error for object type without source code
+  → listFunctionGroupIncludes(ZAC_SHR_FUGR)
+PASS src/__tests__/integration/shared/functionGroupIncludesList.test.ts
+[1] ▶ START Batch scope - discovery via debugger batch :: batch_scope_discovery
+  → sending non-debugger request (GET /sap/bc/adt/discovery) via /sap/bc/adt/debugger/batch
+  → response status: 202
+  → discovery content found: true
+  → error in inner response: false
+[1] ✓ PASS Batch scope - discovery via debugger batch (0.3s)
+[1] ✓ END Batch scope - discovery via debugger batch
+
+[2] ▶ START Batch scope - mixed requests :: batch_scope_mixed
+  → sending 2 non-debugger requests (class + program read) via /sap/bc/adt/debugger/batch
+PASS src/__tests__/integration/runtime/debugger/BatchEndpointScope.test.ts
+  → response status: 202
+  → multipart parts count: 2
+[2] ✓ PASS Batch scope - mixed requests (0.1s)
+[2] ✓ END Batch scope - mixed requests
+
+PASS src/__tests__/integration/connection/csrf.test.ts
+  ● Console
+
+    console.log
+      
+      === CSRF Token Diagnostic ===
+
+      at Object.<anonymous> (src/__tests__/integration/connection/csrf.test.ts:78:13)
+
+    console.log
+      System: http://epbyminsd0654.epam.com:8000
+
+      at Object.<anonymous> (src/__tests__/integration/connection/csrf.test.ts:79:13)
+
+    console.log
+      
+      --- Trying: /sap/bc/adt/core/discovery ---
+
+      at Object.<anonymous> (src/__tests__/integration/connection/csrf.test.ts:86:15)
+
+    console.log
+        Status: 200
+
+      at Object.<anonymous> (src/__tests__/integration/connection/csrf.test.ts:104:17)
+
+    console.log
+        Content-Type: application/atomsvc+xml
+
+      at Object.<anonymous> (src/__tests__/integration/connection/csrf.test.ts:105:17)
+
+    console.log
+        x-csrf-token: WpV-x-iceoUT_UDTu3scxw==
+
+      at Object.<anonymous> (src/__tests__/integration/connection/csrf.test.ts:106:17)
+
+    console.log
+      
+      --- Trying: /sap/bc/adt/discovery ---
+
+      at Object.<anonymous> (src/__tests__/integration/connection/csrf.test.ts:86:15)
+
+    console.log
+        Status: 200
+
+      at Object.<anonymous> (src/__tests__/integration/connection/csrf.test.ts:104:17)
+
+    console.log
+        Content-Type: application/atomsvc+xml
+
+      at Object.<anonymous> (src/__tests__/integration/connection/csrf.test.ts:105:17)
+
+    console.log
+        x-csrf-token: WpV-x-iceoUT_UDTu3scxw==
+
+      at Object.<anonymous> (src/__tests__/integration/connection/csrf.test.ts:106:17)
+
+    console.log
+      
+      === Summary ===
+
+      at Object.<anonymous> (src/__tests__/integration/connection/csrf.test.ts:130:13)
+
+    console.log
+        /sap/bc/adt/core/discovery: OK (WpV-x-iceoUT_UDTu3sc...)
+
+      at Object.<anonymous> (src/__tests__/integration/connection/csrf.test.ts:132:15)
+
+    console.log
+        /sap/bc/adt/discovery: OK (WpV-x-iceoUT_UDTu3sc...)
+
+      at Object.<anonymous> (src/__tests__/integration/connection/csrf.test.ts:132:15)
+
+    console.log
+      
+        Result: CSRF token available
+
+      at Object.<anonymous> (src/__tests__/integration/connection/csrf.test.ts:139:13)
+
+    console.log
+      === End Diagnostic ===
+
+      at Object.<anonymous> (src/__tests__/integration/connection/csrf.test.ts:142:13)
+
+[1] ▶ START ObjectStructure - fetch :: get_object_structure
+  → read
+PASS src/__tests__/integration/shared/objectStructure.test.ts
+[1] ✓ PASS ObjectStructure - fetch (0.2s)
+[1] ✓ END ObjectStructure - fetch
+
+PASS src/__tests__/unit/capabilities/behaviour.test.ts
+[1] ▶ START NodeStructure - fetch :: fetch_node_structure
+  → read
+PASS src/__tests__/integration/shared/nodeStructure.test.ts
+[1] ✓ PASS NodeStructure - fetch (0.1s)
+[1] ✓ END NodeStructure - fetch
+
+[1] ▶ START MessageClass - Full workflow :: adt_message_class
+  → create message class
+  → read message class
+  → create message 001
+  → read message 001
+  → update message 001
+  → read-back message 001 after update
+  → delete message 001
+  → verify message removal
+[1] ✓ PASS MessageClass - Full workflow (2.9s)
+[1] ✓ END MessageClass - Full workflow
+
+PASS src/__tests__/integration/core/messageClass/messageClass.test.ts (5.504 s)
+[1] ▶ START SystemMessages - list :: adt_system_messages
+  → list system messages
+[1] ✓ PASS SystemMessages - list (0.1s)
+[1] ✓ END SystemMessages - list
+
+[2] ▶ START SystemMessages - list with maxResults :: adt_system_messages
+  → list system messages with maxResults: 5
+PASS src/__tests__/integration/runtime/logs/SystemMessages.test.ts
+[2] ✓ PASS SystemMessages - list with maxResults (0.1s)
+[2] ✓ END SystemMessages - list with maxResults
+
+  → fetch ADT discovery document
+PASS src/__tests__/integration/shared/discovery.test.ts
+[1] ▶ START Transformation-XSLT - Full workflow :: adt_xslt_program
+  → validate
+  → create
+  → read (wait for object ready)
+  → read initial (post-create, no version)
+  → read initial (post-create, no version) length: 224 characters
+  → update
+  → read inactive (post-update)
+  → read inactive (post-update) length: 207 characters
+  → activate
+  → read active (post-activate)
+  → read active (post-activate) length: 207 characters
+  → delete (cleanup)
+PASS src/__tests__/integration/core/transformation/TransformationXslt.test.ts (21.798 s)
+[1] ✓ PASS Transformation-XSLT - Full workflow (20.6s)
+[1] ✓ END Transformation-XSLT - Full workflow
+
+[1] ▶ START AppendStructure - full workflow (structure base) :: ZADT_S_APPEND_S
+[1] ✓ PASS AppendStructure - full workflow (structure base) (3.8s)
+[1] ✓ END AppendStructure - full workflow (structure base)
+
+[2] ▶ START AppendStructure - full workflow (table base) :: ZADT_S_APPEND_T
+PASS src/__tests__/integration/core/appendStructure/AppendStructure.test.ts (8.181 s)
+[2] ✓ PASS AppendStructure - full workflow (table base) (3.2s)
+[2] ✓ END AppendStructure - full workflow (table base)
+
+PASS src/__tests__/integration/clients/abapGit/AbapGit.test.ts
+  ● Console
+
+    console.log
+      [dotenv@17.3.1] injecting env (0) from .env -- tip: ⚙️  specify custom .env file path with { path: '/custom/path/.env' }
+
+      at _log (node_modules/dotenv/lib/main.js:139:11)
+
+[1] ▶ START Transformation-ST - Full workflow :: adt_simple_transformation
+  → validate
+  → create
+  → read (wait for object ready)
+  → read initial (post-create, no version)
+  → read initial (post-create, no version) length: 173 characters
+  → update
+  → read inactive (post-update)
+  → read inactive (post-update) length: 230 characters
+  → activate
+  → read active (post-activate)
+  → read active (post-activate) length: 230 characters
+  → delete (cleanup)
+PASS src/__tests__/integration/core/transformation/Transformation.test.ts (21.569 s)
+[1] ✓ PASS Transformation-ST - Full workflow (20.3s)
+[1] ✓ END Transformation-ST - Full workflow
+
+[2] ▶ START Transformation - read standard object :: read_standard
+[2] ⏭ SKIP Transformation - read standard object – Standard transformation not configured for on-premise environment
+[1] ▶ START FeatureToggle - full workflow :: adt_feature_toggle
+[1] ⏭ SKIP FeatureToggle - full workflow – Cannot verify feature toggle existence: Feature toggle 'ZAC_FT01' not found
+[1] ⏭ SKIP FeatureToggle - getRuntimeState – Cannot verify feature toggle: Feature toggle 'ZAC_FT01' not found
+[1] ⏭ SKIP FeatureToggle - checkState – Cannot verify feature toggle: Feature toggle 'ZAC_FT01' not found
+PASS src/__tests__/integration/core/featureToggle/FeatureToggle.test.ts
+[1] ⏭ SKIP FeatureToggle - readSource – Cannot verify feature toggle: Feature toggle 'ZAC_FT01' not found
+[1] ▶ START FeedRepository - list :: adt_feeds
+  → list feed catalog
+[1] ✓ PASS FeedRepository - list (0.2s)
+[1] ✓ END FeedRepository - list
+
+[2] ▶ START FeedRepository - variants :: adt_feeds
+  → list feed variants
+[2] ⏭ SKIP FeedRepository - variants – HTTP 400 — endpoint may require additional parameters (category)
+[2] ✓ END FeedRepository - variants
+
+[3] ▶ START FeedRepository - dumps :: adt_feeds
+  → get dumps via feed
+[3] ✓ PASS FeedRepository - dumps (3.3s)
+[3] ✓ END FeedRepository - dumps
+
+[4] ▶ START FeedRepository - byUrl :: adt_feeds
+  → fetch feed by URL /sap/bc/adt/runtime/dumps
+PASS src/__tests__/integration/runtime/feeds/FeedRepository.test.ts (8.137 s)
+[4] ✓ PASS FeedRepository - byUrl (3.2s)
+[4] ✓ END FeedRepository - byUrl
+
+[1] ▶ START GatewayErrorLog - list :: adt_gateway_errors
+  → list gateway error log entries
+[1] ✓ PASS GatewayErrorLog - list (0.3s)
+[1] ✓ END GatewayErrorLog - list
+
+[2] ▶ START GatewayErrorLog - list with maxResults :: adt_gateway_errors
+  → list gateway error log entries with maxResults: 10
+PASS src/__tests__/integration/runtime/logs/GatewayErrorLog.test.ts
+[2] ✓ PASS GatewayErrorLog - list with maxResults (0.3s)
+[2] ✓ END GatewayErrorLog - list with maxResults
+
+[1] ▶ START FunctionInclude - Full workflow :: adt_function_include
+  → validate
+  → create
+  → read (wait for object ready)
+  → read initial (post-create, no version)
+  → read initial (post-create, no version) length: 242 characters
+  → update
+  → read inactive (post-update)
+  → read inactive (post-update) length: 255 characters
+  → activate
+  → read active (post-activate)
+  → read active (post-activate) length: 255 characters
+  → delete (cleanup)
+[1] ✓ PASS FunctionInclude - Full workflow (21.3s)
+[1] ✓ END FunctionInclude - Full workflow
+
+PASS src/__tests__/integration/core/functionInclude/FunctionInclude.test.ts (23.09 s)
+PASS src/__tests__/unit/scripts/probeAtcVerdict.test.ts
+  ● Console
+
+    console.error
+      PinoLogger initialization error: Cannot find module 'pino' from 'node_modules/@mcp-abap-adt/logger/dist/pino-logger.js'
+
+    [0m [90m 100 |[39m   [33mLogLevel[39m[33m,[39m
+     [90m 101 |[39m } [36mfrom[39m [32m'@mcp-abap-adt/interfaces'[39m[33m;[39m
+    [31m[1m>[22m[39m[90m 102 |[39m [36mimport[39m { [33mDefaultLogger[39m } [36mfrom[39m [32m'@mcp-abap-adt/logger'[39m[33m;[39m
+     [90m     |[39m [31m[1m^[22m[39m
+     [90m 103 |[39m [36mimport[39m [33m*[39m [36mas[39m dotenv [36mfrom[39m [32m'dotenv'[39m[33m;[39m
+     [90m 104 |[39m [36mimport[39m {
+     [90m 105 |[39m   createTestConnection[33m,[39m[0m
+
+      at new PinoLogger (node_modules/@mcp-abap-adt/logger/dist/pino-logger.js:49:25)
+      at Object.<anonymous> (node_modules/@mcp-abap-adt/logger/dist/index.js:20:22)
+      at Object.<anonymous> (scripts/probe-atc.ts:102:1)
+      at Object.<anonymous> (src/__tests__/unit/scripts/probeAtcVerdict.test.ts:15:1)
+
+PASS src/__tests__/unit/publicApiSurface.test.ts
+[1] ▶ START Session lock registry - unlockAll across object types :: session_unlock_all
+[1] ✓ PASS Session lock registry - unlockAll across object types (1.3s)
+[1] ✓ END Session lock registry - unlockAll across object types
+
+PASS src/__tests__/integration/core/domain/SessionLockRegistry.test.ts
+PASS src/__tests__/unit/runtime/traceParsing.test.ts
+[1] ▶ START Domain - lock registry final unlock :: lock_registry_final_unlock
+[1] ✓ PASS Domain - lock registry final unlock (0.6s)
+[1] ✓ END Domain - lock registry final unlock
+
+PASS src/__tests__/integration/core/domain/DomainLockRegistry.test.ts
+PASS src/__tests__/unit/clients/AdtClientLockRegistry.test.ts
+[1] ▶ START AdtClient dispose - best-effort :: dispose_best_effort
+[1] ✓ PASS AdtClient dispose - best-effort (0.0s)
+[1] ✓ END AdtClient dispose - best-effort
+
+PASS src/__tests__/integration/core/class/run.test.ts
+PASS src/__tests__/unit/capabilities/completeness.test.ts
+PASS src/__tests__/unit/subpathExports.test.ts
+PASS src/__tests__/unit/core/postUpdateReadinessRead.test.ts
+PASS src/__tests__/unit/core/AdtInclude.test.ts
+PASS src/__tests__/unit/session/clientConnectGuard.test.ts
+PASS src/__tests__/unit/core/domainLockRegistry.test.ts
+[1] ▶ START Domain lock registry - lock() tracks :: lock_tracks
+[1] ✓ PASS Domain lock registry - lock() tracks (0.0s)
+[1] ✓ END Domain lock registry - lock() tracks
+
+[2] ▶ START Domain lock registry - unlock() untracks :: unlock_untracks
+[2] ✓ PASS Domain lock registry - unlock() untracks (0.0s)
+[2] ✓ END Domain lock registry - unlock() untracks
+
+[3] ▶ START Domain lock registry - unlockAll() releases :: unlockall_releases
+[3] ✓ PASS Domain lock registry - unlockAll() releases (0.0s)
+[3] ✓ END Domain lock registry - unlockAll() releases
+
+[4] ▶ START Domain lock registry - managed retention :: managed_retention
+[4] ✓ PASS Domain lock registry - managed retention (0.1s)
+[4] ✓ END Domain lock registry - managed retention
+
+PASS src/__tests__/unit/runtime/AdtAtc.test.ts
+PASS src/__tests__/unit/core/updateNoActivateReadsInactive.test.ts
+PASS src/__tests__/unit/core/scalarFunctionImplementation/factory.test.ts
+PASS src/__tests__/unit/core/appendStructure/factory.test.ts
+PASS src/__tests__/unit/core/scalarFunction/factory.test.ts
+PASS src/__tests__/unit/core/serviceDefinitionUpdateRead.test.ts
+[1] ▶ START ServiceDefinition update - readiness read targets inactive :: update_readiness_read_inactive
+[1] ✓ PASS ServiceDefinition update - readiness read targets inactive (0.0s)
+[1] ✓ END ServiceDefinition update - readiness read targets inactive
+
+[1] ▶ START LockRegistry - unlockAll clears all :: unlockall_clears
+[1] ✓ PASS LockRegistry - unlockAll clears all (0.0s)
+[1] ✓ END LockRegistry - unlockAll clears all
+
+[2] ▶ START LockRegistry - untrack skips unlock :: untrack_skips
+[2] ✓ PASS LockRegistry - untrack skips unlock (0.0s)
+[2] ✓ END LockRegistry - untrack skips unlock
+
+[3] ▶ START LockRegistry - retains failed unlock :: retains_failed
+[3] ✓ PASS LockRegistry - retains failed unlock (0.0s)
+[3] ✓ END LockRegistry - retains failed unlock
+
+[4] ▶ START LockRegistry - batch session :: batch_session
+[4] ✓ PASS LockRegistry - batch session (0.0s)
+[4] ✓ END LockRegistry - batch session
+
+[5] ▶ START LockRegistry - empty batch :: empty_batch
+[5] ✓ PASS LockRegistry - empty batch (0.0s)
+[5] ✓ END LockRegistry - empty batch
+
+PASS src/__tests__/unit/shared/LockRegistry.test.ts
+PASS src/__tests__/unit/core/unitTest/validateIsReal.test.ts
+PASS src/__tests__/unit/core/unitTest/managingAndRunning.test.ts
+PASS src/__tests__/unit/clients/AdtRuntimeClient.factory.test.ts
+PASS src/__tests__/unit/core/masterLanguage.test.ts
+PASS src/__tests__/unit/runtime/Profiler.test.ts
+PASS src/__tests__/unit/session/sessionInvariants.test.ts
+PASS src/__tests__/unit/core/capabilities/conformance.test.ts
+PASS src/__tests__/unit/classVersions.test.ts
+PASS src/__tests__/unit/core/service/deleteRefusedVerdict.test.ts
+PASS src/__tests__/unit/core/functionGroup/activateReportsFailure.test.ts
+PASS src/__tests__/unit/core/serviceDefinitionCreateMetadataOnly.test.ts
+PASS src/__tests__/unit/core/class/activateErrorShape.test.ts
+PASS src/__tests__/unit/runtime/traces/profiler.test.ts
+PASS src/__tests__/unit/shared/getObjectSourceUri.test.ts
+  → build inactive uris
+  → build active uris
+PASS src/__tests__/unit/clients/returnTypeNarrowing.test.ts
+PASS src/__tests__/unit/unitTestContractConformance.test.ts
+PASS src/__tests__/unit/session/connectorSessionContract.test.ts
+PASS src/__tests__/unit/core/transport/parseTransportTree.test.ts
+PASS src/__tests__/unit/core/functionModulesList.test.ts
+PASS src/__tests__/unit/core/transport/listNodes.test.ts
+PASS src/__tests__/unit/core/scalarFunctionImplementation/handler.test.ts
+PASS src/__tests__/unit/versionsParse.test.ts
+PASS src/__tests__/unit/messageClass.test.ts
+PASS src/__tests__/unit/shared/getWhereUsedList.test.ts
+PASS src/__tests__/unit/runtime/AbapDebugger.test.ts
+PASS src/__tests__/unit/runtime/memory/snapshots.test.ts
+PASS src/__tests__/unit/core/scalarFunction/handler.test.ts
+PASS src/__tests__/unit/core/transport/listTransports.test.ts
+PASS src/__tests__/unit/runtime/debugger/abap.batch.test.ts
+PASS src/__tests__/unit/core/transport/updateDelete.test.ts
+PASS src/__tests__/unit/core/transport/listResolution.test.ts
+PASS src/__tests__/unit/core/appendStructure/handler.test.ts
+PASS src/__tests__/unit/utils/xmlPatchFailsLoudly.test.ts
+PASS src/__tests__/unit/clients/AdtClientsWS.test.ts
+PASS src/__tests__/unit/core/functionGroupIncludesList.test.ts
+PASS src/__tests__/unit/messageClassXml.test.ts
+PASS src/__tests__/unit/utils/assertActivationSucceeded.test.ts
+PASS src/__tests__/unit/messageClassMessage.test.ts
+PASS src/__tests__/unit/core/transport/legacyList.test.ts
+PASS src/__tests__/unit/core/capabilities/versionsCapability.test.ts
+PASS src/__tests__/unit/utils/acceptNegotiation.test.ts
+PASS src/__tests__/unit/runtime/MemorySnapshots.test.ts
+PASS src/__tests__/unit/core/behaviorDefinition/Namespace.test.ts
+PASS src/__tests__/unit/utils/activateObjectInSession.test.ts
+PASS src/__tests__/unit/runtime/ApplicationLog.test.ts
+PASS src/__tests__/unit/runtime/dumps/read.test.ts
+PASS src/__tests__/unit/parseSearchResults.test.ts
+PASS src/__tests__/unit/tableVersions.test.ts
+PASS src/__tests__/unit/core/capabilities/lockCapability.test.ts
+PASS src/__tests__/unit/runtime/GatewayErrorLog.test.ts
+PASS src/__tests__/unit/runtime/FeedRepository.test.ts
+PASS src/__tests__/unit/interfaceVersions.test.ts
+PASS src/__tests__/unit/core/functionIncludeDelete.test.ts
+PASS src/__tests__/unit/core/scalarFunction/create.test.ts
+PASS src/__tests__/unit/utils/dsfiMappings.test.ts
+PASS src/__tests__/unit/shared/modifyWhereUsedScope.test.ts
+PASS src/__tests__/unit/runtime/RuntimeDumps.test.ts
+PASS src/__tests__/unit/runtime/St05Trace.test.ts
+PASS src/__tests__/unit/core/functionIncludeRead.test.ts
+PASS src/__tests__/unit/utils/checkRunObjectUri.test.ts
+PASS src/__tests__/unit/runtime/SystemMessages.test.ts
+PASS src/__tests__/unit/batch/deferredResponses.test.ts
+PASS src/__tests__/unit/programVersions.test.ts
+PASS src/__tests__/unit/core/scalarFunction/delete.test.ts
+PASS src/__tests__/unit/core/appendStructure/delete.test.ts
+PASS src/__tests__/unit/core/appendStructure/create.test.ts
+PASS src/__tests__/unit/core/featureToggleNoLongPolling.test.ts
+PASS src/__tests__/unit/clients/DebuggerSessionClient.test.ts
+PASS src/__tests__/unit/unsupportedOperation.test.ts
+PASS src/__tests__/unit/packageVersions.test.ts
+PASS src/__tests__/unit/runtime/AtcLog.test.ts
+PASS src/__tests__/unit/core/scalarFunctionImplementation/create.test.ts
+PASS src/__tests__/unit/core/appendStructure/wire.test.ts
+PASS src/__tests__/unit/runtime/CrossTrace.test.ts
+PASS src/__tests__/unit/core/scalarFunction/wire.test.ts
+PASS src/__tests__/unit/core/scalarFunctionImplementation/delete.test.ts
+PASS src/__tests__/unit/runtime/DdicActivation.test.ts
+PASS src/__tests__/unit/core/enhancementCreateParamsSurface.test.ts
+PASS src/__tests__/unit/core/scalarFunctionImplementation/wire.test.ts
+PASS src/__tests__/unit/utils/xml.test.ts
+
+Summary of all failing tests
+FAIL src/__tests__/integration/core/authorizationField/AuthorizationField.test.ts (5.059 s)
+  ● AuthorizationField (using AdtClient) › Full workflow › should execute full workflow and store all results
+
+    AxiosError: Request failed with status code 500
+
+    [0m [90m 177 |[39m   [36mconst[39m baseRequest [33m=[39m getBaseRequest(connection)[33m;[39m
+     [90m 178 |[39m   [36mtry[39m {
+    [31m[1m>[22m[39m[90m 179 |[39m     [36mreturn[39m [36mawait[39m baseRequest({
+     [90m     |[39m            [31m[1m^[22m[39m
+     [90m 180 |[39m       [33m...[39mrequest[33m,[39m
+     [90m 181 |[39m       headers[33m,[39m
+     [90m 182 |[39m     })[33m;[39m[0m
+
+      at settle (node_modules/axios/dist/node/axios.cjs:2216:12)
+      at IncomingMessage.handleStreamEnd (node_modules/axios/dist/node/axios.cjs:4062:11)
+      at Axios.request (node_modules/axios/dist/node/axios.cjs:5517:41)
+      at OnPremHttpTransport.dispatch (node_modules/@mcp-abap-adt/connection/dist/connection/HttpTransport.js:378:26)
+      at SharedOnPremConnector.performRequest (node_modules/@mcp-abap-adt/connection/dist/connection/AbstractAbapConnection.js:813:30)
+      at SharedOnPremConnector.makeAdtRequest (node_modules/@mcp-abap-adt/connection/dist/connection/AbstractAbapConnection.js:708:20)
+      at makeAdtRequestWithAcceptNegotiation (src/utils/acceptNegotiation.ts:179:12)
+      at AdtAuthorizationField.create (src/core/authorizationField/AdtAuthorizationField.ts:178:30)
+      at BaseTester.flowTest (src/__tests__/helpers/BaseTester.ts:773:7)
+      at Object.<anonymous> (src/__tests__/integration/core/authorizationField/AuthorizationField.test.ts:316:11)
+
+
+Test Suites: 1 failed, 1 skipped, 165 passed, 166 of 167 total
+Tests:       1 failed, 2 skipped, 1280 passed, 1283 total
+Snapshots:   0 total
+Time:        781.196 s
+Ran all test suites.
+[globalTeardown] shared session released
+Force exiting Jest: Have you considered using `--detectOpenHandles` to detect async operations that kept running after all tests finished?

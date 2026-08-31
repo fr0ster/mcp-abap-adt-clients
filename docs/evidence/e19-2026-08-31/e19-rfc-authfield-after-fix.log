@@ -1,0 +1,28 @@
+[globalSetup] Checking SAP connectivity: http://epbyminsd0654.epam.com:8000 (onprem) (up to 30000ms; SKIP_SAP_PREFLIGHT=1 to skip, SAP_PREFLIGHT_TIMEOUT_MS to change) ...
+[globalSetup] session e8bbde35-1869-4c31-b5f5-fd5b8ad01869 — shared by every test file
+[globalSetup] SAP connection OK
+[1] ▶ START AuthorizationField - full workflow :: adt_authorization_field
+  → validate
+  → create
+  → read (wait for object ready)
+  → read initial (post-create, no version)
+  → read initial (post-create, no version) length: 2555 characters
+  → update
+  → read inactive (post-update)
+  → read inactive (post-update) length: 2591 characters
+  → activate
+  → read active (post-activate)
+  → read active (post-activate) length: 2591 characters
+  → delete (cleanup)
+PASS src/__tests__/integration/core/authorizationField/AuthorizationField.test.ts (23.929 s)
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        24.03 s
+Ran all test suites matching integration/core/authorizationField.
+[1] ✓ PASS AuthorizationField - full workflow (20.0s)
+[1] ✓ END AuthorizationField - full workflow
+
+[globalTeardown] shared session released
+Force exiting Jest: Have you considered using `--detectOpenHandles` to detect async operations that kept running after all tests finished?
