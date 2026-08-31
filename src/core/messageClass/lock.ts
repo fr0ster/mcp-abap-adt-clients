@@ -101,3 +101,35 @@ export async function lockClassForMessage(
 
   return parseLockHandle(response.data, 'class-for-message lock response');
 }
+
+/**
+ * The class lock a message save needs, the way Eclipse takes it.
+ *
+ * Eclipse asks for the message-scoped variant first and, when the server
+ * refuses it, falls back to the plain class lock and uses that handle for the
+ * PUT. Captured on E19 2026-08-31 creating ZOK_MESSAGE_0002 and adding message
+ * 000, on one stateful session:
+ *
+ *   15:54:33.587  POST …?_action=LOCK&accessMode=MODIFY&msgNo=000&onSave=X  403
+ *   15:54:33.759  POST …?_action=LOCK&accessMode=MODIFY                     200
+ *
+ * The 403 is not a failure to report — it is a documented step of the flow, and
+ * treating it as fatal is what this used to do.
+ */
+export async function lockClassForMessageOrPlain(
+  connection: IAbapConnection,
+  name: string,
+  no: string,
+): Promise<string> {
+  try {
+    return await lockClassForMessage(connection, name, no);
+  } catch (error) {
+    const status =
+      (error as { response?: { status?: number }; status?: number })?.response
+        ?.status ?? (error as { status?: number })?.status;
+    if (status !== 403) {
+      throw error;
+    }
+    return lockMessageClass(connection, name);
+  }
+}

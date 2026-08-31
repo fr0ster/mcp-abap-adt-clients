@@ -44,7 +44,7 @@ import {
   safeErrorMessage,
 } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
-import { lockClassForMessage, lockMessage } from './lock';
+import { lockClassForMessageOrPlain, lockMessage } from './lock';
 import { getMessageClassSource } from './read';
 import type {
   IMessageClassMessageConfig,
@@ -193,9 +193,20 @@ export class AdtMessageClassMessage
 
       // 4. Lock class for message save
       this.logger?.info?.('upsertMessage: lockClassForMessage');
-      classLockHandle = await lockClassForMessage(this.connection, name, no);
+      classLockHandle = await lockClassForMessageOrPlain(
+        this.connection,
+        name,
+        no,
+      );
 
       // 5. PUT full class XML with message lock handle embedded
+      // The PUT carries the lock handle, so it does not need the lock session —
+      // and Eclipse deliberately keeps it out of one. In the E19 capture of
+      // 2026-08-31 every lock and unlock is on the stateful "enqueue" session
+      // (155) while the PUT that saves the message runs stateless (215), as do
+      // the reads around it. The locks survive because they belong to the
+      // enqueue session, not to the request that uses their handle.
+      this.connection.setSessionType('stateless');
       this.logger?.info?.('upsertMessage: PUT');
       const xmlBody = buildMessageClassXml(cls, {
         messageLockHandles: { [no]: messageLockHandle },
@@ -211,6 +222,9 @@ export class AdtMessageClassMessage
         data: xmlBody,
         headers: { 'Content-Type': MESSAGE_CLASS_UPDATE_CONTENT_TYPE },
       });
+
+      // Back to the lock session to give the handles up.
+      this.connection.setSessionType('stateful');
 
       // 6. Unlock the class first, then release the message locks — the order
       //    Eclipse uses. Captured on E19 2026-08-31 editing a message in
@@ -310,9 +324,15 @@ export class AdtMessageClassMessage
 
       // 3. Lock the class for a message-save (msgNo + onSave=X)
       this.logger?.info?.('deleteMessage: lockClassForMessage');
-      classLockHandle = await lockClassForMessage(this.connection, name, no);
+      classLockHandle = await lockClassForMessageOrPlain(
+        this.connection,
+        name,
+        no,
+      );
 
       // 4. PUT: target message → <mc:deletedmessages>; all others → <mc:messages>
+      // Stateless, for the reason spelled out in _upsertMessage.
+      this.connection.setSessionType('stateless');
       this.logger?.info?.('deleteMessage: PUT');
       const xmlBody = buildMessageClassXml(cls, {
         deletedMsgnos: [no],
@@ -329,6 +349,9 @@ export class AdtMessageClassMessage
         data: xmlBody,
         headers: { 'Content-Type': MESSAGE_CLASS_UPDATE_CONTENT_TYPE },
       });
+
+      // Back to the lock session to give the handles up.
+      this.connection.setSessionType('stateful');
 
       // 5. Unlock the class first, then release the message locks — the order
       //    Eclipse uses; see the note in _upsertMessage.
