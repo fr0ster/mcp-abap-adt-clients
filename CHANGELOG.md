@@ -5,6 +5,169 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [15.0.0] - 2026-08-30
+
+Requires `@mcp-abap-adt/interfaces@^25.0.0`.
+
+### Added
+
+- **`Profiler.delete(traceId)`** — a trace can be taken back out.
+
+  Every entry in the trace feed carries a delete link beside the links for its
+  three views, and the `DELETE` it points at answers `200` — measured on an
+  on-prem system. Until now a trace could be listed and read and never removed,
+  so every profiled run was permanent: the feed grew 58 → 61 across one
+  afternoon of integration runs.
+
+  Takes an id or a full URI, like every other trace reader here, so a caller can
+  hand back what `list()` gave it without unpicking the URI first.
+
+  **And the integration suites now use it.** Three files run something with
+  profiling; before this release none of them could remove what the run wrote,
+  which is where the 58 → 61 came from. Each now deletes at teardown, so a red
+  test cleans up too, and only ids resolved by `waitForNewTrace` are deleted —
+  provably this run's, being the newest entry absent before it. Nothing sweeps
+  the feed by diffing it again at the end: on a shared system a trace that
+  appeared in between belongs to somebody else.
+
+  **What a missing id does is not measured.** `void` describes the resolved
+  value and says nothing about failure — a `404`, or any transport error,
+  rejects. Code that must tolerate a missing id has to catch until somebody
+  measures a repeat delete.
+
+- **`compareRecordedAt` is now a public export.**
+
+  It already existed, and `src/index.ts` did not re-export it — so the migration
+  below could not have been followed. A replacement a consumer cannot import is
+  no replacement. Sorting a trace listing needs it: `recordedAt` compared as
+  text gets the order wrong across UTC offsets, and every caller would otherwise
+  write that bug by hand.
+
+### Fixed
+
+- **`check:docs` holds this package's own documentation to its entry point.**
+
+  It matched documented imports against every identifier anywhere under `src`,
+  so a snippet naming a real-but-unreachable symbol passed — which is how the
+  `compareRecordedAt` example above got written. Imports from
+  `@mcp-abap-adt/adt-clients` are now resolved through the barrels from
+  `src/index.ts`; relative imports keep the loose set, since those name internal
+  paths deliberately. Proven by removing the new export and watching the gate go
+  red on the exact line.
+
+  It also read documents with a regular expression, and that was wrong three
+  times in a row — each time making a line **invisible** rather than
+  mis-parsing it, which a gate reports as success: `import type { … }` unread
+  (seven such lines in the docs), then a specifier in double quotes unread, and
+  an import wrapped across lines would have been the fourth.
+
+  The extraction is now done by parsers on both halves. Fences are found by a
+  Markdown parser (`markdown-it@^14.1.0`, a new devDependency — v15 pulls
+  `entities@8`, which requires Node 20.19 and would have contradicted this
+  package's `engines: node >=18`) and each TypeScript block
+  is parsed by the TypeScript compiler's parser, with the import declarations
+  read from the syntax tree.
+
+  Both halves had to change, and the second was found the same way as the first:
+  after the imports moved to a parser, the fences were still matched by hand, so
+  `~~~typescript` and ```` ```ts title="example" ```` never reached it — valid
+  CommonMark, invisible to the gate. Quoting, line breaks, `type` modifiers,
+  aliases, import-looking text in comments, fence length, tilde fences, info
+  strings and fences nested in list items are now all the parsers' business.
+
+  The export side is the type checker now as well: what a package hands out is
+  asked of `getExportsOfModule`, not matched off `export …` lines. That half had
+  never been reported broken — the sibling test had used the checker all along,
+  so the gate was holding its two halves to different standards.
+
+  A default import is checked as well. `import X from '…'` binds the module's
+  `default` export, none of the first-party packages has one, so such a line is
+  always wrong — and it used to be read as binding nothing and pass. The report
+  names what the reader wrote rather than the word `default`, and when that name
+  is a named export it says so, because that is the correction.
+
+  A namespace import (`import * as X`) and a side-effect import (`import '…'`)
+  name no export, but the module they name still has to exist, so they are
+  checked for that and nothing else. They used to be discarded before any check
+  ran — which, once unmeasurable imports became fatal, made
+  `import * as missing from './does/not/exist'` the one shape that could still
+  walk past it.
+
+  The one relative import in the documentation is measured too, against the
+  exports of the file it names. **An import that cannot be measured now fails
+  the gate**, in its own section with its own reason — a relative path matching
+  no file is a stale document, a missing first-party package is an incomplete
+  install, and in neither case can the gate do what it claims. It used to print
+  a note and exit `0`, which is the same defect as every other hole here: an
+  unchecked import is indistinguishable from a clean one.
+
+  The reader lives in `scripts/doc-imports.js` and backs both the gate and the
+  `docsImportsResolve` unit test, which had the identical holes and no longer
+  has its own copy to drift.
+
+  And it pooled the exports of all three packages into one set, so the specifier
+  a name was imported *from* did not matter:
+  `import { AdtClient } from '@mcp-abap-adt/interfaces'` passed, because
+  `AdtClient` is real here — while a reader following that line would be told to
+  import from a package that has no such export. Each specifier now answers for
+  itself: this package against its entry point, each dependency against its own
+  `types` entry, relative imports against the loose set. When a name is real but
+  lives elsewhere the gate says where, so the report is the fix:
+
+  ```
+  README.md:232  AdtClient  (not exported by @mcp-abap-adt/interfaces
+                              — it is in @mcp-abap-adt/adt-clients)
+  ```
+
+  A package that is not installed is reported as unmeasured rather than passed
+  in silence, since a skipped package otherwise looks exactly like a clean one.
+
+  All three holes are proven closed by planting the failure and watching the
+  gate name the exact line.
+
+  Across 29 documents it found nothing else, so this fixes a gap rather than a
+  backlog.
+
+- The worked profiler example in `docs/usage/CLIENT_API_REFERENCE.md` sorted
+  traces with `a.recordedAt > b.recordedAt` — string comparison, which a note
+  further down the same page calls wrong.
+
+### Removed
+
+- **BREAKING** — four methods on `Profiler` that `getProfiler()` never exposed:
+  `latestTraceId()`, `listTraceIds()`, `listTraceFilesResponse()` and the
+  deprecated `listTraceFiles()`.
+
+  `getProfiler()` returns `IProfiler`, so none of them was reachable by a
+  consumer — they were callable only by code inside this package, and only one
+  had a caller. That is how a gap hides: the need looks met because the method
+  exists, and nobody can use it.
+
+  **Migration.** `list()` returns `IAbapTraceEntry[]` with the ids in it.
+  For the newest, reduce with `compareRecordedAt` — which is exported, and which
+  exists because comparing ISO timestamps as strings is wrong across UTC
+  offsets:
+
+  ```ts
+  const traces = await profiler.list();
+  const newest = traces.length
+    ? traces.reduce((a, b) => (compareRecordedAt(a, b) > 0 ? a : b))
+    : undefined;
+  ```
+
+  **Keep the guard.** `latestTraceId()` answered `undefined` when nothing had
+  been profiled yet, and an empty feed is a normal state — while `reduce` with
+  no initial value throws `TypeError` on `[]`. A migration that turns "nothing
+  yet" into a crash is not the same method by another name, so the unit suite
+  pins both halves: the newest across a UTC offset, and `undefined` on an empty
+  feed.
+
+  There is no replacement for `listTraceFilesResponse()`, and deliberately so.
+  The feed is an id and a few identifying fields, measured on two systems that
+  agreed; there is nothing in it to read a second way. A `listWith` was proposed
+  for symmetry with `readWith` and rejected — see decision 11 in the contract's
+  `DECISIONS.md`.
+
 ## [14.0.0] - 2026-08-29
 
 Requires `@mcp-abap-adt/interfaces@^24.0.0`.

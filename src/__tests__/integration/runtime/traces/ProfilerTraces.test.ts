@@ -6,6 +6,7 @@
  * - Run a pre-existing shared class with profiling
  * - Discover traces from trace files feed
  * - Read individual trace (hitlist, statements, dbAccesses)
+ * - Delete the trace this run produced
  *
  * The runnable class (e.g. ZAC_SHR_RUN01) must already exist on the SAP system.
  * The test does NOT create or modify the class.
@@ -88,6 +89,15 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
 
   // Shared state between tests — traceId from profiled run or discovery
   let resolvedTraceId: string | undefined;
+  /**
+   * Only the trace THIS run produced, and never a discovered one.
+   *
+   * `resolvedTraceId` may come from the feed, and on a shared system the newest
+   * trace in the feed belongs to whoever profiled last — deleting that would
+   * take somebody else's measurement away mid-analysis. So deletion is scoped
+   * to what this file made.
+   */
+  let traceIdFromThisRun: string | undefined;
 
   beforeAll(async () => {
     try {
@@ -103,6 +113,19 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
   });
 
   afterAll(async () => {
+    // The delete test clears this on success, so this only fires when the test
+    // failed before removing the trace it made — otherwise a red run leaves the
+    // very thing this suite exists to clean up.
+    if (traceIdFromThisRun && runtime) {
+      try {
+        await runtime.getProfiler().delete(traceIdFromThisRun);
+      } catch (cleanupError) {
+        testsLogger.warn?.(
+          `⚠️ Cleanup failed for trace ${traceIdFromThisRun}: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,
+        );
+      }
+    }
+
     if (connection) {
       await releaseTestConnection(connection);
     }
@@ -354,6 +377,7 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
           { logger: testsLogger },
         );
         expect(resolvedTraceId).toBeDefined();
+        traceIdFromThisRun = resolvedTraceId;
 
         logTestSuccess(testsLogger, testName);
       } catch (error) {
@@ -630,6 +654,94 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
             return;
           }
         }
+        logTestError(testsLogger, testName, error);
+        throw error;
+      } finally {
+        logTestEnd(testsLogger, testName);
+      }
+    },
+    getTimeout('test'),
+  );
+
+  it(
+    'should delete the trace this run produced',
+    async () => {
+      const testName = 'Profiler Traces - delete trace';
+      const testCase = getEnabledTestCase(
+        'profiler_traces',
+        'adt_profiler_traces',
+      );
+
+      logTestStart(testsLogger, testName, {
+        name: 'adt_profiler_traces',
+        params: testCase?.params || {},
+      });
+
+      if (!testCase) {
+        logTestSkip(
+          testsLogger,
+          testName,
+          'profiler_traces/adt_profiler_traces not configured or disabled in test-config.yaml',
+        );
+        return;
+      }
+
+      if (!hasConfig || !runtime) {
+        logTestSkip(testsLogger, testName, 'No SAP configuration');
+        return;
+      }
+
+      if (!traceIdFromThisRun) {
+        // Deliberately NOT falling back to `resolvedTraceId`: that one can come
+        // from the feed, and deleting a trace this file did not make is not
+        // this test's business.
+        logTestSkip(
+          testsLogger,
+          testName,
+          'the profiled run produced no trace to delete',
+        );
+        return;
+      }
+
+      try {
+        const traceId = traceIdFromThisRun;
+        logTestStep(`delete trace ${traceId}`, testsLogger);
+        await runtime.getProfiler().delete(traceId);
+
+        // Deleted means gone from the feed. Polled rather than read once,
+        // because how quickly the feed reflects a deletion is not measured —
+        // but the id must disappear, or the call did nothing.
+        //
+        // These lines are the ones the log tends not to show, and their absence
+        // does NOT mean the loop was skipped: a passing test proves it ran, or
+        // `stillListed` would still be `true`. This suite writes progress
+        // straight to stdout from a jest worker, and that output reaches the
+        // parent through an asynchronous relay which `forceExit: true` does not
+        // wait for. Measured on an on-prem run: over RFC the line survived but
+        // landed *after* jest's own summary, and over HTTP it did not arrive at
+        // all. See decision 5 in `docs/architecture/DECISIONS.md`.
+        let stillListed = true;
+        for (let attempt = 1; attempt <= 4 && stillListed; attempt++) {
+          const ids = await traceIdsNow(runtime.getProfiler());
+          stillListed = ids.has(traceId);
+          logTestStep(
+            `after delete, attempt ${attempt}: trace ${stillListed ? 'still listed' : 'gone from the feed'}`,
+            testsLogger,
+          );
+          if (stillListed && attempt < 4) {
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+          }
+        }
+        expect(stillListed).toBe(false);
+
+        // Nothing left for a later run to trip over.
+        traceIdFromThisRun = undefined;
+        if (resolvedTraceId === traceId) {
+          resolvedTraceId = undefined;
+        }
+
+        logTestSuccess(testsLogger, testName);
+      } catch (error) {
         logTestError(testsLogger, testName, error);
         throw error;
       } finally {

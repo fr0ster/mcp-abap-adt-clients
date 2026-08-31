@@ -876,11 +876,20 @@ executors. The two never share a vocabulary: scheduling yields a *request id*,
 reading takes a *trace id*.
 
 ```typescript
+import { compareRecordedAt } from '@mcp-abap-adt/adt-clients';
+
 const profiler = runtime.getProfiler();
 
 // What traces exist — parsed entries, not a raw response.
 const traces = await profiler.list({ user: 'SOMEONE' });
-const newest = traces.reduce((a, b) => (a.recordedAt > b.recordedAt ? a : b));
+// Not `a.recordedAt > b.recordedAt`: that compares ISO timestamps as text and
+// gets the answer wrong across UTC offsets. See the note below.
+// The guard is not decoration: an empty feed is normal — nothing profiled yet —
+// and `reduce` with no initial value throws `TypeError` on `[]`.
+const newest = traces.length
+  ? traces.reduce((a, b) => (compareRecordedAt(a, b) > 0 ? a : b))
+  : undefined;
+if (!newest) return;
 
 // What is inside one. The result is the view's own type.
 const hitList = await profiler.read(newest.id, 'hitlist', {
@@ -890,6 +899,9 @@ const statements = await profiler.read(newest.id, 'statements');
 const dbAccesses = await profiler.read(newest.id, 'dbAccesses');
 
 console.log(hitList.entries.length, dbAccesses.accesses[0]?.accessTime?.total);
+
+// And take it back out when done — since 15.0.0.
+await profiler.delete(newest.id);
 ```
 
 Configuring and scheduling live on the executors:
@@ -945,8 +957,21 @@ Contract notes:
   `runtime` and its three parts, `isAggregated`, `amdpFileSize`. `client` is a
   **string**, because `010` is not `10`.
 - Comparing `recordedAt` as a **string** is wrong: `09:00:00Z` is later than
-  `10:00:00+02:00` and sorts lower as text. Use `compareRecordedAt`, which
-  `latestTraceId()` does.
+  `10:00:00+02:00` and sorts lower as text. Use the exported `compareRecordedAt`.
+  There is no `latestTraceId()` since 15.0.0 — it lived on the concrete class
+  where `getProfiler()` never exposed it, so no consumer could call it:
+
+  ```typescript
+  const traces = await profiler.list();
+  // `latestTraceId()` answered `undefined` on an empty feed. Keep that: an
+  // empty feed is normal, and `reduce` with no initial value throws on `[]`.
+  const newest = traces.length
+    ? traces.reduce((a, b) => (compareRecordedAt(a, b) > 0 ? a : b))
+    : undefined;
+  ```
+- **`delete(traceId)` takes an id or a full URI**, so the `uri` from `list()`
+  can go straight back. What a missing id does is **not measured**: a `404`
+  rejects, so cleanup code has to catch.
 
 ### Cross-Trace Analysis
 

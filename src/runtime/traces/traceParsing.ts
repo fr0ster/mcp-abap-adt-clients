@@ -205,9 +205,8 @@ const SUB_MILLI = /\.(\d+)/;
  * the wire:
  *
  * - **Not as text.** `2026-08-28T09:00:00Z` is later than
- *   `2026-08-28T10:00:00+02:00` and sorts lower as a string, so
- *   `latestTraceId()` — which exists to avoid taking a stale trace by feed
- *   position — would take the stale one.
+ *   `2026-08-28T10:00:00+02:00` and sorts lower as a string, so a caller
+ *   picking the newest entry would take the stale one instead.
  * - **Past the millisecond.** `Date.parse` truncates there, so `…00.1001Z` and
  *   `…00.1009Z` come back equal and the older of the two is kept. Removing the
  *   RFC 3339 validator took this fix with it, which it should not have: the
