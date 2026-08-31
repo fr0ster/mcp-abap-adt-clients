@@ -427,17 +427,48 @@ export class AdtPackage
       };
     }
 
-    // TODO: Package update via RFC (SADT_REST_RFC_ENDPOINT) fails with HTTP 400
-    // "Package is already locked" on PUT even though LOCK/UNLOCK succeed.
-    // Root cause: PAK framework locks are session-scoped. Each call to
-    // SADT_REST_RFC_ENDPOINT runs in a new internal ABAP context, so the
-    // PUT cannot access the PAK lock created by the LOCK call.
-    // DDIC objects are unaffected because their locks live in the DDIC buffer
-    // (accessible by lockHandle from any context).
-    // This is non-critical for release — HTTP is the primary transport for
-    // modern on-premise systems. RFC is used for legacy (BASIS < 7.50) where
-    // package CRUD is not supported anyway.
-    // Reference: docs/development/RFC_TESTING.md
+    // Package update over RFC fails, and not for the reason this comment used
+    // to give. It said the PUT "cannot access the PAK lock created by the LOCK
+    // call". Measured on E19 2026-08-31, that is wrong: the PUT reads the
+    // parameter, validates the handle, and accepts ours. Four answers from the
+    // same endpoint, same session, same package, over rfc:
+    //
+    //   PUT with no lockHandle     400  ExceptionParameterNotFound
+    //                                   SADT_RESOURCE/017  "Parameter lockHandle
+    //                                   could not be found"
+    //   PUT with a made-up handle  423  ExceptionResourceInvalidLockHandle
+    //                                   SADT_RESOURCE/026  "is not locked
+    //                                   (invalid lock handle: DEADBEEF…)"
+    //   a second _action=LOCK      403  ExceptionResourceNoAccess
+    //                                   EU/510  "User … is currently editing"
+    //   PUT with OUR handle        400  ExceptionResourceAlreadyExists
+    //                                   PAK/058  "Package … is already locked"
+    //
+    // The first two say the lock handle is read and checked, and ours passes
+    // both checks — a PUT that could not see the lock would answer 423, exactly
+    // as the made-up handle does. The third says the ADT resource lock is ours
+    // and is recognised as ours: asking for it again is refused under EU/510,
+    // a different message class from what the PUT reports.
+    //
+    // So the refusal comes from a layer past the ADT lock. PAK is the package
+    // framework's own message class, and PAK/058 is what it answers when its
+    // own lock cannot be taken — while the exception type says the resource
+    // already exists, which is what PAK reports when a save arrives without the
+    // edit state a LOCK is meant to have left it. That state does not survive
+    // the hop between internal contexts that SADT_REST_RFC_ENDPOINT makes per
+    // call; the enqueue handle does, which is why UNLOCK afterwards answers 200.
+    //
+    // It is packages alone. In the same rfc run 31 other updates pass — classes,
+    // interfaces, domains, data elements, tables, structures, DDL, behaviour
+    // definitions — and no PAK message appears anywhere else in the log. Every
+    // other type keeps its state where a lock handle can reach it from any
+    // context; the package is the one with a second locking layer of its own.
+    //
+    // Not critical for release: http is the primary transport for modern
+    // on-premise systems, and rfc exists for BASIS < 7.50, where package CRUD
+    // is not supported regardless. What is written above is measured; why PAK
+    // takes the create path rather than the change path is not, and would need
+    // the ABAP side to answer.
 
     let lockHandle: string | undefined;
     let lockCorrNr: string | undefined;
