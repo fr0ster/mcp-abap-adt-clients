@@ -20,7 +20,8 @@ System: E19, `http://epbyminsd0654.epam.com:8000`, client 100,
 | `e19-rfc-executors-shared.log` | rfc | the same three suites | 10 passed | 7.7 s |
 | `e19-http-full-verify.log` | http | full suite, this branch | **1286 passed, 0 failed**, 2 skipped | 724 s |
 | `e19-rfc-full-verify.log` | rfc | full suite, this branch | 1285 passed, 1 failed, 2 skipped | 758 s |
-| `e19-rfc-messageclass-trace.log` | rfc | `messageClass` with `DEBUG_ADT_LIBS` | 1 failed | 38 s |
+| `e19-rfc-messageclass-trace.log` | rfc | `messageClass` with `DEBUG_ADT_LIBS`, before the fix | 1 failed | 38 s |
+| `e19-rfc-full-fixed.log` | rfc | full suite with the message-lock fallback | 1285 passed, 1 failed, 2 skipped | 727 s |
 
 RFC was run with the SDK on the path:
 
@@ -226,3 +227,19 @@ Recorded because each looked promising and cost a run:
   the stateful header flips the outcome, so it is not the connection id.
 - **Eclipse's exact header shape over rfc** — never marking a request stateful.
   Still 403.
+
+## Left open: `Package` over rfc alternates
+
+The one red line remaining in `e19-rfc-full-fixed.log` is
+`Package - Full workflow: HTTP 400, Package TEST_INNER_PKG02 is already locked`.
+
+Run on its own, nothing else, four times over rfc: **FAIL, PASS, FAIL, PASS**. A
+successful run appears to leave `TEST_INNER_PKG02` locked; the next one trips on
+it and, in tripping, clears it. Over http the suite is stable.
+
+It reproduces in isolation, so it is independent of anything on this branch, and
+it is a `400` rather than a `403` — a business-level "package is locked" state
+rather than an enqueue, which is why it survives the end of a session where the
+MessageClass lock did not. Not chased here, and deliberately not re-run until
+green: a suite that passes on the second attempt is the thing this evidence set
+exists to catch.
