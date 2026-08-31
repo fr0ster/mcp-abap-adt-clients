@@ -30,6 +30,7 @@ interface WireResponse {
   status: number;
   statusText?: string;
   headers: unknown;
+  data?: unknown;
 }
 
 /** Header names whose value is a credential or a token, never written out. */
@@ -111,6 +112,7 @@ export function withWireLog<T extends object>(transport: T): T {
             `  <- ${response.status}${response.statusText ? ` ${response.statusText}` : ''}\n`,
           );
           write(headerLines(response.headers, '     '));
+          write(bodyLine(response.data, 1200).replace('  body:', '     body:'));
           return response;
         } catch (error) {
           const status =

@@ -35,6 +35,7 @@ import type {
   ILogger,
   IObjectVersion,
 } from '@mcp-abap-adt/interfaces';
+import { parseCheckRunResponse } from '../../utils/checkRun';
 import { safeErrorMessage } from '../../utils/internalUtils';
 import {
   createLockTracker,
@@ -194,7 +195,50 @@ export class AdtPackage
       }
       objectCreated = true;
 
-      // Packages are containers — no source code, no activation, no syntax check needed
+      // 3. Check, the way Eclipse does it — a checkrun on the new object, not a
+      //    second call to the validation endpoint. Captured on E19 2026-08-31
+      //    creating ZOK_MESSAGE... sorry, TEST_INNER_PKG05: validation, create,
+      //    then `POST /sap/bc/adt/checkruns` on the created package, before it
+      //    is ever locked. This class's own header has said
+      //    "Create: validate → create → check" from the start; the check was
+      //    the part that was never written.
+      //
+      //    Packages are containers, so this is not a syntax check — it is the
+      //    server's own verdict on the object that was just created, and a
+      //    failure here is worth surfacing rather than discovering at the next
+      //    operation.
+      this.logger?.info?.('Step 3: Checking package');
+      try {
+        const checkResponse = await checkPackage(
+          this.connection,
+          config.packageName,
+          'active',
+        );
+        const checkResult = parseCheckRunResponse(checkResponse);
+        if (checkResult.has_errors) {
+          this.logger?.warn?.(
+            `Check reported errors after create: ${checkResult.errors
+              .map((e) => e.text)
+              .join('; ')}`,
+          );
+          return {
+            errors: checkResult.errors.map((e) => ({
+              method: 'create',
+              error: new Error(String(e.text)),
+              timestamp: new Date(),
+            })),
+          };
+        }
+        this.logger?.info?.('Check passed');
+      } catch (checkError) {
+        // A check that cannot run is not a create that failed — the object is
+        // there, and saying otherwise would send the caller deleting it.
+        this.logger?.warn?.(
+          'Check after create could not run:',
+          safeErrorMessage(checkError),
+        );
+      }
+
       return { errors: [] };
     } catch (error: unknown) {
       // Ensure stateless if needed

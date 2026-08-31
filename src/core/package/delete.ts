@@ -32,7 +32,7 @@ export async function checkPackageDeletion(
     throw new Error('package_name is required');
   }
 
-  const encodedName = encodeSapObjectName(params.package_name);
+  const encodedName = encodeSapObjectName(params.package_name.toLowerCase());
   const objectUri = `/sap/bc/adt/packages/${encodedName}`;
 
   const checkUrl = `/sap/bc/adt/deletion/check`;
@@ -108,7 +108,7 @@ export async function deletePackage(
     throw new Error('package_name is required');
   }
 
-  const encodedName = encodeSapObjectName(params.package_name);
+  const encodedName = encodeSapObjectName(params.package_name.toLowerCase());
   const objectUri = `/sap/bc/adt/packages/${encodedName}`;
 
   const deletionUrl = `/sap/bc/adt/deletion/delete`;

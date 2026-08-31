@@ -23,7 +23,7 @@ export async function getPackage(
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtResponse> {
-  const encodedName = encodeSapObjectName(packageName);
+  const encodedName = encodeSapObjectName(packageName.toLowerCase());
   const longPollingQuery = options?.withLongPolling
     ? '&withLongPolling=true'
     : '';
@@ -54,7 +54,7 @@ export async function getPackageTransport(
   packageName: string,
   options?: IReadOptions,
 ): Promise<IAdtResponse> {
-  const encodedName = encodeSapObjectName(packageName);
+  const encodedName = encodeSapObjectName(packageName.toLowerCase());
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
   const url = `/sap/bc/adt/packages/${encodedName}/transport${query}`;
 
