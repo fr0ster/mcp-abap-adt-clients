@@ -23,7 +23,7 @@ System: E19, `http://epbyminsd0654.epam.com:8000`, client 100,
 | `e19-rfc-messageclass-trace.log` | rfc | `messageClass` with `DEBUG_ADT_LIBS`, before the fix | 1 failed | 38 s |
 | `e19-rfc-full-fixed.log` | rfc | full suite with the message-lock fallback | 1285 passed, 1 failed, 2 skipped | 727 s |
 | `e19-http-final.log` | http | full suite, final state of this branch | **1281 passed, 0 failed**, 2 skipped | 708 s |
-| `e19-rfc-final.log` | rfc | full suite, final state of this branch | **1281 passed, 0 failed**, 2 skipped | 707 s |
+| `e19-rfc-final.log` | rfc | full suite, final state of this branch | **1281 passed, 0 failed**, 2 skipped | 713 s |
 
 RFC was run with the SDK on the path:
 
