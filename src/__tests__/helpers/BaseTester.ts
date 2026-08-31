@@ -264,9 +264,13 @@ export class BaseTester<TConfig, TState> {
       this.log(LogLevel.INFO, 'Pre-existing object deleted successfully');
       this.objectCreated = false;
     } catch (cleanupError) {
+      // Not raised: this runs on the skip path, where the test was never going
+      // to execute, and turning a legitimate skip red would say the wrong
+      // thing. Recorded at ERROR because the object is still there and the run
+      // after this one will meet it.
       this.log(
-        LogLevel.WARN,
-        'Pre-existing object cleanup failed:',
+        LogLevel.ERROR,
+        'Pre-existing object cleanup failed — it is left on the system:',
         cleanupError,
       );
     }
@@ -1065,9 +1069,17 @@ export class BaseTester<TConfig, TState> {
                 : cleanupError
                   ? JSON.stringify(cleanupError)
                   : 'Unknown error';
-          this.log(
-            LogLevel.WARN,
-            `delete failed${status ? ` (HTTP ${status})` : ''}: ${responseText || errorMessage}`,
+          const detail = `${status ? `HTTP ${status}: ` : ''}${responseText || errorMessage}`;
+          this.log(LogLevel.ERROR, `delete (cleanup) failed: ${detail}`);
+          // The test body passed, so this is the only failure in the run — and
+          // swallowing it is how a suite came to report success while leaving
+          // its object behind, which then made the NEXT run skip its own
+          // workflow and report success too. Measured on E19 2026-08-31 with
+          // TEST_INNER_PKG02. A cleanup that fails is a red test.
+          throw new Error(
+            `Test body passed but cleanup failed: ${detail}. ` +
+              `${String((config as Record<string, unknown>).name ?? '')} is left on the system, ` +
+              'and the next run will not start from a clean state.',
           );
         }
       } else if (this.objectCreated) {
@@ -1105,7 +1117,14 @@ export class BaseTester<TConfig, TState> {
             'delete',
           );
         } catch (cleanupError) {
-          this.log(LogLevel.WARN, 'Cleanup after error failed:', cleanupError);
+          // Not rethrown, deliberately: the test already has a failure, and it
+          // is the one worth reporting. This is recorded at ERROR so the object
+          // left behind is not invisible either.
+          this.log(
+            LogLevel.ERROR,
+            'Cleanup after a failed test also failed — the object is left on the system:',
+            cleanupError,
+          );
         }
       } else if (this.objectCreated && !cleanupSettings.shouldCleanup) {
         this.log(
