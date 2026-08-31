@@ -49,6 +49,12 @@ jobs:
           generate_release_notes: true
           draft: false
           prerelease: false
+          # Appends instead of replacing. Without this, `body` overwrites — and
+          # a release written by hand before the tag was pushed lost its notes
+          # on v13.0.0, v14.0.0 and v15.0.0, each time silently, each time
+          # restored by hand afterwards. The action's own documentation:
+          # "append_body — Append to existing body instead of overwriting it".
+          append_body: true
           body: |
             ## Installation
 
