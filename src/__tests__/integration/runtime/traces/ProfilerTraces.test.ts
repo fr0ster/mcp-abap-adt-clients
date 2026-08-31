@@ -619,19 +619,17 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
       }
 
       const params = testCase?.params || {};
+      // Falls back to the class this suite already runs, rather than skipping.
+      //
+      // `object_uri` ships empty in the template, so this test skipped on every
+      // system it was ever run on — both transports, every time — and
+      // `getRequestsByUri` had no coverage against SAP at all. A skip whose
+      // reason is an unfilled config value is not the same as one whose reason
+      // is the environment, and only the second kind is normal.
       const objectUri =
         typeof params.object_uri === 'string' && params.object_uri.trim()
           ? params.object_uri.trim()
-          : undefined;
-
-      if (!objectUri) {
-        logTestSkip(
-          testsLogger,
-          testName,
-          'object_uri not configured in test-config.yaml params',
-        );
-        return;
-      }
+          : `/sap/bc/adt/oo/classes/${resolveRunnableClassName(params).toLowerCase()}`;
 
       try {
         logTestStep(`get trace requests by URI: ${objectUri}`, testsLogger);
