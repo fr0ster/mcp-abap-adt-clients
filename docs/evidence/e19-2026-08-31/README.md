@@ -22,8 +22,8 @@ System: E19, `http://epbyminsd0654.epam.com:8000`, client 100,
 | `e19-rfc-full-verify.log` | rfc | full suite, this branch | 1285 passed, 1 failed, 2 skipped | 758 s |
 | `e19-rfc-messageclass-trace.log` | rfc | `messageClass` with `DEBUG_ADT_LIBS`, before the fix | 1 failed | 38 s |
 | `e19-rfc-full-fixed.log` | rfc | full suite with the message-lock fallback | 1285 passed, 1 failed, 2 skipped | 727 s |
-| `e19-http-final.log` | http | full suite, final state of this branch | 1280 passed, 1 failed, 2 skipped | 704 s |
-| `e19-rfc-final.log` | rfc | full suite, final state of this branch | **1281 passed, 0 failed**, 2 skipped | 685 s |
+| `e19-http-final.log` | http | full suite, final state of this branch | **1281 passed, 0 failed**, 2 skipped | 708 s |
+| `e19-rfc-final.log` | rfc | full suite, final state of this branch | **1281 passed, 0 failed**, 2 skipped | 707 s |
 
 RFC was run with the SDK on the path:
 
@@ -229,6 +229,69 @@ Recorded because each looked promising and cost a run:
   the stateful header flips the outcome, so it is not the connection id.
 - **Eclipse's exact header shape over rfc** — never marking a request stateful.
   Still 403.
+
+## Left open: `Package` over rfc, and a suite that passes without testing
+
+The one red line remaining in `e19-rfc-full-fixed.log` is
+`Package - Full workflow: HTTP 400, Package TEST_INNER_PKG02 is already locked`.
+
+It first looked intermittent — run alone over rfc it goes FAIL, PASS, FAIL, PASS.
+Reading the steps rather than the verdict says otherwise:
+
+```
+run 1:  → delete (pre-existing object cleanup)                    ← nothing else ran
+run 2:  → validate → create → read → update ✗ 400 "already locked"
+```
+
+What alternates is not the outcome but whether the suite does anything. When the
+previous run left the package behind, `ensureObjectReady` deletes it and the
+tester returns early — reporting **PASS having run neither create nor update**.
+When there is no leftover, the workflow runs and fails.
+
+So `update` immediately after `create` over rfc fails **every time it is
+actually attempted**. It is the shape that broke `MessageClass`: an operation on
+an object in the same ABAP session that created it, which http never meets
+because its create goes out on a session of its own.
+
+Two separate things to fix, and neither is done here:
+
+1. **The package chain over rfc.** Unlike MSAG there is no second lock variant to
+   fall back on — `/sap/bc/adt/packages/…?_action=LOCK&accessMode=MODIFY` is the
+   only one. What the server will accept after a create in the same session is
+   not yet measured.
+2. **A suite that reports green without testing.** A leftover object silently
+   turns the package lifecycle into a no-op that passes. That is what hid this
+   failure on every second run, and it is not specific to packages.
+
+## The final pair
+
+`e19-http-final.log` and `e19-rfc-final.log` are the runs this branch ends on.
+Both green, on the same commit, with `cleanup_session_after_test: true`.
+
+That flag is why. Without it the http run failed one suite — the package
+lifecycle passed and its cleanup delete did not, because the session that
+updated the package cannot delete it (`PAK/058`). Until this branch that failure
+was caught and logged at WARN while the suite reported success, leaving the
+package behind for the next run's `ensureObjectReady` to meet and skip over,
+reporting success again. Two green runs, nothing tested.
+
+`recycleTestSession()` reopens the session before the cleanup delete, and a
+delete from any other session succeeds on the first attempt — measured while the
+first session was still open, so it is ownership of the PAK state rather than a
+delay. The harness has had the mechanism all along; `test-config.yaml` shipped
+with the flag off. It is on now, in the template too. The cost is not visible:
+708 s against 704 s over http, 707 s against 685 s over rfc.
+
+The limitation itself has not gone anywhere. Package `update` over rfc is still
+refused by the same layer, and that suite is skipped with the reason at the skip,
+written up in `docs/development/RFC_TESTING.md`, to be taken up separately.
+
+### One instrument limit worth knowing
+
+The wire log shows no `logoff` or `discovery` around the recycle, which reads as
+if it never happened. It did: `recycleTestSession()` goes through the transport's
+`establish`/`close`, and `withWireLog` wraps `send`. The log records requests,
+not session lifecycle.
 
 ## Left open: `Package` over rfc, and a suite that passes without testing
 

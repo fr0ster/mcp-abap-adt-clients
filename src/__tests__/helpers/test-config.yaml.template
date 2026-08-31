@@ -71,7 +71,7 @@ test_settings:
 
 # Session persistence configuration
 session_config:
-  cleanup_session_after_test: false
+  cleanup_session_after_test: true
 
 # Lock persistence configuration
 lock_config:
