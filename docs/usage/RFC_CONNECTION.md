@@ -182,3 +182,15 @@ Some endpoints via RFC don't support specific Accept content types. The library 
 ### Lock handle encoding errors (423 "invalid lock handle")
 
 RFC returns base64 lock handles that may contain spaces, `+`, `=`. All lock handles are encoded with `encodeURIComponent()` when placed in URL query parameters.
+
+## Known limitation: package update
+
+`AdtPackage.update()` does not work over RFC. Everything else on a package does
+— create, lock, unlock, delete — and every other object type updates normally.
+The save is refused with `400 ExceptionResourceAlreadyExists`, `PAK/058`, and
+the cause sits below the ADT lock, in the package framework's own state rather
+than in the lock handle this library sends.
+
+The evidence and the four endpoint answers that place it are in
+[`docs/development/RFC_TESTING.md`](../development/RFC_TESTING.md#known-limitation-package-update).
+Use HTTP for package changes on a system that supports it.

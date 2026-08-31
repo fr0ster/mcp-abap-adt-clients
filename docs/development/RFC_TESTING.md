@@ -157,3 +157,63 @@ The function group read endpoint via RFC does not accept specific content types 
 ### ensureObjectReady Cleaner
 
 `BaseTester` resolves object names from config using camelCase property names (e.g., `config.functionGroupName`). The `loggerPrefix` is converted to camelCase: `'FunctionGroup'` -> `'functionGroup'` + `'Name'` = `'functionGroupName'`.
+
+## Known limitation: package update
+
+Updating a package over RFC fails. `create`, `LOCK`, `UNLOCK` and `delete` all
+work; only the `PUT` that saves a change is refused:
+
+```
+PUT /sap/bc/adt/packages/<name>?lockHandle=<ours>
+  400  ExceptionResourceAlreadyExists   PAK/058  "Package <name> is already locked"
+```
+
+It is not the lock handle. Measured on E19 2026-08-31, the same endpoint in the
+same session answers:
+
+| Request | Answer |
+| --- | --- |
+| `PUT` with no `lockHandle` | 400 `ExceptionParameterNotFound`, `SADT_RESOURCE/017` |
+| `PUT` with a made-up handle | 423 `ExceptionResourceInvalidLockHandle`, `SADT_RESOURCE/026` |
+| a second `_action=LOCK` | 403 `ExceptionResourceNoAccess`, `EU/510` |
+| `PUT` with our real handle | 400 `ExceptionResourceAlreadyExists`, `PAK/058` |
+
+The parameter is read, the handle is validated, and ours passes — a `PUT` blind
+to the lock would answer 423, exactly as the made-up handle does. The ADT
+resource lock is recognised as ours, and a second one is refused under `EU/510`,
+a different message class from the one the `PUT` reports. So the refusal comes
+from a layer past the ADT lock: PAK's own, whose state does not survive the hop
+between internal contexts that `SADT_REST_RFC_ENDPOINT` makes per call, while
+the enqueue handle does — which is why the `UNLOCK` afterwards still answers 200.
+
+**Packages only.** In the same RFC run 31 other updates pass — classes,
+interfaces, domains, data elements, tables, structures, DDL, behaviour
+definitions — and no `PAK` message appears anywhere else in the log. Every other
+type keeps its state where a lock handle reaches it from any context; the package
+is the one with a second locking layer of its own.
+
+### The same layer blocks a delete after an update, on either transport
+
+`PAK/058` is not confined to RFC. Over **HTTP**, a package the session has just
+updated cannot be deleted by that session either: `deletion/check` answers
+`isDeletable="true"`, and `deletion/delete` answers HTTP 200 carrying
+`isDeleted="false"` and the same `PAK/058`. A delete from any other session
+succeeds on the first attempt, immediately, while the first session is still
+open — so it is ownership of the PAK state, not a delay. Retried for 30 seconds
+inside the run it never succeeds; sent one second after the run ends it works.
+
+The harness has the mechanism for this — `recycleTestSession()`, which reopens
+the session before the cleanup delete — and `test-config.yaml` ships with
+`cleanup_session_after_test: false`, so it does not run. Turning it on is a
+decision about every suite on every system, and is left to whoever makes it.
+
+Until then the package lifecycle test fails at cleanup over HTTP, and that
+failure is real: the object is left behind, and the next run meets it. It is no
+longer swallowed.
+
+Why PAK takes the create path rather than the change path is **not established**,
+and needs the ABAP side to answer. Until it is, this is a known limitation rather
+than an open defect in this library: HTTP is the primary transport for modern
+on-premise systems, and RFC exists for BASIS < 7.50 where package CRUD is not
+supported regardless. The package lifecycle test is skipped over RFC with this
+reason at the skip.
