@@ -65,8 +65,9 @@ RFC reaches parity with http on this system: 1279 of the same 1283 tests, and
 wall-clock within 1.4% of the http run. Running both was what placed the
 `AuthorizationField` failure — a defect that reproduces identically on two
 transports is in the payload, not the pipe. The one RFC-only failure went the
-other way: it does not reproduce on http at all, and that asymmetry is itself the
-finding — it is the rfc session model, not server state.
+other way: it does not reproduce on http at all, and chasing that asymmetry is
+what exposed a latent dependency on http's statelessness that had been there all
+along.
 
 ## The executor suites no longer build what they run
 
@@ -105,7 +106,8 @@ cookie jar and never logged off. Probe with one jar and log off.
 
 http on this branch is green end to end — 1286 passed, nothing failed. Over rfc
 one suite stays red, at the first `LOCK_MSG` on `ZADT_MSGX01 001`:
-`403 ExceptionResourceNoAccess`, "User OKYSLYTSIA is currently editing".
+`403 ExceptionResourceNoAccess`, "User OKYSLYTSIA is currently editing". It is a
+library-level dependency on transport semantics, not an rfc defect — see below.
 
 Probed on E19, each step in its own process so no session can carry state:
 
@@ -130,17 +132,44 @@ session** — class `LOCK` → 200 then `LOCK_MSG` → 403, and `LOCK_MSG` → 2
 class `LOCK` → 403. ADT registers one lock per session per object and refuses the
 second, reporting it as "user is currently editing".
 
-`AdtMessageClass.create` is a plain POST that takes no lock of its own; the server
-takes one inside the call. Over http that request's session ends when it returns
-and the registration goes with it. Over rfc it does not: `RfcTransport` states
-that an RFC conversation is inherently stateful — one ABAP session — and that the
-only thing which drops its state is `close()`. `setSessionType('stateless')`
-cannot release it, and nothing reachable from inside the session does either, per
-the table above.
+### It is not an rfc defect
 
-**So this one is not fixable in this package.** It belongs where the session
-lives: over rfc, `setSessionType('stateless')` has to recycle the ABAP
-conversation the way an http stateless request does.
+The same sequence over **http**, inside one session carrying
+`x-sap-adt-sessiontype: stateful` throughout:
+
+| Step (http, one stateful session) | Result |
+| --- | --- |
+| `POST /deletion/delete` on the class | 200 |
+| `POST /messageclass` (create) | 201 |
+| `POST /messageclass/zadt_msgx01/messages/001?_action=LOCK_MSG` | **403, "User OKYSLYTSIA is currently editing ZADT_MSGX01 001"** |
+
+So the server behaves identically on both transports. The rule is
+transport-independent: **a message class created inside a stateful session leaves
+that session owning the object, and the next lock in that session is refused.**
+
+`AdtMessageClass.create` is a plain POST that takes no lock of its own and gets
+no handle back — the create answers `201` with `content-length: 0` and only a
+`location` header, so there is nothing to release with. The server takes the lock
+inside the call and keeps it for the session.
+
+http passes by accident, not by design: our create is sent stateless, so its
+session ends when the request returns and the registration dies with it. rfc has
+no such accident — one conversation, one ABAP session, by design and for a
+reason: rfc is here precisely so lock handles survive on BASIS < 7.50 where
+stateful http does not work. Making `setSessionType('stateless')` tear that
+session down would defeat what rfc is for.
+
+The Eclipse trace above points at the shape of the real fix. Eclipse segregates:
+the lock calls run on one stateful session marked `enqueue` (155), while every
+GET and the PUT run on their own stateless sessions (156–160). Nothing that is
+not a lock shares the enqueue session. This library does not segregate — over rfc
+everything shares one conversation.
+
+**Open question, not yet measured:** whether Eclipse's *create* also goes on a
+stateless session. A trace of creating a message class and then adding a message
+to it would settle it, and would say whether the fix is "issue create outside the
+stateful conversation" (needing a second rfc conversation for non-lock calls) or
+something ADT offers explicitly.
 
 ## The unlock order, corrected against Eclipse
 
