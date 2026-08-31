@@ -102,12 +102,12 @@ a run opens, and every log here ends with `shared session released`. The extra
 sessions in that window came from manual `curl` probes, each opened with its own
 cookie jar and never logged off. Probe with one jar and log off.
 
-## The remaining red line: `MessageClass` over rfc
+## `MessageClass` over rfc: what it was, and the fix
 
-http on this branch is green end to end — 1286 passed, nothing failed. Over rfc
-one suite stays red, at the first `LOCK_MSG` on `ZADT_MSGX01 001`:
-`403 ExceptionResourceNoAccess`, "User OKYSLYTSIA is currently editing". It is a
-library-level dependency on transport semantics, not an rfc defect — see below.
+Over rfc this suite failed at the first `LOCK_MSG` on `ZADT_MSGX01 001`:
+`403 ExceptionResourceNoAccess`, "User OKYSLYTSIA is currently editing". It now
+passes on both transports. The road to that is below, wrong turns included,
+because most of them looked right at the time.
 
 Probed on E19, each step in its own process so no session can carry state:
 
@@ -179,61 +179,50 @@ rfc session on one run:
 | --- | --- |
 | domain | **OK** |
 | class | **OK** |
-| message class | **403** on the class lock *and* on `LOCK_MSG` |
+| message class | 403 |
 
-Domain and class do not care. Only MSAG does. So this is a property of the ADT
-message-class create, not of the session model, and the other 26 core types are
-unaffected.
+Only MSAG. It is the one type here that is not a dictionary object: two lock
+levels, a bespoke `?_action=LOCK&msgNo=…&onSave=X` variant, and an error text
+("user is currently editing", down to the message number) that no other type
+produces.
 
-### What actually decides it, header by header
+### And it is fixable: one of the three locks is granted
 
-A full Eclipse capture with headers (create `ZOK_MESSAGE_0002`, then add message
-000) shows Eclipse sends **no `x-sap-adt-sessiontype` at all** — not on create,
-not on the locks, not on the PUT. Every request carries the same
-`sap-adt-connection-id`. The "stateful, enqueue" session in the trace is the
-server's own doing, not something the client asked for.
+The chain asks for `LOCK_MSG` first and used to die there. It never tried the
+others. After an rfc create, all three, in order:
 
-That made `sap-adt-connection-id` look like the lever. It is not. The same
-delete → create → `LOCK_MSG` over http, one cookie jar, varying only headers:
+| Lock | After an rfc create |
+| --- | --- |
+| `LOCK_MSG` | 403 |
+| `LOCK&msgNo=001&onSave=X` | **200** |
+| plain `LOCK` | 403 |
 
-| Headers | create | `LOCK_MSG` |
-| --- | --- | --- |
-| no sessiontype, with `sap-adt-connection-id` (Eclipse's own combination) | 201 | **200** |
-| `x-sap-adt-sessiontype: stateful` + `sap-adt-connection-id` | 201 | **403** |
-| `x-sap-adt-sessiontype: stateful`, no connection-id | 201 | **403** |
+The message-scoped class lock is granted in exactly the situation where the
+message lock is refused. And a save carrying that handle as `mc:lockhandle`
+answers **200** — measured before changing any code.
 
-The deciding factor is the *absence* of the stateful header — that is, whether
-create and the lock land in the same ABAP session. The connection id changes
-nothing.
+So a refused `LOCK_MSG` costs the chain nothing but the separate handle.
+`lockMessageIfGranted` swallows 403 there and only 403, the class-for-message
+handle stands in for the message, and the full lifecycle now passes over rfc in
+**2.4 s** where it previously spent 33.7 s failing. http is unchanged at 2.6 s.
 
-So both readings hold at once, and neither alone is the whole story: it is
-MSAG-specific (domain and class share a session happily) **and** it is about
-sharing the session (MSAG is fine when they do not). rfc can only ever be the
-failing combination.
+The shape came from the Eclipse capture, where a refused
+`?_action=LOCK&…&msgNo=000&onSave=X` is followed by a plain `LOCK` that answers
+200 and whose handle goes on to the PUT. Whether Eclipse asks conditionally or
+simply sends both is not visible in the log; what is visible is that a refused
+lock is survivable and the flow continues. Both fallbacks here key on the status
+alone.
 
-Two more things the headers settle. The create response carries `Location` and a
-profiling header, nothing else — no handle, confirming there is nothing to
-release with. And Eclipse's 403 on the message-scoped class lock is a *different*
-error from the one this suite hits: `SADT_RESOURCE 029, "Resource Message Class
-… could not be locked"`, where this suite gets `"User … is currently editing"`.
-The fallback added here covers both, because it keys on the status.
+### What was tried and did not work
 
-### What was done about it
+Recorded because each looked promising and cost a run:
 
-The suite is gated off for rfc, with the reason stated at the skip. Not a
-workaround for a bug in this package — there is nothing here to fix. Creating a
-message class and locking one of its messages cannot happen in the same ABAP
-session, and an rfc conversation has exactly one for its whole life. That is what
-rfc is, and why it is here: lock handles have to survive on BASIS < 7.50, where
-stateful http does not work. Eclipse never meets this because its create runs on
-a stateless http session (209 in the capture) while its locks live on a separate
-stateful one (155) — a separation http gives away and rfc cannot express.
-
-Building a second rfc conversation to imitate it was considered and dropped: one
-MSAG flow does not pay for doubling the ABAP sessions every run opens, and this
-run already showed what stray sessions cost.
-
-What *was* taken from the Eclipse capture, and applies to both transports, is in
-`AdtMessageClassMessage`: the class lock is released before the message locks,
-the save runs outside the lock session, and a 403 on the message-scoped class
-lock falls back to the plain one instead of being fatal.
+- **Dropping `x-sap-adt-sessiontype: stateful` on on-prem**, which Eclipse never
+  sends there. Our flow breaks without it — `423 invalid lock handle` on domain
+  and on messageClass alike. An earlier probe seemed to show locks surviving
+  without it; that probe did `LOCK` → `UNLOCK`, which only checks the handle as a
+  token, not work done under the lock.
+- **`sap-adt-connection-id` as the lever.** Holding it constant and varying only
+  the stateful header flips the outcome, so it is not the connection id.
+- **Eclipse's exact header shape over rfc** — never marking a request stateful.
+  Still 403.

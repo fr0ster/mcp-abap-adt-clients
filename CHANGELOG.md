@@ -7,6 +7,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ### Fixed
 
+- Adding or deleting a message failed outright when the message class had been
+  created in the same ABAP session — every time over RFC, where one conversation
+  is one session for its whole life.
+
+  `LOCK_MSG` answers 403 "user is currently editing" there. The chain asked for
+  it first and treated the refusal as fatal, without trying the other two locks
+  the endpoint offers. Measured on E19: in exactly that situation
+  `?_action=LOCK&msgNo=…&onSave=X` is granted, and a save carrying its handle as
+  `mc:lockhandle` answers 200. `lockMessageIfGranted` now swallows 403 there —
+  and only 403 — and the class-for-message handle stands in. The full lifecycle
+  passes over RFC in 2.4 s where it previously spent 33.7 s failing.
+
 - `AdtMessageClassMessage` released its two locks in the wrong order.
 
   A trace of Eclipse editing a message shows the class `UNLOCK` first and the

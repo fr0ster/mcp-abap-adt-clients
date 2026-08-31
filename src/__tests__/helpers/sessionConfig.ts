@@ -87,12 +87,8 @@ export function skipUnlessConfigured(error: unknown, logger: ILogger): false {
 /**
  * Get connection_type from test-config.yaml environment section.
  * Returns 'http' (default) or 'rfc'.
- *
- * Exported because a suite occasionally has to know: an RFC conversation is one
- * ABAP session for its whole life, and a handful of ADT flows cannot be
- * expressed inside a single session at all. See messageClass.
  */
-export function getConnectionType(): 'http' | 'rfc' {
+function getConnectionType(): 'http' | 'rfc' {
   const { getEnvironmentConfig } = require('./test-helper');
   try {
     const envConfig = getEnvironmentConfig();

@@ -33,7 +33,6 @@ import { BaseTester } from '../../../helpers/BaseTester';
 import {
   createTestAdtClient,
   createTestConnection,
-  getConnectionType,
   resolveSystemContext,
   skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
@@ -196,31 +195,6 @@ describe('MessageClass (using AdtClient)', () => {
       'should execute full MessageClass lifecycle',
       async () => {
         if (!tester) {
-          return;
-        }
-
-        // Not runnable over RFC, and not for want of trying.
-        //
-        // An RFC conversation is one ABAP session for its whole life — that is
-        // what RFC is, and why it is here: lock handles have to survive on
-        // BASIS < 7.50 where stateful HTTP does not work. Creating a message
-        // class leaves that session unable to lock the object it just made:
-        // measured on E19 2026-08-31, `create` then `LOCK` answers 403 "User
-        // ... is currently editing", and so does LOCK_MSG, on every message
-        // number, with no handle returned by the create to release with.
-        //
-        // It is specific to MSAG, not a rule about sessions. In the same RFC
-        // session on the same run, domain and class both create-then-lock
-        // without complaint. Eclipse never meets it because its create goes on
-        // a stateless HTTP session (E19 capture, session 209) while its locks
-        // live on a separate stateful one (155) — a separation HTTP gives for
-        // free and RFC cannot express.
-        if (getConnectionType() === 'rfc') {
-          logTestSkip(
-            testsLogger,
-            'MessageClass - Full workflow',
-            'message class create and message locking cannot share one ABAP session; RFC has only one',
-          );
           return;
         }
 

@@ -44,7 +44,7 @@ import {
   safeErrorMessage,
 } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
-import { lockClassForMessageOrPlain, lockMessage } from './lock';
+import { lockClassForMessageOrPlain, lockMessageIfGranted } from './lock';
 import { getMessageClassSource } from './read';
 import type {
   IMessageClassMessageConfig,
@@ -189,7 +189,7 @@ export class AdtMessageClassMessage
 
       // 3. Lock individual message
       this.logger?.info?.('upsertMessage: lockMessage');
-      messageLockHandle = await lockMessage(this.connection, name, no);
+      messageLockHandle = await lockMessageIfGranted(this.connection, name, no);
 
       // 4. Lock class for message save
       this.logger?.info?.('upsertMessage: lockClassForMessage');
@@ -208,8 +208,10 @@ export class AdtMessageClassMessage
       // enqueue session, not to the request that uses their handle.
       this.connection.setSessionType('stateless');
       this.logger?.info?.('upsertMessage: PUT');
+      // Whichever handle this chain actually holds. When LOCK_MSG was refused
+      // the class-for-message handle stands in, and the save takes it.
       const xmlBody = buildMessageClassXml(cls, {
-        messageLockHandles: { [no]: messageLockHandle },
+        messageLockHandles: { [no]: messageLockHandle ?? classLockHandle },
       });
       const encoded = encodeSapObjectName(name.toLowerCase());
       const corrNr = config.transportRequest?.trim()
@@ -320,7 +322,7 @@ export class AdtMessageClassMessage
 
       // 2. Lock the individual message (required for <mc:deletedmessages>)
       this.logger?.info?.('deleteMessage: lockMessage');
-      messageLockHandle = await lockMessage(this.connection, name, no);
+      messageLockHandle = await lockMessageIfGranted(this.connection, name, no);
 
       // 3. Lock the class for a message-save (msgNo + onSave=X)
       this.logger?.info?.('deleteMessage: lockClassForMessage');
@@ -336,7 +338,7 @@ export class AdtMessageClassMessage
       this.logger?.info?.('deleteMessage: PUT');
       const xmlBody = buildMessageClassXml(cls, {
         deletedMsgnos: [no],
-        messageLockHandles: { [no]: messageLockHandle },
+        messageLockHandles: { [no]: messageLockHandle ?? classLockHandle },
       });
       const encoded = encodeSapObjectName(name.toLowerCase());
       const corrNr = config.transportRequest?.trim()
