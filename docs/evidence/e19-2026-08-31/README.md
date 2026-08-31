@@ -185,6 +185,39 @@ Domain and class do not care. Only MSAG does. So this is a property of the ADT
 message-class create, not of the session model, and the other 26 core types are
 unaffected.
 
+### What actually decides it, header by header
+
+A full Eclipse capture with headers (create `ZOK_MESSAGE_0002`, then add message
+000) shows Eclipse sends **no `x-sap-adt-sessiontype` at all** — not on create,
+not on the locks, not on the PUT. Every request carries the same
+`sap-adt-connection-id`. The "stateful, enqueue" session in the trace is the
+server's own doing, not something the client asked for.
+
+That made `sap-adt-connection-id` look like the lever. It is not. The same
+delete → create → `LOCK_MSG` over http, one cookie jar, varying only headers:
+
+| Headers | create | `LOCK_MSG` |
+| --- | --- | --- |
+| no sessiontype, with `sap-adt-connection-id` (Eclipse's own combination) | 201 | **200** |
+| `x-sap-adt-sessiontype: stateful` + `sap-adt-connection-id` | 201 | **403** |
+| `x-sap-adt-sessiontype: stateful`, no connection-id | 201 | **403** |
+
+The deciding factor is the *absence* of the stateful header — that is, whether
+create and the lock land in the same ABAP session. The connection id changes
+nothing.
+
+So both readings hold at once, and neither alone is the whole story: it is
+MSAG-specific (domain and class share a session happily) **and** it is about
+sharing the session (MSAG is fine when they do not). rfc can only ever be the
+failing combination.
+
+Two more things the headers settle. The create response carries `Location` and a
+profiling header, nothing else — no handle, confirming there is nothing to
+release with. And Eclipse's 403 on the message-scoped class lock is a *different*
+error from the one this suite hits: `SADT_RESOURCE 029, "Resource Message Class
+… could not be locked"`, where this suite gets `"User … is currently editing"`.
+The fallback added here covers both, because it keys on the status.
+
 ### What was done about it
 
 The suite is gated off for rfc, with the reason stated at the skip. Not a
