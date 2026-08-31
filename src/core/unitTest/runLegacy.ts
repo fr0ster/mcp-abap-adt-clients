@@ -21,6 +21,26 @@ const ACCEPT_XML = 'application/xml';
  * Start ABAP Unit test run on legacy systems
  * Uses /sap/bc/adt/abapunit/testruns endpoint with aunit:runConfiguration format
  *
+ * There is only a start here. `getClassUnitTestStatusLegacy` and
+ * `getClassUnitTestResultLegacy` polled `testruns/{runId}` and
+ * `testruns/{runId}/results`, and were removed once the endpoint was measured:
+ * the POST answers with the finished result, so there was never a run to poll.
+ * Nothing called them — `AdtUnitTestLegacy` serves both from the response the
+ * POST returned — so they were an unmeasured contract kept alive by nobody
+ * looking.
+ *
+ * **Reading the result: `kind` carries the distinction, `severity` does not.** A
+ * failed assertion and an uncaught exception both come back
+ * `severity="critical"`, measured on one release — so a parser classifying on
+ * severity reports a short dump as a failed test. The field that separates them
+ * is `kind`: `failedAssertion`, `exception`, `noTestClasses`.
+ *
+ * Also measured: this endpoint is **synchronous** on both a modern and a legacy
+ * on-prem system, over HTTP and over RFC — `<aunit:runResult>` with no
+ * `Location`, and the typed and `application/xml` bodies byte-identical. The
+ * legacy system ignores the typed `Accept` altogether and answers
+ * `application/xml` either way.
+ *
  * Legacy format differs from modern:
  * - Root element: aunit:runConfiguration (not aunit:run)
  * - Namespace: http://www.sap.com/adt/aunit (not http://www.sap.com/adt/api/aunit)
@@ -63,49 +83,6 @@ ${objectRefs}
     data: xml,
     headers: {
       'Content-Type': CT_XML,
-      Accept: ACCEPT_XML,
-    },
-  });
-}
-
-export async function getClassUnitTestStatusLegacy(
-  connection: IAbapConnection,
-  runId: string,
-  withLongPolling: boolean = true,
-): Promise<IAdtResponse> {
-  if (!runId) {
-    throw new Error('runId is required');
-  }
-  const query = withLongPolling ? '?withLongPolling=true' : '';
-  return connection.makeAdtRequest({
-    url: `/sap/bc/adt/abapunit/testruns/${runId}${query}`,
-    method: 'GET',
-    timeout: getTimeout('default'),
-    headers: {
-      Accept: ACCEPT_XML,
-    },
-  });
-}
-
-export async function getClassUnitTestResultLegacy(
-  connection: IAbapConnection,
-  runId: string,
-  options?: { withNavigationUris?: boolean },
-): Promise<IAdtResponse> {
-  if (!runId) {
-    throw new Error('runId is required');
-  }
-  const params: string[] = [];
-  if (options?.withNavigationUris === false) {
-    params.push('withNavigationUris=false');
-  }
-  const query = params.length ? `?${params.join('&')}` : '';
-
-  return connection.makeAdtRequest({
-    url: `/sap/bc/adt/abapunit/testruns/${runId}/results${query}`,
-    method: 'GET',
-    timeout: getTimeout('default'),
-    headers: {
       Accept: ACCEPT_XML,
     },
   });

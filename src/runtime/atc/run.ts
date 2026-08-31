@@ -105,6 +105,14 @@ export async function getAtcCustomizing(
 /**
  * Create the worklist a run writes its findings into.
  *
+ * The id this returns is **not** a run id: `GET /atc/runs/{worklistId}` answers
+ * 404, measured on-prem over both transports. The run id only ever arrives in
+ * the `Location` of the run that was posted.
+ *
+ * And a worklist lists only objects that produced findings, so an empty one
+ * cannot be told apart from "nothing was checked" — which is why a check run
+ * reporting `TOOL_FAILURE` is the thing to look at, not the object count.
+ *
  * Answers with a bare id in the body — no XML envelope, which is why both
  * content types are `text/plain`.
  */

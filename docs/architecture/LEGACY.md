@@ -164,11 +164,32 @@ Legacy systems do not support versioned content types. The `AdtContentTypesBase`
 
 ## Discovery Reference
 
-Discovery catalogs are stored in `scripts/` for reference:
+Measured catalogue sizes — collections advertised by `/sap/bc/adt/discovery`:
 
-| File | System | Endpoints |
-|------|--------|-----------|
-| `scripts/endpoints_e77.txt` | Legacy (BASIS ~7.40) | ~100 endpoints |
-| `scripts/endpoints_e19.txt` | Modern (S/4 HANA) | ~500+ endpoints |
+| System | Collections |
+|---|---|
+| Legacy on-prem (BASIS ~7.40) | 124 |
+| Modern on-prem (S/4 HANA) | 818 |
+| ABAP Cloud (trial and a production tenant, separately) | 918 each |
 
-Use `fetchDiscoveryEndpoints(connection)` from the public API to check a specific system's available endpoints at runtime.
+The legacy system advertises **15%** of what the modern one does, and the two
+cloud captures were functionally identical — their only differences were their
+own base URLs.
+
+**Advertised is not available.** The legacy catalogue lists
+`/sap/bc/adt/atc/customizing`, and a `GET` of it answers
+`404 No suitable resource found`. Two derived analyses of the same capture
+disagreed about exactly this — one calling ATC and the debugger absent from that
+system, the other marking them present — and neither was checkable without the
+raw document and a live request. So a hit from `fetchDiscoveryEndpoints` means
+the system says it has the resource; a miss is the stronger signal.
+
+This section previously pointed at `scripts/endpoints_e77.txt` and
+`scripts/endpoints_e19.txt` with "~100" and "~500+". Neither file has ever
+existed at that path and neither figure was right.
+
+The raw catalogues are not kept in the tree — 1.4 MB of four systems' endpoint
+listings, re-fetchable from any of them in one request, and in git history for
+anyone who wants the exact bytes.
+
+Use `fetchDiscoveryEndpoints(connection)` from the public API to read a specific system's catalogue at runtime.

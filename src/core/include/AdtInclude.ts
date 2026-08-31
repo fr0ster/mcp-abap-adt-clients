@@ -85,6 +85,11 @@ export class AdtInclude
    * — the same three `/programs/validation` takes, with `description`
    * optional. Eclipse does not call it in the captured create, so this is
    * available rather than obligatory.
+   *
+   * It does **not** police `objtype`: posting `PROG/P` to the *includes*
+   * validation also answers `200 X`. So a success here says the name is free,
+   * not that the type was understood — the endpoint carries the type, the
+   * parameter does not gate it.
    */
   async validate(config: Partial<IIncludeConfig>): Promise<IIncludeState> {
     const state = emptyState();

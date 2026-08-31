@@ -1,8 +1,17 @@
 /**
  * Discovery-based endpoint availability checking
  *
- * Utilities for parsing /sap/bc/adt/discovery and determining
- * which ADT endpoints a system supports.
+ * Utilities for parsing /sap/bc/adt/discovery and reading which collections a
+ * system advertises.
+ *
+ * **Advertised is not the same as available**, and on a legacy system the gap is
+ * real rather than theoretical. Measured: that system's discovery document lists
+ * `/sap/bc/adt/atc/customizing`, and a `GET` of it answers
+ * `404 No suitable resource found`. Two derived analyses of the same capture
+ * disagreed about this for months — one calling ATC and the debugger absent, the
+ * other marking them present — and only the raw document plus a live request
+ * settled it. So treat a hit here as "the system says it has this", and a miss
+ * as the stronger signal of the two.
  *
  * The main library uses isModernAdtSystem() to auto-detect and
  * AdtClientLegacy has hardcoded stubs for known-unsupported types.
@@ -46,16 +55,23 @@ export async function fetchDiscoveryEndpoints(
       match = hrefRegex.exec(xml);
     }
   } catch {
-    // If discovery fails, return empty set — caller decides what to do
+    // A failed discovery and a system advertising nothing both come back as an
+    // empty set, and the caller cannot tell them apart. Left as it is because
+    // changing it changes a published signature; worth knowing before treating
+    // an empty result as an answer.
   }
 
   return endpoints;
 }
 
 /**
- * Check if a specific endpoint path is available in the discovery set.
+ * Check whether a path is advertised in the discovery set.
+ *
  * Supports prefix matching — e.g., '/sap/bc/adt/ddic/domains' matches
  * if the discovery contains '/sap/bc/adt/ddic/domains' or any sub-path.
+ *
+ * `true` means the system listed it, not that a request will succeed; see the
+ * note at the top of this file.
  */
 export function isEndpointInDiscovery(
   endpoints: Set<string>,
