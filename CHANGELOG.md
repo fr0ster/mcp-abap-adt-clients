@@ -5,6 +5,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+### Fixed
+
+- `AuthorizationField` create and update sent the wrong root element, and every
+  write against `/sap/bc/adt/aps/iam/auth` failed with HTTP 500.
+
+  The payload was built as `auth:authorizationField`; the endpoint accepts only
+  `auth:auth` — the root it returns itself on a GET — and rejects anything else
+  in that namespace with `System expected the element
+  '{http://www.sap.com/iam/auth}auth'`. The namespace and every attribute were
+  already correct, so the fix is the local name alone, in the one builder that
+  create and update share. Confirmed on E19 over both http and rfc; the same
+  POST with only the root changed goes from 500 to 201.
+
 ## [15.0.0] - 2026-08-30
 
 Requires `@mcp-abap-adt/interfaces@^25.0.0`.

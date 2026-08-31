@@ -1,9 +1,11 @@
 /**
  * Shared XML helpers for authorization field (SUSO / AUTH) payloads.
  *
- * The auth envelope is `auth:authorizationField` with an inline `auth:content`
- * block. Create and update share the same root element but differ only in
- * whether the URL carries a lockHandle — so the XML builder is shared.
+ * The auth envelope is `auth:auth` with an inline `auth:content` block — the
+ * same root the endpoint returns on a GET. Any other local name in that
+ * namespace is rejected with HTTP 500, "System expected the element
+ * '{http://www.sap.com/iam/auth}auth'". Create and update share the root and
+ * differ only in whether the URL carries a lockHandle, so the builder is shared.
  */
 
 import { limitDescription } from '../../utils/internalUtils';
@@ -68,9 +70,9 @@ export function buildAuthorizationFieldXml(
     tag('col_searchhelp_descr', args.col_searchhelp_descr);
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-<auth:authorizationField xmlns:auth="http://www.sap.com/iam/auth" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="${escapeXml(name)}" adtcore:type="AUTH" adtcore:description="${description}"${masterSystemAttr}${responsibleAttr}>
+<auth:auth xmlns:auth="http://www.sap.com/iam/auth" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="${escapeXml(name)}" adtcore:type="AUTH" adtcore:description="${description}"${masterSystemAttr}${responsibleAttr}>
   <adtcore:packageRef adtcore:name="${escapeXml(pkg)}"/>
   <auth:content>
 ${content}  </auth:content>
-</auth:authorizationField>`;
+</auth:auth>`;
 }
