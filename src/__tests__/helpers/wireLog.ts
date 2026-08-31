@@ -119,9 +119,19 @@ export function withWireLog<T extends object>(transport: T): T {
             (error as { response?: { status?: number } })?.response?.status ??
             (error as { status?: number })?.status;
           write(`  <- ${status ?? 'threw'} ${(error as Error).message}\n`);
-          const headers = (error as { response?: { headers?: unknown } })
-            ?.response?.headers;
-          if (headers) write(headerLines(headers, '     '));
+          const response = (
+            error as { response?: { headers?: unknown; data?: unknown } }
+          )?.response;
+          if (response?.headers) write(headerLines(response.headers, '     '));
+          // The body of a refusal is the part worth reading — a 400 whose XML
+          // names the message is the difference between "it failed" and knowing
+          // why. Logged here because axios carries it on the error, not on a
+          // response this function ever returns.
+          if (response?.data !== undefined) {
+            write(
+              bodyLine(response.data, 1600).replace('  body:', '     body:'),
+            );
+          }
           throw error;
         }
       };
