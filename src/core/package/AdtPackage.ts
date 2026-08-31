@@ -29,7 +29,6 @@ import type {
   IAdtCrud,
   IAdtLockable,
   IAdtOperationOptions,
-  IAdtResponse,
   IAdtSystemContext,
   IAdtTransportAware,
   IAdtValidatable,
@@ -601,24 +600,26 @@ export class AdtPackage
       });
       this.logger?.info?.('Deletion check passed');
 
-      // Delete, waiting out a lock that is on its way out.
+      // Delete.
       //
-      // ADT answers a mutating request when it has accepted it, not when the
-      // system has finished with it. An UNLOCK moments earlier answers 200 and
-      // the PAK lock is still there when the deletion arrives — measured on E19
-      // 2026-08-31, where `deletion/check` said `isDeletable="true"` and
-      // `deletion/delete` answered HTTP 200 carrying
-      // `isDeleted="false"` and a type E message, "Package … is already
-      // locked". The same request, sent later, deletes it with
-      // `isDeleted="true"` and no message. SM12 showed no lock by then either.
+      // A package this session has just updated cannot be deleted by this
+      // session — measured on E19 2026-08-31: `deletion/check` answers
+      // `isDeletable="true"` while `deletion/delete` answers HTTP 200 carrying
+      // `isDeleted="false"` and PAK/058, "package is already locked", even
+      // though the UNLOCK moments earlier answered 200. It is not a delay:
+      // retried for 30 seconds inside the run it never succeeds, and the same
+      // request one second after the run ends deletes it on the first attempt.
+      // The PAK lock belongs to the ABAP session and goes with it, which is
+      // what the note on `update()` above says about the RFC case and is just
+      // as true here.
       //
-      // So the verdict is retried, not the guess: the deletion endpoint states
-      // in its own body whether the object went away, and that is what this
-      // waits for. Only the "still locked" verdict is retried — every other
-      // failure is reported at once, because a package that cannot be deleted
-      // for any other reason will not become deletable by asking again.
+      // So this reports the failure rather than waiting for something that
+      // cannot happen while the caller still holds the session.
       this.logger?.info?.('Deleting package');
-      const result = await this.deleteWaitingForLock(config);
+      const result = await deletePackage(this.connection, {
+        package_name: config.packageName,
+        transport_request: config.transportRequest,
+      });
       this.logger?.info?.('Package deleted');
 
       return { deleteResult: result, errors: [] };
@@ -626,49 +627,6 @@ export class AdtPackage
       this.logger?.error('Delete failed:', safeErrorMessage(error));
       throw error;
     }
-  }
-
-  /**
-   * `deletePackage`, retried while the only thing standing in the way is a lock
-   * that has already been released and not yet cleared.
-   *
-   * Attempts and delay are deliberately plain numbers rather than a timeout
-   * from config: this is not waiting on work the server is doing, it is waiting
-   * on state settling, and the budget wants to be small enough that a genuinely
-   * undeletable package is reported quickly.
-   */
-  private async deleteWaitingForLock(
-    config: Partial<IPackageConfig>,
-    attempts = 15,
-    delayMs = 2000,
-  ): Promise<IAdtResponse> {
-    let lastError: unknown;
-    for (let attempt = 1; attempt <= attempts; attempt++) {
-      try {
-        return await deletePackage(this.connection, {
-          package_name: config.packageName as string,
-          transport_request: config.transportRequest,
-        });
-      } catch (error: unknown) {
-        lastError = error;
-        // PAK/058 is "package is already locked" and does not change with the
-        // logon language; the English text is kept as a fallback for a server
-        // that answers without the longtext link.
-        const message = safeErrorMessage(error);
-        const stillLocked =
-          /\[PAK\/0*58\]/i.test(message) || /is already locked/i.test(message);
-        if (!stillLocked) {
-          throw error;
-        }
-        this.logger?.info?.(
-          `Package still locked, waiting (attempt ${attempt}/${attempts})`,
-        );
-        if (attempt < attempts) {
-          await new Promise((resolve) => setTimeout(resolve, delayMs));
-        }
-      }
-    }
-    throw lastError;
   }
 
   /**
