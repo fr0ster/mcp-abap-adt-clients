@@ -34,6 +34,7 @@ import {
   SharedOnPremConnector,
 } from './sharedSession';
 import { createConnectionLogger, createRunIntegrityLogger } from './testLogger';
+import { withWireLog } from './wireLog';
 
 /**
  * Whether this machine has SAP configured at all.
@@ -486,12 +487,14 @@ function onPremWire(
   wire: { client?: string; baseUrl?: string },
 ): OnPremHttpTransport | RfcTransport {
   if (getConnectionType() === 'rfc') {
-    return new RfcTransport(rfcConversationFrom(config), logger);
+    return withWireLog(new RfcTransport(rfcConversationFrom(config), logger));
   }
   const material = materialOf(credentialFor(config));
-  return isLegacyEnvironment()
-    ? new LegacyOnPremHttpTransport(material, logger, wire)
-    : new OnPremHttpTransport(material, logger, wire);
+  return withWireLog(
+    isLegacyEnvironment()
+      ? new LegacyOnPremHttpTransport(material, logger, wire)
+      : new OnPremHttpTransport(material, logger, wire),
+  );
 }
 
 /**
