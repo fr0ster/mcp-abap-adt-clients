@@ -2043,7 +2043,7 @@ profiler_traces:
       description: "Profiler trace list/read/create and run-with-profiling flow"
       params:
         trace_id: ""              # Optional: existing trace ID to read; when empty, discovered from feed
-        object_uri: ""            # Optional: ADT object URI for trace-requests-by-URI test
+        object_uri: ""            # Optional: ADT object URI for trace-requests-by-URI test; empty derives it from class_name
         class_name: "ZAC_SHR_RUN01"  # Pre-existing shared runnable class (if_oo_adt_classrun)
         skip_create: false        # Skip create-trace-parameters test
         skip_run_with_profiling: false  # Skip run-with-profiling test
