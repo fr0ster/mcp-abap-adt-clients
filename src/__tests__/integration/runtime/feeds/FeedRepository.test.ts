@@ -157,22 +157,35 @@ describe('FeedRepository (using AdtRuntimeClient)', () => {
 
       try {
         logTestStep('list feed variants', testsLogger);
-        const variants = await runtime.getFeeds().variants();
+        // The endpoint requires a category; a run without one answers 400 and
+        // this test used to call that a skip.
+        // `getFeeds()` is typed `IFeedRepository`, and that contract — which
+        // lives in @mcp-abap-adt/interfaces — still declares `variants()` with
+        // no parameter, while the endpoint requires a category. The cast is the
+        // seam between the two, and goes when the contract catches up —
+        // fr0ster/mcp-abap-adt-interfaces#54.
+        const variants = await (runtime.getFeeds() as FeedRepository).variants(
+          'dumps',
+        );
         expect(variants).toBeDefined();
         expect(Array.isArray(variants)).toBe(true);
 
         logTestSuccess(testsLogger, testName);
       } catch (error) {
         const status = (error as any)?.response?.status;
-        if (status === 400 || status === 406) {
-          // /feeds/variants may require additional parameters not yet known
+        if (status === 406) {
           logTestSkip(
             testsLogger,
             testName,
-            `HTTP ${status} — endpoint may require additional parameters (category)`,
+            `HTTP ${status} — endpoint not acceptable on this system`,
           );
           return;
         }
+        // 400 is no longer skipped. It meant one thing and the comment here
+        // named it correctly — the missing `category` — and skipping on it left
+        // the method broken and the note unread. Measured on E19: without a
+        // category the endpoint answers 400 SADT_RESOURCE/017, with one it
+        // answers 200. If a 400 comes back now, it is news.
         logTestError(testsLogger, testName, error);
         throw error;
       } finally {

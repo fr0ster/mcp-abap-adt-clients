@@ -327,8 +327,17 @@ export class AdtFeatureToggle implements IFeatureToggleObject {
         state.metadataResult = readState.readResult;
         state.readResult = readState.readResult;
       } else {
-        const error = new Error(
-          `Feature toggle '${config.featureToggleName}' not found`,
+        // `read()` answers `undefined` for a 404 and the status stops there, so
+        // a plain Error here left the caller unable to tell "no such toggle"
+        // from "the read broke" — and a caller that has to tell them apart is
+        // the normal case: the test that creates this object probes for it
+        // first, and read the loss of the status as a system it could not
+        // verify. It then skipped, green, on every run, and the toggle it would
+        // have created was never created. Measured on E19: the endpoint does
+        // answer 404 with FTG2/000.
+        const error = Object.assign(
+          new Error(`Feature toggle '${config.featureToggleName}' not found`),
+          { status: 404, response: { status: 404 } },
         );
         state.errors.push({
           method: 'readMetadata',

@@ -283,8 +283,31 @@ export class FeedRepository implements IFeedRepository, IRuntimeAnalysisObject {
     return parseFeedDescriptors(response.data);
   }
 
-  async variants(): Promise<IFeedVariant[]> {
-    const response = await getFeedVariants(this.connection);
+  /**
+   * Feed variants for a category.
+   *
+   * The endpoint refuses the request without a category — see
+   * `getFeedVariants` — so this needs one, and nothing that called it before
+   * was working: it was answering 400.
+   *
+   * Optional in the signature only because `IFeedRepository` in
+   * `@mcp-abap-adt/interfaces` declares `variants()` with no parameter, and a
+   * required one here would not satisfy it. Required in behaviour: called
+   * without a category it says so at once instead of sending a request the
+   * server will refuse.
+   *
+   * The interface is where this belongs, and is tracked as
+   * fr0ster/mcp-abap-adt-interfaces#54. When it lands, this parameter becomes
+   * required and the note goes with it.
+   */
+  async variants(category?: string): Promise<IFeedVariant[]> {
+    if (!category) {
+      throw new Error(
+        'FeedRepository.variants() requires a category — /sap/bc/adt/feeds/variants ' +
+          'answers 400 ExceptionParameterNotFound without one.',
+      );
+    }
+    const response = await getFeedVariants(this.connection, category);
     return parseFeedVariants(response.data);
   }
 

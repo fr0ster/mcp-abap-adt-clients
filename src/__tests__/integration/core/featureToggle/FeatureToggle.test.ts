@@ -68,6 +68,24 @@ const libraryLogger: ILogger = createLibraryLogger();
 // Test execution logs use DEBUG_ADT_TESTS
 const testsLogger: ILogger = createTestsLogger();
 
+/**
+ * The system's own refusal to create feature toggles.
+ *
+ * E19 answers `403 "It is not allowed to create/update feature toggles in this
+ * system."` — a policy, not a defect and not something a test can arrange
+ * around. Recognised so the suite can say that instead of failing, and
+ * recognised narrowly: any other 403 is a real failure and still is one.
+ */
+function isCreationForbiddenBySystem(error: unknown): boolean {
+  const e = error as { response?: { status?: number; data?: unknown } };
+  if (e?.response?.status !== 403) return false;
+  const body =
+    typeof e.response?.data === 'string'
+      ? e.response.data
+      : JSON.stringify(e.response?.data ?? '');
+  return /not allowed to create\/update feature toggles/i.test(body);
+}
+
 describe('FeatureToggle (using AdtClient)', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
@@ -352,6 +370,17 @@ describe('FeatureToggle (using AdtClient)', () => {
 
           logTestSuccess(testsLogger, 'FeatureToggle - full workflow');
         } catch (error: any) {
+          // The system refusing to have feature toggles created in it is not a
+          // failure of this code, and no arrangement here can get past it.
+          // Anything else is, and still fails.
+          if (isCreationForbiddenBySystem(error)) {
+            logTestSkip(
+              testsLogger,
+              'FeatureToggle - full workflow',
+              'the system does not allow creating feature toggles — 403 "It is not allowed to create/update feature toggles in this system."',
+            );
+            return;
+          }
           logTestError(testsLogger, 'FeatureToggle - full workflow', error);
           throw error;
         } finally {

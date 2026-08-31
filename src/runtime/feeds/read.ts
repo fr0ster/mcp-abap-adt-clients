@@ -37,13 +37,29 @@ export async function getFeeds(
 /**
  * Get feed variants
  *
+ * The endpoint requires `category` and refuses the request without it — measured
+ * on E19 2026-08-31: `GET /sap/bc/adt/feeds/variants` answers
+ * `400 ExceptionParameterNotFound`, `SADT_RESOURCE/017`, "Parameter category
+ * could not be found", and the same call with a category answers 200. It was
+ * being sent without one, so this never worked.
+ *
+ * Left as a plain string rather than a union: on that system every value tried
+ * — feed ids from `/sap/bc/adt/feeds`, and invented ones — answered 200 with an
+ * empty body, so there is nothing to enumerate from and no evidence for what
+ * the valid set is.
+ *
  * @param connection - ABAP connection
+ * @param category - required by the endpoint; without it the request is refused
  * @returns Axios response with feed variants
  */
 export async function getFeedVariants(
   connection: IAbapConnection,
+  category: string,
 ): Promise<IAdtResponse> {
-  const url = `/sap/bc/adt/feeds/variants`;
+  if (!category) {
+    throw new Error('category is required for /sap/bc/adt/feeds/variants');
+  }
+  const url = `/sap/bc/adt/feeds/variants?category=${encodeURIComponent(category)}`;
 
   return connection.makeAdtRequest({
     url,
