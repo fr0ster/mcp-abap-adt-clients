@@ -124,11 +124,16 @@ const sourceFiles = walk(path.join(ROOT, 'src')).filter(
  * otherwise the import is reported as unmeasured rather than guessed at.
  */
 function relativeEntry(specifier) {
+  // Compared with forward slashes on both sides. A specifier is always written
+  // with them; `sourceFiles` carries whatever the platform uses, which on
+  // Windows is `\` — so the two never met there and every multi-segment
+  // relative import in a snippet was reported as unresolvable, on Windows only.
   const wanted = specifier.replace(/^[./]+/, '');
+  const slashed = (f) => f.split(path.sep).join('/');
   const matches = sourceFiles.filter(
     (f) =>
-      f.endsWith(`${path.sep}${wanted}.ts`) ||
-      f.endsWith(`${path.sep}${wanted}${path.sep}index.ts`),
+      slashed(f).endsWith(`/${wanted}.ts`) ||
+      slashed(f).endsWith(`/${wanted}/index.ts`),
   );
   return matches.length === 1 ? matches[0] : null;
 }

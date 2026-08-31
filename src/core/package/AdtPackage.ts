@@ -646,6 +646,15 @@ export class AdtPackage
       //
       // So this reports the failure rather than waiting for something that
       // cannot happen while the caller still holds the session.
+      //
+      // And reporting is as far as it can go. `IAbapConnection` is `connect`,
+      // `getBaseUrl`, `getSessionId`, `setSessionType`, `makeAdtRequest` — no
+      // `disconnect`, no `recycle`. Nothing here can end the session that holds
+      // the PAK state, and nothing here should: the connection belongs to the
+      // caller and is usually shared, so tearing it down mid-operation would
+      // take every other user of it down as well. Recycling is the consumer's
+      // call. See docs/usage/STATEFUL_SESSION_GUIDE.md, and
+      // recycleTestSession() in the test harness for what that looks like.
       this.logger?.info?.('Deleting package');
       const result = await deletePackage(this.connection, {
         package_name: config.packageName,
