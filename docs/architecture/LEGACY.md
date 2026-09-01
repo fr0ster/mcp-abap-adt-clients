@@ -124,8 +124,12 @@ These types throw an error with the exact missing endpoint when the getter is ca
 | Table contents | `getTableContents()` | `/sap/bc/adt/datapreview/ddic` | None |
 | SQL query | `getSqlQuery()` | `/sap/bc/adt/datapreview/freestyle` | None |
 | Virtual folders | `getVirtualFoldersContents()` | `.../virtualfolders` | None |
-| Type info | `getTypeInfo()` | `.../objectproperties/values` | None |
-| Transaction info | `getTransaction()` | `.../objectproperties/values` | None |
+| Object properties | *(removed — see below)* | `.../objectproperties/values` | None |
+
+`getTypeInfo()` and `getTransaction()` were the two members that reached
+`objectproperties/values`, and both were removed as uncalled — the
+endpoint is still absent on legacy, there is simply nothing left here that asks
+for it. `AdtUtils` records what a replacement would have to call.
 
 ## Validation Endpoints on Legacy
 

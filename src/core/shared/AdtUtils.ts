@@ -26,6 +26,50 @@
  * // Group activation
  * await utils.activateObjectsGroup([{ type: 'DOMA', name: 'ZMY_DOMAIN' }]);
  * ```
+ *
+ * ## Six members removed, and what went with them
+ *
+ * `getTypeInfo`, `getTransaction`, `getBdef`, `getEnhancements`,
+ * `getEnhancementSpot` and `getEnhancementImpl` had no callers. Not "few" —
+ * every occurrence of those names in this repository and its siblings was their
+ * own `@example` block, plus one legacy override that existed only to refuse
+ * `getTransaction`.
+ *
+ * Three were a second door to a handler that is already typed, so nothing was
+ * lost by closing them:
+ *
+ * | removed | same request, still available |
+ * |---|---|
+ * | `getBdef` | `AdtClient.getBehaviorDefinition().read()` |
+ * | `getEnhancementImpl` | `AdtClient.getEnhancement().read()` |
+ * | `getEnhancementSpot` | `AdtClient.getEnhancement().readMetadata()` |
+ *
+ * `getTypeInfo` was a fourth of that kind wearing a disguise: it asked
+ * `/ddic/domains/{n}/source/main`, then `/ddic/dataelements/{n}`, then
+ * `/ddic/tabletypes/{n}`, keeping whichever answered — three resources that
+ * `getDomain()`, `getDataElement()` and `getTableType()` each read directly and
+ * without guessing. Only its last resort was its own.
+ *
+ * That last resort is the one capability actually removed, and it is one
+ * endpoint rather than two:
+ *
+ * ```
+ * GET /sap/bc/adt/repository/informationsystem/objectproperties/values?uri={objectUri}
+ * ```
+ *
+ * `getTypeInfo` reached it with a domain's uri and `getTransaction` with
+ * `/sap/bc/adt/transactions/{name}` — the same request about different objects,
+ * which is what made two members of it. Plus one endpoint nothing else reaches:
+ *
+ * ```
+ * GET /sap/bc/adt/oo/classes/{name}/source/main/enhancements/elements
+ * ```
+ *
+ * Recorded here, and not only in the history of a deleted file, so a typed
+ * handler can be written when somebody wants one. A generic member kept in case
+ * someone needs it is a member the contract must describe and every implementer
+ * must provide; adding one when the need appears is cheaper than carrying six
+ * that never had one.
  */
 
 import type {
@@ -38,12 +82,8 @@ import type {
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
-import { readSource as readBehaviorDefinitionSource } from '../behaviorDefinition/read';
-import { getEnhancementMetadata } from '../enhancement/read';
 import { getAllTypes as getAllTypesUtil } from './allTypes';
 import { getDiscovery as getDiscoveryUtil } from './discovery';
-import { getEnhancementImpl as getEnhancementImplUtil } from './enhancementImpl';
-import { getEnhancements } from './enhancements';
 import { listFunctionGroupIncludes } from './functionGroupIncludesList';
 import { listFunctionModules } from './functionModulesList';
 import { getInactiveObjects } from './getInactiveObjects';
@@ -59,8 +99,6 @@ import { getPackageHierarchy } from './packageHierarchy';
 import { searchObjects, searchObjectsTyped } from './search';
 import { getSqlQuery } from './sqlQuery';
 import { getTableContents } from './tableContents';
-import { getTransaction } from './transaction';
-import { getTypeInfo as getTypeInfoUtil } from './typeInfo';
 import { getVirtualFoldersContents } from './virtualFolders';
 import {
   getWhereUsed,
@@ -514,53 +552,6 @@ export class AdtUtils
   }
 
   /**
-   * Get transaction properties (metadata) for ABAP transaction
-   *
-   * Retrieves transaction information using ADT object properties endpoint:
-   * - Transaction name
-   * - Description
-   * - Package (if applicable)
-   * - Transaction type
-   *
-   * @param transactionName - Transaction code (e.g., 'SE80', 'SE11', 'SM30')
-   * @returns Axios response with XML containing transaction properties
-   *          Response format: opr:objectProperties with opr:object containing
-   *          name, text (description), package, type
-   *
-   * @example
-   * ```typescript
-   * const response = await utils.getTransaction('SE80');
-   * // Response contains XML with transaction properties
-   * ```
-   */
-  async getTransaction(transactionName: string): Promise<IAdtResponse> {
-    return getTransaction(this.connection, transactionName);
-  }
-
-  /**
-   * Get behavior definition source code (BDEF)
-   *
-   * Convenience wrapper for reading behavior definition source code.
-   * Uses the same endpoint as `AdtClient.getBehaviorDefinition().read()`.
-   *
-   * @param bdefName - Behavior definition name (e.g., 'Z_I_MYENTITY')
-   * @param version - Version to read: 'active' or 'inactive' (default: 'active')
-   * @returns Axios response with source code (plain text)
-   *
-   * @example
-   * ```typescript
-   * const response = await utils.getBdef('Z_I_MYENTITY');
-   * const sourceCode = response.data; // BDEF source code
-   * ```
-   */
-  async getBdef(
-    bdefName: string,
-    version: 'active' | 'inactive' = 'active',
-  ): Promise<IAdtResponse> {
-    return readBehaviorDefinitionSource(this.connection, bdefName, version);
-  }
-
-  /**
    * Fetch node structure from ADT repository
    *
    * Used for object tree navigation and structure discovery.
@@ -589,36 +580,6 @@ export class AdtUtils
       nodeId,
       withShortDescriptions,
     );
-  }
-
-  /**
-   * Get enhancement implementations for ABAP object
-   *
-   * Retrieves enhancement implementations for programs, includes, or classes.
-   *
-   * @param objectName - Object name (program, include, or class)
-   * @param objectType - Object type: 'program' | 'include' | 'class'
-   * @param context - Optional program context for includes (required when objectType is 'include')
-   * @returns Axios response with XML containing enhancement implementations
-   *
-   * @example
-   * ```typescript
-   * // For a program
-   * const response = await utils.getEnhancements('ZMY_PROGRAM', 'program');
-   *
-   * // For an include
-   * const response = await utils.getEnhancements('ZMY_INCLUDE', 'include', 'ZMY_PROGRAM');
-   *
-   * // For a class
-   * const response = await utils.getEnhancements('ZMY_CLASS', 'class');
-   * ```
-   */
-  async getEnhancements(
-    objectName: string,
-    objectType: 'program' | 'include' | 'class',
-    context?: string,
-  ): Promise<IAdtResponse> {
-    return getEnhancements(this.connection, objectName, objectType, context);
   }
 
   /**
@@ -797,73 +758,6 @@ export class AdtUtils
    */
   async getInclude(includeName: string): Promise<IAdtResponse> {
     return getIncludeUtil(this.connection, includeName);
-  }
-
-  /**
-   * Get type information with fallback chain
-   *
-   * Tries multiple endpoints in order: domain, data element, table type, object properties.
-   *
-   * @param typeName - Type name to look up
-   * @returns Axios response with type information (XML)
-   *
-   * @example
-   * ```typescript
-   * const response = await utils.getTypeInfo('ZMY_TYPE');
-   * ```
-   */
-  async getTypeInfo(typeName: string): Promise<IAdtResponse> {
-    return getTypeInfoUtil(this.connection, typeName);
-  }
-
-  /**
-   * Get enhancement implementation source code
-   *
-   * Uses different URL format: /sap/bc/adt/enhancements/{spot}/{name}/source/main
-   * where spot is the enhancement spot name (not type).
-   *
-   * @param enhancementSpot - Enhancement spot name (e.g., 'enhoxhh')
-   * @param enhancementName - Enhancement implementation name
-   * @returns Axios response with XML containing enhancement source code
-   *
-   * @example
-   * ```typescript
-   * const response = await utils.getEnhancementImpl('enhoxhh', 'zpartner_update_pai');
-   * ```
-   */
-  async getEnhancementImpl(
-    enhancementSpot: string,
-    enhancementName: string,
-  ): Promise<IAdtResponse> {
-    return getEnhancementImplUtil(
-      this.connection,
-      enhancementSpot,
-      enhancementName,
-    );
-  }
-
-  /**
-   * Get enhancement spot metadata
-   *
-   * Convenience wrapper for reading enhancement spot metadata.
-   * Uses type 'enhsxsb' (BAdI Enhancement Spot).
-   *
-   * @param enhancementSpot - Enhancement spot name
-   * @returns Axios response with XML containing enhancement spot metadata
-   *
-   * @example
-   * ```typescript
-   * const response = await utils.getEnhancementSpot('enhoxhh');
-   * ```
-   */
-  async getEnhancementSpot(enhancementSpot: string): Promise<IAdtResponse> {
-    return getEnhancementMetadata(
-      this.connection,
-      'enhsxsb',
-      enhancementSpot,
-      undefined,
-      this.logger,
-    );
   }
 
   /**

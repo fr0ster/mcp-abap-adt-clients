@@ -5,6 +5,76 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+### Removed
+
+- **BREAKING: six `AdtUtils` methods that nobody called** — `getTypeInfo()`,
+  `getTransaction()`, `getBdef()`, `getEnhancements()`, `getEnhancementSpot()`,
+  `getEnhancementImpl()`.
+
+  Not "few callers" — none. Every occurrence of those names across this
+  repository and its siblings was their own `@example` block, plus one
+  `AdtUtilsLegacy` override whose only purpose was to refuse `getTransaction`.
+  That override went too, along with four now-unreachable modules under
+  `src/core/shared/` (`typeInfo`, `transaction`, `enhancements`,
+  `enhancementImpl`) and the internal `getTransaction` re-export from
+  `src/core/shared/index.ts`. None of the four was exported from the package,
+  so no import path outside these deletions changes.
+
+  Three were a second door to a handler that is already typed, and the same
+  request is still one call away:
+
+  ```typescript
+  // utils.getBdef('Z_I_MYENTITY', 'active')
+  client.getBehaviorDefinition().read({ name: 'Z_I_MYENTITY' }, 'active');
+
+  // utils.getEnhancementImpl('enhoxhh', 'zpartner_update_pai')
+  client.getEnhancement().read({
+    enhancementType: 'enhoxhh',
+    enhancementName: 'zpartner_update_pai',
+  });
+
+  // utils.getEnhancementSpot('zspot')  — the removed member fixed the type to 'enhsxsb'
+  client.getEnhancement().readMetadata({
+    enhancementType: 'enhsxsb',
+    enhancementName: 'zspot',
+  });
+  ```
+
+  Those three calls were compiled against this package before being written
+  here; a migration note nobody runs is how the first draft of it got the
+  argument shapes wrong twice.
+
+  What changes for a caller besides the name: these return the handler's state
+  object rather than the response, and each state names the payload differently
+  — `state.readResult` for the behaviour definition, `state.sourceCode` for the
+  enhancement source, `state.metadataResult` for the spot metadata. Errors no
+  longer throw past the caller; they arrive in `state.errors`.
+
+  Two of those three fields still hold `IAdtResponse`, which is the gap
+  `@mcp-abap-adt/interfaces` decision 13 is about, not something this removal
+  introduces.
+
+  `getTypeInfo()` was a fourth of that kind: it tried
+  `/ddic/domains/{n}/source/main`, then `/ddic/dataelements/{n}`, then
+  `/ddic/tabletypes/{n}` and kept whichever answered — three resources
+  `getDomain()`, `getDataElement()` and `getTableType()` each read directly,
+  without guessing which type the name is.
+
+  Two endpoints lose their only route, and are recorded in the `AdtUtils` header
+  so a typed handler can be written if one is wanted:
+  `/repository/informationsystem/objectproperties/values?uri=…` (reached by
+  `getTypeInfo` with a domain uri and by `getTransaction` with a transaction
+  one — the same request about different objects, which is what made two members
+  of it) and
+  `/oo/classes/{n}/source/main/enhancements/elements`.
+
+  Why remove rather than type: the atoms in `@mcp-abap-adt/interfaces` state
+  what a consumer gets, and every member a contract carries is a member each
+  implementation must provide. For these six the open question was never which
+  result to promise — it was why they were in a contract at all. Adding a member
+  when a need appears costs less than carrying six that never had one.
+
+
 ## [16.1.0] - 2026-09-01
 
 Requires `@mcp-abap-adt/interfaces@^26.1.0`.

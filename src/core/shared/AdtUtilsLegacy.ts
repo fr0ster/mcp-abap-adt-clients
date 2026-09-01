@@ -4,8 +4,12 @@
  * Overrides methods that rely on endpoints absent from legacy /sap/bc/adt/discovery:
  * - getTableContents → /sap/bc/adt/datapreview/ddic (not available)
  * - getSqlQuery → /sap/bc/adt/datapreview/freestyle (not available)
- * - getTransaction → /sap/bc/adt/repository/informationsystem/objectproperties (not available)
  * - activateObjectsGroup → /sap/bc/adt/activation/runs (not available, uses /sap/bc/adt/activation)
+ *
+ * A fourth override refused `getTransaction`
+ * (/sap/bc/adt/repository/informationsystem/objectproperties, also absent). It
+ * went with the base method, which nobody called: the only code that ever
+ * mentioned `getTransaction` was its own doc comment and this refusal of it.
  */
 
 import type { IAdtResponse } from '@mcp-abap-adt/interfaces';
@@ -68,15 +72,6 @@ ${objectReferences}
   override async getSqlQuery(): Promise<never> {
     throw new Error(
       unsupportedError('SQL query', '/sap/bc/adt/datapreview/freestyle'),
-    );
-  }
-
-  override async getTransaction(): Promise<never> {
-    throw new Error(
-      unsupportedError(
-        'Transaction',
-        '/sap/bc/adt/repository/informationsystem/objectproperties',
-      ),
     );
   }
 }
