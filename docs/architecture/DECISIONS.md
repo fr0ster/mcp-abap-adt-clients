@@ -354,3 +354,25 @@ two are unchecked; the assumption deserved more scrutiny than the guard did.
 **What would change it.** Nothing for the returns themselves. The *shape* stays
 open: a set of atoms used by one handler is spelled at the getter and earns a
 name when a second handler wants the same set.
+
+**What this cannot reach, and why.** `AdtClientLegacy.getRequest()` declares the
+same `IAdtRequest` while its handler refuses `create`, `update`, `delete` and
+`listNodes` at runtime, and serves a `list` that rejects `configUri`. That is the
+shape 12.0.0 removed everywhere else, and it survives here for a reason the type
+system enforces:
+
+```
+Property 'getRequest' in type 'AdtClientLegacy' is not assignable
+to the same property in base type 'AdtClient'
+```
+
+An override's return must be assignable to the base's, and offering *less* is the
+one direction the language refuses. `AdtClientLegacy extends AdtClient` while
+this handler is not a behavioural subtype — so the contract cannot be narrowed
+where it is wrong.
+
+A narrower contract was written and then thrown away rather than published,
+because nothing could return it: an interface no factory can hand out is decision
+11's mistake in another costume. Fixing this means changing the inheritance, not
+the types, and that is tracked in #109 rather than smuggled into a release about
+something else.
