@@ -876,11 +876,19 @@ export class AdtClient {
   /**
    * Get high-level operations for Request (Transport Request) objects.
    *
-   * Declared as `IAdtRequest`, not as the class. A concrete return is the one a
-   * consumer cannot substitute, cannot compose with their own types, and cannot
-   * have checked — the capability guard compares a factory's declared return
-   * against its manifest, and where the declared type is the implementation that
-   * comparison is between a thing and itself.
+   * Declared as `IAdtRequest`, not as the class, so the compiler checks the
+   * handler here. `AdtRequest` has to satisfy the contract at this line: remove
+   * a method from it and the build fails *here*, rather than only where
+   * something happens to call it — and a method with no internal caller could
+   * otherwise vanish while every consumer lost it.
+   *
+   * A consumer can also substitute their own handler and compose the contract
+   * with their own types, neither of which is possible against a class.
+   *
+   * Not because the capability guard could not see the concrete return: it
+   * could. Its check is structural and fails identically either way — see
+   * decision 10 in `docs/architecture/DECISIONS.md`, which keeps that wrong
+   * reason beside the right one.
    *
    * @returns the transport request contract
    */

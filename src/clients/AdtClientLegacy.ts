@@ -24,6 +24,7 @@ import type {
   IAdtLockable,
   IAdtObject,
   IAdtReadable,
+  IAdtRequest,
   IAdtRunnable,
   IAdtSourceObject,
   IAdtTransportAware,
@@ -178,7 +179,15 @@ export class AdtClientLegacy extends AdtClient {
 
   // --- Transport with legacy URL prefix ---
 
-  override getRequest(): AdtRequest {
+  /**
+   * The legacy transport handler, under the same contract as the modern one.
+   *
+   * It answers a different URL prefix — `/sap/bc/cts/` rather than
+   * `/sap/bc/adt/cts/` — and that is the only difference a caller sees. Left as
+   * `AdtRequest` when the base narrowed to `IAdtRequest`, which would have given
+   * legacy consumers a different shape for the same method.
+   */
+  override getRequest(): IAdtRequest {
     return new AdtRequestLegacy(
       this.connection,
       this.logger,
