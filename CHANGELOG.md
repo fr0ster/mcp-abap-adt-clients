@@ -55,11 +55,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 - `FeedRepository.variants()` never worked: `/sap/bc/adt/feeds/variants` requires
   a `category` and the request was sent without one, so it always answered
-  `400 ExceptionParameterNotFound`, `SADT_RESOURCE/017`. It takes a category now.
+  `400 ExceptionParameterNotFound`, `SADT_RESOURCE/017`. It takes a category now
+  — required, per the **Changed** entry above.
 
-  The parameter is optional in the signature only because `IFeedRepository` in
-  `@mcp-abap-adt/interfaces` declares `variants()` with none — required in
-  behaviour, and tracked as fr0ster/mcp-abap-adt-interfaces#54.
+  Its integration test caught that 400 and turned it into a skip, with a comment
+  naming the cause correctly. The method was broken and green for as long as
+  that stood.
 
 - `AdtFeatureToggle.readMetadata()` turned a 404 into a plain `Error`, so a
   caller could not tell "no such toggle" from "the read broke". The thrown error
