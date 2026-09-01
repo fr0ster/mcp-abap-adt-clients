@@ -16,6 +16,7 @@ import {
   CT_METADATA_EXTENSION,
 } from '../../constants/contentTypes';
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
+import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { IReadOptions } from '../shared/types';
 
@@ -37,7 +38,7 @@ export async function readMetadataExtension(
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtResponse> {
-  const lowerName = name.toLowerCase();
+  const lowerName = encodeSapObjectName(name).toLowerCase();
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
   const url = `/sap/bc/adt/ddic/ddlx/sources/${lowerName}${query}`;
 
@@ -78,7 +79,7 @@ export async function readMetadataExtensionSource(
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtResponse> {
-  const lowerName = name.toLowerCase();
+  const lowerName = encodeSapObjectName(name).toLowerCase();
   const versionQuery = version === 'inactive' ? '?version=inactive' : '';
   const longPollingQuery = options?.withLongPolling
     ? versionQuery
@@ -114,7 +115,7 @@ export async function getMetadataExtensionTransport(
   name: string,
   options?: IReadOptions,
 ): Promise<IAdtResponse> {
-  const lowerName = name.toLowerCase();
+  const lowerName = encodeSapObjectName(name).toLowerCase();
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
   const url = `/sap/bc/adt/ddic/ddlx/sources/${lowerName}/transport${query}`;
 

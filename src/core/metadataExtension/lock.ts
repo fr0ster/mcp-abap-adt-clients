@@ -7,6 +7,7 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
 import { ACCEPT_LOCK } from '../../constants/contentTypes';
+import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -26,7 +27,7 @@ export async function lockMetadataExtension(
   connection: IAbapConnection,
   name: string,
 ): Promise<string> {
-  const lowerName = name.toLowerCase();
+  const lowerName = encodeSapObjectName(name).toLowerCase();
   const url = `/sap/bc/adt/ddic/ddlx/sources/${lowerName}?_action=LOCK&accessMode=MODIFY`;
 
   const headers = {
