@@ -248,6 +248,17 @@ export class AdtMessageClassMessage
 
       return { updateResult, errors: [] };
     } catch (error: unknown) {
+      // Back to the lock session before releasing anything. The PUT above runs
+      // stateless, so a failure at or after it leaves the connection stateless —
+      // and an unlock sent that way does not reach the session holding the
+      // handles. The `catch` around each unlock would swallow the refusal and
+      // the lock would stay on the object.
+      //
+      // Set unconditionally rather than only on the paths that switched: this
+      // block is reached from every step, and asking "did we get far enough to
+      // have switched?" is the question that produced the bug.
+      this.connection.setSessionType('stateful');
+
       // Always clean up locks and reset session on failure — class first,
       // then the message locks, mirroring the happy path.
       if (classLockHandle) {
@@ -371,6 +382,11 @@ export class AdtMessageClassMessage
 
       return { deleteResult, errors: [] };
     } catch (error: unknown) {
+      // Back to the lock session first — same reason as in `_upsertMessage`: the
+      // PUT runs stateless, and an unlock sent stateless never reaches the
+      // session that holds the handles.
+      this.connection.setSessionType('stateful');
+
       // Class first, then the message locks, mirroring the happy path.
       if (classLockHandle) {
         try {

@@ -231,3 +231,66 @@ record of where the answer came from.
 
 **What would change it.** A decision that provenance must go too — a different
 question, and one this entry does not settle.
+
+---
+
+## 8. The save runs outside the lock session, and cleanup runs back inside it
+
+**Problem.** A message class created inside one ABAP session cannot then be
+locked by that session: `LOCK_MSG` answers `403 "user is currently editing"`.
+Over HTTP nobody noticed, because our create is sent stateless and the roll area
+— with the lock in it — is torn down when the request returns. Over RFC one
+conversation is one session for its whole life, which is the entire reason RFC
+is here, so the lock is still held when the next step asks for it.
+
+**Decided.** The PUT that saves a message is sent `stateless`, the way Eclipse
+sends it: the handle authorises the write, so the write does not need the
+session that holds the handle. Cleanup switches back to `stateful`
+**unconditionally** before releasing anything.
+
+**Against.** Tearing the RFC session down on `setSessionType('stateless')`,
+which would defeat the transport rather than fix the bug — lock handles have to
+survive on BASIS < 7.50, and that survival is what RFC is for.
+
+**Why.** An Eclipse capture shows locks on one stateful session marked `enqueue`
+and every GET and the PUT on separate stateless ones. We have one connection, so
+we cannot reproduce that shape — but we can keep the *save* off the lock session,
+which is the half that matters.
+
+The unconditional switch back is the part worth stating. The failure path is
+reached from every step, and answering "did we get far enough to have switched?"
+is what produced the bug: an unlock sent stateless never reaches the session
+holding the handles, the `catch` around it swallows the refusal, and the lock
+stays on the object with nothing said. `cleanupSessionMode.test.ts` asserts the
+mode **at the moment each unlock is sent**, because asserting that unlock was
+called would have passed before the fix.
+
+**What would change it.** A connection that can hold two sessions. Then the
+locks get their own and none of this is needed.
+
+---
+
+## 9. A test that cleans up badly is worse than one that fails
+
+**Problem.** A package lifecycle suite reported green on runs where it did
+nothing: finding a leftover object from the previous run, it deleted it in
+`ensureObjectReady` and returned early — running neither create nor update. The
+run that *had* failed left the object behind, so the next run skipped and passed,
+and the two alternated. Reading the verdict showed a flake; reading the steps
+showed a defect that reproduces every time.
+
+**Decided.** A cleanup that fails after a passing test body makes the test red,
+and says which object was left. A cleanup that fails after an already-failing
+test is logged at ERROR, not raised — the first failure is the one worth
+reporting.
+
+**Against.** Logging the cleanup failure at WARN and returning green, which is
+what hid this.
+
+**Why.** The object left behind is not a tidiness problem; it changes what the
+*next* run does. A suite that silently becomes a no-op is indistinguishable, in
+CI, from one that verified everything — the same shape as decision 3's
+invisible-import and decision 5's missing log lines, in a third place.
+
+**What would change it.** Nothing. A leftover object has to be visible where it
+is created, because that is the only place that knows it is a leftover.
