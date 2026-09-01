@@ -5,6 +5,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [16.0.0] - 2026-09-01
+
+Requires `@mcp-abap-adt/interfaces@^26.0.0`.
+
+Everything here was found by running the integration suite against an on-prem
+system twice — once over HTTP, once over RFC — and chasing what differed. Three
+of these defects meant a method could not work at all; each had a test that
+skipped, or a comment that named the wrong cause, keeping it green.
+
 ### Changed
 
 - **`FeedRepository.variants()` takes a required `category`**, following
