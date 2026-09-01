@@ -503,5 +503,39 @@ or system-dependent, let the consumer read it.
 **How to catch it.** `Promise<IAdtResponse>` on a public method. Correct only
 where the answer really is the envelope, and that should be said at the method.
 
+## The two criteria, because they decide the work rather than describe it
+
+**A contract names an essence, not a method.** It differs from a concrete class
+by saying *how to work with the thing*, and two methods return the **same**
+contract when their results mean the same. This is already how the package works:
+`IAdtObjectHit` serves `search`, `getWhereUsedList`, `getPackageContentsList` and
+`getPackageHierarchy` through types that extend it — one essence, four methods.
+
+Without this the rule reads as "write a result type per method", which is the
+envelope's mistake with the sign reversed: instead of everything meaning one
+thing, nothing would mean the same as anything.
+
+**Whether two things are one contract is settled by substitution.**
+Implementations of one contract are interchangeable — a caller holding it can be
+handed either and carry on. Where the logic forbids putting one in the other's
+place, they implement different contracts, **however identical their members**.
+
+TypeScript does not answer this. Structural typing is about shape and silent
+about meaning, and this repository has the proof: `AdtRequestLegacy` has every
+method `AdtRequest` has, by inheritance, and refuses four of them. The compiler
+was content for years — decision 11 is what that cost.
+
+The same test decides grouping. Six of the open members were about to be gathered
+as "object metadata" because they all return metadata-ish XML; whether a
+transaction's metadata can stand where a type's is expected is a question
+substitution asks and member-matching does not.
+
+**The envelope's real reach.** `IAdtResponse<T = any>` defaults its body to
+`any`, and the generic is not used: **1121** bare uses here against **5** that
+name a type. Every method sharing that return shares one type, so a consumer
+cannot tell one answer from another — apples and oranges in one container. In the
+contract package the same count is 180 against 4, and only **one** of those 180
+is in `connection/`, where an envelope belongs.
+
 **What would change it.** Nothing. The twenty-three close one at a time, and
 `getUtils()` cannot hand out contracts worth the name until they do — #109.
