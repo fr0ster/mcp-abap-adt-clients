@@ -159,14 +159,9 @@ describe('FeedRepository (using AdtRuntimeClient)', () => {
         logTestStep('list feed variants', testsLogger);
         // The endpoint requires a category; a run without one answers 400 and
         // this test used to call that a skip.
-        // `getFeeds()` is typed `IFeedRepository`, and that contract — which
-        // lives in @mcp-abap-adt/interfaces — still declares `variants()` with
-        // no parameter, while the endpoint requires a category. The cast is the
-        // seam between the two, and goes when the contract catches up —
-        // fr0ster/mcp-abap-adt-interfaces#54.
-        const variants = await (runtime.getFeeds() as FeedRepository).variants(
-          'dumps',
-        );
+        // No cast since `@mcp-abap-adt/interfaces@26.0.0` — `IFeedRepository`
+        // declares the parameter, so the contract and the endpoint agree.
+        const variants = await runtime.getFeeds().variants('dumps');
         expect(variants).toBeDefined();
         expect(Array.isArray(variants)).toBe(true);
 

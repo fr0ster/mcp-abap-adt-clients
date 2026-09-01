@@ -1205,11 +1205,16 @@ Memory snapshots are accessed via the composite debugger: `runtime.getDebugger()
 const feeds = runtime.getFeeds();
 
 const catalog = await feeds.list();         // feed catalog
-const variants = await feeds.variants();    // feed variants
+const variants = await feeds.variants('dumps'); // variants of one feed category
 const dumps = await feeds.dumps();          // dumps via Atom feed
 const sysMessages = await feeds.systemMessages(); // system messages via feed
 const gwErrors = await feeds.gatewayErrors();     // gateway errors via feed
 ```
+
+`variants` takes a **required** category — the id of a feed from `list()`, such
+as `dumps`. Without one `/sap/bc/adt/feeds/variants` answers
+`400 ExceptionParameterNotFound`, so the parameterless call earlier versions
+allowed could not work. Required since `@mcp-abap-adt/interfaces@26.0.0`.
 
 ### System Messages
 
