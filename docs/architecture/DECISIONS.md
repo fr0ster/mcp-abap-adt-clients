@@ -294,3 +294,85 @@ invisible-import and decision 5's missing log lines, in a third place.
 
 **What would change it.** Nothing. A leftover object has to be visible where it
 is created, because that is the only place that knows it is a leftover.
+
+---
+
+## 10. A factory's return type is a contract, so the compiler checks the handler
+
+**Problem.** `AdtClient` has 38 factories. Thirty-six return interfaces; two
+returned the implementation — `getRequest(): AdtRequest` and
+`getUtils(): AdtUtils`. A class as a return type asserts nothing: it satisfies
+itself by definition, so the factory compiles whatever the class happens to be
+on any given day.
+
+**Decided.** The declared return is a contract. `getRequest(): IAdtRequest` as of
+this release; `getUtils()` waits for `AdtUtils`' 35 methods to be decomposed into
+atoms, because one interface with 35 members would satisfy the letter of this and
+miss the point.
+
+**Against.** Leaving it, on the grounds that the class *is* the contract in
+practice and a consumer can read it.
+
+**Why — measured, because the first reason given for this was wrong.** Remove
+`list()` from `AdtRequest` and compare:
+
+| return type | what fails |
+|---|---|
+| `AdtRequest` | `AdtRequest.ts:168` and an `override` in `AdtRequestLegacy` — two errors **inside the transport module**, none at the factory |
+| `IAdtRequest` | `AdtClient.ts: Property 'list' is missing in type 'AdtRequest' but required in type 'IAdtRequest'` |
+
+With the class, the removal is caught only by whatever happens to *call* the
+method. Had no internal caller existed, `list()` could have disappeared with a
+green build while every consumer lost it. With the contract, the class must
+satisfy it **at the point it is handed out**, or the package does not build.
+
+That is the whole of it: the contract makes "does this handler still offer what
+it offered" a question the compiler asks, rather than one that depends on
+somebody having written a call.
+
+Two further consequences, real but not what decided it: a consumer can
+**substitute** their own handler where the type names a contract, and can
+**compose** it with their own types. Neither is possible against a class.
+
+**The reason that was wrong, kept because it read plausibly.** The first draft
+argued that `src/__tests__/unit/capabilities/` was blind to the two concrete
+returns — "a comparison between a thing and itself". It is not. Planting a
+capability the handler does not have makes that guard fail *identically* whether
+the factory returns the class or the contract:
+
+```
+shape.ts: Type 'true' is not assignable to type
+          '"transport.activatable — claimed but not offered"'
+```
+
+Its check is structural, and a class satisfies an atom the same way an interface
+does. A guard reporting "36 of 38 verified" invites the assumption that the other
+two are unchecked; the assumption deserved more scrutiny than the guard did.
+
+**How to catch it.** A factory whose declared return is not an `I`-prefixed name.
+
+**What would change it.** Nothing for the returns themselves. The *shape* stays
+open: a set of atoms used by one handler is spelled at the getter and earns a
+name when a second handler wants the same set.
+
+**What this cannot reach, and why.** `AdtClientLegacy.getRequest()` declares the
+same `IAdtRequest` while its handler refuses `create`, `update`, `delete` and
+`listNodes` at runtime, and serves a `list` that rejects `configUri`. That is the
+shape 12.0.0 removed everywhere else, and it survives here for a reason the type
+system enforces:
+
+```
+Property 'getRequest' in type 'AdtClientLegacy' is not assignable
+to the same property in base type 'AdtClient'
+```
+
+An override's return must be assignable to the base's, and offering *less* is the
+one direction the language refuses. `AdtClientLegacy extends AdtClient` while
+this handler is not a behavioural subtype — so the contract cannot be narrowed
+where it is wrong.
+
+A narrower contract was written and then thrown away rather than published,
+because nothing could return it: an interface no factory can hand out is decision
+11's mistake in another costume. Fixing this means changing the inheritance, not
+the types, and that is tracked in #109 rather than smuggled into a release about
+something else.

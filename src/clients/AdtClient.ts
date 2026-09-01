@@ -26,6 +26,7 @@ import type {
   IAdtModifiable,
   IAdtObject,
   IAdtReadable,
+  IAdtRequest,
   IAdtRunnable,
   IAdtSourceObject,
   IAdtSystemContext,
@@ -873,10 +874,25 @@ export class AdtClient {
   }
 
   /**
-   * Get high-level operations for Request (Transport Request) objects
-   * @returns IAdtObject instance for Request operations
+   * Get high-level operations for Request (Transport Request) objects.
+   *
+   * Declared as `IAdtRequest`, not as the class, so the compiler checks the
+   * handler here. `AdtRequest` has to satisfy the contract at this line: remove
+   * a method from it and the build fails *here*, rather than only where
+   * something happens to call it — and a method with no internal caller could
+   * otherwise vanish while every consumer lost it.
+   *
+   * A consumer can also substitute their own handler and compose the contract
+   * with their own types, neither of which is possible against a class.
+   *
+   * Not because the capability guard could not see the concrete return: it
+   * could. Its check is structural and fails identically either way — see
+   * decision 10 in `docs/architecture/DECISIONS.md`, which keeps that wrong
+   * reason beside the right one.
+   *
+   * @returns the transport request contract
    */
-  getRequest(): AdtRequest {
+  getRequest(): IAdtRequest {
     this.assertConnected();
     return new AdtRequest(this.connection, this.logger, this.systemContext);
   }

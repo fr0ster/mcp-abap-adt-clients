@@ -24,6 +24,7 @@ import type {
   IAdtLockable,
   IAdtObject,
   IAdtReadable,
+  IAdtRequest,
   IAdtRunnable,
   IAdtSourceObject,
   IAdtTransportAware,
@@ -57,7 +58,6 @@ import { AdtProgramLegacy } from '../core/program/AdtProgramLegacy';
 import type { AdtUtils } from '../core/shared/AdtUtils';
 import { AdtUtilsLegacy } from '../core/shared/AdtUtilsLegacy';
 import { AdtContentTypesBase } from '../core/shared/contentTypes';
-import type { AdtRequest } from '../core/transport';
 import { AdtRequestLegacy } from '../core/transport/AdtRequestLegacy';
 import type { IUnitTestConfig, IUnitTestState } from '../core/unitTest';
 import { AdtUnitTestLegacy } from '../core/unitTest/AdtUnitTestLegacy';
@@ -178,7 +178,27 @@ export class AdtClientLegacy extends AdtClient {
 
   // --- Transport with legacy URL prefix ---
 
-  override getRequest(): AdtRequest {
+  /**
+   * The legacy transport handler.
+   *
+   * The **type** is the base's contract, and that is all this declaration says.
+   * It is not a claim that the two behave alike: a legacy CTS endpoint serves
+   * `read` and `list`, while `create`, `update`, `delete` and `listNodes` refuse
+   * at runtime — `create` because the endpoint accepts no POST that creates a
+   * request, the rest because nobody has captured whether it supports them and
+   * guessing against the modern shape is not a contract. `list` differs too: no
+   * saved-configuration search, and `configUri` is rejected rather than used.
+   *
+   * Narrowing this to what the handler offers does not compile: an override's
+   * return must be assignable to the base's, and offering *less* is the one
+   * direction the language refuses. `AdtClientLegacy extends AdtClient` while
+   * this handler is not a behavioural subtype — inheritance is what made the
+   * mismatch type-check while `AdtRequest` was the declared return.
+   *
+   * So the declaration is honest about the type and silent about the behaviour,
+   * and the gap is tracked rather than papered over: #109.
+   */
+  override getRequest(): IAdtRequest {
     return new AdtRequestLegacy(
       this.connection,
       this.logger,
