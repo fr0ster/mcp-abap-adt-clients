@@ -148,9 +148,7 @@ describe('CSRF Token diagnostics', () => {
     // Summary
     console.log('\n=== Summary ===');
     for (const [endpoint, token] of Object.entries(results)) {
-      console.log(
-        `  ${endpoint}: ${token ? `OK (${token.substring(0, 20)}...)` : 'FAILED'}`,
-      );
+      console.log(`  ${endpoint}: ${token ? describeToken(token) : 'FAILED'}`);
     }
 
     // At least one endpoint should return CSRF

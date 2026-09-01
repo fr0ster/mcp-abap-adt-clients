@@ -203,13 +203,19 @@ open — so it is ownership of the PAK state, not a delay. Retried for 30 second
 inside the run it never succeeds; sent one second after the run ends it works.
 
 The harness has the mechanism for this — `recycleTestSession()`, which reopens
-the session before the cleanup delete — and `test-config.yaml` ships with
-`cleanup_session_after_test: false`, so it does not run. Turning it on is a
-decision about every suite on every system, and is left to whoever makes it.
+the session before the cleanup delete — and the template now ships with
+`cleanup_session_after_test: true`, so it runs. That is what makes the package
+lifecycle test pass its cleanup over HTTP: the delete goes out on a session that
+does not own the PAK state.
 
-Until then the package lifecycle test fails at cleanup over HTTP, and that
-failure is real: the object is left behind, and the next run meets it. It is no
-longer swallowed.
+A `test-config.yaml` written before this change still carries `false` — the file
+is not in git, and `check:config` compares top-level sections, so it will not
+report the difference. If the package suite fails at cleanup with `PAK/058`,
+that setting is the first thing to look at.
+
+The failure it replaces was real, not swallowed: the object was left behind and
+the next run met it — which then made that run skip its own workflow and report
+green.
 
 Why PAK takes the create path rather than the change path is **not established**,
 and needs the ABAP side to answer. Until it is, this is a known limitation rather

@@ -69,4 +69,3 @@ understood, not that the object went away.
 The test harness does exactly this, in `recycleTestSession()`, under the
 `cleanup_session_after_test` flag in `test-config.yaml`. That is harness code on
 the consumer side, not a library method, for the reasons above.
-
