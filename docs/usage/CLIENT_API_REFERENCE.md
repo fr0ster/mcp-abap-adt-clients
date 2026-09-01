@@ -334,7 +334,14 @@ await abapGit.unlink({ package: 'ZMY_PKG' });
 
 ### Transport Requests (getRequest())
 
-`client.getRequest()` returns `AdtRequest`. `create()` and `read()` behave as any
+`client.getRequest()` returns **`IAdtRequest`** — the contract, not the class, since 16.1.0. That is what makes the compiler check the handler: `AdtRequest` has to satisfy the interface at the factory, so a method removed from it fails the build there rather than only where something happens to call it. It also means a consumer can substitute their own handler, or intersect the contract with their own types. To name the type, import it from the contract package — this one does not re-export interface types:
+
+```typescript
+import type { IAdtRequest } from '@mcp-abap-adt/interfaces';
+
+const requests: IAdtRequest = client.getRequest();
+```
+ `create()` and `read()` behave as any
 other handler; `list()` is the one method worth reading closely, because the
 endpoint it calls is a **saved-configuration search**, not a filtered query —
 sending `user`/`status`/`dateRange`/`targetSystem` as query parameters has

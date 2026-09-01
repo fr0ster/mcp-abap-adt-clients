@@ -26,6 +26,7 @@ import type {
   IAdtModifiable,
   IAdtObject,
   IAdtReadable,
+  IAdtRequest,
   IAdtRunnable,
   IAdtSourceObject,
   IAdtSystemContext,
@@ -873,10 +874,17 @@ export class AdtClient {
   }
 
   /**
-   * Get high-level operations for Request (Transport Request) objects
-   * @returns IAdtObject instance for Request operations
+   * Get high-level operations for Request (Transport Request) objects.
+   *
+   * Declared as `IAdtRequest`, not as the class. A concrete return is the one a
+   * consumer cannot substitute, cannot compose with their own types, and cannot
+   * have checked — the capability guard compares a factory's declared return
+   * against its manifest, and where the declared type is the implementation that
+   * comparison is between a thing and itself.
+   *
+   * @returns the transport request contract
    */
-  getRequest(): AdtRequest {
+  getRequest(): IAdtRequest {
     this.assertConnected();
     return new AdtRequest(this.connection, this.logger, this.systemContext);
   }

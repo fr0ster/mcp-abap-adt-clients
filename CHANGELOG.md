@@ -5,6 +5,63 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [16.1.0] - 2026-09-01
+
+Requires `@mcp-abap-adt/interfaces@^26.1.0`.
+
+### Changed
+
+- **`getRequest()` returns `IAdtRequest`, the contract, instead of the concrete
+  `AdtRequest`.**
+
+  A class as a return type asserts nothing — it satisfies itself by definition,
+  so the factory compiles whatever the class happens to be that day. A contract
+  makes the compiler check the handler at the point it is handed out.
+
+  Measured, because the first reason given for this change was wrong. Remove
+  `list()` from `AdtRequest`:
+
+  | return type | what fails |
+  |---|---|
+  | `AdtRequest` | two errors **inside the transport module** — a call site and an `override`. Nothing at the factory. |
+  | `IAdtRequest` | `AdtClient.ts: Property 'list' is missing in type 'AdtRequest' but required in type 'IAdtRequest'` |
+
+  Had no internal caller existed, `list()` could have vanished with a green build
+  while every consumer lost it.
+
+  Two further consequences, real but not what decided it: a consumer can
+  substitute their own handler where the type names a contract, and can intersect
+  it with their own types. Neither is possible against a class.
+
+  **Naming the type.** A consumer that needs to write the type down takes it from
+  the contract package, not from here:
+
+  ```ts
+  import type { IAdtRequest } from '@mcp-abap-adt/interfaces';
+
+  const requests: IAdtRequest = client.getRequest();
+  ```
+
+  This package does not re-export interface types — one import point is the
+  reason the contract package exists.
+
+  **Not breaking.** `AdtRequest` was never exported — not from the barrels, not
+  in the public-surface manifest — so no consumer could name it, and every method
+  it has is in `IAdtRequest`.
+
+  Checked against the consumer rather than inferred from the export surface:
+  `mcp-abap-adt` calls `getRequest().create()` and `getRequest().list()`, both in
+  the contract, and never names the class. That is a source inspection, not a
+  compile — it is six majors behind, so nothing here was type-checked against it.
+
+  Recorded as decision 10 in `docs/architecture/DECISIONS.md`, with the reason
+  that was wrong kept beside it: the capability guard was *not* blind to the
+  concrete returns, and one experiment settles it.
+
+  `getUtils(): AdtUtils` is the other concrete return and is deliberately not
+  changed here — 35 methods, which want decomposing into atoms rather than one
+  interface with 35 members. Tracked in #109.
+
 ## [16.0.0] - 2026-09-01
 
 Requires `@mcp-abap-adt/interfaces@^26.0.0`.
