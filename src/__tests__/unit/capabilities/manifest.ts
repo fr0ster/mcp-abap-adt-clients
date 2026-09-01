@@ -1034,7 +1034,10 @@ export const HANDLERS = {
         { method: 'POST', path: '/sap/bc/adt/deletion/check' },
         '/sap/bc/adt/deletion/delete',
       ],
-      validate: '/sap/bc/adt/sfw/featuretoggles',
+      // The collection answers a GET with 400 "URI-Mapping cannot be
+      // performed"; discovery advertises this sub-resource for validation, and
+      // it answers a POST with CHECK_RESULT. Measured on E19 2026-08-31.
+      validate: '/sap/bc/adt/sfw/featuretoggles/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
       lock: '/sap/bc/adt/sfw/featuretoggles/zguard_ft',

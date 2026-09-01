@@ -44,18 +44,28 @@ describe('FeedRepository', () => {
     );
   });
 
-  it('variants() delegates to /sap/bc/adt/feeds/variants', async () => {
+  it('variants() delegates to /sap/bc/adt/feeds/variants with the category', async () => {
     const connection = createConnectionMock();
     const repo = new FeedRepository(connection, createLogger());
 
-    await repo.variants();
+    await repo.variants('dumps');
 
     expect(connection.makeAdtRequest).toHaveBeenCalledWith(
       expect.objectContaining({
-        url: '/sap/bc/adt/feeds/variants',
+        url: '/sap/bc/adt/feeds/variants?category=dumps',
         method: 'GET',
       }),
     );
+  });
+
+  it('variants() refuses without a category rather than sending a request the server rejects', async () => {
+    const connection = createConnectionMock();
+    const repo = new FeedRepository(connection, createLogger());
+
+    // The endpoint answers 400 ExceptionParameterNotFound without one, so there
+    // is nothing to gain by asking.
+    await expect(repo.variants()).rejects.toThrow(/requires a category/i);
+    expect(connection.makeAdtRequest).not.toHaveBeenCalled();
   });
 
   it('byUrl() parses Atom XML into IFeedEntry array', async () => {

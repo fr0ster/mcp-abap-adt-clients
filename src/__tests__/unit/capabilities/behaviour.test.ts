@@ -182,9 +182,6 @@ const VERB_BY_HANDLER: Record<string, string> = {
   // not a resource of its own.
   'messageClassMessage.create': 'PUT',
   'messageClassMessage.delete': 'PUT',
-  // Feature toggles are validated by asking the collection whether the name is
-  // taken — GET /sfw/featuretoggles.
-  'featureToggle.validate': 'GET',
   // A function include's name is validated the same way, against its group.
   'functionInclude.validate': 'GET',
   // A service binding's validation starts with a GET on the bindingtypes
