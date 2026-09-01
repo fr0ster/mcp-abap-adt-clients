@@ -283,8 +283,31 @@ export class FeedRepository implements IFeedRepository, IRuntimeAnalysisObject {
     return parseFeedDescriptors(response.data);
   }
 
-  async variants(): Promise<IFeedVariant[]> {
-    const response = await getFeedVariants(this.connection);
+  /**
+   * Feed variants for a category.
+   *
+   * Required, because the endpoint requires it: without a category
+   * `/sap/bc/adt/feeds/variants` answers `400 ExceptionParameterNotFound`,
+   * "Parameter category could not be found." Everything that called this before
+   * was getting that 400.
+   *
+   * The parameter was optional here for one release, with a `throw` behind it,
+   * only because `IFeedRepository` declared no parameter and a required one
+   * would not have satisfied it. `@mcp-abap-adt/interfaces@26.0.0` fixed the
+   * contract, so the workaround goes with it.
+   */
+  async variants(category: string): Promise<IFeedVariant[]> {
+    // The compiler rejects a missing category since interfaces 26.0.0;
+    // JavaScript callers reach here anyway, so it says so rather than sending a
+    // request the server answers with 400 — the same shape `Profiler.read()`
+    // uses for a view that does not exist.
+    if (!category) {
+      throw new Error(
+        'FeedRepository.variants() requires a category — /sap/bc/adt/feeds/variants ' +
+          'answers 400 ExceptionParameterNotFound without one.',
+      );
+    }
+    const response = await getFeedVariants(this.connection, category);
     return parseFeedVariants(response.data);
   }
 

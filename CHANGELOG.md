@@ -5,6 +5,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+### Changed
+
+- **`FeedRepository.variants()` takes a required `category`**, following
+  `@mcp-abap-adt/interfaces@26.0.0`.
+
+  It was optional for one release only because the old contract declared no
+  parameter and a required one would not have satisfied it — a method the
+  published contract told you to call and that could not succeed. The interface
+  landed first; the workaround goes with it.
+
+  The runtime check stays: the compiler refuses a missing category, JavaScript
+  callers reach the method anyway, and it says so rather than sending the request
+  the server answers with `400 ExceptionParameterNotFound`. Same shape as
+  `Profiler.read()` refusing a view that does not exist.
+
 ### Fixed
 
 - Adding or deleting a message failed outright when the message class had been
@@ -37,6 +52,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   already correct, so the fix is the local name alone, in the one builder that
   create and update share. Confirmed on E19 over both http and rfc; the same
   POST with only the root changed goes from 500 to 201.
+
+- `FeedRepository.variants()` never worked: `/sap/bc/adt/feeds/variants` requires
+  a `category` and the request was sent without one, so it always answered
+  `400 ExceptionParameterNotFound`, `SADT_RESOURCE/017`. It takes a category now
+  — required, per the **Changed** entry above.
+
+  Its integration test caught that 400 and turned it into a skip, with a comment
+  naming the cause correctly. The method was broken and green for as long as
+  that stood.
+
+- `AdtFeatureToggle.readMetadata()` turned a 404 into a plain `Error`, so a
+  caller could not tell "no such toggle" from "the read broke". The thrown error
+  now carries the status.
+
+- `validateFeatureToggleName()` sent `GET /sap/bc/adt/sfw/featuretoggles` — the
+  collection, which answers `400 "URI-Mapping cannot be performed"` to a GET —
+  and discarded the name, package and description it was given. It now POSTs to
+  `/sap/bc/adt/sfw/featuretoggles/validation`, the resource discovery advertises,
+  with those three as query parameters.
 
 ## [15.0.0] - 2026-08-30
 
