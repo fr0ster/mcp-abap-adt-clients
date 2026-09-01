@@ -376,3 +376,75 @@ because nothing could return it: an interface no factory can hand out is decisio
 11's mistake in another costume. Fixing this means changing the inheritance, not
 the types, and that is tracked in #109 rather than smuggled into a release about
 something else.
+
+---
+
+## 11. Moving to contracts means giving up inheritance, not renaming it
+
+**Problem.** `AdtClientLegacy extends AdtClient`, and `AdtRequestLegacy extends
+AdtRequest`. Both were written for implementation reuse, and both make a handler
+that offers *less* pass as one that offers more. Decision 10 hit the wall this
+builds: the legacy transport handler refuses four of seven methods, and its
+factory cannot say so, because an override's return must be assignable to the
+base's and offering less is the one direction the language refuses.
+
+The inheritance is what made the mismatch type-check for years. Replacing the
+declared class with a contract made the lie visible; it cannot make it go away.
+
+**Decided.** Implementations do not extend implementations. A legacy client is
+not a subclass of a modern one; it is a separate implementation of whatever
+contract it actually satisfies, reusing code by **delegation** where reuse is
+worth having.
+
+Interfaces compose only where the contract genuinely needs it — where two
+handlers share a set of members that means the same thing in both. Not to make
+two types line up, and not to satisfy the compiler.
+
+**Against.** Keeping `extends` for the code it saves and describing the
+difference in comments — which is exactly what this repository has been doing,
+and what decision 10 had to write down instead of fixing.
+
+**Why.** Inheritance answers "is this the same kind of thing" with "yes" and
+then makes the answer unfalsifiable: the subclass inherits every promise whether
+or not it can keep it. Two clients that serve different endpoints, refuse
+different operations and are chosen at runtime by a discovery probe are not the
+same kind of thing. They implement overlapping contracts, which is a different
+statement and one the compiler can check.
+
+A composition written to please the type system is the same mistake in the other
+direction: `IAdtRequest extends IAdtRequestReadOnly` would be reasonable if two
+handlers wanted that set, and noise if the second handler is hypothetical — see
+decision 11 in the contract package, which is about exactly that.
+
+**What it commits us to.** `AdtClientLegacy` stops extending `AdtClient` — 24
+overrides, 313 lines — and `createAdtClient()` stops returning a concrete
+`AdtClient`, which is the same defect one level up. Only then can a legacy
+factory declare the two methods it honours. Tracked in #109.
+
+**The inventory, counted rather than guessed** — and the first count was wrong,
+which is why it is here rather than in prose. 27 `extends` between classes under
+`src/`, and they are not one thing:
+
+| kind | count | verdict |
+|---|---|---|
+| `*Legacy extends *` — a handler that refuses what its base offers | 11 | what this decision is about |
+| the `Unsupported*Error` hierarchy | 9 | not contracts; an error hierarchy is what `Error` is for |
+| `AdtLocal* extends AdtClassMemberBase` | 4 | four members of the same kind sharing a base — the one case where "is this the same kind of thing" is genuinely yes |
+| `AdtRuntimeClientExperimental extends AdtRuntimeClient {}` | 1 | an empty body: a rename wearing a class |
+| `AdtService extends AdtServiceBinding {}` | 1 | the same, and already deprecated |
+| `AdtContentTypesModern extends AdtContentTypesBase` | 1 | to re-examine: a table of values, not a handler |
+
+So the rule is not "no `extends`". It is: **no implementation inherits promises
+it cannot keep.** Two empty-bodied subclasses exist only to give a second name to
+one thing, and four class members share a base because they are the same kind of
+thing — neither is the failure this decision names.
+
+**How to catch it.** A subclass that overrides a method to refuse what the base
+performs. Every `*Legacy` in the table does that, which is why they are the list
+and the error classes are not.
+
+Also: an interface that exists so an `extends` clause compiles.
+
+**What would change it.** A pair of implementations that genuinely are the same
+kind of thing, differing only in a value. There is none here: every pair found so
+far differs in what it refuses.
