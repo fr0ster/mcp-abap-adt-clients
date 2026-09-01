@@ -445,6 +445,25 @@ and the error classes are not.
 
 Also: an interface that exists so an `extends` clause compiles.
 
+**Where this does not reach, said plainly because I nearly got it wrong.** This
+is about *implementations* inheriting implementations. It is not a rule against
+`extends` between interfaces.
+
+A composite contract is extension where extension is needed: `IAdtCrud extends
+IAdtCreatable, IAdtReadable, IAdtModifiable` names a set several handlers share,
+and `IAdtRequest extends IAdtCrud` names the transport handler's contract —
+`IAdtCrud` plus the two methods nothing else has. Neither invents a member,
+neither exists to make a type line up, and dissolving them would leave every
+getter spelling the same intersection by hand.
+
+The line is what the extension is *for*: composing a contract someone needs, or
+making a subclass pass as something it is not. The counted inventory of the
+contract package — 85 heritage relations, 23 of them between capability
+contracts — was read from the syntax tree after three greps gave three different
+wrong answers, including one that reported zero capability extensions because the
+`extends` sat on its own line. A rule about types is worth stating only on
+numbers a parser produced.
+
 **What would change it.** A pair of implementations that genuinely are the same
 kind of thing, differing only in a value. There is none here: every pair found so
 far differs in what it refuses.
