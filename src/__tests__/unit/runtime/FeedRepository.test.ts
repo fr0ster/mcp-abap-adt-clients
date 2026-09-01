@@ -64,7 +64,12 @@ describe('FeedRepository', () => {
 
     // The endpoint answers 400 ExceptionParameterNotFound without one, so there
     // is nothing to gain by asking.
-    await expect(repo.variants()).rejects.toThrow(/requires a category/i);
+    // The compiler rejects this since interfaces 26.0.0; JavaScript callers
+    // reach it, so it throws rather than sending a request the server refuses.
+    await expect(
+      // @ts-expect-error variants() requires a category — the endpoint does
+      repo.variants(),
+    ).rejects.toThrow(/requires a category/i);
     expect(connection.makeAdtRequest).not.toHaveBeenCalled();
   });
 

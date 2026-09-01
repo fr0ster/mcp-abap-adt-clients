@@ -5,6 +5,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+### Changed
+
+- **`FeedRepository.variants()` takes a required `category`**, following
+  `@mcp-abap-adt/interfaces@26.0.0`.
+
+  It was optional for one release only because the old contract declared no
+  parameter and a required one would not have satisfied it — a method the
+  published contract told you to call and that could not succeed. The interface
+  landed first; the workaround goes with it.
+
+  The runtime check stays: the compiler refuses a missing category, JavaScript
+  callers reach the method anyway, and it says so rather than sending the request
+  the server answers with `400 ExceptionParameterNotFound`. Same shape as
+  `Profiler.read()` refusing a view that does not exist.
+
 ### Fixed
 
 - Adding or deleting a message failed outright when the message class had been
