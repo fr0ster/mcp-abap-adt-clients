@@ -5,6 +5,39 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+### Fixed
+
+- Adding or deleting a message failed outright when the message class had been
+  created in the same ABAP session — every time over RFC, where one conversation
+  is one session for its whole life.
+
+  `LOCK_MSG` answers 403 "user is currently editing" there. The chain asked for
+  it first and treated the refusal as fatal, without trying the other two locks
+  the endpoint offers. Measured on E19: in exactly that situation
+  `?_action=LOCK&msgNo=…&onSave=X` is granted, and a save carrying its handle as
+  `mc:lockhandle` answers 200. `lockMessageIfGranted` now swallows 403 there —
+  and only 403 — and the class-for-message handle stands in. The full lifecycle
+  passes over RFC in 2.4 s where it previously spent 33.7 s failing.
+
+- `AdtMessageClassMessage` released its two locks in the wrong order.
+
+  A trace of Eclipse editing a message shows the class `UNLOCK` first and the
+  message `UNLOCK_ALL` second. All four release paths here did the reverse —
+  both happy paths and both cleanup blocks — behind a comment claiming the class
+  lock "must be the final release of the process". The lock order was already
+  right; only the release was inverted.
+
+- `AuthorizationField` create and update sent the wrong root element, and every
+  write against `/sap/bc/adt/aps/iam/auth` failed with HTTP 500.
+
+  The payload was built as `auth:authorizationField`; the endpoint accepts only
+  `auth:auth` — the root it returns itself on a GET — and rejects anything else
+  in that namespace with `System expected the element
+  '{http://www.sap.com/iam/auth}auth'`. The namespace and every attribute were
+  already correct, so the fix is the local name alone, in the one builder that
+  create and update share. Confirmed on E19 over both http and rfc; the same
+  POST with only the root changed goes from 500 to 201.
+
 ## [15.0.0] - 2026-08-30
 
 Requires `@mcp-abap-adt/interfaces@^25.0.0`.

@@ -35,6 +35,7 @@ import type {
   ILogger,
   IObjectVersion,
 } from '@mcp-abap-adt/interfaces';
+import { parseCheckRunResponse } from '../../utils/checkRun';
 import { safeErrorMessage } from '../../utils/internalUtils';
 import {
   createLockTracker,
@@ -194,7 +195,50 @@ export class AdtPackage
       }
       objectCreated = true;
 
-      // Packages are containers — no source code, no activation, no syntax check needed
+      // 3. Check, the way Eclipse does it — a checkrun on the new object, not a
+      //    second call to the validation endpoint. Captured on E19 2026-08-31
+      //    creating ZOK_MESSAGE... sorry, TEST_INNER_PKG05: validation, create,
+      //    then `POST /sap/bc/adt/checkruns` on the created package, before it
+      //    is ever locked. This class's own header has said
+      //    "Create: validate → create → check" from the start; the check was
+      //    the part that was never written.
+      //
+      //    Packages are containers, so this is not a syntax check — it is the
+      //    server's own verdict on the object that was just created, and a
+      //    failure here is worth surfacing rather than discovering at the next
+      //    operation.
+      this.logger?.info?.('Step 3: Checking package');
+      try {
+        const checkResponse = await checkPackage(
+          this.connection,
+          config.packageName,
+          'active',
+        );
+        const checkResult = parseCheckRunResponse(checkResponse);
+        if (checkResult.has_errors) {
+          this.logger?.warn?.(
+            `Check reported errors after create: ${checkResult.errors
+              .map((e) => e.text)
+              .join('; ')}`,
+          );
+          return {
+            errors: checkResult.errors.map((e) => ({
+              method: 'create',
+              error: new Error(String(e.text)),
+              timestamp: new Date(),
+            })),
+          };
+        }
+        this.logger?.info?.('Check passed');
+      } catch (checkError) {
+        // A check that cannot run is not a create that failed — the object is
+        // there, and saying otherwise would send the caller deleting it.
+        this.logger?.warn?.(
+          'Check after create could not run:',
+          safeErrorMessage(checkError),
+        );
+      }
+
       return { errors: [] };
     } catch (error: unknown) {
       // Ensure stateless if needed
@@ -383,17 +427,48 @@ export class AdtPackage
       };
     }
 
-    // TODO: Package update via RFC (SADT_REST_RFC_ENDPOINT) fails with HTTP 400
-    // "Package is already locked" on PUT even though LOCK/UNLOCK succeed.
-    // Root cause: PAK framework locks are session-scoped. Each call to
-    // SADT_REST_RFC_ENDPOINT runs in a new internal ABAP context, so the
-    // PUT cannot access the PAK lock created by the LOCK call.
-    // DDIC objects are unaffected because their locks live in the DDIC buffer
-    // (accessible by lockHandle from any context).
-    // This is non-critical for release — HTTP is the primary transport for
-    // modern on-premise systems. RFC is used for legacy (BASIS < 7.50) where
-    // package CRUD is not supported anyway.
-    // Reference: docs/development/RFC_TESTING.md
+    // Package update over RFC fails, and not for the reason this comment used
+    // to give. It said the PUT "cannot access the PAK lock created by the LOCK
+    // call". Measured on E19 2026-08-31, that is wrong: the PUT reads the
+    // parameter, validates the handle, and accepts ours. Four answers from the
+    // same endpoint, same session, same package, over rfc:
+    //
+    //   PUT with no lockHandle     400  ExceptionParameterNotFound
+    //                                   SADT_RESOURCE/017  "Parameter lockHandle
+    //                                   could not be found"
+    //   PUT with a made-up handle  423  ExceptionResourceInvalidLockHandle
+    //                                   SADT_RESOURCE/026  "is not locked
+    //                                   (invalid lock handle: DEADBEEF…)"
+    //   a second _action=LOCK      403  ExceptionResourceNoAccess
+    //                                   EU/510  "User … is currently editing"
+    //   PUT with OUR handle        400  ExceptionResourceAlreadyExists
+    //                                   PAK/058  "Package … is already locked"
+    //
+    // The first two say the lock handle is read and checked, and ours passes
+    // both checks — a PUT that could not see the lock would answer 423, exactly
+    // as the made-up handle does. The third says the ADT resource lock is ours
+    // and is recognised as ours: asking for it again is refused under EU/510,
+    // a different message class from what the PUT reports.
+    //
+    // So the refusal comes from a layer past the ADT lock. PAK is the package
+    // framework's own message class, and PAK/058 is what it answers when its
+    // own lock cannot be taken — while the exception type says the resource
+    // already exists, which is what PAK reports when a save arrives without the
+    // edit state a LOCK is meant to have left it. That state does not survive
+    // the hop between internal contexts that SADT_REST_RFC_ENDPOINT makes per
+    // call; the enqueue handle does, which is why UNLOCK afterwards answers 200.
+    //
+    // It is packages alone. In the same rfc run 31 other updates pass — classes,
+    // interfaces, domains, data elements, tables, structures, DDL, behaviour
+    // definitions — and no PAK message appears anywhere else in the log. Every
+    // other type keeps its state where a lock handle can reach it from any
+    // context; the package is the one with a second locking layer of its own.
+    //
+    // Not critical for release: http is the primary transport for modern
+    // on-premise systems, and rfc exists for BASIS < 7.50, where package CRUD
+    // is not supported regardless. What is written above is measured; why PAK
+    // takes the create path rather than the change path is not, and would need
+    // the ABAP side to answer.
 
     let lockHandle: string | undefined;
     let lockCorrNr: string | undefined;
@@ -556,7 +631,30 @@ export class AdtPackage
       });
       this.logger?.info?.('Deletion check passed');
 
-      // Delete (no stateful needed - no lock/unlock)
+      // Delete.
+      //
+      // A package this session has just updated cannot be deleted by this
+      // session — measured on E19 2026-08-31: `deletion/check` answers
+      // `isDeletable="true"` while `deletion/delete` answers HTTP 200 carrying
+      // `isDeleted="false"` and PAK/058, "package is already locked", even
+      // though the UNLOCK moments earlier answered 200. It is not a delay:
+      // retried for 30 seconds inside the run it never succeeds, and the same
+      // request one second after the run ends deletes it on the first attempt.
+      // The PAK lock belongs to the ABAP session and goes with it, which is
+      // what the note on `update()` above says about the RFC case and is just
+      // as true here.
+      //
+      // So this reports the failure rather than waiting for something that
+      // cannot happen while the caller still holds the session.
+      //
+      // And reporting is as far as it can go. `IAbapConnection` is `connect`,
+      // `getBaseUrl`, `getSessionId`, `setSessionType`, `makeAdtRequest` — no
+      // `disconnect`, no `recycle`. Nothing here can end the session that holds
+      // the PAK state, and nothing here should: the connection belongs to the
+      // caller and is usually shared, so tearing it down mid-operation would
+      // take every other user of it down as well. Recycling is the consumer's
+      // call. See docs/usage/STATEFUL_SESSION_GUIDE.md, and
+      // recycleTestSession() in the test harness for what that looks like.
       this.logger?.info?.('Deleting package');
       const result = await deletePackage(this.connection, {
         package_name: config.packageName,

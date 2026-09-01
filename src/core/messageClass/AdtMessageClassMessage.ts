@@ -9,12 +9,12 @@ import { beginCriticalSection } from '../../utils/criticalSection';
  * - read:   GET class XML → find message by msgno → return state.message
  * - create/update: GET class → merge message → stateful → lockMessage (MH) +
  *           lockClassForMessage (CH) → PUT full class XML (message with
- *           mc:lockhandle=MH, lockHandle=CH) → unlockAllMessages →
- *           unlock class (CH) → stateless
+ *           mc:lockhandle=MH, lockHandle=CH) → unlock class (CH) →
+ *           unlockAllMessages → stateless
  * - delete: GET class → stateful → lockMessage (MH) + lockClassForMessage (CH)
  *           → PUT class XML with target message as <mc:deletedmessages
  *           mc:lockhandle=MH>, all other messages as <mc:messages> →
- *           unlockAllMessages → unlock class (CH) → stateless.
+ *           unlock class (CH) → unlockAllMessages → stateless.
  *           (SAP does NOT delete omitted messages on PUT — <mc:deletedmessages>
  *           is the correct mechanism. A message-level DELETE /messages/{no}
  *           returns 423 and is NOT used.)
@@ -44,7 +44,7 @@ import {
   safeErrorMessage,
 } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
-import { lockClassForMessage, lockMessage } from './lock';
+import { lockClassForMessageOrPlain, lockMessageIfGranted } from './lock';
 import { getMessageClassSource } from './read';
 import type {
   IMessageClassMessageConfig,
@@ -189,16 +189,29 @@ export class AdtMessageClassMessage
 
       // 3. Lock individual message
       this.logger?.info?.('upsertMessage: lockMessage');
-      messageLockHandle = await lockMessage(this.connection, name, no);
+      messageLockHandle = await lockMessageIfGranted(this.connection, name, no);
 
       // 4. Lock class for message save
       this.logger?.info?.('upsertMessage: lockClassForMessage');
-      classLockHandle = await lockClassForMessage(this.connection, name, no);
+      classLockHandle = await lockClassForMessageOrPlain(
+        this.connection,
+        name,
+        no,
+      );
 
       // 5. PUT full class XML with message lock handle embedded
+      // The PUT carries the lock handle, so it does not need the lock session —
+      // and Eclipse deliberately keeps it out of one. In the E19 capture of
+      // 2026-08-31 every lock and unlock is on the stateful "enqueue" session
+      // (155) while the PUT that saves the message runs stateless (215), as do
+      // the reads around it. The locks survive because they belong to the
+      // enqueue session, not to the request that uses their handle.
+      this.connection.setSessionType('stateless');
       this.logger?.info?.('upsertMessage: PUT');
+      // Whichever handle this chain actually holds. When LOCK_MSG was refused
+      // the class-for-message handle stands in, and the save takes it.
       const xmlBody = buildMessageClassXml(cls, {
-        messageLockHandles: { [no]: messageLockHandle },
+        messageLockHandles: { [no]: messageLockHandle ?? classLockHandle },
       });
       const encoded = encodeSapObjectName(name.toLowerCase());
       const corrNr = config.transportRequest?.trim()
@@ -212,16 +225,22 @@ export class AdtMessageClassMessage
         headers: { 'Content-Type': MESSAGE_CLASS_UPDATE_CONTENT_TYPE },
       });
 
-      // 6. Release the message lock first, then unlock the whole class last —
-      //    the class edit-lock must be the final release of the process.
-      this.logger?.info?.('upsertMessage: unlockAllMessages');
-      await unlockAllMessages(this.connection, name, no);
-      messageLockHandle = undefined;
+      // Back to the lock session to give the handles up.
+      this.connection.setSessionType('stateful');
 
-      // 7. Unlock the whole class (final release)
+      // 6. Unlock the class first, then release the message locks — the order
+      //    Eclipse uses. Captured on E19 2026-08-31 editing a message in
+      //    ZADT_MSGX01: UNLOCK on the class at 15:17:15.085, UNLOCK_ALL on the
+      //    message at 15:17:15.202. This file used to do the reverse and said
+      //    the class lock "must be the final release", which the trace refutes.
       this.logger?.info?.('upsertMessage: unlock class');
       await unlockMessageClass(this.connection, name, classLockHandle);
       classLockHandle = undefined;
+
+      // 7. Release the message locks
+      this.logger?.info?.('upsertMessage: unlockAllMessages');
+      await unlockAllMessages(this.connection, name, no);
+      messageLockHandle = undefined;
 
       // 8. Back to stateless
       this.connection.setSessionType('stateless');
@@ -229,24 +248,35 @@ export class AdtMessageClassMessage
 
       return { updateResult, errors: [] };
     } catch (error: unknown) {
-      // Always clean up locks and reset session on failure — release the
-      // message lock first, then the class (final release), mirroring the happy path.
-      if (messageLockHandle) {
-        try {
-          await unlockAllMessages(this.connection, name, no);
-        } catch (ue) {
-          this.logger?.warn?.(
-            'Failed to unlock messages during cleanup:',
-            safeErrorMessage(ue),
-          );
-        }
-      }
+      // Back to the lock session before releasing anything. The PUT above runs
+      // stateless, so a failure at or after it leaves the connection stateless —
+      // and an unlock sent that way does not reach the session holding the
+      // handles. The `catch` around each unlock would swallow the refusal and
+      // the lock would stay on the object.
+      //
+      // Set unconditionally rather than only on the paths that switched: this
+      // block is reached from every step, and asking "did we get far enough to
+      // have switched?" is the question that produced the bug.
+      this.connection.setSessionType('stateful');
+
+      // Always clean up locks and reset session on failure — class first,
+      // then the message locks, mirroring the happy path.
       if (classLockHandle) {
         try {
           await unlockMessageClass(this.connection, name, classLockHandle);
         } catch (ue) {
           this.logger?.warn?.(
             'Failed to unlock class during cleanup:',
+            safeErrorMessage(ue),
+          );
+        }
+      }
+      if (messageLockHandle) {
+        try {
+          await unlockAllMessages(this.connection, name, no);
+        } catch (ue) {
+          this.logger?.warn?.(
+            'Failed to unlock messages during cleanup:',
             safeErrorMessage(ue),
           );
         }
@@ -271,8 +301,8 @@ export class AdtMessageClassMessage
    *
    * Chain: GET class → stateful → lockMessage (MH) + lockClassForMessage (CH)
    * → PUT class XML with target in <mc:deletedmessages mc:lockhandle=MH>,
-   * remaining messages in <mc:messages> → unlockAllMessages →
-   * unlock class (CH) → stateless.
+   * remaining messages in <mc:messages> → unlock class (CH) →
+   * unlockAllMessages → stateless.
    */
   async delete(
     config: Partial<IMessageClassMessageConfig>,
@@ -303,17 +333,23 @@ export class AdtMessageClassMessage
 
       // 2. Lock the individual message (required for <mc:deletedmessages>)
       this.logger?.info?.('deleteMessage: lockMessage');
-      messageLockHandle = await lockMessage(this.connection, name, no);
+      messageLockHandle = await lockMessageIfGranted(this.connection, name, no);
 
       // 3. Lock the class for a message-save (msgNo + onSave=X)
       this.logger?.info?.('deleteMessage: lockClassForMessage');
-      classLockHandle = await lockClassForMessage(this.connection, name, no);
+      classLockHandle = await lockClassForMessageOrPlain(
+        this.connection,
+        name,
+        no,
+      );
 
       // 4. PUT: target message → <mc:deletedmessages>; all others → <mc:messages>
+      // Stateless, for the reason spelled out in _upsertMessage.
+      this.connection.setSessionType('stateless');
       this.logger?.info?.('deleteMessage: PUT');
       const xmlBody = buildMessageClassXml(cls, {
         deletedMsgnos: [no],
-        messageLockHandles: { [no]: messageLockHandle },
+        messageLockHandles: { [no]: messageLockHandle ?? classLockHandle },
       });
       const encoded = encodeSapObjectName(name.toLowerCase());
       const corrNr = config.transportRequest?.trim()
@@ -327,38 +363,47 @@ export class AdtMessageClassMessage
         headers: { 'Content-Type': MESSAGE_CLASS_UPDATE_CONTENT_TYPE },
       });
 
-      // 5. Release the message lock first, then unlock the whole class last.
-      this.logger?.info?.('deleteMessage: unlockAllMessages');
-      await unlockAllMessages(this.connection, name, no);
-      messageLockHandle = undefined;
+      // Back to the lock session to give the handles up.
+      this.connection.setSessionType('stateful');
 
-      // 6. Unlock the whole class (final release)
+      // 5. Unlock the class first, then release the message locks — the order
+      //    Eclipse uses; see the note in _upsertMessage.
       this.logger?.info?.('deleteMessage: unlock class');
       await unlockMessageClass(this.connection, name, classLockHandle);
       classLockHandle = undefined;
+
+      // 6. Release the message locks
+      this.logger?.info?.('deleteMessage: unlockAllMessages');
+      await unlockAllMessages(this.connection, name, no);
+      messageLockHandle = undefined;
 
       this.connection.setSessionType('stateless');
       this.logger?.info?.('deleteMessage: done');
 
       return { deleteResult, errors: [] };
     } catch (error: unknown) {
-      // Release the message lock first, then the class (final release).
-      if (messageLockHandle) {
-        try {
-          await unlockAllMessages(this.connection, name, no);
-        } catch (ue) {
-          this.logger?.warn?.(
-            'Failed to unlock messages during cleanup:',
-            safeErrorMessage(ue),
-          );
-        }
-      }
+      // Back to the lock session first — same reason as in `_upsertMessage`: the
+      // PUT runs stateless, and an unlock sent stateless never reaches the
+      // session that holds the handles.
+      this.connection.setSessionType('stateful');
+
+      // Class first, then the message locks, mirroring the happy path.
       if (classLockHandle) {
         try {
           await unlockMessageClass(this.connection, name, classLockHandle);
         } catch (ue) {
           this.logger?.warn?.(
             'Failed to unlock class during cleanup:',
+            safeErrorMessage(ue),
+          );
+        }
+      }
+      if (messageLockHandle) {
+        try {
+          await unlockAllMessages(this.connection, name, no);
+        } catch (ue) {
+          this.logger?.warn?.(
+            'Failed to unlock messages during cleanup:',
             safeErrorMessage(ue),
           );
         }

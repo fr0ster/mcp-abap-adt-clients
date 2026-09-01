@@ -32,7 +32,7 @@ export async function checkPackageDeletion(
     throw new Error('package_name is required');
   }
 
-  const encodedName = encodeSapObjectName(params.package_name);
+  const encodedName = encodeSapObjectName(params.package_name.toLowerCase());
   const objectUri = `/sap/bc/adt/packages/${encodedName}`;
 
   const checkUrl = `/sap/bc/adt/deletion/check`;
@@ -108,7 +108,7 @@ export async function deletePackage(
     throw new Error('package_name is required');
   }
 
-  const encodedName = encodeSapObjectName(params.package_name);
+  const encodedName = encodeSapObjectName(params.package_name.toLowerCase());
   const objectUri = `/sap/bc/adt/packages/${encodedName}`;
 
   const deletionUrl = `/sap/bc/adt/deletion/delete`;
@@ -159,11 +159,23 @@ export async function deletePackage(
       deleteObject?.['@_isDeleted'] === 'true';
 
     if (!isDeleted) {
+      const messageNode =
+        deleteObject?.['del:message'] || deleteObject?.message || {};
       const message =
-        deleteObject?.['del:message']?.['del:text'] ||
-        deleteObject?.message?.text ||
-        'Deletion failed';
-      throw new Error(`Package deletion failed: ${message}`);
+        messageNode['del:text'] || messageNode.text || 'Deletion failed';
+      // The message id travels in the longtext link — `…/messageclass/PAK/
+      // messages/058/longtext?…` for "package is already locked" — and it is
+      // the only part of this that does not change with the logon language.
+      // Carried into the error so a caller can act on the id rather than on
+      // English prose.
+      const longtext =
+        messageNode['atom:link']?.['@_href'] || messageNode.link?.['@_href'];
+      const id =
+        typeof longtext === 'string'
+          ? /messageclass\/([A-Z0-9_]+)\/messages\/(\d+)/i.exec(longtext)
+          : null;
+      const idPart = id ? ` [${id[1]}/${id[2]}]` : '';
+      throw new Error(`Package deletion failed${idPart}: ${message}`);
     }
   } catch (error: unknown) {
     const e = error as HttpError;

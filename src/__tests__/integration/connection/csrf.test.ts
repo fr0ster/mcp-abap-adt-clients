@@ -39,6 +39,19 @@ if (fs.existsSync(envPath)) {
 const connectionLogger = createConnectionLogger();
 const testsLogger = createTestsLogger();
 
+/**
+ * What a token looks like, without being one.
+ *
+ * `present (32 chars)` answers everything this diagnostic asks — did the
+ * endpoint issue a token, and is it the shape expected — while leaving nothing
+ * usable in a log that gets pasted into an issue.
+ */
+function describeToken(token?: string): string {
+  if (!token) return 'NOT FOUND';
+  if (token === 'fetch' || token === 'required') return token;
+  return `present (${token.length} chars)`;
+}
+
 describe('CSRF Token diagnostics', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let hasConfig = false;
@@ -103,7 +116,11 @@ describe('CSRF Token diagnostics', () => {
 
         console.log(`  Status: ${status}`);
         console.log(`  Content-Type: ${contentType}`);
-        console.log(`  x-csrf-token: ${csrfToken || 'NOT FOUND'}`);
+        // The value never goes to the log. This diagnostic runs against a real
+        // system and its output gets pasted into issues and committed as
+        // evidence — which is how live tokens reached a public repository once
+        // already. What it needs to report is whether one came back.
+        console.log(`  x-csrf-token: ${describeToken(csrfToken)}`);
 
         results[endpoint] = csrfToken || undefined;
       } catch (error: unknown) {
@@ -119,7 +136,9 @@ describe('CSRF Token diagnostics', () => {
           // Even failed requests may carry a CSRF token
           const csrfToken = err.response.headers?.['x-csrf-token'];
           if (csrfToken) {
-            console.log(`  x-csrf-token (from error): ${csrfToken}`);
+            console.log(
+              `  x-csrf-token (from error): ${describeToken(csrfToken)}`,
+            );
             results[endpoint] = csrfToken;
           }
         }
@@ -129,9 +148,7 @@ describe('CSRF Token diagnostics', () => {
     // Summary
     console.log('\n=== Summary ===');
     for (const [endpoint, token] of Object.entries(results)) {
-      console.log(
-        `  ${endpoint}: ${token ? `OK (${token.substring(0, 20)}...)` : 'FAILED'}`,
-      );
+      console.log(`  ${endpoint}: ${token ? describeToken(token) : 'FAILED'}`);
     }
 
     // At least one endpoint should return CSRF

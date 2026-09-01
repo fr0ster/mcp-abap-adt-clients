@@ -34,6 +34,7 @@ import {
   SharedOnPremConnector,
 } from './sharedSession';
 import { createConnectionLogger, createRunIntegrityLogger } from './testLogger';
+import { withWireLog } from './wireLog';
 
 /**
  * Whether this machine has SAP configured at all.
@@ -87,8 +88,12 @@ export function skipUnlessConfigured(error: unknown, logger: ILogger): false {
 /**
  * Get connection_type from test-config.yaml environment section.
  * Returns 'http' (default) or 'rfc'.
+ *
+ * Exported because a suite occasionally has to know. `available_in` gates on the
+ * kind of system; this gates on the wire, and one known limitation lives there —
+ * see the package lifecycle test.
  */
-function getConnectionType(): 'http' | 'rfc' {
+export function getConnectionType(): 'http' | 'rfc' {
   const { getEnvironmentConfig } = require('./test-helper');
   try {
     const envConfig = getEnvironmentConfig();
@@ -486,12 +491,14 @@ function onPremWire(
   wire: { client?: string; baseUrl?: string },
 ): OnPremHttpTransport | RfcTransport {
   if (getConnectionType() === 'rfc') {
-    return new RfcTransport(rfcConversationFrom(config), logger);
+    return withWireLog(new RfcTransport(rfcConversationFrom(config), logger));
   }
   const material = materialOf(credentialFor(config));
-  return isLegacyEnvironment()
-    ? new LegacyOnPremHttpTransport(material, logger, wire)
-    : new OnPremHttpTransport(material, logger, wire);
+  return withWireLog(
+    isLegacyEnvironment()
+      ? new LegacyOnPremHttpTransport(material, logger, wire)
+      : new OnPremHttpTransport(material, logger, wire),
+  );
 }
 
 /**
