@@ -467,3 +467,41 @@ numbers a parser produced.
 **What would change it.** A pair of implementations that genuinely are the same
 kind of thing, differing only in a value. There is none here: every pair found so
 far differs in what it refuses.
+
+---
+
+## 12. A method's result is named by a contract, not by `IAdtResponse`
+
+The rule lives in `@mcp-abap-adt/interfaces`, decision 13. It is here because the
+code it judges is here.
+
+**Decided.** It does not matter what concrete type a method returns, as long as
+it satisfies the contract the caller was promised. `Promise<T>` is a promise
+about `T`; `T` is what the consumer holds, so `T` is a contract.
+`Promise<IAdtResponse>` is not one — it names the transport envelope, which every
+method could name.
+
+**Where we stand.** `AdtUtils` has 31 public methods. **Eight** resolve to a
+shape — `search`, `getWhereUsedList`, `getPackageContentsList`,
+`getPackageHierarchy`, `getInactiveObjects` and the three list readers.
+**Twenty-three** resolve to the envelope.
+
+**Against.** Closing the twenty-three by inventing result types. Two parsers
+exist for them, so twenty-one shapes would be guesses, and a guessed shape is
+indistinguishable to a consumer from a measured one.
+
+**Why it is not cosmetic.** A consumer decides what to do next from the type it
+was handed. When that type is the envelope, the decision is made by reading our
+implementation instead — the coupling decision 10 removed at the factory,
+surviving one level down at every method.
+
+**How each one closes.** Measured, or handed to the consumer's own parser, which
+the implementation must satisfy. Which of the two is the same question decision 5
+of the contract package answers for parsing: small and stable, measure it; large
+or system-dependent, let the consumer read it.
+
+**How to catch it.** `Promise<IAdtResponse>` on a public method. Correct only
+where the answer really is the envelope, and that should be said at the method.
+
+**What would change it.** Nothing. The twenty-three close one at a time, and
+`getUtils()` cannot hand out contracts worth the name until they do — #109.
