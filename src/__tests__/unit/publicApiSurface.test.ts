@@ -15,7 +15,11 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import * as rootExports from '../../index';
-import { parseSearchResults, parseTransportTree } from '../../index';
+import {
+  AdtExceptionDocumentError,
+  parseSearchResults,
+  parseTransportTree,
+} from '../../index';
 
 describe('public API surface', () => {
   it('hands out parseSearchResults from the package root', () => {
@@ -40,6 +44,33 @@ describe('public API surface', () => {
         uri: undefined,
       },
     ]);
+  });
+
+  it('hands out AdtExceptionDocumentError from the package root', () => {
+    // Every client throws this. A consumer who cannot import it cannot tell a
+    // refusal from any other failure, and `.document` — the answer SAP actually
+    // sent — is unreachable. It shipped that way in the first draft: the class
+    // had `export`, the changelog named it, the tests asserted on it, and
+    // nothing outside this package could see it.
+    expect(typeof AdtExceptionDocumentError).toBe('function');
+  });
+
+  it('is the class the clients throw, with its fields intact', () => {
+    const raised = new AdtExceptionDocumentError(
+      'SAP refused the request: locked',
+      '<exc:exception/>',
+      'ExceptionResourceNotFound',
+      'com.sap.adt',
+    );
+
+    // `instanceof` across the entry point is the check that matters: a second
+    // copy reachable by a deep import would satisfy `typeof` and fail every
+    // consumer's `catch`.
+    expect(raised).toBeInstanceOf(Error);
+    expect(raised.name).toBe('AdtExceptionDocumentError');
+    expect(raised.document).toBe('<exc:exception/>');
+    expect(raised.adtType).toBe('ExceptionResourceNotFound');
+    expect(raised.namespace).toBe('com.sap.adt');
   });
 
   it('hands out parseTransportTree from the package root', () => {
@@ -85,6 +116,9 @@ const RUNTIME_EXPORTS = [
   'AdtClientsWS',
   'AdtContentTypesBase',
   'AdtContentTypesModern',
+  // Thrown by every client since the refusal check; a consumer catches it by
+  // name, so it is part of the surface rather than an internal detail.
+  'AdtExceptionDocumentError',
   'AdtExecutor',
   'AdtInclude',
   'AdtMessageClass',

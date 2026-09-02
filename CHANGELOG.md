@@ -57,6 +57,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   will now throw where SAP refused. That is the point, and it is a behaviour
   change to plan for.
 
+  ```typescript
+  import { AdtExceptionDocumentError } from '@mcp-abap-adt/adt-clients';
+
+  try {
+    await client.getClass().create({ className: 'ZCL_X', packageName: 'ZP' });
+  } catch (error) {
+    if (error instanceof AdtExceptionDocumentError) {
+      error.message;    // what SAP said, including who holds the lock
+      error.document;   // the answer, untouched
+      error.adtType;    // e.g. 'ExceptionResourceNotFound'
+    }
+  }
+  ```
+
+  `AdtExceptionDocumentError` is exported from the package root and from
+  `./core`, and the export-surface manifest lists it — the first draft of this
+  change threw a class nothing outside the package could name, which makes
+  `instanceof` impossible and `.document` unreachable. `adtExceptionIn` and
+  `throwIfAdtException` are deliberately **not** exported: a consumer catches a
+  refusal, it does not detect one.
+
 
 - **A refusal from SAP no longer becomes an empty result.** ADT answers some
   refusals with 200 and an `<exc:exception>` document — the transport succeeded,

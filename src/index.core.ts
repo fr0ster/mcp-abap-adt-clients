@@ -32,6 +32,21 @@ export {
   AdtContentTypesModern,
 } from './core/shared/contentTypes';
 export { parseTransportTree } from './core/transport/parseTransportTree';
+/**
+ * The refusal a 2xx can carry.
+ *
+ * Every client throws this now, so a consumer must be able to name it —
+ * `instanceof` is how they tell "SAP said no, and here is what it said" apart
+ * from any other failure, and `.document` is where the untouched answer lives.
+ * It shipped unreachable in the first draft: the class had `export`, the
+ * changelog named it, the tests asserted on it, and nothing outside this package
+ * could see it.
+ *
+ * Only the class. `adtExceptionIn` and `throwIfAdtException` install the check
+ * and are the library's own business — a consumer catches a refusal, they do not
+ * detect one, and a member is exported because somebody needs it.
+ */
+export { AdtExceptionDocumentError } from './utils/adtException';
 export {
   fetchDiscoveryEndpoints,
   isEndpointInDiscovery,
