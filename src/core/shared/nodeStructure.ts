@@ -15,6 +15,7 @@ import type {
   XmlNode,
 } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
+import { throwIfAdtException } from '../../utils/adtException';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -191,6 +192,11 @@ export const toNodeContents = (
   xmlData: string,
   logger?: ILogger,
 ): IRepositoryNodeContents => {
+  // Before anything is read out of it. ADT answers some refusals with 200 and an
+  // exception document, and a parser finding no nodes in one would report
+  // "nothing here" — the server said "no", and that difference is the caller's.
+  throwIfAdtException(xmlData);
+
   const { nodes, objectTypes } = parseNodeStructure(xmlData, logger);
 
   const objects: IRepositoryObjectNode[] = [];

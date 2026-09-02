@@ -13,6 +13,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
+import { AdtUtils } from '../../../core/shared/AdtUtils';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import {
   createTestAdtClient,
@@ -100,7 +101,12 @@ describe('Shared - getWhereUsed', () => {
     testsLogger.info?.(`📋 Object: ${objectName} (${objectType})`);
     testsLogger.info?.('🔍 Step 1: Fetching scope configuration...');
 
-    const utils = client.getUtils();
+    // `AdtUtils` and not `client.getUtils()`: the two-step flow under test fetches
+    // a scope document and hands it back, and `getWhereUsed(scopeXml)` is a class
+    // member that `IAdtInformationSystem` does not carry. The contract's
+    // `getWhereUsedList` builds its own scope from flags instead, so it cannot
+    // stand in here — see the CHANGELOG entry for the gap and what closes it.
+    const utils = new AdtUtils(connection, testsLogger);
     const scopeResponse = await withAcceptHandling(
       utils.getWhereUsedScope({
         object_name: objectName,
@@ -173,7 +179,12 @@ describe('Shared - getWhereUsed', () => {
     testsLogger.info?.(`📋 Object: ${objectName} (${objectType})`);
     testsLogger.info?.('🔍 Step 1: Fetching scope configuration...');
 
-    const utils = client.getUtils();
+    // `AdtUtils` and not `client.getUtils()`: the two-step flow under test fetches
+    // a scope document and hands it back, and `getWhereUsed(scopeXml)` is a class
+    // member that `IAdtInformationSystem` does not carry. The contract's
+    // `getWhereUsedList` builds its own scope from flags instead, so it cannot
+    // stand in here — see the CHANGELOG entry for the gap and what closes it.
+    const utils = new AdtUtils(connection, testsLogger);
     const scopeResponse = await withAcceptHandling(
       utils.getWhereUsedScope({
         object_name: objectName,
@@ -272,7 +283,7 @@ describe('Shared - getWhereUsed', () => {
       testsLogger.info?.('🔍 Step 1: Fetching scope configuration...');
 
       const result = await withAcceptHandling(
-        client.getUtils().getWhereUsed({
+        new AdtUtils(connection, testsLogger).getWhereUsed({
           object_name: objectName,
           object_type: objectType,
         }),
@@ -350,7 +361,7 @@ describe('Shared - getWhereUsed', () => {
 
     logTestStep('validate error if object name is missing', testsLogger);
     await expect(
-      client.getUtils().getWhereUsed({
+      new AdtUtils(connection, testsLogger).getWhereUsed({
         object_name: '',
         object_type: 'class',
       }),
@@ -383,7 +394,7 @@ describe('Shared - getWhereUsed', () => {
 
     logTestStep('validate error if object type is missing', testsLogger);
     await expect(
-      client.getUtils().getWhereUsed({
+      new AdtUtils(connection, testsLogger).getWhereUsed({
         object_name: 'TEST',
         object_type: '',
       }),
@@ -428,7 +439,12 @@ describe('Shared - getWhereUsed', () => {
     testsLogger.info?.(`📋 Object: ${objectName} (${objectType})`);
     testsLogger.info?.('🔍 Fetching parsed where-used list...');
 
-    const utils = client.getUtils();
+    // `AdtUtils` and not `client.getUtils()`: the two-step flow under test fetches
+    // a scope document and hands it back, and `getWhereUsed(scopeXml)` is a class
+    // member that `IAdtInformationSystem` does not carry. The contract's
+    // `getWhereUsedList` builds its own scope from flags instead, so it cannot
+    // stand in here — see the CHANGELOG entry for the gap and what closes it.
+    const utils = new AdtUtils(connection, testsLogger);
     const result = await utils.getWhereUsedList({
       object_name: objectName,
       object_type: objectType,
@@ -501,7 +517,12 @@ describe('Shared - getWhereUsed', () => {
 
     logTestStep('get where-used list with raw XML', testsLogger);
 
-    const utils = client.getUtils();
+    // `AdtUtils` and not `client.getUtils()`: the two-step flow under test fetches
+    // a scope document and hands it back, and `getWhereUsed(scopeXml)` is a class
+    // member that `IAdtInformationSystem` does not carry. The contract's
+    // `getWhereUsedList` builds its own scope from flags instead, so it cannot
+    // stand in here — see the CHANGELOG entry for the gap and what closes it.
+    const utils = new AdtUtils(connection, testsLogger);
     const result = await utils.getWhereUsedList({
       object_name: objectName,
       object_type: objectType,
@@ -550,7 +571,12 @@ describe('Shared - getWhereUsed', () => {
       return;
     }
 
-    const utils = client.getUtils();
+    // `AdtUtils` and not `client.getUtils()`: the two-step flow under test fetches
+    // a scope document and hands it back, and `getWhereUsed(scopeXml)` is a class
+    // member that `IAdtInformationSystem` does not carry. The contract's
+    // `getWhereUsedList` builds its own scope from flags instead, so it cannot
+    // stand in here — see the CHANGELOG entry for the gap and what closes it.
+    const utils = new AdtUtils(connection, testsLogger);
 
     // Step 1: search ALL types — the "select all" baseline.
     logTestStep('where-used: ALL types (baseline)', testsLogger);

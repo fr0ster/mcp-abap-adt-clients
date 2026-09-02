@@ -7,6 +7,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ### Fixed
 
+- **A refusal from SAP no longer becomes an empty result.** ADT answers some
+  refusals with 200 and an `<exc:exception>` document — the transport succeeded,
+  so nothing throws. That was harmless while these members returned the response
+  and the caller could read it. Typing them put a parser in between, and a parser
+  finding no nodes in an exception document reported "nothing here" where the
+  server said "no": the message, the type and the document all gone, with no
+  status to give it away.
+
+  `fetchNodeStructure` and `getAllTypes` now throw `AdtExceptionDocumentError`,
+  which carries the server's own message plus the document **verbatim** in
+  `.document`, and `.adtType` / `.namespace` when the document names them. A
+  refusal whose own XML will not parse is still reported as a refusal, with the
+  raw document attached.
+
+  A genuinely empty result stays an empty result. Telling those two apart is the
+  whole job — "throw when the parse yields nothing" would make every legitimate
+  empty read fail.
+
+  The other two paths were verified rather than assumed: a failing status still
+  arrives as a throw carrying the full response (status, headers, body
+  byte-for-byte), because nothing here catches it; and `search(criteria, parse)`
+  hands the parser the document untouched, so a consumer inspecting the payload
+  themselves sees exactly what they saw before.
+
+
 - **A node id was losing its leading zeros.** The node-structure parser left
   `fast-xml-parser` on its default `parseTagValue`, so
   `<NODE_ID>000010</NODE_ID>` arrived as the number `10` — and that id goes
@@ -36,6 +61,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   was the alternative. The local `IObjectTypeInfo` twins went with it:
   `IRepositoryNodeChild` from the contract means the same thing, and two
   declarations of one shape drift.
+
+### Known gap
+
+- **`getWhereUsed` is not on the contract, and `getWhereUsedList` cannot replace
+  it.** Both hit `/repository/informationsystem/usageReferences`, so one endpoint
+  is one member — but their parameters differ: `getWhereUsed` takes a scope
+  document the caller already fetched and edited, while `getWhereUsedList` builds
+  a scope from flags. A caller running the two-step flow has nowhere on the
+  contract to hand their scope back.
+
+  The integration test for that flow therefore constructs `AdtUtils` directly,
+  which states the gap rather than hiding it behind a cast. Closing it means
+  `IGetWhereUsedListParams` accepting an optional scope document — additive, in
+  `@mcp-abap-adt/interfaces`, and not bundled into this release.
 
 ### Requires
 

@@ -11,6 +11,7 @@ import type {
   INamedItem,
 } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
+import { throwIfAdtException } from '../../utils/adtException';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -76,6 +77,10 @@ export const parseNamedItems = (
   xmlData: string,
   logger?: ILogger,
 ): INamedItem[] => {
+  // Outside the try: a refusal must reach the caller, and the catch below turns
+  // everything into an empty list.
+  throwIfAdtException(xmlData);
+
   try {
     if (!xmlData) {
       return [];
