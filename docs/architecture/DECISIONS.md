@@ -539,3 +539,64 @@ is in `connection/`, where an envelope belongs.
 
 **What would change it.** Nothing. The twenty-three close one at a time, and
 `getUtils()` cannot hand out contracts worth the name until they do — #109.
+
+## 13. A refusal is raised once, at the edge, and goes back whole
+
+**The problem, measured.** ADT answers some refusals with a 2xx and an
+`<exc:exception>` document. The transport is right to admit it — the request did
+come back — so nothing threw and every layer above stored the body as a result.
+With a connection answering 200 and "Object ZNOPE is locked by user XYZ" to
+everything:
+
+| call | `state.errors` was | the caller was told |
+|---|---|---|
+| `getClass().create()` | 0 | the class was created |
+| `getClass().delete()` | 0 | the class was deleted |
+| `getClass().activate()` | 0 | the class was activated |
+| `getDomain().create()` | 0 | the domain was created |
+| `getClass().read()` | 0 | it was read |
+| `getClass().update()` | threw | "Class may be locked by another user" |
+
+Five of seven reported success, three of them writes. `delete()` issued its
+second request after the first had already been refused. The two that threw
+invented their own reason and never showed the caller `XYZ`.
+
+**The status code is the channel; the response is the result.** A 2xx says the
+request reached the server and came back. What the server decided is in the body,
+and nothing in this library was reading it.
+
+**Decided.** The check is installed once, where a connection enters the library —
+`AdtClient`, `AdtRuntimeClient`, `AdtExecutor`, `AdtUtils`. Not at the 466 call
+sites, and not at the 241 places that assign a response into a state: a rule
+applied in 241 places has 241 chances to be forgotten, and the next member
+written would be the 242nd.
+
+`AdtExceptionDocumentError` carries the server's message, the document
+**verbatim**, the ADT type and namespace, the response, and **the request that
+produced it** — a chain has several calls, and "object is locked" means a
+different thing depending on which asked. It is exported from the package root
+and `./core`, because a consumer who cannot name it cannot tell a refusal from
+any other failure.
+
+**Against.** Putting the refusal into `state.errors` and returning normally,
+which would keep existing callers compiling. Rejected: `state.errors` is what a
+caller reads to decide, and a full one after a chain that carried on regardless
+is a worse lie than a throw. The behaviour change is the point.
+
+**How it is installed matters.** It replaces `makeAdtRequest` and calls what it
+captured — the same shape `installAcceptNegotiation` already uses, so the two
+compose in either order. A `Proxy` was tried first and recursed: accept
+negotiation keys a `WeakMap` by the connection object, and a proxy is not its
+target. A test asserts one request per call so that cannot come back.
+
+**How to catch it.** A parser that answers empty for a document it could not
+read. A `catch` that discards. Any path where a 2xx body is stored without being
+looked at.
+
+**What would change it.** The direction in decision 19 of
+`@mcp-abap-adt/interfaces`: strategies for what to do with a result and with an
+error. Three of its questions are answered and they bind here — **without a
+strategy a refusal still throws**, so the safe path stays the default; a strategy
+receives the refusal **whole**, so completeness is never the consumer's to lose
+by accident; and strategies arrive as **one options object**, because hanging a
+second signature on each member was tried across 23 of them and reverted.
