@@ -173,13 +173,32 @@ export class AdtUtils
   /**
    * Locate objects by name pattern — the IAdtSearchable capability.
    *
-   * `searchObjects` above returns the raw response and stays; this returns the
-   * hits themselves. Both are kept because they answer different questions:
-   * one for a caller that needs status and headers, one for a caller that
-   * wants the objects.
+   * One endpoint, one member. `searchObjects` above issues the same request and
+   * hands back the envelope; it survives here for callers on the old signature
+   * and is not in `IAdtInformationSystem`, because a second member over one
+   * resource makes "how far the answer was parsed" a property of which method
+   * was called rather than of the contract.
+   *
+   * A caller who needs the document rather than the hits passes a parser. That
+   * is the same request and the same work — only the reading is theirs, which is
+   * what a strategy is for.
    */
-  async search(criteria: ISearchObjectsParams): Promise<ISearchResult[]> {
-    return searchObjectsTyped(this.connection, criteria);
+  async search(criteria: ISearchObjectsParams): Promise<ISearchResult[]>;
+  async search<T>(
+    criteria: ISearchObjectsParams,
+    parse: (data: unknown) => T,
+  ): Promise<T>;
+  async search<T>(
+    criteria: ISearchObjectsParams,
+    parse?: (data: unknown) => T,
+  ): Promise<ISearchResult[] | T> {
+    if (!parse) {
+      return searchObjectsTyped(this.connection, criteria);
+    }
+    // The caller reads the document; nothing here forms a second opinion about
+    // it, so the raw body goes over untouched rather than parsed and re-emitted.
+    const response = await searchObjects(this.connection, criteria);
+    return parse(response.data);
   }
 
   /**

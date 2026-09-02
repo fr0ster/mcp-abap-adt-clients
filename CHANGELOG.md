@@ -5,6 +5,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+### Changed
+
+- **`AdtUtils.search()` takes an optional parser.** One endpoint is one member:
+  `search` and `searchObjects` issue the same request to
+  `/repository/informationsystem/search`, and having both made "how far the
+  answer was parsed" a property of which method a caller happened to use rather
+  than of the contract. `IAdtInformationSystem` in
+  `@mcp-abap-adt/interfaces` therefore names one member with a strategy
+  overload, and this implements it:
+
+  ```typescript
+  // unchanged — the parsed hits
+  const hits = await utils.search({ query: 'ZCL_*' });
+
+  // the document, read by the caller
+  const xml = await utils.search({ query: 'ZCL_*' }, (data) => String(data));
+  ```
+
+  The parser is handed the **raw body**, untouched, and the same request goes out
+  either way — both asserted in `src/__tests__/unit/shared/searchStrategy.test.ts`
+  and each proved by breaking the implementation and watching that case fail. A
+  strategy that quietly issued a different request would otherwise still return
+  the caller's type and still compile.
+
+  `searchObjects()` is unchanged and still returns `IAdtResponse`. It is not in
+  the contract, so it will disappear from `getUtils()`'s type when that factory
+  narrows to the atoms — a consumer using it for the document moves to the parser
+  above and gets a contract instead of a guess at `response.data`.
+
+
 ### Removed
 
 - **BREAKING: six `AdtUtils` methods that nobody called** — `getTypeInfo()`,
