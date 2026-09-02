@@ -9,6 +9,7 @@ import type {
   IAbapConnection,
   IAdtResponse,
   ILogger,
+  IRepositoryNodeChild,
   IRepositoryNodeContents,
   IRepositoryObjectNode,
   XmlNode,
@@ -76,23 +77,30 @@ export async function fetchNodeStructure(
   });
 }
 
+// `parseTagValue: false` because a NODE_ID is a code, not a count. Left on its
+// default, `<NODE_ID>000010</NODE_ID>` arrives as the number 10 and the leading
+// zeros are gone — and that id goes straight back to the server as `node_id`.
+// The two copies this parser replaced both had it, and a unit test is what
+// noticed.
 const xmlParser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: '',
-  parseAttributeValue: true,
+  parseTagValue: false,
+  parseAttributeValue: false,
   trimValues: true,
 });
 
-/** One `SEU_ADT_OBJECT_TYPE_INFO` entry: a type and the node id holding it. */
-export interface IObjectTypeInfo {
-  objectType: string;
-  nodeId: string;
-}
-
-/** The document's two halves, still as parsed XML. */
+/**
+ * The document's two halves, still as parsed XML.
+ *
+ * `objectTypes` is `IRepositoryNodeChild` from `@mcp-abap-adt/interfaces` and
+ * not a local twin of it: one `SEU_ADT_OBJECT_TYPE_INFO` entry means the same
+ * thing here as it does in the contract, and a second declaration of the same
+ * shape is two names that drift.
+ */
 export interface IParsedNodeStructure {
   nodes: XmlNode[];
-  objectTypes: IObjectTypeInfo[];
+  objectTypes: IRepositoryNodeChild[];
 }
 
 const readNodeValue = (value: XmlNode[string]): string | undefined => {
@@ -154,7 +162,7 @@ export const parseNodeStructure = (
     const objectTypesData = data?.OBJECT_TYPES as XmlNode | undefined;
     const typeInfos = asArray(objectTypesData?.SEU_ADT_OBJECT_TYPE_INFO);
 
-    const objectTypes: IObjectTypeInfo[] = [];
+    const objectTypes: IRepositoryNodeChild[] = [];
     for (const typeInfo of typeInfos) {
       const objectType = readNodeValue(typeInfo?.OBJECT_TYPE);
       const nodeId = readNodeValue(typeInfo?.NODE_ID);
@@ -172,7 +180,7 @@ export const parseNodeStructure = (
 
 /**
  * One level of the tree as `IAdtRepositoryStructure` promises it: the objects
- * here, and the node ids to ask for next.
+ * here, and the typed child nodes to ask for next.
  *
  * A node missing any of the four identity fields is dropped. `IRepositoryObjectNode`
  * names all four as required because a node without them cannot be identified or
@@ -196,5 +204,8 @@ export const toNodeContents = (
     }
   }
 
-  return { objects, childNodeIds: objectTypes.map((t) => t.nodeId) };
+  // The pairs go over whole. `objectTypes` is already `{ objectType, nodeId }`,
+  // and flattening it to ids is what the contract shipped in 26.2.0 doing —
+  // a caller cannot then ask which node holds `PROG/I`.
+  return { objects, childNodes: objectTypes };
 };

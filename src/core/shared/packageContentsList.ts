@@ -105,16 +105,6 @@ const mapAdtTypeToSupported = (
   return undefined;
 };
 
-interface IObjectTypeInfo {
-  objectType: string;
-  nodeId: string;
-}
-
-interface IParsedNodeStructure {
-  nodes: XmlNode[];
-  objectTypes: IObjectTypeInfo[];
-}
-
 const parseNodesToItems = (
   nodes: XmlNode[],
   packageName: string,

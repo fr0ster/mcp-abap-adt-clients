@@ -176,16 +176,6 @@ const isRestoreImplemented = (
   return supported.has(type);
 };
 
-interface IObjectTypeInfo {
-  objectType: string;
-  nodeId: string;
-}
-
-interface IParsedNodeStructure {
-  nodes: XmlNode[];
-  objectTypes: IObjectTypeInfo[];
-}
-
 const buildTreeFromNodes = (
   nodes: XmlNode[],
   includeDescriptions: boolean,

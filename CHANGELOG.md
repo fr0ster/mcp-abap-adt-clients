@@ -5,6 +5,43 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+### Fixed
+
+- **A node id was losing its leading zeros.** The node-structure parser left
+  `fast-xml-parser` on its default `parseTagValue`, so
+  `<NODE_ID>000010</NODE_ID>` arrived as the number `10` — and that id goes
+  straight back to the server as the `node_id` parameter of the next request.
+  Codes are strings; only counts are numbers.
+
+  Present in both copies of this parser before they were consolidated, and found
+  by a unit test written for the consolidated one rather than by anything the
+  compiler could see.
+
+### Changed
+
+- **`AdtUtils.fetchNodeStructure` returns `IRepositoryNodeContents`** and
+  `getAllTypes` returns `INamedItem[]`, matching what
+  `@mcp-abap-adt/interfaces` promises. Both returned `IAdtResponse` until
+  `AdtUtils` was declared `implements` against the atoms and the compiler said
+  so. **Breaking** for anyone reading `response.data` off either.
+
+  `childNodes` pairs each object type with the node id holding it, which is what
+  makes `contents.childNodes.find((c) => c.objectType === 'PROG/I')?.nodeId`
+  expressible — interfaces 27.0.0 exists because the first shape carried the ids
+  alone.
+
+- **The node-structure parser lives in `nodeStructure.ts`**, beside the request
+  that produces it. It had been copied into `packageContentsList` and
+  `packageHierarchy`, identical but for a logger on the catch, and a third copy
+  was the alternative. The local `IObjectTypeInfo` twins went with it:
+  `IRepositoryNodeChild` from the contract means the same thing, and two
+  declarations of one shape drift.
+
+### Requires
+
+- `@mcp-abap-adt/interfaces@^27.0.0`.
+
+
 ### Changed
 
 - **`AdtUtils.search()` takes an optional parser.** One endpoint is one member:
