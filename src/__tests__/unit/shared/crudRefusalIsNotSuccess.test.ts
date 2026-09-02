@@ -97,7 +97,19 @@ describe('a refusal carried by a 2xx is not a result', () => {
     // "may be locked by another user" would satisfy a weaker assertion and tell
     // the caller nothing they can act on.
     expect((error as Error).message).toContain(HOLDER);
-    expect((error as AdtExceptionDocumentError).document).toBe(REFUSAL);
+    const refusal = error as AdtExceptionDocumentError;
+    expect(refusal.document).toBe(REFUSAL);
+
+    // Enough for the consumer to do their own analysis and decide: what the
+    // server said, how it classified it, the response it came on, and WHICH
+    // call produced it. Without the request, a chain's steps are
+    // indistinguishable — `delete()` sends two, `create()` sends six, and
+    // "locked" means a different thing at each.
+    expect(refusal.adtType).toBe('ExceptionResourceNotFound');
+    expect(refusal.namespace).toBe('com.sap.adt');
+    expect(refusal.response?.status).toBe(200);
+    expect(refusal.request?.method).toBeDefined();
+    expect(refusal.request?.url).toContain('/sap/bc/adt/');
   });
 
   it('stops the chain rather than continuing on a false premise', async () => {

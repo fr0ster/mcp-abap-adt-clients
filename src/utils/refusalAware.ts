@@ -89,7 +89,14 @@ export function withRefusalDetection(
     // and only the body says what the server decided about it.
     const body = (response as IAdtResponse).data;
     if (typeof body === 'string') {
-      const refusal = adtExceptionIn(body);
+      // The request goes with it. A refusal with no request beside it says
+      // something was refused and leaves the caller to guess which step of a
+      // chain asked — `delete()` sends a check and a delete, `create()` sends
+      // six. "Object is locked" means a different thing depending on which.
+      const refusal = adtExceptionIn(body, {
+        response: response as IAdtResponse,
+        request: { method: request?.method, url: request?.url },
+      });
       if (refusal) {
         throw refusal;
       }

@@ -21,6 +21,7 @@
  * It is the library declining to translate a refusal into a fact.
  */
 
+import type { IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
 
 const parser = new XMLParser({
@@ -30,26 +31,53 @@ const parser = new XMLParser({
   trimValues: true,
 });
 
-/** Thrown when a parsed ADT document turns out to be a refusal. */
+/** What the library asked for, when a refusal came back. */
+export interface IAdtRefusalRequest {
+  method?: string;
+  url?: string;
+}
+
+/**
+ * Thrown when a response turns out to be a refusal.
+ *
+ * Carries enough for a consumer to do their own analysis and decide what to do,
+ * because this library does not decide for them: what the server said, the
+ * document it said it in, the classification the server itself gave, the
+ * response it arrived on, and the request that produced it.
+ *
+ * The last one is why this is not just the document. A refusal with no request
+ * beside it tells a caller that something was refused, and leaves them to guess
+ * which of the several calls in a chain it was — `delete()` issues a check and a
+ * delete, `create()` runs validate, create, lock, update, unlock and activate.
+ * "Object is locked" is a different problem depending on which of those asked.
+ */
 export class AdtExceptionDocumentError extends Error {
   /** The document exactly as the server sent it. Nothing is summarised away. */
   readonly document: string;
-  /** `<type id="…">`, when the document names one. */
+  /** `<type id="…">`, when the document names one — the server's own classification. */
   readonly adtType?: string;
   /** `<namespace id="…">`, when the document names one. */
   readonly namespace?: string;
+  /** The response it arrived on. A 2xx, or this would have thrown lower down. */
+  readonly response?: IAdtResponse;
+  /** The call that produced it, so a chain's steps can be told apart. */
+  readonly request?: IAdtRefusalRequest;
 
   constructor(
     message: string,
     document: string,
     adtType?: string,
     namespace?: string,
+    response?: IAdtResponse,
+    request?: IAdtRefusalRequest,
   ) {
     super(message);
     this.name = 'AdtExceptionDocumentError';
     this.document = document;
     this.adtType = adtType;
     this.namespace = namespace;
+    this.response = response;
+    this.request = request;
   }
 }
 
@@ -85,6 +113,7 @@ const attribute = (value: unknown, name: string): string | undefined => {
  */
 export function adtExceptionIn(
   xmlData: string,
+  context?: { response?: IAdtResponse; request?: IAdtRefusalRequest },
 ): AdtExceptionDocumentError | undefined {
   if (!xmlData || !xmlData.includes('<exc:exception')) {
     return undefined;
@@ -120,6 +149,8 @@ export function adtExceptionIn(
     xmlData,
     adtType,
     namespace,
+    context?.response,
+    context?.request,
   );
 }
 
