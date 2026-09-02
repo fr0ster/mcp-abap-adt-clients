@@ -2,7 +2,10 @@
  * DataElement check operations
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_CHECK_MESSAGES,
   CT_CHECK_OBJECTS,
@@ -33,8 +36,8 @@ export async function checkDataElement(
   dataElementName: string,
   version: CheckRunVersion = 'active',
   xmlContent?: string,
-): Promise<IAdtResponse> {
-  let response: IAdtResponse;
+): Promise<IAdtWireResponse> {
+  let response: IAdtWireResponse;
 
   if (xmlContent) {
     // Check with XML content (for unsaved changes or new content validation)

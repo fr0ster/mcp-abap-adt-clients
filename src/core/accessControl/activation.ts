@@ -1,4 +1,7 @@
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { assertActivationSucceeded } from '../../utils/activationUtils';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -23,7 +26,7 @@ function buildActivationXml(accessControlName: string): string {
 export async function activateAccessControl(
   connection: IAbapConnection,
   accessControlName: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = '/sap/bc/adt/activation?method=activate&preauditRequested=true';
   const xmlBody = buildActivationXml(accessControlName);
 

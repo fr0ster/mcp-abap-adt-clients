@@ -2,7 +2,10 @@
  * FunctionModule unlock operations
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
@@ -14,7 +17,7 @@ export async function unlockFunctionModule(
   functionGroupName: string,
   functionModuleName: string,
   lockHandle: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const encodedGroupName = encodeSapObjectName(functionGroupName).toLowerCase();
   const encodedModuleName =
     encodeSapObjectName(functionModuleName).toLowerCase();

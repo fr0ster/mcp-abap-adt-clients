@@ -2,7 +2,10 @@
  * TableType unlock operations
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
@@ -14,7 +17,7 @@ export async function unlockTableType(
   connection: IAbapConnection,
   tableTypeName: string,
   lockHandle: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/ddic/tabletypes/${encodeSapObjectName(tableTypeName)}?_action=UNLOCK&lockHandle=${encodeURIComponent(lockHandle)}`;
 
   return connection.makeAdtRequest({
@@ -32,7 +35,7 @@ export async function unlockTableType(
 export async function deleteTableTypeLock(
   connection: IAbapConnection,
   tableTypeName: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/ddic/ddlock/locks?lockAction=DELETE&name=${encodeSapObjectName(tableTypeName)}`;
 
   return connection.makeAdtRequest({

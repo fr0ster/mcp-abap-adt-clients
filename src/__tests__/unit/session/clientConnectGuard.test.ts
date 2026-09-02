@@ -13,7 +13,7 @@
 import {
   ADT_SESSION_ERROR,
   type IAbapConnection,
-  type IAdtResponse,
+  type IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
 import { AdtClient } from '../../../clients/AdtClient';
 
@@ -37,7 +37,7 @@ function baseConnection(): IAbapConnection {
         status: 200,
         statusText: 'OK',
         headers: {},
-      }) as unknown as IAdtResponse<T, D>,
+      }) as unknown as IAdtWireResponse<T, D>,
   };
 }
 

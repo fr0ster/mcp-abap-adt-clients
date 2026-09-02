@@ -2,7 +2,10 @@
  * Domain create operations
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { ACCEPT_DOMAIN, CT_DOMAIN } from '../../constants/contentTypes';
 import { limitDescription } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -17,7 +20,7 @@ import type { ICreateDomainParams } from './types';
 export async function create(
   connection: IAbapConnection,
   args: ICreateDomainParams,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const corrNrParam = args.transport_request
     ? `?corrNr=${args.transport_request}`
     : '';

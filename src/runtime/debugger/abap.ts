@@ -13,7 +13,10 @@
  * - Batch requests
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import {
   createBatchBoundary,
   createRequestId,
@@ -40,7 +43,7 @@ export interface ILaunchDebuggerOptions {
 export async function launchDebugger(
   connection: IAbapConnection,
   options?: ILaunchDebuggerOptions,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/debugger/listeners`;
   const params: Record<string, string | number | boolean> = {};
 
@@ -85,7 +88,7 @@ export interface IStopDebuggerOptions {
 export async function stopDebugger(
   connection: IAbapConnection,
   options?: IStopDebuggerOptions,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/debugger/listeners`;
   const params: Record<string, string | number | boolean> = {};
 
@@ -128,7 +131,7 @@ export interface IGetDebuggerOptions {
 export async function getDebugger(
   connection: IAbapConnection,
   options?: IGetDebuggerOptions,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/debugger/listeners`;
   const params: Record<string, string | number | boolean> = {};
 
@@ -161,7 +164,7 @@ export async function getDebugger(
 export async function getMemorySizes(
   connection: IAbapConnection,
   includeAbap?: boolean,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/debugger/memorysizes`;
   const params: Record<string, string | number | boolean> = {};
 
@@ -201,7 +204,7 @@ export async function getSystemArea(
   connection: IAbapConnection,
   systemarea: string,
   options?: IGetSystemAreaOptions,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   if (!systemarea) {
     throw new Error('System area is required');
   }
@@ -242,7 +245,7 @@ export async function getSystemArea(
 export async function synchronizeBreakpoints(
   connection: IAbapConnection,
   checkConflict?: boolean,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/debugger/breakpoints`;
   const params: Record<string, string | number | boolean> = {};
 
@@ -269,7 +272,7 @@ export async function synchronizeBreakpoints(
  */
 export async function getBreakpointStatements(
   connection: IAbapConnection,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/debugger/breakpoints/statements`;
 
   return connection.makeAdtRequest({
@@ -290,7 +293,7 @@ export async function getBreakpointStatements(
  */
 export async function getBreakpointMessageTypes(
   connection: IAbapConnection,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/debugger/breakpoints/messagetypes`;
 
   return connection.makeAdtRequest({
@@ -311,7 +314,7 @@ export async function getBreakpointMessageTypes(
  */
 export async function getBreakpointConditions(
   connection: IAbapConnection,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/debugger/breakpoints/conditions`;
 
   return connection.makeAdtRequest({
@@ -332,7 +335,7 @@ export async function getBreakpointConditions(
  */
 export async function validateBreakpoints(
   connection: IAbapConnection,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/debugger/breakpoints/validations`;
 
   return connection.makeAdtRequest({
@@ -353,7 +356,7 @@ export async function validateBreakpoints(
  */
 export async function getVitBreakpoints(
   connection: IAbapConnection,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/debugger/breakpoints/vit`;
 
   return connection.makeAdtRequest({
@@ -380,7 +383,7 @@ export async function getVariableMaxLength(
   variableName: string,
   part: string,
   maxLength?: number,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   if (!variableName || !part) {
     throw new Error('Variable name and part are required');
   }
@@ -419,7 +422,7 @@ export async function getVariableSubcomponents(
   part: string,
   component?: string,
   line?: number,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   if (!variableName || !part) {
     throw new Error('Variable name and part are required');
   }
@@ -467,7 +470,7 @@ export async function getVariableAsCsv(
   variableName: string,
   part: string,
   options?: IGetVariableAsCsvOptions,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   if (!variableName || !part) {
     throw new Error('Variable name and part are required');
   }
@@ -519,7 +522,7 @@ export async function getVariableAsJson(
   variableName: string,
   part: string,
   options?: IGetVariableAsJsonOptions,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   if (!variableName || !part) {
     throw new Error('Variable name and part are required');
   }
@@ -571,7 +574,7 @@ export async function getVariableValueStatement(
   variableName: string,
   part: string,
   options?: IGetVariableValueStatementOptions,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   if (!variableName || !part) {
     throw new Error('Variable name and part are required');
   }
@@ -617,7 +620,7 @@ export async function executeDebuggerAction(
   connection: IAbapConnection,
   action: string,
   value?: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   if (!action) {
     throw new Error('Action is required');
   }
@@ -656,7 +659,7 @@ export async function executeDebuggerAction(
  */
 export async function getCallStack(
   connection: IAbapConnection,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/debugger/stack`;
 
   return connection.makeAdtRequest({
@@ -681,7 +684,7 @@ export async function insertWatchpoint(
   connection: IAbapConnection,
   variableName: string,
   condition?: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   if (!variableName) {
     throw new Error('Variable name is required');
   }
@@ -711,7 +714,7 @@ export async function insertWatchpoint(
  */
 export async function getWatchpoints(
   connection: IAbapConnection,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/debugger/watchpoints`;
 
   return connection.makeAdtRequest({
@@ -735,7 +738,7 @@ export async function getWatchpoints(
 export async function executeBatchRequest(
   connection: IAbapConnection,
   requests: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   if (!requests) {
     throw new Error('Requests are required');
   }
@@ -813,7 +816,7 @@ export function buildDebuggerStepWithStackBatchPayload(
 export async function executeDebuggerStepBatch(
   connection: IAbapConnection,
   stepMethod: IAbapDebuggerStepMethod,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const payload = buildDebuggerStepWithStackBatchPayload(stepMethod);
 
   return connection.makeAdtRequest({
@@ -830,18 +833,18 @@ export async function executeDebuggerStepBatch(
 
 export async function stepIntoDebuggerBatch(
   connection: IAbapConnection,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   return executeDebuggerStepBatch(connection, 'stepInto');
 }
 
 export async function stepOutDebuggerBatch(
   connection: IAbapConnection,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   return executeDebuggerStepBatch(connection, 'stepOut');
 }
 
 export async function stepContinueDebuggerBatch(
   connection: IAbapConnection,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   return executeDebuggerStepBatch(connection, 'stepContinue');
 }

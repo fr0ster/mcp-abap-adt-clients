@@ -7,7 +7,7 @@
 
 import type {
   IAbapConnection,
-  IAdtResponse,
+  IAdtWireResponse,
   ILogger,
   IRepositoryNodeChild,
   IRepositoryNodeContents,
@@ -42,7 +42,7 @@ export async function fetchNodeStructure(
   parentName: string,
   nodeId?: string,
   withShortDescriptions: boolean = true,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/repository/nodestructure`;
 
   const params: Record<string, string | number | boolean> = {

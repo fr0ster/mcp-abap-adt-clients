@@ -1,4 +1,7 @@
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { AdtMessageClass } from '../../core/messageClass/AdtMessageClass';
 import { noopLogger } from '../../utils/noopLogger';
 
@@ -15,7 +18,7 @@ interface Recorded {
 }
 
 function recorder(
-  handler: (call: Recorded, index: number) => Promise<IAdtResponse>,
+  handler: (call: Recorded, index: number) => Promise<IAdtWireResponse>,
 ): { conn: IAbapConnection; calls: Recorded[]; sessionTypes: string[] } {
   const calls: Recorded[] = [];
   const sessionTypes: string[] = [];
@@ -32,7 +35,7 @@ function recorder(
   return { conn, calls, sessionTypes };
 }
 
-function conn(handler: (o: any) => Promise<IAdtResponse>): IAbapConnection {
+function conn(handler: (o: any) => Promise<IAdtWireResponse>): IAbapConnection {
   return {
     makeAdtRequest: handler,
     setSessionType: () => {},
@@ -61,7 +64,7 @@ describe('AdtMessageClass', () => {
     const mc = new AdtMessageClass(
       conn(async (o) => {
         seen = o;
-        return { data: '', status: 201, headers: {} } as IAdtResponse;
+        return { data: '', status: 201, headers: {} } as IAdtWireResponse;
       }),
       noopLogger,
     );
@@ -77,7 +80,7 @@ describe('AdtMessageClass', () => {
       new AdtMessageClass(
         conn(async (o) => {
           seen = o;
-          return { data: '', status: 201, headers: {} } as IAdtResponse;
+          return { data: '', status: 201, headers: {} } as IAdtWireResponse;
         }),
         noopLogger,
       );
@@ -101,7 +104,7 @@ describe('AdtMessageClass', () => {
             rec.url === '/sap/bc/adt/deletion/check' ? deletionApproved() : '',
           status: 200,
           headers: {},
-        }) as IAdtResponse,
+        }) as IAdtWireResponse,
     );
     await new AdtMessageClass(c, noopLogger).delete({
       name: 'ZT',
@@ -116,14 +119,14 @@ describe('AdtMessageClass', () => {
   it('update appends &corrNr= on the PUT when transportRequest is set', async () => {
     const { conn: c, calls } = recorder(async (_rec, idx) => {
       if (idx === 0)
-        return { data: LOCK_XML, status: 200, headers: {} } as IAdtResponse;
+        return { data: LOCK_XML, status: 200, headers: {} } as IAdtWireResponse;
       if (idx === 1)
         return {
           data: CLASS_XML_WITH_MSG,
           status: 200,
           headers: {},
-        } as IAdtResponse;
-      return { data: '', status: 200, headers: {} } as IAdtResponse;
+        } as IAdtWireResponse;
+      return { data: '', status: 200, headers: {} } as IAdtWireResponse;
     });
     await new AdtMessageClass(c, noopLogger).update({
       name: 'ZT',
@@ -140,7 +143,7 @@ describe('AdtMessageClass', () => {
     const mc = new AdtMessageClass(
       conn(async (o) => {
         seen = o;
-        return { data: '', status: 200, headers: {} } as IAdtResponse;
+        return { data: '', status: 200, headers: {} } as IAdtWireResponse;
       }),
       noopLogger,
     );
@@ -156,7 +159,7 @@ describe('AdtMessageClass', () => {
     const mc = new AdtMessageClass(
       conn(async (o) => {
         seen = o;
-        return { data: '', status: 201, headers: {} } as IAdtResponse;
+        return { data: '', status: 201, headers: {} } as IAdtWireResponse;
       }),
       noopLogger,
     );
@@ -171,7 +174,7 @@ describe('AdtMessageClass', () => {
     const mc = new AdtMessageClass(
       conn(async (o) => {
         seen = o;
-        return { data: '', status: 201, headers: {} } as IAdtResponse;
+        return { data: '', status: 201, headers: {} } as IAdtWireResponse;
       }),
       noopLogger,
     );
@@ -190,7 +193,7 @@ describe('AdtMessageClass', () => {
     const mc = new AdtMessageClass(
       conn(async (o) => {
         seen = o;
-        return { data: '', status: 201, headers: {} } as IAdtResponse;
+        return { data: '', status: 201, headers: {} } as IAdtWireResponse;
       }),
       noopLogger,
       { masterLanguage: 'DE' },
@@ -204,7 +207,7 @@ describe('AdtMessageClass', () => {
     const mc = new AdtMessageClass(
       conn(
         async () =>
-          ({ data: CLASS_XML, status: 200, headers: {} }) as IAdtResponse,
+          ({ data: CLASS_XML, status: 200, headers: {} }) as IAdtWireResponse,
       ),
       noopLogger,
     );
@@ -217,7 +220,7 @@ describe('AdtMessageClass', () => {
     // class is not activated, has no syntax check, no version history, and
     // travels in its package's transport rather than carrying one of its own.
     const mc = new AdtMessageClass(
-      conn(async () => ({}) as IAdtResponse),
+      conn(async () => ({}) as IAdtWireResponse),
       noopLogger,
     );
     for (const name of [
@@ -239,19 +242,19 @@ describe('AdtMessageClass', () => {
     } = recorder(async (rec, idx) => {
       // idx 0: LOCK POST → return lock XML
       if (idx === 0)
-        return { data: LOCK_XML, status: 200, headers: {} } as IAdtResponse;
+        return { data: LOCK_XML, status: 200, headers: {} } as IAdtWireResponse;
       // idx 1: GET (read current inside updateMessageClass) → return XML with msg 001
       if (idx === 1)
         return {
           data: CLASS_XML_WITH_MSG,
           status: 200,
           headers: {},
-        } as IAdtResponse;
+        } as IAdtWireResponse;
       // idx 2: PUT
       if (idx === 2)
-        return { data: '', status: 200, headers: {} } as IAdtResponse;
+        return { data: '', status: 200, headers: {} } as IAdtWireResponse;
       // idx 3: UNLOCK POST
-      return { data: '', status: 200, headers: {} } as IAdtResponse;
+      return { data: '', status: 200, headers: {} } as IAdtWireResponse;
     });
 
     const mc = new AdtMessageClass(c, noopLogger);
@@ -293,7 +296,7 @@ describe('AdtMessageClass', () => {
             rec.url === '/sap/bc/adt/deletion/check' ? deletionApproved() : '',
           status: 200,
           headers: {},
-        }) as IAdtResponse,
+        }) as IAdtWireResponse,
     );
 
     const mc = new AdtMessageClass(c, noopLogger);
@@ -327,19 +330,19 @@ describe('AdtMessageClass', () => {
       sessionTypes,
     } = recorder(async (_rec, idx) => {
       if (idx === 0)
-        return { data: LOCK_XML, status: 200, headers: {} } as IAdtResponse;
+        return { data: LOCK_XML, status: 200, headers: {} } as IAdtWireResponse;
       if (idx === 1)
         return {
           data: CLASS_XML_WITH_MSG,
           status: 200,
           headers: {},
-        } as IAdtResponse;
+        } as IAdtWireResponse;
       if (idx === 2)
         throw Object.assign(new Error('PUT failed'), {
           response: { status: 500 },
         });
       // idx 3: UNLOCK (called during error cleanup)
-      return { data: '', status: 200, headers: {} } as IAdtResponse;
+      return { data: '', status: 200, headers: {} } as IAdtWireResponse;
     });
 
     const mc = new AdtMessageClass(c, noopLogger);

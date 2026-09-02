@@ -2,7 +2,10 @@
  * Enhancement delete operations - Low-level functions
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_DELETION,
   ACCEPT_DELETION_CHECK,
@@ -23,7 +26,7 @@ import { getEnhancementUri, type IDeleteEnhancementParams } from './types';
 export async function checkDeletion(
   connection: IAbapConnection,
   params: IDeleteEnhancementParams,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const { enhancement_name, enhancement_type } = params;
 
   if (!enhancement_name) {
@@ -67,7 +70,7 @@ export async function checkDeletion(
 export async function deleteEnhancement(
   connection: IAbapConnection,
   params: IDeleteEnhancementParams,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const { enhancement_name, enhancement_type, transport_request } = params;
 
   if (!enhancement_name) {
@@ -120,5 +123,5 @@ export async function deleteEnhancement(
       transport_request: transport_request || 'local',
       message: `Enhancement ${enhancement_name} deleted successfully`,
     },
-  } as IAdtResponse;
+  } as IAdtWireResponse;
 }

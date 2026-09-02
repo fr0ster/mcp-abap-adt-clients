@@ -35,6 +35,7 @@ import type {
   IPackageContentItem,
   IPackageHierarchyNode,
 } from '../src/core/shared/types';
+import { orThrow } from '../src/utils/adtResponse';
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../.env');
 if (fs.existsSync(envPath)) {
@@ -181,11 +182,13 @@ async function run(): Promise<void> {
   try {
     if (options.treeMode) {
       // Tree mode - use getPackageHierarchy
-      const tree = await utils.getPackageHierarchy(options.packageName, {
-        includeSubpackages: options.includeSubpackages,
-        maxDepth: options.maxDepth,
-        includeDescriptions: true,
-      });
+      const tree = await orThrow(
+        utils.getPackageHierarchy(options.packageName, {
+          includeSubpackages: options.includeSubpackages,
+          maxDepth: options.maxDepth,
+          includeDescriptions: true,
+        }),
+      );
 
       if (options.jsonOutput) {
         console.log(JSON.stringify(tree, null, 2));
@@ -199,11 +202,13 @@ async function run(): Promise<void> {
       }
     } else {
       // List mode - use getPackageContentsList
-      const items = await utils.getPackageContentsList(options.packageName, {
-        includeSubpackages: options.includeSubpackages,
-        maxDepth: options.maxDepth,
-        includeDescriptions: true,
-      });
+      const items = await orThrow(
+        utils.getPackageContentsList(options.packageName, {
+          includeSubpackages: options.includeSubpackages,
+          maxDepth: options.maxDepth,
+          includeDescriptions: true,
+        }),
+      );
 
       if (options.jsonOutput) {
         console.log(JSON.stringify(items, null, 2));

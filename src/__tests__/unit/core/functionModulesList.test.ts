@@ -1,6 +1,7 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AdtUtils } from '../../../core/shared/AdtUtils';
 import { listFunctionModules } from '../../../core/shared/functionModulesList';
+import { orThrow } from '../../../utils/adtResponse';
 
 const ROOT_XML = (nodeId = '000007') =>
   `<?xml version="1.0" encoding="utf-8"?><asx:abap version="1.0" xmlns:asx="http://www.sap.com/abapxml"><asx:values><DATA><TREE_CONTENT/><OBJECT_TYPES><SEU_ADT_OBJECT_TYPE_INFO><OBJECT_TYPE>FUGR/FF</OBJECT_TYPE><NODE_ID>${nodeId}</NODE_ID></SEU_ADT_OBJECT_TYPE_INFO><SEU_ADT_OBJECT_TYPE_INFO><OBJECT_TYPE>FUGR/I</OBJECT_TYPE><NODE_ID>000002</NODE_ID></SEU_ADT_OBJECT_TYPE_INFO></OBJECT_TYPES></DATA></asx:values></asx:abap>`;
@@ -200,6 +201,8 @@ describe('AdtUtils.listFunctionModules', () => {
       error: jest.fn(),
     };
     const utils = new AdtUtils({ makeAdtRequest } as any, logger as any);
-    expect(await utils.listFunctionModules('zfugr')).toEqual(['Z_FM1']);
+    expect(await orThrow(utils.listFunctionModules('zfugr'))).toEqual([
+      'Z_FM1',
+    ]);
   });
 });

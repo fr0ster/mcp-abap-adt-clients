@@ -4,7 +4,7 @@
 
 import type {
   IAbapConnection,
-  IAdtResponse,
+  IAdtWireResponse,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_PACKAGE, ACCEPT_TRANSPORT } from '../../constants/contentTypes';
@@ -22,7 +22,7 @@ export async function getPackage(
   version: 'active' | 'inactive' = 'active',
   options?: IReadOptions,
   logger?: ILogger,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const encodedName = encodeSapObjectName(packageName.toLowerCase());
   const longPollingQuery = options?.withLongPolling
     ? '&withLongPolling=true'
@@ -53,7 +53,7 @@ export async function getPackageTransport(
   connection: IAbapConnection,
   packageName: string,
   options?: IReadOptions,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const encodedName = encodeSapObjectName(packageName.toLowerCase());
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
   const url = `/sap/bc/adt/packages/${encodedName}/transport${query}`;

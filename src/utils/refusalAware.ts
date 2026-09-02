@@ -40,7 +40,7 @@
 import type {
   IAbapConnection,
   IAbapRequestOptions,
-  IAdtResponse,
+  IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
 import { sapErrorIn } from './adtErrors';
 
@@ -81,20 +81,20 @@ export function withRefusalDetection(
   connection.makeAdtRequest = async function makeAdtRequestRefusalAware<
     T = unknown,
     D = unknown,
-  >(request: IAbapRequestOptions): Promise<IAdtResponse<T, D>> {
+  >(request: IAbapRequestOptions): Promise<IAdtWireResponse<T, D>> {
     const response = await base<T, D>(request);
 
     // A status the transport rejected never reaches here — it threw, carrying
     // the response. What arrives is a request the channel considers finished,
     // and only the body says what the server decided about it.
-    const body = (response as IAdtResponse).data;
+    const body = (response as IAdtWireResponse).data;
     if (typeof body === 'string') {
       // The request goes with it. A refusal with no request beside it says
       // something was refused and leaves the caller to guess which step of a
       // chain asked — `delete()` sends a check and a delete, `create()` sends
       // six. "Object is locked" means a different thing depending on which.
       const refusal = sapErrorIn(body, {
-        response: response as IAdtResponse,
+        response: response as IAdtWireResponse,
         request: { method: request?.method, url: request?.url },
       });
       if (refusal) {

@@ -9,10 +9,11 @@ import type {
   IAbapConnection,
   IAdtObject,
   IAdtOperationOptions,
-  IAdtResponse,
+  IAdtWireResponse,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import type { AdtClient } from '../../../clients/AdtClient';
+import { orThrow } from '../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import { BaseTester } from '../../helpers/BaseTester';
 import {
@@ -49,7 +50,7 @@ const libraryLogger: ILogger = createLibraryLogger();
 const testsLogger: ILogger = createTestsLogger();
 
 class ObjectStructureObject
-  implements IAdtObject<IObjectStructureParams, IAdtResponse>
+  implements IAdtObject<IObjectStructureParams, IAdtWireResponse>
 {
   private client: AdtClient;
 
@@ -71,14 +72,16 @@ class ObjectStructureObject
     return this.rejectUnsupported<never>('getVersionSource');
   }
 
-  validate(_config: Partial<IObjectStructureParams>): Promise<IAdtResponse> {
+  validate(
+    _config: Partial<IObjectStructureParams>,
+  ): Promise<IAdtWireResponse> {
     return this.rejectUnsupported('validate');
   }
 
   create(
     _config: IObjectStructureParams,
     _options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     return this.rejectUnsupported('create');
   }
 
@@ -86,48 +89,52 @@ class ObjectStructureObject
     config: Partial<IObjectStructureParams>,
     _version?: 'active' | 'inactive',
     _options?: { withLongPolling?: boolean },
-  ): Promise<IAdtResponse | undefined> {
+  ): Promise<IAdtWireResponse | undefined> {
     if (!config.object_type || !config.object_name) {
       return Promise.reject(new Error('object_type and object_name required'));
     }
-    return this.client
-      .getUtils()
-      .getObjectStructure(config.object_type, config.object_name);
+    return orThrow(
+      this.client
+        .getUtils()
+        .getObjectStructure(config.object_type, config.object_name),
+    );
   }
 
   readMetadata(
     _config: Partial<IObjectStructureParams>,
     _options?: { withLongPolling?: boolean },
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     return this.rejectUnsupported('readMetadata');
   }
 
   update(
     _config: Partial<IObjectStructureParams>,
     _options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     return this.rejectUnsupported('update');
   }
 
-  delete(_config: Partial<IObjectStructureParams>): Promise<IAdtResponse> {
+  delete(_config: Partial<IObjectStructureParams>): Promise<IAdtWireResponse> {
     return this.rejectUnsupported('delete');
   }
 
-  activate(_config: Partial<IObjectStructureParams>): Promise<IAdtResponse> {
+  activate(
+    _config: Partial<IObjectStructureParams>,
+  ): Promise<IAdtWireResponse> {
     return this.rejectUnsupported('activate');
   }
 
   check(
     _config: Partial<IObjectStructureParams>,
     _status?: string,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     return this.rejectUnsupported('check');
   }
 
   readTransport(
     _config: Partial<IObjectStructureParams>,
     _options?: { withLongPolling?: boolean },
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     return this.rejectUnsupported('readTransport');
   }
 
@@ -138,7 +145,7 @@ class ObjectStructureObject
   unlock(
     _config: Partial<IObjectStructureParams>,
     _lockHandle: string,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     return this.rejectUnsupported('unlock');
   }
 }
@@ -149,7 +156,7 @@ describe('Shared - getObjectStructure', () => {
   let hasConfig = false;
   let isLegacy = false;
   let isCloudSystem = false;
-  let tester: BaseTester<IObjectStructureParams, IAdtResponse>;
+  let tester: BaseTester<IObjectStructureParams, IAdtWireResponse>;
 
   beforeAll(async () => {
     try {

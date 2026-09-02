@@ -2,7 +2,10 @@
  * Message class read operations
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
@@ -20,7 +23,7 @@ export async function getMessageClassSource(
   connection: IAbapConnection,
   name: string,
   options?: { withLongPolling?: boolean },
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const encoded = encodeSapObjectName(name.toLowerCase());
   // No ADT operation that changes system state guarantees when the change
   // becomes visible, so a read straight after a create can legitimately find

@@ -27,8 +27,8 @@ import {
   type IAbapConnection,
   type IAdtContentTypes,
   type IAdtOperationOptions,
-  type IAdtResponse,
   type IAdtSourceObject,
+  type IAdtWireResponse,
   type ILogger,
   type IObjectVersion,
 } from '@mcp-abap-adt/interfaces';
@@ -635,7 +635,7 @@ export class AdtClass
   async unlockTestClasses(
     config: Partial<IClassConfig>,
     lockHandle: string,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
@@ -655,7 +655,7 @@ export class AdtClass
   async checkTestClass(
     config: Partial<IClassConfig> & { testClassCode: string },
     version: 'active' | 'inactive' = 'inactive',
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
@@ -677,7 +677,7 @@ export class AdtClass
    */
   async updateTestClasses(
     config: Partial<IClassConfig> & { testClassCode: string },
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
@@ -749,7 +749,7 @@ export class AdtClass
    */
   async activateTestClasses(
     config: Partial<IClassConfig> & { testClassName: string },
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     if (!config.className) {
       throw new Error('Class name is required');
     }

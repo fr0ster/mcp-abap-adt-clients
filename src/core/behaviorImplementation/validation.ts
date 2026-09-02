@@ -2,7 +2,10 @@
  * Behavior Implementation validation
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { AxiosError } from 'axios';
 import { ACCEPT_VALIDATION_CLASS_NAME } from '../../constants/contentTypes';
 import { limitDescription } from '../../utils/internalUtils';
@@ -31,7 +34,7 @@ export async function validateBehaviorImplementationName(
   packageName: string,
   description?: string,
   behaviorDefinition?: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   // Build query parameters for behavior implementation validation
   const params = new URLSearchParams({
     objname: className,

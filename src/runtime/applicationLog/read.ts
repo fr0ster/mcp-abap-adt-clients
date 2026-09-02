@@ -7,7 +7,10 @@
  * - Validate application log object name
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -33,7 +36,7 @@ export async function getApplicationLogObject(
   connection: IAbapConnection,
   objectName: string,
   options?: IGetApplicationLogObjectOptions,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/applicationlog/objects/${objectName}`;
   const params: Record<string, string | number | boolean> = {};
 
@@ -77,7 +80,7 @@ export async function getApplicationLogSource(
   connection: IAbapConnection,
   objectName: string,
   options?: IGetApplicationLogSourceOptions,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/applicationlog/objects/${objectName}/source/main`;
   const params: Record<string, string | number | boolean> = {};
 
@@ -108,7 +111,7 @@ export async function getApplicationLogSource(
 export async function validateApplicationLogName(
   connection: IAbapConnection,
   objectName: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/applicationlog/objects/validation`;
   const params: Record<string, string | number | boolean> = {};
 

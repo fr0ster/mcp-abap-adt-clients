@@ -5,7 +5,7 @@
 import type {
   HttpError,
   IAbapConnection,
-  IAdtResponse,
+  IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
 import { CT_BEHAVIOR_DEFINITION } from '../../constants/contentTypes';
 import { limitDescription } from '../../utils/internalUtils';
@@ -38,7 +38,7 @@ import type { IBehaviorDefinitionCreateParams } from './types';
 export async function create(
   connection: IAbapConnection,
   params: IBehaviorDefinitionCreateParams,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   try {
     const language = params.language || 'EN';
 

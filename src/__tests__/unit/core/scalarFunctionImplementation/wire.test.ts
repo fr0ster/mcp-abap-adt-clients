@@ -1,4 +1,7 @@
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { getScalarFunctionImplementationSource } from '../../../../core/scalarFunctionImplementation/read';
 import { unlockScalarFunctionImplementation } from '../../../../core/scalarFunctionImplementation/unlock';
 import { updateScalarFunctionImplementation } from '../../../../core/scalarFunctionImplementation/update';
@@ -8,7 +11,7 @@ function cap() {
   const c: { url?: string; method?: string; headers?: Record<string, string> } =
     {};
   const conn = {
-    makeAdtRequest: async (r: any): Promise<IAdtResponse> => {
+    makeAdtRequest: async (r: any): Promise<IAdtWireResponse> => {
       c.url = r.url;
       c.method = r.method;
       c.headers = r.headers;
@@ -17,7 +20,7 @@ function cap() {
         statusText: 'OK',
         headers: {},
         data: '',
-      } as IAdtResponse;
+      } as IAdtWireResponse;
     },
     setSessionType: () => {},
   } as unknown as IAbapConnection;

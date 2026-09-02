@@ -15,7 +15,7 @@
 import type {
   AtcObjectType,
   IAbapConnection,
-  IAdtResponse,
+  IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_ATC_CUSTOMIZING,
@@ -93,7 +93,7 @@ export function buildAtcObjectUri(
  */
 export async function getAtcCustomizing(
   connection: IAbapConnection,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   return connection.makeAdtRequest({
     url: `${ATC}/customizing`,
     method: 'GET',
@@ -119,7 +119,7 @@ export async function getAtcCustomizing(
 export async function createAtcWorklist(
   connection: IAbapConnection,
   checkVariant: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   return connection.makeAdtRequest({
     url: `${ATC}/worklists?checkVariant=${encodeURIComponent(checkVariant)}`,
     method: 'POST',
@@ -165,7 +165,7 @@ export async function startAtcRun(
   objectUris: readonly string[],
   maximumVerdicts: number,
   wait: boolean,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   return connection.makeAdtRequest({
     url: `${ATC}/runs?worklistId=${encodeURIComponent(worklistId)}&clientWait=${wait}`,
     method: 'POST',
@@ -179,7 +179,7 @@ export async function startAtcRun(
 export async function getAtcRunStatus(
   connection: IAbapConnection,
   runId: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   return connection.makeAdtRequest({
     url: `${ATC}/runs/${encodeURIComponent(runId)}`,
     method: 'GET',
@@ -199,7 +199,7 @@ export async function getAtcRunStatus(
 export async function getAtcWorklist(
   connection: IAbapConnection,
   worklistId: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   return connection.makeAdtRequest({
     url: `${ATC}/worklists/${encodeURIComponent(worklistId)}?includeExemptedFindings=false`,
     method: 'GET',

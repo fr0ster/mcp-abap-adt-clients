@@ -2,7 +2,10 @@
  * FunctionGroup activation operations
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { assertActivationSucceeded } from '../../utils/activationUtils';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 
@@ -12,7 +15,7 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
 export async function activateFunctionGroup(
   connection: IAbapConnection,
   functionGroupName: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const encodedName = encodeSapObjectName(functionGroupName).toLowerCase();
   const objectUri = `/sap/bc/adt/functions/groups/${encodedName}`;
 

@@ -2,7 +2,10 @@
  * Group Activation operations - activate multiple objects with session support
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
 import { buildObjectUri } from '../../utils/activationUtils';
 import { headerValueToString } from '../../utils/internalUtils';
@@ -15,7 +18,7 @@ const xmlParser = new XMLParser({
   parseAttributeValue: false,
 });
 
-type AdtHeaderValue = IAdtResponse['headers'][string];
+type AdtHeaderValue = IAdtWireResponse['headers'][string];
 
 /**
  * Extract run ID from location header
@@ -35,7 +38,7 @@ async function waitForActivationRun(
   runId: string,
   maxWaitTime: number = 60000,
   pollInterval: number = 1000,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const startTime = Date.now();
   const url = `/sap/bc/adt/activation/runs/${runId}?withLongPolling=true`;
 
@@ -85,7 +88,7 @@ async function waitForActivationRun(
 async function getActivationResults(
   connection: IAbapConnection,
   runId: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/activation/results/${runId}`;
 
   return connection.makeAdtRequest({
@@ -136,7 +139,7 @@ export async function activateObjectsGroup(
   connection: IAbapConnection,
   objects: IObjectReference[],
   preauditRequested: boolean = false,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   // Step 1: Start activation run
   const url = `/sap/bc/adt/activation/runs?method=activate&preauditRequested=${preauditRequested}`;
 

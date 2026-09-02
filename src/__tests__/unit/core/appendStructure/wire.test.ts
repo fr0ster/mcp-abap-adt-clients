@@ -1,4 +1,7 @@
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { getAppendStructureSource } from '../../../../core/appendStructure/read';
 import { unlockAppendStructure } from '../../../../core/appendStructure/unlock';
 import { updateAppendStructure } from '../../../../core/appendStructure/update';
@@ -7,7 +10,7 @@ function cap() {
   const c: { url?: string; method?: string; headers?: Record<string, string> } =
     {};
   const conn = {
-    makeAdtRequest: async (r: any): Promise<IAdtResponse> => {
+    makeAdtRequest: async (r: any): Promise<IAdtWireResponse> => {
       c.url = r.url;
       c.method = r.method;
       c.headers = r.headers;
@@ -16,7 +19,7 @@ function cap() {
         statusText: 'OK',
         headers: {},
         data: '',
-      } as IAdtResponse;
+      } as IAdtWireResponse;
     },
     setSessionType: () => {},
   } as unknown as IAbapConnection;

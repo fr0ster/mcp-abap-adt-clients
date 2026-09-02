@@ -3,7 +3,10 @@
  * Uses ADT validation endpoint: /sap/bc/adt/functions/validation
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -27,7 +30,7 @@ export async function validateFunctionModuleName(
   functionGroupName: string,
   functionModuleName: string,
   description?: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/functions/validation`;
   const queryParams = new URLSearchParams({
     objtype: 'FUGR/FF',
@@ -71,7 +74,7 @@ export async function validateFunctionModuleSource(
   functionModuleName: string,
   sourceCode?: string,
   version: 'inactive' | 'active' = 'active',
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const { runCheckRun, runCheckRunWithSource, parseCheckRunResponse } =
     await import('../../utils/checkRun');
 
@@ -79,7 +82,7 @@ export async function validateFunctionModuleSource(
   const objectType = 'function_module';
   const objectName = `${functionGroupName}/${functionModuleName}`;
 
-  let response: IAdtResponse;
+  let response: IAdtWireResponse;
 
   if (sourceCode) {
     // Live validation with artifacts (code not saved to SAP)

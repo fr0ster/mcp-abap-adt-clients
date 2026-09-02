@@ -1,6 +1,6 @@
 import type {
   IAbapConnection,
-  IAdtResponse,
+  IAdtWireResponse,
   ILogger,
   INamedItem,
   IProfilerTraceParameters,
@@ -40,7 +40,7 @@ export class ProgramExecutor implements IProgramExecutor {
   scheduleTrace = (options?: IProfilerTraceParameters): Promise<string> =>
     this.scheduling.scheduleTrace(options);
 
-  async run(target: IProgramExecutionTarget): Promise<IAdtResponse> {
+  async run(target: IProgramExecutionTarget): Promise<IAdtWireResponse> {
     if (!target.programName) {
       throw new Error('Program name is required');
     }
@@ -50,7 +50,7 @@ export class ProgramExecutor implements IProgramExecutor {
   async runWithProfiler(
     target: IProgramExecutionTarget,
     options: IProgramExecuteWithProfilerOptions,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     if (!target.programName) {
       throw new Error('Program name is required');
     }
@@ -88,7 +88,7 @@ export class ProgramExecutor implements IProgramExecutor {
   private async runWithProfilerId(
     programName: string,
     profilerId: string,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     const normalizedProgramName =
       encodeSapObjectName(programName).toUpperCase();
     const encodedProfilerId = encodeURIComponent(profilerId);

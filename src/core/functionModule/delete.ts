@@ -2,7 +2,10 @@
  * FunctionModule delete operations - Low-level functions
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_DELETION,
   ACCEPT_DELETION_CHECK,
@@ -19,7 +22,7 @@ import type { IDeleteFunctionModuleParams } from './types';
 export async function checkDeletion(
   connection: IAbapConnection,
   params: IDeleteFunctionModuleParams,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const { function_module_name, function_group_name } = params;
 
   if (!function_module_name) {
@@ -60,7 +63,7 @@ export async function checkDeletion(
 export async function deleteFunctionModule(
   connection: IAbapConnection,
   params: IDeleteFunctionModuleParams,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const { function_module_name, function_group_name, transport_request } =
     params;
 
@@ -115,5 +118,5 @@ export async function deleteFunctionModule(
       transport_request: transport_request || 'local',
       message: `Function module ${function_module_name} deleted successfully`,
     },
-  } as IAdtResponse;
+  } as IAdtWireResponse;
 }

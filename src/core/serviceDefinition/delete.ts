@@ -2,7 +2,10 @@
  * ServiceDefinition delete operations - Low-level functions
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_DELETION,
   ACCEPT_DELETION_CHECK,
@@ -19,7 +22,7 @@ import type { IDeleteServiceDefinitionParams } from './types';
 export async function checkDeletion(
   connection: IAbapConnection,
   params: IDeleteServiceDefinitionParams,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const { service_definition_name } = params;
 
   if (!service_definition_name) {
@@ -56,7 +59,7 @@ export async function checkDeletion(
 export async function deleteServiceDefinition(
   connection: IAbapConnection,
   params: IDeleteServiceDefinitionParams,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const { service_definition_name, transport_request } = params;
 
   if (!service_definition_name) {
@@ -105,5 +108,5 @@ export async function deleteServiceDefinition(
       transport_request: transport_request || 'local',
       message: `Service definition ${service_definition_name} deleted successfully`,
     },
-  } as IAdtResponse;
+  } as IAdtWireResponse;
 }

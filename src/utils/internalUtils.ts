@@ -3,9 +3,9 @@
  * These are private utilities used internally by client classes
  */
 
-import type { IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces';
 
-type AdtHeaderValue = IAdtResponse['headers'][string];
+type AdtHeaderValue = IAdtWireResponse['headers'][string];
 
 /**
  * Encodes SAP object names for use in URLs

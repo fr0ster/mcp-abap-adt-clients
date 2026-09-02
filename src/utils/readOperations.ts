@@ -3,7 +3,10 @@
  * All read-only methods are implemented here once and reused by clients
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { ACCEPT_NODE_STRUCTURE } from '../constants/contentTypes';
 import { buildQueryString, encodeSapObjectName } from '../utils/internalUtils';
 import { getTimeout } from './timeouts';
@@ -19,7 +22,7 @@ async function makeAdtRequest(
   data?: unknown,
   params?: unknown,
   headers?: Record<string, string>,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const timeoutValue = getTimeout(timeout);
   return connection.makeAdtRequest({
     url,
@@ -41,7 +44,7 @@ async function makeAdtRequest(
 export async function getProgram(
   connection: IAbapConnection,
   programName: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const encodedName = encodeSapObjectName(programName);
   const url = `/sap/bc/adt/programs/programs/${encodedName}/source/main`;
   return makeAdtRequest(connection, url, 'GET', 'default');
@@ -53,7 +56,7 @@ export async function getProgram(
 export async function getClass(
   connection: IAbapConnection,
   className: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const encodedName = encodeSapObjectName(className);
   const url = `/sap/bc/adt/oo/classes/${encodedName}/source/main`;
   return makeAdtRequest(connection, url, 'GET', 'default');
@@ -65,7 +68,7 @@ export async function getClass(
 export async function getTable(
   connection: IAbapConnection,
   tableName: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const encodedName = encodeSapObjectName(tableName);
   const url = `/sap/bc/adt/ddic/tables/${encodedName}/source/main`;
   return makeAdtRequest(connection, url, 'GET', 'default');
@@ -77,7 +80,7 @@ export async function getTable(
 export async function getStructure(
   connection: IAbapConnection,
   structureName: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const encodedName = encodeSapObjectName(structureName);
   const url = `/sap/bc/adt/ddic/structures/${encodedName}/source/main`;
   return makeAdtRequest(connection, url, 'GET', 'default');
@@ -89,7 +92,7 @@ export async function getStructure(
 export async function getDomain(
   connection: IAbapConnection,
   domainName: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const encodedName = encodeSapObjectName(domainName);
   const url = `/sap/bc/adt/ddic/domains/${encodedName}`;
   return makeAdtRequest(connection, url, 'GET', 'default');
@@ -101,7 +104,7 @@ export async function getDomain(
 export async function getDataElement(
   connection: IAbapConnection,
   dataElementName: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const encodedName = encodeSapObjectName(dataElementName);
   const url = `/sap/bc/adt/ddic/dataelements/${encodedName}`;
   return makeAdtRequest(connection, url, 'GET', 'default');
@@ -113,7 +116,7 @@ export async function getDataElement(
 export async function getInterface(
   connection: IAbapConnection,
   interfaceName: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const encodedName = encodeSapObjectName(interfaceName);
   const url = `/sap/bc/adt/oo/interfaces/${encodedName}/source/main`;
   return makeAdtRequest(connection, url, 'GET', 'default');
@@ -125,7 +128,7 @@ export async function getInterface(
 export async function getFunctionGroup(
   connection: IAbapConnection,
   functionGroupName: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const encodedName = encodeSapObjectName(functionGroupName);
   const url = `/sap/bc/adt/functions/groups/${encodedName}`;
   return makeAdtRequest(connection, url, 'GET', 'default');
@@ -138,7 +141,7 @@ export async function getFunction(
   connection: IAbapConnection,
   functionName: string,
   functionGroup: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const encodedGroup = encodeSapObjectName(functionGroup);
   const encodedName = encodeSapObjectName(functionName);
   const url = `/sap/bc/adt/functions/groups/${encodedGroup}/fmodules/${encodedName}`;
@@ -151,7 +154,7 @@ export async function getFunction(
 export async function getPackage(
   connection: IAbapConnection,
   packageName: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const encodedName = encodeSapObjectName(packageName);
   const url = `/sap/bc/adt/packages/${encodedName}`;
   return makeAdtRequest(connection, url, 'GET', 'default');
@@ -163,7 +166,7 @@ export async function getPackage(
 export async function getDdl(
   connection: IAbapConnection,
   ddlName: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const encodedName = encodeSapObjectName(ddlName);
   const url = `/sap/bc/adt/ddic/ddl/sources/${encodedName}/source/main`;
   return makeAdtRequest(connection, url, 'GET', 'default');
@@ -179,7 +182,7 @@ export async function fetchNodeStructure(
   parentType: string,
   nodeKey: string,
   withShortDescriptions: boolean = true,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const qs = buildQueryString({
     parent_name: parentName,
     parent_tech_name: parentTechName,

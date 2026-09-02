@@ -4,7 +4,10 @@
  * Uses standard ABAP check run endpoint
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { runCheckRun } from '../../utils/checkRun';
 
 /**
@@ -27,7 +30,7 @@ export async function checkMetadataExtension(
   name: string,
   version: 'active' | 'inactive' = 'inactive',
   sourceCode?: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const objectType = 'DDLX/EX';
   // Pass just the name, getObjectUri will build the full URI
   const objectName = name;

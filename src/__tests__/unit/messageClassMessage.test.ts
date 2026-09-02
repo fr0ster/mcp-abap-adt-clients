@@ -1,4 +1,7 @@
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { AdtMessageClassMessage } from '../../core/messageClass/AdtMessageClassMessage';
 import { noopLogger } from '../../utils/noopLogger';
 
@@ -19,12 +22,20 @@ function recorder(classXml = CLASS_XML) {
     makeAdtRequest: async (o: any) => {
       calls.push(o);
       if (String(o.url).includes('_action=LOCK_MSG'))
-        return { data: LOCK('MH'), status: 200, headers: {} } as IAdtResponse;
+        return {
+          data: LOCK('MH'),
+          status: 200,
+          headers: {},
+        } as IAdtWireResponse;
       if (String(o.url).includes('_action=LOCK'))
-        return { data: LOCK('CH'), status: 200, headers: {} } as IAdtResponse;
+        return {
+          data: LOCK('CH'),
+          status: 200,
+          headers: {},
+        } as IAdtWireResponse;
       if (o.method === 'GET')
-        return { data: classXml, status: 200, headers: {} } as IAdtResponse;
-      return { data: '', status: 200, headers: {} } as IAdtResponse;
+        return { data: classXml, status: 200, headers: {} } as IAdtWireResponse;
+      return { data: '', status: 200, headers: {} } as IAdtWireResponse;
     },
   } as unknown as IAbapConnection;
   return { conn, calls };

@@ -2,8 +2,12 @@
  * Structure read operations
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { ACCEPT_TRANSPORT } from '../../constants/contentTypes';
+import { orThrow } from '../../utils/adtResponse';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { noopLogger } from '../../utils/noopLogger';
 import { getTimeout } from '../../utils/timeouts';
@@ -21,12 +25,14 @@ export async function getStructureMetadata(
   connection: IAbapConnection,
   structureName: string,
   options?: IReadOptions,
-): Promise<IAdtResponse> {
-  return getUtils(connection).readObjectMetadata(
-    'structure',
-    structureName,
-    undefined,
-    options,
+): Promise<IAdtWireResponse> {
+  return orThrow(
+    getUtils(connection).readObjectMetadata(
+      'structure',
+      structureName,
+      undefined,
+      options,
+    ),
   );
 }
 
@@ -38,13 +44,15 @@ export async function getStructureSource(
   structureName: string,
   version?: 'active' | 'inactive',
   options?: IReadOptions,
-): Promise<IAdtResponse> {
-  return getUtils(connection).readObjectSource(
-    'structure',
-    structureName,
-    undefined,
-    version,
-    options,
+): Promise<IAdtWireResponse> {
+  return orThrow(
+    getUtils(connection).readObjectSource(
+      'structure',
+      structureName,
+      undefined,
+      version,
+      options,
+    ),
   );
 }
 
@@ -55,7 +63,7 @@ export async function getStructureSource(
 export async function getStructure(
   connection: IAbapConnection,
   structureName: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   return getStructureSource(connection, structureName);
 }
 
@@ -69,7 +77,7 @@ export async function getStructureTransport(
   connection: IAbapConnection,
   structureName: string,
   options?: IReadOptions,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const encodedName = encodeSapObjectName(structureName);
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
   const url = `/sap/bc/adt/ddic/structures/${encodedName}/transport${query}`;

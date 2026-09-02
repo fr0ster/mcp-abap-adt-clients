@@ -13,7 +13,7 @@
  * in our logic regardless of what SAP sends.
  */
 
-import type { IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces';
 import {
   compareRecordedAt,
   parseDbAccesses,
@@ -24,8 +24,8 @@ import {
   parseTraceRequests,
 } from '../../../runtime/traces/traceParsing';
 
-const response = (data: string): IAdtResponse =>
-  ({ data, status: 200, statusText: 'OK', headers: {} }) as IAdtResponse;
+const response = (data: string): IAdtWireResponse =>
+  ({ data, status: 200, statusText: 'OK', headers: {} }) as IAdtWireResponse;
 
 const FEED = (entries: string) =>
   response(

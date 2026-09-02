@@ -3,7 +3,10 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { ACCEPT_DISCOVERY } from '../../constants/contentTypes';
 import { getTimeout } from '../../utils/timeouts';
 import type { IGetDiscoveryParams } from './types';
@@ -18,7 +21,7 @@ import type { IGetDiscoveryParams } from './types';
 export async function getDiscovery(
   connection: IAbapConnection,
   params: IGetDiscoveryParams = {},
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const requestId = params.requestId ?? randomUUID().replace(/-/g, '');
   const timeout = params.timeout ?? getTimeout('default');
 

@@ -6,7 +6,10 @@
  * - Get trace directory
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -17,7 +20,7 @@ import { getTimeout } from '../../utils/timeouts';
  */
 export async function getSt05TraceState(
   connection: IAbapConnection,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/st05/trace/state`;
 
   return connection.makeAdtRequest({
@@ -38,7 +41,7 @@ export async function getSt05TraceState(
  */
 export async function getSt05TraceDirectory(
   connection: IAbapConnection,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/st05/trace/directory`;
 
   return connection.makeAdtRequest({

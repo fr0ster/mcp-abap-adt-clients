@@ -9,11 +9,12 @@ import type {
   IAbapConnection,
   IAdtObject,
   IAdtOperationOptions,
-  IAdtResponse,
+  IAdtWireResponse,
   ILogger,
   IRepositoryNodeContents,
 } from '@mcp-abap-adt/interfaces';
 import type { AdtClient } from '../../../clients/AdtClient';
+import { orThrow } from '../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import { BaseTester } from '../../helpers/BaseTester';
 import {
@@ -55,7 +56,7 @@ const testsLogger: ILogger = createTestsLogger();
  * The state type is `IRepositoryNodeContents`, not the envelope.
  *
  * `getUtils()` returns contracts as of this release, and `fetchNodeStructure`
- * answers the parsed level. A shim that still declared `IAdtResponse` would have
+ * answers the parsed level. A shim that still declared `IAdtWireResponse` would have
  * to invent a status to satisfy itself — so it declares what it actually gets.
  */
 class NodeStructureObject
@@ -102,7 +103,7 @@ class NodeStructureObject
     if (!config.parent_type || !config.parent_name) {
       return Promise.reject(new Error('parent_type and parent_name required'));
     }
-    return (
+    return orThrow(
       this.client
         .getUtils()
         // Three arguments: the contract does not take `withShortDescriptions`,
@@ -111,7 +112,7 @@ class NodeStructureObject
           config.parent_type,
           config.parent_name,
           config.node_id,
-        )
+        ),
     );
   }
 

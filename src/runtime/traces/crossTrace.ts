@@ -16,7 +16,10 @@
  * rather than shaping it.
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -38,7 +41,7 @@ export interface IListCrossTracesOptions {
 export async function listCrossTraces(
   connection: IAbapConnection,
   options?: IListCrossTracesOptions,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/crosstrace/traces`;
   const params: Record<string, string | number | boolean> = {};
 
@@ -69,7 +72,7 @@ export async function getCrossTrace(
   connection: IAbapConnection,
   traceId: string,
   includeSensitiveData?: boolean,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/crosstrace/traces/${traceId}`;
   const params: Record<string, string | number | boolean> = {};
 
@@ -97,7 +100,7 @@ export async function getCrossTrace(
 export async function getCrossTraceRecords(
   connection: IAbapConnection,
   traceId: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/crosstrace/traces/${traceId}/records`;
 
   return connection.makeAdtRequest({
@@ -122,7 +125,7 @@ export async function getCrossTraceRecordContent(
   connection: IAbapConnection,
   traceId: string,
   recordNumber: number,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/crosstrace/traces/${traceId}/records/${recordNumber}/content`;
 
   return connection.makeAdtRequest({
@@ -143,7 +146,7 @@ export async function getCrossTraceRecordContent(
  */
 export async function getCrossTraceActivations(
   connection: IAbapConnection,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/crosstrace/activations`;
 
   return connection.makeAdtRequest({

@@ -1,12 +1,15 @@
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { AdtScalarFunction } from '../../../../core/scalarFunction/AdtScalarFunction';
 
 type Call = { url: string; method?: string };
-function makeConn(handler: (r: any) => Partial<IAdtResponse> | Error) {
+function makeConn(handler: (r: any) => Partial<IAdtWireResponse> | Error) {
   const sessionTypes: string[] = [];
   const calls: Call[] = [];
   const conn = {
-    makeAdtRequest: async (r: any): Promise<IAdtResponse> => {
+    makeAdtRequest: async (r: any): Promise<IAdtWireResponse> => {
       calls.push({ url: r.url, method: r.method });
       const res = handler(r);
       if (res instanceof Error) throw res;
@@ -16,7 +19,7 @@ function makeConn(handler: (r: any) => Partial<IAdtResponse> | Error) {
         headers: {},
         data: '',
         ...res,
-      } as IAdtResponse;
+      } as IAdtWireResponse;
     },
     setSessionType: (t: string) => {
       sessionTypes.push(t);

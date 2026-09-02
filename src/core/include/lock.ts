@@ -6,7 +6,10 @@
  * This is the opposite of class includes, where the CLASS is what gets locked.
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
 import { ACCEPT_LOCK } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
@@ -19,7 +22,11 @@ function includeUrl(includeName: string): string {
 export async function lockInclude(
   connection: IAbapConnection,
   includeName: string,
-): Promise<{ response: IAdtResponse; lockHandle: string; corrNr?: string }> {
+): Promise<{
+  response: IAdtWireResponse;
+  lockHandle: string;
+  corrNr?: string;
+}> {
   const response = await connection.makeAdtRequest({
     url: `${includeUrl(includeName)}?_action=LOCK&accessMode=MODIFY`,
     method: 'POST',

@@ -2,7 +2,10 @@
  * FunctionGroup read operations
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { ACCEPT_TRANSPORT } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -15,7 +18,7 @@ export async function getFunctionGroup(
   connection: IAbapConnection,
   functionGroupName: string,
   options?: IReadOptions,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const encodedName = encodeSapObjectName(functionGroupName);
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
   const url = `/sap/bc/adt/functions/groups/${encodedName}${query}`;
@@ -38,7 +41,7 @@ export async function getFunctionGroupTransport(
   connection: IAbapConnection,
   functionGroupName: string,
   options?: IReadOptions,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const encodedName = encodeSapObjectName(functionGroupName);
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
   const url = `/sap/bc/adt/functions/groups/${encodedName}/transport${query}`;

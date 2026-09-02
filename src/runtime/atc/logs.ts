@@ -6,7 +6,10 @@
  * - Get execution log
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -30,7 +33,7 @@ export interface IGetCheckFailureLogsOptions {
 export async function getCheckFailureLogs(
   connection: IAbapConnection,
   options?: IGetCheckFailureLogsOptions,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/atc/checkfailures/logs`;
   const params: Record<string, string | number | boolean> = {};
 
@@ -63,7 +66,7 @@ export async function getCheckFailureLogs(
 export async function getExecutionLog(
   connection: IAbapConnection,
   executionId: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/atc/results/${executionId}/log`;
 
   return connection.makeAdtRequest({

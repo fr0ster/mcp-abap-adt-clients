@@ -39,6 +39,7 @@ import {
 import { AdtClient } from '../src/clients/AdtClient';
 import type { AdtSourceObjectType } from '../src/core/shared/types';
 import { makeAdtRequestWithAcceptNegotiation } from '../src/utils/acceptNegotiation';
+import { orThrow } from '../src/utils/adtResponse';
 import { getTimeout } from '../src/utils/timeouts';
 
 const testHelper = require('../src/__tests__/helpers/test-helper');
@@ -332,10 +333,12 @@ async function run(): Promise<void> {
         `Reading metadata for ${options.objectType} ${options.objectName}...`,
       );
       try {
-        const metadata = await utils.readObjectMetadata(
-          options.objectType as any,
-          options.objectName,
-          options.functionGroup,
+        const metadata = await orThrow(
+          utils.readObjectMetadata(
+            options.objectType as any,
+            options.objectName,
+            options.functionGroup,
+          ),
         );
         testsLogger.info?.(`Metadata status: ${metadata.status}`);
       } catch (error) {

@@ -2,7 +2,10 @@
  * AppendStructure create operations - Low-level functions
  * Metadata-only POST with base_structure template; source via update().
  */
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_APPEND_STRUCTURE,
   CT_STRUCTURE,
@@ -15,7 +18,7 @@ import type { ICreateAppendStructureParams } from './types';
 export async function create(
   connection: IAbapConnection,
   args: ICreateAppendStructureParams,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   if (!args.append_structure_name || !args.base_object || !args.package_name) {
     throw new Error(
       'Missing required parameters: append_structure_name, base_object, package_name',

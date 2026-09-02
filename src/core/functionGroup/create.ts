@@ -6,7 +6,7 @@ import type {
   HttpError,
   IAbapConnection,
   IAdtContentTypes,
-  IAdtResponse,
+  IAdtWireResponse,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { CT_FUNCTION_GROUP } from '../../constants/contentTypes';
@@ -25,7 +25,7 @@ export async function create(
   params: ICreateFunctionGroupParams,
   logger?: ILogger,
   contentTypes?: IAdtContentTypes,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/functions/groups${params.transportRequest ? `?corrNr=${params.transportRequest}` : ''}`;
 
   const finalMasterSystem = params.masterSystem || undefined;
@@ -113,7 +113,7 @@ export async function create(
           status: 201,
           statusText: 'Created',
           data: e.response.data,
-        } as IAdtResponse;
+        } as IAdtWireResponse;
       }
     }
 

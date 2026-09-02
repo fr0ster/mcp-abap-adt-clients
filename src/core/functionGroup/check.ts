@@ -2,7 +2,10 @@
  * FunctionGroup check operations
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 
 /**
  * Check function group code (syntax, compilation, rules)
@@ -25,11 +28,11 @@ export async function checkFunctionGroup(
   functionGroupName: string,
   version: 'active' | 'inactive',
   sourceCode?: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const { runCheckRun, runCheckRunWithSource, parseCheckRunResponse } =
     await import('../../utils/checkRun');
 
-  let response: IAdtResponse;
+  let response: IAdtWireResponse;
 
   if (sourceCode) {
     // Validate hypothetical code (object doesn't need to exist)

@@ -8,7 +8,7 @@
 
 import type {
   IAbapConnection,
-  IAdtResponse,
+  IAdtWireResponse,
   IListTransportsParams,
   ITransportSearchConfiguration,
 } from '@mcp-abap-adt/interfaces';
@@ -31,7 +31,7 @@ export { parseSearchConfigurations };
 export async function listTransports(
   connection: IAbapConnection,
   params: IListTransportsParams,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   if (!params.configUri) {
     throw new Error(
       'listTransports requires configUri: the transport list is a saved-configuration ' +

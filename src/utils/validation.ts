@@ -17,7 +17,10 @@
  * the generic /sap/bc/adt/functions/validation endpoint.
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { getTimeout } from './timeouts';
 
 /**
@@ -32,14 +35,14 @@ import { getTimeout } from './timeouts';
  * @param objectType - SAP object type (e.g., 'FUGR/FF', 'CLAS/OC', 'PROG/P')
  * @param objectName - Name to validate
  * @param additionalParams - Additional validation parameters (e.g., fugrname, description)
- * @returns Raw IAdtResponse from validation endpoint
+ * @returns Raw IAdtWireResponse from validation endpoint
  */
 export async function validateObjectName(
   connection: IAbapConnection,
   objectType: string,
   objectName: string,
   additionalParams?: Record<string, string>,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const params = new URLSearchParams({
     objtype: objectType,
     objname: objectName,

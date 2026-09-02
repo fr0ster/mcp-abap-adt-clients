@@ -6,7 +6,10 @@
  * - Cell substring retrieval
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -34,7 +37,7 @@ export interface IGetAmdpDataPreviewOptions {
 export async function getAmdpDataPreview(
   connection: IAbapConnection,
   options?: IGetAmdpDataPreviewOptions,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/datapreview/amdpdebugger`;
   const params: Record<string, string | number | boolean> = {};
 
@@ -88,7 +91,7 @@ export interface IGetAmdpCellSubstringOptions {
 export async function getAmdpCellSubstring(
   connection: IAbapConnection,
   options?: IGetAmdpCellSubstringOptions,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/datapreview/amdpdebugger/cellsubstring`;
   const params: Record<string, string | number | boolean> = {};
 

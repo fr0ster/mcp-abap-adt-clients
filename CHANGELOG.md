@@ -7,12 +7,54 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [17.0.0] - 2026-09-02
 
-Requires `@mcp-abap-adt/interfaces@^27.0.0`.
+Requires `@mcp-abap-adt/interfaces@^28.0.0`.
 
 **Breaking in three ways, and the third is a behaviour change no signature shows:**
 six public methods are gone, `getUtils()` returns contracts instead of the class,
 and a refusal SAP sends with a 2xx now throws where it used to be reported as
 success.
+
+### Changed
+
+- **BREAKING: `getUtils()`'s members answer `IAdtResponse`, and a failure comes
+  back instead of flying past.**
+
+  ```typescript
+  const answer = await client.getUtils().search({ query: 'ZCL_*' });
+
+  if (answer.ok) {
+    answer.getResult().value;      // ISearchResult[]
+  } else {
+    answer.getError().origin;      // 'connection' | 'refusal' | 'parse'
+    answer.getError().message;     // what SAP said
+  }
+  ```
+
+  All 22 asynchronous members. `ok` is what makes the check compulsory: an
+  exception is invisible to the type system, and a caller who never learns a
+  failure path exists is the one this contract is for.
+
+  The default error strategy recognises three origins, and they are not
+  decoration — a caller cannot act on "something went wrong". Reauthenticate, ask
+  the server something else, or fix a parser are three different days of work.
+
+- **BREAKING: the transport frame is `IAdtWireResponse`** throughout, matching
+  interfaces 28.0.0. 320 files renamed; the type is unchanged, only its name and
+  what it is allowed to mean. `IAdtResponse` now names the answer a member gives.
+
+- **`AdtUtils` no longer declares `IAdtSearchable`.** That atom says
+  `search(criteria): Promise<ISearchResult[]>` and `IAdtInformationSystem` says
+  the same member answers `IAdtResponse`. One class cannot satisfy both, and the
+  compiler said so. The atom migrates with the rest of the interfaces package,
+  member by member; until it does, the information system is what `getUtils()`
+  hands out and therefore what this class answers to.
+
+- **`orThrow()` marks the boundary with code that has not migrated.** The
+  per-type handlers still return state objects and signal failure by throwing,
+  and the low-level helpers pass a wire response around. Every use of `orThrow`
+  is a call site that has not moved, which makes the remaining work countable
+  instead of invisible — 11 files today, and each one is deleted rather than
+  edited when its caller migrates.
 
 ### Added
 

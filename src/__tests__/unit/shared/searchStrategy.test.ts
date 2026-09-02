@@ -68,7 +68,9 @@ describe('AdtUtils.search — one endpoint, the reading chosen by the caller', (
 
     // Untouched: the document the server sent, not a parse of it re-emitted.
     expect(seen).toEqual([SEARCH_XML]);
-    expect(result).toEqual({ length: SEARCH_XML.length });
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected a result');
+    expect(result.getResult().value).toEqual({ length: SEARCH_XML.length });
   });
 
   it('issues the same request with the strategy as without it', async () => {
@@ -96,7 +98,9 @@ describe('AdtUtils.search — one endpoint, the reading chosen by the caller', (
       query: 'ZCL_*',
     });
 
-    expect(hits).toEqual([
+    expect(hits.ok).toBe(true);
+    if (!hits.ok) throw new Error('expected a result');
+    expect(hits.getResult().value).toEqual([
       expect.objectContaining({ name: 'ZCL_A', type: 'CLAS/OC' }),
     ]);
   });

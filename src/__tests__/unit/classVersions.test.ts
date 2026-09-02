@@ -1,11 +1,14 @@
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { AdtClass } from '../../core/class/AdtClass';
 import { AdtLocalTypes } from '../../core/class/AdtLocalTypes';
 import { getClassIncludeVersions } from '../../core/class/versions';
 
 const FEED = `<?xml version="1.0"?><atom:feed xmlns:atom="http://www.w3.org/2005/Atom"><atom:title>Version List of ZCL (CLAS)</atom:title><atom:entry><atom:content type="text/plain" src="/sap/bc/adt/oo/classes/zcl/includes/main/versions/1/00000/content"/><atom:id>00000</atom:id></atom:entry></atom:feed>`;
 
-function conn(handler: (o: any) => Promise<IAdtResponse>): IAbapConnection {
+function conn(handler: (o: any) => Promise<IAdtWireResponse>): IAbapConnection {
   return {
     makeAdtRequest: handler,
     setSessionType: () => {},
@@ -17,7 +20,7 @@ describe('getClassIncludeVersions', () => {
     let seen: any;
     const c = conn(async (o) => {
       seen = o;
-      return { data: FEED, status: 200, headers: {} } as IAdtResponse;
+      return { data: FEED, status: 200, headers: {} } as IAdtWireResponse;
     });
     const cls = new AdtClass(c);
     const list = await cls.getVersions({ className: 'ZCL' });
@@ -30,7 +33,7 @@ describe('getClassIncludeVersions', () => {
     let seen: any;
     const c = conn(async (o) => {
       seen = o;
-      return { data: FEED, status: 200, headers: {} } as IAdtResponse;
+      return { data: FEED, status: 200, headers: {} } as IAdtWireResponse;
     });
     const local = new AdtLocalTypes(c);
     await local.getVersions({ className: 'ZCL' });

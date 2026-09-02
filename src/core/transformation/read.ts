@@ -1,6 +1,6 @@
 import type {
   IAbapConnection,
-  IAdtResponse,
+  IAdtWireResponse,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import {
@@ -22,7 +22,7 @@ export async function getTransformation(
   version: 'active' | 'inactive' | 'workingArea' = 'inactive',
   options?: IReadOptions,
   logger?: ILogger,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const encodedName = encodeSapObjectName(transformationName.toLowerCase());
   const queryParams: string[] = [];
   if (version) {
@@ -57,7 +57,7 @@ export async function getTransformationSource(
   version: 'active' | 'inactive' | 'workingArea' = 'inactive',
   options?: IReadOptions,
   logger?: ILogger,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const encodedName = encodeSapObjectName(transformationName.toLowerCase());
   const queryParams: string[] = [];
   if (version) {
@@ -90,7 +90,7 @@ export async function getTransformationTransport(
   connection: IAbapConnection,
   transformationName: string,
   options?: IReadOptions,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const encodedName = encodeSapObjectName(transformationName.toLowerCase());
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
   const url = `/sap/bc/adt/xslt/transformations/${encodedName}/transport${query}`;

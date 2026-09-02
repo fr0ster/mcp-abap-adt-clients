@@ -1,6 +1,6 @@
 import type {
   IAbapConnection,
-  IAdtResponse,
+  IAdtWireResponse,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import {
@@ -29,7 +29,7 @@ export async function checkAccessControl(
   version: CheckRunVersion = 'inactive',
   sourceCode?: string,
   logger?: ILogger,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   for (let attempt = 0; attempt < 2; attempt++) {
     const response = await runCheckRun(
       connection,

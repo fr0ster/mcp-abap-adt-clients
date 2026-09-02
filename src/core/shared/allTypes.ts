@@ -6,7 +6,7 @@
 
 import type {
   IAbapConnection,
-  IAdtResponse,
+  IAdtWireResponse,
   ILogger,
   INamedItem,
 } from '@mcp-abap-adt/interfaces';
@@ -36,7 +36,7 @@ export async function getAllTypes(
   maxItemCount: number = 999,
   name: string = '*',
   data: string = 'usedByProvider',
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const params = new URLSearchParams({
     maxItemCount: String(maxItemCount),
     name: name,

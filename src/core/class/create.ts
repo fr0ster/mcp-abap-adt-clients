@@ -6,7 +6,7 @@ import type {
   HttpError,
   IAbapConnection,
   IAdtContentTypes,
-  IAdtResponse,
+  IAdtWireResponse,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { CT_CLASS } from '../../constants/contentTypes';
@@ -27,7 +27,7 @@ export async function create(
   args: ICreateClassParams,
   logger?: ILogger,
   contentTypes?: IAdtContentTypes,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   // Description is limited to 60 characters in SAP ADT
   const description = limitDescription(
     args.description || args.class_name || '',

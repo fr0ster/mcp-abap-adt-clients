@@ -2,7 +2,10 @@
  * Interface delete operations - Low-level functions
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_DELETION,
   ACCEPT_DELETION_CHECK,
@@ -19,7 +22,7 @@ import type { IDeleteInterfaceParams } from './types';
 export async function checkDeletion(
   connection: IAbapConnection,
   params: IDeleteInterfaceParams,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const { interface_name } = params;
 
   if (!interface_name) {
@@ -56,7 +59,7 @@ export async function checkDeletion(
 export async function deleteInterface(
   connection: IAbapConnection,
   params: IDeleteInterfaceParams,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const { interface_name, transport_request } = params;
 
   if (!interface_name) {
@@ -105,5 +108,5 @@ export async function deleteInterface(
       transport_request: transport_request || 'local',
       message: `Interface ${interface_name} deleted successfully`,
     },
-  } as IAdtResponse;
+  } as IAdtWireResponse;
 }

@@ -4,7 +4,7 @@
 
 import type {
   IAbapConnection,
-  IAdtResponse,
+  IAdtWireResponse,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import {
@@ -41,7 +41,7 @@ export async function read(
   version: string = 'inactive',
   options?: IReadOptions,
   logger?: ILogger,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const query = options?.withLongPolling ? `&withLongPolling=true` : '';
   const url = `/sap/bc/adt/bo/behaviordefinitions/${encodeSapObjectName(name).toLowerCase()}?version=${version}${query}`;
 
@@ -84,7 +84,7 @@ export async function readSource(
   version: string = 'inactive',
   options?: IReadOptions,
   logger?: ILogger,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const query = options?.withLongPolling ? `&withLongPolling=true` : '';
   const url = `/sap/bc/adt/bo/behaviordefinitions/${encodeSapObjectName(name).toLowerCase()}/source/main?version=${version}${query}`;
 
@@ -114,7 +114,7 @@ export async function getBehaviorDefinitionTransport(
   connection: IAbapConnection,
   name: string,
   options?: IReadOptions,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
   const url = `/sap/bc/adt/bo/behaviordefinitions/${encodeSapObjectName(name).toLowerCase()}/transport${query}`;
 

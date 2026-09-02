@@ -6,7 +6,10 @@
  * assertActivationSucceeded; this one has its own activation and was missed
  * when 10.0.2 fixed them.
  */
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { AdtFunctionGroup } from '../../../../core/functionGroup/AdtFunctionGroup';
 
 const FAILED = `<?xml version="1.0" encoding="utf-8"?>
@@ -33,7 +36,7 @@ const connectionReturning = (body: string) => {
           status: 200,
           statusText: 'OK',
           headers: {},
-        } as unknown as IAdtResponse;
+        } as unknown as IAdtWireResponse;
       },
     } as unknown as IAbapConnection,
   };

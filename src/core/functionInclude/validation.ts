@@ -6,7 +6,10 @@
  * missing before any create/update is attempted.
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
@@ -21,7 +24,7 @@ export async function validateFunctionIncludeName(
   connection: IAbapConnection,
   groupName: string,
   _includeName: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   if (!groupName) {
     throw new Error('Function group name is required');
   }

@@ -7,7 +7,10 @@
  * - Read dump by ID (default/summary/formatted view)
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 
 export interface IRuntimeDumpsListOptions {
@@ -86,7 +89,7 @@ export function buildRuntimeDumpsUserQuery(user?: string): string | undefined {
 export async function listRuntimeDumps(
   connection: IAbapConnection,
   options: IRuntimeDumpsListOptions = {},
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const params = new URLSearchParams();
 
   appendIfDefined(params, '$query', options.query);
@@ -117,7 +120,7 @@ export async function listRuntimeDumpsByUser(
   connection: IAbapConnection,
   user?: string,
   options: Omit<IRuntimeDumpsListOptions, 'query'> = {},
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   return listRuntimeDumps(connection, {
     ...options,
     query: buildRuntimeDumpsUserQuery(user),
@@ -131,7 +134,7 @@ export async function getRuntimeDumpById(
   connection: IAbapConnection,
   dumpId: string,
   options: IRuntimeDumpReadOptions = {},
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const normalized = normalizeDumpId(dumpId);
   const view = options.view || 'default';
   const suffix =

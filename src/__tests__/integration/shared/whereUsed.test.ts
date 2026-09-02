@@ -14,6 +14,7 @@ import type {
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
 import { AdtUtils } from '../../../core/shared/AdtUtils';
+import { orThrow } from '../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import {
   createTestAdtClient,
@@ -445,11 +446,13 @@ describe('Shared - getWhereUsed', () => {
     // `getWhereUsedList` builds its own scope from flags instead, so it cannot
     // stand in here — see the CHANGELOG entry for the gap and what closes it.
     const utils = new AdtUtils(connection, testsLogger);
-    const result = await utils.getWhereUsedList({
-      object_name: objectName,
-      object_type: objectType,
-      enableAllTypes: enableAllTypes,
-    });
+    const result = await orThrow(
+      utils.getWhereUsedList({
+        object_name: objectName,
+        object_type: objectType,
+        enableAllTypes: enableAllTypes,
+      }),
+    );
 
     expect(result).toBeDefined();
     expect(result.objectName).toBe(objectName);
@@ -523,11 +526,13 @@ describe('Shared - getWhereUsed', () => {
     // `getWhereUsedList` builds its own scope from flags instead, so it cannot
     // stand in here — see the CHANGELOG entry for the gap and what closes it.
     const utils = new AdtUtils(connection, testsLogger);
-    const result = await utils.getWhereUsedList({
-      object_name: objectName,
-      object_type: objectType,
-      includeRawXml: true,
-    });
+    const result = await orThrow(
+      utils.getWhereUsedList({
+        object_name: objectName,
+        object_type: objectType,
+        includeRawXml: true,
+      }),
+    );
 
     expect(result).toBeDefined();
     expect(result.rawXml).toBeDefined();
@@ -580,11 +585,13 @@ describe('Shared - getWhereUsed', () => {
 
     // Step 1: search ALL types — the "select all" baseline.
     logTestStep('where-used: ALL types (baseline)', testsLogger);
-    const all = await utils.getWhereUsedList({
-      object_name: objectName,
-      object_type: objectType,
-      enableAllTypes: true,
-    });
+    const all = await orThrow(
+      utils.getWhereUsedList({
+        object_name: objectName,
+        object_type: objectType,
+        enableAllTypes: true,
+      }),
+    );
     const allTypes = [...new Set(all.references.map((r) => r.type))].sort();
     testsLogger.info?.(
       `📊 ALL: ${all.references.length} refs across types [${allTypes.join(', ')}]`,
@@ -600,11 +607,13 @@ describe('Shared - getWhereUsed', () => {
     // Step 2a (KEEP): narrow to a type that IS referenced — count is unchanged
     // for that type, and no other type leaks in.
     logTestStep(`where-used: ONLY [${keepType}] (present)`, testsLogger);
-    const kept = await utils.getWhereUsedList({
-      object_name: objectName,
-      object_type: objectType,
-      enableOnlyTypes: [keepType],
-    });
+    const kept = await orThrow(
+      utils.getWhereUsedList({
+        object_name: objectName,
+        object_type: objectType,
+        enableOnlyTypes: [keepType],
+      }),
+    );
     const keptTypes = [...new Set(kept.references.map((r) => r.type))].sort();
     testsLogger.info?.(
       `📊 KEEP [${keepType}]: ${kept.references.length} refs across types [${keptTypes.join(', ')}]`,
@@ -626,10 +635,12 @@ describe('Shared - getWhereUsed', () => {
     // guarantees enableOnlyTypes actually selects a searchable type, so a zero
     // result proves the filter excluded the referenced type rather than simply
     // selecting nothing.
-    const scopeResponse = await utils.getWhereUsedScope({
-      object_name: objectName,
-      object_type: objectType,
-    });
+    const scopeResponse = await orThrow(
+      utils.getWhereUsedScope({
+        object_name: objectName,
+        object_type: objectType,
+      }),
+    );
     const scopeTypes = [
       ...new Set(
         [...String(scopeResponse.data).matchAll(/name="([^"]+)"/g)].map(
@@ -643,11 +654,13 @@ describe('Shared - getWhereUsed', () => {
     );
     if (absentType) {
       logTestStep(`where-used: ONLY [${absentType}] (absent)`, testsLogger);
-      const excluded = await utils.getWhereUsedList({
-        object_name: objectName,
-        object_type: objectType,
-        enableOnlyTypes: [absentType],
-      });
+      const excluded = await orThrow(
+        utils.getWhereUsedList({
+          object_name: objectName,
+          object_type: objectType,
+          enableOnlyTypes: [absentType],
+        }),
+      );
       testsLogger.info?.(
         `📊 EXCLUDE [${absentType}]: ${excluded.references.length} refs (baseline had ${all.references.length})`,
       );

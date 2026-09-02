@@ -11,12 +11,13 @@ import type {
   IAbapConnection,
   IAdtObject,
   IAdtOperationOptions,
-  IAdtResponse,
+  IAdtWireResponse,
   IGetVirtualFoldersContentsParams,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
+import { orThrow } from '../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import { BaseTester } from '../../helpers/BaseTester';
 import {
@@ -51,7 +52,7 @@ const libraryLogger: ILogger = createLibraryLogger();
 const testsLogger: ILogger = createTestsLogger();
 
 class VirtualFoldersContentsObject
-  implements IAdtObject<IGetVirtualFoldersContentsParams, IAdtResponse>
+  implements IAdtObject<IGetVirtualFoldersContentsParams, IAdtWireResponse>
 {
   private client: AdtClient;
 
@@ -77,14 +78,14 @@ class VirtualFoldersContentsObject
 
   validate(
     _config: Partial<IGetVirtualFoldersContentsParams>,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     return this.rejectUnsupported('validate');
   }
 
   create(
     _config: IGetVirtualFoldersContentsParams,
     _options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     return this.rejectUnsupported('create');
   }
 
@@ -92,49 +93,51 @@ class VirtualFoldersContentsObject
     config: Partial<IGetVirtualFoldersContentsParams>,
     _version?: 'active' | 'inactive',
     _options?: { withLongPolling?: boolean },
-  ): Promise<IAdtResponse | undefined> {
-    return this.client
-      .getUtils()
-      .getVirtualFoldersContents(config as IGetVirtualFoldersContentsParams);
+  ): Promise<IAdtWireResponse | undefined> {
+    return orThrow(
+      this.client
+        .getUtils()
+        .getVirtualFoldersContents(config as IGetVirtualFoldersContentsParams),
+    );
   }
 
   readMetadata(
     _config: Partial<IGetVirtualFoldersContentsParams>,
     _options?: { withLongPolling?: boolean },
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     return this.rejectUnsupported('readMetadata');
   }
 
   update(
     _config: Partial<IGetVirtualFoldersContentsParams>,
     _options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     return this.rejectUnsupported('update');
   }
 
   delete(
     _config: Partial<IGetVirtualFoldersContentsParams>,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     return this.rejectUnsupported('delete');
   }
 
   activate(
     _config: Partial<IGetVirtualFoldersContentsParams>,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     return this.rejectUnsupported('activate');
   }
 
   check(
     _config: Partial<IGetVirtualFoldersContentsParams>,
     _status?: string,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     return this.rejectUnsupported('check');
   }
 
   readTransport(
     _config: Partial<IGetVirtualFoldersContentsParams>,
     _options?: { withLongPolling?: boolean },
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     return this.rejectUnsupported('readTransport');
   }
 
@@ -145,7 +148,7 @@ class VirtualFoldersContentsObject
   unlock(
     _config: Partial<IGetVirtualFoldersContentsParams>,
     _lockHandle: string,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     return this.rejectUnsupported('unlock');
   }
 }
@@ -156,7 +159,7 @@ describe('Shared - getVirtualFoldersContents', () => {
   let hasConfig = false;
   let isLegacy = false;
   let isCloudSystem = false;
-  let tester: BaseTester<IGetVirtualFoldersContentsParams, IAdtResponse>;
+  let tester: BaseTester<IGetVirtualFoldersContentsParams, IAdtWireResponse>;
 
   beforeAll(async () => {
     try {

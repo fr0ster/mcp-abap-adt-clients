@@ -2,7 +2,10 @@
  * View delete operations - Low-level functions
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_DELETION,
   ACCEPT_DELETION_CHECK,
@@ -19,7 +22,7 @@ import type { IDeleteDdlParams } from './types';
 export async function checkDeletion(
   connection: IAbapConnection,
   params: IDeleteDdlParams,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const { ddl_name } = params;
 
   if (!ddl_name) {
@@ -56,7 +59,7 @@ export async function checkDeletion(
 export async function deleteDdl(
   connection: IAbapConnection,
   params: IDeleteDdlParams,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const { ddl_name, transport_request } = params;
 
   if (!ddl_name) {
@@ -105,5 +108,5 @@ export async function deleteDdl(
       transport_request: transport_request || 'local',
       message: `View ${ddl_name} deleted successfully`,
     },
-  } as IAdtResponse;
+  } as IAdtWireResponse;
 }

@@ -57,16 +57,6 @@ const answering = (data: string): IAbapConnection =>
     })),
   }) as unknown as IAbapConnection;
 
-const failureFrom = async (call: Promise<unknown>) =>
-  call.then(
-    (value) => {
-      throw new Error(
-        `expected a failure, got ${JSON.stringify(value)?.slice(0, 80)}`,
-      );
-    },
-    (error: unknown) => error,
-  );
-
 class ConsumerParserBug extends Error {
   constructor() {
     super('the consumer parser blew up');
@@ -75,25 +65,30 @@ class ConsumerParserBug extends Error {
 }
 
 describe('the three origins stay apart', () => {
-  it('SAP refused — the server speaks', async () => {
+  it('SAP refused — the server speaks, in the failure half', async () => {
     const utils = new AdtUtils(answering(REFUSAL), logger);
 
-    const error = await failureFrom(utils.getAllTypes());
+    const response = await utils.getAllTypes();
 
-    expect(error).toBeInstanceOf(AdtSAPError);
-    expect((error as Error).message).toContain('locked by user XYZ');
+    // The contract carries it back rather than throwing past the caller: an
+    // exception is invisible to the type system, and `ok` is not.
+    expect(response.ok).toBe(false);
+    if (response.ok) throw new Error('expected a failure');
+    expect(response.getError().origin).toBe('refusal');
+    expect(response.getError().message).toContain('locked by user XYZ');
   });
 
-  it('this library could not read it — the library says so, and hands it back', async () => {
+  it('this library could not read it — a different origin, not "no types"', async () => {
     const utils = new AdtUtils(answering(LOGON_PAGE), logger);
 
-    const error = await failureFrom(utils.getAllTypes());
+    const response = await utils.getAllTypes();
 
-    // Not "no types exist". The distinction this class was added for.
-    expect(error).toBeInstanceOf(AdtParseError);
-    const unreadable = error as AdtParseError;
-    expect(unreadable.expected).toBe('nameditem:namedItemList');
-    expect(unreadable.document).toBe(LOGON_PAGE);
+    // Not an empty list. `origin` is what tells a caller which remedy applies —
+    // fix a parser, versus ask the server something else.
+    expect(response.ok).toBe(false);
+    if (response.ok) throw new Error('expected a failure');
+    expect(response.getError().origin).toBe('parse');
+    expect(response.getError().cause).toBeInstanceOf(AdtParseError);
   });
 
   it("the caller's parser threw — their error, untouched", async () => {
@@ -102,24 +97,32 @@ describe('the three origins stay apart', () => {
       logger,
     );
 
-    const error = await failureFrom(
-      utils.search({ query: 'Z*' }, () => {
-        throw new ConsumerParserBug();
-      }),
-    );
+    const response = await utils.search({ query: 'Z*' }, () => {
+      throw new ConsumerParserBug();
+    });
 
-    // Not wrapped, not renamed. Putting this library's name on a failure that is
-    // not its own would send a caller looking in the wrong place.
-    expect(error).toBeInstanceOf(ConsumerParserBug);
-    expect(error).not.toBeInstanceOf(AdtParseError);
-    expect(error).not.toBeInstanceOf(AdtSAPError);
+    // Their error survives as itself in `cause`, and the origin says it did not
+    // come from SAP or from our parsing. Renaming it would send a caller
+    // looking in the wrong place.
+    expect(response.ok).toBe(false);
+    if (response.ok) throw new Error('expected a failure');
+    expect(response.getError().cause).toBeInstanceOf(ConsumerParserBug);
+    expect(response.getError().cause).not.toBeInstanceOf(AdtParseError);
+    expect(response.getError().cause).not.toBeInstanceOf(AdtSAPError);
   });
 
   it('nothing matched — still a result, still not a failure', async () => {
     const utils = new AdtUtils(answering(EMPTY_LEVEL), logger);
 
-    await expect(utils.fetchNodeStructure('DEVC/K', 'ZEMPTY')).resolves.toEqual(
-      { objects: [], childNodes: [] },
-    );
+    const response = await utils.fetchNodeStructure('DEVC/K', 'ZEMPTY');
+
+    // The fourth case, and the one that must NOT become a failure: nothing
+    // matched is an answer, and `ok` says so.
+    expect(response.ok).toBe(true);
+    if (!response.ok) throw new Error('expected a result');
+    expect(response.getResult().value).toEqual({
+      objects: [],
+      childNodes: [],
+    });
   });
 });

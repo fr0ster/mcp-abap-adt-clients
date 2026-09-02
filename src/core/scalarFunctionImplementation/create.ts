@@ -2,7 +2,10 @@
  * ScalarFunctionImplementation create operations - Low-level functions
  * Metadata-only POST (blues v2 + server-driven content linking to the scalar function).
  */
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_SCALAR_FUNCTION_IMPL,
   CT_SCALAR_FUNCTION_IMPL,
@@ -30,7 +33,7 @@ export function buildServerDrivenContent(
 export async function create(
   connection: IAbapConnection,
   args: ICreateScalarFunctionImplementationParams,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   if (
     !args.implementation_name ||
     !args.scalar_function_name ||

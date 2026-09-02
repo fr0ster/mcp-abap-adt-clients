@@ -10,7 +10,10 @@
  * - Breakpoint operations
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -29,7 +32,7 @@ export interface IStartAmdpDebuggerOptions {
 export async function startAmdpDebugger(
   connection: IAbapConnection,
   options?: IStartAmdpDebuggerOptions,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/amdp/debugger/main`;
   const params: Record<string, string | number | boolean> = {};
 
@@ -61,7 +64,7 @@ export async function startAmdpDebugger(
 export async function resumeAmdpDebugger(
   connection: IAbapConnection,
   mainId: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/amdp/debugger/main/${mainId}`;
 
   return connection.makeAdtRequest({
@@ -88,7 +91,7 @@ export async function terminateAmdpDebugger(
   connection: IAbapConnection,
   mainId: string,
   hardStop?: boolean,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/amdp/debugger/main/${mainId}`;
   const params: Record<string, string | number | boolean> = {};
 
@@ -119,7 +122,7 @@ export async function getAmdpDebuggee(
   connection: IAbapConnection,
   mainId: string,
   debuggeeId: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/amdp/debugger/main/${mainId}/debuggees/${debuggeeId}`;
 
   return connection.makeAdtRequest({
@@ -152,7 +155,7 @@ export async function getAmdpVariable(
   varname: string,
   offset?: number,
   length?: number,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/amdp/debugger/main/${mainId}/debuggees/${debuggeeId}/variables/${varname}`;
   const params: Record<string, string | number | boolean> = {};
 
@@ -188,7 +191,7 @@ export async function setAmdpVariable(
   debuggeeId: string,
   varname: string,
   setNull?: boolean,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/amdp/debugger/main/${mainId}/debuggees/${debuggeeId}/variables/${varname}`;
   const params: Record<string, string | number | boolean> = {};
 
@@ -221,7 +224,7 @@ export async function lookupAmdp(
   mainId: string,
   debuggeeId: string,
   name?: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/amdp/debugger/main/${mainId}/debuggees/${debuggeeId}/lookup`;
   const params: Record<string, string | number | boolean> = {};
 
@@ -252,7 +255,7 @@ export async function stepOverAmdp(
   connection: IAbapConnection,
   mainId: string,
   debuggeeId: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/amdp/debugger/main/${mainId}/debuggees/${debuggeeId}`;
 
   return connection.makeAdtRequest({
@@ -280,7 +283,7 @@ export async function stepContinueAmdp(
   connection: IAbapConnection,
   mainId: string,
   debuggeeId: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/amdp/debugger/main/${mainId}/debuggees/${debuggeeId}`;
 
   return connection.makeAdtRequest({
@@ -306,7 +309,7 @@ export async function stepContinueAmdp(
 export async function getAmdpBreakpoints(
   connection: IAbapConnection,
   mainId: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/amdp/debugger/main/${mainId}/breakpoints`;
 
   return connection.makeAdtRequest({
@@ -331,7 +334,7 @@ export async function getAmdpBreakpoints(
 export async function getAmdpBreakpointsLlang(
   connection: IAbapConnection,
   mainId: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/amdp/debugger/main/${mainId}/breakpoints`;
 
   return connection.makeAdtRequest({
@@ -356,7 +359,7 @@ export async function getAmdpBreakpointsLlang(
 export async function getAmdpBreakpointsTableFunctions(
   connection: IAbapConnection,
   mainId: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/amdp/debugger/main/${mainId}/breakpoints`;
 
   return connection.makeAdtRequest({

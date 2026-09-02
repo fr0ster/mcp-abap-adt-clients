@@ -8,7 +8,7 @@
 import type {
   IAbapConnection,
   IAbapRequestOptions,
-  IAdtResponse,
+  IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
 import { AdtRequest } from '../../../../core/transport/AdtRequest';
 
@@ -61,7 +61,7 @@ const connectionOver = (bodyFor: (url: string) => string) => {
         status: 200,
         statusText: 'OK',
         headers: {},
-      } as unknown as IAdtResponse;
+      } as unknown as IAdtWireResponse;
     },
   } as unknown as IAbapConnection;
   return { connection, calls };

@@ -14,7 +14,7 @@
 import type {
   IAbapConnection,
   IAdtContentTypes,
-  IAdtResponse,
+  IAdtWireResponse,
   ICreateIncludeParams,
 } from '@mcp-abap-adt/interfaces';
 import { limitDescription } from '../../utils/internalUtils';
@@ -28,7 +28,7 @@ export async function create(
   connection: IAbapConnection,
   args: ICreateIncludeParams,
   contentTypes?: IAdtContentTypes,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   // Every value below is escaped before it reaches an attribute. A description
   // with an apostrophe or an ampersand — "R&D", "the caller's include" — would
   // otherwise produce XML the server cannot parse, and the create fails on a

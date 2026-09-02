@@ -2,7 +2,10 @@
  * AuthorizationField (SUSO / AUTH) activation operations
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { assertActivationSucceeded } from '../../utils/activationUtils';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -22,7 +25,7 @@ function buildActivationXml(name: string): string {
 export async function activateAuthorizationField(
   connection: IAbapConnection,
   name: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   if (!name) {
     throw new Error('Authorization field name is required');
   }

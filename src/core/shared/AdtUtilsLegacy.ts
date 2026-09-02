@@ -12,8 +12,13 @@
  * mentioned `getTransaction` was its own doc comment and this refusal of it.
  */
 
-import type { IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAdtResponse,
+  IAdtResult,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { buildObjectUri } from '../../utils/activationUtils';
+import { answering } from '../../utils/adtResponse';
 import { getTimeout } from '../../utils/timeouts';
 import { AdtUtils } from './AdtUtils';
 import type { IObjectReference } from './types';
@@ -36,7 +41,7 @@ export class AdtUtilsLegacy extends AdtUtils {
   override async activateObjectsGroup(
     objects: IObjectReference[],
     preauditRequested: boolean = false,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtResponse<IAdtResult<IAdtWireResponse>>> {
     const url = `/sap/bc/adt/activation?method=activate&preauditRequested=${preauditRequested}`;
 
     const objectReferences = objects
@@ -51,16 +56,18 @@ export class AdtUtilsLegacy extends AdtUtils {
 ${objectReferences}
 </adtcore:objectReferences>`;
 
-    return this.connection.makeAdtRequest({
-      url,
-      method: 'POST',
-      timeout: getTimeout('default'),
-      data: xmlBody,
-      headers: {
-        Accept: 'application/xml',
-        'Content-Type': 'application/xml',
-      },
-    });
+    return answering(() =>
+      this.connection.makeAdtRequest({
+        url,
+        method: 'POST',
+        timeout: getTimeout('default'),
+        data: xmlBody,
+        headers: {
+          Accept: 'application/xml',
+          'Content-Type': 'application/xml',
+        },
+      }),
+    );
   }
 
   override async getTableContents(): Promise<never> {

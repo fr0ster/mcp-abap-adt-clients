@@ -2,7 +2,10 @@
  * Package validation operations
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { ACCEPT_VALIDATION } from '../../constants/contentTypes';
 import { buildQueryString } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -15,7 +18,7 @@ import type { ICreatePackageParams } from './types';
 export async function validatePackageBasic(
   connection: IAbapConnection,
   args: ICreatePackageParams,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const qs = buildQueryString({
     objname: args.package_name,
     packagename: args.super_package,
@@ -44,7 +47,7 @@ export async function validatePackageFull(
   args: ICreatePackageParams,
   swcomp: string,
   transportLayer: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const qs = buildQueryString({
     objname: args.package_name,
     packagename: args.super_package,

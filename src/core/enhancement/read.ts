@@ -4,7 +4,7 @@
 
 import type {
   IAbapConnection,
-  IAdtResponse,
+  IAdtWireResponse,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import {
@@ -37,7 +37,7 @@ export async function getEnhancementMetadata(
   enhancementName: string,
   options?: IReadOptions,
   logger?: ILogger,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const encodedName = encodeSapObjectName(enhancementName).toLowerCase();
   let url = getEnhancementUri(enhancementType, encodedName);
 
@@ -77,7 +77,7 @@ export async function getEnhancementSource(
   version: 'active' | 'inactive' = 'active',
   options?: IReadOptions,
   logger?: ILogger,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   if (!supportsSourceCode(enhancementType)) {
     throw new Error(
       `Enhancement type '${enhancementType}' does not support source code operations. Only 'enhoxhh' supports source code.`,
@@ -120,7 +120,7 @@ export async function getEnhancementTransport(
   enhancementType: EnhancementType,
   enhancementName: string,
   options?: IReadOptions,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const encodedName = encodeSapObjectName(enhancementName).toLowerCase();
   let url = `${getEnhancementUri(enhancementType, encodedName)}/transport`;
 

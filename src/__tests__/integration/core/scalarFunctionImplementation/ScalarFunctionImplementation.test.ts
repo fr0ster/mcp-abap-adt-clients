@@ -22,6 +22,7 @@ import * as path from 'node:path';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
+import { orThrow } from '../../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import {
   createTestAdtClient,
@@ -266,11 +267,13 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
           });
 
           // 4) Group-activate the trio (synchronous).
-          await client.getUtils().activateObjectsGroup([
-            { type: 'DSFD/SCF', name: funcName },
-            { type: 'CLAS/OC', name: amdpName },
-            { type: 'DSFI/SFI', name: implName },
-          ]);
+          await orThrow(
+            client.getUtils().activateObjectsGroup([
+              { type: 'DSFD/SCF', name: funcName },
+              { type: 'CLAS/OC', name: amdpName },
+              { type: 'DSFI/SFI', name: implName },
+            ]),
+          );
 
           // 5) Read implementation source (JSON) — must contain the amdpReference.
           const readState = await dsfi.read(

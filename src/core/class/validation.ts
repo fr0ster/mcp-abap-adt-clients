@@ -2,7 +2,10 @@
  * Class validation
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { ACCEPT_VALIDATION_CLASS_NAME } from '../../constants/contentTypes';
 import { getTimeout } from '../../utils/timeouts';
 
@@ -27,7 +30,7 @@ export async function validateClassName(
   packageName: string,
   description?: string,
   superClass?: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   // Build query parameters for class validation
   const params = new URLSearchParams({
     objname: className,
@@ -75,11 +78,11 @@ export async function validateClassSource(
   className: string,
   sourceCode?: string,
   version: 'inactive' | 'active' = 'active',
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const { runCheckRun, runCheckRunWithSource, parseCheckRunResponse } =
     await import('../../utils/checkRun');
 
-  let response: IAdtResponse;
+  let response: IAdtWireResponse;
 
   if (sourceCode) {
     // Live validation with artifacts (code not saved to SAP)

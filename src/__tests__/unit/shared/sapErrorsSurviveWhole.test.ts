@@ -21,6 +21,7 @@
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import { AdtUtils } from '../../../core/shared/AdtUtils';
 import { AdtSAPError } from '../../../utils/adtErrors';
+import { orThrow } from '../../../utils/adtResponse';
 
 const MESSAGE = 'Resource ZNOPE does not exist';
 
@@ -70,7 +71,7 @@ function connectionAnswering(status: number, data: string): IAbapConnection {
   } as unknown as IAbapConnection;
 }
 
-describe('a failing status reaches the caller with the response attached', () => {
+describe('a failing status reaches the caller, in the failure half', () => {
   it.each([
     [
       'fetchNodeStructure',
@@ -78,21 +79,22 @@ describe('a failing status reaches the caller with the response attached', () =>
     ],
     ['getAllTypes', (u: AdtUtils) => u.getAllTypes()],
     ['search', (u: AdtUtils) => u.search({ query: 'Z*' })],
-    ['searchObjects', (u: AdtUtils) => u.searchObjects({ query: 'Z*' })],
   ])('%s', async (_name, call) => {
     const utils = new AdtUtils(connectionAnswering(404, EXCEPTION_XML), logger);
 
-    const error = await call(utils).then(
-      () => {
-        throw new Error('expected a rejection');
-      },
-      (e: Error & { response?: { status: number; data: string } }) => e,
-    );
+    const response = await call(utils);
 
-    // Nothing in this library caught it, retyped it, or shortened the body.
-    expect(error.response?.status).toBe(404);
-    expect(error.response?.data).toBe(EXCEPTION_XML);
-    expect(error.message).toContain('404');
+    // Members on the contract answer with the failure; `searchObjects` is not on
+    // it and still throws, which is why it is asserted separately below.
+    expect(response.ok).toBe(false);
+    if (response.ok) throw new Error('expected a failure');
+
+    const failure = response.getError();
+    // Nothing in this library shortened it: the status the transport refused and
+    // the body it refused with are both still here.
+    expect(failure.origin).toBe('connection');
+    expect(failure.response?.status).toBe(404);
+    expect(failure.response?.data).toBe(EXCEPTION_XML);
   });
 });
 
@@ -100,7 +102,9 @@ describe('200 carrying an exception document is a refusal, not an empty result',
   it('fetchNodeStructure throws with the message and the whole document', async () => {
     const utils = new AdtUtils(connectionAnswering(200, EXCEPTION_XML), logger);
 
-    const error = await utils.fetchNodeStructure('PROG/P', 'ZNOPE').then(
+    const error = await orThrow(
+      utils.fetchNodeStructure('PROG/P', 'ZNOPE'),
+    ).then(
       () => {
         throw new Error('expected a rejection');
       },
@@ -120,7 +124,7 @@ describe('200 carrying an exception document is a refusal, not an empty result',
   it('getAllTypes throws rather than answering an empty list', async () => {
     const utils = new AdtUtils(connectionAnswering(200, EXCEPTION_XML), logger);
 
-    const error = await utils.getAllTypes().then(
+    const error = await orThrow(utils.getAllTypes()).then(
       () => {
         throw new Error('expected a rejection');
       },
@@ -135,7 +139,7 @@ describe('200 carrying an exception document is a refusal, not an empty result',
     const truncated = '<exc:exception><message>cut off here';
     const utils = new AdtUtils(connectionAnswering(200, truncated), logger);
 
-    const error = await utils.getAllTypes().then(
+    const error = await orThrow(utils.getAllTypes()).then(
       () => {
         throw new Error('expected a rejection');
       },
@@ -157,10 +161,14 @@ describe('200 with a genuinely empty result stays an empty result', () => {
     );
 
     // The distinction this whole file is about: "nothing matched" is an answer,
-    // and turning it into a throw would make every legitimate empty read fail.
-    await expect(utils.fetchNodeStructure('PROG/P', 'ZEMPTY')).resolves.toEqual(
-      { objects: [], childNodes: [] },
-    );
+    // and turning it into a failure would break every legitimate empty read.
+    const response = await utils.fetchNodeStructure('PROG/P', 'ZEMPTY');
+    expect(response.ok).toBe(true);
+    if (!response.ok) throw new Error('expected a result');
+    expect(response.getResult().value).toEqual({
+      objects: [],
+      childNodes: [],
+    });
   });
 
   it('an empty named-item list is not an error', async () => {
@@ -168,7 +176,10 @@ describe('200 with a genuinely empty result stays an empty result', () => {
       '<nameditem:namedItemList xmlns:nameditem="http://www.sap.com/adt/nameditems"/>';
     const utils = new AdtUtils(connectionAnswering(200, empty), logger);
 
-    await expect(utils.getAllTypes()).resolves.toEqual([]);
+    const response = await utils.getAllTypes();
+    expect(response.ok).toBe(true);
+    if (!response.ok) throw new Error('expected a result');
+    expect(response.getResult().value).toEqual([]);
   });
 });
 
@@ -177,17 +188,10 @@ describe('a strategy must not become a place a refusal can hide', () => {
     const utils = new AdtUtils(connectionAnswering(200, EXCEPTION_XML), logger);
 
     const seen: unknown[] = [];
-    const error = await utils
-      .search({ query: 'Z*' }, (data) => {
-        seen.push(data);
-        return String(data);
-      })
-      .then(
-        () => {
-          throw new Error('expected a rejection');
-        },
-        (e: unknown) => e as AdtSAPError,
-      );
+    const response = await utils.search({ query: 'Z*' }, (data) => {
+      seen.push(data);
+      return String(data);
+    });
 
     // The parser is not called at all. Handing it the refusal would look
     // harmless — the document arrives — but a parser looking for hits in an
@@ -195,16 +199,21 @@ describe('a strategy must not become a place a refusal can hide', () => {
     // there to control how much of a large answer the caller takes, not to
     // decide whether the request was refused.
     expect(seen).toEqual([]);
-    expect(error).toBeInstanceOf(AdtSAPError);
-    expect(error.document).toBe(EXCEPTION_XML);
+    expect(response.ok).toBe(false);
+    if (response.ok) throw new Error('expected a failure');
+    expect(response.getError().origin).toBe('refusal');
+    expect(response.getError().response?.data).toBe(EXCEPTION_XML);
   });
 
   it('still hands over a real answer untouched', async () => {
     const document = '<adtcore:objectReferences/>';
     const utils = new AdtUtils(connectionAnswering(200, document), logger);
 
-    await expect(
-      utils.search({ query: 'Z*' }, (data) => String(data)),
-    ).resolves.toBe(document);
+    const response = await utils.search({ query: 'Z*' }, (data) =>
+      String(data),
+    );
+    expect(response.ok).toBe(true);
+    if (!response.ok) throw new Error('expected a result');
+    expect(response.getResult().value).toBe(document);
   });
 });

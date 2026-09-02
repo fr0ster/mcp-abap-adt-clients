@@ -2,7 +2,10 @@
  * Enhancement validation operations
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 import {
   ENHANCEMENT_TYPE_CODES,
@@ -24,7 +27,7 @@ import {
 export async function validateEnhancementName(
   connection: IAbapConnection,
   params: IValidateEnhancementParams,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const { enhancement_name, enhancement_type, package_name, description } =
     params;
 
@@ -82,7 +85,7 @@ export async function validate(
   enhancementName: string,
   packageName?: string,
   description?: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   return validateEnhancementName(connection, {
     enhancement_name: enhancementName,
     enhancement_type: enhancementType,

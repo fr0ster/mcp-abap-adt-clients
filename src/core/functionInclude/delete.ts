@@ -2,7 +2,10 @@
  * FunctionInclude (FUGR/I) delete operations - Low-level functions
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
 import {
   ACCEPT_DELETION,
@@ -84,7 +87,7 @@ function objectUri(groupName: string, includeName: string): string {
 export async function checkDeletion(
   connection: IAbapConnection,
   params: IDeleteFunctionIncludeParams,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   if (!params.function_group_name) {
     throw new Error('function_group_name is required');
   }
@@ -117,7 +120,7 @@ export async function checkDeletion(
 export async function deleteFunctionInclude(
   connection: IAbapConnection,
   params: IDeleteFunctionIncludeParams,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   if (!params.function_group_name) {
     throw new Error('function_group_name is required');
   }
@@ -162,5 +165,5 @@ export async function deleteFunctionInclude(
       transport_request: params.transport_request || 'local',
       message: `Function include ${params.include_name} deleted successfully`,
     },
-  } as IAdtResponse;
+  } as IAdtWireResponse;
 }

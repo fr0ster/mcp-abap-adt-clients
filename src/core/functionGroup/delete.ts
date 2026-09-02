@@ -2,7 +2,10 @@
  * FunctionGroup delete operations - Low-level functions
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_DELETION,
   ACCEPT_DELETION_CHECK,
@@ -19,7 +22,7 @@ import type { IDeleteFunctionGroupParams } from './types';
 export async function checkDeletion(
   connection: IAbapConnection,
   params: IDeleteFunctionGroupParams,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const { function_group_name } = params;
 
   if (!function_group_name) {
@@ -56,7 +59,7 @@ export async function checkDeletion(
 export async function deleteFunctionGroup(
   connection: IAbapConnection,
   params: IDeleteFunctionGroupParams,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const { function_group_name, transport_request } = params;
 
   if (!function_group_name) {
@@ -105,5 +108,5 @@ export async function deleteFunctionGroup(
       transport_request: transport_request || 'local',
       message: `Function group ${function_group_name} deleted successfully`,
     },
-  } as IAdtResponse;
+  } as IAdtWireResponse;
 }

@@ -4,7 +4,7 @@
 
 import type {
   IAbapConnection,
-  IAdtResponse,
+  IAdtWireResponse,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import {
@@ -39,7 +39,7 @@ export async function checkDdl(
   version: CheckRunVersion = 'active',
   sourceCode?: string,
   logger?: ILogger,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   let attempt = 0;
   // Allow one retry when system did not materialize inactive version yet
   while (attempt < 2) {

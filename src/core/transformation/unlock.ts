@@ -1,4 +1,7 @@
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
@@ -10,7 +13,7 @@ export async function unlockTransformation(
   connection: IAbapConnection,
   transformationName: string,
   lockHandle: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const transformationNameEncoded = encodeSapObjectName(
     transformationName.toLowerCase(),
   );

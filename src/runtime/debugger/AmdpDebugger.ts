@@ -1,6 +1,6 @@
 import type {
   IAbapConnection,
-  IAdtResponse,
+  IAdtWireResponse,
   IAmdpDebugger,
   IGetAmdpCellSubstringOptions,
   IGetAmdpDataPreviewOptions,
@@ -35,19 +35,25 @@ export class AmdpDebugger implements IAmdpDebugger {
     private readonly logger: ILogger,
   ) {}
 
-  async start(options?: IStartAmdpDebuggerOptions): Promise<IAdtResponse> {
+  async start(options?: IStartAmdpDebuggerOptions): Promise<IAdtWireResponse> {
     return startAmdpDebugger(this.connection, options);
   }
 
-  async resume(mainId: string): Promise<IAdtResponse> {
+  async resume(mainId: string): Promise<IAdtWireResponse> {
     return resumeAmdpDebugger(this.connection, mainId);
   }
 
-  async terminate(mainId: string, hardStop?: boolean): Promise<IAdtResponse> {
+  async terminate(
+    mainId: string,
+    hardStop?: boolean,
+  ): Promise<IAdtWireResponse> {
     return terminateAmdpDebugger(this.connection, mainId, hardStop);
   }
 
-  async getDebuggee(mainId: string, debuggeeId: string): Promise<IAdtResponse> {
+  async getDebuggee(
+    mainId: string,
+    debuggeeId: string,
+  ): Promise<IAdtWireResponse> {
     return getAmdpDebuggee(this.connection, mainId, debuggeeId);
   }
 
@@ -57,7 +63,7 @@ export class AmdpDebugger implements IAmdpDebugger {
     varname: string,
     offset?: number,
     length?: number,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     return getAmdpVariable(
       this.connection,
       mainId,
@@ -73,7 +79,7 @@ export class AmdpDebugger implements IAmdpDebugger {
     debuggeeId: string,
     varname: string,
     setNull?: boolean,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     return setAmdpVariable(
       this.connection,
       mainId,
@@ -87,42 +93,47 @@ export class AmdpDebugger implements IAmdpDebugger {
     mainId: string,
     debuggeeId: string,
     name?: string,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     return lookupAmdp(this.connection, mainId, debuggeeId, name);
   }
 
-  async stepOver(mainId: string, debuggeeId: string): Promise<IAdtResponse> {
+  async stepOver(
+    mainId: string,
+    debuggeeId: string,
+  ): Promise<IAdtWireResponse> {
     return stepOverAmdp(this.connection, mainId, debuggeeId);
   }
 
   async stepContinue(
     mainId: string,
     debuggeeId: string,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     return stepContinueAmdp(this.connection, mainId, debuggeeId);
   }
 
-  async getBreakpoints(mainId: string): Promise<IAdtResponse> {
+  async getBreakpoints(mainId: string): Promise<IAdtWireResponse> {
     return getAmdpBreakpoints(this.connection, mainId);
   }
 
-  async getBreakpointsLlang(mainId: string): Promise<IAdtResponse> {
+  async getBreakpointsLlang(mainId: string): Promise<IAdtWireResponse> {
     return getAmdpBreakpointsLlang(this.connection, mainId);
   }
 
-  async getBreakpointsTableFunctions(mainId: string): Promise<IAdtResponse> {
+  async getBreakpointsTableFunctions(
+    mainId: string,
+  ): Promise<IAdtWireResponse> {
     return getAmdpBreakpointsTableFunctions(this.connection, mainId);
   }
 
   async getDataPreview(
     options?: IGetAmdpDataPreviewOptions,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     return getAmdpDataPreview(this.connection, options);
   }
 
   async getCellSubstring(
     options?: IGetAmdpCellSubstringOptions,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     return getAmdpCellSubstring(this.connection, options);
   }
 }

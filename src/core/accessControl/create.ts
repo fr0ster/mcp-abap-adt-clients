@@ -1,4 +1,7 @@
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { CT_ACCESS_CONTROL } from '../../constants/contentTypes';
 import { limitDescription } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -11,7 +14,7 @@ import type { ICreateAccessControlParams } from './types';
 export async function create(
   connection: IAbapConnection,
   args: ICreateAccessControlParams,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/acm/dcl/sources${args.transport_request ? `?corrNr=${args.transport_request}` : ''}`;
 
   const username = args.responsible || '';

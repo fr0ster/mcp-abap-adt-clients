@@ -2,7 +2,10 @@
  * Feature Toggle (FTG2/FT) delete operations - Low-level functions
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_DELETION,
   ACCEPT_DELETION_CHECK,
@@ -23,7 +26,7 @@ function objectUri(name: string): string {
 export async function checkDeletion(
   connection: IAbapConnection,
   params: IDeleteFeatureToggleParams,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   if (!params.feature_toggle_name) {
     throw new Error('feature_toggle_name is required');
   }
@@ -53,7 +56,7 @@ export async function checkDeletion(
 export async function deleteFeatureToggle(
   connection: IAbapConnection,
   params: IDeleteFeatureToggleParams,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   if (!params.feature_toggle_name) {
     throw new Error('feature_toggle_name is required');
   }
@@ -90,5 +93,5 @@ export async function deleteFeatureToggle(
       transport_request: params.transport_request || 'local',
       message: `Feature toggle ${params.feature_toggle_name} deleted successfully`,
     },
-  } as IAdtResponse;
+  } as IAdtWireResponse;
 }

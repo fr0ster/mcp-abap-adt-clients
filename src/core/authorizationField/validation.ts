@@ -3,7 +3,10 @@
  * Endpoint: POST /sap/bc/adt/aps/iam/auth/validation
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { ACCEPT_VALIDATION } from '../../constants/contentTypes';
 import { getTimeout } from '../../utils/timeouts';
 
@@ -23,7 +26,7 @@ export async function validateAuthorizationFieldName(
   name: string,
   description: string,
   packageName?: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   if (!name) {
     throw new Error('Authorization field name is required');
   }

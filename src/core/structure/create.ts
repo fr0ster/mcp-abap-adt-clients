@@ -3,7 +3,10 @@
  * NOTE: Caller should call connection.setSessionType("stateful") before creating
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { CT_STRUCTURE } from '../../constants/contentTypes';
 import { limitDescription } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -16,7 +19,7 @@ import type { ICreateStructureParams } from './types';
 export async function create(
   connection: IAbapConnection,
   params: ICreateStructureParams,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const createUrl = `/sap/bc/adt/ddic/structures${params.transportRequest ? `?corrNr=${params.transportRequest}` : ''}`;
 
   const masterSystem = params.masterSystem || '';

@@ -8,7 +8,10 @@
  * - Object types and process types
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
 import {
   ACCEPT_TRACE_CALLTREE,
@@ -172,7 +175,7 @@ export function buildTraceParametersXml(
 export async function createTraceParameters(
   connection: IAbapConnection,
   options: IProfilerTraceParameters = {},
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/runtime/traces/abaptraces/parameters`;
   const data = buildTraceParametersXml(options);
   return connection.makeAdtRequest({
@@ -188,7 +191,7 @@ export async function createTraceParameters(
 }
 
 export function extractProfilerIdFromResponse(
-  response: IAdtResponse,
+  response: IAdtWireResponse,
 ): string | undefined {
   const headers = response?.headers as
     | Record<string, string | string[] | undefined>
@@ -229,7 +232,7 @@ const TRACE_ID_REGEX =
  * resolve an id.
  */
 export function extractTraceIdFromTraceFeed(
-  response: IAdtResponse,
+  response: IAdtWireResponse,
 ): string | undefined {
   const headers = response?.headers as
     | Record<string, string | string[] | undefined>
@@ -290,7 +293,7 @@ const ID_IN_URI = /abaptraces\/([A-Za-z0-9]{16,})(?:\/|$)/;
  * own run.
  */
 export function parseTraceFeedEntries(
-  response: IAdtResponse,
+  response: IAdtWireResponse,
 ): ITraceFeedEntry[] {
   const body =
     typeof response?.data === 'string'
@@ -357,7 +360,7 @@ export const extractTraceIdFromTraceRequestsResponse =
 export async function deleteTrace(
   connection: IAbapConnection,
   traceIdOrUri: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const traceId = normalizeProfilerTraceId(traceIdOrUri);
   return connection.makeAdtRequest({
     url: `/sap/bc/adt/runtime/traces/abaptraces/${encodeURIComponent(traceId)}`,
@@ -371,7 +374,7 @@ export async function getTraceHitList(
   connection: IAbapConnection,
   traceIdOrUri: string,
   options: IProfilerTraceHitListOptions = {},
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const traceId = normalizeProfilerTraceId(traceIdOrUri);
   const params = new URLSearchParams();
   const withSystemEvents = boolToQueryValue(options.withSystemEvents);
@@ -401,7 +404,7 @@ export async function getTraceStatements(
   connection: IAbapConnection,
   traceIdOrUri: string,
   options: IProfilerTraceStatementsOptions = {},
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const traceId = normalizeProfilerTraceId(traceIdOrUri);
   const params = new URLSearchParams();
   if (options.id !== undefined) {
@@ -444,7 +447,7 @@ export async function getTraceDbAccesses(
   connection: IAbapConnection,
   traceIdOrUri: string,
   options: IProfilerTraceDbAccessesOptions = {},
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const traceId = normalizeProfilerTraceId(traceIdOrUri);
   const params = new URLSearchParams();
   const withSystemEvents = boolToQueryValue(options.withSystemEvents);
@@ -472,7 +475,7 @@ export async function getTraceDbAccesses(
 export async function listTraceFiles(
   connection: IAbapConnection,
   options?: { user?: string },
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const params = new URLSearchParams();
   if (options?.user) {
     params.set('user', options.user);
@@ -498,7 +501,7 @@ export async function listTraceFiles(
  */
 export async function getTraceParameters(
   connection: IAbapConnection,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/runtime/traces/abaptraces/parameters`;
 
   return connection.makeAdtRequest({
@@ -519,7 +522,7 @@ export async function getTraceParameters(
  */
 export async function getTraceParametersForCallstack(
   connection: IAbapConnection,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/runtime/traces/abaptraces/parameters`;
 
   return connection.makeAdtRequest({
@@ -540,7 +543,7 @@ export async function getTraceParametersForCallstack(
  */
 export async function getTraceParametersForAmdp(
   connection: IAbapConnection,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/runtime/traces/abaptraces/parameters`;
 
   return connection.makeAdtRequest({
@@ -567,7 +570,7 @@ export async function getTraceParametersForAmdp(
  */
 export async function listTraceRequests(
   connection: IAbapConnection,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/runtime/traces/abaptraces/requests`;
 
   return connection.makeAdtRequest({
@@ -590,7 +593,7 @@ export async function listTraceRequests(
 export async function getTraceRequestsByUri(
   connection: IAbapConnection,
   uri: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   if (!uri) {
     throw new Error('URI is required');
   }
@@ -615,7 +618,7 @@ export async function getTraceRequestsByUri(
  */
 export async function listObjectTypes(
   connection: IAbapConnection,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/runtime/traces/abaptraces/objecttypes`;
 
   return connection.makeAdtRequest({
@@ -636,7 +639,7 @@ export async function listObjectTypes(
  */
 export async function listProcessTypes(
   connection: IAbapConnection,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/runtime/traces/abaptraces/processtypes`;
 
   return connection.makeAdtRequest({

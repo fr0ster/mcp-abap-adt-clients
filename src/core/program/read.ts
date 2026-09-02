@@ -2,8 +2,12 @@
  * Program read operations
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { ACCEPT_TRANSPORT } from '../../constants/contentTypes';
+import { orThrow } from '../../utils/adtResponse';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { noopLogger } from '../../utils/noopLogger';
 import { getTimeout } from '../../utils/timeouts';
@@ -21,12 +25,14 @@ export async function getProgramMetadata(
   connection: IAbapConnection,
   programName: string,
   options?: IReadOptions,
-): Promise<IAdtResponse> {
-  return getUtils(connection).readObjectMetadata(
-    'program',
-    programName,
-    undefined,
-    options,
+): Promise<IAdtWireResponse> {
+  return orThrow(
+    getUtils(connection).readObjectMetadata(
+      'program',
+      programName,
+      undefined,
+      options,
+    ),
   );
 }
 
@@ -38,13 +44,15 @@ export async function getProgramSource(
   programName: string,
   version?: 'active' | 'inactive',
   options?: IReadOptions,
-): Promise<IAdtResponse> {
-  return getUtils(connection).readObjectSource(
-    'program',
-    programName,
-    undefined,
-    version,
-    options,
+): Promise<IAdtWireResponse> {
+  return orThrow(
+    getUtils(connection).readObjectSource(
+      'program',
+      programName,
+      undefined,
+      version,
+      options,
+    ),
   );
 }
 
@@ -55,7 +63,7 @@ export async function getProgramSource(
 export async function getProgram(
   connection: IAbapConnection,
   programName: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   return getProgramSource(connection, programName);
 }
 
@@ -69,7 +77,7 @@ export async function getProgramTransport(
   connection: IAbapConnection,
   programName: string,
   options?: IReadOptions,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const encodedName = encodeSapObjectName(programName);
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
   const url = `/sap/bc/adt/programs/programs/${encodedName}/transport${query}`;

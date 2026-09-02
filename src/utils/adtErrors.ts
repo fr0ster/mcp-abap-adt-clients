@@ -21,7 +21,7 @@
  * It is the library declining to translate a refusal into a fact.
  */
 
-import type { IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
 
 const parser = new XMLParser({
@@ -106,7 +106,7 @@ export class AdtSAPError extends Error {
   /** `<namespace id="…">`, when the document names one. */
   readonly namespace?: string;
   /** The response it arrived on. A 2xx, or this would have thrown lower down. */
-  readonly response?: IAdtResponse;
+  readonly response?: IAdtWireResponse;
   /** The call that produced it, so a chain's steps can be told apart. */
   readonly request?: IAdtRefusalRequest;
 
@@ -115,7 +115,7 @@ export class AdtSAPError extends Error {
     document: string,
     adtType?: string,
     namespace?: string,
-    response?: IAdtResponse,
+    response?: IAdtWireResponse,
     request?: IAdtRefusalRequest,
   ) {
     super(message);
@@ -160,7 +160,7 @@ const attribute = (value: unknown, name: string): string | undefined => {
  */
 export function sapErrorIn(
   xmlData: string,
-  context?: { response?: IAdtResponse; request?: IAdtRefusalRequest },
+  context?: { response?: IAdtWireResponse; request?: IAdtRefusalRequest },
 ): AdtSAPError | undefined {
   if (!xmlData || !xmlData.includes('<exc:exception')) {
     return undefined;

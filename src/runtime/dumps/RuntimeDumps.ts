@@ -1,6 +1,6 @@
 import type {
   IAbapConnection,
-  IAdtResponse,
+  IAdtWireResponse,
   ILogger,
   IRuntimeDumpReadOptions,
   IRuntimeDumps,
@@ -21,21 +21,21 @@ export class RuntimeDumps implements IRuntimeDumps {
     private readonly logger: ILogger,
   ) {}
 
-  async list(options?: IRuntimeDumpsListOptions): Promise<IAdtResponse> {
+  async list(options?: IRuntimeDumpsListOptions): Promise<IAdtWireResponse> {
     return listRuntimeDumps(this.connection, options ?? {});
   }
 
   async listByUser(
     user?: string,
     options?: Omit<IRuntimeDumpsListOptions, 'query'>,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     return listRuntimeDumpsByUser(this.connection, user, options);
   }
 
   async getById(
     dumpId: string,
     options?: IRuntimeDumpReadOptions,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     return getRuntimeDumpById(this.connection, dumpId, options);
   }
 

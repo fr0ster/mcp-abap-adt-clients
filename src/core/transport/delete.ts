@@ -7,7 +7,10 @@
  * collection URL.
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { ACCEPT_TRANSPORT } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -20,7 +23,7 @@ import { getTimeout } from '../../utils/timeouts';
 export async function deleteTransport(
   connection: IAbapConnection,
   transportNumber: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   if (!transportNumber) {
     throw new Error('Transport request number is required');
   }

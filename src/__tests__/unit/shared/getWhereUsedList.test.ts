@@ -6,7 +6,10 @@
  * search was actually restricted to — without touching a live SAP system.
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { getWhereUsedList } from '../../../core/shared/whereUsed';
 
 // Real attribute order from SAP: isDefault, isSelected, name (name LAST).
@@ -39,13 +42,17 @@ function makeFakeConnection(): {
 } {
   const searchBodies: string[] = [];
   const connection = {
-    makeAdtRequest: async (options: any): Promise<IAdtResponse> => {
+    makeAdtRequest: async (options: any): Promise<IAdtWireResponse> => {
       if (options.url.includes('/usageReferences/scope')) {
-        return { data: SCOPE_XML, status: 200, headers: {} } as IAdtResponse;
+        return {
+          data: SCOPE_XML,
+          status: 200,
+          headers: {},
+        } as IAdtWireResponse;
       }
       // Actual search request — record its body.
       searchBodies.push(String(options.data));
-      return { data: RESULT_XML, status: 200, headers: {} } as IAdtResponse;
+      return { data: RESULT_XML, status: 200, headers: {} } as IAdtWireResponse;
     },
   } as unknown as IAbapConnection;
   return { connection, searchBodies };
@@ -81,16 +88,20 @@ describe('getWhereUsedList type filtering', () => {
   it('applies the type filter when the scope uses a camel-case prefix', async () => {
     const searchBodies: string[] = [];
     const connection = {
-      makeAdtRequest: async (options: any): Promise<IAdtResponse> => {
+      makeAdtRequest: async (options: any): Promise<IAdtWireResponse> => {
         if (options.url.includes('/usageReferences/scope')) {
           return {
             data: SCOPE_XML_CAMEL,
             status: 200,
             headers: {},
-          } as IAdtResponse;
+          } as IAdtWireResponse;
         }
         searchBodies.push(String(options.data));
-        return { data: RESULT_XML, status: 200, headers: {} } as IAdtResponse;
+        return {
+          data: RESULT_XML,
+          status: 200,
+          headers: {},
+        } as IAdtWireResponse;
       },
     } as unknown as IAbapConnection;
 
@@ -115,10 +126,14 @@ describe('getWhereUsedList type filtering', () => {
     const urls: string[] = [];
     const searchBodies: string[] = [];
     const connection = {
-      makeAdtRequest: async (options: any): Promise<IAdtResponse> => {
+      makeAdtRequest: async (options: any): Promise<IAdtWireResponse> => {
         urls.push(options.url);
         searchBodies.push(String(options.data));
-        return { data: RESULT_XML, status: 200, headers: {} } as IAdtResponse;
+        return {
+          data: RESULT_XML,
+          status: 200,
+          headers: {},
+        } as IAdtWireResponse;
       },
     } as unknown as IAbapConnection;
 
@@ -138,7 +153,7 @@ describe('getWhereUsedList type filtering', () => {
     const urls: string[] = [];
     const searchBodies: string[] = [];
     const connection = {
-      makeAdtRequest: async (options: any): Promise<IAdtResponse> => {
+      makeAdtRequest: async (options: any): Promise<IAdtWireResponse> => {
         urls.push(options.url);
         if (options.url.includes('/usageReferences/scope')) {
           // Some S/4 releases do not expose the scope sub-resource.
@@ -147,7 +162,11 @@ describe('getWhereUsedList type filtering', () => {
           throw err;
         }
         searchBodies.push(String(options.data));
-        return { data: RESULT_XML, status: 200, headers: {} } as IAdtResponse;
+        return {
+          data: RESULT_XML,
+          status: 200,
+          headers: {},
+        } as IAdtWireResponse;
       },
     } as unknown as IAbapConnection;
 
@@ -171,13 +190,13 @@ describe('getWhereUsedList type filtering', () => {
     const MIXED = `<?xml version="1.0" encoding="UTF-8"?><usagereferences:usageReferenceResult xmlns:usagereferences="http://www.sap.com/adt/ris/usageReferences" xmlns:adtcore="http://www.sap.com/adt/core" numberOfResults="3" resultDescription="Found 3"><usagereferences:referencedObjects><usagereferences:referencedObject uri="/a"><usagereferences:adtObject adtcore:type="CLAS/OC" adtcore:name="CL_FOO"/></usagereferences:referencedObject><usagereferences:referencedObject uri="/b"><usagereferences:adtObject adtcore:type="TABL/DS" adtcore:name="ZAPPEND_VBAK"/></usagereferences:referencedObject><usagereferences:referencedObject uri="/c"><usagereferences:adtObject adtcore:type="PROG/P" adtcore:name="ZREPORT"/></usagereferences:referencedObject></usagereferences:referencedObjects></usagereferences:usageReferenceResult>`;
 
     const connection = {
-      makeAdtRequest: async (options: any): Promise<IAdtResponse> => {
+      makeAdtRequest: async (options: any): Promise<IAdtWireResponse> => {
         if (options.url.includes('/usageReferences/scope')) {
           const err: any = new Error('Request failed with status code 404');
           err.status = 404;
           throw err;
         }
-        return { data: MIXED, status: 200, headers: {} } as IAdtResponse;
+        return { data: MIXED, status: 200, headers: {} } as IAdtWireResponse;
       },
     } as unknown as IAbapConnection;
 
@@ -210,12 +229,12 @@ describe('getWhereUsedList type filtering', () => {
   for (const prefix of ['usagereferences', 'usageReferences']) {
     it(`parses the result regardless of the "${prefix}:" namespace prefix`, async () => {
       const connection = {
-        makeAdtRequest: async (): Promise<IAdtResponse> =>
+        makeAdtRequest: async (): Promise<IAdtWireResponse> =>
           ({
             data: resultWith(prefix),
             status: 200,
             headers: {},
-          }) as IAdtResponse,
+          }) as IAdtWireResponse,
       } as unknown as IAbapConnection;
 
       const result = await getWhereUsedList(connection, {
@@ -238,13 +257,17 @@ describe('getWhereUsedList type filtering', () => {
 
   it('re-throws non-404 scope errors instead of falling back', async () => {
     const connection = {
-      makeAdtRequest: async (options: any): Promise<IAdtResponse> => {
+      makeAdtRequest: async (options: any): Promise<IAdtWireResponse> => {
         if (options.url.includes('/usageReferences/scope')) {
           const err: any = new Error('Request failed with status code 500');
           err.status = 500;
           throw err;
         }
-        return { data: RESULT_XML, status: 200, headers: {} } as IAdtResponse;
+        return {
+          data: RESULT_XML,
+          status: 200,
+          headers: {},
+        } as IAdtWireResponse;
       },
     } as unknown as IAbapConnection;
 

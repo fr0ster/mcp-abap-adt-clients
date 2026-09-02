@@ -4,11 +4,12 @@
 
 import type {
   IAbapConnection,
-  IAdtResponse,
+  IAdtWireResponse,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_SOURCE } from '../../constants/contentTypes';
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
+import { orThrow } from '../../utils/adtResponse';
 import { noopLogger } from '../../utils/noopLogger';
 import { AdtUtils } from '../shared/AdtUtils';
 import type { IReadOptions } from '../shared/types';
@@ -27,12 +28,14 @@ export async function getBehaviorImplementationMetadata(
   className: string,
   options?: IReadOptions,
   logger?: ILogger,
-): Promise<IAdtResponse> {
-  return getUtils(connection, logger).readObjectMetadata(
-    'class',
-    className,
-    undefined,
-    options,
+): Promise<IAdtWireResponse> {
+  return orThrow(
+    getUtils(connection, logger).readObjectMetadata(
+      'class',
+      className,
+      undefined,
+      options,
+    ),
   );
 }
 
@@ -48,13 +51,15 @@ export async function getBehaviorImplementationSource(
   version?: 'active' | 'inactive',
   options?: IReadOptions,
   logger?: ILogger,
-): Promise<IAdtResponse> {
-  return getUtils(connection, logger).readObjectSource(
-    'class',
-    className,
-    undefined,
-    version,
-    options,
+): Promise<IAdtWireResponse> {
+  return orThrow(
+    getUtils(connection, logger).readObjectSource(
+      'class',
+      className,
+      undefined,
+      version,
+      options,
+    ),
   );
 }
 
@@ -70,7 +75,7 @@ export async function getBehaviorImplementationImplementations(
   version: 'active' | 'inactive' | 'workingArea' = 'active',
   options?: IReadOptions,
   logger?: ILogger,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const { encodeSapObjectName } = await import('../../utils/internalUtils');
   const { getTimeout } = await import('../../utils/timeouts');
 
@@ -101,7 +106,7 @@ export async function getBehaviorImplementationTransport(
   connection: IAbapConnection,
   className: string,
   options?: IReadOptions,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   // Behavior implementation is a class, so use class transport endpoint
   const { getClassTransport } = await import('../class/read');
   return getClassTransport(connection, className, options);

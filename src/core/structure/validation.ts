@@ -3,7 +3,10 @@
  * Uses ADT validation endpoint: /sap/bc/adt/ddic/structures/validation
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { ACCEPT_VALIDATION } from '../../constants/contentTypes';
 import { getTimeout } from '../../utils/timeouts';
 
@@ -21,7 +24,7 @@ export async function validateStructureName(
   connection: IAbapConnection,
   structureName: string,
   description?: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/ddic/structures/validation`;
   const queryParams = new URLSearchParams({
     objtype: 'stru',

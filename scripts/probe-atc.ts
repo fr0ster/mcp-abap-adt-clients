@@ -109,6 +109,7 @@ import {
 import { refuseWhileRunOwnsSession } from '../src/__tests__/helpers/sharedSession';
 import { createConnectionLogger } from '../src/__tests__/helpers/testLogger';
 import { AdtUtils } from '../src/core/shared/AdtUtils';
+import { orThrow } from '../src/utils/adtResponse';
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../.env');
 if (fs.existsSync(envPath)) {
@@ -923,9 +924,11 @@ async function main(): Promise<void> {
     logger.info(`Reading contents of ${packageName}`);
 
     const readContents = async () => {
-      const items = await utils.getPackageContentsList(packageName, {
-        includeSubpackages: true,
-      });
+      const items = await orThrow(
+        utils.getPackageContentsList(packageName, {
+          includeSubpackages: true,
+        }),
+      );
       const map = new Map<
         string,
         { name: string; type: string; uri?: string }

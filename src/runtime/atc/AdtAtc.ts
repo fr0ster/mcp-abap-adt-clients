@@ -17,8 +17,8 @@ import {
   AdtObjectErrorCodes,
   AdtOperationError,
   type IAbapConnection,
-  type IAdtResponse,
   type IAdtRunnable,
+  type IAdtWireResponse,
   type IAtcFindings,
   type IAtcRunOptions,
   type IAtcRunResult,
@@ -129,7 +129,7 @@ export class AdtAtc
     };
   }
 
-  async getFindings(worklistId: string): Promise<IAdtResponse> {
+  async getFindings(worklistId: string): Promise<IAdtWireResponse> {
     return getAtcWorklist(this.connection, worklistId);
   }
 
@@ -189,7 +189,7 @@ export class AdtAtc
 
   /** `clientWait=false`: 201, empty body, the run id in `Location`. */
   private readStartedRun(
-    response: IAdtResponse,
+    response: IAdtWireResponse,
     worklistId: string,
   ): IAtcRunResult {
     const location =
@@ -215,7 +215,7 @@ export class AdtAtc
 
   /** `clientWait=true`: 200, `<atcworklist:worklistRun>` with FINDING_STATS. */
   private readWaitingRun(
-    response: IAdtResponse,
+    response: IAdtWireResponse,
     worklistId: string,
   ): IAtcRunResult {
     const parsed = parseWaitingRun(response.data);
