@@ -208,3 +208,29 @@ export function throwIfSapError(xmlData: string): void {
     throw refusal;
   }
 }
+
+/**
+ * The transport list has no saved configuration to run.
+ *
+ * Lives here rather than in `@mcp-abap-adt/interfaces` because it is a class: a
+ * contract says what a thing is, a class is one way of being it, and shipping
+ * one from the contracts package makes "swap in your own implementation" untrue
+ * for that piece.
+
+ * It survives the move where `AdtOperationError` does not, and the difference is
+ * what each carries. This names one condition, says what to do about it, and
+ * hands over the `endpoint` a caller needs to act — a failure worth
+ * distinguishing. `AdtOperationError` named "an operation failed" and carried two
+ * `unknown` fields.
+ */
+export class TransportSearchConfigurationMissing extends Error {
+  constructor(public readonly endpoint: string) {
+    super(
+      'No transport search configuration exists on this system. The transport ' +
+        'list is a saved-configuration search, so there is nothing to run: create ' +
+        'a configuration in Eclipse, or pass configUri explicitly. Configurations ' +
+        `live at ${endpoint}`,
+    );
+    this.name = 'TransportSearchConfigurationMissing';
+  }
+}

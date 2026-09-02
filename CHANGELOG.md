@@ -14,6 +14,23 @@ six public methods are gone, `getUtils()` returns contracts instead of the class
 and a refusal SAP sends with a 2xx now throws where it used to be reported as
 success.
 
+### Added
+
+- **`TransportSearchConfigurationMissing` is now this package's class**, exported
+  from the root and `./core`, and no longer imported from
+  `@mcp-abap-adt/interfaces`. A contract says what a thing is; a class is one way
+  of being it, and shipping one from the contracts package makes "swap in your own
+  implementation" untrue for that piece.
+
+  Nothing changes for a caller yet — the class in `interfaces` still exists at
+  27.0.0, so the two are separate constructors and `instanceof` against the
+  `interfaces` one stops matching what this package throws. **Catch it from here.**
+  The removal on the other side is its own release.
+
+  It survives the move where `AdtOperationError` will not, and the difference is
+  what each carries: this names one condition, says what to do about it, and hands
+  over the `endpoint` a caller needs to act on it.
+
 ### Fixed
 
 - **BREAKING: a refusal SAP sends with a 2xx is no longer reported as success.**

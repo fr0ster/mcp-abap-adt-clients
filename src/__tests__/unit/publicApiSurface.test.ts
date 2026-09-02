@@ -106,6 +106,9 @@ describe('public API surface', () => {
  * reads only what is marked.
  */
 const RUNTIME_EXPORTS = [
+  // name, so it is part of the surface rather than an internal detail.
+  // Public since 15.0.0: the replacement for the removed `latestTraceId()`.
+  // Thrown by every client since the refusal check; a consumer catches it by
   'AbapDebugger',
   'AdtAbapGitClient',
   'AdtAppendStructure',
@@ -116,17 +119,15 @@ const RUNTIME_EXPORTS = [
   'AdtClientsWS',
   'AdtContentTypesBase',
   'AdtContentTypesModern',
-  // Thrown by every client since the refusal check; a consumer catches it by
-  // name, so it is part of the surface rather than an internal detail.
-  'AdtSAPError',
   'AdtExecutor',
   'AdtInclude',
-  'AdtParseError',
   'AdtMessageClass',
   'AdtMessageClassMessage',
+  'AdtParseError',
   'AdtRuntimeClient',
   'AdtRuntimeClientBatch',
   'AdtRuntimeClientExperimental',
+  'AdtSAPError',
   'AdtScalarFunction',
   'AdtScalarFunctionImplementation',
   'AdtService',
@@ -135,31 +136,31 @@ const RUNTIME_EXPORTS = [
   'ApplicationLog',
   'AtcLog',
   'BatchRecordingConnection',
-  'CT_INCLUDE',
+  'buildDumpIdPrefix',
+  'buildRuntimeDumpsUserQuery',
+  'compareRecordedAt',
+  'createAdtClient',
   'CrossTrace',
+  'CT_INCLUDE',
   'DdicActivation',
   'Debugger',
   'DebuggerSessionClient',
   'FeedRepository',
-  'GatewayErrorLog',
-  'MemorySnapshots',
-  'Profiler',
-  'RuntimeDumps',
-  'St05Trace',
-  'SystemMessages',
-  'buildDumpIdPrefix',
-  'buildRuntimeDumpsUserQuery',
-  // Public since 15.0.0: the replacement for the removed `latestTraceId()`.
-  'compareRecordedAt',
-  'createAdtClient',
   'fetchDiscoveryEndpoints',
+  'GatewayErrorLog',
   'getSystemInformation',
   'isEndpointInDiscovery',
   'isModernAdtSystem',
+  'MemorySnapshots',
   'parseSearchResults',
   'parseTransportTree',
+  'Profiler',
   'resolveBindingVariant',
   'resolveContentTypes',
+  'RuntimeDumps',
+  'St05Trace',
+  'SystemMessages',
+  'TransportSearchConfigurationMissing',
 ];
 
 describe('runtime export surface', () => {

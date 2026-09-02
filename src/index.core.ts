@@ -46,7 +46,11 @@ export { parseTransportTree } from './core/transport/parseTransportTree';
  * and are the library's own business — a consumer catches a refusal, they do not
  * detect one, and a member is exported because somebody needs it.
  */
-export { AdtParseError, AdtSAPError } from './utils/adtErrors';
+export {
+  AdtParseError,
+  AdtSAPError,
+  TransportSearchConfigurationMissing,
+} from './utils/adtErrors';
 export {
   fetchDiscoveryEndpoints,
   isEndpointInDiscovery,
