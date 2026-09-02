@@ -172,15 +172,39 @@ describe('200 with a genuinely empty result stays an empty result', () => {
   });
 });
 
-describe('the search strategy hands the document over untouched', () => {
-  it('gives the parser the exception document rather than swallowing it', async () => {
+describe('a strategy must not become a place a refusal can hide', () => {
+  it('never runs the parser on an exception document', async () => {
     const utils = new AdtUtils(connectionAnswering(200, EXCEPTION_XML), logger);
 
-    // `search(criteria, parse)` is the migration for a consumer that was reading
-    // `searchObjects().data`. What that consumer inspected must still arrive:
-    // here, the refusal itself.
-    const seen = await utils.search({ query: 'Z*' }, (data) => String(data));
+    const seen: unknown[] = [];
+    const error = await utils
+      .search({ query: 'Z*' }, (data) => {
+        seen.push(data);
+        return String(data);
+      })
+      .then(
+        () => {
+          throw new Error('expected a rejection');
+        },
+        (e: unknown) => e as AdtExceptionDocumentError,
+      );
 
-    expect(seen).toBe(EXCEPTION_XML);
+    // The parser is not called at all. Handing it the refusal would look
+    // harmless — the document arrives — but a parser looking for hits in an
+    // exception document finds none and answers "nothing found". The strategy is
+    // there to control how much of a large answer the caller takes, not to
+    // decide whether the request was refused.
+    expect(seen).toEqual([]);
+    expect(error).toBeInstanceOf(AdtExceptionDocumentError);
+    expect(error.document).toBe(EXCEPTION_XML);
+  });
+
+  it('still hands over a real answer untouched', async () => {
+    const document = '<adtcore:objectReferences/>';
+    const utils = new AdtUtils(connectionAnswering(200, document), logger);
+
+    await expect(
+      utils.search({ query: 'Z*' }, (data) => String(data)),
+    ).resolves.toBe(document);
   });
 });

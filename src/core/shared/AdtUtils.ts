@@ -89,6 +89,7 @@ import type {
   ISearchResult,
 } from '@mcp-abap-adt/interfaces';
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
+import { throwIfAdtException } from '../../utils/adtException';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import { getAllTypes as getAllTypesUtil, parseNamedItems } from './allTypes';
@@ -230,9 +231,18 @@ export class AdtUtils
     if (!parse) {
       return searchObjectsTyped(this.connection, criteria);
     }
-    // The caller reads the document; nothing here forms a second opinion about
-    // it, so the raw body goes over untouched rather than parsed and re-emitted.
     const response = await searchObjects(this.connection, criteria);
+    const body = String(response.data ?? '');
+
+    // A strategy exists so the caller can control how much of a large answer they
+    // take. It is not a place a refusal can hide: the parser is handed a
+    // document, and a parser looking for hits in an exception document finds
+    // none and reports emptiness. So a refusal is raised before the strategy
+    // runs, and the parser only ever sees an answer.
+    throwIfAdtException(body);
+
+    // Beyond that, nothing here forms a second opinion about the document — the
+    // raw body goes over untouched rather than parsed and re-emitted.
     return parse(response.data);
   }
 
