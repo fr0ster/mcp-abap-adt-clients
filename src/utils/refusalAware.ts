@@ -42,7 +42,7 @@ import type {
   IAbapRequestOptions,
   IAdtResponse,
 } from '@mcp-abap-adt/interfaces';
-import { adtExceptionIn } from './adtException';
+import { sapErrorIn } from './adtErrors';
 
 /** Connections already carrying the check. */
 const installed = new WeakSet<IAbapConnection>();
@@ -93,7 +93,7 @@ export function withRefusalDetection(
       // something was refused and leaves the caller to guess which step of a
       // chain asked — `delete()` sends a check and a delete, `create()` sends
       // six. "Object is locked" means a different thing depending on which.
-      const refusal = adtExceptionIn(body, {
+      const refusal = sapErrorIn(body, {
         response: response as IAdtResponse,
         request: { method: request?.method, url: request?.url },
       });

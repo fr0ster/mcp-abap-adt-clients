@@ -23,7 +23,7 @@
 
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import { AdtClient } from '../../../clients/AdtClient';
-import { AdtExceptionDocumentError } from '../../../utils/adtException';
+import { AdtSAPError } from '../../../utils/adtErrors';
 
 const HOLDER = 'Object ZNOPE is locked by user XYZ';
 
@@ -92,12 +92,12 @@ describe('a refusal carried by a 2xx is not a result', () => {
 
     const error = await refusalFrom(call(new AdtClient(connection, logger)));
 
-    expect(error).toBeInstanceOf(AdtExceptionDocumentError);
+    expect(error).toBeInstanceOf(AdtSAPError);
     // The server's own words, including who holds the lock. A throw carrying
     // "may be locked by another user" would satisfy a weaker assertion and tell
     // the caller nothing they can act on.
     expect((error as Error).message).toContain(HOLDER);
-    const refusal = error as AdtExceptionDocumentError;
+    const refusal = error as AdtSAPError;
     expect(refusal.document).toBe(REFUSAL);
 
     // Enough for the consumer to do their own analysis and decide: what the

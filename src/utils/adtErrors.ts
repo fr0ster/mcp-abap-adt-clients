@@ -31,6 +31,46 @@ const parser = new XMLParser({
   trimValues: true,
 });
 
+/**
+ * Thrown when the library could not read the answer.
+ *
+ * Distinct from a refusal, and distinct from nothing. Three outcomes have to
+ * stay apart, and until this existed two of them looked identical:
+ *
+ * | the answer | what the caller must be told |
+ * |---|---|
+ * | an empty document | nothing matched — a result |
+ * | a refusal | the server said no — an error |
+ * | something unreadable | *we* could not read it — an error, a different one |
+ *
+ * The third was reported as the first. A logon page — what an expired session
+ * answers with — parsed to no nodes and went back as "the package is empty".
+ *
+ * The distinction matters because the error method on a result contract must be
+ * empty only when there really is no error, never because a parser gave up. A
+ * caller cannot act on a failure they were told did not happen.
+ *
+ * This is not the library judging the server's document. It is the library
+ * saying what it did: it was handed something it does not know how to read, and
+ * hands it back rather than inventing an answer from it.
+ */
+export class AdtParseError extends Error {
+  /** The document exactly as it arrived. */
+  readonly document: string;
+  /** What was looked for and not found, e.g. `asx:abap/asx:values/DATA`. */
+  readonly expected: string;
+
+  constructor(expected: string, document: string) {
+    super(
+      `The answer could not be read: expected ${expected}. ` +
+        'It is not empty and it is not an ADT exception — see `document`.',
+    );
+    this.name = 'AdtParseError';
+    this.document = document;
+    this.expected = expected;
+  }
+}
+
 /** What the library asked for, when a refusal came back. */
 export interface IAdtRefusalRequest {
   method?: string;
@@ -51,7 +91,14 @@ export interface IAdtRefusalRequest {
  * delete, `create()` runs validate, create, lock, update, unlock and activate.
  * "Object is locked" is a different problem depending on which of those asked.
  */
-export class AdtExceptionDocumentError extends Error {
+/**
+ * SAP refused, and this is what it said.
+ *
+ * Named for where the failure came from, not for the document it arrived in: a
+ * caller catching this needs to know the server said no, and `AdtExceptionDocument…`
+ * described the mechanism instead of the fact.
+ */
+export class AdtSAPError extends Error {
   /** The document exactly as the server sent it. Nothing is summarised away. */
   readonly document: string;
   /** `<type id="…">`, when the document names one — the server's own classification. */
@@ -72,7 +119,7 @@ export class AdtExceptionDocumentError extends Error {
     request?: IAdtRefusalRequest,
   ) {
     super(message);
-    this.name = 'AdtExceptionDocumentError';
+    this.name = 'AdtSAPError';
     this.document = document;
     this.adtType = adtType;
     this.namespace = namespace;
@@ -111,10 +158,10 @@ const attribute = (value: unknown, name: string): string | undefined => {
  * Cheap string test first: an ADT document that is not an exception is the
  * common case, and re-parsing every payload to learn that would cost every read.
  */
-export function adtExceptionIn(
+export function sapErrorIn(
   xmlData: string,
   context?: { response?: IAdtResponse; request?: IAdtRefusalRequest },
-): AdtExceptionDocumentError | undefined {
+): AdtSAPError | undefined {
   if (!xmlData || !xmlData.includes('<exc:exception')) {
     return undefined;
   }
@@ -141,7 +188,7 @@ export function adtExceptionIn(
     // rather than a silent empty result.
   }
 
-  return new AdtExceptionDocumentError(
+  return new AdtSAPError(
     message
       ? `SAP refused the request: ${message}`
       : 'SAP refused the request with an ADT exception document ' +
@@ -155,8 +202,8 @@ export function adtExceptionIn(
 }
 
 /** Throws when the document is a refusal; returns otherwise. */
-export function throwIfAdtException(xmlData: string): void {
-  const refusal = adtExceptionIn(xmlData);
+export function throwIfSapError(xmlData: string): void {
+  const refusal = sapErrorIn(xmlData);
   if (refusal) {
     throw refusal;
   }

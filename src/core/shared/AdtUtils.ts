@@ -89,7 +89,7 @@ import type {
   ISearchResult,
 } from '@mcp-abap-adt/interfaces';
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
-import { throwIfAdtException } from '../../utils/adtException';
+import { throwIfSapError } from '../../utils/adtErrors';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { withRefusalDetection } from '../../utils/refusalAware';
 import { getTimeout } from '../../utils/timeouts';
@@ -243,7 +243,7 @@ export class AdtUtils
     // document, and a parser looking for hits in an exception document finds
     // none and reports emptiness. So a refusal is raised before the strategy
     // runs, and the parser only ever sees an answer.
-    throwIfAdtException(body);
+    throwIfSapError(body);
 
     // Beyond that, nothing here forms a second opinion about the document — the
     // raw body goes over untouched rather than parsed and re-emitted.

@@ -11,7 +11,7 @@ import type {
   INamedItem,
 } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
-import { throwIfAdtException } from '../../utils/adtException';
+import { AdtParseError, throwIfSapError } from '../../utils/adtErrors';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -79,7 +79,7 @@ export const parseNamedItems = (
 ): INamedItem[] => {
   // Outside the try: a refusal must reach the caller, and the catch below turns
   // everything into an empty list.
-  throwIfAdtException(xmlData);
+  throwIfSapError(xmlData);
 
   try {
     if (!xmlData) {
@@ -89,6 +89,13 @@ export const parseNamedItems = (
     const list = parsed['nameditem:namedItemList'] as
       | Record<string, unknown>
       | undefined;
+
+    // A document that is not this one. An empty list is `<namedItemList/>`, which
+    // parses and yields no items — that is a result. Absent entirely is not.
+    if (list === undefined) {
+      throw new AdtParseError('nameditem:namedItemList', xmlData);
+    }
+
     const raw = list?.['nameditem:namedItem'];
     const items = raw ? (Array.isArray(raw) ? raw : [raw]) : [];
 
@@ -105,7 +112,10 @@ export const parseNamedItems = (
     }
     return result;
   } catch (error) {
+    if (error instanceof AdtParseError) {
+      throw error;
+    }
     logger?.debug?.('Failed to parse named item list', { error });
-    return [];
+    throw new AdtParseError('nameditem:namedItemList', xmlData);
   }
 };

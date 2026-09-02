@@ -20,7 +20,7 @@
 
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import { AdtUtils } from '../../../core/shared/AdtUtils';
-import { AdtExceptionDocumentError } from '../../../utils/adtException';
+import { AdtSAPError } from '../../../utils/adtErrors';
 
 const MESSAGE = 'Resource ZNOPE does not exist';
 
@@ -109,8 +109,8 @@ describe('200 carrying an exception document is a refusal, not an empty result',
 
     // Before this, the answer was { objects: [], childNodes: [] } — the server's
     // "does not exist" reported to the caller as "there is nothing here".
-    expect(error).toBeInstanceOf(AdtExceptionDocumentError);
-    const refusal = error as AdtExceptionDocumentError;
+    expect(error).toBeInstanceOf(AdtSAPError);
+    const refusal = error as AdtSAPError;
     expect(refusal.message).toContain(MESSAGE);
     expect(refusal.document).toBe(EXCEPTION_XML);
     expect(refusal.adtType).toBe('ExceptionResourceNotFound');
@@ -124,10 +124,10 @@ describe('200 carrying an exception document is a refusal, not an empty result',
       () => {
         throw new Error('expected a rejection');
       },
-      (e: unknown) => e as AdtExceptionDocumentError,
+      (e: unknown) => e as AdtSAPError,
     );
 
-    expect(error).toBeInstanceOf(AdtExceptionDocumentError);
+    expect(error).toBeInstanceOf(AdtSAPError);
     expect(error.document).toBe(EXCEPTION_XML);
   });
 
@@ -139,12 +139,12 @@ describe('200 carrying an exception document is a refusal, not an empty result',
       () => {
         throw new Error('expected a rejection');
       },
-      (e: unknown) => e as AdtExceptionDocumentError,
+      (e: unknown) => e as AdtSAPError,
     );
 
     // A refusal that cannot be read is still a refusal. What the library cannot
     // interpret it hands over instead of discarding.
-    expect(error).toBeInstanceOf(AdtExceptionDocumentError);
+    expect(error).toBeInstanceOf(AdtSAPError);
     expect(error.document).toBe(truncated);
   });
 });
@@ -186,7 +186,7 @@ describe('a strategy must not become a place a refusal can hide', () => {
         () => {
           throw new Error('expected a rejection');
         },
-        (e: unknown) => e as AdtExceptionDocumentError,
+        (e: unknown) => e as AdtSAPError,
       );
 
     // The parser is not called at all. Handing it the refusal would look
@@ -195,7 +195,7 @@ describe('a strategy must not become a place a refusal can hide', () => {
     // there to control how much of a large answer the caller takes, not to
     // decide whether the request was refused.
     expect(seen).toEqual([]);
-    expect(error).toBeInstanceOf(AdtExceptionDocumentError);
+    expect(error).toBeInstanceOf(AdtSAPError);
     expect(error.document).toBe(EXCEPTION_XML);
   });
 

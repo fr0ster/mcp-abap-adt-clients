@@ -10,6 +10,7 @@
 import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { parseNamedItems } from '../../../core/shared/allTypes';
 import { toNodeContents } from '../../../core/shared/nodeStructure';
+import { AdtParseError } from '../../../utils/adtErrors';
 
 const logger = {
   log: jest.fn(),
@@ -76,18 +77,27 @@ describe('toNodeContents', () => {
     ]);
   });
 
-  it('answers empty for a document it cannot read, without throwing', () => {
-    // A level that cannot be read is a level with nothing under it, not a
-    // failed traversal — the callers walk trees and would abandon the whole
-    // walk over one bad level.
+  it('answers empty for an empty document — nothing is not a failure', () => {
     expect(toNodeContents('', logger)).toEqual({
       objects: [],
       childNodes: [],
     });
-    expect(toNodeContents('<not-xml', logger)).toEqual({
-      objects: [],
-      childNodes: [],
-    });
+  });
+
+  it('raises rather than answering empty for a document it cannot read', () => {
+    // This case asserted the opposite when it was written, which is how a defect
+    // gets pinned by its own coverage. "The package is empty" and "we were handed
+    // something else entirely" are different answers, and the second is what an
+    // expired session's logon page looks like.
+    //
+    // The throw is the DEFAULT, not the law: deciding what counts as an error
+    // belongs to an error strategy the consumer supplies (decision 19). Until
+    // that exists, failing loudly is the safe default rather than a judgement
+    // imposed for good.
+    expect(() => toNodeContents('<not-xml', logger)).toThrow(AdtParseError);
+    expect(() =>
+      toNodeContents('<html><body>Logon</body></html>', logger),
+    ).toThrow(AdtParseError);
   });
 });
 
@@ -128,8 +138,12 @@ describe('parseNamedItems', () => {
     ]);
   });
 
-  it('answers empty for a document it cannot read', () => {
+  it('answers empty for an empty document, and raises for an unreadable one', () => {
     expect(parseNamedItems('', logger)).toEqual([]);
-    expect(parseNamedItems('<not-xml', logger)).toEqual([]);
+
+    expect(() => parseNamedItems('<not-xml', logger)).toThrow(AdtParseError);
+    expect(() =>
+      parseNamedItems('<html><body>Logon</body></html>', logger),
+    ).toThrow(AdtParseError);
   });
 });

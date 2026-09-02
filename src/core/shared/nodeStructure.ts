@@ -15,7 +15,7 @@ import type {
   XmlNode,
 } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
-import { throwIfAdtException } from '../../utils/adtException';
+import { AdtParseError, throwIfSapError } from '../../utils/adtErrors';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -157,6 +157,13 @@ export const parseNodeStructure = (
       | XmlNode
       | undefined;
 
+    // Not empty, not a refusal, and not this document either. Returning an empty
+    // level here is how a logon page from an expired session became "the package
+    // is empty".
+    if (!data) {
+      throw new AdtParseError('asx:abap/asx:values/DATA', xmlData);
+    }
+
     const treeContent = data?.TREE_CONTENT as XmlNode | undefined;
     const nodes = asArray(treeContent?.SEU_ADT_REPOSITORY_OBJ_NODE);
 
@@ -174,8 +181,14 @@ export const parseNodeStructure = (
 
     return { nodes, objectTypes };
   } catch (error) {
+    // Only our own "cannot read" passes through. Anything else the parser threw
+    // is the same thing said less clearly, so it is reported the same way rather
+    // than swallowed into an empty level.
+    if (error instanceof AdtParseError) {
+      throw error;
+    }
     logger?.debug?.('Failed to parse node structure XML', { error });
-    return emptyResult;
+    throw new AdtParseError('asx:abap/asx:values/DATA', xmlData);
   }
 };
 
@@ -195,7 +208,7 @@ export const toNodeContents = (
   // Before anything is read out of it. ADT answers some refusals with 200 and an
   // exception document, and a parser finding no nodes in one would report
   // "nothing here" — the server said "no", and that difference is the caller's.
-  throwIfAdtException(xmlData);
+  throwIfSapError(xmlData);
 
   const { nodes, objectTypes } = parseNodeStructure(xmlData, logger);
 

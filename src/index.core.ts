@@ -42,11 +42,11 @@ export { parseTransportTree } from './core/transport/parseTransportTree';
  * changelog named it, the tests asserted on it, and nothing outside this package
  * could see it.
  *
- * Only the class. `adtExceptionIn` and `throwIfAdtException` install the check
+ * Only the classes. `sapErrorIn` and `throwIfSapError` install the check
  * and are the library's own business — a consumer catches a refusal, they do not
  * detect one, and a member is exported because somebody needs it.
  */
-export { AdtExceptionDocumentError } from './utils/adtException';
+export { AdtParseError, AdtSAPError } from './utils/adtErrors';
 export {
   fetchDiscoveryEndpoints,
   isEndpointInDiscovery,
