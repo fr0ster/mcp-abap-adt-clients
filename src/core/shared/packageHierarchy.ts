@@ -10,7 +10,7 @@ import type {
   XmlNode,
 } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
-import { fetchNodeStructure } from './nodeStructure';
+import { fetchNodeStructure, parseNodeStructure } from './nodeStructure';
 import type {
   IGetPackageHierarchyOptions,
   IPackageHierarchyNode,
@@ -185,57 +185,6 @@ interface IParsedNodeStructure {
   nodes: XmlNode[];
   objectTypes: IObjectTypeInfo[];
 }
-
-const parseNodeStructure = (
-  xmlData: string,
-  logger?: ILogger,
-): IParsedNodeStructure => {
-  const emptyResult: IParsedNodeStructure = { nodes: [], objectTypes: [] };
-  try {
-    if (!xmlData) {
-      return emptyResult;
-    }
-    const result = xmlParser.parse(xmlData) as XmlNode;
-    const abap = result?.['asx:abap'] as XmlNode | undefined;
-    const data = (abap?.['asx:values'] as XmlNode | undefined)?.DATA as
-      | XmlNode
-      | undefined;
-
-    // Parse TREE_CONTENT nodes
-    const treeContent = data?.TREE_CONTENT as XmlNode | undefined;
-    const rawNodes = treeContent?.SEU_ADT_REPOSITORY_OBJ_NODE;
-    const nodes: XmlNode[] = rawNodes
-      ? Array.isArray(rawNodes)
-        ? (rawNodes as XmlNode[])
-        : [rawNodes as XmlNode]
-      : [];
-
-    // Parse OBJECT_TYPES to get NODE_ID for each object type
-    const objectTypesData = data?.OBJECT_TYPES as XmlNode | undefined;
-    const rawTypes = objectTypesData?.SEU_ADT_OBJECT_TYPE_INFO;
-    const typeInfos: XmlNode[] = rawTypes
-      ? Array.isArray(rawTypes)
-        ? (rawTypes as XmlNode[])
-        : [rawTypes as XmlNode]
-      : [];
-
-    const objectTypes: IObjectTypeInfo[] = [];
-    for (const typeInfo of typeInfos) {
-      const objectType = readNodeValue(typeInfo?.OBJECT_TYPE);
-      const nodeId = readNodeValue(typeInfo?.NODE_ID);
-      if (objectType && nodeId) {
-        objectTypes.push({ objectType, nodeId });
-      }
-    }
-
-    return { nodes, objectTypes };
-  } catch (error) {
-    if (debugEnabled) {
-      logger?.warn?.('Failed to parse node structure XML', error);
-    }
-    return emptyResult;
-  }
-};
 
 const buildTreeFromNodes = (
   nodes: XmlNode[],

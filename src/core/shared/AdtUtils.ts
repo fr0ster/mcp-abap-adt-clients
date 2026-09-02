@@ -74,15 +74,24 @@
 
 import type {
   IAbapConnection,
+  IAdtDataPreview,
+  IAdtDiscovery,
+  IAdtGroupLifecycle,
+  IAdtInformationSystem,
+  IAdtObjectAccess,
+  IAdtPackageBrowsing,
+  IAdtRepositoryStructure,
   IAdtResponse,
   IAdtSearchable,
   ILogger,
+  INamedItem,
+  IRepositoryNodeContents,
   ISearchResult,
 } from '@mcp-abap-adt/interfaces';
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
-import { getAllTypes as getAllTypesUtil } from './allTypes';
+import { getAllTypes as getAllTypesUtil, parseNamedItems } from './allTypes';
 import { getDiscovery as getDiscoveryUtil } from './discovery';
 import { listFunctionGroupIncludes } from './functionGroupIncludesList';
 import { listFunctionModules } from './functionModulesList';
@@ -91,7 +100,10 @@ import { activateObjectsGroup } from './groupActivation';
 import { checkDeletionGroup, deleteObjectsGroup } from './groupDeletion';
 import { getInclude as getIncludeUtil } from './include';
 import { getIncludesList } from './includesList';
-import { fetchNodeStructure as fetchNodeStructureUtil } from './nodeStructure';
+import {
+  fetchNodeStructure as fetchNodeStructureUtil,
+  toNodeContents,
+} from './nodeStructure';
 import { getObjectStructure as getObjectStructureUtil } from './objectStructure';
 import { getPackageContentsList } from './packageContentsList';
 import { getPackageHierarchy } from './packageHierarchy';
@@ -149,8 +161,31 @@ import type {
   IWhereUsedListResult,
 } from './types';
 
+/**
+ * Declared against every atom, not only `IAdtSearchable`.
+ *
+ * `implements` here is what makes the compiler check this class against the
+ * contract `getUtils()` hands out — the same reason decision 10 gives for a
+ * factory returning a contract. Without it the class satisfies itself, and the
+ * factory's declared type would be an assertion nobody verifies.
+ *
+ * The three members not in any atom — `searchObjects`, `getWhereUsed`,
+ * `getPackageContents` — stay on the class and are simply not in what
+ * `getUtils()` promises. Each has a contract-shaped sibling over the same
+ * endpoint (`search`, `getWhereUsedList`, `getPackageContentsList`), which is
+ * decision 16: one endpoint is one member, and a caller who needs the raw
+ * document passes a parser to the one that has a contract.
+ */
 export class AdtUtils
-  implements IAdtSearchable<ISearchObjectsParams, ISearchResult>
+  implements
+    IAdtSearchable<ISearchObjectsParams, ISearchResult>,
+    IAdtInformationSystem,
+    IAdtRepositoryStructure,
+    IAdtPackageBrowsing,
+    IAdtGroupLifecycle,
+    IAdtDataPreview,
+    IAdtDiscovery,
+    IAdtObjectAccess
 {
   protected connection: IAbapConnection;
   private logger: ILogger;
@@ -591,14 +626,15 @@ export class AdtUtils
     parentName: string,
     nodeId?: string,
     withShortDescriptions: boolean = true,
-  ): Promise<IAdtResponse> {
-    return fetchNodeStructureUtil(
+  ): Promise<IRepositoryNodeContents> {
+    const response = await fetchNodeStructureUtil(
       this.connection,
       parentType,
       parentName,
       nodeId,
       withShortDescriptions,
     );
+    return toNodeContents(String(response.data ?? ''), this.logger);
   }
 
   /**
@@ -799,8 +835,14 @@ export class AdtUtils
     maxItemCount: number = 999,
     name: string = '*',
     data: string = 'usedByProvider',
-  ): Promise<IAdtResponse> {
-    return getAllTypesUtil(this.connection, maxItemCount, name, data);
+  ): Promise<INamedItem[]> {
+    const response = await getAllTypesUtil(
+      this.connection,
+      maxItemCount,
+      name,
+      data,
+    );
+    return parseNamedItems(String(response.data ?? ''), this.logger);
   }
 }
 

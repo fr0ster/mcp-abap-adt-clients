@@ -21,11 +21,18 @@ import type {
   IAdtContentTypes,
   IAdtCreatable,
   IAdtCrud,
+  IAdtDataPreview,
   IAdtDeletable,
+  IAdtDiscovery,
+  IAdtGroupLifecycle,
+  IAdtInformationSystem,
   IAdtLockable,
   IAdtModifiable,
   IAdtObject,
+  IAdtObjectAccess,
+  IAdtPackageBrowsing,
   IAdtReadable,
+  IAdtRepositoryStructure,
   IAdtRequest,
   IAdtRunnable,
   IAdtSourceObject,
@@ -907,9 +914,31 @@ export class AdtClient {
    * - Object metadata and source code reading
    * - SQL queries and table contents
    *
-   * @returns AdtUtils instance for utility operations
+   * Returns the seven atoms, spelled as an intersection rather than named —
+   * there is no composite for "all of them", because a composite would be a
+   * capability claim nobody makes: a consumer takes the family they need.
+   *
+   * A contract and not `AdtUtils`, for the reason decision 10 gives: a class as a
+   * return type satisfies itself by definition, so the factory compiles whatever
+   * the class happens to be that day. This makes the compiler check the handler
+   * where it is handed out — and it caught two members returning the envelope
+   * while the contract promised a parsed result.
+   *
+   * Narrower than the class on purpose. `searchObjects`, `getWhereUsed` and
+   * `getPackageContents` stay on `AdtUtils` and are not here: each issues the
+   * same request as a sibling that has a contract, and one endpoint is one member
+   * (decision 16 in `@mcp-abap-adt/interfaces`). A caller who needs the raw
+   * document passes a parser to the sibling.
+   *
+   * @returns The cross-cutting operations, as contracts
    */
-  getUtils(): AdtUtils {
+  getUtils(): IAdtInformationSystem &
+    IAdtRepositoryStructure &
+    IAdtPackageBrowsing &
+    IAdtGroupLifecycle &
+    IAdtDataPreview &
+    IAdtDiscovery &
+    IAdtObjectAccess {
     this.assertConnected();
     return new AdtUtils(this.connection, this.logger);
   }

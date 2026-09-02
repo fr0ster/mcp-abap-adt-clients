@@ -208,7 +208,16 @@ export class AdtClientLegacy extends AdtClient {
 
   // --- Utilities with legacy restrictions ---
 
-  override getUtils(): AdtUtils {
+  /**
+   * The same contract, a different implementation.
+   *
+   * The return type is inherited rather than restated: `AdtUtilsLegacy` refuses
+   * `getSqlQuery` and `getTableContents`, and a refusal is behaviour, not a
+   * narrower type — `Promise<never>` satisfies the contract, which is what makes
+   * the substitution legitimate at compile time and what a caller must still
+   * handle at run time.
+   */
+  override getUtils() {
     return new AdtUtilsLegacy(this.connection, this.logger);
   }
 
