@@ -5,6 +5,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [17.0.0] - 2026-09-02
+
+Requires `@mcp-abap-adt/interfaces@^27.0.0`.
+
+**Breaking in three ways, and the third is a behaviour change no signature shows:**
+six public methods are gone, `getUtils()` returns contracts instead of the class,
+and a refusal SAP sends with a 2xx now throws where it used to be reported as
+success.
+
 ### Fixed
 
 - **BREAKING: a refusal SAP sends with a 2xx is no longer reported as success.**
