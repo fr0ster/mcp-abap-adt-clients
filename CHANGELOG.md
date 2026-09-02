@@ -7,6 +7,57 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ### Fixed
 
+- **BREAKING: a refusal SAP sends with a 2xx is no longer reported as success.**
+
+  The status code is the channel; the response is the result. ADT answers some
+  refusals with a 2xx carrying an `<exc:exception>` document — the request did
+  reach the server and come back, so the transport admits it and nothing throws.
+  Every layer above then stored that body as a result.
+
+  Measured, with a connection answering 200 and "Object ZNOPE is locked by user
+  XYZ" to every request:
+
+  | call | `state.errors` was | the caller was told |
+  |---|---|---|
+  | `getClass().create()` | 0 | the class was created |
+  | `getClass().delete()` | 0 | the class was deleted |
+  | `getClass().activate()` | 0 | the class was activated |
+  | `getDomain().create()` | 0 | the domain was created |
+  | `getClass().read()` | 0 | it was read |
+  | `getClass().update()` | threw | "Class may be locked by another user" |
+
+  Five of seven probed chains reported success on a refusal, and three of those
+  are writes: a caller believed an object existed that did not, and that one had
+  been deleted that had not. The refusal sat in `state.createResult.data` the
+  whole time, but nothing said to look — a successful call is not read twice.
+  `delete()` went on to issue its second request after the first had already been
+  refused.
+
+  The two that did throw invented their own reason and never showed the caller
+  `XYZ`, which is the part that makes the message worth having.
+
+  Now `AdtExceptionDocumentError` is raised the moment such a response arrives,
+  carrying **the server's own message**, the document verbatim in `.document`,
+  and `.adtType` / `.namespace`.
+
+  **Installed once**, where a connection enters the library, rather than at the
+  241 places that assign a response into a state object — a rule applied in 241
+  places has 241 chances to be forgotten, and the next member written would be
+  the 242nd. It composes with accept negotiation by replacing `makeAdtRequest`
+  and calling what it captured, the same shape that wrapper already uses. A
+  `Proxy` was tried first and recursed: accept negotiation keys a `WeakMap` by
+  the connection object, and a proxy is not its target.
+
+  Unchanged: a failing status still throws from the transport with the full
+  response attached, an empty body is still a faithful "nothing", and validation
+  is unaffected — its "already exists" answer arrives as a 400, which threw
+  before this and throws now.
+
+  **For consumers:** calls that previously returned a state with `errors: []`
+  will now throw where SAP refused. That is the point, and it is a behaviour
+  change to plan for.
+
+
 - **A refusal from SAP no longer becomes an empty result.** ADT answers some
   refusals with 200 and an `<exc:exception>` document — the transport succeeded,
   so nothing throws. That was harmless while these members returned the response

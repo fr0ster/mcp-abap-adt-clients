@@ -71,6 +71,7 @@ import { SystemMessages } from '../runtime/systemMessages/SystemMessages';
 import { CrossTrace } from '../runtime/traces/CrossTraceDomain';
 import { Profiler } from '../runtime/traces/ProfilerDomain';
 import { St05Trace } from '../runtime/traces/St05Trace';
+import { withRefusalDetection } from '../utils/refusalAware';
 
 export class AdtRuntimeClient {
   protected readonly connection: IAbapConnection;
@@ -94,7 +95,10 @@ export class AdtRuntimeClient {
     logger?: ILogger,
     options?: { enableAcceptCorrection?: boolean },
   ) {
-    this.connection = connection;
+    // Wrapped once, here, where a connection enters the library. A refusal SAP
+    // sends with a 2xx would otherwise be stored as a result and reported as
+    // success — see src/utils/refusalAware.ts for what that measured.
+    this.connection = withRefusalDetection(connection);
     this.logger = logger ?? {
       debug: () => {},
       info: () => {},

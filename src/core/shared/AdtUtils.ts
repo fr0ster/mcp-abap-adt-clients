@@ -91,6 +91,7 @@ import type {
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
 import { throwIfAdtException } from '../../utils/adtException';
 import { encodeSapObjectName } from '../../utils/internalUtils';
+import { withRefusalDetection } from '../../utils/refusalAware';
 import { getTimeout } from '../../utils/timeouts';
 import { getAllTypes as getAllTypesUtil, parseNamedItems } from './allTypes';
 import { getDiscovery as getDiscoveryUtil } from './discovery';
@@ -192,7 +193,10 @@ export class AdtUtils
   private logger: ILogger;
 
   constructor(connection: IAbapConnection, logger: ILogger) {
-    this.connection = connection;
+    // Wrapped once, here, where a connection enters the library. A refusal SAP
+    // sends with a 2xx would otherwise be stored as a result and reported as
+    // success — see src/utils/refusalAware.ts for what that measured.
+    this.connection = withRefusalDetection(connection);
     this.logger = logger;
   }
 

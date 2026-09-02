@@ -196,6 +196,7 @@ import {
   type IUnitTestConfig,
   type IUnitTestState,
 } from '../core/unitTest';
+import { withRefusalDetection } from '../utils/refusalAware';
 
 export class AdtClient {
   protected connection: IAbapConnection;
@@ -213,7 +214,10 @@ export class AdtClient {
     logger?: ILogger,
     options?: IAdtClientOptions,
   ) {
-    this.connection = connection;
+    // Wrapped once, here, where a connection enters the library. A refusal SAP
+    // sends with a 2xx would otherwise be stored as a result and reported as
+    // success — see src/utils/refusalAware.ts for what that measured.
+    this.connection = withRefusalDetection(connection);
     // Pass the connection so unlockAll() can keep the whole batch stateful.
     this.lockRegistry = new LockRegistry(connection);
     this.logger = logger ?? {
