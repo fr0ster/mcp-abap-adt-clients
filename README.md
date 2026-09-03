@@ -195,16 +195,33 @@ await client.getClass().create({
   description: 'Test class'
 }, { activateOnCreate: true });
 
-// Utility functions
+// Utility functions. Since 17.0.0 every one of them answers a contract:
+// a result or a failure, and the compiler makes you say which you are reading.
 const utils = client.getUtils();
-await utils.searchObjects({ query: 'Z*', objectType: 'CLAS' });
 
-// Where-used with parsed results (recommended)
-const result = await utils.getWhereUsedList({
+const found = await utils.search({ query: 'Z*', objectType: 'CLAS' });
+if (found.ok) {
+  found.getResult().value;        // ISearchResult[]
+} else {
+  found.getError().origin;        // 'connection' | 'refusal' | 'parse'
+  found.getError().message;       // what SAP said, verbatim
+}
+
+// Where-used with parsed results
+const answer = await utils.getWhereUsedList({
   object_name: 'ZCL_TEST',
   object_type: 'class',
   enableAllTypes: true  // Eclipse "select all" behavior
 });
+
+if (!answer.ok) {
+  // A refusal is an answer, not an exception flying past. `origin` says which
+  // remedy applies: reauthenticate, ask the server something else, or fix a
+  // parser — three different problems that "something went wrong" hides.
+  throw new Error(answer.getError().message);
+}
+
+const result = answer.getResult().value;
 console.log(`Found ${result.totalReferences} references`);
 for (const ref of result.references) {
   console.log(`${ref.name} (${ref.type}) in ${ref.packageName}`);
@@ -483,6 +500,56 @@ See [Tools Documentation](tools/README.md) for complete details and options.
 ## API Reference
 
 ### AdtClient Overview
+
+### What a call answers with (since 17.0.0)
+
+`client.getUtils()` hands out **contracts**, not the `AdtUtils` class, and each of
+its members answers `IAdtResponse` — a result or a failure, never both and never
+neither:
+
+```typescript
+const answer = await client.getUtils().getPackageHierarchy('ZPKG');
+
+if (answer.ok) {
+  answer.getResult().value;   // IPackageHierarchyNode
+} else {
+  answer.getError().origin;   // 'connection' | 'refusal' | 'parse'
+  answer.getError().message;  // the server's own words
+  answer.getError().request;  // which call in a chain was refused
+}
+```
+
+`ok` is what makes the check compulsory. `answer.getResult()` does not compile
+until you have asked which half you hold — an exception is invisible to the type
+system, and the caller who never learns a failure path exists is who this is for.
+
+**The per-type handlers have not moved yet.** `client.getClass()` and the rest
+still return state objects and signal failure by throwing `AdtSAPError` — which
+is itself the 17.0.0 change worth testing first, because before it they returned
+`errors: []` and reported success while SAP had refused:
+
+```typescript
+import { AdtSAPError } from '@mcp-abap-adt/adt-clients';
+
+try {
+  await client.getClass().create({ className: 'ZCL_X', packageName: 'ZP' });
+} catch (error) {
+  if (error instanceof AdtSAPError) {
+    error.message;   // includes the user holding the lock, when SAP names one
+    error.adtType;   // the server's own classification
+    error.request;   // create() issues six calls — this says which was refused
+  }
+}
+```
+
+`AdtParseError` is the other half of that: the answer arrived and this library
+could not read it, which is a different problem from the server saying no. A
+logon page from an expired session is that case, and it used to read as "the
+package is empty".
+
+The transport frame is `IAdtWireResponse` since 17.0.0. It is the same shape as
+the old `IAdtResponse` and lives at the connection boundary; `IAdtResponse` now
+names what a member answers with.
 
 - Factory accessors for ADT objects: `client.getClass()`, `client.getProgram()`, `client.getDdl()` (DDL sources — CDS views, AMDP table functions; formerly `getView()`), `client.getTable()`, `client.getScalarFunction()`, `client.getScalarFunctionImplementation()`, `client.getAppendStructure()`, `client.getRequest()`, `client.getUtils()`, etc.
 - Each accessor returns an `Adt*` object typed to its **honest capability set** (since 8.0.0, completed in 12.0.0). A full source-backed object (e.g. `getClass()`) returns `IAdtSourceObject`; everything else returns the intersection of the capability atoms it actually supports, written positively — there is no composite named for what an object lacks. Calling a capability a handler lacks — e.g. `client.getDomain().getVersions(...)` — is a **compile error** rather than a runtime throw. See the [Type System](#type-system) section.

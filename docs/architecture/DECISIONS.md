@@ -600,3 +600,49 @@ strategy a refusal still throws**, so the safe path stays the default; a strateg
 receives the refusal **whole**, so completeness is never the consumer's to lose
 by accident; and strategies arrive as **one options object**, because hanging a
 second signature on each member was tried across 23 of them and reverted.
+
+## 14. What a member answers with, and the seam to what has not moved
+
+**The change.** `getUtils()` hands out contracts, and each of its 22
+asynchronous members answers `IAdtResponse` — a result or a failure, never both
+and never neither. Decisions 17-19 in `@mcp-abap-adt/interfaces` are the design;
+this records what implementing it cost here and the two choices that were local.
+
+**A failure comes back rather than flying past.** `ok` is what makes handling
+compulsory: `answer.getResult()` does not compile until the caller has asked
+which half they hold. An exception is invisible to the type system — nothing
+makes a caller catch one, nothing tells them it exists — and the caller who never
+learns a failure path exists is who this is for.
+
+**The default strategies ship in `src/utils/adtResponse.ts`.** The error strategy
+recognises three origins, and they are not decoration: reauthenticate, ask the
+server something else, or fix a parser are three different days of work, and
+"something went wrong" makes a caller guess which.
+
+**A consumer's own parser is outside that classification**, and this is the local
+decision worth stating. `answering()` catches what the library's work raised;
+`answeringWith()` keeps the caller's strategy outside the `try`, so an exception
+from the parser they passed to `search(criteria, parse)` surfaces as itself. The
+first version ran the parser inside, and the fallback in `recogniseFailure` calls
+an unrecognised error a connection failure — so a bug in their code told them to
+reauthenticate. A test caught nothing, because it asserted the error survived in
+`cause` and never read `origin`.
+
+**`orThrow()` is the seam, and it is deliberately ugly.** The per-type handlers
+still return state objects and throw; the low-level helpers still pass a wire
+response around. Those call sites cannot read `getError()` without becoming a
+different design halfway, so they unwrap and raise. Every use is a place that has
+not migrated — eleven files today — which makes the remaining work countable
+instead of invisible. When a caller migrates, the fix is to delete the call.
+
+**Against.** Migrating everything at once. Rejected: the per-type handlers are 28
+object types with chains of six calls each, and a release that moves them
+together is one nobody can review. Decision 19 says member by member, and the
+seam is what makes that honest rather than a promise.
+
+**How to catch a regression.** A `getUtils()` member whose return type is not
+`Promise<IAdtResponse<...>>`. An `orThrow` added rather than removed. A catch
+that turns a consumer's exception into an `IAdtError`.
+
+**What would change it.** The handlers migrating, at which point `orThrow`
+disappears and this decision is about the whole library rather than one class.

@@ -571,9 +571,49 @@ const utils = client.getUtils();
 const metadataType: AdtObjectType = 'DDLS/DF';
 const sourceType: AdtSourceObjectType = 'view';
 
-await utils.readObjectMetadata(metadataType, 'ZOK_I_CDS_TEST');
-await utils.readObjectSource(sourceType, 'ZOK_I_CDS_TEST', undefined, 'active');
+const metadata = await utils.readObjectMetadata(metadataType, 'ZOK_I_CDS_TEST');
+const source = await utils.readObjectSource(
+  sourceType,
+  'ZOK_I_CDS_TEST',
+  undefined,
+  'active',
+);
+
+// Since 17.0.0 every `getUtils()` member answers a contract. Reading the result
+// without asking which half you hold does not compile.
+if (source.ok) {
+  source.getResult().value;   // the wire response, for members with no named result yet
+} else {
+  source.getError().origin;   // 'connection' | 'refusal' | 'parse'
+}
 ```
+
+### What every `getUtils()` member answers with
+
+`IAdtResponse` is a discriminated union — a result **or** a failure:
+
+| | on success | on failure |
+|---|---|---|
+| `answer.ok` | `true` | `false` |
+| `answer.getResult()` | the member's result contract | `undefined` |
+| `answer.getError()` | `undefined` | `IAdtError` |
+
+`IAdtError` always carries `origin` and `message`; `adtType`, `namespace`,
+`response`, `request` and `cause` are filled in as far as the strategy was asked
+for. `origin` is the part to act on:
+
+| origin | what happened | remedy |
+|---|---|---|
+| `connection` | no usable answer — unreachable, expired session, endpoint absent | reauthenticate, or check reachability |
+| `refusal` | SAP answered about this object and said no | ask something else |
+| `parse` | an answer arrived and could not be read | fix a parser, or report it |
+
+A **consumer's own parser** throwing is none of these: it surfaces as itself,
+untouched, because it is not this library's failure to describe.
+
+On a legacy system `getSqlQuery` and `getTableContents` answer
+`origin: 'connection'` — the endpoint is not there, which is the same remedy as an
+unreachable host rather than a server refusing.
 
 ### Message class (MSAG) and its messages
 

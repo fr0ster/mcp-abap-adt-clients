@@ -124,7 +124,7 @@ success.
   The two that did throw invented their own reason and never showed the caller
   `XYZ`, which is the part that makes the message worth having.
 
-  Now `AdtExceptionDocumentError` is raised the moment such a response arrives,
+  Now `AdtSAPError` is raised the moment such a response arrives,
   carrying **the server's own message**, the document verbatim in `.document`,
   and `.adtType` / `.namespace`.
 
@@ -146,20 +146,28 @@ success.
   change to plan for.
 
   ```typescript
-  import { AdtExceptionDocumentError } from '@mcp-abap-adt/adt-clients';
+  import { AdtSAPError } from '@mcp-abap-adt/adt-clients';
 
+  // The per-type handlers still throw — they have not moved to the response
+  // contract yet, and this is the change to test first: before it they answered
+  // `errors: []` and reported success while SAP had refused.
   try {
     await client.getClass().create({ className: 'ZCL_X', packageName: 'ZP' });
   } catch (error) {
-    if (error instanceof AdtExceptionDocumentError) {
-      error.message;    // what SAP said, including who holds the lock
-      error.document;   // the answer, untouched
-      error.adtType;    // e.g. 'ExceptionResourceNotFound'
+    if (error instanceof AdtSAPError) {
+      error.message;          // what SAP said, including who holds the lock
+      error.response?.data;   // the answer, untouched
+      error.adtType;          // e.g. 'ExceptionResourceNotFound'
+      error.request;          // create() issues six calls — which one was refused
     }
   }
   ```
 
-  `AdtExceptionDocumentError` is exported from the package root and from
+  `getUtils()`'s members are the ones that answer instead of throwing; the two
+  paths coexist in 17.0.0 on purpose, and `orThrow()` marks every place still on
+  the old one.
+
+  `AdtSAPError` is exported from the package root and from
   `./core`, and the export-surface manifest lists it — the first draft of this
   change threw a class nothing outside the package could name, which makes
   `instanceof` impossible and `.document` unreachable. `adtExceptionIn` and
@@ -175,7 +183,8 @@ success.
   server said "no": the message, the type and the document all gone, with no
   status to give it away.
 
-  `fetchNodeStructure` and `getAllTypes` now throw `AdtExceptionDocumentError`,
+  `fetchNodeStructure` and `getAllTypes` answer a failure carrying `AdtSAPError`'s
+  information,
   which carries the server's own message plus the document **verbatim** in
   `.document`, and `.adtType` / `.namespace` when the document names them. A
   refusal whose own XML will not parse is still reported as a refusal, with the
