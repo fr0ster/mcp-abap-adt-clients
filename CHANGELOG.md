@@ -9,6 +9,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 Requires `@mcp-abap-adt/interfaces@^28.0.0`.
 
+### Licence
+
+- **This package is now `LGPL-3.0-only`.** It was MIT through 16.x, and those
+  versions stay MIT — a licence change is not retroactive, and anyone already
+  using 16.x under MIT keeps that grant for 16.x.
+
+  The library licence of the GNU family, chosen for what it does *not* ask:
+  linking it into your own program — importing it, as every consumer of an npm
+  package does — does not put your program under the LGPL. What it asks is that
+  changes to this library stay free and that your users can substitute their own
+  build of it.
+
+  Both texts ship in the package: `LICENSE` is the LGPL, `COPYING` is the GPL it
+  is written on top of. The LGPL is a set of additional permissions over the GPL,
+  so it cannot be read without both.
+
+  Copyright © 2025 Oleksii Kyslytsia.
+
 **Breaking in three ways, and the third is a behaviour change no signature shows:**
 six public methods are gone, `getUtils()` returns contracts instead of the class,
 and a refusal SAP sends with a 2xx now throws where it used to be reported as

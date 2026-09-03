@@ -881,7 +881,28 @@ Some ADT endpoints are system-specific; 406 is treated as an Accept/header suppo
 
 ## License
 
-MIT
+**GNU Lesser General Public License v3.0 only** (`LGPL-3.0-only`), since 17.0.0.
+Before that, MIT — versions already published under MIT stay MIT.
+
+Copyright © 2025 Oleksii Kyslytsia
+
+This library is free software: you can redistribute it and/or modify it under the
+terms of the GNU Lesser General Public License as published by the Free Software
+Foundation, version 3.
+
+It is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
+PURPOSE. See the GNU Lesser General Public License for more details.
+
+The licence texts ship with the package: [`LICENSE`](LICENSE) is the LGPL, and
+[`COPYING`](COPYING) is the GPL it is built on — the LGPL is written as a set of
+additional permissions over the GPL, so both are needed to read it.
+
+**What this means if you depend on this package.** The LGPL is the library
+licence of the GNU family: linking it into your own program — importing it, as
+every consumer of an npm package does — does not put your program under the LGPL.
+What the licence asks is that changes *to this library* stay free, and that your
+users can replace it with their own build.
 
 ## Author
 
