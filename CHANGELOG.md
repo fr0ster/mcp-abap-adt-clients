@@ -25,7 +25,7 @@ Requires `@mcp-abap-adt/interfaces@^28.0.0`.
   is written on top of. The LGPL is a set of additional permissions over the GPL,
   so it cannot be read without both.
 
-  Copyright © 2025 Oleksii Kyslytsia.
+  Copyright © 2025–2026 Oleksii Kyslytsia.
 
 **Breaking in three ways, and the third is a behaviour change no signature shows:**
 six public methods are gone, `getUtils()` returns contracts instead of the class,

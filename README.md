@@ -884,7 +884,7 @@ Some ADT endpoints are system-specific; 406 is treated as an Accept/header suppo
 **GNU Lesser General Public License v3.0 only** (`LGPL-3.0-only`), since 17.0.0.
 Before that, MIT — versions already published under MIT stay MIT.
 
-Copyright © 2025 Oleksii Kyslytsia
+Copyright © 2025–2026 Oleksii Kyslytsia
 
 This library is free software: you can redistribute it and/or modify it under the
 terms of the GNU Lesser General Public License as published by the Free Software
