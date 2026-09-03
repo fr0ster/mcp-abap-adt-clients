@@ -29,6 +29,31 @@ restricts nothing, so finding it in a role proves nothing about behaviour.
 all; `S_ABPLNGVS` additionally governs *which language version* they may be
 created, changed and run in.
 
+### What "access to a language version" actually grants
+
+The object is checked as a pair, and both halves have to match the request:
+
+- **`ABP_LNG_VS` — which language.** An object is written in one ABAP language
+  version, fixed by the software component its package belongs to. Writing into a
+  package whose component is *ABAP for Cloud Development* requires that value;
+  writing a Standard ABAP object requires the Standard ABAP value. Holding one
+  does not grant the other, and this is the usual cause on BTP ABAP Environment,
+  where a developer is typically granted the cloud value only.
+- **`ACTVT` — which operation, per language.** Access is granted per activity:
+  create, change, activate, execute, run ABAP Unit. A user can hold *change* for
+  a language version and not *activate* it, so a chain can write successfully and
+  then fail at the activation step with the same object named.
+
+That second half is what makes the failure look intermittent: the same user, the
+same package, refused at one step of a create chain and not at the earlier ones.
+Read which step the failure carries — `IAdtError.request` names it — before
+concluding the whole language version is denied.
+
+**What to check, in order.** Whether the package in the request exists; which
+language version its software component fixes; whether the user holds that value
+in `ABP_LNG_VS`; and whether they hold the specific `ACTVT` for the operation
+that failed rather than for the one that succeeded.
+
 **The trap.** It is raised wherever the language version cannot be satisfied —
 including cases that have nothing to do with your rights. Creating a class into a
 package **that does not exist** answers with this object rather than "package not
