@@ -2,8 +2,12 @@
  * FunctionModule read operations
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { ACCEPT_TRANSPORT } from '../../constants/contentTypes';
+import { orThrow } from '../../utils/adtResponse';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { noopLogger } from '../../utils/noopLogger';
 import { getTimeout } from '../../utils/timeouts';
@@ -22,12 +26,14 @@ export async function getFunctionMetadata(
   functionName: string,
   functionGroup: string,
   options?: IReadOptions,
-): Promise<IAdtResponse> {
-  return getUtils(connection).readObjectMetadata(
-    'functionmodule',
-    functionName,
-    functionGroup,
-    options,
+): Promise<IAdtWireResponse> {
+  return orThrow(
+    getUtils(connection).readObjectMetadata(
+      'functionmodule',
+      functionName,
+      functionGroup,
+      options,
+    ),
   );
 }
 
@@ -44,13 +50,15 @@ export async function getFunctionSource(
   functionGroup: string,
   version?: 'active' | 'inactive',
   options?: IReadOptions,
-): Promise<IAdtResponse> {
-  return getUtils(connection).readObjectSource(
-    'functionmodule',
-    functionName,
-    functionGroup,
-    version,
-    options,
+): Promise<IAdtWireResponse> {
+  return orThrow(
+    getUtils(connection).readObjectSource(
+      'functionmodule',
+      functionName,
+      functionGroup,
+      version,
+      options,
+    ),
   );
 }
 
@@ -63,7 +71,7 @@ export async function getFunction(
   functionName: string,
   functionGroup: string,
   version: 'active' | 'inactive' = 'active',
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   return getFunctionSource(connection, functionName, functionGroup, version);
 }
 
@@ -79,7 +87,7 @@ export async function getFunctionModuleTransport(
   functionName: string,
   functionGroup: string,
   options?: IReadOptions,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const encodedGroup = encodeSapObjectName(functionGroup);
   const encodedName = encodeSapObjectName(functionName);
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';

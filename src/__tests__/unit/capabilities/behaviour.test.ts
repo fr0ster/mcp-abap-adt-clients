@@ -16,7 +16,10 @@
  * atom — `readMetadata`, `unlock` and `getVersionSource` are where stubs hid.
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { AdtClient } from '../../../clients/AdtClient';
 import { createLibraryLogger } from '../../helpers/testLogger';
 import type { RequestSpec } from './manifest';
@@ -118,7 +121,7 @@ function recordingClient(activationBody: string = ACTIVATION_OK) {
         statusText: 'OK',
         headers: { location: '/sap/bc/adt/abapunit/runs/GUARD' },
         data: bodyFor(req.url, activationBody),
-      } as IAdtResponse;
+      } as IAdtWireResponse;
     },
   } as unknown as IAbapConnection;
 

@@ -2,7 +2,7 @@ import type {
   IAbapConnection,
   IAbapTraceEntry,
   IAbapTraceViews,
-  IAdtResponse,
+  IAdtWireResponse,
   ILogger,
   IProfiler,
   IProfilerListOptions,
@@ -87,7 +87,7 @@ export class Profiler implements IProfiler {
     traceId: string,
     view: K,
     options: unknown,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     switch (view) {
       case 'hitlist':
         return getTraceHitList(
@@ -161,7 +161,7 @@ export class Profiler implements IProfiler {
     return buildTraceParametersXml(options);
   }
 
-  extractIdFromResponse(response: IAdtResponse): string | undefined {
+  extractIdFromResponse(response: IAdtWireResponse): string | undefined {
     return extractProfilerIdFromResponse(response);
   }
 

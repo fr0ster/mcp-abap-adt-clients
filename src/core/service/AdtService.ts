@@ -1,8 +1,8 @@
 import type {
   IAbapConnection,
   IAdtOperationOptions,
-  IAdtResponse,
   IAdtSystemContext,
+  IAdtWireResponse,
   ILogger,
   IObjectVersion,
 } from '@mcp-abap-adt/interfaces';
@@ -124,7 +124,9 @@ export class AdtServiceBinding implements IAdtServiceBinding {
     return `<?xml version="1.0" encoding="UTF-8"?><del:deletionRequest xmlns:del="http://www.sap.com/adt/deletion" xmlns:adtcore="http://www.sap.com/adt/core"><del:object adtcore:uri="${bindingUri}"><del:transportNumber>${transportNumber}</del:transportNumber></del:object></del:deletionRequest>`;
   }
 
-  private extractAvailableBindingTypes(response: IAdtResponse): Set<string> {
+  private extractAvailableBindingTypes(
+    response: IAdtWireResponse,
+  ): Set<string> {
     const available = new Set<string>();
     const raw = typeof response.data === 'string' ? response.data : '';
     if (!raw) {
@@ -149,7 +151,7 @@ export class AdtServiceBinding implements IAdtServiceBinding {
     return available;
   }
 
-  private parseServiceBindingState(response: IAdtResponse): {
+  private parseServiceBindingState(response: IAdtWireResponse): {
     published: boolean;
     allowedAction?: string;
     serviceType?: 'odatav2' | 'odatav4';
@@ -217,7 +219,7 @@ export class AdtServiceBinding implements IAdtServiceBinding {
     bindingName: string,
     servicename: string,
     serviceversion?: string,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     const bindingUri = `/sap/bc/adt/businessservices/bindings/${AdtServiceBinding.encodeName(bindingName)}`;
     const xml = `<?xml version="1.0" encoding="UTF-8"?><adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core"><adtcore:objectReference adtcore:uri="${bindingUri}" adtcore:name="${bindingName.toUpperCase()}"/></adtcore:objectReferences>`;
 
@@ -239,7 +241,7 @@ export class AdtServiceBinding implements IAdtServiceBinding {
     bindingName: string,
     servicename: string,
     serviceversion?: string,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     const bindingUri = `/sap/bc/adt/businessservices/bindings/${AdtServiceBinding.encodeName(bindingName)}`;
     const xml = `<?xml version="1.0" encoding="UTF-8"?><adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core"><adtcore:objectReference adtcore:uri="${bindingUri}" adtcore:name="${bindingName.toUpperCase()}"/></adtcore:objectReferences>`;
 
@@ -628,7 +630,7 @@ export class AdtServiceBinding implements IAdtServiceBinding {
     };
   }
 
-  async getServiceBindingTypes(): Promise<IAdtResponse> {
+  async getServiceBindingTypes(): Promise<IAdtWireResponse> {
     return this.connection.makeAdtRequest({
       url: '/sap/bc/adt/businessservices/bindings/bindingtypes',
       method: 'GET',
@@ -641,7 +643,7 @@ export class AdtServiceBinding implements IAdtServiceBinding {
 
   async validateServiceBinding(
     params: IValidateServiceBindingParams,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     if (!params.objname) {
       throw new Error('objname is required');
     }
@@ -663,7 +665,7 @@ export class AdtServiceBinding implements IAdtServiceBinding {
 
   async transportCheckServiceBinding(
     params: ITransportCheckServiceBindingParams,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     if (!params.objectName) {
       throw new Error('objectName is required');
     }
@@ -685,7 +687,7 @@ export class AdtServiceBinding implements IAdtServiceBinding {
 
   async createServiceBinding(
     params: ICreateServiceBindingParams,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     if (!params.bindingName) {
       throw new Error('bindingName is required');
     }
@@ -747,7 +749,7 @@ export class AdtServiceBinding implements IAdtServiceBinding {
 
   async readServiceBinding(
     params: IReadServiceBindingParams,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     if (!params.bindingName) {
       throw new Error('bindingName is required');
     }
@@ -766,7 +768,7 @@ export class AdtServiceBinding implements IAdtServiceBinding {
 
   async updateServiceBinding(
     params: IUpdateServiceBindingParams,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     if (!params.bindingName) {
       throw new Error('bindingName is required');
     }
@@ -833,7 +835,7 @@ export class AdtServiceBinding implements IAdtServiceBinding {
 
   async deleteServiceBinding(
     params: IDeleteServiceBindingParams,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     if (!params.bindingName) {
       throw new Error('bindingName is required');
     }
@@ -852,7 +854,7 @@ export class AdtServiceBinding implements IAdtServiceBinding {
 
   async checkServiceBinding(
     params: ICheckServiceBindingParams,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     if (!params.bindingName) {
       throw new Error('bindingName is required');
     }
@@ -875,7 +877,7 @@ export class AdtServiceBinding implements IAdtServiceBinding {
 
   async activateServiceBinding(
     params: IActivateServiceBindingParams,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     if (!params.bindingName) {
       throw new Error('bindingName is required');
     }
@@ -899,7 +901,7 @@ export class AdtServiceBinding implements IAdtServiceBinding {
 
   async generateServiceBinding(
     params: IGenerateServiceBindingParams,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     if (!params.bindingName) {
       throw new Error('bindingName is required');
     }
@@ -937,12 +939,12 @@ export class AdtServiceBinding implements IAdtServiceBinding {
   async createAndGenerateServiceBinding(
     params: ICreateAndGenerateServiceBindingParams,
   ): Promise<{
-    createResult: IAdtResponse;
-    inactiveCheckResult: IAdtResponse;
-    activationResult?: IAdtResponse;
-    readResult: IAdtResponse;
-    generatedInfoResult: IAdtResponse;
-    activeCheckResult?: IAdtResponse;
+    createResult: IAdtWireResponse;
+    inactiveCheckResult: IAdtWireResponse;
+    activationResult?: IAdtWireResponse;
+    readResult: IAdtWireResponse;
+    generatedInfoResult: IAdtWireResponse;
+    activeCheckResult?: IAdtWireResponse;
   }> {
     const state = await this.create(
       {
@@ -984,7 +986,7 @@ export class AdtServiceBinding implements IAdtServiceBinding {
 
   async getODataV2ServiceBinding(
     params: IGetServiceBindingODataParams,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     if (!params.objectname) {
       throw new Error('objectname is required');
     }
@@ -1006,7 +1008,7 @@ export class AdtServiceBinding implements IAdtServiceBinding {
 
   async getODataV4ServiceBinding(
     params: IGetServiceBindingODataParams,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     if (!params.objectname) {
       throw new Error('objectname is required');
     }
@@ -1026,7 +1028,9 @@ export class AdtServiceBinding implements IAdtServiceBinding {
     });
   }
 
-  async publishODataV2(params: IPublishODataV2Params): Promise<IAdtResponse> {
+  async publishODataV2(
+    params: IPublishODataV2Params,
+  ): Promise<IAdtWireResponse> {
     if (!params.servicename) {
       throw new Error('servicename is required');
     }
@@ -1049,7 +1053,7 @@ export class AdtServiceBinding implements IAdtServiceBinding {
 
   async unpublishODataV2(
     params: IUnpublishODataV2Params,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     if (!params.servicename) {
       throw new Error('servicename is required');
     }
@@ -1072,7 +1076,7 @@ export class AdtServiceBinding implements IAdtServiceBinding {
 
   async classifyServiceBinding(
     params: IClassifyServiceBindingParams,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     if (!params.objectname) {
       throw new Error('objectname is required');
     }

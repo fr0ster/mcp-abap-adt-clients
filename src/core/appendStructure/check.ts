@@ -1,4 +1,7 @@
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import {
   type CheckRunVersion,
   parseCheckRunResponse,
@@ -10,7 +13,7 @@ export async function checkAppendStructure(
   name: string,
   version: CheckRunVersion = 'inactive',
   sourceCode?: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const response = await runCheckRun(
     connection,
     'append_structure',

@@ -1,4 +1,7 @@
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { create } from '../../../../core/scalarFunctionImplementation/create';
 
 function mockConn(cap: {
@@ -7,7 +10,7 @@ function mockConn(cap: {
   headers?: Record<string, string>;
 }) {
   return {
-    makeAdtRequest: async (r: any): Promise<IAdtResponse> => {
+    makeAdtRequest: async (r: any): Promise<IAdtWireResponse> => {
       cap.url = r.url;
       cap.data = r.data;
       cap.headers = r.headers;
@@ -16,7 +19,7 @@ function mockConn(cap: {
         statusText: 'OK',
         headers: {},
         data: '',
-      } as IAdtResponse;
+      } as IAdtWireResponse;
     },
     setSessionType: () => {},
   } as unknown as IAbapConnection;

@@ -2,7 +2,10 @@
  * Behavior Definition update operations
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -47,7 +50,7 @@ import type { IUpdateBehaviorDefinitionParams } from './types';
 export async function update(
   connection: IAbapConnection,
   params: IUpdateBehaviorDefinitionParams,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   if (!params.sourceCode) {
     throw new Error('sourceCode is required');
   }

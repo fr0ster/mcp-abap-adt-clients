@@ -1,9 +1,12 @@
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { getInterfaceVersions } from '../../core/interface/versions';
 
 const FEED = `<?xml version="1.0"?><atom:feed xmlns:atom="http://www.w3.org/2005/Atom"><atom:title>Version List of ZIF (INTF)</atom:title><atom:entry><atom:content type="text/plain" src="/sap/bc/adt/oo/interfaces/zif/source/main/versions/1/00000/content"/><atom:id>00000</atom:id></atom:entry></atom:feed>`;
 
-function conn(handler: (o: any) => Promise<IAdtResponse>): IAbapConnection {
+function conn(handler: (o: any) => Promise<IAdtWireResponse>): IAbapConnection {
   return { makeAdtRequest: handler } as unknown as IAbapConnection;
 }
 
@@ -12,7 +15,7 @@ describe('getInterfaceVersions', () => {
     let seen: any;
     const c = conn(async (o) => {
       seen = o;
-      return { data: FEED, status: 200, headers: {} } as IAdtResponse;
+      return { data: FEED, status: 200, headers: {} } as IAdtWireResponse;
     });
     const list = await getInterfaceVersions(c, { interfaceName: 'ZIF' });
     expect(seen.url).toBe('/sap/bc/adt/oo/interfaces/ZIF/source/main/versions');

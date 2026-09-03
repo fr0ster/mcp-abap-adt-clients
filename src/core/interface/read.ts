@@ -2,8 +2,12 @@
  * Interface read operations
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { ACCEPT_TRANSPORT } from '../../constants/contentTypes';
+import { orThrow } from '../../utils/adtResponse';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { noopLogger } from '../../utils/noopLogger';
 import { getTimeout } from '../../utils/timeouts';
@@ -21,12 +25,14 @@ export async function getInterfaceMetadata(
   connection: IAbapConnection,
   interfaceName: string,
   options?: IReadOptions,
-): Promise<IAdtResponse> {
-  return getUtils(connection).readObjectMetadata(
-    'interface',
-    interfaceName,
-    undefined,
-    options,
+): Promise<IAdtWireResponse> {
+  return orThrow(
+    getUtils(connection).readObjectMetadata(
+      'interface',
+      interfaceName,
+      undefined,
+      options,
+    ),
   );
 }
 
@@ -39,13 +45,15 @@ export async function getInterfaceSource(
   interfaceName: string,
   version?: 'active' | 'inactive',
   options?: IReadOptions,
-): Promise<IAdtResponse> {
-  return getUtils(connection).readObjectSource(
-    'interface',
-    interfaceName,
-    undefined,
-    version,
-    options,
+): Promise<IAdtWireResponse> {
+  return orThrow(
+    getUtils(connection).readObjectSource(
+      'interface',
+      interfaceName,
+      undefined,
+      version,
+      options,
+    ),
   );
 }
 
@@ -56,7 +64,7 @@ export async function getInterfaceSource(
 export async function getInterface(
   connection: IAbapConnection,
   interfaceName: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   return getInterfaceSource(connection, interfaceName);
 }
 
@@ -70,7 +78,7 @@ export async function getInterfaceTransport(
   connection: IAbapConnection,
   interfaceName: string,
   options?: IReadOptions,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const encodedName = encodeSapObjectName(interfaceName);
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
   const url = `/sap/bc/adt/oo/interfaces/${encodedName}/transport${query}`;

@@ -14,7 +14,10 @@
  * - source was given → check the **code**, whichever branch was taken.
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { AdtCdsUnitTest } from '../../../../core/unitTest/AdtCdsUnitTest';
 import { AdtUnitTest } from '../../../../core/unitTest/AdtUnitTest';
 import { createLibraryLogger } from '../../../helpers/testLogger';
@@ -22,7 +25,7 @@ import { createLibraryLogger } from '../../../helpers/testLogger';
 type Call = { url: string; method: string; data?: unknown };
 
 function makeConn(
-  handler: (call: Call, index: number) => Partial<IAdtResponse> | Error,
+  handler: (call: Call, index: number) => Partial<IAdtWireResponse> | Error,
 ) {
   const calls: Call[] = [];
   let callIndex = 0;
@@ -40,7 +43,7 @@ function makeConn(
         headers: {},
         data: '',
         ...res,
-      } as IAdtResponse;
+      } as IAdtWireResponse;
     },
     setSessionType: () => {},
   } as unknown as IAbapConnection;

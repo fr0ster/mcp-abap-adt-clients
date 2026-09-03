@@ -2,7 +2,10 @@
  * Message class unlock operations
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
@@ -17,7 +20,7 @@ export async function unlockMessageClass(
   connection: IAbapConnection,
   name: string,
   lockHandle: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const encoded = encodeSapObjectName(name.toLowerCase());
   const url = `${BASE}/${encoded}?_action=UNLOCK&lockHandle=${encodeURIComponent(lockHandle)}`;
 
@@ -37,7 +40,7 @@ export async function unlockAllMessages(
   connection: IAbapConnection,
   name: string,
   no: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const encoded = encodeSapObjectName(name.toLowerCase());
   const url = `${BASE}/${encoded}/messages/${encodeURIComponent(no)}?_action=UNLOCK_ALL`;
 

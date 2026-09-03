@@ -50,7 +50,7 @@ import type {
   IAbapTraceHitListEntry,
   IAbapTraceStatement,
   IAbapTraceStatements,
-  IAdtResponse,
+  IAdtWireResponse,
   INamedItem,
   ITraceProgramRef,
   ITraceRequestEntry,
@@ -69,7 +69,7 @@ const parser = new XMLParser({
 
 type Node = Record<string, unknown>;
 
-function rootOf(response: IAdtResponse, rootName: string): Node {
+function rootOf(response: IAdtWireResponse, rootName: string): Node {
   const body = typeof response?.data === 'string' ? response.data : '';
   if (!body.trim()) {
     return {};
@@ -276,7 +276,9 @@ export function compareRecordedAt(
  * entries were minutes old while its last were eight days older. A caller that
  * wants the newest uses {@link compareRecordedAt}.
  */
-export function parseTraceEntries(response: IAdtResponse): IAbapTraceEntry[] {
+export function parseTraceEntries(
+  response: IAdtWireResponse,
+): IAbapTraceEntry[] {
   return asList(rootOf(response, 'feed').entry).map(
     (entry): IAbapTraceEntry => {
       const idText = text(entry.id) ?? '';
@@ -346,7 +348,7 @@ function programRef(node: unknown): ITraceProgramRef | undefined {
   };
 }
 
-export function parseHitList(response: IAdtResponse): IAbapTraceHitList {
+export function parseHitList(response: IAdtWireResponse): IAbapTraceHitList {
   return {
     entries: asList(rootOf(response, 'hitlist').entry).map(
       (row): IAbapTraceHitListEntry => ({
@@ -365,7 +367,9 @@ export function parseHitList(response: IAdtResponse): IAbapTraceHitList {
   };
 }
 
-export function parseStatements(response: IAdtResponse): IAbapTraceStatements {
+export function parseStatements(
+  response: IAdtWireResponse,
+): IAbapTraceStatements {
   return {
     statements: asList(rootOf(response, 'statements').statement).map(
       (row): IAbapTraceStatement => ({
@@ -400,7 +404,9 @@ function accessTime(node: unknown): IAbapTraceAccessTime | undefined {
   };
 }
 
-export function parseDbAccesses(response: IAdtResponse): IAbapTraceDbAccesses {
+export function parseDbAccesses(
+  response: IAdtWireResponse,
+): IAbapTraceDbAccesses {
   return {
     accesses: asList(rootOf(response, 'dbAccesses').dbAccess).map(
       (row): IAbapTraceDbAccess => ({
@@ -423,7 +429,7 @@ export function parseDbAccesses(response: IAdtResponse): IAbapTraceDbAccesses {
  * what a stored trace request echoes back as `trc:processTypeId` /
  * `trc:objectTypeId`. Renaming it here would hide that they are the same string.
  */
-export function parseNamedItems(response: IAdtResponse): INamedItem[] {
+export function parseNamedItems(response: IAdtWireResponse): INamedItem[] {
   return asList(rootOf(response, 'namedItemList').namedItem).map((item) => ({
     name: text(item.name) as string,
     description: text(item.description) as string,
@@ -437,7 +443,7 @@ export function parseNamedItems(response: IAdtResponse): INamedItem[] {
  * runs that fulfil it — NOT that the endpoint is broken.
  */
 export function parseTraceRequests(
-  response: IAdtResponse,
+  response: IAdtWireResponse,
 ): ITraceRequestEntry[] {
   return asList(rootOf(response, 'feed').entry).map(
     (entry): ITraceRequestEntry => {

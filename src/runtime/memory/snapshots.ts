@@ -8,7 +8,10 @@
  * - Delta comparisons between snapshots
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -50,7 +53,7 @@ export async function listSnapshots(
   connection: IAbapConnection,
   user?: string,
   originalUser?: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const params = new URLSearchParams();
   if (user) params.append('user', user);
   if (originalUser) params.append('originalUser', originalUser);
@@ -77,7 +80,7 @@ export async function listSnapshots(
 export async function getSnapshot(
   connection: IAbapConnection,
   snapshotId: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   if (!snapshotId) {
     throw new Error('Snapshot ID is required');
   }
@@ -106,7 +109,7 @@ export async function getSnapshotRankingList(
   connection: IAbapConnection,
   snapshotId: string,
   options?: ISnapshotRankingListOptions,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   if (!snapshotId) {
     throw new Error('Snapshot ID is required');
   }
@@ -152,7 +155,7 @@ export async function getSnapshotDeltaRankingList(
   uri1: string,
   uri2: string,
   options?: ISnapshotRankingListOptions,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   if (!uri1 || !uri2) {
     throw new Error('Both snapshot URIs are required');
   }
@@ -200,7 +203,7 @@ export async function getSnapshotChildren(
   snapshotId: string,
   parentKey: string,
   options?: ISnapshotChildrenOptions,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   if (!snapshotId) {
     throw new Error('Snapshot ID is required');
   }
@@ -245,7 +248,7 @@ export async function getSnapshotDeltaChildren(
   uri2: string,
   parentKey: string,
   options?: ISnapshotChildrenOptions,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   if (!uri1 || !uri2) {
     throw new Error('Both snapshot URIs are required');
   }
@@ -290,7 +293,7 @@ export async function getSnapshotReferences(
   snapshotId: string,
   objectKey: string,
   options?: ISnapshotReferencesOptions,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   if (!snapshotId) {
     throw new Error('Snapshot ID is required');
   }
@@ -334,7 +337,7 @@ export async function getSnapshotDeltaReferences(
   uri2: string,
   objectKey: string,
   options?: ISnapshotReferencesOptions,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   if (!uri1 || !uri2) {
     throw new Error('Both snapshot URIs are required');
   }
@@ -374,7 +377,7 @@ export async function getSnapshotDeltaReferences(
 export async function getSnapshotOverview(
   connection: IAbapConnection,
   snapshotId: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   if (!snapshotId) {
     throw new Error('Snapshot ID is required');
   }
@@ -403,7 +406,7 @@ export async function getSnapshotDeltaOverview(
   connection: IAbapConnection,
   uri1: string,
   uri2: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   if (!uri1 || !uri2) {
     throw new Error('Both snapshot URIs are required');
   }

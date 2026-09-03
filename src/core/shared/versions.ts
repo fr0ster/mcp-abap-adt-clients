@@ -84,7 +84,7 @@ export function throwUnsupportedVersions(detail?: string): never {
 }
 
 /** Translate ANY version-request failure into an interface-level error so no
- *  raw IAdtResponse/axios object ever leaks outward. 404/406 → unsupported;
+ *  raw IAdtWireResponse/axios object ever leaks outward. 404/406 → unsupported;
  *  everything else → AdtOperationError carrying status + originalError.
  *  Call this from the catch of every version list/content GET. */
 export function throwVersionsError(error: unknown, detail: string): never {

@@ -4,7 +4,10 @@
  * Endpoint: POST /sap/bc/adt/ddic/ddlx/sources
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { CT_METADATA_EXTENSION } from '../../constants/contentTypes';
 import { limitDescription } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -31,7 +34,7 @@ import type { IMetadataExtensionCreateParams } from './types';
 export async function createMetadataExtension(
   connection: IAbapConnection,
   params: IMetadataExtensionCreateParams,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = '/sap/bc/adt/ddic/ddlx/sources';
 
   const masterLanguage = params.masterLanguage || 'EN';

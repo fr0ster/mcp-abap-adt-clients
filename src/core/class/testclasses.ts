@@ -2,7 +2,10 @@
  * Class test include operations
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
 import { activateObjectInSession } from '../../utils/activationUtils';
 import { encodeSapObjectName } from '../../utils/internalUtils';
@@ -19,7 +22,7 @@ export async function updateClassTestInclude(
   lockHandle: string,
   transportRequest?: string,
   sourceContentType?: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   // Empty source is legitimate: PUTting it is how a test class is deleted.
   // Only a missing argument is an error.
   if (testClassSource === undefined || testClassSource === null) {
@@ -55,7 +58,7 @@ export async function activateClassTestClasses(
   connection: IAbapConnection,
   className: string,
   testClassName: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const encodedClass = encodeSapObjectName(className).toLowerCase();
   const encodedTest = encodeSapObjectName(testClassName).toUpperCase();
   const objectUri = `/sap/bc/adt/oo/classes/${encodedClass}#testclass=${encodedTest}`;

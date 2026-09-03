@@ -1,4 +1,7 @@
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import {
   checkDeletion,
   deleteScalarFunction,
@@ -7,14 +10,14 @@ import {
 function capConn() {
   const calls: Array<{ url: string; data?: string }> = [];
   const conn = {
-    makeAdtRequest: async (r: any): Promise<IAdtResponse> => {
+    makeAdtRequest: async (r: any): Promise<IAdtWireResponse> => {
       calls.push({ url: r.url, data: r.data });
       return {
         status: 200,
         statusText: 'OK',
         headers: {},
         data: '',
-      } as IAdtResponse;
+      } as IAdtWireResponse;
     },
     setSessionType: () => {},
   } as unknown as IAbapConnection;

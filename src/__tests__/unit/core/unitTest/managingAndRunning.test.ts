@@ -8,7 +8,10 @@
  * `run` needs none of them to have been called.
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { AdtUnitTest } from '../../../../core/unitTest/AdtUnitTest';
 import { createLibraryLogger } from '../../../helpers/testLogger';
 
@@ -21,7 +24,7 @@ const RUN_STARTED = {
 };
 
 function makeConn(
-  handler?: (call: Call, index: number) => Partial<IAdtResponse> | Error,
+  handler?: (call: Call, index: number) => Partial<IAdtWireResponse> | Error,
 ) {
   const calls: Call[] = [];
   let i = 0;
@@ -40,7 +43,7 @@ function makeConn(
         headers: {},
         data: '<asx:abap xmlns:asx="http://www.sap.com/abapxml"><asx:values><DATA><LOCK_HANDLE>LH</LOCK_HANDLE></DATA></asx:values></asx:abap>',
         ...res,
-      } as IAdtResponse;
+      } as IAdtWireResponse;
     },
   } as unknown as IAbapConnection;
   return { conn, calls };

@@ -16,6 +16,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
+import { orThrow } from '../../../utils/adtResponse';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -76,9 +77,9 @@ describe('Shared - listFunctionModules', () => {
 
     logTestStep(`listFunctionModules(${SHARED_FUNCTION_GROUP})`, testsLogger);
 
-    const result = await client
-      .getUtils()
-      .listFunctionModules(SHARED_FUNCTION_GROUP);
+    const result = await orThrow(
+      client.getUtils().listFunctionModules(SHARED_FUNCTION_GROUP),
+    );
 
     testsLogger.info?.(`🎯 Function modules: ${JSON.stringify(result)}`);
 
@@ -109,9 +110,11 @@ describe('Shared - listFunctionModules', () => {
       testsLogger,
     );
 
-    const result = await client
-      .getUtils()
-      .listFunctionModules(SHARED_FUNCTION_GROUP.toLowerCase());
+    const result = await orThrow(
+      client
+        .getUtils()
+        .listFunctionModules(SHARED_FUNCTION_GROUP.toLowerCase()),
+    );
 
     const upper = result.map((fm) => fm.toUpperCase());
     expect(upper).toContain(SHARED_FUNCTION_MODULE.toUpperCase());

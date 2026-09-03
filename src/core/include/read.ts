@@ -7,7 +7,10 @@
  * told by content, not by status.
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 import { CT_INCLUDE } from './create';
 import { includeUrl } from './lock';
@@ -15,7 +18,7 @@ import { includeUrl } from './lock';
 export async function getIncludeMetadata(
   connection: IAbapConnection,
   includeName: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   return connection.makeAdtRequest({
     url: includeUrl(includeName),
     method: 'GET',
@@ -28,7 +31,7 @@ export async function getIncludeSource(
   connection: IAbapConnection,
   includeName: string,
   version?: 'active' | 'inactive',
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const query = version ? `?version=${version}` : '';
   return connection.makeAdtRequest({
     url: `${includeUrl(includeName)}/source/main${query}`,

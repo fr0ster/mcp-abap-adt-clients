@@ -13,6 +13,7 @@ import type {
   IPackageHierarchyNode,
 } from '@mcp-abap-adt/interfaces';
 import type { AdtClient } from '../../../clients/AdtClient';
+import { orThrow } from '../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import { BaseTester } from '../../helpers/BaseTester';
 import {
@@ -89,7 +90,9 @@ class PackageHierarchyObject
     if (!config.package_name) {
       return Promise.reject(new Error('package_name required'));
     }
-    return this.client.getUtils().getPackageHierarchy(config.package_name);
+    return orThrow(
+      this.client.getUtils().getPackageHierarchy(config.package_name),
+    );
   }
 
   readMetadata(

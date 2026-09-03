@@ -2,7 +2,10 @@
  * FunctionModule lock operations
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
 import { ACCEPT_LOCK } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
@@ -55,7 +58,11 @@ export async function lockFunctionModuleForUpdate(
   functionGroupName: string,
   functionModuleName: string,
   _sessionId: string,
-): Promise<{ response: IAdtResponse; lockHandle: string; corrNr?: string }> {
+): Promise<{
+  response: IAdtWireResponse;
+  lockHandle: string;
+  corrNr?: string;
+}> {
   const encodedGroupName = encodeSapObjectName(functionGroupName).toLowerCase();
   const encodedModuleName =
     encodeSapObjectName(functionModuleName).toLowerCase();

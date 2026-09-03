@@ -15,6 +15,7 @@ import type {
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
 import type { AdtObjectType } from '../../../core/shared/types';
+import { orThrow } from '../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import {
   createTestAdtClient,
@@ -102,16 +103,16 @@ describe('Shared - readMetadata', () => {
       testsLogger.info?.(`📋 Object: ${className} (class)`);
       testsLogger.info?.('📖 Reading metadata...');
 
-      const activeResult = await client
-        .getUtils()
-        .readObjectMetadata('class', className, undefined, {
+      const activeResult = await orThrow(
+        client.getUtils().readObjectMetadata('class', className, undefined, {
           version: 'active',
-        });
-      const inactiveResult = await client
-        .getUtils()
-        .readObjectMetadata('class', className, undefined, {
+        }),
+      );
+      const inactiveResult = await orThrow(
+        client.getUtils().readObjectMetadata('class', className, undefined, {
           version: 'inactive',
-        });
+        }),
+      );
 
       expect(activeResult.status).toBe(200);
       expect(activeResult.data).toBeDefined();
@@ -182,9 +183,9 @@ describe('Shared - readMetadata', () => {
       testsLogger.info?.(`📋 Object: ${domainName} (domain)`);
       testsLogger.info?.('📖 Reading metadata...');
 
-      const result = await client
-        .getUtils()
-        .readObjectMetadata('domain', domainName);
+      const result = await orThrow(
+        client.getUtils().readObjectMetadata('domain', domainName),
+      );
 
       expect(result.status).toBe(200);
       expect(result.data).toBeDefined();
@@ -245,9 +246,9 @@ describe('Shared - readMetadata', () => {
     }
     try {
       logTestStep('read table metadata', testsLogger);
-      const result = await client
-        .getUtils()
-        .readObjectMetadata('table', tableName);
+      const result = await orThrow(
+        client.getUtils().readObjectMetadata('table', tableName),
+      );
       expect(result.status).toBe(200);
       expect(result.data).toBeDefined();
     } catch (error: any) {

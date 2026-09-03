@@ -2,7 +2,10 @@
  * DataElement read operations
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_DATA_ELEMENT,
   ACCEPT_TRANSPORT,
@@ -18,7 +21,7 @@ export async function getDataElement(
   connection: IAbapConnection,
   dataElementName: string,
   options?: IReadOptions,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const encodedName = encodeSapObjectName(dataElementName);
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
   const url = `/sap/bc/adt/ddic/dataelements/${encodedName}${query}`;
@@ -43,7 +46,7 @@ export async function getDataElementTransport(
   connection: IAbapConnection,
   dataElementName: string,
   options?: IReadOptions,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const encodedName = encodeSapObjectName(dataElementName);
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
   const url = `/sap/bc/adt/ddic/dataelements/${encodedName}/transport${query}`;

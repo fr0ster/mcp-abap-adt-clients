@@ -4,7 +4,10 @@ import type { CheckRunVersion } from './checkRun';
  * All activation and check methods are implemented here once and reused by clients
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { getTimeout } from './timeouts';
 
 /**
@@ -18,7 +21,7 @@ async function makeAdtRequest(
   data?: unknown,
   params?: unknown,
   headers?: Record<string, string>,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const timeoutValue = getTimeout(timeout);
   return connection.makeAdtRequest({
     url,
@@ -42,7 +45,7 @@ export async function activateObjectsGroup(
   connection: IAbapConnection,
   objects: Array<{ uri: string; name: string }>,
   preaudit: boolean = true,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/activation/runs?method=activate&preauditRequested=${preaudit}`;
 
   const objectReferences = objects
@@ -168,7 +171,7 @@ export async function checkObject(
   name: string,
   type: string,
   version?: CheckRunVersion,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const { runCheckRun } = await import('../utils/checkRun');
   return runCheckRun(
     connection,

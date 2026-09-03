@@ -29,10 +29,10 @@ import {
   type IAdtLockable,
   type IAdtOperationOptions,
   type IAdtReadable,
-  type IAdtResponse,
   type IAdtRunnable,
   type IAdtUpdatable,
   type IAdtValidatable,
+  type IAdtWireResponse,
   type ILogger,
   type ITestRunInformation,
   type IUnitTestResultOptions,
@@ -67,8 +67,8 @@ export class AdtUnitTest
   public readonly objectType: string = 'UnitTest';
 
   protected lastRunId?: string;
-  protected lastStatusResponse?: IAdtResponse;
-  protected lastResultResponse?: IAdtResponse;
+  protected lastStatusResponse?: IAdtWireResponse;
+  protected lastResultResponse?: IAdtWireResponse;
 
   protected adtClass: AdtClass;
   protected adtLocalTestClass: AdtLocalTestClass;
@@ -348,7 +348,7 @@ export class AdtUnitTest
   async getStatus(
     runId: string,
     withLongPolling: boolean = true,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     const response = await getClassUnitTestStatus(
       this.connection,
       runId,
@@ -359,7 +359,7 @@ export class AdtUnitTest
   }
 
   /** Response of the most recent {@link getStatus}, if one has been made. */
-  getStatusResponse(): IAdtResponse | undefined {
+  getStatusResponse(): IAdtWireResponse | undefined {
     return this.lastStatusResponse;
   }
 
@@ -367,7 +367,7 @@ export class AdtUnitTest
   async getResult(
     runId: string,
     options?: IUnitTestResultOptions,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     const response = await getClassUnitTestResult(
       this.connection,
       runId,
@@ -378,14 +378,14 @@ export class AdtUnitTest
   }
 
   /** Response of the most recent {@link getResult}, if one has been made. */
-  getResultResponse(): IAdtResponse | undefined {
+  getResultResponse(): IAdtWireResponse | undefined {
     return this.lastResultResponse;
   }
 
   /**
    * Extract run ID from unit test run response
    */
-  protected extractRunId(response: IAdtResponse): string | undefined {
+  protected extractRunId(response: IAdtWireResponse): string | undefined {
     // First, try to extract from response headers (most reliable)
     const locationHeader =
       headerValueToString(response.headers?.location) ||

@@ -5,7 +5,7 @@
 import type {
   IAbapConnection,
   IAdtContentTypes,
-  IAdtResponse,
+  IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_SOURCE,
@@ -87,7 +87,7 @@ export async function create(
   connection: IAbapConnection,
   args: ICreateProgramParams,
   contentTypes?: IAdtContentTypes,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   // Description is limited to 60 characters in SAP ADT
   const description = limitDescription(args.description || args.programName);
   const programType = convertProgramType(args.programType);
@@ -132,7 +132,7 @@ async function _uploadProgramSource(
   lockHandle: string,
   _sessionId: string,
   transportRequest?: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const queryParams = `lockHandle=${encodeURIComponent(lockHandle)}${transportRequest ? `&corrNr=${transportRequest}` : ''}`;
   const url = `/sap/bc/adt/programs/programs/${encodeSapObjectName(programName).toLowerCase()}/source/main?${queryParams}`;
 

@@ -3,7 +3,10 @@ import type { CheckRunVersion } from '../../utils/checkRun';
  * Behavior Definition check operations
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_CHECK_MESSAGES,
   CT_CHECK_OBJECTS,
@@ -41,7 +44,7 @@ export async function check(
   _sessionId: string,
   version: CheckRunVersion = 'inactive',
   sourceCode?: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   let xmlBody: string;
 
   if (sourceCode) {
@@ -107,7 +110,7 @@ export async function checkImplementation(
   sessionId: string,
   version: CheckRunVersion = 'inactive',
   sourceCode?: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   return check(
     connection,
     name,
@@ -145,7 +148,7 @@ export async function checkAbap(
   sessionId: string,
   version: CheckRunVersion = 'inactive',
   sourceCode?: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   return check(
     connection,
     name,

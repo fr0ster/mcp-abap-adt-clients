@@ -11,7 +11,10 @@
  * lock handle). It only answers: in which session mode did each request leave?
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 
 export type SessionMode = 'stateful' | 'stateless';
 
@@ -62,8 +65,8 @@ const OBJECT_XML =
   '<doma:valueTableRef/>' +
   '</doma:wbobject>';
 
-const ok = (data: unknown): IAdtResponse =>
-  ({ data, status: 200, statusText: 'OK', headers: {} }) as IAdtResponse;
+const ok = (data: unknown): IAdtWireResponse =>
+  ({ data, status: 200, statusText: 'OK', headers: {} }) as IAdtWireResponse;
 
 /**
  * @param respond Optional override consulted before the default responses;
@@ -75,7 +78,7 @@ export function createSessionRecorder(
     url: string;
     method: string;
     index: number;
-  }) => IAdtResponse | undefined,
+  }) => IAdtWireResponse | undefined,
   lockHandle = 'LH-1',
 ): SessionRecorder {
   let mode: SessionMode = 'stateless';
@@ -89,7 +92,7 @@ export function createSessionRecorder(
       mode = type;
     },
     // Loose shape on purpose: the fake mirrors what handlers actually pass.
-    makeAdtRequest: async (options: any): Promise<IAdtResponse> => {
+    makeAdtRequest: async (options: any): Promise<IAdtWireResponse> => {
       const url = String(options.url);
       const method = String(options.method ?? 'GET').toUpperCase();
       const index = calls.length;

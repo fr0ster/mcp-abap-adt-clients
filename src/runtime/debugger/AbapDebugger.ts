@@ -2,7 +2,7 @@ import type {
   IAbapConnection,
   IAbapDebugger,
   IAbapDebuggerStepMethod,
-  IAdtResponse,
+  IAdtWireResponse,
   IGetDebuggerOptions,
   IGetSystemAreaOptions,
   IGetVariableAsCsvOptions,
@@ -51,50 +51,52 @@ export class AbapDebugger implements IAbapDebugger {
     private readonly logger: ILogger,
   ) {}
 
-  async launch(options?: ILaunchDebuggerOptions): Promise<IAdtResponse> {
+  async launch(options?: ILaunchDebuggerOptions): Promise<IAdtWireResponse> {
     return launchDebugger(this.connection, options);
   }
 
-  async stop(options?: IStopDebuggerOptions): Promise<IAdtResponse> {
+  async stop(options?: IStopDebuggerOptions): Promise<IAdtWireResponse> {
     return stopDebugger(this.connection, options);
   }
 
-  async get(options?: IGetDebuggerOptions): Promise<IAdtResponse> {
+  async get(options?: IGetDebuggerOptions): Promise<IAdtWireResponse> {
     return getDebugger(this.connection, options);
   }
 
-  async getMemorySizes(includeAbap?: boolean): Promise<IAdtResponse> {
+  async getMemorySizes(includeAbap?: boolean): Promise<IAdtWireResponse> {
     return getMemorySizes(this.connection, includeAbap);
   }
 
   async getSystemArea(
     systemarea: string,
     options?: IGetSystemAreaOptions,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     return getSystemArea(this.connection, systemarea, options);
   }
 
-  async synchronizeBreakpoints(checkConflict?: boolean): Promise<IAdtResponse> {
+  async synchronizeBreakpoints(
+    checkConflict?: boolean,
+  ): Promise<IAdtWireResponse> {
     return synchronizeBreakpoints(this.connection, checkConflict);
   }
 
-  async getBreakpointStatements(): Promise<IAdtResponse> {
+  async getBreakpointStatements(): Promise<IAdtWireResponse> {
     return getBreakpointStatements(this.connection);
   }
 
-  async getBreakpointMessageTypes(): Promise<IAdtResponse> {
+  async getBreakpointMessageTypes(): Promise<IAdtWireResponse> {
     return getBreakpointMessageTypes(this.connection);
   }
 
-  async getBreakpointConditions(): Promise<IAdtResponse> {
+  async getBreakpointConditions(): Promise<IAdtWireResponse> {
     return getBreakpointConditions(this.connection);
   }
 
-  async validateBreakpoints(): Promise<IAdtResponse> {
+  async validateBreakpoints(): Promise<IAdtWireResponse> {
     return validateBreakpoints(this.connection);
   }
 
-  async getVitBreakpoints(): Promise<IAdtResponse> {
+  async getVitBreakpoints(): Promise<IAdtWireResponse> {
     return getVitBreakpoints(this.connection);
   }
 
@@ -102,7 +104,7 @@ export class AbapDebugger implements IAbapDebugger {
     variableName: string,
     part: string,
     maxLength?: number,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     return getVariableMaxLength(this.connection, variableName, part, maxLength);
   }
 
@@ -111,7 +113,7 @@ export class AbapDebugger implements IAbapDebugger {
     part: string,
     component?: string,
     line?: number,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     return getVariableSubcomponents(
       this.connection,
       variableName,
@@ -125,7 +127,7 @@ export class AbapDebugger implements IAbapDebugger {
     variableName: string,
     part: string,
     options?: IGetVariableAsCsvOptions,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     return getVariableAsCsv(this.connection, variableName, part, options);
   }
 
@@ -133,7 +135,7 @@ export class AbapDebugger implements IAbapDebugger {
     variableName: string,
     part: string,
     options?: IGetVariableAsJsonOptions,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     return getVariableAsJson(this.connection, variableName, part, options);
   }
 
@@ -141,7 +143,7 @@ export class AbapDebugger implements IAbapDebugger {
     variableName: string,
     part: string,
     options?: IGetVariableValueStatementOptions,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     return getVariableValueStatement(
       this.connection,
       variableName,
@@ -150,26 +152,29 @@ export class AbapDebugger implements IAbapDebugger {
     );
   }
 
-  async executeAction(action: string, value?: string): Promise<IAdtResponse> {
+  async executeAction(
+    action: string,
+    value?: string,
+  ): Promise<IAdtWireResponse> {
     return executeDebuggerAction(this.connection, action, value);
   }
 
-  async getCallStack(): Promise<IAdtResponse> {
+  async getCallStack(): Promise<IAdtWireResponse> {
     return getCallStack(this.connection);
   }
 
   async insertWatchpoint(
     variableName: string,
     condition?: string,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     return insertWatchpoint(this.connection, variableName, condition);
   }
 
-  async getWatchpoints(): Promise<IAdtResponse> {
+  async getWatchpoints(): Promise<IAdtWireResponse> {
     return getWatchpoints(this.connection);
   }
 
-  async executeBatchRequest(requests: string): Promise<IAdtResponse> {
+  async executeBatchRequest(requests: string): Promise<IAdtWireResponse> {
     return executeBatchRequest(this.connection, requests);
   }
 
@@ -185,19 +190,19 @@ export class AbapDebugger implements IAbapDebugger {
 
   async executeStepBatch(
     stepMethod: IAbapDebuggerStepMethod,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     return executeDebuggerStepBatch(this.connection, stepMethod);
   }
 
-  async stepIntoBatch(): Promise<IAdtResponse> {
+  async stepIntoBatch(): Promise<IAdtWireResponse> {
     return stepIntoDebuggerBatch(this.connection);
   }
 
-  async stepOutBatch(): Promise<IAdtResponse> {
+  async stepOutBatch(): Promise<IAdtWireResponse> {
     return stepOutDebuggerBatch(this.connection);
   }
 
-  async stepContinueBatch(): Promise<IAdtResponse> {
+  async stepContinueBatch(): Promise<IAdtWireResponse> {
     return stepContinueDebuggerBatch(this.connection);
   }
 }

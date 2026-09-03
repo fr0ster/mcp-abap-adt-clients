@@ -6,7 +6,10 @@
  * - application/xml for Content-Type and Accept (not versioned vnd.sap.adt.api.abapunit.* types)
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type {
@@ -51,7 +54,7 @@ export async function startClassUnitTestRunLegacy(
   connection: IAbapConnection,
   tests: IClassUnitTestDefinition[],
   _options?: IClassUnitTestRunOptions,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   if (!tests.length) {
     throw new Error('At least one test definition is required');
   }

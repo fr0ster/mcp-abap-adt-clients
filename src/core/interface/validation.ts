@@ -4,7 +4,10 @@
  * Same endpoint as class validation, but with objtype=INTF/OI
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { ACCEPT_VALIDATION_CLASS_NAME } from '../../constants/contentTypes';
 import { getTimeout } from '../../utils/timeouts';
 
@@ -29,7 +32,7 @@ export async function validateInterfaceName(
   interfaceName: string,
   packageName: string,
   description?: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   // Build query parameters for interface validation (same format as class validation)
   const params = new URLSearchParams({
     objname: interfaceName,

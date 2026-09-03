@@ -2,7 +2,10 @@
  * Group Deletion operations - delete multiple objects with session support
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_DELETION,
   ACCEPT_DELETION_CHECK,
@@ -45,7 +48,7 @@ import type { IObjectReference } from './types';
 export async function checkDeletionGroup(
   connection: IAbapConnection,
   objects: IObjectReference[],
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const checkUrl = `/sap/bc/adt/deletion/check`;
 
   // Build object URIs
@@ -108,7 +111,7 @@ export async function deleteObjectsGroup(
   connection: IAbapConnection,
   objects: IObjectReference[],
   transportRequest?: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const deletionUrl = `/sap/bc/adt/deletion/delete`;
 
   // Build object URIs with transport number

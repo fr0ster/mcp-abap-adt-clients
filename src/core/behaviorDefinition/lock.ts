@@ -2,7 +2,10 @@
  * Behavior Definition lock operations
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
 import { ACCEPT_LOCK } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
@@ -96,7 +99,11 @@ export async function lockForUpdate(
   name: string,
   _sessionId: string,
   accessMode: string = 'MODIFY',
-): Promise<{ response: IAdtResponse; lockHandle: string; corrNr?: string }> {
+): Promise<{
+  response: IAdtWireResponse;
+  lockHandle: string;
+  corrNr?: string;
+}> {
   const url = `/sap/bc/adt/bo/behaviordefinitions/${encodeSapObjectName(name).toLowerCase()}?_action=LOCK&accessMode=${accessMode}`;
 
   const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">

@@ -2,7 +2,10 @@
  * Package create operations
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { ACCEPT_PACKAGE, CT_PACKAGE } from '../../constants/contentTypes';
 import { buildQueryString, limitDescription } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -14,7 +17,7 @@ import type { ICreatePackageParams } from './types';
 export async function createPackage(
   connection: IAbapConnection,
   params: ICreatePackageParams,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   if (!params.package_name) {
     throw new Error('Package name is required');
   }

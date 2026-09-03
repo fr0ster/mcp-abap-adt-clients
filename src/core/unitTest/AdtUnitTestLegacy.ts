@@ -14,7 +14,7 @@
  * now, is identical on a legacy system.
  */
 
-import type { IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces';
 import { safeErrorMessage } from '../../utils/internalUtils';
 import { AdtUnitTest } from './AdtUnitTest';
 import { startClassUnitTestRunLegacy } from './runLegacy';
@@ -71,7 +71,7 @@ export class AdtUnitTestLegacy extends AdtUnitTest {
   override async getStatus(
     _runId: string,
     _withLongPolling: boolean = true,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     if (this.lastStatusResponse) {
       return this.lastStatusResponse;
     }
@@ -84,7 +84,7 @@ export class AdtUnitTestLegacy extends AdtUnitTest {
   override async getResult(
     _runId: string,
     _options?: { withNavigationUris?: boolean; format?: 'abapunit' | 'junit' },
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     if (this.lastResultResponse) {
       return this.lastResultResponse;
     }

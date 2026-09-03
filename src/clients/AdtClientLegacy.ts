@@ -20,10 +20,17 @@ import type {
   IAdtClientOptions,
   IAdtCreatable,
   IAdtCrud,
+  IAdtDataPreview,
   IAdtDeletable,
+  IAdtDiscovery,
+  IAdtGroupLifecycle,
+  IAdtInformationSystem,
   IAdtLockable,
   IAdtObject,
+  IAdtObjectAccess,
+  IAdtPackageBrowsing,
   IAdtReadable,
+  IAdtRepositoryStructure,
   IAdtRequest,
   IAdtRunnable,
   IAdtSourceObject,
@@ -208,7 +215,29 @@ export class AdtClientLegacy extends AdtClient {
 
   // --- Utilities with legacy restrictions ---
 
-  override getUtils(): AdtUtils {
+  /**
+   * The same contract, a different implementation.
+   *
+   * **Annotated, not inherited.** An unannotated override infers its own return
+   * type — `AdtUtilsLegacy`, the class — so the published `.d.ts` handed out a
+   * concrete implementation while the modern client handed out the contract.
+   * Nothing failed: the class satisfies the intersection, so the compiler was
+   * content, and the legacy surface quietly exposed members the contract does
+   * not carry. That is decision 10's whole point, arrived at through the one
+   * shape it does not check.
+   *
+   * What this implementation refuses — `getSqlQuery`, `getTableContents` — it
+   * refuses by *answering a failure*, not by throwing. A caller holding this
+   * contract branches on `ok` either way, and a legacy system is not a reason to
+   * be told about a refusal differently.
+   */
+  override getUtils(): IAdtInformationSystem &
+    IAdtRepositoryStructure &
+    IAdtPackageBrowsing &
+    IAdtGroupLifecycle &
+    IAdtDataPreview &
+    IAdtDiscovery &
+    IAdtObjectAccess {
     return new AdtUtilsLegacy(this.connection, this.logger);
   }
 

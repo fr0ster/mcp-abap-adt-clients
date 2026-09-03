@@ -5,6 +5,342 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [17.0.0] - 2026-09-02
+
+Requires `@mcp-abap-adt/interfaces@^28.0.0`.
+
+**Breaking in three ways, and the third is a behaviour change no signature shows:**
+six public methods are gone, `getUtils()` returns contracts instead of the class,
+and a refusal SAP sends with a 2xx now throws where it used to be reported as
+success.
+
+### Changed
+
+- **BREAKING: `getUtils()`'s members answer `IAdtResponse`, and a failure comes
+  back instead of flying past.**
+
+  ```typescript
+  const answer = await client.getUtils().search({ query: 'ZCL_*' });
+
+  if (answer.ok) {
+    answer.getResult().value;      // ISearchResult[]
+  } else {
+    answer.getError().origin;      // 'connection' | 'refusal' | 'parse'
+    answer.getError().message;     // what SAP said
+  }
+  ```
+
+  All 22 asynchronous members. `ok` is what makes the check compulsory: an
+  exception is invisible to the type system, and a caller who never learns a
+  failure path exists is the one this contract is for.
+
+  The default error strategy recognises three origins, and they are not
+  decoration — a caller cannot act on "something went wrong". Reauthenticate, ask
+  the server something else, or fix a parser are three different days of work.
+
+  **A consumer's own parser is outside that classification.** An exception from
+  the strategy they passed to `search(criteria, parse)` surfaces as itself,
+  untouched: it is not the library's failure to describe. The first version of
+  this ran the parser inside the classifier, which labelled their bug
+  `origin: 'connection'` — advice to reauthenticate, over a defect in their own
+  code.
+
+- **BREAKING: the transport frame is `IAdtWireResponse`** throughout, matching
+  interfaces 28.0.0. 320 files renamed; the type is unchanged, only its name and
+  what it is allowed to mean. `IAdtResponse` now names the answer a member gives.
+
+- **`AdtUtils` no longer declares `IAdtSearchable`.** That atom says
+  `search(criteria): Promise<ISearchResult[]>` and `IAdtInformationSystem` says
+  the same member answers `IAdtResponse`. One class cannot satisfy both, and the
+  compiler said so. The atom migrates with the rest of the interfaces package,
+  member by member; until it does, the information system is what `getUtils()`
+  hands out and therefore what this class answers to.
+
+- **`AdtClientLegacy.getUtils()` answers the contract too**, and its refusals are
+  failures rather than throws. Both were broken in the same way and neither
+  failed a check: an unannotated override infers the class, so the published
+  `.d.ts` handed out `AdtUtilsLegacy` while the modern client handed out the
+  intersection — the class satisfies the contract, so the compiler was content
+  and the legacy surface quietly exposed members the contract does not carry.
+
+  `getSqlQuery` and `getTableContents` on a legacy system now answer
+  `origin: 'connection'` — the endpoint is not there, which is the same remedy as
+  an unreachable host and a different thing from a server refusing about an
+  object. Throwing would have made one implementation of a member behave unlike
+  the other for a reason invisible in the type.
+
+- **`orThrow()` marks the boundary with code that has not migrated.** The
+  per-type handlers still return state objects and signal failure by throwing,
+  and the low-level helpers pass a wire response around. Every use of `orThrow`
+  is a call site that has not moved, which makes the remaining work countable
+  instead of invisible — 11 files today, and each one is deleted rather than
+  edited when its caller migrates.
+
+### Added
+
+- **`TransportSearchConfigurationMissing` is now this package's class**, exported
+  from the root and `./core`, and no longer imported from
+  `@mcp-abap-adt/interfaces`. A contract says what a thing is; a class is one way
+  of being it, and shipping one from the contracts package makes "swap in your own
+  implementation" untrue for that piece.
+
+  Nothing changes for a caller yet — the class in `interfaces` still exists at
+  27.0.0, so the two are separate constructors and `instanceof` against the
+  `interfaces` one stops matching what this package throws. **Catch it from here.**
+  The removal on the other side is its own release.
+
+  It survives the move where `AdtOperationError` will not, and the difference is
+  what each carries: this names one condition, says what to do about it, and hands
+  over the `endpoint` a caller needs to act on it.
+
+### Fixed
+
+- **BREAKING: a refusal SAP sends with a 2xx is no longer reported as success.**
+
+  The status code is the channel; the response is the result. ADT answers some
+  refusals with a 2xx carrying an `<exc:exception>` document — the request did
+  reach the server and come back, so the transport admits it and nothing throws.
+  Every layer above then stored that body as a result.
+
+  Measured, with a connection answering 200 and "Object ZNOPE is locked by user
+  XYZ" to every request:
+
+  | call | `state.errors` was | the caller was told |
+  |---|---|---|
+  | `getClass().create()` | 0 | the class was created |
+  | `getClass().delete()` | 0 | the class was deleted |
+  | `getClass().activate()` | 0 | the class was activated |
+  | `getDomain().create()` | 0 | the domain was created |
+  | `getClass().read()` | 0 | it was read |
+  | `getClass().update()` | threw | "Class may be locked by another user" |
+
+  Five of seven probed chains reported success on a refusal, and three of those
+  are writes: a caller believed an object existed that did not, and that one had
+  been deleted that had not. The refusal sat in `state.createResult.data` the
+  whole time, but nothing said to look — a successful call is not read twice.
+  `delete()` went on to issue its second request after the first had already been
+  refused.
+
+  The two that did throw invented their own reason and never showed the caller
+  `XYZ`, which is the part that makes the message worth having.
+
+  Now `AdtExceptionDocumentError` is raised the moment such a response arrives,
+  carrying **the server's own message**, the document verbatim in `.document`,
+  and `.adtType` / `.namespace`.
+
+  **Installed once**, where a connection enters the library, rather than at the
+  241 places that assign a response into a state object — a rule applied in 241
+  places has 241 chances to be forgotten, and the next member written would be
+  the 242nd. It composes with accept negotiation by replacing `makeAdtRequest`
+  and calling what it captured, the same shape that wrapper already uses. A
+  `Proxy` was tried first and recursed: accept negotiation keys a `WeakMap` by
+  the connection object, and a proxy is not its target.
+
+  Unchanged: a failing status still throws from the transport with the full
+  response attached, an empty body is still a faithful "nothing", and validation
+  is unaffected — its "already exists" answer arrives as a 400, which threw
+  before this and throws now.
+
+  **For consumers:** calls that previously returned a state with `errors: []`
+  will now throw where SAP refused. That is the point, and it is a behaviour
+  change to plan for.
+
+  ```typescript
+  import { AdtExceptionDocumentError } from '@mcp-abap-adt/adt-clients';
+
+  try {
+    await client.getClass().create({ className: 'ZCL_X', packageName: 'ZP' });
+  } catch (error) {
+    if (error instanceof AdtExceptionDocumentError) {
+      error.message;    // what SAP said, including who holds the lock
+      error.document;   // the answer, untouched
+      error.adtType;    // e.g. 'ExceptionResourceNotFound'
+    }
+  }
+  ```
+
+  `AdtExceptionDocumentError` is exported from the package root and from
+  `./core`, and the export-surface manifest lists it — the first draft of this
+  change threw a class nothing outside the package could name, which makes
+  `instanceof` impossible and `.document` unreachable. `adtExceptionIn` and
+  `throwIfAdtException` are deliberately **not** exported: a consumer catches a
+  refusal, it does not detect one.
+
+
+- **A refusal from SAP no longer becomes an empty result.** ADT answers some
+  refusals with 200 and an `<exc:exception>` document — the transport succeeded,
+  so nothing throws. That was harmless while these members returned the response
+  and the caller could read it. Typing them put a parser in between, and a parser
+  finding no nodes in an exception document reported "nothing here" where the
+  server said "no": the message, the type and the document all gone, with no
+  status to give it away.
+
+  `fetchNodeStructure` and `getAllTypes` now throw `AdtExceptionDocumentError`,
+  which carries the server's own message plus the document **verbatim** in
+  `.document`, and `.adtType` / `.namespace` when the document names them. A
+  refusal whose own XML will not parse is still reported as a refusal, with the
+  raw document attached.
+
+  A genuinely empty result stays an empty result. Telling those two apart is the
+  whole job — "throw when the parse yields nothing" would make every legitimate
+  empty read fail.
+
+  The other two paths were verified rather than assumed: a failing status still
+  arrives as a throw carrying the full response (status, headers, body
+  byte-for-byte), because nothing here catches it; and `search(criteria, parse)`
+  hands the parser the document untouched, so a consumer inspecting the payload
+  themselves sees exactly what they saw before.
+
+
+- **A node id was losing its leading zeros.** The node-structure parser left
+  `fast-xml-parser` on its default `parseTagValue`, so
+  `<NODE_ID>000010</NODE_ID>` arrived as the number `10` — and that id goes
+  straight back to the server as the `node_id` parameter of the next request.
+  Codes are strings; only counts are numbers.
+
+  Present in both copies of this parser before they were consolidated, and found
+  by a unit test written for the consolidated one rather than by anything the
+  compiler could see.
+
+### Changed
+
+- **`AdtUtils.fetchNodeStructure` returns `IRepositoryNodeContents`** and
+  `getAllTypes` returns `INamedItem[]`, matching what
+  `@mcp-abap-adt/interfaces` promises. Both returned `IAdtResponse` until
+  `AdtUtils` was declared `implements` against the atoms and the compiler said
+  so. **Breaking** for anyone reading `response.data` off either.
+
+  `childNodes` pairs each object type with the node id holding it, which is what
+  makes `contents.childNodes.find((c) => c.objectType === 'PROG/I')?.nodeId`
+  expressible — interfaces 27.0.0 exists because the first shape carried the ids
+  alone.
+
+- **The node-structure parser lives in `nodeStructure.ts`**, beside the request
+  that produces it. It had been copied into `packageContentsList` and
+  `packageHierarchy`, identical but for a logger on the catch, and a third copy
+  was the alternative. The local `IObjectTypeInfo` twins went with it:
+  `IRepositoryNodeChild` from the contract means the same thing, and two
+  declarations of one shape drift.
+
+### Known gap
+
+- **`getWhereUsed` is not on the contract, and `getWhereUsedList` cannot replace
+  it.** Both hit `/repository/informationsystem/usageReferences`, so one endpoint
+  is one member — but their parameters differ: `getWhereUsed` takes a scope
+  document the caller already fetched and edited, while `getWhereUsedList` builds
+  a scope from flags. A caller running the two-step flow has nowhere on the
+  contract to hand their scope back.
+
+  The integration test for that flow therefore constructs `AdtUtils` directly,
+  which states the gap rather than hiding it behind a cast. Closing it means
+  `IGetWhereUsedListParams` accepting an optional scope document — additive, in
+  `@mcp-abap-adt/interfaces`, and not bundled into this release.
+
+### Requires
+
+- `@mcp-abap-adt/interfaces@^27.0.0`.
+
+
+### Changed
+
+- **`AdtUtils.search()` takes an optional parser.** One endpoint is one member:
+  `search` and `searchObjects` issue the same request to
+  `/repository/informationsystem/search`, and having both made "how far the
+  answer was parsed" a property of which method a caller happened to use rather
+  than of the contract. `IAdtInformationSystem` in
+  `@mcp-abap-adt/interfaces` therefore names one member with a strategy
+  overload, and this implements it:
+
+  ```typescript
+  // unchanged — the parsed hits
+  const hits = await utils.search({ query: 'ZCL_*' });
+
+  // the document, read by the caller
+  const xml = await utils.search({ query: 'ZCL_*' }, (data) => String(data));
+  ```
+
+  The parser is handed the **raw body**, untouched, and the same request goes out
+  either way — both asserted in `src/__tests__/unit/shared/searchStrategy.test.ts`
+  and each proved by breaking the implementation and watching that case fail. A
+  strategy that quietly issued a different request would otherwise still return
+  the caller's type and still compile.
+
+  `searchObjects()` is unchanged and still returns `IAdtResponse`. It is not in
+  the contract, so it will disappear from `getUtils()`'s type when that factory
+  narrows to the atoms — a consumer using it for the document moves to the parser
+  above and gets a contract instead of a guess at `response.data`.
+
+
+### Removed
+
+- **BREAKING: six `AdtUtils` methods that nobody called** — `getTypeInfo()`,
+  `getTransaction()`, `getBdef()`, `getEnhancements()`, `getEnhancementSpot()`,
+  `getEnhancementImpl()`.
+
+  Not "few callers" — none. Every occurrence of those names across this
+  repository and its siblings was their own `@example` block, plus one
+  `AdtUtilsLegacy` override whose only purpose was to refuse `getTransaction`.
+  That override went too, along with four now-unreachable modules under
+  `src/core/shared/` (`typeInfo`, `transaction`, `enhancements`,
+  `enhancementImpl`) and the internal `getTransaction` re-export from
+  `src/core/shared/index.ts`. None of the four was exported from the package,
+  so no import path outside these deletions changes.
+
+  Three were a second door to a handler that is already typed, and the same
+  request is still one call away:
+
+  ```typescript
+  // utils.getBdef('Z_I_MYENTITY', 'active')
+  client.getBehaviorDefinition().read({ name: 'Z_I_MYENTITY' }, 'active');
+
+  // utils.getEnhancementImpl('enhoxhh', 'zpartner_update_pai')
+  client.getEnhancement().read({
+    enhancementType: 'enhoxhh',
+    enhancementName: 'zpartner_update_pai',
+  });
+
+  // utils.getEnhancementSpot('zspot')  — the removed member fixed the type to 'enhsxsb'
+  client.getEnhancement().readMetadata({
+    enhancementType: 'enhsxsb',
+    enhancementName: 'zspot',
+  });
+  ```
+
+  Those three calls were compiled against this package before being written
+  here; a migration note nobody runs is how the first draft of it got the
+  argument shapes wrong twice.
+
+  What changes for a caller besides the name: these return the handler's state
+  object rather than the response, and each state names the payload differently
+  — `state.readResult` for the behaviour definition, `state.sourceCode` for the
+  enhancement source, `state.metadataResult` for the spot metadata. Errors no
+  longer throw past the caller; they arrive in `state.errors`.
+
+  Two of those three fields still hold `IAdtResponse`, which is the gap
+  `@mcp-abap-adt/interfaces` decision 13 is about, not something this removal
+  introduces.
+
+  `getTypeInfo()` was a fourth of that kind: it tried
+  `/ddic/domains/{n}/source/main`, then `/ddic/dataelements/{n}`, then
+  `/ddic/tabletypes/{n}` and kept whichever answered — three resources
+  `getDomain()`, `getDataElement()` and `getTableType()` each read directly,
+  without guessing which type the name is.
+
+  Two endpoints lose their only route, and are recorded in the `AdtUtils` header
+  so a typed handler can be written if one is wanted:
+  `/repository/informationsystem/objectproperties/values?uri=…` (reached by
+  `getTypeInfo` with a domain uri and by `getTransaction` with a transaction
+  one — the same request about different objects, which is what made two members
+  of it) and
+  `/oo/classes/{n}/source/main/enhancements/elements`.
+
+  Why remove rather than type: the atoms in `@mcp-abap-adt/interfaces` state
+  what a consumer gets, and every member a contract carries is a member each
+  implementation must provide. For these six the open question was never which
+  result to promise — it was why they were in a contract at all. Adding a member
+  when a need appears costs less than carrying six that never had one.
+
+
 ## [16.1.0] - 2026-09-01
 
 Requires `@mcp-abap-adt/interfaces@^26.1.0`.

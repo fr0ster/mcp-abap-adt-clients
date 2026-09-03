@@ -4,7 +4,7 @@
 
 import type {
   IAbapConnection,
-  IAdtResponse,
+  IAdtWireResponse,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
@@ -170,7 +170,7 @@ export function buildCheckRunXmlWithSource(
 /**
  * Parse check run response
  */
-export function parseCheckRunResponse(response: IAdtResponse): {
+export function parseCheckRunResponse(response: IAdtWireResponse): {
   success: boolean;
   status: string;
   message: string;
@@ -347,7 +347,7 @@ export async function runCheckRun(
   reporter: string = 'abapCheckRun',
   sourceCode?: string,
   artifactContentType: string = 'text/plain; charset=utf-8',
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const objectUri = getObjectUri(objectType, objectName);
   const xmlBody = sourceCode
     ? buildCheckRunXmlWithSource(
@@ -387,7 +387,7 @@ export async function runCheckRun(
  * @param version - Version to validate against ('active' or 'inactive')
  * @param reporter - Reporter type for check results
  * @param sessionId - Optional session ID for session-based requests
- * @returns Promise resolving to IAdtResponse with check results
+ * @returns Promise resolving to IAdtWireResponse with check results
  */
 export async function runCheckRunWithSource(
   connection: IAbapConnection,
@@ -397,7 +397,7 @@ export async function runCheckRunWithSource(
   version: CheckRunVersion = 'active',
   reporter: string = 'abapCheckRun',
   artifactContentType: string = 'text/plain; charset=utf-8',
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const objectUri = await getObjectUri(objectType, objectName);
   const xmlBody = buildCheckRunXmlWithSource(
     objectUri,
@@ -453,7 +453,7 @@ export async function waitForCleanCheckRun(
   version: CheckRunVersion,
   sourceCode: string | undefined,
   options?: { attempts?: number; delayMs?: number; logger?: ILogger },
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const attempts = options?.attempts ?? 10;
   const delayMs = options?.delayMs ?? 2000;
   let lastMessages = '';

@@ -9,7 +9,10 @@
  * same server.
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { ACCEPT_TRANSPORT } from '../../constants/contentTypes';
 import {
   encodeSapObjectName,
@@ -29,7 +32,7 @@ export async function updateTransport(
   connection: IAbapConnection,
   transportNumber: string,
   description: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   if (!transportNumber) {
     throw new Error('Transport request number is required');
   }

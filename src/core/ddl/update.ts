@@ -2,7 +2,10 @@
  * View update operations
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -18,7 +21,7 @@ export async function updateDdl(
   ddlSource: string,
   lockHandle: string,
   transportRequest?: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const queryParams = `lockHandle=${encodeURIComponent(lockHandle)}${transportRequest ? `&corrNr=${transportRequest}` : ''}`;
   const url = `/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(ddlName).toLowerCase()}/source/main?${queryParams}`;
 

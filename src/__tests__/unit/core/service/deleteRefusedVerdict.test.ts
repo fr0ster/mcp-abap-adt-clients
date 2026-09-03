@@ -12,7 +12,10 @@
  * and that nothing is deleted after it.
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { AdtServiceBinding } from '../../../../core/service/AdtService';
 import { createLibraryLogger } from '../../../helpers/testLogger';
 
@@ -49,7 +52,7 @@ function recording(verdict: string) {
         statusText: 'OK',
         headers: {},
         data: body,
-      } as IAdtResponse;
+      } as IAdtWireResponse;
     },
   } as unknown as IAbapConnection;
   return { calls, connection };

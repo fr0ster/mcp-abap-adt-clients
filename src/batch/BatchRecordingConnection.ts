@@ -1,14 +1,14 @@
 import type {
   IAbapConnection,
   IAbapRequestOptions,
-  IAdtResponse,
+  IAdtWireResponse,
   IBatchRequestPart,
   IBatchResponsePart,
   IDeferredResponseConnection,
 } from '@mcp-abap-adt/interfaces';
 
 interface IDeferredResponse {
-  resolve: (value: IAdtResponse) => void;
+  resolve: (value: IAdtWireResponse) => void;
   reject: (reason: Error) => void;
 }
 
@@ -48,7 +48,7 @@ export class BatchRecordingConnection
 
   makeAdtRequest<T = unknown, D = unknown>(
     options: IAbapRequestOptions,
-  ): Promise<IAdtResponse<T, D>> {
+  ): Promise<IAdtWireResponse<T, D>> {
     const part: IBatchRequestPart = {
       method: options.method,
       url: options.url,
@@ -62,9 +62,9 @@ export class BatchRecordingConnection
 
     this.parts.push(part);
 
-    const promise = new Promise<IAdtResponse<T, D>>((resolve, reject) => {
+    const promise = new Promise<IAdtWireResponse<T, D>>((resolve, reject) => {
       this.deferred.push({
-        resolve: resolve as (value: IAdtResponse) => void,
+        resolve: resolve as (value: IAdtWireResponse) => void,
         reject,
       });
     });

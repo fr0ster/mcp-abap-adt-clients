@@ -2,7 +2,10 @@
  * Class include files operations (local types, definitions, macros)
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -27,7 +30,7 @@ export async function updateClassLocalTypes(
   lockHandle: string,
   transportRequest?: string,
   sourceContentType?: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   return updateClassInclude(
     connection,
     className,
@@ -59,7 +62,7 @@ export async function updateClassDefinitions(
   lockHandle: string,
   transportRequest?: string,
   sourceContentType?: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   return updateClassInclude(
     connection,
     className,
@@ -92,7 +95,7 @@ export async function updateClassMacros(
   lockHandle: string,
   transportRequest?: string,
   sourceContentType?: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   return updateClassInclude(
     connection,
     className,
@@ -123,7 +126,7 @@ async function updateClassInclude(
   lockHandle: string,
   transportRequest?: string,
   sourceContentType?: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   // Empty source is legitimate: PUTting it is how an include is emptied.
   // Only a missing argument is an error.
   if (includeSource === undefined || includeSource === null) {

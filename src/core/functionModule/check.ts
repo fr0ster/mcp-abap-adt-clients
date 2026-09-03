@@ -5,7 +5,7 @@
 import type {
   IAbapConnection,
   IAdtContentTypes,
-  IAdtResponse,
+  IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_CHECK_MESSAGES,
@@ -76,7 +76,7 @@ export async function checkFunctionModule(
   version: 'active' | 'inactive',
   sourceCode?: string,
   contentTypes?: IAdtContentTypes,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const xmlBody = buildCheckRunXml(
     functionGroupName,
     functionModuleName,

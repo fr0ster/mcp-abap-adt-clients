@@ -7,7 +7,10 @@
  * matching Eclipse ADT behavior.
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_DATA_ELEMENT,
   CT_DATA_ELEMENT,
@@ -24,7 +27,7 @@ import type { ICreateDataElementParams } from './types';
 export async function create(
   connection: IAbapConnection,
   args: ICreateDataElementParams,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/ddic/dataelements${args.transport_request ? `?corrNr=${args.transport_request}` : ''}`;
 
   const username = args.responsible || '';

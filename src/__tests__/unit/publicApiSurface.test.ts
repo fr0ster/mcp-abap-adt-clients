@@ -15,7 +15,11 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import * as rootExports from '../../index';
-import { parseSearchResults, parseTransportTree } from '../../index';
+import {
+  AdtSAPError,
+  parseSearchResults,
+  parseTransportTree,
+} from '../../index';
 
 describe('public API surface', () => {
   it('hands out parseSearchResults from the package root', () => {
@@ -40,6 +44,33 @@ describe('public API surface', () => {
         uri: undefined,
       },
     ]);
+  });
+
+  it('hands out AdtSAPError from the package root', () => {
+    // Every client throws this. A consumer who cannot import it cannot tell a
+    // refusal from any other failure, and `.document` — the answer SAP actually
+    // sent — is unreachable. It shipped that way in the first draft: the class
+    // had `export`, the changelog named it, the tests asserted on it, and
+    // nothing outside this package could see it.
+    expect(typeof AdtSAPError).toBe('function');
+  });
+
+  it('is the class the clients throw, with its fields intact', () => {
+    const raised = new AdtSAPError(
+      'SAP refused the request: locked',
+      '<exc:exception/>',
+      'ExceptionResourceNotFound',
+      'com.sap.adt',
+    );
+
+    // `instanceof` across the entry point is the check that matters: a second
+    // copy reachable by a deep import would satisfy `typeof` and fail every
+    // consumer's `catch`.
+    expect(raised).toBeInstanceOf(Error);
+    expect(raised.name).toBe('AdtSAPError');
+    expect(raised.document).toBe('<exc:exception/>');
+    expect(raised.adtType).toBe('ExceptionResourceNotFound');
+    expect(raised.namespace).toBe('com.sap.adt');
   });
 
   it('hands out parseTransportTree from the package root', () => {
@@ -75,6 +106,9 @@ describe('public API surface', () => {
  * reads only what is marked.
  */
 const RUNTIME_EXPORTS = [
+  // name, so it is part of the surface rather than an internal detail.
+  // Public since 15.0.0: the replacement for the removed `latestTraceId()`.
+  // Thrown by every client since the refusal check; a consumer catches it by
   'AbapDebugger',
   'AdtAbapGitClient',
   'AdtAppendStructure',
@@ -89,9 +123,11 @@ const RUNTIME_EXPORTS = [
   'AdtInclude',
   'AdtMessageClass',
   'AdtMessageClassMessage',
+  'AdtParseError',
   'AdtRuntimeClient',
   'AdtRuntimeClientBatch',
   'AdtRuntimeClientExperimental',
+  'AdtSAPError',
   'AdtScalarFunction',
   'AdtScalarFunctionImplementation',
   'AdtService',
@@ -100,31 +136,31 @@ const RUNTIME_EXPORTS = [
   'ApplicationLog',
   'AtcLog',
   'BatchRecordingConnection',
-  'CT_INCLUDE',
+  'buildDumpIdPrefix',
+  'buildRuntimeDumpsUserQuery',
+  'compareRecordedAt',
+  'createAdtClient',
   'CrossTrace',
+  'CT_INCLUDE',
   'DdicActivation',
   'Debugger',
   'DebuggerSessionClient',
   'FeedRepository',
-  'GatewayErrorLog',
-  'MemorySnapshots',
-  'Profiler',
-  'RuntimeDumps',
-  'St05Trace',
-  'SystemMessages',
-  'buildDumpIdPrefix',
-  'buildRuntimeDumpsUserQuery',
-  // Public since 15.0.0: the replacement for the removed `latestTraceId()`.
-  'compareRecordedAt',
-  'createAdtClient',
   'fetchDiscoveryEndpoints',
+  'GatewayErrorLog',
   'getSystemInformation',
   'isEndpointInDiscovery',
   'isModernAdtSystem',
+  'MemorySnapshots',
   'parseSearchResults',
   'parseTransportTree',
+  'Profiler',
   'resolveBindingVariant',
   'resolveContentTypes',
+  'RuntimeDumps',
+  'St05Trace',
+  'SystemMessages',
+  'TransportSearchConfigurationMissing',
 ];
 
 describe('runtime export surface', () => {

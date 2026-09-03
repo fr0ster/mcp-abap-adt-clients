@@ -5,7 +5,7 @@
 import type {
   HttpError,
   IAbapConnection,
-  IAdtResponse,
+  IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
 import { encodeSapObjectName, safeStringify } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -18,7 +18,7 @@ export async function unlockInterface(
   connection: IAbapConnection,
   interfaceName: string,
   lockHandle: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/oo/interfaces/${encodeSapObjectName(interfaceName)}?_action=UNLOCK&lockHandle=${encodeURIComponent(lockHandle)}`;
 
   try {

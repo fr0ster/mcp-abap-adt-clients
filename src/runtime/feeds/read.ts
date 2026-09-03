@@ -8,7 +8,7 @@
 
 import type {
   IAbapConnection,
-  IAdtResponse,
+  IAdtWireResponse,
   IFeedQueryOptions,
 } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
@@ -21,7 +21,7 @@ import { getTimeout } from '../../utils/timeouts';
  */
 export async function getFeeds(
   connection: IAbapConnection,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/feeds`;
 
   return connection.makeAdtRequest({
@@ -55,7 +55,7 @@ export async function getFeeds(
 export async function getFeedVariants(
   connection: IAbapConnection,
   category: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   if (!category) {
     throw new Error('category is required for /sap/bc/adt/feeds/variants');
   }
@@ -112,7 +112,7 @@ export async function fetchFeed(
   feedUrl: string,
   options?: IFeedQueryOptions,
   userAttribute?: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const url = `${feedUrl}${buildFeedQueryParams(options, userAttribute)}`;
 
   return connection.makeAdtRequest({

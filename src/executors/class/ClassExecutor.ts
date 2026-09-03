@@ -1,6 +1,6 @@
 import type {
   IAbapConnection,
-  IAdtResponse,
+  IAdtWireResponse,
   IClassExecuteWithProfilerOptions,
   IClassExecuteWithProfilingOptions,
   IClassExecuteWithProfilingResult,
@@ -41,7 +41,7 @@ export class ClassExecutor implements IClassExecutor {
   scheduleTrace = (options?: IProfilerTraceParameters): Promise<string> =>
     this.scheduling.scheduleTrace(options);
 
-  async run(target: IClassExecutionTarget): Promise<IAdtResponse> {
+  async run(target: IClassExecutionTarget): Promise<IAdtWireResponse> {
     if (!target.className) {
       throw new Error('Class name is required');
     }
@@ -51,7 +51,7 @@ export class ClassExecutor implements IClassExecutor {
   async runWithProfiler(
     target: IClassExecutionTarget,
     options: IClassExecuteWithProfilerOptions,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     if (!target.className) {
       throw new Error('Class name is required');
     }
@@ -99,7 +99,7 @@ export class ClassExecutor implements IClassExecutor {
   private async runWithProfilerId(
     className: string,
     profilerId: string,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     const encodedProfilerId = encodeURIComponent(profilerId);
     return this.connection.makeAdtRequest({
       url: `/sap/bc/adt/oo/classrun/${className}?profilerId=${encodedProfilerId}`,

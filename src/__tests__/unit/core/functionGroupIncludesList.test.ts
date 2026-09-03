@@ -1,6 +1,7 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AdtUtils } from '../../../core/shared/AdtUtils';
 import { listFunctionGroupIncludes } from '../../../core/shared/functionGroupIncludesList';
+import { orThrow } from '../../../utils/adtResponse';
 
 // Root catalog exposing the FUGR/I (includes) type node, alongside FUGR/FF so the
 // wrapper proves it picks the includes node, not the modules node.
@@ -87,6 +88,8 @@ describe('AdtUtils.listFunctionGroupIncludes', () => {
       error: jest.fn(),
     };
     const utils = new AdtUtils({ makeAdtRequest } as any, logger as any);
-    expect(await utils.listFunctionGroupIncludes('zfugr')).toEqual(['LZTOP']);
+    expect(await orThrow(utils.listFunctionGroupIncludes('zfugr'))).toEqual([
+      'LZTOP',
+    ]);
   });
 });

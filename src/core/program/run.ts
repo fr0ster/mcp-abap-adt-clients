@@ -2,7 +2,10 @@
  * Program run operations - execute ABAP executable programs
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { ACCEPT_SOURCE } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -16,7 +19,7 @@ export async function runProgram(
   connection: IAbapConnection,
   programName: string,
   _sessionId?: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   if (!programName?.trim()) {
     throw new Error('programName is required');
   }

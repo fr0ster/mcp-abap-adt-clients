@@ -6,7 +6,7 @@
 
 import type {
   IAbapConnection,
-  IAdtResponse,
+  IAdtWireResponse,
   IFeedQueryOptions,
   ILogger,
   ISystemMessages,
@@ -20,11 +20,11 @@ export class SystemMessages implements ISystemMessages {
     private readonly logger: ILogger,
   ) {}
 
-  async list(options?: IFeedQueryOptions): Promise<IAdtResponse> {
+  async list(options?: IFeedQueryOptions): Promise<IAdtWireResponse> {
     return listSystemMessages(this.connection, options);
   }
 
-  async getById(messageId: string): Promise<IAdtResponse> {
+  async getById(messageId: string): Promise<IAdtWireResponse> {
     return getSystemMessage(this.connection, messageId);
   }
 }

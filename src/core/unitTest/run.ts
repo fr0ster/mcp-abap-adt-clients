@@ -2,7 +2,10 @@
  * ABAP Unit test run operations
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_JUNIT_RESULT,
   ACCEPT_UNIT_TEST_RESULT,
@@ -28,7 +31,7 @@ export async function startClassUnitTestRun(
   connection: IAbapConnection,
   tests: IClassUnitTestDefinition[],
   options?: IClassUnitTestRunOptions,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   if (!tests.length) {
     throw new Error('At least one test definition is required');
   }
@@ -86,7 +89,7 @@ export async function startClassUnitTestRunByObject(
   connection: IAbapConnection,
   className: string,
   options?: IClassUnitTestRunOptions,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   if (!className) {
     throw new Error('className is required');
   }
@@ -133,7 +136,7 @@ export async function getClassUnitTestStatus(
   connection: IAbapConnection,
   runId: string,
   withLongPolling: boolean = true,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   if (!runId) {
     throw new Error('runId is required');
   }
@@ -152,7 +155,7 @@ export async function getClassUnitTestResult(
   connection: IAbapConnection,
   runId: string,
   options?: { withNavigationUris?: boolean; format?: 'abapunit' | 'junit' },
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   if (!runId) {
     throw new Error('runId is required');
   }

@@ -2,7 +2,10 @@
  * FunctionInclude (FUGR/I) activation operations
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { activateObjectInSession } from '../../utils/activationUtils';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 
@@ -13,7 +16,7 @@ export async function activateFunctionInclude(
   connection: IAbapConnection,
   groupName: string,
   includeName: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const groupLower = encodeSapObjectName(groupName).toLowerCase();
   const encodedInclude = encodeSapObjectName(includeName.toUpperCase());
   const objectUri = `/sap/bc/adt/functions/groups/${groupLower}/includes/${encodedInclude}`;

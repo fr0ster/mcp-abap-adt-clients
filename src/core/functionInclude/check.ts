@@ -6,7 +6,10 @@
  * the server re-reads the persisted version by URI.
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_CHECK_MESSAGES,
   CT_CHECK_OBJECTS,
@@ -25,7 +28,7 @@ export async function checkFunctionInclude(
   version: 'active' | 'inactive',
   xmlContent?: string,
   sourceContentType?: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   if (!groupName) {
     throw new Error('Function group name is required');
   }

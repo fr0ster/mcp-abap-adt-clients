@@ -5,7 +5,7 @@
 import type {
   HttpError,
   IAbapConnection,
-  IAdtResponse,
+  IAdtWireResponse,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
@@ -34,7 +34,7 @@ export async function update(
   connection: IAbapConnection,
   args: IUpdateEnhancementParams,
   logger?: ILogger,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   if (!args.enhancement_name) {
     throw new Error('enhancement_name is required');
   }
@@ -133,7 +133,7 @@ export async function updateEnhancement(
   lockHandle: string,
   transportRequest?: string,
   logger?: ILogger,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   return update(
     connection,
     {

@@ -2,7 +2,7 @@ import type {
   HttpError,
   IAbapConnection,
   IAbapRequestOptions,
-  IAdtResponse,
+  IAdtWireResponse,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 
@@ -139,7 +139,7 @@ export function wrapConnectionAcceptNegotiation(
   connection.makeAdtRequest = async function makeAdtRequestWithNegotiation<
     T = unknown,
     D = unknown,
-  >(request: IAbapRequestOptions): Promise<IAdtResponse<T, D>> {
+  >(request: IAbapRequestOptions): Promise<IAdtWireResponse<T, D>> {
     return makeAdtRequestWithAcceptNegotiation(
       connection,
       request,
@@ -155,7 +155,7 @@ export async function makeAdtRequestWithAcceptNegotiation<
   connection: IAbapConnection,
   request: IAbapRequestOptions,
   options?: IAcceptNegotiationOptions,
-): Promise<IAdtResponse<T, D>> {
+): Promise<IAdtWireResponse<T, D>> {
   const enableCorrection =
     options?.enableAcceptCorrection ?? getAcceptCorrectionEnabled();
   const logger = options?.logger;

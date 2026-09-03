@@ -26,24 +26,78 @@
  * // Group activation
  * await utils.activateObjectsGroup([{ type: 'DOMA', name: 'ZMY_DOMAIN' }]);
  * ```
+ *
+ * ## Six members removed, and what went with them
+ *
+ * `getTypeInfo`, `getTransaction`, `getBdef`, `getEnhancements`,
+ * `getEnhancementSpot` and `getEnhancementImpl` had no callers. Not "few" —
+ * every occurrence of those names in this repository and its siblings was their
+ * own `@example` block, plus one legacy override that existed only to refuse
+ * `getTransaction`.
+ *
+ * Three were a second door to a handler that is already typed, so nothing was
+ * lost by closing them:
+ *
+ * | removed | same request, still available |
+ * |---|---|
+ * | `getBdef` | `AdtClient.getBehaviorDefinition().read()` |
+ * | `getEnhancementImpl` | `AdtClient.getEnhancement().read()` |
+ * | `getEnhancementSpot` | `AdtClient.getEnhancement().readMetadata()` |
+ *
+ * `getTypeInfo` was a fourth of that kind wearing a disguise: it asked
+ * `/ddic/domains/{n}/source/main`, then `/ddic/dataelements/{n}`, then
+ * `/ddic/tabletypes/{n}`, keeping whichever answered — three resources that
+ * `getDomain()`, `getDataElement()` and `getTableType()` each read directly and
+ * without guessing. Only its last resort was its own.
+ *
+ * That last resort is the one capability actually removed, and it is one
+ * endpoint rather than two:
+ *
+ * ```
+ * GET /sap/bc/adt/repository/informationsystem/objectproperties/values?uri={objectUri}
+ * ```
+ *
+ * `getTypeInfo` reached it with a domain's uri and `getTransaction` with
+ * `/sap/bc/adt/transactions/{name}` — the same request about different objects,
+ * which is what made two members of it. Plus one endpoint nothing else reaches:
+ *
+ * ```
+ * GET /sap/bc/adt/oo/classes/{name}/source/main/enhancements/elements
+ * ```
+ *
+ * Recorded here, and not only in the history of a deleted file, so a typed
+ * handler can be written when somebody wants one. A generic member kept in case
+ * someone needs it is a member the contract must describe and every implementer
+ * must provide; adding one when the need appears is cheaper than carrying six
+ * that never had one.
  */
 
 import type {
   IAbapConnection,
+  IAdtDataPreview,
+  IAdtDiscovery,
+  IAdtGroupLifecycle,
+  IAdtInformationSystem,
+  IAdtObjectAccess,
+  IAdtPackageBrowsing,
+  IAdtRepositoryStructure,
   IAdtResponse,
+  IAdtResult,
   IAdtSearchable,
+  IAdtWireResponse,
   ILogger,
+  INamedItem,
+  IRepositoryNodeContents,
   ISearchResult,
 } from '@mcp-abap-adt/interfaces';
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
+import { throwIfSapError } from '../../utils/adtErrors';
+import { answering, answeringWith } from '../../utils/adtResponse';
 import { encodeSapObjectName } from '../../utils/internalUtils';
+import { withRefusalDetection } from '../../utils/refusalAware';
 import { getTimeout } from '../../utils/timeouts';
-import { readSource as readBehaviorDefinitionSource } from '../behaviorDefinition/read';
-import { getEnhancementMetadata } from '../enhancement/read';
-import { getAllTypes as getAllTypesUtil } from './allTypes';
+import { getAllTypes as getAllTypesUtil, parseNamedItems } from './allTypes';
 import { getDiscovery as getDiscoveryUtil } from './discovery';
-import { getEnhancementImpl as getEnhancementImplUtil } from './enhancementImpl';
-import { getEnhancements } from './enhancements';
 import { listFunctionGroupIncludes } from './functionGroupIncludesList';
 import { listFunctionModules } from './functionModulesList';
 import { getInactiveObjects } from './getInactiveObjects';
@@ -51,7 +105,10 @@ import { activateObjectsGroup } from './groupActivation';
 import { checkDeletionGroup, deleteObjectsGroup } from './groupDeletion';
 import { getInclude as getIncludeUtil } from './include';
 import { getIncludesList } from './includesList';
-import { fetchNodeStructure as fetchNodeStructureUtil } from './nodeStructure';
+import {
+  fetchNodeStructure as fetchNodeStructureUtil,
+  toNodeContents,
+} from './nodeStructure';
 import { getObjectStructure as getObjectStructureUtil } from './objectStructure';
 import { getPackageContentsList } from './packageContentsList';
 import { getPackageHierarchy } from './packageHierarchy';
@@ -59,8 +116,6 @@ import { getPackageHierarchy } from './packageHierarchy';
 import { searchObjects, searchObjectsTyped } from './search';
 import { getSqlQuery } from './sqlQuery';
 import { getTableContents } from './tableContents';
-import { getTransaction } from './transaction';
-import { getTypeInfo as getTypeInfoUtil } from './typeInfo';
 import { getVirtualFoldersContents } from './virtualFolders';
 import {
   getWhereUsed,
@@ -111,14 +166,48 @@ import type {
   IWhereUsedListResult,
 } from './types';
 
+/**
+ * Declared against every atom, not only `IAdtSearchable`.
+ *
+ * `implements` here is what makes the compiler check this class against the
+ * contract `getUtils()` hands out — the same reason decision 10 gives for a
+ * factory returning a contract. Without it the class satisfies itself, and the
+ * factory's declared type would be an assertion nobody verifies.
+ *
+ * **`IAdtSearchable` is no longer among them, and the compiler is why.** That
+ * atom declares `search(criteria): Promise<ISearchResult[]>`; the information
+ * system declares the same name answering `IAdtResponse`. One class cannot
+ * satisfy both, and the disagreement is not cosmetic — it is the same member
+ * described before and after this contract existed. `IAdtSearchable` migrates
+ * with the rest of `@mcp-abap-adt/interfaces` (decision 19: member by member),
+ * and until it does, the information system is the one this class answers to,
+ * because that is what `getUtils()` hands out.
+ *
+ * The three members not in any atom — `searchObjects`, `getWhereUsed`,
+ * `getPackageContents` — stay on the class and are simply not in what
+ * `getUtils()` promises. Each has a contract-shaped sibling over the same
+ * endpoint (`search`, `getWhereUsedList`, `getPackageContentsList`), which is
+ * decision 16: one endpoint is one member, and a caller who needs the raw
+ * document passes a parser to the one that has a contract.
+ */
 export class AdtUtils
-  implements IAdtSearchable<ISearchObjectsParams, ISearchResult>
+  implements
+    IAdtInformationSystem,
+    IAdtRepositoryStructure,
+    IAdtPackageBrowsing,
+    IAdtGroupLifecycle,
+    IAdtDataPreview,
+    IAdtDiscovery,
+    IAdtObjectAccess
 {
   protected connection: IAbapConnection;
   private logger: ILogger;
 
   constructor(connection: IAbapConnection, logger: ILogger) {
-    this.connection = connection;
+    // Wrapped once, here, where a connection enters the library. A refusal SAP
+    // sends with a 2xx would otherwise be stored as a result and reported as
+    // success — see src/utils/refusalAware.ts for what that measured.
+    this.connection = withRefusalDetection(connection);
     this.logger = logger;
   }
 
@@ -128,20 +217,61 @@ export class AdtUtils
    * @param params - Search parameters
    * @returns Search results
    */
-  async searchObjects(params: ISearchObjectsParams): Promise<IAdtResponse> {
-    return searchObjects(this.connection, params);
+  async searchObjects(
+    params: ISearchObjectsParams,
+  ): Promise<IAdtResponse<IAdtResult<IAdtWireResponse>>> {
+    return answering(() => searchObjects(this.connection, params));
   }
 
   /**
    * Locate objects by name pattern — the IAdtSearchable capability.
    *
-   * `searchObjects` above returns the raw response and stays; this returns the
-   * hits themselves. Both are kept because they answer different questions:
-   * one for a caller that needs status and headers, one for a caller that
-   * wants the objects.
+   * One endpoint, one member. `searchObjects` above issues the same request and
+   * hands back the envelope; it survives here for callers on the old signature
+   * and is not in `IAdtInformationSystem`, because a second member over one
+   * resource makes "how far the answer was parsed" a property of which method
+   * was called rather than of the contract.
+   *
+   * A caller who needs the document rather than the hits passes a parser. That
+   * is the same request and the same work — only the reading is theirs, which is
+   * what a strategy is for.
    */
-  async search(criteria: ISearchObjectsParams): Promise<ISearchResult[]> {
-    return searchObjectsTyped(this.connection, criteria);
+  async search(
+    criteria: ISearchObjectsParams,
+  ): Promise<IAdtResponse<IAdtResult<ISearchResult[]>>>;
+  async search<T>(
+    criteria: ISearchObjectsParams,
+    parse: (data: unknown) => T,
+  ): Promise<IAdtResponse<IAdtResult<T>>>;
+  async search<T>(
+    criteria: ISearchObjectsParams,
+    parse?: (data: unknown) => T,
+  ): Promise<IAdtResponse<IAdtResult<ISearchResult[] | T>>> {
+    if (!parse) {
+      return answering<ISearchResult[] | T>(() =>
+        searchObjectsTyped(this.connection, criteria),
+      );
+    }
+
+    return answeringWith<unknown, ISearchResult[] | T>(
+      async () => {
+        const response = await searchObjects(this.connection, criteria);
+
+        // A strategy exists so the caller can control how much of a large answer
+        // they take. It is not a place a refusal can hide: a parser looking for
+        // hits in an exception document finds none and reports emptiness. So the
+        // refusal is recognised before the parser runs, and comes back as the
+        // failure half rather than flying past.
+        throwIfSapError(String(response.data ?? ''));
+
+        // Nothing here forms a second opinion about the document — the raw body
+        // goes over untouched rather than parsed and re-emitted.
+        return response.data;
+      },
+      // Theirs, and outside the classification: a bug in this parser is not a
+      // connection failure, and must not be reported as one.
+      (data) => parse(data),
+    );
   }
 
   /**
@@ -152,8 +282,8 @@ export class AdtUtils
    */
   async getVirtualFoldersContents(
     params: IGetVirtualFoldersContentsParams,
-  ): Promise<IAdtResponse> {
-    return getVirtualFoldersContents(this.connection, params);
+  ): Promise<IAdtResponse<IAdtResult<IAdtWireResponse>>> {
+    return answering(() => getVirtualFoldersContents(this.connection, params));
   }
 
   /**
@@ -190,8 +320,8 @@ export class AdtUtils
    */
   async getWhereUsedScope(
     params: IGetWhereUsedScopeParams,
-  ): Promise<IAdtResponse> {
-    return getWhereUsedScope(this.connection, params);
+  ): Promise<IAdtResponse<IAdtResult<IAdtWireResponse>>> {
+    return answering(() => getWhereUsedScope(this.connection, params));
   }
 
   /**
@@ -269,8 +399,10 @@ export class AdtUtils
    *   searchInAllTypes: ['CLAS/OC', 'INTF/OI']
    * });
    */
-  async getWhereUsed(params: IGetWhereUsedParams): Promise<IAdtResponse> {
-    return getWhereUsed(this.connection, params);
+  async getWhereUsed(
+    params: IGetWhereUsedParams,
+  ): Promise<IAdtResponse<IAdtResult<IAdtWireResponse>>> {
+    return answering(() => getWhereUsed(this.connection, params));
   }
 
   /**
@@ -298,8 +430,8 @@ export class AdtUtils
    */
   async getWhereUsedList(
     params: IGetWhereUsedListParams,
-  ): Promise<IWhereUsedListResult> {
-    return getWhereUsedList(this.connection, params);
+  ): Promise<IAdtResponse<IAdtResult<IWhereUsedListResult>>> {
+    return answering(() => getWhereUsedList(this.connection, params));
   }
 
   /**
@@ -310,8 +442,8 @@ export class AdtUtils
    */
   async getInactiveObjects(options?: {
     includeRawXml?: boolean;
-  }): Promise<IInactiveObjectsResponse> {
-    return getInactiveObjects(this.connection, options);
+  }): Promise<IAdtResponse<IAdtResult<IInactiveObjectsResponse>>> {
+    return answering(() => getInactiveObjects(this.connection, options));
   }
 
   /**
@@ -324,8 +456,10 @@ export class AdtUtils
   async activateObjectsGroup(
     objects: IObjectReference[],
     preauditRequested: boolean = false,
-  ): Promise<IAdtResponse> {
-    return activateObjectsGroup(this.connection, objects, preauditRequested);
+  ): Promise<IAdtResponse<IAdtResult<IAdtWireResponse>>> {
+    return answering(() =>
+      activateObjectsGroup(this.connection, objects, preauditRequested),
+    );
   }
 
   /**
@@ -334,8 +468,10 @@ export class AdtUtils
    * @param objects - Array of object references to check
    * @returns Check result
    */
-  async checkDeletionGroup(objects: IObjectReference[]): Promise<IAdtResponse> {
-    return checkDeletionGroup(this.connection, objects);
+  async checkDeletionGroup(
+    objects: IObjectReference[],
+  ): Promise<IAdtResponse<IAdtResult<IAdtWireResponse>>> {
+    return answering(() => checkDeletionGroup(this.connection, objects));
   }
 
   /**
@@ -348,8 +484,10 @@ export class AdtUtils
   async deleteObjectsGroup(
     objects: IObjectReference[],
     transportRequest?: string,
-  ): Promise<IAdtResponse> {
-    return deleteObjectsGroup(this.connection, objects, transportRequest);
+  ): Promise<IAdtResponse<IAdtResult<IAdtWireResponse>>> {
+    return answering(() =>
+      deleteObjectsGroup(this.connection, objects, transportRequest),
+    );
   }
 
   /**
@@ -368,33 +506,36 @@ export class AdtUtils
     objectName: string,
     functionGroup?: string,
     options?: IReadOptions,
-  ): Promise<IAdtResponse> {
-    let uri = getObjectMetadataUri(objectType, objectName, functionGroup);
-    const params = [];
-    if (options?.version) {
-      params.push(`version=${options.version}`);
-    }
-    if (options?.withLongPolling) {
-      params.push('withLongPolling=true');
-    }
-    if (params.length > 0) {
-      uri += `?${params.join('&')}`;
-    }
-    const acceptHeader = options?.accept ?? getMetadataAcceptHeader(objectType);
-    return makeAdtRequestWithAcceptNegotiation(
-      this.connection,
-      {
-        url: uri,
-        method: 'GET',
-        timeout: getTimeout('default'),
-        headers: {
-          Accept: acceptHeader,
+  ): Promise<IAdtResponse<IAdtResult<IAdtWireResponse>>> {
+    return answering(async () => {
+      let uri = getObjectMetadataUri(objectType, objectName, functionGroup);
+      const params = [];
+      if (options?.version) {
+        params.push(`version=${options.version}`);
+      }
+      if (options?.withLongPolling) {
+        params.push('withLongPolling=true');
+      }
+      if (params.length > 0) {
+        uri += `?${params.join('&')}`;
+      }
+      const acceptHeader =
+        options?.accept ?? getMetadataAcceptHeader(objectType);
+      return makeAdtRequestWithAcceptNegotiation(
+        this.connection,
+        {
+          url: uri,
+          method: 'GET',
+          timeout: getTimeout('default'),
+          headers: {
+            Accept: acceptHeader,
+          },
         },
-      },
-      {
-        logger: this.logger,
-      },
-    );
+        {
+          logger: this.logger,
+        },
+      );
+    });
   }
 
   /**
@@ -416,39 +557,41 @@ export class AdtUtils
     functionGroup?: string,
     version?: 'active' | 'inactive',
     options?: IReadOptions,
-  ): Promise<IAdtResponse> {
-    if (!supportsSourceCode(objectType)) {
-      throw new Error(
-        `Object type ${objectType} does not support source code reading`,
+  ): Promise<IAdtResponse<IAdtResult<IAdtWireResponse>>> {
+    return answering(async () => {
+      if (!supportsSourceCode(objectType)) {
+        throw new Error(
+          `Object type ${objectType} does not support source code reading`,
+        );
+      }
+
+      let uri = getObjectSourceUri(
+        objectType,
+        objectName,
+        functionGroup,
+        version,
       );
-    }
+      if (options?.withLongPolling) {
+        const separator = uri.includes('?') ? '&' : '?';
+        uri += `${separator}withLongPolling=true`;
+      }
 
-    let uri = getObjectSourceUri(
-      objectType,
-      objectName,
-      functionGroup,
-      version,
-    );
-    if (options?.withLongPolling) {
-      const separator = uri.includes('?') ? '&' : '?';
-      uri += `${separator}withLongPolling=true`;
-    }
-
-    const acceptHeader = options?.accept ?? 'text/plain';
-    return makeAdtRequestWithAcceptNegotiation(
-      this.connection,
-      {
-        url: uri,
-        method: 'GET',
-        timeout: getTimeout('default'),
-        headers: {
-          Accept: acceptHeader,
+      const acceptHeader = options?.accept ?? 'text/plain';
+      return makeAdtRequestWithAcceptNegotiation(
+        this.connection,
+        {
+          url: uri,
+          method: 'GET',
+          timeout: getTimeout('default'),
+          headers: {
+            Accept: acceptHeader,
+          },
         },
-      },
-      {
-        logger: this.logger,
-      },
-    );
+        {
+          logger: this.logger,
+        },
+      );
+    });
   }
 
   /**
@@ -486,8 +629,10 @@ export class AdtUtils
    * @param params - SQL query parameters
    * @returns Query result
    */
-  async getSqlQuery(params: IGetSqlQueryParams): Promise<IAdtResponse> {
-    return getSqlQuery(this.connection, params);
+  async getSqlQuery(
+    params: IGetSqlQueryParams,
+  ): Promise<IAdtResponse<IAdtResult<IAdtWireResponse>>> {
+    return answering(() => getSqlQuery(this.connection, params));
   }
 
   /**
@@ -499,8 +644,8 @@ export class AdtUtils
    */
   async getTableContents(
     params: IGetTableContentsParams,
-  ): Promise<IAdtResponse> {
-    return getTableContents(this.connection, params);
+  ): Promise<IAdtResponse<IAdtResult<IAdtWireResponse>>> {
+    return answering(() => getTableContents(this.connection, params));
   }
 
   /**
@@ -509,55 +654,10 @@ export class AdtUtils
    * @param params - Optional request/timeout options
    * @returns Axios response with discovery XML
    */
-  async discovery(params: IGetDiscoveryParams = {}): Promise<IAdtResponse> {
-    return getDiscoveryUtil(this.connection, params);
-  }
-
-  /**
-   * Get transaction properties (metadata) for ABAP transaction
-   *
-   * Retrieves transaction information using ADT object properties endpoint:
-   * - Transaction name
-   * - Description
-   * - Package (if applicable)
-   * - Transaction type
-   *
-   * @param transactionName - Transaction code (e.g., 'SE80', 'SE11', 'SM30')
-   * @returns Axios response with XML containing transaction properties
-   *          Response format: opr:objectProperties with opr:object containing
-   *          name, text (description), package, type
-   *
-   * @example
-   * ```typescript
-   * const response = await utils.getTransaction('SE80');
-   * // Response contains XML with transaction properties
-   * ```
-   */
-  async getTransaction(transactionName: string): Promise<IAdtResponse> {
-    return getTransaction(this.connection, transactionName);
-  }
-
-  /**
-   * Get behavior definition source code (BDEF)
-   *
-   * Convenience wrapper for reading behavior definition source code.
-   * Uses the same endpoint as `AdtClient.getBehaviorDefinition().read()`.
-   *
-   * @param bdefName - Behavior definition name (e.g., 'Z_I_MYENTITY')
-   * @param version - Version to read: 'active' or 'inactive' (default: 'active')
-   * @returns Axios response with source code (plain text)
-   *
-   * @example
-   * ```typescript
-   * const response = await utils.getBdef('Z_I_MYENTITY');
-   * const sourceCode = response.data; // BDEF source code
-   * ```
-   */
-  async getBdef(
-    bdefName: string,
-    version: 'active' | 'inactive' = 'active',
-  ): Promise<IAdtResponse> {
-    return readBehaviorDefinitionSource(this.connection, bdefName, version);
+  async discovery(
+    params: IGetDiscoveryParams = {},
+  ): Promise<IAdtResponse<IAdtResult<IAdtWireResponse>>> {
+    return answering(() => getDiscoveryUtil(this.connection, params));
   }
 
   /**
@@ -581,44 +681,17 @@ export class AdtUtils
     parentName: string,
     nodeId?: string,
     withShortDescriptions: boolean = true,
-  ): Promise<IAdtResponse> {
-    return fetchNodeStructureUtil(
-      this.connection,
-      parentType,
-      parentName,
-      nodeId,
-      withShortDescriptions,
-    );
-  }
-
-  /**
-   * Get enhancement implementations for ABAP object
-   *
-   * Retrieves enhancement implementations for programs, includes, or classes.
-   *
-   * @param objectName - Object name (program, include, or class)
-   * @param objectType - Object type: 'program' | 'include' | 'class'
-   * @param context - Optional program context for includes (required when objectType is 'include')
-   * @returns Axios response with XML containing enhancement implementations
-   *
-   * @example
-   * ```typescript
-   * // For a program
-   * const response = await utils.getEnhancements('ZMY_PROGRAM', 'program');
-   *
-   * // For an include
-   * const response = await utils.getEnhancements('ZMY_INCLUDE', 'include', 'ZMY_PROGRAM');
-   *
-   * // For a class
-   * const response = await utils.getEnhancements('ZMY_CLASS', 'class');
-   * ```
-   */
-  async getEnhancements(
-    objectName: string,
-    objectType: 'program' | 'include' | 'class',
-    context?: string,
-  ): Promise<IAdtResponse> {
-    return getEnhancements(this.connection, objectName, objectType, context);
+  ): Promise<IAdtResponse<IAdtResult<IRepositoryNodeContents>>> {
+    return answering(async () => {
+      const response = await fetchNodeStructureUtil(
+        this.connection,
+        parentType,
+        parentName,
+        nodeId,
+        withShortDescriptions,
+      );
+      return toNodeContents(String(response.data ?? ''), this.logger);
+    });
   }
 
   /**
@@ -641,8 +714,10 @@ export class AdtUtils
     objectName: string,
     objectType: 'PROG/P' | 'PROG/I' | 'FUGR' | 'CLAS/OC',
     timeout: number = 30000,
-  ): Promise<string[]> {
-    return getIncludesList(this.connection, objectName, objectType, timeout);
+  ): Promise<IAdtResponse<IAdtResult<string[]>>> {
+    return answering(() =>
+      getIncludesList(this.connection, objectName, objectType, timeout),
+    );
   }
 
   /**
@@ -652,8 +727,12 @@ export class AdtUtils
    * const fms = await utils.listFunctionModules('ZMY_FUGR');
    * // Returns: ['Z_MY_FM1', 'Z_MY_FM2']
    */
-  async listFunctionModules(functionGroupName: string): Promise<string[]> {
-    return listFunctionModules(this.connection, functionGroupName);
+  async listFunctionModules(
+    functionGroupName: string,
+  ): Promise<IAdtResponse<IAdtResult<string[]>>> {
+    return answering(() =>
+      listFunctionModules(this.connection, functionGroupName),
+    );
   }
 
   /**
@@ -669,8 +748,10 @@ export class AdtUtils
    */
   async listFunctionGroupIncludes(
     functionGroupName: string,
-  ): Promise<string[]> {
-    return listFunctionGroupIncludes(this.connection, functionGroupName);
+  ): Promise<IAdtResponse<IAdtResult<string[]>>> {
+    return answering(() =>
+      listFunctionGroupIncludes(this.connection, functionGroupName),
+    );
   }
 
   /**
@@ -688,12 +769,16 @@ export class AdtUtils
    * // Response contains XML with objects in the package
    * ```
    */
-  async getPackageContents(packageName: string): Promise<IAdtResponse> {
-    return fetchNodeStructureUtil(
-      this.connection,
-      'DEVC/K',
-      packageName.toUpperCase(),
-    );
+  async getPackageContents(
+    packageName: string,
+  ): Promise<IAdtResponse<IAdtResult<IAdtWireResponse>>> {
+    return answering(async () => {
+      return fetchNodeStructureUtil(
+        this.connection,
+        'DEVC/K',
+        packageName.toUpperCase(),
+      );
+    });
   }
 
   /**
@@ -720,13 +805,15 @@ export class AdtUtils
   async getPackageContentsList(
     packageName: string,
     options?: IGetPackageContentsListOptions,
-  ): Promise<IPackageContentItem[]> {
-    return getPackageContentsList(
-      this.connection,
-      packageName,
-      options,
-      this.logger,
-    );
+  ): Promise<IAdtResponse<IAdtResult<IPackageContentItem[]>>> {
+    return answering(async () => {
+      return getPackageContentsList(
+        this.connection,
+        packageName,
+        options,
+        this.logger,
+      );
+    });
   }
 
   /**
@@ -751,13 +838,15 @@ export class AdtUtils
   async getPackageHierarchy(
     packageName: string,
     options?: IGetPackageHierarchyOptions,
-  ): Promise<IPackageHierarchyNode> {
-    return getPackageHierarchy(
-      this.connection,
-      packageName,
-      options,
-      this.logger,
-    );
+  ): Promise<IAdtResponse<IAdtResult<IPackageHierarchyNode>>> {
+    return answering(async () => {
+      return getPackageHierarchy(
+        this.connection,
+        packageName,
+        options,
+        this.logger,
+      );
+    });
   }
 
   /**
@@ -777,8 +866,10 @@ export class AdtUtils
   async getObjectStructure(
     objectType: string,
     objectName: string,
-  ): Promise<IAdtResponse> {
-    return getObjectStructureUtil(this.connection, objectType, objectName);
+  ): Promise<IAdtResponse<IAdtResult<IAdtWireResponse>>> {
+    return answering(() =>
+      getObjectStructureUtil(this.connection, objectType, objectName),
+    );
   }
 
   /**
@@ -795,75 +886,10 @@ export class AdtUtils
    * const sourceCode = response.data; // Include source code
    * ```
    */
-  async getInclude(includeName: string): Promise<IAdtResponse> {
-    return getIncludeUtil(this.connection, includeName);
-  }
-
-  /**
-   * Get type information with fallback chain
-   *
-   * Tries multiple endpoints in order: domain, data element, table type, object properties.
-   *
-   * @param typeName - Type name to look up
-   * @returns Axios response with type information (XML)
-   *
-   * @example
-   * ```typescript
-   * const response = await utils.getTypeInfo('ZMY_TYPE');
-   * ```
-   */
-  async getTypeInfo(typeName: string): Promise<IAdtResponse> {
-    return getTypeInfoUtil(this.connection, typeName);
-  }
-
-  /**
-   * Get enhancement implementation source code
-   *
-   * Uses different URL format: /sap/bc/adt/enhancements/{spot}/{name}/source/main
-   * where spot is the enhancement spot name (not type).
-   *
-   * @param enhancementSpot - Enhancement spot name (e.g., 'enhoxhh')
-   * @param enhancementName - Enhancement implementation name
-   * @returns Axios response with XML containing enhancement source code
-   *
-   * @example
-   * ```typescript
-   * const response = await utils.getEnhancementImpl('enhoxhh', 'zpartner_update_pai');
-   * ```
-   */
-  async getEnhancementImpl(
-    enhancementSpot: string,
-    enhancementName: string,
-  ): Promise<IAdtResponse> {
-    return getEnhancementImplUtil(
-      this.connection,
-      enhancementSpot,
-      enhancementName,
-    );
-  }
-
-  /**
-   * Get enhancement spot metadata
-   *
-   * Convenience wrapper for reading enhancement spot metadata.
-   * Uses type 'enhsxsb' (BAdI Enhancement Spot).
-   *
-   * @param enhancementSpot - Enhancement spot name
-   * @returns Axios response with XML containing enhancement spot metadata
-   *
-   * @example
-   * ```typescript
-   * const response = await utils.getEnhancementSpot('enhoxhh');
-   * ```
-   */
-  async getEnhancementSpot(enhancementSpot: string): Promise<IAdtResponse> {
-    return getEnhancementMetadata(
-      this.connection,
-      'enhsxsb',
-      enhancementSpot,
-      undefined,
-      this.logger,
-    );
+  async getInclude(
+    includeName: string,
+  ): Promise<IAdtResponse<IAdtResult<IAdtWireResponse>>> {
+    return answering(() => getIncludeUtil(this.connection, includeName));
   }
 
   /**
@@ -886,8 +912,16 @@ export class AdtUtils
     maxItemCount: number = 999,
     name: string = '*',
     data: string = 'usedByProvider',
-  ): Promise<IAdtResponse> {
-    return getAllTypesUtil(this.connection, maxItemCount, name, data);
+  ): Promise<IAdtResponse<IAdtResult<INamedItem[]>>> {
+    return answering(async () => {
+      const response = await getAllTypesUtil(
+        this.connection,
+        maxItemCount,
+        name,
+        data,
+      );
+      return parseNamedItems(String(response.data ?? ''), this.logger);
+    });
   }
 }
 

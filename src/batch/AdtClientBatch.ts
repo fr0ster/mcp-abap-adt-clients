@@ -1,7 +1,7 @@
 import type {
   IAbapConnection,
   IAdtClientOptions,
-  IAdtResponse,
+  IAdtWireResponse,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { AdtClient } from '../clients/AdtClient';
@@ -116,7 +116,7 @@ export class AdtClientBatch {
     return this.innerClient.getLocalMacros();
   }
 
-  async batchExecute(): Promise<IAdtResponse[]> {
+  async batchExecute(): Promise<IAdtWireResponse[]> {
     const parts = this.recorder.getRecordedParts();
     if (parts.length === 0) {
       return [];

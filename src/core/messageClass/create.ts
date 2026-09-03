@@ -2,7 +2,10 @@
  * Message class create operations
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 import type { ICreateMessageClassParams } from './types';
 import { buildMessageClassXml } from './xml';
@@ -18,7 +21,7 @@ const BASE = '/sap/bc/adt/messageclass';
 export async function createMessageClass(
   connection: IAbapConnection,
   params: ICreateMessageClassParams,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   // Emit BOTH adtcore:language and adtcore:masterLanguage (like domain/class),
   // both set to the resolved language.
   const lang = params.master_language ?? 'EN';

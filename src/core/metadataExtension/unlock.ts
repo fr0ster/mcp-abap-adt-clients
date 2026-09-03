@@ -6,7 +6,10 @@
  * NOTE: Caller should call connection.setSessionType("stateless") after unlocking
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
@@ -28,7 +31,7 @@ export async function unlockMetadataExtension(
   connection: IAbapConnection,
   name: string,
   lockHandle: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const lowerName = encodeSapObjectName(name).toLowerCase();
   const url = `/sap/bc/adt/ddic/ddlx/sources/${lowerName}?_action=UNLOCK&lockHandle=${encodeURIComponent(lockHandle)}`;
 

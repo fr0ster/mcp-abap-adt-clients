@@ -467,3 +467,136 @@ numbers a parser produced.
 **What would change it.** A pair of implementations that genuinely are the same
 kind of thing, differing only in a value. There is none here: every pair found so
 far differs in what it refuses.
+
+---
+
+## 12. A method's result is named by a contract, not by `IAdtResponse`
+
+The rule lives in `@mcp-abap-adt/interfaces`, decision 13. It is here because the
+code it judges is here.
+
+**Decided.** It does not matter what concrete type a method returns, as long as
+it satisfies the contract the caller was promised. `Promise<T>` is a promise
+about `T`; `T` is what the consumer holds, so `T` is a contract.
+`Promise<IAdtResponse>` is not one — it names the transport envelope, which every
+method could name.
+
+**Where we stand.** `AdtUtils` has 31 public methods. **Eight** resolve to a
+shape — `search`, `getWhereUsedList`, `getPackageContentsList`,
+`getPackageHierarchy`, `getInactiveObjects` and the three list readers.
+**Twenty-three** resolve to the envelope.
+
+**Against.** Closing the twenty-three by inventing result types. Two parsers
+exist for them, so twenty-one shapes would be guesses, and a guessed shape is
+indistinguishable to a consumer from a measured one.
+
+**Why it is not cosmetic.** A consumer decides what to do next from the type it
+was handed. When that type is the envelope, the decision is made by reading our
+implementation instead — the coupling decision 10 removed at the factory,
+surviving one level down at every method.
+
+**How each one closes.** Measured, or handed to the consumer's own parser, which
+the implementation must satisfy. Which of the two is the same question decision 5
+of the contract package answers for parsing: small and stable, measure it; large
+or system-dependent, let the consumer read it.
+
+**How to catch it.** `Promise<IAdtResponse>` on a public method. Correct only
+where the answer really is the envelope, and that should be said at the method.
+
+## The two criteria, because they decide the work rather than describe it
+
+**A contract names an essence, not a method.** It differs from a concrete class
+by saying *how to work with the thing*, and two methods return the **same**
+contract when their results mean the same. This is already how the package works:
+`IAdtObjectHit` serves `search`, `getWhereUsedList`, `getPackageContentsList` and
+`getPackageHierarchy` through types that extend it — one essence, four methods.
+
+Without this the rule reads as "write a result type per method", which is the
+envelope's mistake with the sign reversed: instead of everything meaning one
+thing, nothing would mean the same as anything.
+
+**Whether two things are one contract is settled by substitution.**
+Implementations of one contract are interchangeable — a caller holding it can be
+handed either and carry on. Where the logic forbids putting one in the other's
+place, they implement different contracts, **however identical their members**.
+
+TypeScript does not answer this. Structural typing is about shape and silent
+about meaning, and this repository has the proof: `AdtRequestLegacy` has every
+method `AdtRequest` has, by inheritance, and refuses four of them. The compiler
+was content for years — decision 11 is what that cost.
+
+The same test decides grouping. Six of the open members were about to be gathered
+as "object metadata" because they all return metadata-ish XML; whether a
+transaction's metadata can stand where a type's is expected is a question
+substitution asks and member-matching does not.
+
+**The envelope's real reach.** `IAdtResponse<T = any>` defaults its body to
+`any`, and the generic is not used: **1121** bare uses here against **5** that
+name a type. Every method sharing that return shares one type, so a consumer
+cannot tell one answer from another — apples and oranges in one container. In the
+contract package the same count is 180 against 4, and only **one** of those 180
+is in `connection/`, where an envelope belongs.
+
+**What would change it.** Nothing. The twenty-three close one at a time, and
+`getUtils()` cannot hand out contracts worth the name until they do — #109.
+
+## 13. A refusal is raised once, at the edge, and goes back whole
+
+**The problem, measured.** ADT answers some refusals with a 2xx and an
+`<exc:exception>` document. The transport is right to admit it — the request did
+come back — so nothing threw and every layer above stored the body as a result.
+With a connection answering 200 and "Object ZNOPE is locked by user XYZ" to
+everything:
+
+| call | `state.errors` was | the caller was told |
+|---|---|---|
+| `getClass().create()` | 0 | the class was created |
+| `getClass().delete()` | 0 | the class was deleted |
+| `getClass().activate()` | 0 | the class was activated |
+| `getDomain().create()` | 0 | the domain was created |
+| `getClass().read()` | 0 | it was read |
+| `getClass().update()` | threw | "Class may be locked by another user" |
+
+Five of seven reported success, three of them writes. `delete()` issued its
+second request after the first had already been refused. The two that threw
+invented their own reason and never showed the caller `XYZ`.
+
+**The status code is the channel; the response is the result.** A 2xx says the
+request reached the server and came back. What the server decided is in the body,
+and nothing in this library was reading it.
+
+**Decided.** The check is installed once, where a connection enters the library —
+`AdtClient`, `AdtRuntimeClient`, `AdtExecutor`, `AdtUtils`. Not at the 466 call
+sites, and not at the 241 places that assign a response into a state: a rule
+applied in 241 places has 241 chances to be forgotten, and the next member
+written would be the 242nd.
+
+`AdtExceptionDocumentError` carries the server's message, the document
+**verbatim**, the ADT type and namespace, the response, and **the request that
+produced it** — a chain has several calls, and "object is locked" means a
+different thing depending on which asked. It is exported from the package root
+and `./core`, because a consumer who cannot name it cannot tell a refusal from
+any other failure.
+
+**Against.** Putting the refusal into `state.errors` and returning normally,
+which would keep existing callers compiling. Rejected: `state.errors` is what a
+caller reads to decide, and a full one after a chain that carried on regardless
+is a worse lie than a throw. The behaviour change is the point.
+
+**How it is installed matters.** It replaces `makeAdtRequest` and calls what it
+captured — the same shape `installAcceptNegotiation` already uses, so the two
+compose in either order. A `Proxy` was tried first and recursed: accept
+negotiation keys a `WeakMap` by the connection object, and a proxy is not its
+target. A test asserts one request per call so that cannot come back.
+
+**How to catch it.** A parser that answers empty for a document it could not
+read. A `catch` that discards. Any path where a 2xx body is stored without being
+looked at.
+
+**What would change it.** The direction in decision 19 of
+`@mcp-abap-adt/interfaces`: strategies for what to do with a result and with an
+error. Three of its questions are answered and they bind here — **without a
+strategy a refusal still throws**, so the safe path stays the default; a strategy
+receives the refusal **whole**, so completeness is never the consumer's to lose
+by accident; and strategies arrive as **one options object**, because hanging a
+second signature on each member was tried across 23 of them and reverted.

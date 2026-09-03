@@ -1,4 +1,7 @@
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_FEATURE_TOGGLE_METADATA,
   CT_FEATURE_TOGGLE_METADATA,
@@ -10,7 +13,7 @@ import { buildFeatureToggleXml } from './xmlBuilder';
 export async function create(
   connection: IAbapConnection,
   args: ICreateFeatureToggleParams,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const xml = buildFeatureToggleXml(args);
   const params: Record<string, string> = {};
   if (args.transport_request) params.corrNr = args.transport_request;

@@ -2,7 +2,10 @@
  * Structure activation operations
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { activateObjectInSession } from '../../utils/activationUtils';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 
@@ -12,7 +15,7 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
 export async function activateStructure(
   connection: IAbapConnection,
   structureName: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const objectUri = `/sap/bc/adt/ddic/structures/${encodeSapObjectName(structureName)}`;
   return await activateObjectInSession(
     connection,

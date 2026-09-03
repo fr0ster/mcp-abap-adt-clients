@@ -9,7 +9,7 @@
 import type {
   HttpError,
   IAbapConnection,
-  IAdtResponse,
+  IAdtWireResponse,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { CT_TABLE_TYPE } from '../../constants/contentTypes';
@@ -74,7 +74,7 @@ export async function updateTableType(
   params: IUpdateTableTypeParams,
   lockHandle: string,
   logger?: ILogger,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   if (!params.tabletype_name) {
     throw new Error('tabletype_name is required');
   }

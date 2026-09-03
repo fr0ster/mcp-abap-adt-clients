@@ -1,6 +1,6 @@
 import type {
   IAbapConnection,
-  IAdtResponse,
+  IAdtWireResponse,
   ILogger,
   IMemorySnapshots,
   IMemorySnapshotsListOptions,
@@ -29,22 +29,22 @@ export class MemorySnapshots implements IMemorySnapshots {
     private readonly logger: ILogger,
   ) {}
 
-  async list(options?: IMemorySnapshotsListOptions): Promise<IAdtResponse> {
+  async list(options?: IMemorySnapshotsListOptions): Promise<IAdtWireResponse> {
     return listSnapshots(this.connection, options?.user, options?.originalUser);
   }
 
-  async getById(snapshotId: string): Promise<IAdtResponse> {
+  async getById(snapshotId: string): Promise<IAdtWireResponse> {
     return getSnapshot(this.connection, snapshotId);
   }
 
-  async getOverview(snapshotId: string): Promise<IAdtResponse> {
+  async getOverview(snapshotId: string): Promise<IAdtWireResponse> {
     return getSnapshotOverview(this.connection, snapshotId);
   }
 
   async getRankingList(
     snapshotId: string,
     options?: ISnapshotRankingListOptions,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     return getSnapshotRankingList(this.connection, snapshotId, options);
   }
 
@@ -59,7 +59,7 @@ export class MemorySnapshots implements IMemorySnapshots {
     snapshotId: string,
     parentKey: string,
     options?: ISnapshotChildrenOptions,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     return getSnapshotChildren(this.connection, snapshotId, parentKey, options);
   }
 
@@ -74,7 +74,7 @@ export class MemorySnapshots implements IMemorySnapshots {
     snapshotId: string,
     objectKey: string,
     options?: ISnapshotReferencesOptions,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     return getSnapshotReferences(
       this.connection,
       snapshotId,
@@ -89,7 +89,10 @@ export class MemorySnapshots implements IMemorySnapshots {
    * @param uri1 - URI of first snapshot
    * @param uri2 - URI of second snapshot
    */
-  async getDeltaOverview(uri1: string, uri2: string): Promise<IAdtResponse> {
+  async getDeltaOverview(
+    uri1: string,
+    uri2: string,
+  ): Promise<IAdtWireResponse> {
     return getSnapshotDeltaOverview(this.connection, uri1, uri2);
   }
 
@@ -104,7 +107,7 @@ export class MemorySnapshots implements IMemorySnapshots {
     uri1: string,
     uri2: string,
     options?: ISnapshotRankingListOptions,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     return getSnapshotDeltaRankingList(this.connection, uri1, uri2, options);
   }
 
@@ -121,7 +124,7 @@ export class MemorySnapshots implements IMemorySnapshots {
     uri2: string,
     parentKey: string,
     options?: ISnapshotChildrenOptions,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     return getSnapshotDeltaChildren(
       this.connection,
       uri1,
@@ -144,7 +147,7 @@ export class MemorySnapshots implements IMemorySnapshots {
     uri2: string,
     objectKey: string,
     options?: ISnapshotReferencesOptions,
-  ): Promise<IAdtResponse> {
+  ): Promise<IAdtWireResponse> {
     return getSnapshotDeltaReferences(
       this.connection,
       uri1,

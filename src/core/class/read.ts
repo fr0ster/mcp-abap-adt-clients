@@ -4,11 +4,12 @@
 
 import type {
   IAbapConnection,
-  IAdtResponse,
+  IAdtWireResponse,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_SOURCE, ACCEPT_TRANSPORT } from '../../constants/contentTypes';
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
+import { orThrow } from '../../utils/adtResponse';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { noopLogger } from '../../utils/noopLogger';
 import { getTimeout } from '../../utils/timeouts';
@@ -28,12 +29,14 @@ export async function getClassMetadata(
   connection: IAbapConnection,
   className: string,
   options?: IReadOptions,
-): Promise<IAdtResponse> {
-  return getUtils(connection).readObjectMetadata(
-    'class',
-    className,
-    undefined,
-    options,
+): Promise<IAdtWireResponse> {
+  return orThrow(
+    getUtils(connection).readObjectMetadata(
+      'class',
+      className,
+      undefined,
+      options,
+    ),
   );
 }
 
@@ -48,13 +51,15 @@ export async function getClassSource(
   className: string,
   version?: 'active' | 'inactive',
   options?: IReadOptions,
-): Promise<IAdtResponse> {
-  return getUtils(connection).readObjectSource(
-    'class',
-    className,
-    undefined,
-    version,
-    options,
+): Promise<IAdtWireResponse> {
+  return orThrow(
+    getUtils(connection).readObjectSource(
+      'class',
+      className,
+      undefined,
+      version,
+      options,
+    ),
   );
 }
 
@@ -69,7 +74,7 @@ export async function getClass(
   connection: IAbapConnection,
   className: string,
   version: 'active' | 'inactive' = 'active',
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   return getClassSource(connection, className, version);
 }
 
@@ -83,7 +88,7 @@ export async function getClassTransport(
   connection: IAbapConnection,
   className: string,
   options?: IReadOptions,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const encodedName = encodeSapObjectName(className);
   let url = `/sap/bc/adt/oo/classes/${encodedName}/transport`;
   if (options?.withLongPolling) {
@@ -112,7 +117,7 @@ export async function getClassDefinitionsInclude(
   version: 'active' | 'inactive' = 'active',
   logger?: ILogger,
   options?: IReadOptions,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const encodedName = encodeSapObjectName(className);
   const versionParam = version === 'inactive' ? 'workingArea' : 'active';
   const url = `/sap/bc/adt/oo/classes/${encodedName}/includes/definitions?version=${versionParam}`;
@@ -143,7 +148,7 @@ export async function getClassMacrosInclude(
   version: 'active' | 'inactive' = 'active',
   logger?: ILogger,
   options?: IReadOptions,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const encodedName = encodeSapObjectName(className);
   const versionParam = version === 'inactive' ? 'workingArea' : 'active';
   const url = `/sap/bc/adt/oo/classes/${encodedName}/includes/macros?version=${versionParam}`;
@@ -174,7 +179,7 @@ export async function getClassTestClassesInclude(
   version: 'active' | 'inactive' = 'active',
   logger?: ILogger,
   options?: IReadOptions,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const encodedName = encodeSapObjectName(className);
   const versionParam = version === 'inactive' ? 'workingArea' : 'active';
   const url = `/sap/bc/adt/oo/classes/${encodedName}/includes/testclasses?version=${versionParam}`;
@@ -205,7 +210,7 @@ export async function getClassImplementationsInclude(
   version: 'active' | 'inactive' = 'active',
   logger?: ILogger,
   options?: IReadOptions,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const encodedName = encodeSapObjectName(className);
   const versionParam = version === 'inactive' ? 'workingArea' : 'active';
   const url = `/sap/bc/adt/oo/classes/${encodedName}/includes/implementations?version=${versionParam}`;

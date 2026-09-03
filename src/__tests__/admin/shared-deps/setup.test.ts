@@ -17,6 +17,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
+import { orThrow } from '../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import {
   createTestAdtClient,
@@ -239,7 +240,9 @@ describe('Admin: Setup shared dependencies', () => {
           `Group activating ${groupActivationObjects.length} objects: ${groupActivationObjects.map((o) => `${o.type}:${o.name}`).join(', ')}`,
         );
         try {
-          await client.getUtils().activateObjectsGroup(groupActivationObjects);
+          await orThrow(
+            client.getUtils().activateObjectsGroup(groupActivationObjects),
+          );
           testsLogger.info('Group activation completed successfully');
         } catch (error) {
           const msg = error instanceof Error ? error.message : String(error);
@@ -297,7 +300,7 @@ describe('Admin: Setup shared dependencies', () => {
         list.filter((o) => configured.has(String(o.name).toUpperCase()));
 
       const firstPass = ours(
-        (await client.getUtils().getInactiveObjects()).objects,
+        (await orThrow(client.getUtils().getInactiveObjects())).objects,
       ) as Array<{ name: string; type: string }>;
       if (firstPass.length > 0) {
         testsLogger.info(
@@ -320,7 +323,7 @@ describe('Admin: Setup shared dependencies', () => {
         }
       }
 
-      const inactive = await client.getUtils().getInactiveObjects();
+      const inactive = await orThrow(client.getUtils().getInactiveObjects());
       const stillInactive = ours(inactive.objects).map(
         (o) => `inactive ${(o as { type: string }).type}:${o.name}`,
       );

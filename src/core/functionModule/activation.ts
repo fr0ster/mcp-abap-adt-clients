@@ -2,7 +2,10 @@
  * FunctionModule activation operations
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { activateObjectInSession } from '../../utils/activationUtils';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 
@@ -13,7 +16,7 @@ export async function activateFunctionModule(
   connection: IAbapConnection,
   functionGroupName: string,
   functionModuleName: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const encodedGroupName = encodeSapObjectName(functionGroupName).toLowerCase();
   const encodedModuleName =
     encodeSapObjectName(functionModuleName).toLowerCase();

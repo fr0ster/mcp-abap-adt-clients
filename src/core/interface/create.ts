@@ -7,7 +7,7 @@
 import type {
   HttpError,
   IAbapConnection,
-  IAdtResponse,
+  IAdtWireResponse,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { CT_INTERFACE } from '../../constants/contentTypes';
@@ -41,7 +41,7 @@ export async function create(
   connection: IAbapConnection,
   params: ICreateInterfaceParams,
   logger?: ILogger,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const finalMasterSystem = params.masterSystem || '';
   const finalResponsible = params.responsible || '';
 

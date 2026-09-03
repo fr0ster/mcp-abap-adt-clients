@@ -22,4 +22,3 @@ export {
  * document — would otherwise have to reach in past the package boundary.
  */
 export { parseSearchResults } from './search';
-export { getTransaction } from './transaction';

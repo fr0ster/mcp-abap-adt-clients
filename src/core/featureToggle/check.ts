@@ -2,7 +2,10 @@
  * Feature Toggle check operations
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_CHECK_MESSAGES,
   CT_CHECK_OBJECTS,
@@ -24,7 +27,7 @@ export async function checkFeatureToggle(
   name: string,
   version: 'active' | 'inactive',
   xmlContent?: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   if (!name) {
     throw new Error('Feature toggle name is required');
   }

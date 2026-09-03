@@ -19,6 +19,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
+import { orThrow } from '../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import {
   createTestAdtClient,
@@ -536,9 +537,9 @@ define structure ${structureName} {
         ];
 
         // Step 4: Group activation - activate all objects together
-        const activationResult = await client
-          .getUtils()
-          .activateObjectsGroup(objectsToActivate, false);
+        const activationResult = await orThrow(
+          client.getUtils().activateObjectsGroup(objectsToActivate, false),
+        );
         expect(activationResult).toBeDefined();
         expect(activationResult.status).toBe(200);
         testsLogger.info?.('✅ Group activation completed successfully');

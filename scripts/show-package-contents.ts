@@ -30,6 +30,7 @@ import {
 } from '../src/__tests__/helpers/testLogger';
 import { AdtClient } from '../src/clients/AdtClient';
 import type { IPackageHierarchyNode } from '../src/core/shared/types';
+import { orThrow } from '../src/utils/adtResponse';
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../.env');
 if (fs.existsSync(envPath)) {
@@ -152,11 +153,13 @@ async function run(): Promise<void> {
   console.log('');
 
   try {
-    const hierarchy = await utils.getPackageHierarchy(options.packageName, {
-      maxDepth: options.maxDepth,
-      includeSubpackages: options.includeSubpackages,
-      includeDescriptions: options.includeDescriptions,
-    });
+    const hierarchy = await orThrow(
+      utils.getPackageHierarchy(options.packageName, {
+        maxDepth: options.maxDepth,
+        includeSubpackages: options.includeSubpackages,
+        includeDescriptions: options.includeDescriptions,
+      }),
+    );
 
     if (options.jsonOutput) {
       console.log(JSON.stringify(hierarchy, null, 2));

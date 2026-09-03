@@ -9,7 +9,10 @@
  * it is NOT used here.
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_DELETION,
   ACCEPT_DELETION_CHECK,
@@ -31,7 +34,7 @@ const objectUri = (name: string): string =>
 export async function checkDeletion(
   connection: IAbapConnection,
   name: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   if (!name) throw new Error('name is required');
 
   const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
@@ -62,7 +65,7 @@ export async function deleteMessageClass(
   connection: IAbapConnection,
   name: string,
   transportRequest?: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   if (!name) throw new Error('name is required');
 
   const transportNumberTag = transportRequest?.trim()

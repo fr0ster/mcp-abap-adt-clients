@@ -5,7 +5,10 @@
  * → rebuild full XML (messages preserved) → PUT with lock handle.
  */
 
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { MESSAGE_CLASS_UPDATE_CONTENT_TYPE } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -27,7 +30,7 @@ export async function updateMessageClass(
   lockHandle: string,
   description: string | undefined,
   transportRequest?: string,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   // 1. Read current state to preserve existing messages and all SAP-managed attrs
   const currentResponse = await getMessageClassSource(connection, name);
   const current = parseMessageClass(String(currentResponse.data));

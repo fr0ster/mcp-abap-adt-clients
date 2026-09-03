@@ -5,7 +5,7 @@
 import type {
   IAbapConnection,
   IAdtContentTypes,
-  IAdtResponse,
+  IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
@@ -21,7 +21,7 @@ export async function update(
   connection: IAbapConnection,
   params: IUpdateFunctionModuleParams,
   contentTypes?: IAdtContentTypes,
-): Promise<IAdtResponse> {
+): Promise<IAdtWireResponse> {
   const encodedGroupName = encodeSapObjectName(
     params.functionGroupName,
   ).toLowerCase();
