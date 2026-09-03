@@ -172,6 +172,16 @@ export function buildObjectUri(
 
   // Map type to URI path
   switch (type.toUpperCase()) {
+    // A package is not `/sap/bc/adt/devc/k/…`, which is what the fallback at the
+    // bottom of this switch builds from the type code. ADT answers that address
+    // with `No URI-Mapping defined for URI`, and every group operation —
+    // deletion check, delete, activate — was asking about packages there.
+    // `AdtPackage` has always used the right resource directly, which is why
+    // package CRUD worked while the group operations did not.
+    case 'DEVC/K':
+    case 'DEVC':
+      return `/sap/bc/adt/packages/${lowerName}`;
+
     case 'CLAS/OC':
     case 'CLAS':
       return `/sap/bc/adt/oo/classes/${lowerName}`;
@@ -258,7 +268,15 @@ export function buildObjectUri(
       return `/sap/bc/adt/enhancements/${lowerName}`;
 
     default:
-      // Fallback: try to construct URI from type
+      // A guess dressed as a mapping: right when the ADT path happens to be the
+      // lowercased type code, silent when it is not. `DEVC/K` is the case that
+      // showed it — the address it built exists nowhere, and ADT's complaint
+      // arrived inside a 200 where nothing was reading it.
+      //
+      // Left in place rather than made to throw: the types above are mapped, and
+      // the ones that are not are reached by callers passing a type this library
+      // never claimed to know. Making that a throw is a separate decision about
+      // how strict `IObjectReference` should be.
       return `/sap/bc/adt/${type.toLowerCase()}/${lowerName}`;
   }
 }

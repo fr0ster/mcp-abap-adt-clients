@@ -95,6 +95,38 @@ success.
 
 ### Fixed
 
+- **A group deletion that did not delete is now a failure (#136).** ADT answers
+  `/deletion/delete` with **200** and a document reporting per object:
+
+  ```xml
+  <del:object del:isDeleted="false" adtcore:name="ZADT_BLD_PKG03">
+    <del:message del:type="E"><del:text>Package contains 2 objects</del:text></del:message>
+  </del:object>
+  ```
+
+  The transport succeeded and the body is not an `<exc:exception>`, so the
+  refusal check passed it through and `deleteObjectsGroup` answered `ok: true`
+  for objects still on the system. It now answers a failure carrying the server's
+  own sentence.
+
+  **`checkDeletionGroup` is deliberately unchanged.** Asked "can this be
+  deleted", `isDeletable="false"` with a reason is the answer to the question,
+  not a failure to answer it — the same reason a probe's "not found" is a result.
+  Only a *delete* that reports objects left behind is a failure.
+
+- **`buildObjectUri` maps `DEVC/K` (#137).** It fell through 40 mapped types to a
+  fallback that lowercases the type code, producing `/sap/bc/adt/devc/k/{name}`.
+  ADT answers that address with `No URI-Mapping defined for URI` — inside a 200,
+  where nothing was reading it. Every group operation asked about packages there:
+  deletion check, delete, activate. `AdtPackage` has always used
+  `/sap/bc/adt/packages/{name}` directly, which is why package CRUD worked while
+  the group operations did not.
+
+  Both were found by probing a live system after the release, not by review: the
+  deletion check answered "Package contains 2 objects" for a package that has
+  two, and "No URI-Mapping defined for URI" for the address we built.
+
+
 - **A refusal SAP sends with a failing status is now recognised as a refusal.**
   The check only inspected successful answers, because the case it was written
   for was ADT answering 200 with an exception document. A live system answering
