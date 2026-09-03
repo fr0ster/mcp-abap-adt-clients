@@ -38,6 +38,13 @@ success.
   decoration — a caller cannot act on "something went wrong". Reauthenticate, ask
   the server something else, or fix a parser are three different days of work.
 
+  **A consumer's own parser is outside that classification.** An exception from
+  the strategy they passed to `search(criteria, parse)` surfaces as itself,
+  untouched: it is not the library's failure to describe. The first version of
+  this ran the parser inside the classifier, which labelled their bug
+  `origin: 'connection'` — advice to reauthenticate, over a defect in their own
+  code.
+
 - **BREAKING: the transport frame is `IAdtWireResponse`** throughout, matching
   interfaces 28.0.0. 320 files renamed; the type is unchanged, only its name and
   what it is allowed to mean. `IAdtResponse` now names the answer a member gives.
@@ -48,6 +55,19 @@ success.
   compiler said so. The atom migrates with the rest of the interfaces package,
   member by member; until it does, the information system is what `getUtils()`
   hands out and therefore what this class answers to.
+
+- **`AdtClientLegacy.getUtils()` answers the contract too**, and its refusals are
+  failures rather than throws. Both were broken in the same way and neither
+  failed a check: an unannotated override infers the class, so the published
+  `.d.ts` handed out `AdtUtilsLegacy` while the modern client handed out the
+  intersection — the class satisfies the contract, so the compiler was content
+  and the legacy surface quietly exposed members the contract does not carry.
+
+  `getSqlQuery` and `getTableContents` on a legacy system now answer
+  `origin: 'connection'` — the endpoint is not there, which is the same remedy as
+  an unreachable host and a different thing from a server refusing about an
+  object. Throwing would have made one implementation of a member behave unlike
+  the other for a reason invisible in the type.
 
 - **`orThrow()` marks the boundary with code that has not migrated.** The
   per-type handlers still return state objects and signal failure by throwing,

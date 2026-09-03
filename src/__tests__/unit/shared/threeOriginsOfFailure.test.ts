@@ -76,6 +76,9 @@ describe('the three origins stay apart', () => {
     if (response.ok) throw new Error('expected a failure');
     expect(response.getError().origin).toBe('refusal');
     expect(response.getError().message).toContain('locked by user XYZ');
+    // The origin is the assertion that matters: it is what tells a caller which
+    // remedy applies, and a wrong one sends them at the wrong system.
+    expect(response.getError().origin).not.toBe('connection');
   });
 
   it('this library could not read it — a different origin, not "no types"', async () => {
@@ -97,18 +100,29 @@ describe('the three origins stay apart', () => {
       logger,
     );
 
-    const response = await utils.search({ query: 'Z*' }, () => {
-      throw new ConsumerParserBug();
-    });
+    const error = await utils
+      .search({ query: 'Z*' }, () => {
+        throw new ConsumerParserBug();
+      })
+      .then(
+        (answer) => {
+          throw new Error(
+            `expected the parser's own error, got ${JSON.stringify(answer.ok)}`,
+          );
+        },
+        (e: unknown) => e,
+      );
 
-    // Their error survives as itself in `cause`, and the origin says it did not
-    // come from SAP or from our parsing. Renaming it would send a caller
-    // looking in the wrong place.
-    expect(response.ok).toBe(false);
-    if (response.ok) throw new Error('expected a failure');
-    expect(response.getError().cause).toBeInstanceOf(ConsumerParserBug);
-    expect(response.getError().cause).not.toBeInstanceOf(AdtParseError);
-    expect(response.getError().cause).not.toBeInstanceOf(AdtSAPError);
+    // Not wrapped, not classified, not renamed. It surfaces as itself.
+    //
+    // The first version of this case checked only that the error survived in
+    // `cause` — and passed while the library was labelling it
+    // `origin: 'connection'`, which tells a caller to reauthenticate or check
+    // the network over a bug in their own parser. A test that reads the payload
+    // and not the classification cannot see that.
+    expect(error).toBeInstanceOf(ConsumerParserBug);
+    expect(error).not.toBeInstanceOf(AdtParseError);
+    expect(error).not.toBeInstanceOf(AdtSAPError);
   });
 
   it('nothing matched — still a result, still not a failure', async () => {
@@ -124,5 +138,27 @@ describe('the three origins stay apart', () => {
       objects: [],
       childNodes: [],
     });
+  });
+});
+
+describe('a legacy refusal is an answer, not a throw', () => {
+  it('answers a failure where the endpoint is absent', async () => {
+    const { AdtUtilsLegacy } = await import(
+      '../../../core/shared/AdtUtilsLegacy'
+    );
+    const utils = new AdtUtilsLegacy(answering(EMPTY_LEVEL), logger);
+
+    const response = await utils.getSqlQuery({ sql_query: 'SELECT 1' });
+
+    // Two implementations of one member must behave alike in shape. Throwing
+    // here would make the legacy one unlike the modern one for a reason the
+    // caller cannot see in the type — the substitution decision 13 is about.
+    expect(response.ok).toBe(false);
+    if (response.ok) throw new Error('expected a failure');
+
+    // `connection`, not `refusal`: the endpoint is not there. Same remedy as an
+    // unreachable host — a different system, not a different question.
+    expect(response.getError().origin).toBe('connection');
+    expect(response.getError().message).toContain('legacy');
   });
 });

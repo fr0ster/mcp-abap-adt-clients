@@ -18,10 +18,14 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
 import { buildObjectUri } from '../../utils/activationUtils';
-import { answering } from '../../utils/adtResponse';
+import { answering, failed } from '../../utils/adtResponse';
 import { getTimeout } from '../../utils/timeouts';
 import { AdtUtils } from './AdtUtils';
-import type { IObjectReference } from './types';
+import type {
+  IGetSqlQueryParams,
+  IGetTableContentsParams,
+  IObjectReference,
+} from './types';
 
 function unsupportedError(operation: string, endpoint: string): string {
   return (
@@ -70,15 +74,39 @@ ${objectReferences}
     );
   }
 
-  override async getTableContents(): Promise<never> {
-    throw new Error(
-      unsupportedError('Table contents', '/sap/bc/adt/datapreview/ddic'),
-    );
+  /**
+   * Refused, and answered as a failure rather than thrown.
+   *
+   * The contract says a member answers `IAdtResponse`; a caller branches on `ok`
+   * and reads `getError()`. Throwing here would make one implementation of a
+   * member behave unlike the other for reasons the caller cannot see in the
+   * type — the substitution decision 13 is about, broken by the half that is
+   * meant to be interchangeable.
+   *
+   * `origin` is `'connection'`: the endpoint is not there. That is the same
+   * remedy as an unreachable host — a different system, not a different
+   * question — and it is what separates this from a refusal, which is a server
+   * answering about an object.
+   */
+  override async getTableContents(
+    _params: IGetTableContentsParams,
+  ): Promise<IAdtResponse<IAdtResult<IAdtWireResponse>>> {
+    return this.refuse('Table contents', '/sap/bc/adt/datapreview/ddic');
   }
 
-  override async getSqlQuery(): Promise<never> {
-    throw new Error(
-      unsupportedError('SQL query', '/sap/bc/adt/datapreview/freestyle'),
-    );
+  override async getSqlQuery(
+    _params: IGetSqlQueryParams,
+  ): Promise<IAdtResponse<IAdtResult<IAdtWireResponse>>> {
+    return this.refuse('SQL query', '/sap/bc/adt/datapreview/freestyle');
+  }
+
+  private refuse<T>(
+    operation: string,
+    endpoint: string,
+  ): IAdtResponse<IAdtResult<T>> {
+    return failed<T>({
+      origin: 'connection',
+      message: unsupportedError(operation, endpoint),
+    });
   }
 }

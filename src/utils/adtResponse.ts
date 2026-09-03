@@ -118,6 +118,35 @@ export async function answering<T>(
 }
 
 /**
+ * The same, with the caller's own work kept outside the classification.
+ *
+ * `read` is this library's: a request, and the refusal recognised in its answer.
+ * `then` is the consumer's strategy, and **an exception from it is not caught** —
+ * decision 19's composition table puts a strategy's own throw in a row of its
+ * own, surfacing as itself.
+ *
+ * That is not tidiness. The fallback in `recogniseFailure` calls an unrecognised
+ * error a connection failure, which tells a caller to reauthenticate or check
+ * the network. Applied to a bug in their own parser it is advice pointing at the
+ * wrong system entirely — and the first version of this file did exactly that,
+ * because the parser ran inside the `try`.
+ */
+export async function answeringWith<TRaw, T>(
+  read: () => Promise<TRaw>,
+  then: (raw: TRaw) => T,
+): Promise<IAdtResponse<IAdtResult<T>>> {
+  let raw: TRaw;
+  try {
+    raw = await read();
+  } catch (error: unknown) {
+    return failed<T>(recogniseFailure(error));
+  }
+
+  // Outside the catch on purpose. Their exception is theirs.
+  return succeeded(then(raw));
+}
+
+/**
  * The value, or the failure raised — the boundary with code not yet on the
  * contract.
  *

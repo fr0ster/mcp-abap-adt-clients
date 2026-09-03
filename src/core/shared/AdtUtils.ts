@@ -92,7 +92,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
 import { throwIfSapError } from '../../utils/adtErrors';
-import { answering } from '../../utils/adtResponse';
+import { answering, answeringWith } from '../../utils/adtResponse';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { withRefusalDetection } from '../../utils/refusalAware';
 import { getTimeout } from '../../utils/timeouts';
@@ -247,25 +247,31 @@ export class AdtUtils
     criteria: ISearchObjectsParams,
     parse?: (data: unknown) => T,
   ): Promise<IAdtResponse<IAdtResult<ISearchResult[] | T>>> {
-    return answering<ISearchResult[] | T>(async () => {
-      if (!parse) {
-        return searchObjectsTyped(this.connection, criteria);
-      }
+    if (!parse) {
+      return answering<ISearchResult[] | T>(() =>
+        searchObjectsTyped(this.connection, criteria),
+      );
+    }
 
-      const response = await searchObjects(this.connection, criteria);
-      const body = String(response.data ?? '');
+    return answeringWith<unknown, ISearchResult[] | T>(
+      async () => {
+        const response = await searchObjects(this.connection, criteria);
 
-      // A strategy exists so the caller can control how much of a large answer
-      // they take. It is not a place a refusal can hide: a parser looking for
-      // hits in an exception document finds none and reports emptiness. So the
-      // refusal is recognised before the parser runs, and `answering` turns it
-      // into the failure half of the answer rather than letting it fly past.
-      throwIfSapError(body);
+        // A strategy exists so the caller can control how much of a large answer
+        // they take. It is not a place a refusal can hide: a parser looking for
+        // hits in an exception document finds none and reports emptiness. So the
+        // refusal is recognised before the parser runs, and comes back as the
+        // failure half rather than flying past.
+        throwIfSapError(String(response.data ?? ''));
 
-      // Beyond that nothing here forms a second opinion about the document — the
-      // raw body goes over untouched rather than parsed and re-emitted.
-      return parse(response.data);
-    });
+        // Nothing here forms a second opinion about the document — the raw body
+        // goes over untouched rather than parsed and re-emitted.
+        return response.data;
+      },
+      // Theirs, and outside the classification: a bug in this parser is not a
+      // connection failure, and must not be reported as one.
+      (data) => parse(data),
+    );
   }
 
   /**
