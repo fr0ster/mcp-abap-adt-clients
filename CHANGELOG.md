@@ -95,6 +95,40 @@ success.
 
 ### Fixed
 
+- **A refusal SAP sends with a failing status is now recognised as a refusal.**
+  The check only inspected successful answers, because the case it was written
+  for was ADT answering 200 with an exception document. A live system answering
+  "Resource CLASS Z… does not exist" does it with **404**: the transport throws,
+  the document rides along on `error.response`, and nobody read it. The caller
+  got `origin: 'connection'` and "Request failed with status code 404" — the
+  transport's sentence about itself — while the server's own words sat unread two
+  fields away.
+
+  Now `origin: 'refusal'`, with SAP's message, its `adtType`, and the request
+  that produced it. A failing status carrying nothing to read is still
+  `'connection'`, which is the honest distinction.
+
+  Found by an integration test against a real system. The unit tests were green
+  either side of it, because they send the document *I* wrote in the situation
+  *I* imagined.
+
+- **`request` is carried on connection failures too.** It was set only for
+  refusals, leaving the most common failure the one a caller could not locate in
+  a chain of six calls.
+
+- **A package that does not exist is no longer an empty package.** Probed:
+  `/repository/nodestructure` answers **200 with zero bytes** for a package that
+  does not exist, and 200 with a tree for one that does — the same status, and no
+  document to tell them apart. `getPackageHierarchy` built a node out of the name
+  it was given, so `getPackageHierarchy('ZZ_NO_SUCH')` answered
+  `{ name: 'ZZ_NO_SUCH', children: [] }` — the caller's own input handed back as a
+  fact. It now raises, with what the server did and why that is not an empty
+  package.
+
+  Only at the root: a *sub*package answering empty is a real package with nothing
+  in it, and the parent already proved it exists by listing it.
+
+
 - **BREAKING: a refusal SAP sends with a 2xx is no longer reported as success.**
 
   The status code is the channel; the response is the result. ADT answers some

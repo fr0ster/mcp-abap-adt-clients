@@ -39,7 +39,7 @@ const parser = new XMLParser({
  *
  * | the answer | what the caller must be told |
  * |---|---|
- * | an empty document | nothing matched — a result |
+ * | an empty document | usually nothing matched — a result, unless the endpoint answers empty for "no such thing" |
  * | a refusal | the server said no — an error |
  * | something unreadable | *we* could not read it — an error, a different one |
  *
@@ -60,10 +60,11 @@ export class AdtParseError extends Error {
   /** What was looked for and not found, e.g. `asx:abap/asx:values/DATA`. */
   readonly expected: string;
 
-  constructor(expected: string, document: string) {
+  constructor(expected: string, document: string, because?: string) {
     super(
       `The answer could not be read: expected ${expected}. ` +
-        'It is not empty and it is not an ADT exception — see `document`.',
+        (because ??
+          'It is not empty and it is not an ADT exception — see `document`.'),
     );
     this.name = 'AdtParseError';
     this.document = document;

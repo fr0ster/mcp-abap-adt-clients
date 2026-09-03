@@ -24,6 +24,7 @@ import { AdtSAPError } from '../../../utils/adtErrors';
 import { orThrow } from '../../../utils/adtResponse';
 
 const MESSAGE = 'Resource ZNOPE does not exist';
+const HOLDER_MESSAGE = 'ZNOPE';
 
 const EXCEPTION_XML =
   '<?xml version="1.0" encoding="utf-8"?>' +
@@ -90,11 +91,41 @@ describe('a failing status reaches the caller, in the failure half', () => {
     if (response.ok) throw new Error('expected a failure');
 
     const failure = response.getError();
-    // Nothing in this library shortened it: the status the transport refused and
-    // the body it refused with are both still here.
-    expect(failure.origin).toBe('connection');
+    // **A refusal, not a connection failure**, and the distinction is what a
+    // live system taught this file. A 404 whose body is an `<exc:exception>`
+    // document is the server answering about the object; only a failing status
+    // with nothing to read is the channel. Asserting `connection` here was
+    // asserting that the server's own words go unread — which is what the
+    // library did until an integration test asked a real system.
+    expect(failure.origin).toBe('refusal');
+    expect(failure.message).toContain(HOLDER_MESSAGE);
     expect(failure.response?.status).toBe(404);
     expect(failure.response?.data).toBe(EXCEPTION_XML);
+    expect(failure.request?.url).toContain('/sap/bc/adt/');
+  });
+
+  it('is a connection failure when the status carries nothing to read', async () => {
+    const { connection } = (() => {
+      const c = {
+        setSessionType: jest.fn(),
+        isConnected: () => true,
+        makeAdtRequest: jest.fn(async () => {
+          const error = new Error('socket hang up') as Error & {
+            response?: unknown;
+          };
+          throw error;
+        }),
+      } as unknown as IAbapConnection;
+      return { connection: c };
+    })();
+
+    const response = await new AdtUtils(connection, logger).getAllTypes();
+
+    expect(response.ok).toBe(false);
+    if (response.ok) throw new Error('expected a failure');
+    // Nothing arrived, so there is nothing to have refused. The remedy is the
+    // channel, and `origin` is what says so.
+    expect(response.getError().origin).toBe('connection');
   });
 });
 

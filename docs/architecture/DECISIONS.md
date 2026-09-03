@@ -470,6 +470,21 @@ far differs in what it refuses.
 
 ---
 
+### The boundary: contract surface, not every hierarchy
+
+This decision is about the **contract surface** — a class a factory hands out as a
+contract, where inheritance produced a member the class carries and refuses.
+`AdtRequestLegacy extends AdtRequest` had every method of its parent and refused
+four, and the compiler was content for years.
+
+It does not reach internal implementations nobody substitutes across that
+boundary. A default strategy that a descendant refines for one object type is not
+a contract anybody holds; it is how this package is built inside, and inheriting
+there promises nothing to a consumer that could be broken.
+
+Recorded because the rule was applied too widely once, to argue against a
+hierarchy of strategies — where it does not belong.
+
 ## 12. A method's result is named by a contract, not by `IAdtResponse`
 
 The rule lives in `@mcp-abap-adt/interfaces`, decision 13. It is here because the

@@ -31,6 +31,16 @@
  * none of which looked at the body. A rule applied in 241 places has 241 chances
  * to be forgotten, and the next member written would be the 242nd.
  *
+ * **Both halves of the wire are inspected**, and the first version inspected
+ * only one. It read the body of successful answers, because the case it was
+ * written for was ADT answering 200 with an exception document. A live system
+ * answering "Resource CLASS Z… does not exist" does it with **404**: the
+ * transport throws, the document rides along on `error.response`, and nobody
+ * read it — so the caller was handed "Request failed with status code 404",
+ * the transport's sentence about itself, while the server's own words sat
+ * unread two fields away. An integration test found that; the unit tests could
+ * not, because they send the document *I* wrote in the situation *I* imagined.
+ *
  * **What it does not do.** It does not judge documents, which this library
  * leaves to the server. It raises only on `<exc:exception>` — the server's own
  * statement that it refused — and passes everything else through untouched,
@@ -82,11 +92,36 @@ export function withRefusalDetection(
     T = unknown,
     D = unknown,
   >(request: IAbapRequestOptions): Promise<IAdtWireResponse<T, D>> {
-    const response = await base<T, D>(request);
+    const asked = { method: request?.method, url: request?.url };
 
-    // A status the transport rejected never reaches here — it threw, carrying
-    // the response. What arrives is a request the channel considers finished,
-    // and only the body says what the server decided about it.
+    let response: IAdtWireResponse<T, D>;
+    try {
+      response = await base<T, D>(request);
+    } catch (error: unknown) {
+      // **A refusal usually arrives with a failing status, not a 2xx.** This
+      // only inspected successful answers at first, because the case it was
+      // written for was ADT answering 200 with an exception document. A live
+      // system answering "Resource CLASS Z… does not exist" does it with 404:
+      // the transport throws, the document rides along on `error.response`, and
+      // nobody read it — so the caller got "Request failed with status code
+      // 404", the transport's sentence about itself, while the server's own
+      // words sat unread two fields away.
+      const carried = (error as { response?: IAdtWireResponse }).response;
+      const raised = carried?.data;
+      if (typeof raised === 'string') {
+        const refusal = sapErrorIn(raised, {
+          response: carried,
+          request: asked,
+        });
+        if (refusal) {
+          throw refusal;
+        }
+      }
+      throw error;
+    }
+
+    // The other half: an answer the channel considers finished, where only the
+    // body says what the server decided about it.
     const body = (response as IAdtWireResponse).data;
     if (typeof body === 'string') {
       // The request goes with it. A refusal with no request beside it says

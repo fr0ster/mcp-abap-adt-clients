@@ -10,6 +10,7 @@ import type {
   XmlNode,
 } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
+import { AdtParseError } from '../../utils/adtErrors';
 import { fetchNodeStructure, parseNodeStructure } from './nodeStructure';
 import type {
   IGetPackageHierarchyOptions,
@@ -318,6 +319,27 @@ const fetchPackageTreeRecursive = async (
     typeof response.data === 'string'
       ? response.data
       : JSON.stringify(response.data);
+
+  // **An empty body at the root is "no such package", and the server will not
+  // say so itself.** Probed: `/repository/nodestructure` answers 200 with zero
+  // bytes for a package that does not exist, and 200 with a tree for one that
+  // does — the same status, and nothing in the document to tell them apart
+  // because there is no document. Building a node out of the name we were given
+  // reports the caller's own input back to them as a fact, which is how
+  // `getPackageHierarchy('ZZ_NO_SUCH')` answered `{ children: [] }`.
+  //
+  // Only at the root: a *sub*package answering empty is a real package with
+  // nothing in it, and the parent already proved it exists by listing it.
+  if (currentDepth === 0 && xml.trim().length === 0) {
+    throw new AdtParseError(
+      `a node structure for package ${packageName}`,
+      '',
+      'The server answered 200 with an empty body, which is what ADT does for a ' +
+        'package that does not exist — it neither refuses nor says so. Reporting ' +
+        'an empty package here would hand the name back as a fact.',
+    );
+  }
+
   const { nodes, objectTypes } = parseNodeStructure(xml, logger);
 
   // Collect all nodes including subpackages from initial response

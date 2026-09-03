@@ -54,6 +54,7 @@ export function failed<T>(error: IAdtError): IAdtResponse<IAdtResult<T>> {
 interface IWithResponse {
   response?: IAdtWireResponse;
   message?: string;
+  request?: { method?: string; url?: string };
 }
 
 /**
@@ -94,6 +95,10 @@ function recogniseFailure(error: unknown): IAdtError {
       carried?.message ??
       (typeof error === 'string' ? error : 'The request did not complete'),
     response: carried?.response,
+    // The request, when whatever threw attached one. Omitting it here left the
+    // most common failure — a status the transport refused — as the one a
+    // caller could not locate in a chain of six.
+    request: carried?.request,
     cause: error,
   };
 }
