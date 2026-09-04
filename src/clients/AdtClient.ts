@@ -52,8 +52,9 @@ import type {
 import { ADT_SESSION_ERROR } from '@mcp-abap-adt/interfaces';
 import {
   AdtAccessControl,
+  accessControlDocuments,
   type IAccessControlConfig,
-  type IAccessControlState,
+  type IAccessControlResults,
 } from '../core/accessControl';
 import {
   AdtAppendStructure,
@@ -68,13 +69,15 @@ import {
 } from '../core/authorizationField';
 import {
   AdtBehaviorDefinition,
+  behaviorDefinitionDocuments,
   type IBehaviorDefinitionConfig,
-  type IBehaviorDefinitionState,
+  type IBehaviorDefinitionResults,
 } from '../core/behaviorDefinition';
 import {
   AdtBehaviorImplementation,
+  classDocuments,
   type IBehaviorImplementationConfig,
-  type IBehaviorImplementationState,
+  type IClassResults,
 } from '../core/behaviorImplementation';
 import {
   AdtClass,
@@ -82,9 +85,7 @@ import {
   AdtLocalMacros,
   AdtLocalTestClass,
   AdtLocalTypes,
-  classDocuments,
   type IClassConfig,
-  type IClassResults,
   type ILocalDefinitionsConfig,
   type ILocalMacrosConfig,
   type ILocalTestClassConfig,
@@ -96,7 +97,12 @@ import {
   type IDataElementConfig,
   type IDataElementResults,
 } from '../core/dataElement';
-import { AdtDdl, type IDdlConfig, type IDdlState } from '../core/ddl';
+import {
+  AdtDdl,
+  ddlDocuments,
+  type IDdlConfig,
+  type IDdlResults,
+} from '../core/ddl';
 import {
   AdtDomain,
   domainDocuments,
@@ -152,7 +158,8 @@ import {
 import {
   AdtMetadataExtension,
   type IMetadataExtensionConfig,
-  type IMetadataExtensionState,
+  type IMetadataExtensionResults,
+  metadataExtensionDocuments,
 } from '../core/metadataExtension';
 import {
   AdtPackage,
@@ -179,7 +186,8 @@ import { AdtServiceBinding, type IAdtServiceBinding } from '../core/service';
 import {
   AdtServiceDefinition,
   type IServiceDefinitionConfig,
-  type IServiceDefinitionState,
+  type IServiceDefinitionResults,
+  serviceDefinitionDocuments,
 } from '../core/serviceDefinition';
 import { AdtUtils } from '../core/shared/AdtUtils';
 import { type LockFailure, LockRegistry } from '../core/shared/LockRegistry';
@@ -898,13 +906,55 @@ export class AdtClient {
    * (`/ddic/dsfd/sources/`) have their own clients.
    * @returns IAdtObject instance for DDL source operations
    */
-  getDdl(): IAdtSourceObject<IDdlConfig, IDdlState> {
+  getDdl(): AdtDdl;
+  getDdl<
+    R extends IDdlResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    >,
+  >(
+    results: R,
+  ): IAdtCreatable<IDdlConfig, ReturnType<R['created']>> &
+    IAdtReadable<
+      IDdlConfig,
+      ReturnType<R['source']>,
+      ReturnType<R['metadata']>
+    > &
+    IAdtUpdatable<IDdlConfig, ReturnType<R['updated']>> &
+    IAdtDeletable<IDdlConfig, ReturnType<R['deletion']>> &
+    IAdtValidatable<IDdlConfig, ReturnType<R['validation']>> &
+    IAdtCheckable<IDdlConfig, ReturnType<R['check']>> &
+    IAdtActivatable<IDdlConfig, ReturnType<R['activation']>> &
+    IAdtLockable<IDdlConfig> &
+    IAdtTransportAware<IDdlConfig, ReturnType<R['transport']>> &
+    IAdtVersionable<IDdlConfig, ObjectVersion[], string>;
+  getDdl<
+    R extends IDdlResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    > = IDdlResults,
+  >(results: R = ddlDocuments as unknown as R): AdtDdl<R> {
     this.assertConnected();
-    return new AdtDdl(
+    return new AdtDdl<R>(
       this.connection,
       this.logger,
       this.systemContext,
       this.lockRegistry,
+      results,
     );
   }
 
@@ -1133,16 +1183,55 @@ export class AdtClient {
    * Get high-level operations for AccessControl objects
    * @returns IAdtObject instance for AccessControl operations
    */
-  getAccessControl(): IAdtSourceObject<
-    IAccessControlConfig,
-    IAccessControlState
-  > {
+  getAccessControl(): AdtAccessControl;
+  getAccessControl<
+    R extends IAccessControlResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    >,
+  >(
+    results: R,
+  ): IAdtCreatable<IAccessControlConfig, ReturnType<R['created']>> &
+    IAdtReadable<
+      IAccessControlConfig,
+      ReturnType<R['source']>,
+      ReturnType<R['metadata']>
+    > &
+    IAdtUpdatable<IAccessControlConfig, ReturnType<R['updated']>> &
+    IAdtDeletable<IAccessControlConfig, ReturnType<R['deletion']>> &
+    IAdtValidatable<IAccessControlConfig, ReturnType<R['validation']>> &
+    IAdtCheckable<IAccessControlConfig, ReturnType<R['check']>> &
+    IAdtActivatable<IAccessControlConfig, ReturnType<R['activation']>> &
+    IAdtLockable<IAccessControlConfig> &
+    IAdtTransportAware<IAccessControlConfig, ReturnType<R['transport']>> &
+    IAdtVersionable<IAccessControlConfig, ObjectVersion[], string>;
+  getAccessControl<
+    R extends IAccessControlResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    > = IAccessControlResults,
+  >(results: R = accessControlDocuments as unknown as R): AdtAccessControl<R> {
     this.assertConnected();
-    return new AdtAccessControl(
+    return new AdtAccessControl<R>(
       this.connection,
       this.logger,
       this.systemContext,
       this.lockRegistry,
+      results,
     );
   }
 
@@ -1168,16 +1257,57 @@ export class AdtClient {
    * Get high-level operations for ServiceDefinition objects
    * @returns IAdtObject instance for ServiceDefinition operations
    */
-  getServiceDefinition(): IAdtSourceObject<
-    IServiceDefinitionConfig,
-    IServiceDefinitionState
-  > {
+  getServiceDefinition(): AdtServiceDefinition;
+  getServiceDefinition<
+    R extends IServiceDefinitionResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    >,
+  >(
+    results: R,
+  ): IAdtCreatable<IServiceDefinitionConfig, ReturnType<R['created']>> &
+    IAdtReadable<
+      IServiceDefinitionConfig,
+      ReturnType<R['source']>,
+      ReturnType<R['metadata']>
+    > &
+    IAdtUpdatable<IServiceDefinitionConfig, ReturnType<R['updated']>> &
+    IAdtDeletable<IServiceDefinitionConfig, ReturnType<R['deletion']>> &
+    IAdtValidatable<IServiceDefinitionConfig, ReturnType<R['validation']>> &
+    IAdtCheckable<IServiceDefinitionConfig, ReturnType<R['check']>> &
+    IAdtActivatable<IServiceDefinitionConfig, ReturnType<R['activation']>> &
+    IAdtLockable<IServiceDefinitionConfig> &
+    IAdtTransportAware<IServiceDefinitionConfig, ReturnType<R['transport']>> &
+    IAdtVersionable<IServiceDefinitionConfig, ObjectVersion[], string>;
+  getServiceDefinition<
+    R extends IServiceDefinitionResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    > = IServiceDefinitionResults,
+  >(
+    results: R = serviceDefinitionDocuments as unknown as R,
+  ): AdtServiceDefinition<R> {
     this.assertConnected();
-    return new AdtServiceDefinition(
+    return new AdtServiceDefinition<R>(
       this.connection,
       this.logger,
       this.systemContext,
       this.lockRegistry,
+      results,
     );
   }
 
@@ -1294,16 +1424,57 @@ export class AdtClient {
    * Get high-level operations for BehaviorDefinition objects
    * @returns IAdtObject instance for BehaviorDefinition operations
    */
-  getBehaviorDefinition(): IAdtSourceObject<
-    IBehaviorDefinitionConfig,
-    IBehaviorDefinitionState
-  > {
+  getBehaviorDefinition(): AdtBehaviorDefinition;
+  getBehaviorDefinition<
+    R extends IBehaviorDefinitionResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    >,
+  >(
+    results: R,
+  ): IAdtCreatable<IBehaviorDefinitionConfig, ReturnType<R['created']>> &
+    IAdtReadable<
+      IBehaviorDefinitionConfig,
+      ReturnType<R['source']>,
+      ReturnType<R['metadata']>
+    > &
+    IAdtUpdatable<IBehaviorDefinitionConfig, ReturnType<R['updated']>> &
+    IAdtDeletable<IBehaviorDefinitionConfig, ReturnType<R['deletion']>> &
+    IAdtValidatable<IBehaviorDefinitionConfig, ReturnType<R['validation']>> &
+    IAdtCheckable<IBehaviorDefinitionConfig, ReturnType<R['check']>> &
+    IAdtActivatable<IBehaviorDefinitionConfig, ReturnType<R['activation']>> &
+    IAdtLockable<IBehaviorDefinitionConfig> &
+    IAdtTransportAware<IBehaviorDefinitionConfig, ReturnType<R['transport']>> &
+    IAdtVersionable<IBehaviorDefinitionConfig, ObjectVersion[], string>;
+  getBehaviorDefinition<
+    R extends IBehaviorDefinitionResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    > = IBehaviorDefinitionResults,
+  >(
+    results: R = behaviorDefinitionDocuments as unknown as R,
+  ): AdtBehaviorDefinition<R> {
     this.assertConnected();
-    return new AdtBehaviorDefinition(
+    return new AdtBehaviorDefinition<R>(
       this.connection,
       this.logger,
       this.systemContext,
       this.lockRegistry,
+      results,
     );
   }
 
@@ -1311,15 +1482,58 @@ export class AdtClient {
    * Get high-level operations for BehaviorImplementation objects
    * @returns IAdtObject instance for BehaviorImplementation operations
    */
-  getBehaviorImplementation(): IAdtSourceObject<
-    IBehaviorImplementationConfig,
-    IBehaviorImplementationState
-  > {
+  getBehaviorImplementation(): AdtBehaviorImplementation;
+  getBehaviorImplementation<
+    R extends IClassResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    >,
+  >(
+    results: R,
+  ): IAdtCreatable<IBehaviorImplementationConfig, ReturnType<R['created']>> &
+    IAdtReadable<
+      IBehaviorImplementationConfig,
+      ReturnType<R['source']>,
+      ReturnType<R['metadata']>
+    > &
+    IAdtUpdatable<IBehaviorImplementationConfig, ReturnType<R['updated']>> &
+    IAdtDeletable<IBehaviorImplementationConfig, ReturnType<R['deletion']>> &
+    IAdtValidatable<
+      IBehaviorImplementationConfig,
+      ReturnType<R['validation']>
+    > &
+    IAdtCheckable<IBehaviorImplementationConfig, ReturnType<R['check']>> &
+    IAdtActivatable<
+      IBehaviorImplementationConfig,
+      ReturnType<R['activation']>
+    > &
+    IAdtLockable<IBehaviorImplementationConfig> &
+    IAdtTransportAware<IBehaviorImplementationConfig, string> &
+    IAdtVersionable<IBehaviorImplementationConfig, ObjectVersion[], string>;
+  getBehaviorImplementation<
+    R extends IClassResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    > = IClassResults,
+  >(results: R = classDocuments as unknown as R): AdtBehaviorImplementation<R> {
     this.assertConnected();
-    return new AdtBehaviorImplementation(
+    return new AdtBehaviorImplementation<R>(
       this.connection,
       this.logger,
       this.lockRegistry,
+      results,
     );
   }
 
@@ -1327,16 +1541,57 @@ export class AdtClient {
    * Get high-level operations for MetadataExtension objects
    * @returns IAdtObject instance for MetadataExtension operations
    */
-  getMetadataExtension(): IAdtSourceObject<
-    IMetadataExtensionConfig,
-    IMetadataExtensionState
-  > {
+  getMetadataExtension(): AdtMetadataExtension;
+  getMetadataExtension<
+    R extends IMetadataExtensionResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    >,
+  >(
+    results: R,
+  ): IAdtCreatable<IMetadataExtensionConfig, ReturnType<R['created']>> &
+    IAdtReadable<
+      IMetadataExtensionConfig,
+      ReturnType<R['source']>,
+      ReturnType<R['metadata']>
+    > &
+    IAdtUpdatable<IMetadataExtensionConfig, ReturnType<R['updated']>> &
+    IAdtDeletable<IMetadataExtensionConfig, ReturnType<R['deletion']>> &
+    IAdtValidatable<IMetadataExtensionConfig, ReturnType<R['validation']>> &
+    IAdtCheckable<IMetadataExtensionConfig, ReturnType<R['check']>> &
+    IAdtActivatable<IMetadataExtensionConfig, ReturnType<R['activation']>> &
+    IAdtLockable<IMetadataExtensionConfig> &
+    IAdtTransportAware<IMetadataExtensionConfig, ReturnType<R['transport']>> &
+    IAdtVersionable<IMetadataExtensionConfig, ObjectVersion[], string>;
+  getMetadataExtension<
+    R extends IMetadataExtensionResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    > = IMetadataExtensionResults,
+  >(
+    results: R = metadataExtensionDocuments as unknown as R,
+  ): AdtMetadataExtension<R> {
     this.assertConnected();
-    return new AdtMetadataExtension(
+    return new AdtMetadataExtension<R>(
       this.connection,
       this.logger,
       this.systemContext,
       this.lockRegistry,
+      results,
     );
   }
 
