@@ -111,8 +111,9 @@ import {
 } from '../core/domain';
 import {
   AdtEnhancement,
+  enhancementDocuments,
   type IEnhancementConfig,
-  type IEnhancementState,
+  type IEnhancementResults,
 } from '../core/enhancement';
 import {
   AdtFeatureToggle,
@@ -164,7 +165,8 @@ import {
 import {
   AdtPackage,
   type IPackageConfig,
-  type IPackageState,
+  type IPackageResults,
+  packageDocuments,
 } from '../core/package';
 import {
   AdtProgram,
@@ -217,7 +219,8 @@ import {
 import {
   AdtTransformation,
   type ITransformationConfig,
-  type ITransformationState,
+  type ITransformationResults,
+  transformationDocuments,
 } from '../core/transformation';
 import { AdtRequest } from '../core/transport';
 import {
@@ -1137,17 +1140,51 @@ export class AdtClient {
    * Get high-level operations for Package objects
    * @returns IAdtObject instance for Package operations
    */
-  getPackage(): IAdtCrud<IPackageConfig, IPackageState> &
-    IAdtValidatable<IPackageConfig, IPackageState> &
-    IAdtCheckable<IPackageConfig, IPackageState> &
-    IAdtLockable<IPackageConfig, IPackageState> &
-    IAdtTransportAware<IPackageConfig, IPackageState> {
+  getPackage(): AdtPackage;
+  getPackage<
+    R extends IPackageResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    >,
+  >(
+    results: R,
+  ): IAdtCreatable<IPackageConfig, ReturnType<R['created']>> &
+    IAdtReadable<
+      IPackageConfig,
+      ReturnType<R['source']>,
+      ReturnType<R['metadata']>
+    > &
+    IAdtUpdatable<IPackageConfig, ReturnType<R['updated']>> &
+    IAdtDeletable<IPackageConfig, ReturnType<R['deletion']>> &
+    IAdtValidatable<IPackageConfig, ReturnType<R['validation']>> &
+    IAdtCheckable<IPackageConfig, ReturnType<R['check']>> &
+    IAdtLockable<IPackageConfig> &
+    IAdtTransportAware<IPackageConfig, ReturnType<R['transport']>>;
+  getPackage<
+    R extends IPackageResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    > = IPackageResults,
+  >(results: R = packageDocuments as unknown as R): AdtPackage<R> {
     this.assertConnected();
-    return new AdtPackage(
+    return new AdtPackage<R>(
       this.connection,
       this.logger,
       this.systemContext,
       this.lockRegistry,
+      results,
     );
   }
 
@@ -1244,16 +1281,57 @@ export class AdtClient {
    * Supports both SimpleTransformation and XSLTProgram types
    * @returns IAdtObject instance for Transformation operations
    */
-  getTransformation(): IAdtSourceObject<
-    ITransformationConfig,
-    ITransformationState
-  > {
+  getTransformation(): AdtTransformation;
+  getTransformation<
+    R extends ITransformationResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    >,
+  >(
+    results: R,
+  ): IAdtCreatable<ITransformationConfig, ReturnType<R['created']>> &
+    IAdtReadable<
+      ITransformationConfig,
+      ReturnType<R['source']>,
+      ReturnType<R['metadata']>
+    > &
+    IAdtUpdatable<ITransformationConfig, ReturnType<R['updated']>> &
+    IAdtDeletable<ITransformationConfig, ReturnType<R['deletion']>> &
+    IAdtValidatable<ITransformationConfig, ReturnType<R['validation']>> &
+    IAdtCheckable<ITransformationConfig, ReturnType<R['check']>> &
+    IAdtActivatable<ITransformationConfig, ReturnType<R['activation']>> &
+    IAdtLockable<ITransformationConfig> &
+    IAdtTransportAware<ITransformationConfig, ReturnType<R['transport']>> &
+    IAdtVersionable<ITransformationConfig, ObjectVersion[], string>;
+  getTransformation<
+    R extends ITransformationResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    > = ITransformationResults,
+  >(
+    results: R = transformationDocuments as unknown as R,
+  ): AdtTransformation<R> {
     this.assertConnected();
-    return new AdtTransformation(
+    return new AdtTransformation<R>(
       this.connection,
       this.logger,
       this.systemContext,
       this.lockRegistry,
+      results,
     );
   }
 
@@ -1616,13 +1694,55 @@ export class AdtClient {
    * - BAdI Enhancement Spot
    * @returns IAdtObject instance for Enhancement operations
    */
-  getEnhancement(): IAdtSourceObject<IEnhancementConfig, IEnhancementState> {
+  getEnhancement(): AdtEnhancement;
+  getEnhancement<
+    R extends IEnhancementResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    >,
+  >(
+    results: R,
+  ): IAdtCreatable<IEnhancementConfig, ReturnType<R['created']>> &
+    IAdtReadable<
+      IEnhancementConfig,
+      ReturnType<R['source']>,
+      ReturnType<R['metadata']>
+    > &
+    IAdtUpdatable<IEnhancementConfig, ReturnType<R['updated']>> &
+    IAdtDeletable<IEnhancementConfig, ReturnType<R['deletion']>> &
+    IAdtValidatable<IEnhancementConfig, ReturnType<R['validation']>> &
+    IAdtCheckable<IEnhancementConfig, ReturnType<R['check']>> &
+    IAdtActivatable<IEnhancementConfig, ReturnType<R['activation']>> &
+    IAdtLockable<IEnhancementConfig> &
+    IAdtTransportAware<IEnhancementConfig, ReturnType<R['transport']>> &
+    IAdtVersionable<IEnhancementConfig, ObjectVersion[], string>;
+  getEnhancement<
+    R extends IEnhancementResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    > = IEnhancementResults,
+  >(results: R = enhancementDocuments as unknown as R): AdtEnhancement<R> {
     this.assertConnected();
-    return new AdtEnhancement(
+    return new AdtEnhancement<R>(
       this.connection,
       this.logger,
       this.systemContext,
       this.lockRegistry,
+      results,
     );
   }
 
