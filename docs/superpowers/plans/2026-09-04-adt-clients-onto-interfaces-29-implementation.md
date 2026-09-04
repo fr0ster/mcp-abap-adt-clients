@@ -15,7 +15,13 @@
 - Never change `package.json` version. The number and `npm publish` are the maintainer's.
 - All diagnostics through the injected `ILogger`. `console.*` is banned by `noConsole`.
 - No `"link": true` in `package-lock.json`; everything resolves from the npm registry.
-- Gate for every commit: `npm run lint:check`, `npm run build`, `npm run test:check` all exit 0.
+- Gate for every commit: `npm run lint:check` and `npm run test:check` exit 0.
+  **`npm run build` is expected to fail from Task 1 until the `AdtUtils` task**,
+  which is the first point where the whole package compiles — a migration of this
+  size cannot keep the build green at every step, and pretending otherwise would
+  mean either one enormous commit or a false claim in each small one. Commits
+  during that window use `--no-verify` and say in their message that the build is
+  still red and why.
 - **One SAP-touching run at a time**, and no edits under `src/` while one is in flight.
 - Test output: `npm test 2>&1 | tee test-run.log`, then read the file. Never pipe through `grep`/`head`/`tail`.
 - Deleting or renaming a symbol: enumerate first, edit, then grep the repository for it **including comments, README and docs**, and compare counts before and after. Three regex sweeps in the contracts package silently deleted six types and the first field of three others while every check stayed green.
@@ -84,13 +90,14 @@ Expected: no matches outside `CHANGELOG.md`. Fix any that appear, including comm
 npm run lint:check && npm run build
 ```
 
-Expected: the batch errors are gone from the build. Other migration errors remain — that is fine at this stage.
+Expected: the batch errors are gone. Other migration errors remain — see the
+build exception in Global Constraints; this commit uses `--no-verify`.
 
 - [ ] **Step 6: Commit**
 
 ```bash
 git add -A
-git commit -m "refactor!: remove the batch clients
+git commit --no-verify -m "refactor!: remove the batch clients
 
 Mixed GET+POST in one envelope is a server-side 500, so batch was research
 rather than product and its integration tests were red against a real system.
@@ -640,7 +647,7 @@ Create `src/__tests__/unit/core/classAnswersContract.test.ts`:
 
 ```typescript
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
-import { AdtClass } from '../../../core/class/AdtClass';
+import { AdtClient } from '../../../clients/AdtClient';
 
 const logger = {
   log: jest.fn(), info: jest.fn(), error: jest.fn(),
@@ -665,7 +672,11 @@ const answering = (data: string, status = 200): IAbapConnection =>
 
 describe('AdtClass', () => {
   it('answers a result when the read succeeded', async () => {
-    const cls = new AdtClass(answering('CLASS zcl_x.'), logger);
+    // Through AdtClient, not `new AdtClass`: the refusal detection that turns an
+    // <exc:exception> inside a 200 into a failure is installed on the connection
+    // by the client. Constructing the handler directly skips it, and every
+    // refusal test would pass as a success while proving nothing.
+    const cls = new AdtClient(answering('CLASS zcl_x.'), logger).getClass();
 
     const response = await cls.read({ className: 'ZCL_X' });
 
@@ -675,7 +686,7 @@ describe('AdtClass', () => {
   });
 
   it("answers a failure carrying SAP's own sentence when it refused", async () => {
-    const cls = new AdtClass(answering(REFUSAL), logger);
+    const cls = new AdtClient(answering(REFUSAL), logger).getClass();
 
     const response = await cls.create({
       className: 'ZCL_X',
@@ -815,15 +826,20 @@ unlock is discharged when it happens normally:
 ```typescript
 return chain(this.logger, async ({ step, onScopeEnd }) => {
   this.connection.setSessionType('stateful');
-  const lockHandle = await lockClass(this.connection, name);   // throws; no failure half
-
-  const releaseLock = onScopeEnd(async () => {
-    await unlockClass(this.connection, name, lockHandle);
-  });
-  // Guaranteed whatever happens, and registered before the lock so it runs last.
+  // Registered FIRST so it unwinds LAST. Order matters twice over: on older
+  // BASIS a lock handle is only valid inside a stateful request, so going
+  // stateless before the unlock would break the unlock (#106); and if
+  // lockClass itself throws, the session is still restored because this was
+  // already registered.
   onScopeEnd(async () => {
     this.connection.setSessionType('stateless');
   });
+
+  const lockHandle = await lockClass(this.connection, name);   // throws; no failure half
+  const releaseLock = onScopeEnd(async () => {
+    await unlockClass(this.connection, name, lockHandle);
+  });
+  // Unwind order is therefore: unlock, then stateless.
 
   await step(answering(() => checkClass(...), this.results.check, options?.analyse));
   const updated = await step(
@@ -853,21 +869,25 @@ it('unlocks when a request refuses after the lock was taken', async () => {
     isConnected: () => true,
     makeAdtRequest: jest.fn(async (r: { url: string }) => {
       calls.push(r.url);
-      if (r.url.includes('lock')) {
+      // Real URLs carry `_action=LOCK` / `_action=UNLOCK`, upper case. Matching
+      // lowercase `lock` would also match `lockHandle=` on the update, so the
+      // mock would answer a lock handle to the write and the chain would never
+      // reach the branch under test.
+      if (/_action=LOCK\b/i.test(r.url)) {
         return { data: '<LOCK_HANDLE>h1</LOCK_HANDLE>', status: 200, statusText: 'OK', headers: {} };
       }
       return { data: REFUSAL, status: 200, statusText: 'OK', headers: {} };
     }),
   } as unknown as IAbapConnection;
 
-  const response = await new AdtClass(connection, logger).update({
+  const response = await new AdtClient(connection, logger).getClass().update({
     className: 'ZCL_X',
     sourceCode: 'CLASS zcl_x.',
   });
 
   expect(response.ok).toBe(false);
   // The lock was released even though nothing threw.
-  expect(calls.some((c) => c.includes('unlock') || c.includes('lockHandle'))).toBe(true);
+  expect(calls.some((c) => /_action=UNLOCK\b/i.test(c))).toBe(true);
   expect(calls).toContain('session:stateless');
 });
 
@@ -877,15 +897,15 @@ it('reports what SAP refused, not what the unlock did', async () => {
     setSessionType: jest.fn(),
     isConnected: () => true,
     makeAdtRequest: jest.fn(async (r: { url: string }) => {
-      if (r.url.includes('lock') && !r.url.includes('unlock')) {
+      if (/_action=LOCK\b/i.test(r.url)) {
         return { data: '<LOCK_HANDLE>h1</LOCK_HANDLE>', status: 200, statusText: 'OK', headers: {} };
       }
-      if (r.url.includes('unlock')) throw new Error('unlock exploded');
+      if (/_action=UNLOCK\b/i.test(r.url)) throw new Error('unlock exploded');
       return { data: REFUSAL, status: 200, statusText: 'OK', headers: {} };
     }),
   } as unknown as IAbapConnection;
 
-  const response = await new AdtClass(connection, logger).update({
+  const response = await new AdtClient(connection, logger).getClass().update({
     className: 'ZCL_X',
     sourceCode: 'CLASS zcl_x.',
   });
@@ -906,12 +926,12 @@ it('restores stateless on the success path too', async () => {
     setSessionType: jest.fn((t: string) => calls.push(`session:${t}`)),
     isConnected: () => true,
     makeAdtRequest: jest.fn(async (r: { url: string }) => ({
-      data: r.url.includes('lock') ? '<LOCK_HANDLE>h1</LOCK_HANDLE>' : '',
+      data: /_action=LOCK\b/i.test(r.url) ? '<LOCK_HANDLE>h1</LOCK_HANDLE>' : '',
       status: 200, statusText: 'OK', headers: {},
     })),
   } as unknown as IAbapConnection;
 
-  const response = await new AdtClass(connection, logger).update({
+  const response = await new AdtClient(connection, logger).getClass().update({
     className: 'ZCL_X',
     sourceCode: 'CLASS zcl_x.',
   });
@@ -919,7 +939,7 @@ it('restores stateless on the success path too', async () => {
   expect(response.ok).toBe(true);
   expect(calls[calls.length - 1]).toBe('session:stateless');
   // Discharged, so exactly one unlock.
-  expect(calls.filter((c) => c.includes('unlock')).length).toBe(1);
+  expect(calls.filter((c) => /_action=UNLOCK\b/i.test(c)).length).toBe(1);
 });
 ```
 
@@ -1055,14 +1075,16 @@ getClass<
   IAdtActivatable<IClassConfig, ReturnType<R['activation']>> &
   IAdtLockable<IClassConfig> &
   IAdtVersionable<IClassConfig>;
-// implementation signature: the erased form both overloads collapse to
-getClass(
-  results: IClassResults<
+// The implementation is generic too. Erasing R here would build the handler at
+// `unknown` while the overload promised `ReturnType<R['source']>` — the factory
+// telling the truth in its signature and lying in its body.
+getClass<
+  R extends IClassResults<
     unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown
-  > = classDocuments,
-): unknown {
+  > = IClassResults,
+>(results: R = classDocuments as unknown as R): AdtClass<R> {
   this.assertConnected();
-  return new AdtClass(
+  return new AdtClass<R>(
     this.connection,
     this.logger,
     this.systemContext,
@@ -1073,15 +1095,35 @@ getClass(
 }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [ ] **Step 4: Prove the handler and the overload agree on `R`**
+
+A compile-only assertion, in the same file. A runtime test cannot catch the
+factory building at `unknown` while its signature promises otherwise:
+
+```typescript
+// Compile-only: if these stop compiling, the factory and the handler disagree.
+const named = {
+  ...classDocuments,
+  source: (wire: IAdtWireResponse) => ({ name: String(wire.data) }),
+};
+type Handler = ReturnType<AdtClient['getClass']>;
+type FromNamed = ReturnType<typeof AdtClient.prototype.getClass<typeof named>>;
+const _readsTheirShape: (
+  c: FromNamed,
+) => Promise<IAdtResponse<{ name: string }>> = (c) => c.read({ className: 'X' });
+void _readsTheirShape;
+```
+
+- [ ] **Step 5: Run the tests to verify they pass**
 
 ```bash
 MCP_ENV_PATH=/tmp/nonexistent-env npx jest src/__tests__/unit/clients/factoryStrategy.test.ts 2>&1 | tee unit-run.log
+npx tsc --noEmit -p tsconfig.json 2>&1 | grep factoryStrategy
 ```
 
-Expected: 2 passed, and `answer.getResult().value.name` type-checks without a cast.
+Expected: 2 passed, no tsc output, and `answer.getResult().value.name` type-checks without a cast.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add src/clients/AdtClient.ts src/__tests__/unit/clients/factoryStrategy.test.ts
@@ -1161,7 +1203,7 @@ get around the envelope and are gone with it."
 
 ---
 
-### Tasks 7–11: The remaining 29 object types, in batches
+### Tasks 7 to 11 — the remaining 29 object types, in batches
 
 Five batches, each the same six steps as Tasks 3, 4 and 6 applied to its types. The pattern is proved; what is not proved is what each endpoint answers, so **read each type's low-level functions before naming its results**. Copy the shape, never the values.
 
@@ -1191,7 +1233,7 @@ At the end of each batch:
 
 ---
 
-### Task 7: The short and full strategies the design promised
+### Task 12: The short and full strategies the design promised
 
 The design names three answers large enough that callers want different amounts,
 and nothing so far creates them. Without this task the "two or three defaults"
@@ -1231,13 +1273,24 @@ export const transportShort: ITransportResults<string[]> = { /* … */ list: tra
 getRequest(): AdtRequest;
 getRequest<R extends ITransportResults<unknown>>(results: R): /* atoms over R */;
 
+// src/runtime/dumps/RuntimeDumps.ts — the real class name; its members answer
+// IAdtWireResponse today and must take the set the handler was built with
+export class RuntimeDumps<R extends IDumpResults<unknown> = IDumpResults> {
+  constructor(/* … */, private readonly results: R = dumpDocuments as unknown as R) {}
+  list(params?: IGetDumpsParams): Promise<IAdtResponse<ReturnType<R['list']>>>;
+  read(id: string): Promise<IAdtResponse<ReturnType<R['document']>>>;
+}
+
 // src/clients/AdtRuntimeClient.ts
-getDumps(): AdtDumps;                                            // dumpDocument
-getDumps<R extends IDumpResults<unknown>>(results: R): /* … */;  // dumpList
+getDumps(): RuntimeDumps;
+getDumps<R extends IDumpResults<unknown>>(results: R): RuntimeDumps<R>;
 ```
 
-Package contents reach a caller through `AdtUtils`, whose members take the set
-the handler was built with — wired in Task 13 rather than here.
+Package contents reach a caller through `AdtUtils.getPackageContents`, whose
+result set is given to `AdtUtils` at construction — so `AdtClient.getUtils()`
+gains the same pair of overloads, and `src/core/shared/AdtUtils.ts` takes
+`results: IUtilsResults` alongside its connection. Both are done in the
+`AdtUtils` task, and this step is not complete until that one names them.
 
 - [ ] **Step 7:** Test each factory with both sets: one call, two shapes, and the
 short one typed as its own type rather than as `unknown`.
@@ -1246,7 +1299,7 @@ short one typed as its own type rather than as `unknown`.
 
 ---
 
-### Task 8: `AdtUtils` and the legacy clients
+### Task 13: `AdtUtils` and the legacy clients
 
 **Files:**
 - Modify: `src/core/shared/AdtUtils.ts`, `src/core/shared/AdtUtilsLegacy.ts`, `src/clients/AdtClientLegacy.ts`, and the 13 `*Legacy.ts` files under `src/core/`
@@ -1263,7 +1316,7 @@ short one typed as its own type rather than as `unknown`.
 
 ---
 
-### Task 9: The integration tests read the verdict from the contract
+### Task 14: The integration tests read the verdict from the contract
 
 **Files:**
 - Modify: `src/__tests__/integration/shared/{discovery,readSource,readMetadata,whereUsed,search,sqlQuery,tableContents}.test.ts`
@@ -1281,7 +1334,7 @@ short one typed as its own type rather than as `unknown`.
 
 ---
 
-### Task 10: Full run against the cloud trial
+### Task 15: Full run against the cloud trial
 
 - [ ] **Step 1:** Confirm no other SAP-touching run is in flight, and that the token in `.env` is valid.
 - [ ] **Step 2:** `npm test 2>&1 | tee test-run.log`
@@ -1292,7 +1345,7 @@ short one typed as its own type rather than as `unknown`.
 
 ---
 
-### Task 11: On-prem acceptance
+### Task 16: On-prem acceptance
 
 The report this whole line of work started from. The cloud trial cannot show it: `ZLOCAL` is local and `transport_request` is unset, which the last full run confirmed by skipping `read_transport`.
 
