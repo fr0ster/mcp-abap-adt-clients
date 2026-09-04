@@ -1,12 +1,19 @@
 # `adt-clients` onto the 30.0.0 contracts — implementation plan
 
-> **Retargeted 2026-09-04.** This plan was written against `interfaces@29.0.0`
-> and against the assumption that the contracts package was closed. It is not:
-> 30.0.0 collapses the members that duplicated one endpoint at a different level
-> of doneness, and it ships **first** —
-> `docs/superpowers/plans/2026-09-04-interfaces-30-one-member-per-endpoint.md`.
-> `adt-clients` migrates **once**, onto 30.0.0. Nothing here is executed against
-> 29.0.0; the intermediate state would cost a second migration of the same files.
+> **Retargeted 2026-09-04, and 30.0.0 is published.** This plan was written
+> against `interfaces@29.0.0` and against the assumption that the contracts
+> package was closed. It was not: 30.0.0 collapsed the members that duplicated
+> one endpoint, made every ADT member answer the contract, and stopped contracts
+> inheriting from one another. It is on npm and installed here.
+>
+> **Measured against it, 2026-09-04:** `npx tsc --noEmit -p tsconfig.json` gives
+> **715 error lines across 102 files**. Most of it is the 29.0.0 migration this
+> plan describes and which was never executed — `IAdtCrud` (11), `IClassState`
+> (9), `AdtOperationError` (8), `IAdtSourceObject` (20). The 30.0.0 delta is
+> smaller than the tasks below assumed, and it changes three of them; see
+> **What 30.0.0 changed in this plan** at the end.
+>
+> `adt-clients` migrates **once**, onto 30.0.0.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -28,6 +35,16 @@
 - **No member takes a strategy as an argument.** The choice is injected at
   construction — decision 22. A per-call parse overload was tried across 23
   members in the contracts package and reverted.
+- **Contracts are composed, never inherited — decision 23.** No contract in
+  `interfaces` extends another any more, so an implementation that used to get
+  CRUD by declaring one wide contract must now list the atoms it satisfies:
+  `implements IAdtServiceBinding, IAdtCreatable<IServiceBindingConfig, void>, …`.
+  This is where 98 of the 715 errors are (TS2416), led by `IAdtRunnable` (18),
+  `IAdtServiceBinding` (8), `IAdtInformationSystem` (7) and `IAdtAbapGitClient` (7).
+- **Every atom that takes type arguments is given them.** `IAdtLockable<TConfig>`
+  and `IAdtReadable<TConfig, TSource, TMetadata>` are used bare in 36 places —
+  20 of them in `src/clients/AdtClient.ts` — which is TS2314 and Task 5's work,
+  not a separate concern.
 - All repository artifacts in English. Comments explain *why*.
 - Never change `package.json` version. The number and `npm publish` are the maintainer's.
 - All diagnostics through the injected `ILogger`. `console.*` is banned by `noConsole`.
@@ -36,7 +53,7 @@
   - `npm run lint:check` exits 0 on every commit **except Task 1's**, which lands
     before the five broken documentation imports are fixed.
   - `npm run build` and `npm run test:check` are expected to fail from **Task 1
-    through Task 12**, and exit 0 from Task 13 onward.
+    through Task 12**, and exit 0 from Task 14 onward.
 - `npm run lint:check` runs `check:docs`, and **it is red for Task 1 as well, for
   five broken documentation imports** — `README.md` and `docs/usage/CLIENT_API_REFERENCE.md`
   still say `AdtOperationError` and `IClassState` come from
@@ -1115,6 +1132,13 @@ who holds the lock."
 
 ### Task 5: The factory selects the strategy
 
+**It also carries 36 of the 715 errors on its own.** `IAdtLockable<TConfig>` and
+`IAdtReadable<TConfig, TSource, TMetadata>` are used without type arguments in 36
+places — 20 of them in `src/clients/AdtClient.ts`, 4 in `AdtClientLegacy.ts`, the
+rest in `AdtUnitTest`, `AdtRequest`, `LockCapability` and `AdtPackage`. That is
+TS2314, and it is this task's: a factory return type that names an atom without
+saying what it reads is the same defect as a state bag, one layer up.
+
 **Files:**
 - Modify: `src/clients/AdtClient.ts:304` (`getClass`)
 - Test: `src/__tests__/unit/clients/factoryStrategy.test.ts`
@@ -1430,12 +1454,18 @@ getRequest(): AdtRequest;
 getRequest<R extends ITransportResults<unknown>>(results: R): /* atoms over R */;
 
 // src/runtime/dumps/RuntimeDumps.ts — the real class, with its three real
-// members. `IRuntimeDumps` in interfaces 29.0.0 declares them answering
-// IAdtWireResponse and is NOT changed by this work, so the class stops declaring
-// `implements IRuntimeDumps` and states its own contract instead. That is the
-// honest move: a class cannot both answer the contract and answer the frame, and
-// interfaces is closed for this migration.
-export class RuntimeDumps<R extends IDumpResults<unknown> = IDumpResults> {
+// members. In 29.0.0 `IRuntimeDumps` declared them answering IAdtWireResponse,
+// so this class had to choose between honouring the contract and naming its
+// results, and this plan told it to drop `implements`. **30.0.0 fixed the
+// contract instead**: `IRuntimeDumps<TList, TDump>` answers `IAdtResponse` with
+// the shape as a type parameter, and it inherits nothing (decision 23), so it
+// declares `kind` and `list` itself. The class therefore KEEPS `implements` —
+// and if it cannot satisfy it, that is a defect here, not a reason to stop
+// declaring the contract.
+export class RuntimeDumps<R extends IDumpResults<unknown> = IDumpResults>
+  implements IRuntimeDumps<ReturnType<R['list']>, ReturnType<R['document']>>
+{
+  readonly kind = 'runtimeDumps' as const;
   constructor(/* … */, private readonly results: R = dumpDocuments as unknown as R) {}
   list(options?: IRuntimeDumpsListOptions): Promise<IAdtResponse<ReturnType<R['list']>>>;
   listByUser(
@@ -1451,7 +1481,9 @@ export class RuntimeDumps<R extends IDumpResults<unknown> = IDumpResults> {
 
 `IDumpResults` therefore carries two strategies, not three: `list` serves both
 listing members because they answer the same shape from the same resource, and
-`document` serves `getById`. Callers of all three migrate in this task — find them
+`document` serves `getById`. That is also the shape `IRuntimeDumps<TList, TDump>`
+takes in 30.0.0, so the class's set and the contract's parameters line up one to
+one rather than needing conversion. Callers of all three migrate in this task — find them
 with `grep -rn "getDumps()" src`.
 
 ```typescript
@@ -1493,7 +1525,74 @@ would pass while the cache defect is still there.
 
 ---
 
-### Task 13: `AdtUtils` and the legacy clients
+### Task 13: The implementations that answered past the contract
+
+The 30.0.0 delta this plan was written before. Ninety-eight of the 715 errors are
+TS2416 — a member not assignable to the contract it claims — and they are not the
+object types: they are the clients that answered the transport envelope, or their
+own type, while declaring a contract that now answers `IAdtResponse`.
+
+**Files, with the error count each carries:**
+
+| implementation | errors | contract |
+|---|---|---|
+| `src/executors/*` | 18 | `IAdtRunnable` + `IRunnableWithProfiler` + `IRunnableWithProfiling` + `ITraceScheduling` — **`IExecutor` no longer exists** |
+| `src/core/service/*` | 8 | `IAdtServiceBinding` **and** the CRUD atoms, listed separately |
+| `src/core/shared/AdtUtils.ts` | 7 | `IAdtInformationSystem` |
+| `src/clients/AdtAbapGitClient.ts` | 7 | `IAdtAbapGitClient` |
+| `src/runtime/feeds/*` | 6 | `IFeedRepository` |
+| `src/core/shared/AdtUtils.ts` | 6 | `IAdtObjectAccess` |
+| `src/runtime/traces/*` | 5 + 5 | `ITraceScheduling`, `ICrossTrace` |
+| the rest | ~36 | `IAdtVersionable`, `IAdtGroupLifecycle`, and the runtime clients |
+
+**Interfaces:**
+- Consumes: `answering`, `rawDocument` (Task 2); the result sets from Task 12.
+- Produces: no new types. Every member here answers `IAdtResponse<T>` where it
+  answered a bare value or an envelope, and every class lists the atoms it
+  satisfies instead of inheriting them.
+
+- [ ] **Step 1: Take the work list from the compiler, per file**
+
+```bash
+npx tsc --noEmit -p tsconfig.json 2>&1 | grep TS2416 > ts2416.log
+```
+
+Read the log. Each line names the member, the shape it has and the shape the
+contract wants. Do not guess from the table above — it is the map, not the list.
+
+- [ ] **Step 2: The executors first, because `IExecutor` is gone**
+
+`AdtClassExecutor` and `AdtProgramExecutor` declared one contract and got `run`
+by inheritance. They now declare three:
+
+```typescript
+export class AdtClassExecutor
+  implements
+    IAdtRunnable<IClassExecutionTarget, string>,
+    IRunnableWithProfiler<IClassExecutionTarget, string, IClassExecuteWithProfilerOptions>,
+    IRunnableWithProfiling<IClassExecutionTarget, IClassExecuteWithProfilingResult, IClassExecuteWithProfilingOptions>,
+    ITraceScheduling
+```
+
+`IClassExecuteWithProfilingResult.response` was renamed to `run` and is no longer
+an `IAdtWireResponse` — a result carrying the transport frame is the shape 30.0.0
+removed. Callers of `.response` are found with
+`grep -rn "\.response" src/executors src/clients`.
+
+- [ ] **Step 3: Each remaining class, one commit per file**
+
+Every member wraps its answer in `answering(...)`, and the class lists its atoms.
+Where a contract takes type parameters, instantiate them with what this
+implementation actually answers rather than widening to `string`: the parameter
+exists so the type says which reading this implementation performs.
+
+- [ ] **Step 4: `npx tsc --noEmit -p tsconfig.json 2>&1 | grep -c TS2416`** — expect 0.
+
+- [ ] **Step 5: Commit per file, then move on.**
+
+---
+
+### Task 14: `AdtUtils` and the legacy clients
 
 **Files:**
 - Modify: `src/core/shared/AdtUtils.ts`, `src/core/shared/AdtUtilsLegacy.ts`, `src/clients/AdtClient.ts`, `src/clients/AdtClientLegacy.ts`, and the 13 `*Legacy.ts` files under `src/core/`
@@ -1533,7 +1632,7 @@ member reaches the same resource internally was never the contract's business.
 
 ---
 
-### Task 14: The integration tests read the verdict from the contract
+### Task 15: The integration tests read the verdict from the contract
 
 **Files:**
 - Modify: `src/__tests__/integration/shared/{discovery,readSource,readMetadata,whereUsed,search,sqlQuery,tableContents}.test.ts`
@@ -1551,7 +1650,7 @@ member reaches the same resource internally was never the contract's business.
 
 ---
 
-### Task 15: Full run against the cloud trial
+### Task 16: Full run against the cloud trial
 
 - [ ] **Step 1:** Confirm no other SAP-touching run is in flight, and that the token in `.env` is valid.
 - [ ] **Step 2:** `npm test 2>&1 | tee test-run.log`
@@ -1562,7 +1661,7 @@ member reaches the same resource internally was never the contract's business.
 
 ---
 
-### Task 16: On-prem acceptance
+### Task 17: On-prem acceptance
 
 The report this whole line of work started from. The cloud trial cannot show it: `ZLOCAL` is local and `transport_request` is unset, which the last full run confirmed by skipping `read_transport`.
 
@@ -1576,8 +1675,38 @@ The report this whole line of work started from. The cloud trial cannot show it:
 
 ## Self-review
 
-**Spec coverage.** Consumer-owned interpretation on two axes → Tasks 2, 3, 5. `analyse` composition and the no-wire rule → Task 2, red-proofed; chain cleanup on every path → Task 4, three tests. Result strategy at the factory → Tasks 5 and 12, with the short/full pairs bound to factories in Task 12. Per-type result types → Tasks 3, 7–11. Legacy migrates, batch deleted → Tasks 1, 13. Casts → Task 6 and each batch. Both test directions and negative cases as their own body → Task 6. Visible skips → Task 14. Full trial run → Task 15. On-prem acceptance → Task 16. `interfaces` untouched → Global Constraints.
+**Spec coverage.** Consumer-owned interpretation on two axes → Tasks 2, 3, 5. `analyse` composition and the no-wire rule → Task 2, red-proofed; chain cleanup on every path → Task 4, three tests. Result strategy at the factory → Tasks 5 and 12, with the short/full pairs bound to factories in Task 12. Per-type result types → Tasks 3, 7–11. Legacy migrates, batch deleted → Tasks 1, 14. Contracts composed rather than inherited, and the members that answered past the contract → Task 13. Casts → Task 6 and each batch. Both test directions and negative cases as their own body → Task 6. Visible skips → Task 15. Full trial run → Task 16. On-prem acceptance → Task 17. `interfaces` untouched → Global Constraints.
 
 **Placeholders.** None: every code step carries the code, and the batches in Tasks 7–11 name their types and their six steps rather than saying "as above".
 
 **Type consistency.** `IResultStrategy<T>` comes from `interfaces@30.0.0` under that name; `IAnalyse`, `rawDocument`, `nothing` are defined in Task 2 and used under those names in 3, 4, 5 and the batches. `IClassResults` / `classDocuments` are defined in Task 3 and consumed in 4 and 5. `answering(run, read, analyse?)` keeps that argument order everywhere.
+
+---
+
+## What 30.0.0 changed in this plan
+
+Recorded here rather than folded in silently, because a worker reading a task
+should know which instruction was rewritten and why.
+
+1. **Task 12 — `RuntimeDumps` keeps `implements IRuntimeDumps`.** The plan told it
+   to stop declaring the contract, on the grounds that `IRuntimeDumps` answered
+   `IAdtWireResponse` and `interfaces` was closed. It is not closed and the
+   contract is fixed: `IRuntimeDumps<TList, TDump>` answers `IAdtResponse`, and it
+   inherits nothing, so the class declares `kind` and `list` itself.
+
+2. **Task 13 is new.** The plan covered the 28 object types and the utilities, and
+   never mentioned the executors, abapGit, the service binding, feeds or trace
+   scheduling — 98 errors, and `IExecutor` no longer exists to inherit `run` from.
+
+3. **Task 5 gained the bare atoms.** 36 uses of `IAdtLockable` and `IAdtReadable`
+   without type arguments, which no task named.
+
+4. **Global constraints gained decision 23.** An implementation lists the atoms it
+   satisfies; nothing in `interfaces` extends anything, so nothing is inherited
+   into a class by declaring one wide contract.
+
+**What did not change:** every task about `answering`, the two strategies, the
+per-type result types, the casts, the negative cases, the visible skips and the
+two acceptance runs. The 30.0.0 delta is real but small; most of the 715 errors
+are the 29.0.0 migration this plan already describes and which was never
+executed.
