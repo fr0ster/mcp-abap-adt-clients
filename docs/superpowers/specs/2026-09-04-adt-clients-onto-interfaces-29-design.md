@@ -51,6 +51,25 @@ The shipped default answers the body as it arrived; decision 5 leaves parsing to
 whoever wants a shape out of it, and this library does not know which fields a
 caller needs.
 
+**What more than one default is for.** The same request serves callers who want
+very different amounts, and today the library picks for them:
+
+| endpoint | a caller wanting little | a caller wanting much |
+|---|---|---|
+| transport requests | the request numbers alone | the tree with its containers, plus the description and the language a request carries |
+| runtime dumps | a short list — id, time, program, message | the dump itself |
+| package contents | names and ADT type codes | the full node structure with descriptions and sub-package links |
+
+A short listing is not a truncated full one — it is a different reading of the
+same document, and which is wanted depends on whether the caller is showing a
+picker or opening an object. That is the case `IAdtResult` implementations exist
+for, and the reason the library ships more than one rather than making the
+smaller reading a lossy version of the larger.
+
+Language information is the sharpest instance: a transport request carries it,
+nothing in the current shape exposes it, and a consumer who needs it presently
+has no way to ask without re-fetching and parsing the document themselves.
+
 Mutations that ADT answers with nothing return `void`. Success is `ok: true`; the
 reason for a failure is in `getError()`.
 
