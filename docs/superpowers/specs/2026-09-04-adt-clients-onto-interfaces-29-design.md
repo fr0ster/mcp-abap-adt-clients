@@ -298,3 +298,33 @@ carry it. Here the factory's return type could.
 ## Out of scope
 
 The `adt-clients` version number, and publication. Both are the maintainer's.
+
+## Package contents: one member, and the strategy decides the shape
+
+Decided by the maintainer, 2026-09-04, after three failed attempts on my part to
+close this by reasoning instead of asking.
+
+**One endpoint, one member, and the result strategy chooses.** The node structure
+is a single ADT resource. A caller asks it once, and what comes back — a flat
+list of names and type codes, the whole tree of nodes, or the raw document a
+backup tool needs untransformed — is the result strategy's decision, not a
+different method's.
+
+This is decision 16 and the strategy design working together, and it is the
+canonical case for them rather than an awkward one.
+
+**What that means for the current contract.** `IAdtPackageBrowsing` declares
+`getPackageContentsList` and `getPackageHierarchy` as separate members over that
+one resource, each walking the structure itself and discarding the document. That
+is two members for one endpoint — the shape decision 16 exists to prevent — and
+it is why no strategy can reach a caller through them.
+
+Collapsing them into one member carrying a result strategy is therefore a change
+to `@mcp-abap-adt/interfaces`, not to this migration. **It is a 30.0.0 question**,
+and this release ships package contents as they are.
+
+**What the implementation plan does in the meantime:** nothing for package
+contents. No strategy set on `AdtUtils`, no parser overload, no pretence that the
+two existing members are two readings of one answer. The gap is recorded in the
+CHANGELOG naming the consumer it costs — a backup tool cannot get the raw
+document through these members, and an MCP server cannot ask for names alone.
