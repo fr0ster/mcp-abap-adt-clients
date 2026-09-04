@@ -1360,7 +1360,7 @@ and nothing so far creates them. Without this task the "two or three defaults"
 are a claim rather than a feature, and every consumer still gets one shape.
 
 **Files:**
-- Create: `src/core/transport/results.ts`, `src/runtime/dumps/results.ts`, `src/core/package/results.ts`
+- Create: `src/core/transport/results.ts`, `src/runtime/dumps/results.ts`
 - Modify: `src/runtime/dumps/RuntimeDumps.ts` (generic in its set; three members),
   `src/clients/AdtRuntimeClient.ts` (overloads and the cache), `src/clients/AdtClient.ts`,
   `src/core/transport/types.ts`, `src/core/shared/AdtUtils.ts`
@@ -1374,18 +1374,18 @@ are a claim rather than a feature, and every consumer still gets one shape.
   - `transportTree: IResultStrategy<ITransportTree>` — containers, descriptions, and the **language** a request carries, which nothing currently exposes
   - `dumpList: IResultStrategy<IDumpSummary[]>` — `{ id, at, program, message }`
   - `dumpDocument = rawDocument`
-  - **No package strategies.** They were planned here and are dropped: see Task 13
-    for why 29.0.0 cannot deliver them to a caller, and the CHANGELOG gap it adds.
-
-**One type note that applies to what remains.** `IResultStrategy<T>` is
-`(wire: IAdtWireResponse) => T` — it is handed the whole answer, because a
-strategy may need the status or a header. The `parse` overloads already in
-`interfaces` take `(data: unknown) => T` instead. The two are not
-interchangeable, and passing one where the other is expected type-checks nowhere
-useful: where a member offers the contract's `parse`, write
-`(data) => strategy({ data, status: 200, statusText: '', headers: {} })` at the
-call site, or give that member its own `(data: unknown) => T` strategy. Do not
-introduce a silent adapter that fabricates a status.
+  - **Nothing for package contents — the contract already carries both readings.**
+    `getPackageContentsList` answers `IPackageContentItem[]`: names and ADT type
+    codes, which is the short reading. `getPackageHierarchy` and
+    `fetchNodeStructure` answer the full structure. A caller chooses by **which
+    member they call** — decision 16 working as intended, since one endpoint with
+    two useful readings is already two members. A strategy here would be a second
+    way to express a choice the contract expresses already.
+**One type note.** `IResultStrategy<T>` is `(wire: IAdtWireResponse) => T` — it is
+handed the whole answer, because a strategy may need the status or a header.
+Transport and dumps take strategies in that form throughout, so nothing converts
+between it and the contract's `(data: unknown) => T` parsers, and nothing
+fabricates a status.
 
 - [ ] **Step 1:** Write the failing test: for each pair, the same captured document read by both strategies, asserting the short one carries the identifying fields and the full one carries what the short one drops. Assert the short is **not** a prefix or subset-by-truncation of the full — it is a different reading, and a test that only checks length would pass a truncation.
 - [ ] **Step 2:** Run it; expect FAIL on the missing exports.
@@ -1457,8 +1457,7 @@ getDumps<R extends IDumpResults<unknown> = IDumpResults>(
 Package contents reach a caller through `AdtUtils.getPackageContents`, whose
 result set is given to `AdtUtils` at construction — so `AdtClient.getUtils()`
 gains the same pair of overloads, and `src/core/shared/AdtUtils.ts` takes
-`results: IUtilsResults` alongside its connection. Both are done in the
-`AdtUtils` task, and this step is not complete until that one names them.
+the two package members it already declares. Nothing further is needed there.
 
 - [ ] **Step 7:** Test each factory with both sets **on one client instance**:
 `client.getDumps(dumpShort)` then `client.getDumps(dumpDocuments)`, asserting the
@@ -1473,40 +1472,16 @@ would pass while the cache defect is still there.
 
 **Files:**
 - Modify: `src/core/shared/AdtUtils.ts`, `src/core/shared/AdtUtilsLegacy.ts`, `src/clients/AdtClient.ts`, `src/clients/AdtClientLegacy.ts`, and the 13 `*Legacy.ts` files under `src/core/`
-- Test: `src/__tests__/unit/shared/packageParserOverload.test.ts` — one call, two shapes, the parsed one typed rather than `unknown`
 
 **Interfaces:**
 - Consumes: `answering`, `rawDocument` (Task 2).
 - Produces:
   - **No `IUtilsResults`, and `AdtUtils` does not become generic.**
 
-**Why, and this is a real limit rather than a simplification.** The utility
-contracts in 29.0.0 fix their results: `IAdtInformationSystem`,
-`IAdtPackageBrowsing` and their neighbours declare `getPackageContentsList` and
-`getPackageHierarchy` with no result parameter and **no parser overload**, unlike
-`search`. `AdtClient.getUtils()` answers the intersection of those interfaces, so
-an overload added to the concrete `AdtUtils` is invisible to a consumer holding
-the contract.
-
-**Therefore `packageNames` and `packageStructure` are dropped from Task 12** and
-recorded as a known gap. They cannot reach a caller through 29.0.0 by any route
-that does not either change `interfaces` — closed for this migration — or have
-`getUtils()` return a concrete class, which is what decision 12 forbids.
-
-Transport and dumps are unaffected and stay: `getRequest` answers CRUD atoms,
-which *are* parameterised by their result, and `getDumps` answers `RuntimeDumps`,
-whose contract this package states itself.
-
-- [ ] **Step 0: Record the gap**
-
-Add to the CHANGELOG under this release:
-
-> **Known gap: package contents answer one shape.** `getPackageContentsList` and
-> `getPackageHierarchy` are declared in `@mcp-abap-adt/interfaces` without a
-> parser overload, so a consumer wanting names alone — the case an MCP server has,
-> where a full node structure displaces what a model was reasoning about — must
-> parse the document themselves. Closing it means adding the overload to those
-> members, which is additive and belongs to a later `interfaces` release.
+`AdtUtils` stays non-generic and keeps declaring the utility contracts it already
+satisfies. No `IUtilsResults`, no `getUtils` overload, no parser overload on the
+package members: those members already answer the shapes a caller wants, and the
+choice between them is which one is called.
 
 - [ ] **Step 1:** Confirm against `node_modules/@mcp-abap-adt/interfaces/dist`
   which utility members already declare a parser overload and which do not. Only
