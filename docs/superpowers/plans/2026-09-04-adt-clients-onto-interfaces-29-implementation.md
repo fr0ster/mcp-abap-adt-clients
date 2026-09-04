@@ -23,8 +23,16 @@
   size cannot keep either type-check green at every step, and pretending otherwise
   would mean one enormous commit or a false claim in each small one. Commits in
   that window use `--no-verify` and say in their message that the type-checks are
-  still red and why. `lint:check` stays green throughout and is the gate that
-  actually holds.
+  still red and why.
+- `npm run lint:check` runs `check:docs`, and **it is red right now for five
+  broken documentation imports** — `README.md` and `docs/usage/CLIENT_API_REFERENCE.md`
+  still say `AdtOperationError` and `IClassState` come from
+  `@mcp-abap-adt/interfaces`, which 29.0.0 removed. Task 2 fixes those, and from
+  then on `lint:check` is green on every commit and is the gate that actually
+  holds. Until it is fixed, do not read a red `lint:check` as permission to
+  ignore it — check that the reported names are the five known ones.
+  Three further "unchecked import" lines come from this plan naming
+  `src/utils/resultStrategy.ts` before Task 2 creates it; they clear when it does.
 - **One SAP-touching run at a time**, and no edits under `src/` while one is in flight.
 - Test output: `npm test 2>&1 | tee test-run.log`, then read the file. Never pipe through `grep`/`head`/`tail`.
 - Deleting or renaming a symbol: enumerate first, edit, then grep the repository for it **including comments, README and docs**, and compare counts before and after. Three regex sweeps in the contracts package silently deleted six types and the first field of three others while every check stayed green.
@@ -413,21 +421,34 @@ MCP_ENV_PATH=/tmp/nonexistent-env npx jest src/__tests__/unit/shared/answeringCo
 
 Expected: 6 passed.
 
-- [ ] **Step 7: Export `recogniseFailure`**
+- [ ] **Step 7: Fix the five broken documentation imports**
+
+`check:docs` is red before this task begins. `README.md` and
+`docs/usage/CLIENT_API_REFERENCE.md` document `AdtOperationError` and
+`IClassState` as coming from `@mcp-abap-adt/interfaces`; 29.0.0 removed both. Run
+`npm run lint:check` to list all five, and fix each where it is written — a doc
+that names a removed export is read as the authority, because nothing else checks
+it. `AdtOperationError` has no replacement: catch structurally on `code`, or
+catch this package's `AdtSAPError`.
+
+After this step `lint:check` must exit 0 and stay there for the rest of the
+migration.
+
+- [ ] **Step 8: Export `recogniseFailure`**
 
 `chain` (Task 4) classifies a real exception and cannot reach a private function.
 Change `function recogniseFailure` at `src/utils/adtResponse.ts:68` to
 `export function recogniseFailure`, so the classification has one home rather
 than two copies that drift.
 
-- [ ] **Step 8: Red-proof the no-wire rule**
+- [ ] **Step 9: Red-proof the no-wire rule**
 
 Temporarily change the `if (!wire)` branch to `return succeeded(read(wire as never));`. Re-run. Expected: the "cannot be cleared into a success when nothing came back" case fails. Revert the change and re-run to green. A rule nobody has seen fail is a rule nobody has tested.
 
-- [ ] **Step 9: Commit**
+- [ ] **Step 10: Commit**
 
 ```bash
-git add src/utils/resultStrategy.ts src/utils/adtResponse.ts src/__tests__/unit/shared/answeringComposition.test.ts
+git add README.md docs/usage/CLIENT_API_REFERENCE.md src/utils/resultStrategy.ts src/utils/adtResponse.ts src/__tests__/unit/shared/answeringComposition.test.ts
 git commit -m "feat: answering composes the error and result strategies
 
 The old answering saw a finished value or an exception, never the wire response
