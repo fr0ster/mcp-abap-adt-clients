@@ -20,22 +20,18 @@ import type {
   IAdtClientOptions,
   IAdtContentTypes,
   IAdtCreatable,
-  IAdtCrud,
   IAdtDataPreview,
   IAdtDeletable,
   IAdtDiscovery,
   IAdtGroupLifecycle,
   IAdtInformationSystem,
   IAdtLockable,
-  IAdtModifiable,
-  IAdtObject,
   IAdtObjectAccess,
   IAdtPackageBrowsing,
   IAdtReadable,
   IAdtRepositoryStructure,
   IAdtRequest,
   IAdtRunnable,
-  IAdtSourceObject,
   IAdtSystemContext,
   IAdtTransportAware,
   IAdtUpdatable,
@@ -206,6 +202,12 @@ import {
 import { AdtUtils } from '../core/shared/AdtUtils';
 import { type LockFailure, LockRegistry } from '../core/shared/LockRegistry';
 import type { ObjectVersion } from '../core/shared/results';
+import { type IUtilResults, utilDocuments } from '../core/shared/utilResultSet';
+import type {
+  IInactiveObjectsResponse,
+  IPackageContentItem,
+  IWhereUsedListResult,
+} from '../core/shared/utilResults';
 import {
   AdtStructure,
   type IStructureConfig,
@@ -1975,8 +1977,13 @@ export class AdtClient {
     IAdtValidatable<IFeatureToggleConfig, ReturnType<R['validation']>> &
     IAdtCheckable<IFeatureToggleConfig, ReturnType<R['check']>> &
     IAdtActivatable<IFeatureToggleConfig, ReturnType<R['activation']>> &
-    IAdtLockable<IFeatureToggleConfig> &
-    IFeatureToggleObject<IFeatureToggleRuntimeState>;
+    // Not `IFeatureToggleObject<TState>`: that contract types all five domain
+    // members with one `TState`, and they answer three different things — a
+    // runtime state, a check verdict, and the toggle's source document. Naming
+    // it here would be this factory promising a shape the implementation
+    // cannot honour. Recorded rather than worked around; the contract's own
+    // decision 24 is the rule it collides with.
+    IAdtLockable<IFeatureToggleConfig>;
   getFeatureToggle<
     R extends IFeatureToggleResults<
       unknown,
@@ -2197,15 +2204,25 @@ export class AdtClient {
    *
    * @returns The cross-cutting operations, as contracts
    */
-  getUtils(): IAdtInformationSystem &
-    IAdtRepositoryStructure &
-    IAdtPackageBrowsing &
-    IAdtGroupLifecycle &
+  getUtils(): AdtUtils;
+  getUtils<R extends IUtilResults<unknown, unknown, unknown>>(
+    results: R,
+  ): IAdtInformationSystem<
+    ReturnType<R['search']>,
+    IWhereUsedListResult,
+    ReturnType<R['types']>
+  > &
+    IAdtRepositoryStructure<ReturnType<R['node']>> &
+    IAdtPackageBrowsing<IPackageContentItem[]> &
+    IAdtGroupLifecycle<IInactiveObjectsResponse> &
     IAdtDataPreview &
     IAdtDiscovery &
-    IAdtObjectAccess {
+    IAdtObjectAccess;
+  getUtils<R extends IUtilResults<unknown, unknown, unknown> = IUtilResults>(
+    results: R = utilDocuments as unknown as R,
+  ): AdtUtils<R> {
     this.assertConnected();
-    return new AdtUtils(this.connection, this.logger);
+    return new AdtUtils<R>(this.connection, this.logger, results);
   }
 
   /**

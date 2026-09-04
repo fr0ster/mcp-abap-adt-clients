@@ -15,58 +15,35 @@
 
 import type {
   IAbapConnection,
-  IAdtActivatable,
-  IAdtCheckable,
   IAdtClientOptions,
-  IAdtCreatable,
-  IAdtCrud,
-  IAdtDataPreview,
-  IAdtDeletable,
-  IAdtDiscovery,
-  IAdtGroupLifecycle,
-  IAdtInformationSystem,
-  IAdtLockable,
-  IAdtObject,
-  IAdtObjectAccess,
-  IAdtPackageBrowsing,
-  IAdtReadable,
-  IAdtRepositoryStructure,
-  IAdtRequest,
-  IAdtRunnable,
-  IAdtSourceObject,
-  IAdtTransportAware,
-  IAdtUpdatable,
-  IAdtValidatable,
-  IClassUnitTestDefinition,
-  IClassUnitTestRunOptions,
   ILogger,
-  ITestRunInformation,
 } from '@mcp-abap-adt/interfaces';
-import type { IClassConfig, IClassState } from '../core/class';
+import { classDocuments, type IClassResults } from '../core/class';
 import { AdtClassLegacy } from '../core/class/AdtClassLegacy';
-import type { IDdlConfig, IDdlState } from '../core/ddl';
+import { ddlDocuments, type IDdlResults } from '../core/ddl';
 import { AdtDdlLegacy } from '../core/ddl/AdtDdlLegacy';
-import type {
-  IFunctionGroupConfig,
-  IFunctionGroupState,
+import {
+  functionGroupDocuments,
+  type IFunctionGroupResults,
 } from '../core/functionGroup';
 import { AdtFunctionGroupLegacy } from '../core/functionGroup/AdtFunctionGroupLegacy';
-import type {
-  IFunctionModuleConfig,
-  IFunctionModuleState,
+import {
+  functionModuleDocuments,
+  type IFunctionModuleResults,
 } from '../core/functionModule';
 import { AdtFunctionModuleLegacy } from '../core/functionModule/AdtFunctionModuleLegacy';
-import type { IInterfaceConfig, IInterfaceState } from '../core/interface';
+import { type IInterfaceResults, interfaceDocuments } from '../core/interface';
 import { AdtInterfaceLegacy } from '../core/interface/AdtInterfaceLegacy';
-import type { IPackageConfig, IPackageState } from '../core/package';
+import { type IPackageResults, packageDocuments } from '../core/package';
 import { AdtPackageLegacy } from '../core/package/AdtPackageLegacy';
-import type { IProgramConfig, IProgramState } from '../core/program';
+import { type IProgramResults, programDocuments } from '../core/program';
 import { AdtProgramLegacy } from '../core/program/AdtProgramLegacy';
-import type { AdtUtils } from '../core/shared/AdtUtils';
 import { AdtUtilsLegacy } from '../core/shared/AdtUtilsLegacy';
 import { AdtContentTypesBase } from '../core/shared/contentTypes';
+import { type IUtilResults, utilDocuments } from '../core/shared/utilResultSet';
+import { type ITransportResults, transportDocuments } from '../core/transport';
 import { AdtRequestLegacy } from '../core/transport/AdtRequestLegacy';
-import type { IUnitTestConfig, IUnitTestState } from '../core/unitTest';
+import { type IUnitTestResults, unitTestDocuments } from '../core/unitTest';
 import { AdtUnitTestLegacy } from '../core/unitTest/AdtUnitTestLegacy';
 import { AdtClient } from './AdtClient';
 
@@ -98,89 +75,184 @@ export class AdtClientLegacy extends AdtClient {
 
   // --- Supported types with legacy overrides ---
 
-  override getProgram(): IAdtSourceObject<IProgramConfig, IProgramState> {
-    return new AdtProgramLegacy(
+  override getProgram<
+    R extends IProgramResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    > = IProgramResults,
+  >(results: R = programDocuments as unknown as R): AdtProgramLegacy<R> {
+    return new AdtProgramLegacy<R>(
       this.connection,
       this.logger,
       this.systemContext,
       this.contentTypes,
+      this.lockRegistry,
+      results,
     );
   }
 
-  override getClass(): IAdtSourceObject<IClassConfig, IClassState> {
-    return new AdtClassLegacy(
+  override getClass<
+    R extends IClassResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    > = IClassResults,
+  >(results: R = classDocuments as unknown as R): AdtClassLegacy<R> {
+    return new AdtClassLegacy<R>(
       this.connection,
       this.logger,
       this.systemContext,
       this.contentTypes,
+      this.lockRegistry,
+      results,
     );
   }
 
-  override getInterface(): IAdtSourceObject<IInterfaceConfig, IInterfaceState> {
-    return new AdtInterfaceLegacy(
+  override getInterface<
+    R extends IInterfaceResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    > = IInterfaceResults,
+  >(results: R = interfaceDocuments as unknown as R): AdtInterfaceLegacy<R> {
+    return new AdtInterfaceLegacy<R>(
       this.connection,
       this.logger,
       this.systemContext,
       this.contentTypes,
+      this.lockRegistry,
+      results,
     );
   }
 
-  override getFunctionGroup(): IAdtCrud<
-    IFunctionGroupConfig,
-    IFunctionGroupState
-  > &
-    IAdtValidatable<IFunctionGroupConfig, IFunctionGroupState> &
-    IAdtCheckable<IFunctionGroupConfig, IFunctionGroupState> &
-    IAdtActivatable<IFunctionGroupConfig, IFunctionGroupState> &
-    IAdtLockable<IFunctionGroupConfig, IFunctionGroupState> &
-    IAdtTransportAware<IFunctionGroupConfig, IFunctionGroupState> {
-    return new AdtFunctionGroupLegacy(
+  override getFunctionGroup<
+    R extends IFunctionGroupResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    > = IFunctionGroupResults,
+  >(
+    results: R = functionGroupDocuments as unknown as R,
+  ): AdtFunctionGroupLegacy<R> {
+    return new AdtFunctionGroupLegacy<R>(
       this.connection,
       this.logger,
       this.systemContext,
       this.contentTypes,
+      this.lockRegistry,
+      results,
     );
   }
 
-  override getFunctionModule(): IAdtSourceObject<
-    IFunctionModuleConfig,
-    IFunctionModuleState
-  > {
-    return new AdtFunctionModuleLegacy(
+  override getFunctionModule<
+    R extends IFunctionModuleResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    > = IFunctionModuleResults,
+  >(
+    results: R = functionModuleDocuments as unknown as R,
+  ): AdtFunctionModuleLegacy<R> {
+    return new AdtFunctionModuleLegacy<R>(
       this.connection,
       this.logger,
       this.systemContext,
       this.contentTypes,
+      this.lockRegistry,
+      results,
     );
   }
 
-  override getPackage(): IAdtCrud<IPackageConfig, IPackageState> &
-    IAdtValidatable<IPackageConfig, IPackageState> &
-    IAdtCheckable<IPackageConfig, IPackageState> &
-    IAdtLockable<IPackageConfig, IPackageState> &
-    IAdtTransportAware<IPackageConfig, IPackageState> {
-    return new AdtPackageLegacy(
+  override getPackage<
+    R extends IPackageResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    > = IPackageResults,
+  >(results: R = packageDocuments as unknown as R): AdtPackageLegacy<R> {
+    return new AdtPackageLegacy<R>(
       this.connection,
       this.logger,
       this.systemContext,
+      this.lockRegistry,
+      results,
     );
   }
 
-  override getDdl(): IAdtSourceObject<IDdlConfig, IDdlState> {
-    return new AdtDdlLegacy(this.connection, this.logger, this.systemContext);
+  override getDdl<
+    R extends IDdlResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    > = IDdlResults,
+  >(results: R = ddlDocuments as unknown as R): AdtDdlLegacy<R> {
+    return new AdtDdlLegacy<R>(
+      this.connection,
+      this.logger,
+      this.systemContext,
+      this.lockRegistry,
+      results,
+    );
   }
 
   // --- Unit tests with legacy endpoints ---
 
-  override getUnitTest(): IAdtCreatable<IUnitTestConfig, IUnitTestState> &
-    IAdtReadable<IUnitTestConfig, IUnitTestState> &
-    IAdtUpdatable<IUnitTestConfig, IUnitTestState> &
-    IAdtDeletable<IUnitTestConfig, IUnitTestState> &
-    IAdtValidatable<IUnitTestConfig, IUnitTestState> &
-    IAdtLockable<IUnitTestConfig, IUnitTestState> &
-    IAdtRunnable<IClassUnitTestDefinition[], string, IClassUnitTestRunOptions> &
-    ITestRunInformation {
-    return new AdtUnitTestLegacy(this.connection, this.logger);
+  override getUnitTest<
+    R extends IUnitTestResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    > = IUnitTestResults,
+  >(results: R = unitTestDocuments as unknown as R): AdtUnitTestLegacy<R> {
+    return new AdtUnitTestLegacy<R>(this.connection, this.logger, results);
   }
 
   // --- Transport with legacy URL prefix ---
@@ -205,11 +277,20 @@ export class AdtClientLegacy extends AdtClient {
    * So the declaration is honest about the type and silent about the behaviour,
    * and the gap is tracked rather than papered over: #109.
    */
-  override getRequest(): IAdtRequest {
-    return new AdtRequestLegacy(
+  override getRequest<
+    R extends ITransportResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    > = ITransportResults,
+  >(results: R = transportDocuments as unknown as R): AdtRequestLegacy<R> {
+    return new AdtRequestLegacy<R>(
       this.connection,
       this.logger,
       this.systemContext,
+      results,
     );
   }
 
@@ -231,14 +312,10 @@ export class AdtClientLegacy extends AdtClient {
    * contract branches on `ok` either way, and a legacy system is not a reason to
    * be told about a refusal differently.
    */
-  override getUtils(): IAdtInformationSystem &
-    IAdtRepositoryStructure &
-    IAdtPackageBrowsing &
-    IAdtGroupLifecycle &
-    IAdtDataPreview &
-    IAdtDiscovery &
-    IAdtObjectAccess {
-    return new AdtUtilsLegacy(this.connection, this.logger);
+  override getUtils<
+    R extends IUtilResults<unknown, unknown, unknown> = IUtilResults,
+  >(results: R = utilDocuments as unknown as R): AdtUtilsLegacy<R> {
+    return new AdtUtilsLegacy<R>(this.connection, this.logger, results);
   }
 
   // --- CDS Unit Test: requires modern CDS endpoints ---
