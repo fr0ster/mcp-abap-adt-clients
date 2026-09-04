@@ -105,6 +105,26 @@
   `src/utils/resultStrategy.ts` before Task 2 creates it; they clear when it does.
 - **One SAP-touching run at a time**, and no edits under `src/` while one is in flight.
 - Test output: `npm test 2>&1 | tee test-run.log`, then read the file. Never pipe through `grep`/`head`/`tail`.
+- **A unit test cannot run through `npm test` until Task 14.** Jest's
+  `globalSetup` type-checks the whole project, so while the package is red every
+  suite dies in setup — including the one you just wrote. Run a single file
+  against a scratch config until then, and say so in the commit:
+
+  ```bash
+  cat > /tmp/jest.unit.js <<'CFG'
+  module.exports = {
+    preset: 'ts-jest',
+    testEnvironment: 'node',
+    rootDir: '<the repository root>',
+    transform: { '^.+\\.tsx?$': ['ts-jest', { isolatedModules: true, diagnostics: false }] },
+  };
+  CFG
+  npx jest -c /tmp/jest.unit.js <the one file> 2>&1 | tee unit-run.log
+  ```
+
+  `MCP_ENV_PATH=/tmp/nonexistent-env npx jest …` is **not** enough: it skips the
+  SAP preflight, not the type-check. Every `npx jest` line in Tasks 2, 3, 6 and
+  12 means this until the package compiles.
 - Deleting or renaming a symbol: enumerate first, edit, then grep the repository for it **including comments, README and docs**, and compare counts before and after. Three regex sweeps in the contracts package silently deleted six types and the first field of three others while every check stayed green.
 
 ---
@@ -156,6 +176,16 @@ git rm src/__tests__/unit/runtime/debugger/abap.batch.test.ts
 - [ ] **Step 3: Drop the subpath export**
 
 In `package.json`, remove the whole `"./batch"` key from `exports`.
+
+- [ ] **Step 3a: Move the debugger's batch helpers before deleting the module**
+
+`src/runtime/debugger/abap.ts` imports `createBatchBoundary` and
+`createRequestId` from `src/batch/buildBatchPayload.ts`. The debugger's
+`POST /sap/bc/adt/debugger/batch` is a **real ADT resource** — a step and a stack
+read in one round-trip, which the server answers — and has nothing to do with the
+batch clients this task removes. Copy those two functions into
+`src/runtime/debugger/batchPayload.ts`, with a header saying why they are there,
+and point `abap.ts` at it.
 
 - [ ] **Step 4: Sweep for leftovers**
 
@@ -210,7 +240,8 @@ The mechanism the whole migration rests on. The current `answering(produce)` see
 - Produces:
   - `const rawDocument: IResultStrategy<string>`
   - `const nothing: IResultStrategy<void>`
-  - `type IAnalyse = (verdict: IAdtError | undefined, answer?: IAdtWireResponse) => IAdtError | undefined`
+  - `type IAnalyse = (verdict: IAdtError | AdtNoFailure, answer?: IAdtWireResponse) => IAdtError | AdtNoFailure` — `ADT_NO_FAILURE`, never `undefined`, since `interfaces@31.0.0`
+  - **`answeringWith` is deleted.** Its whole purpose was to keep a consumer's parse outside the classification, and the new `answering` does that by construction: the reading runs after the verdict, outside any `catch`. `AdtUtils` is its only caller and migrates in Task 14.
   - `answering<T>(run: () => Promise<IAdtWireResponse>, read: IResultStrategy<T>, analyse?: IAnalyse): Promise<IAdtResponse<T>>`
 
 - [ ] **Step 1: Write the failing test**
@@ -254,9 +285,18 @@ describe('answering', () => {
 
   it("carries SAP's own sentence, whole, when the request threw a refusal", async () => {
     const answer = await answering(async () => {
-      throw new AdtSAPError('SAP refused the request: ' +
-        'You are not authorized to make changes (authorization object S_ABPLNGVS)',
-        { response: wire(REFUSAL, 403) });
+      // Positional, and this is what the constructor actually takes:
+      // (message, document, adtType?, namespace?, response?, request?). An
+      // earlier draft of this plan invented an options object, which does not
+      // compile — read `src/utils/adtErrors.ts` before copying any of it.
+      throw new AdtSAPError(
+        'SAP refused the request: You are not authorized to make changes ' +
+          '(authorization object S_ABPLNGVS)',
+        REFUSAL,
+        'ExceptionResourceNoAccess',
+        'com.sap.adt',
+        wire(REFUSAL, 403),
+      );
     }, rawDocument);
 
     expect(answer.ok).toBe(false);
@@ -269,11 +309,15 @@ describe('answering', () => {
   });
 
   it('consults analyse on a success, so an empty body can be called a failure', async () => {
-    const analyse = (verdict: IAdtError | undefined, wireIn?: IAdtWireResponse) =>
-      verdict ??
-      (String(wireIn?.data ?? '') === ''
-        ? { origin: 'refusal' as const, message: 'the object is not there' }
-        : undefined);
+    const analyse = (
+      verdict: IAdtError | typeof ADT_NO_FAILURE,
+      wireIn?: IAdtWireResponse,
+    ): IAdtError | typeof ADT_NO_FAILURE =>
+      verdict !== ADT_NO_FAILURE
+        ? verdict
+        : String(wireIn?.data ?? '') === ''
+          ? { origin: 'refusal' as const, message: 'the object is not there' }
+          : ADT_NO_FAILURE;
 
     const answer = await answering(async () => wire(''), rawDocument, analyse);
 
@@ -285,10 +329,16 @@ describe('answering', () => {
   it('lets analyse clear a refusal, and the value comes from the same answer', async () => {
     const answer = await answering(
       async () => {
-        throw new AdtSAPError('refused', { response: wire('<probe/>', 404) });
+        throw new AdtSAPError(
+          'refused',
+          '<probe/>',
+          undefined,
+          undefined,
+          wire('<probe/>', 404),
+        );
       },
       rawDocument,
-      () => undefined,
+      () => ADT_NO_FAILURE,
     );
 
     expect(answer.ok).toBe(true);
@@ -304,7 +354,7 @@ describe('answering', () => {
         throw new Error('connect ECONNREFUSED');
       },
       rawDocument,
-      () => undefined,
+      () => ADT_NO_FAILURE,
     );
 
     expect(answer.ok).toBe(false);
@@ -329,7 +379,7 @@ describe('answering', () => {
 - [ ] **Step 2: Run it to verify it fails**
 
 ```bash
-MCP_ENV_PATH=/tmp/nonexistent-env npx jest src/__tests__/unit/shared/answeringComposition.test.ts 2>&1 | tee unit-run.log
+npx jest -c /tmp/jest.unit.js src/__tests__/unit/shared/answeringComposition.test.ts 2>&1 | tee unit-run.log
 ```
 
 Expected: FAIL — `rawDocument` is not exported and `answering` takes one argument.
@@ -390,7 +440,6 @@ export function succeeded<T>(value: T): IAdtResponse<T> {
   return {
     ok: true,
     getResult: () => ({ value }),
-    getError: () => undefined,
   };
 }
 
@@ -398,11 +447,16 @@ export function succeeded<T>(value: T): IAdtResponse<T> {
 export function failed<T>(error: IAdtError): IAdtResponse<T> {
   return {
     ok: false,
-    getResult: () => undefined,
     getError: () => error,
   };
 }
 ```
+
+**One method each, since `interfaces@31.0.0`.** A success declares no `getError`
+and a failure no `getResult`, so both halves stopped answering `undefined` and
+reaching either one requires narrowing on `ok` first. A caller who skipped the
+check used to get `undefined` and compile; now it is a type error, which is a
+free audit of every call site in this package that skipped it.
 
 `getResult()` still answers `IAdtResult<T>` — that is what the contract says. What
 changed is that `IAdtResult` is no longer written in the *response's* type
@@ -503,7 +557,7 @@ exists.
 - [ ] **Step 8: Run the tests to verify they pass**
 
 ```bash
-MCP_ENV_PATH=/tmp/nonexistent-env npx jest src/__tests__/unit/shared/answeringComposition.test.ts 2>&1 | tee unit-run.log
+npx jest -c /tmp/jest.unit.js src/__tests__/unit/shared/answeringComposition.test.ts 2>&1 | tee unit-run.log
 ```
 
 Expected: 6 passed.
@@ -597,7 +651,7 @@ describe('the class default result strategies', () => {
 - [ ] **Step 2: Run it to verify it fails**
 
 ```bash
-MCP_ENV_PATH=/tmp/nonexistent-env npx jest src/__tests__/unit/core/classResultStrategy.test.ts 2>&1 | tee unit-run.log
+npx jest -c /tmp/jest.unit.js src/__tests__/unit/core/classResultStrategy.test.ts 2>&1 | tee unit-run.log
 ```
 
 Expected: FAIL — `classDocuments` is not exported.
@@ -652,7 +706,7 @@ export const classDocuments: IClassResults = {  // all defaults
 - [ ] **Step 4: Run the tests to verify they pass**
 
 ```bash
-MCP_ENV_PATH=/tmp/nonexistent-env npx jest src/__tests__/unit/core/classResultStrategy.test.ts 2>&1 | tee unit-run.log
+npx jest -c /tmp/jest.unit.js src/__tests__/unit/core/classResultStrategy.test.ts 2>&1 | tee unit-run.log
 ```
 
 Expected: 3 passed.
