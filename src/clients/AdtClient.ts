@@ -45,7 +45,6 @@ import type {
   IClassUnitTestDefinition,
   IClassUnitTestRunOptions,
   IIncludeConfig,
-  IIncludeState,
   ILogger,
   ISessionLifecycleAware,
   ITestRunInformation,
@@ -129,7 +128,8 @@ import { AdtInclude } from '../core/include';
 import {
   AdtInterface,
   type IInterfaceConfig,
-  type IInterfaceState,
+  type IInterfaceResults,
+  interfaceDocuments,
 } from '../core/interface';
 import {
   AdtMessageClass,
@@ -430,26 +430,104 @@ export class AdtClient {
    * Creatable on modern on-prem only, where discovery gives the includes
    * collection an `app:accept`.
    */
-  getInclude(): IAdtCrud<IIncludeConfig, IIncludeState> &
-    IAdtValidatable<IIncludeConfig, IIncludeState> &
-    IAdtActivatable<IIncludeConfig, IIncludeState> &
-    IAdtLockable<IIncludeConfig, IIncludeState> {
+  getInclude(): AdtInclude;
+  getInclude<
+    R extends IIncludeResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    >,
+  >(
+    results: R,
+  ): IAdtCreatable<IIncludeConfig, ReturnType<R['created']>> &
+    IAdtReadable<
+      IIncludeConfig,
+      ReturnType<R['source']>,
+      ReturnType<R['metadata']>
+    > &
+    IAdtUpdatable<IIncludeConfig, ReturnType<R['updated']>> &
+    IAdtDeletable<IIncludeConfig, ReturnType<R['deletion']>> &
+    IAdtValidatable<IIncludeConfig, ReturnType<R['validation']>> &
+    IAdtActivatable<IIncludeConfig, ReturnType<R['activation']>> &
+    IAdtLockable<IIncludeConfig>;
+  getInclude<
+    R extends IIncludeResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    > = IIncludeResults,
+  >(results: R = includeDocuments as unknown as R): AdtInclude<R> {
     this.assertConnected();
-    return new AdtInclude(this.connection, this.logger, this.contentTypes);
+    return new AdtInclude<R>(
+      this.connection,
+      this.logger,
+      this.contentTypes,
+      results,
+    );
   }
 
   /**
    * Get high-level operations for Interface objects
    * @returns IAdtObject instance for Interface operations
    */
-  getInterface(): IAdtSourceObject<IInterfaceConfig, IInterfaceState> {
+  getInterface(): AdtInterface;
+  getInterface<
+    R extends IInterfaceResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    >,
+  >(
+    results: R,
+  ): IAdtCreatable<IInterfaceConfig, ReturnType<R['created']>> &
+    IAdtReadable<
+      IInterfaceConfig,
+      ReturnType<R['source']>,
+      ReturnType<R['metadata']>
+    > &
+    IAdtUpdatable<IInterfaceConfig, ReturnType<R['updated']>> &
+    IAdtDeletable<IInterfaceConfig, ReturnType<R['deletion']>> &
+    IAdtValidatable<IInterfaceConfig, ReturnType<R['validation']>> &
+    IAdtCheckable<IInterfaceConfig, ReturnType<R['check']>> &
+    IAdtActivatable<IInterfaceConfig, ReturnType<R['activation']>> &
+    IAdtLockable<IInterfaceConfig> &
+    IAdtTransportAware<IInterfaceConfig, ReturnType<R['transport']>> &
+    IAdtVersionable<IInterfaceConfig, ObjectVersion[], string>;
+  getInterface<
+    R extends IInterfaceResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    > = IInterfaceResults,
+  >(results: R = interfaceDocuments as unknown as R): AdtInterface<R> {
     this.assertConnected();
-    return new AdtInterface(
+    return new AdtInterface<R>(
       this.connection,
       this.logger,
       this.systemContext,
       undefined,
       this.lockRegistry,
+      results,
     );
   }
 

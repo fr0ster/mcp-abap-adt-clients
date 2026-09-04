@@ -1,62 +1,38 @@
 /**
- * `PROG/I` includes — CRUD and lifecycle.
+ * Standalone `PROG/I` includes — see this module's `index.ts` for how they
+ * differ from a function-group include.
  *
- * The operation chain is the captured Eclipse one, not a guess:
- *
- * ```
- * POST   /programs/includes                                   create
- * POST   /programs/includes/{name}?_action=LOCK&accessMode=MODIFY
- * PUT    /programs/includes/{name}/source/main?lockHandle=…    text/plain; charset=utf-8
- * POST   /programs/includes/{name}?_action=UNLOCK&lockHandle=…
- * POST   /activation?method=activate&preauditRequested=true
- * ```
- *
- * The capabilities this declares are the ones an include has. It is **not**
- * `IAdtObject`: nothing measured says an include is versionable, and claiming a
- * capability a type does not have is the defect the narrowed factory returns
- * were introduced to remove. Validation is included because
- * `/includes/validation` was measured to answer — with the same three
- * parameters `/programs/validation` takes.
- *
- * See `./index.ts` for why this is a different resource from a function-group
- * include, which lives in `src/core/functionInclude/`.
+ * Every member answers `IAdtResponse<T>`, where T is what the result set given
+ * at construction makes of that endpoint's answer. The error bag this class
+ * used to return is gone: a failure now abandons the chain and comes back as
+ * the answer, with the request that produced it.
  */
-
 import type {
   IAbapConnection,
   IAdtActivatable,
   IAdtContentTypes,
-  IAdtCrud,
+  IAdtCreatable,
+  IAdtDeletable,
   IAdtLockable,
   IAdtOperationOptions,
+  IAdtReadable,
+  IAdtResponse,
+  IAdtUpdatable,
   IAdtValidatable,
   IIncludeConfig,
-  IIncludeState,
   ILogger,
+  IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
-import { safeErrorMessage } from '../../utils/internalUtils';
+import { answering } from '../../utils/adtResponse';
+import { chain } from '../shared/chain';
 import { activateInclude } from './activation';
 import { create } from './create';
 import { deleteInclude } from './delete';
 import { lockInclude } from './lock';
 import { getIncludeMetadata, getIncludeSource } from './read';
+import { type IIncludeResults, includeDocuments } from './types';
 import { unlockInclude } from './unlock';
 import { uploadIncludeSource } from './update';
-
-type IncludeError = IIncludeState['errors'][number];
-
-function emptyState(): IIncludeState {
-  return { errors: [] } as IIncludeState;
-}
-
-/** The shape the state's `errors` array actually takes. */
-function asError(method: string, error: unknown): IncludeError {
-  return {
-    method,
-    error: error instanceof Error ? error : new Error(safeErrorMessage(error)),
-    timestamp: new Date(),
-  } as IncludeError;
-}
 
 function requireName(config: Partial<IIncludeConfig>): string {
   if (!config.includeName) {
@@ -65,17 +41,35 @@ function requireName(config: Partial<IIncludeConfig>): string {
   return config.includeName;
 }
 
-export class AdtInclude
-  implements
-    IAdtCrud<IIncludeConfig, IIncludeState>,
-    IAdtValidatable<IIncludeConfig, IIncludeState>,
-    IAdtActivatable<IIncludeConfig, IIncludeState>,
-    IAdtLockable<IIncludeConfig, IIncludeState>
+export class AdtInclude<
+  R extends IIncludeResults<
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown
+  > = IIncludeResults,
+> implements
+    IAdtCreatable<IIncludeConfig, ReturnType<R['created']>>,
+    IAdtReadable<
+      IIncludeConfig,
+      ReturnType<R['source']>,
+      ReturnType<R['metadata']>
+    >,
+    IAdtUpdatable<IIncludeConfig, ReturnType<R['updated']>>,
+    IAdtDeletable<IIncludeConfig, ReturnType<R['deletion']>>,
+    IAdtValidatable<IIncludeConfig, ReturnType<R['validation']>>,
+    IAdtActivatable<IIncludeConfig, ReturnType<R['activation']>>,
+    IAdtLockable<IIncludeConfig>
 {
   constructor(
     private readonly connection: IAbapConnection,
     private readonly logger?: ILogger,
     private readonly contentTypes?: IAdtContentTypes,
+    // The one cast in this file, and it is on the default. See AdtClass.
+    private readonly results: R = includeDocuments as unknown as R,
   ) {}
 
   /**
@@ -85,14 +79,11 @@ export class AdtInclude
    * — the same three `/programs/validation` takes, with `description`
    * optional. Eclipse does not call it in the captured create, so this is
    * available rather than obligatory.
-   *
-   * It does **not** police `objtype`: posting `PROG/P` to the *includes*
-   * validation also answers `200 X`. So a success here says the name is free,
-   * not that the type was understood — the endpoint carries the type, the
-   * parameter does not gate it.
    */
-  async validate(config: Partial<IIncludeConfig>): Promise<IIncludeState> {
-    const state = emptyState();
+  async validate(
+    config: Partial<IIncludeConfig>,
+    options?: IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['validation']>>> {
     const includeName = requireName(config);
     if (!config.packageName) {
       throw new Error('packageName is required for validation');
@@ -107,139 +98,110 @@ export class AdtInclude
       params.set('description', config.description);
     }
 
-    try {
-      state.validationResponse = await this.connection.makeAdtRequest({
-        url: `/sap/bc/adt/includes/validation?${params.toString()}`,
-        method: 'POST',
-        timeout: 45000,
-        headers: { Accept: 'application/vnd.sap.as+xml' },
-      });
-    } catch (error) {
-      state.errors.push(asError('validate', error));
-    }
-    return state;
+    return answering(
+      () =>
+        this.connection.makeAdtRequest({
+          url: `/sap/bc/adt/includes/validation?${params.toString()}`,
+          method: 'POST',
+          timeout: 45000,
+          headers: { Accept: 'application/vnd.sap.as+xml' },
+        }),
+      this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
+      options?.analyse,
+    );
   }
 
   /**
-   * Create, then optionally write the source under a lock, then optionally
-   * activate.
+   * Create the include, and write its source if any was given.
    *
-   * The source may come from `options.sourceCode` or from the config, options
-   * winning — the same precedence every other handler here uses. An empty
-   * string is a source; only `undefined` means none was given.
-   *
-   * Activation happens only when `options.activateOnCreate` asks for it: the
-   * contract defaults it to `false`, and an earlier version of this method
-   * activated unconditionally whenever a source was present, which is a
-   * different behaviour wearing the same signature.
-   *
-   * `options.deleteOnFailure` removes the include again if a step after the
-   * metadata POST fails — otherwise a half-made object is left behind under a
-   * name the caller will collide with on its next attempt.
+   * The answer is the create's own. Whether source was written afterwards is
+   * this implementation's business — a caller asked for an include, not for a
+   * transcript — and a failure in that write is still returned, because it is
+   * why the include is not what was asked for.
    */
   async create(
     config: IIncludeConfig,
     options?: IAdtOperationOptions,
-  ): Promise<IIncludeState> {
-    const state = emptyState();
+  ): Promise<IAdtResponse<ReturnType<R['created']>>> {
     const includeName = requireName(config);
     if (!config.packageName) {
       throw new Error('packageName is required to create an include');
     }
 
-    try {
-      state.createResult = await create(
-        this.connection,
-        {
-          includeName,
-          description: config.description,
-          packageName: config.packageName,
-          transportRequest: config.transportRequest,
-          masterLanguage: config.masterLanguage,
-        },
-        this.contentTypes,
-      );
-    } catch (error) {
-      state.errors.push(asError('create', error));
-      return state;
-    }
-
-    // `!== undefined`, not truthiness: `''` is a source, and an empty include
-    // is a legitimate object — this class says so two paragraphs up. Treating
-    // the empty string as "no source given" makes one valid value unreachable.
-    const sourceCode = options?.sourceCode ?? config.sourceCode;
-    if (sourceCode !== undefined) {
-      const written = await this.writeSource(config, sourceCode, options);
-      state.lockHandle = written.lockHandle;
-      state.updateResult = written.updateResult;
-      state.unlockResult = written.unlockResult;
-      state.errors.push(...written.errors);
-      if (options?.activateOnCreate && written.errors.length === 0) {
-        await this.activateInto(state, includeName);
+    return chain(this.logger, async ({ step, onScopeEnd }) => {
+      let created = false;
+      if (options?.deleteOnFailure) {
+        // The object exists from the create on, so a later failure leaves a
+        // half-made include behind unless the caller asked otherwise.
+        onScopeEnd(async () => {
+          if (!created) return;
+          this.logger?.warn?.('Deleting include after a failed create', {
+            includeName,
+          });
+          await this.delete(config);
+        });
       }
-    }
 
-    // The object exists from here on, so a later failure leaves a half-made
-    // include behind unless the caller asked otherwise.
-    if (options?.deleteOnFailure && state.errors.length > 0) {
-      await this.rollBackCreate(state, config);
-    }
+      const value = await step(
+        answering(
+          () =>
+            create(
+              this.connection,
+              {
+                includeName,
+                description: config.description,
+                packageName: config.packageName as string,
+                transportRequest: config.transportRequest,
+                masterLanguage: config.masterLanguage,
+              },
+              this.contentTypes,
+            ),
+          this.results.created as IResultStrategy<ReturnType<R['created']>>,
+          options?.analyse,
+        ),
+      );
+      created = true;
 
-    return state;
-  }
+      // `!== undefined`, not truthiness: `''` is a source, and an empty include
+      // is a legitimate object. Treating the empty string as "no source given"
+      // makes one valid value unreachable.
+      const sourceCode = options?.sourceCode ?? config.sourceCode;
+      if (sourceCode !== undefined) {
+        await step(this.writeSource(config, sourceCode, options));
+        if (options?.activateOnCreate) {
+          await step(this.activate(config, options));
+        }
+      }
 
-  /**
-   * Undo a create whose later steps failed, when `deleteOnFailure` asks.
-   *
-   * The failure that caused this is already in `state.errors` and must stay
-   * the headline: a rollback that cannot complete is recorded beside it, never
-   * in place of it, and never thrown — the caller is already handling one
-   * failure and a second thrown from the cleanup hides the first.
-   */
-  private async rollBackCreate(
-    state: IIncludeState,
-    config: Partial<IIncludeConfig>,
-  ): Promise<void> {
-    this.logger?.warn?.('Deleting include after a failed create', {
-      includeName: config.includeName,
+      return value;
     });
-    try {
-      const deleted = await this.delete(config);
-      state.deleteResult = deleted.deleteResult;
-      state.errors.push(...deleted.errors);
-    } catch (error) {
-      state.errors.push(asError('deleteOnFailure', error));
-    }
   }
 
+  /** Read the include's source. */
   async read(
     config: Partial<IIncludeConfig>,
     version?: 'active' | 'inactive',
-  ): Promise<IIncludeState | undefined> {
-    const state = emptyState();
-    try {
-      state.readResult = await getIncludeSource(
-        this.connection,
-        requireName(config),
-        version,
-      );
-    } catch (error) {
-      state.errors.push(asError('read', error));
-    }
-    return state;
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['source']>>> {
+    const includeName = requireName(config);
+    return answering(
+      () => getIncludeSource(this.connection, includeName, version),
+      this.results.source as IResultStrategy<ReturnType<R['source']>>,
+      options?.analyse,
+    );
   }
 
-  async readMetadata(config: Partial<IIncludeConfig>): Promise<IIncludeState> {
-    const state = emptyState();
-    try {
-      state.readResult = await getIncludeMetadata(
-        this.connection,
-        requireName(config),
-      );
-    } catch (error) {
-      state.errors.push(asError('readMetadata', error));
-    }
-    return state;
+  /** Read the include's metadata. */
+  async readMetadata(
+    config: Partial<IIncludeConfig>,
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['metadata']>>> {
+    const includeName = requireName(config);
+    return answering(
+      () => getIncludeMetadata(this.connection, includeName),
+      this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
+      options?.analyse,
+    );
   }
 
   /**
@@ -247,14 +209,12 @@ export class AdtInclude
    *
    * `options.sourceCode` wins over the config's. `options.lockHandle` means the
    * caller already holds the lock and manages it — this then writes only, and
-   * neither locks nor unlocks. Activation is `options.activateOnUpdate`, which
-   * the contract defaults to `false`.
+   * neither locks nor unlocks. Activation is `options.activateOnUpdate`.
    */
   async update(
     config: Partial<IIncludeConfig>,
     options?: IAdtOperationOptions,
-  ): Promise<IIncludeState> {
-    const state = emptyState();
+  ): Promise<IAdtResponse<ReturnType<R['updated']>>> {
     // Absence, not emptiness: clearing an include to empty is a real edit, and
     // a truthiness check made it impossible to express.
     const sourceCode = options?.sourceCode ?? config.sourceCode;
@@ -264,90 +224,115 @@ export class AdtInclude
       );
     }
 
-    const written = await this.writeSource(config, sourceCode, options);
-    state.lockHandle = written.lockHandle;
-    state.updateResult = written.updateResult;
-    state.unlockResult = written.unlockResult;
-    state.errors.push(...written.errors);
-    if (options?.activateOnUpdate && written.errors.length === 0) {
-      await this.activateInto(state, requireName(config));
+    if (!options?.activateOnUpdate) {
+      return this.writeSource(config, sourceCode, options);
     }
-    return state;
+
+    return chain(this.logger, async ({ step }) => {
+      const written = await step(this.writeSource(config, sourceCode, options));
+      await step(this.activate(config, options));
+      return written;
+    });
   }
 
-  async delete(config: Partial<IIncludeConfig>): Promise<IIncludeState> {
-    const state = emptyState();
+  /**
+   * Delete the include.
+   *
+   * The unlock afterwards is not tidiness. Measured on E19 (`RFCSAPRL 816`): a
+   * successful DELETE does not release the lock with the object — the editing
+   * registration on the name stays, and the next create for that name is
+   * answered 403 `ExceptionResourceNoAuthorization`, in the same session, on a
+   * name nothing else had touched.
+   *
+   * A refused unlock after a successful delete is logged, not returned: the
+   * object is gone, so it is not a failure of the delete — which is exactly
+   * what `chain` does with a cleanup that throws.
+   */
+  async delete(
+    config: Partial<IIncludeConfig>,
+    options?: IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>>> {
     const includeName = requireName(config);
-    let lockHandle: string | undefined;
 
-    try {
+    return chain(this.logger, async ({ step, onScopeEnd }) => {
       this.connection.setSessionType?.('stateful');
-      const locked = await lockInclude(this.connection, includeName);
-      lockHandle = locked.lockHandle;
-      // Preserved for the caller even on failure — an unreleased handle is
-      // what leaves an object stuck for everyone else.
-      state.lockHandle = lockHandle;
-
-      state.deleteResult = await deleteInclude(
-        this.connection,
-        includeName,
-        lockHandle,
-        config.transportRequest ?? locked.corrNr,
-      );
-      // The handle is deliberately NOT cleared here. A successful DELETE was
-      // assumed to release the lock with the object; measured on E19
-      // (`RFCSAPRL 816`) it does not. The object goes, the editing
-      // registration on its name stays, and the next create for that name is
-      // answered **403 ExceptionResourceNoAuthorization, "User … is currently
-      // editing …"** — in the same session, on a name nothing else had
-      // touched. So the unlock below still has to run.
-    } catch (error) {
-      state.errors.push(asError('delete', error));
-    } finally {
-      // `quiet`: after a successful DELETE the object no longer exists, so the
-      // unlock may well be refused. That refusal is not a failure of the
-      // delete, and recording it as one would make every cleanup look broken
-      // to a caller that checks `state.errors`.
-      await this.releaseAndGoStateless(state, includeName, lockHandle, {
-        quiet: state.deleteResult !== undefined,
+      onScopeEnd(async () => {
+        this.connection.setSessionType?.('stateless');
       });
-    }
-    return state;
+
+      const locked = await lockInclude(this.connection, includeName);
+      onScopeEnd(async () => {
+        await unlockInclude(this.connection, includeName, locked.lockHandle);
+      });
+      config.onLock?.(locked.lockHandle);
+
+      return step(
+        answering(
+          () =>
+            deleteInclude(
+              this.connection,
+              includeName,
+              locked.lockHandle,
+              config.transportRequest ?? locked.corrNr,
+            ),
+          this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+          options?.analyse,
+        ),
+      );
+    });
   }
 
-  async activate(config: Partial<IIncludeConfig>): Promise<IIncludeState> {
-    const state = emptyState();
-    await this.activateInto(state, requireName(config));
-    return state;
-  }
-
-  async lock(config: Partial<IIncludeConfig>): Promise<string> {
-    this.connection.setSessionType?.('stateful');
-    const { lockHandle } = await lockInclude(
-      this.connection,
-      requireName(config),
+  /** Activate the include. */
+  async activate(
+    config: Partial<IIncludeConfig>,
+    options?: IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['activation']>>> {
+    const includeName = requireName(config);
+    return answering(
+      () => activateInclude(this.connection, includeName),
+      this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
+      options?.analyse,
     );
-    config.onLock?.(lockHandle);
-    return lockHandle;
   }
 
+  /** Lock the include for modification. */
+  async lock(config: Partial<IIncludeConfig>): Promise<IAdtResponse<string>> {
+    const includeName = requireName(config);
+    return answering(
+      async () => {
+        this.connection.setSessionType?.('stateful');
+        const { lockHandle } = await lockInclude(this.connection, includeName);
+        config.onLock?.(lockHandle);
+        // The handle is the value, and the request does not keep the wire it
+        // came on — so the answer is built around what the request produced.
+        return {
+          data: lockHandle,
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+        };
+      },
+      (answer) => String(answer.data),
+    );
+  }
+
+  /** Unlock the include, and go back to stateless either way. */
   async unlock(
     config: Partial<IIncludeConfig>,
     lockHandle: string,
-  ): Promise<IIncludeState> {
-    const state = emptyState();
-    try {
-      state.unlockResult = await unlockInclude(
-        this.connection,
-        requireName(config),
-        lockHandle,
+  ): Promise<IAdtResponse<void>> {
+    const includeName = requireName(config);
+    return chain(this.logger, async ({ step, onScopeEnd }) => {
+      onScopeEnd(async () => {
+        this.connection.setSessionType?.('stateless');
+      });
+      await step(
+        answering(
+          () => unlockInclude(this.connection, includeName, lockHandle),
+          () => undefined,
+        ),
       );
-    } catch (error) {
-      state.errors.push(asError('unlock', error));
-    } finally {
-      this.connection.setSessionType?.('stateless');
-    }
-    return state;
+    });
   }
 
   /**
@@ -361,110 +346,48 @@ export class AdtInclude
     config: Partial<IIncludeConfig>,
     sourceCode: string,
     options?: IAdtOperationOptions,
-  ): Promise<
-    Pick<IIncludeState, 'lockHandle' | 'updateResult' | 'unlockResult'> & {
-      errors: IncludeError[];
-    }
-  > {
+  ): Promise<IAdtResponse<ReturnType<R['updated']>>> {
     const includeName = requireName(config);
-    const result: Pick<
-      IIncludeState,
-      'lockHandle' | 'updateResult' | 'unlockResult'
-    > & { errors: IncludeError[] } = { errors: [] };
-
-    // A caller-held lock is used, recorded and NOT released here.
     const borrowed = options?.lockHandle;
-    let lockHandle: string | undefined = borrowed;
-    let corrNr: string | undefined;
 
-    try {
+    return chain(this.logger, async ({ step, onScopeEnd }) => {
+      let lockHandle = borrowed;
+      let corrNr: string | undefined;
+
       if (!borrowed) {
         this.connection.setSessionType?.('stateful');
+        onScopeEnd(async () => {
+          this.connection.setSessionType?.('stateless');
+        });
         const locked = await lockInclude(this.connection, includeName);
         lockHandle = locked.lockHandle;
         corrNr = locked.corrNr;
         config.onLock?.(lockHandle);
-      }
-      result.lockHandle = lockHandle;
-
-      result.updateResult = await uploadIncludeSource(
-        this.connection,
-        includeName,
-        sourceCode,
-        lockHandle as string,
-        config.transportRequest ?? corrNr,
-      );
-    } catch (error) {
-      result.errors.push(asError('update', error));
-    } finally {
-      if (!borrowed) {
-        const unlockResult = await this.releaseAndGoStateless(
-          result,
-          includeName,
-          lockHandle,
-        );
-        if (unlockResult) {
-          result.unlockResult = unlockResult;
-        }
-      }
-    }
-    return result;
-  }
-
-  private async activateInto(
-    state: { activateResult?: unknown; errors: IncludeError[] },
-    includeName: string,
-  ): Promise<void> {
-    try {
-      state.activateResult = await activateInclude(
-        this.connection,
-        includeName,
-      );
-    } catch (error) {
-      state.errors.push(asError('activate', error));
-    }
-  }
-
-  /**
-   * Release the lock and drop back to stateless — on every path.
-   *
-   * A failure to unlock is recorded, never thrown: it must not replace the
-   * error that caused it, and the session has to go stateless either way.
-   */
-  private async releaseAndGoStateless(
-    state: { errors: IncludeError[] },
-    includeName: string,
-    lockHandle: string | undefined,
-    options?: { quiet?: boolean },
-  ) {
-    let unlockResult: Awaited<ReturnType<typeof unlockInclude>> | undefined;
-    if (lockHandle) {
-      try {
-        unlockResult = await unlockInclude(
-          this.connection,
-          includeName,
-          lockHandle,
-        );
-      } catch (error) {
-        // Audible, not debug. A failed unlock is what leaves the editing
-        // registration on the name, and the next create for that name is then
-        // answered `403 ExceptionResourceNoAuthorization, "User … is currently
-        // editing …"` on a name nothing appears to have touched. That cost a
-        // detour once already; a warning nobody sees is the failure it exists
-        // to catch.
-        this.logger?.warn?.('Failed to unlock include', {
-          includeName,
-          error: safeErrorMessage(error),
+        onScopeEnd(async () => {
+          // Audible when it fails: a lock left behind is what makes the next
+          // create for this name answer 403 with nothing appearing to hold it.
+          await unlockInclude(
+            this.connection,
+            includeName,
+            lockHandle as string,
+          );
         });
-        // `quiet` keeps it out of `state.errors` after a successful DELETE —
-        // the object is gone, so a refused unlock is not a failure of the
-        // delete — but it never makes it silent.
-        if (!options?.quiet) {
-          state.errors.push(asError('unlock', error));
-        }
       }
-    }
-    this.connection.setSessionType?.('stateless');
-    return unlockResult;
+
+      return step(
+        answering(
+          () =>
+            uploadIncludeSource(
+              this.connection,
+              includeName,
+              sourceCode,
+              lockHandle as string,
+              config.transportRequest ?? corrNr,
+            ),
+          this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+          options?.analyse,
+        ),
+      );
+    });
   }
 }

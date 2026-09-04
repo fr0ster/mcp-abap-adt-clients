@@ -25,5 +25,6 @@ export { CT_INCLUDE, create } from './create';
 export { deleteInclude } from './delete';
 export { includeUrl, lockInclude } from './lock';
 export { getIncludeMetadata, getIncludeSource } from './read';
+export * from './types';
 export { unlockInclude } from './unlock';
 export { uploadIncludeSource } from './update';
