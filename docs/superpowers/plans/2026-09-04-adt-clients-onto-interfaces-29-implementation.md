@@ -1476,10 +1476,16 @@ nothing fabricates a status.
 
   **For the package readings, assert which nodes of one captured document reach
   each result**, by name: the document's `objects` entries appear in `packageList`
-  and `packageShort`, its `childNodes` appear in `packageTree` as references and
-  in neither of the other two, and `packageRaw` is byte-identical to `wire.data`.
+  and `packageShort`, its `childNodes` appear in `packageTree.children` and in
+  neither of the other two, and `packageRaw` is byte-identical to `wire.data`.
   Their semantics are new — the old members answered a walk — so this is the test
   that defines them rather than one that confirms a port.
+
+  **And assert the walk is possible**, because that is the whole claim: take a
+  `children` entry from `packageTree`, and check it carries both `objectType` and
+  a non-empty `nodeId` — the two things `fetchNodeStructure` needs for the next
+  request. A tree whose references cannot be followed passes every shape
+  assertion and fails the only one that matters.
 - [ ] **Step 2:** Run it; expect FAIL on the missing exports.
 - [ ] **Step 3: Split the old readers into several strategies — and move only what is pure**
 
@@ -1518,13 +1524,50 @@ names, `objects` and `childNodes`. The four readings of it are therefore:
 | strategy | from one document |
 |---|---|
 | `packageList` | `IPackageContentItem[]` built from that document's `objects` — **the level asked for, not the sub-tree**, because deeper levels are other requests |
-| `packageTree` | `IPackageHierarchyNode` for the node itself with its `childNodes` as **unexpanded references** — a caller who wants them expanded asks for them |
+| `packageTree` | `PackageTree` — declared in this package, below. **Not `IPackageHierarchyNode`**, and the reason is measured |
 | `packageShort` | `{ name, type }` per object, the same set as `packageList` |
 | `packageRaw` | the document |
 
+**Why `packageTree` does not answer `IPackageHierarchyNode`.** A tree we return is
+a tree we **built**, and how a consumer walks it further is theirs — but a built
+tree that cannot be walked is a decoration. `IRepositoryNodeChild` is
+`{ objectType, nodeId }`, and both halves are needed to ask the next question;
+`IPackageHierarchyNode` carries `name`, `type`, `isPackage`, `kind`, `codeFormat`,
+`restoreStatus` and `children`, and **no `nodeId`**. Mapping the child references
+into it drops the id and strands the caller at exactly the point the walk becomes
+theirs; keeping the id makes the value not that type. The contract's own comment
+on `IRepositoryNodeContents` says it: a result without `childNodes` forces the
+caller back to the raw document, "which is the coupling this contract removes".
+
+So the strategy answers a type this package declares, because a strategy's return
+type is this package's to choose — `IAdtPackageBrowsing<TContents>` takes whatever
+it returns:
+
+```typescript
+// src/core/shared/results.ts
+export interface PackageTree {
+  /** The package this level is of. */
+  readonly node: IObjectReference;
+  /** What sits at this level, built. */
+  readonly objects: IRepositoryObjectNode[];
+  /** How to ask for what is below — `{ objectType, nodeId }`, both halves. */
+  readonly children: IRepositoryNodeChild[];
+}
+```
+
+Every field is measured: it is `IRepositoryNodeContents` — the shape 27.0.0
+shipped for exactly this document — plus the identity of the node it was read
+for. Nothing here is invented, which decision 1 requires.
+
+**`IPackageHierarchyNode` is not returned by any shipped strategy**, and that is
+the honest outcome rather than an oversight: it describes a recursive tree, one
+document cannot fill it, and filling it would take the walk that left the
+contract. It stays exported by `interfaces` for a consumer who assembles that
+shape from what they walked.
+
 This is a behaviour change and the CHANGELOG says so: `getPackageContentsList`
 with `includeSubpackages` returned a flattened sub-tree, and no reading here does.
-The consumer walks, holding the references the tree gave them.
+The consumer walks, holding the pairs the tree gave them.
 
 - [ ] **Step 3b: Copying is the failure mode, not moving**
 
@@ -1990,6 +2033,15 @@ should know which instruction was rewritten and why.
     every key, undoing what `satisfies` bought, and the no-argument `getUtils()`
     is the call almost every consumer makes. Written as
     `= typeof utilsDocuments`, and the same for `RuntimeDumps` and `AdtRequest`.
+
+12. **`packageTree` answers `PackageTree`, declared here, not `IPackageHierarchyNode`.**
+    A built tree that cannot be walked is a decoration: `IRepositoryNodeChild` is
+    `{ objectType, nodeId }` and `IPackageHierarchyNode` has no `nodeId`, so
+    mapping into it strands the caller exactly where the walk becomes theirs. The
+    strategy's return type is this package's to choose, and the fields are
+    measured — `IRepositoryNodeContents` plus the identity of the node it was read
+    for. No shipped strategy returns `IPackageHierarchyNode`: it describes a
+    recursive tree that one document cannot fill.
 
 11. **The move is into several strategies, and only the pure half moves.** Step 3
     said "move that code into the strategy", which cannot be done: the old package
