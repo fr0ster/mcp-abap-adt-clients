@@ -1405,8 +1405,9 @@ are a claim rather than a feature, and every consumer still gets one shape.
   `src/core/shared/results.ts` (the four package readings and the utilities set —
   they belong beside `AdtUtils`, which is what takes them)
 - Modify: `src/runtime/dumps/RuntimeDumps.ts` (generic in its set; three members),
-  `src/clients/AdtRuntimeClient.ts` (overloads and the cache), `src/clients/AdtClient.ts`,
-  `src/core/transport/types.ts`, `src/core/shared/AdtUtils.ts`
+  `src/clients/AdtRuntimeClient.ts` (`getDumps` overloads and its cache),
+  `src/clients/AdtClient.ts` (`getRequest` overloads only — **`getUtils` is Task 14's**),
+  `src/core/transport/types.ts`
 - Modify: `src/index.ts` (export them; a strategy a consumer cannot import is not an option they have)
 - Test: `src/__tests__/unit/core/resultStrategies.test.ts`
 
@@ -1511,12 +1512,17 @@ getDumps<R extends IDumpResults<unknown> = IDumpResults>(
 }
 ```
 
-Package contents reach a caller through `AdtUtils.getPackageContents`, whose result
-set is given to `AdtUtils` at construction — so `AdtClient.getUtils()` gains the
-same pair of overloads, `AdtUtils` becomes generic in its set exactly as
-`RuntimeDumps` does above, and the cache in `getUtils` is keyed by the set's
-identity for the same reason. This is the injection point decision 22 names;
-there is no per-call parser argument anywhere in this package.
+**`getUtils` is not bound here.** Package contents reach a caller through
+`AdtUtils.getPackageContents`, and `AdtUtils` does not compile until **Task 14**
+migrates it — so the overload pair, the identity-keyed cache and the generic class
+are all that task's, following `RuntimeDumps<R>` above as their worked example.
+This task creates the strategies and the set they go in; Task 14 is where they
+reach a caller.
+
+Doing it here would mean either a test that cannot compile or half of Task 14
+executed early under a heading that does not say so. The injection point is the
+same one decision 22 names, wherever it is written: there is no per-call parser
+argument anywhere in this package.
 
 **`IUtilsResults` carries one key per parameterised atom, and `getPackageContents`
 is its own.** `IAdtPackageBrowsing<TContents>` is a separate atom with its own
@@ -1536,12 +1542,36 @@ export interface IUtilsResults {
   readonly inactiveObjects: IResultStrategy<unknown>; // IAdtGroupLifecycle
 }
 
-export const utilsDocuments: IUtilsResults = { /* … */ packageContents: packageList };
-export const utilsShort: IUtilsResults     = { /* … */ packageContents: packageShort };
-export const utilsRaw: IUtilsResults       = { /* … */ packageContents: packageRaw };
+export const utilsDocuments = {
+  /* … */ packageContents: packageList,
+} satisfies IUtilsResults;
+
+export const utilsShort = {
+  /* … */ packageContents: packageShort,
+} satisfies IUtilsResults;
+
+export const utilsRaw = {
+  /* … */ packageContents: packageRaw,
+} satisfies IUtilsResults;
 ```
 
-and `AdtUtils<R extends IUtilsResults>` instantiates each atom with the matching
+**`satisfies`, never a `: IUtilsResults` annotation.** The interface types every
+field as `IResultStrategy<unknown>`, because it is the *constraint* — it says
+which keys a set must have, not what any of them returns. Annotating a constant
+with it widens every strategy to that constraint, so
+`ReturnType<R['packageContents']>` is `unknown` and
+`getUtils(utilsShort).getPackageContents('Z')` answers `IAdtResponse<unknown>` —
+the exact opposite of what this task is for. `satisfies` checks the shape and
+keeps `packageShort`'s own return type, which is what `R` then carries. TypeScript
+5.9 is what this package builds with, so the operator is available.
+
+The same rule applies to `transportDocuments`, `transportShort`, `dumpDocuments`
+and `dumpShort` in the two `results.ts` files above: **shape checked by
+`satisfies`, types kept.** A set annotated with its constraint is a set that
+answers `unknown` for everything, and the compiler will not say so — every call
+still compiles, and every caller gets `unknown`.
+
+Then `AdtUtils<R extends IUtilsResults>` instantiates each atom with the matching
 key: `IAdtPackageBrowsing<ReturnType<R['packageContents']>>`,
 `IAdtRepositoryStructure<ReturnType<R['nodeContents']>>`, and so on. A set that
 declares a strategy no atom reads, or an atom instantiated with a key the set does
@@ -1555,6 +1585,8 @@ asking the same client twice with different sets and asserting the second is not
 the first and answers the second shape. Calling them on two clients would pass
 while the cache defect is still there.
 
+Two here — `getUtils` is tested in Task 14, where it exists.
+
 ```typescript
 const client = new AdtClient(connection, logger);
 
@@ -1563,24 +1595,17 @@ expect(client.getRequest(transportShort)).not.toBe(client.getRequest(transportDo
 
 // dumps — AdtRuntimeClient
 expect(runtime.getDumps(dumpShort)).not.toBe(runtime.getDumps(dumpDocuments));
-
-// utilities — the one this task created, and the one most likely to be wrong,
-// because `getUtils()` memoised a single AdtUtils long before it took a set
-expect(client.getUtils(utilsShort)).not.toBe(client.getUtils(utilsRaw));
 ```
 
-And one assertion past identity, for `getUtils` alone: the two implementations
-answer different shapes from the same call.
+And one assertion past identity, because a factory can cache correctly and read
+wrongly:
 
 ```typescript
-const short = await client.getUtils(utilsShort).getPackageContents('ZPKG');
-const raw = await client.getUtils(utilsRaw).getPackageContents('ZPKG');
-expect(typeof expectResult(raw, 'getPackageContents')).toBe('string');
-expect(Array.isArray(expectResult(short, 'getPackageContents'))).toBe(true);
+const short = expectResult(await runtime.getDumps(dumpShort).list(), 'list');
+const docs = expectResult(await runtime.getDumps(dumpDocuments).list(), 'list');
+expect(Array.isArray(short)).toBe(true);
+expect(typeof docs).toBe('string');
 ```
-
-A test that only compares identities passes on a factory that caches correctly
-and reads wrongly.
 
 - [ ] **Step 8:** Commit.
 
@@ -1666,7 +1691,11 @@ exists so the type says which reading this implementation performs.
   `packageContents`, `inactiveObjects`.
 - Produces:
   - `AdtUtils<R extends IUtilsResults>`, each atom it declares instantiated with
-    the matching key, and the `getUtils` overload pair bound in Task 12.
+    the matching key.
+  - The `getUtils` overload pair on `AdtClient`, and its identity-keyed cache —
+    **bound here, not in Task 12**, because that is where `AdtUtils` first
+    compiles. `RuntimeDumps<R>` and `getDumps` in Task 12 are the worked example
+    to copy.
 
 `AdtUtils` becomes generic in that set and keeps declaring the utility contracts
 it satisfies — which it can, because the 30.0.0 atoms take their result type as a
@@ -1694,8 +1723,38 @@ where it is: it is the node structure asked for as itself, and that the package
 member reaches the same resource internally was never the contract's business.
 - [ ] **Step 4:** `AdtUtils`' members already answer `IAdtResponse`; they lose the extra `IAdtResult` layer and the twelve that answered `IAdtWireResponse` answer `rawDocument` of it instead.
 - [ ] **Step 5:** The legacy clients follow their non-legacy counterparts. Legacy systems answer differently, but the *contract* is the same — a separate implementation is the point of the contract existing.
-- [ ] **Step 6:** `npm run lint:check && npm run build && npm run test:check` — all 0. This is the first point where the whole package compiles.
-- [ ] **Step 7:** Commit.
+- [ ] **Step 6: Bind `getUtils`, and test the cache that only exists here**
+
+```typescript
+// src/clients/AdtClient.ts — keyed by the set's identity, exactly as getDumps is
+private readonly utilsHandlers = new WeakMap<object, AdtUtils<never>>();
+
+getUtils(): AdtUtils;
+getUtils<R extends IUtilsResults>(results: R): AdtUtils<R>;
+```
+
+```typescript
+const client = new AdtClient(connection, logger);
+expect(client.getUtils(utilsShort)).not.toBe(client.getUtils(utilsRaw));
+
+const short = expectResult(
+  await client.getUtils(utilsShort).getPackageContents('ZPKG'),
+  'getPackageContents',
+);
+const raw = expectResult(
+  await client.getUtils(utilsRaw).getPackageContents('ZPKG'),
+  'getPackageContents',
+);
+expect(Array.isArray(short)).toBe(true);
+expect(typeof raw).toBe('string');
+```
+
+Both assertions matter and neither substitutes for the other: identity catches
+the memoised single instance `getUtils` had before it took a set, and the shapes
+catch a factory that caches correctly and reads wrongly.
+
+- [ ] **Step 7:** `npm run lint:check && npm run build && npm run test:check` — all 0. This is the first point where the whole package compiles.
+- [ ] **Step 8:** Commit.
 
 ---
 
@@ -1786,6 +1845,19 @@ should know which instruction was rewritten and why.
    `getRequest`, `getDumps` and `getUtils`, and for `getUtils` also that the two
    implementations answer different shapes, since a factory can cache correctly
    and still read wrongly.
+
+7. **`satisfies`, not an annotation, on every result set.** `IUtilsResults` types
+   its fields as `IResultStrategy<unknown>` because it is the constraint; a
+   constant annotated with it widens every strategy to that, so
+   `ReturnType<R['packageContents']>` is `unknown` and the caller gets
+   `IAdtResponse<unknown>` — the opposite of the point, with nothing failing to
+   compile to say so. The same holds for the transport and dump sets.
+
+8. **`getUtils` is bound in Task 14, not Task 12.** Task 12 claimed the overloads,
+   the cache and their test while `AdtUtils` does not compile until Task 14 — so
+   either the test could not build or half of Task 14 ran early under a heading
+   that did not say so. Task 12 keeps the strategies and the sets; Task 14 binds
+   them and carries the `getUtils` half of the cache test.
 
 **What did not change:** every task about `answering`, the two strategies, the
 per-type result types, the casts, the negative cases, the visible skips and the
