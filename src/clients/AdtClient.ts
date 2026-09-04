@@ -82,8 +82,9 @@ import {
   AdtLocalMacros,
   AdtLocalTestClass,
   AdtLocalTypes,
+  classDocuments,
   type IClassConfig,
-  type IClassState,
+  type IClassResults,
   type ILocalDefinitionsConfig,
   type ILocalMacrosConfig,
   type ILocalTestClassConfig,
@@ -171,6 +172,7 @@ import {
 } from '../core/serviceDefinition';
 import { AdtUtils } from '../core/shared/AdtUtils';
 import { type LockFailure, LockRegistry } from '../core/shared/LockRegistry';
+import type { ObjectVersion } from '../core/shared/results';
 import {
   AdtStructure,
   type IStructureConfig,
@@ -298,17 +300,64 @@ export class AdtClient {
   }
 
   /**
-   * Get high-level operations for Class objects
-   * @returns IAdtObject instance for Class operations
+   * A class implementation, answering documents.
+   *
+   * The result strategy is chosen here rather than per call because a consumer
+   * that wants a particular shape wants it for every member it touches, and
+   * none of them changes its mind between `create` and `read` of the same
+   * object. The return type is this package's — which is why
+   * `@mcp-abap-adt/interfaces` needs no parser parameter to make this possible.
    */
-  getClass(): IAdtSourceObject<IClassConfig, IClassState> {
+  getClass(): AdtClass;
+  getClass<
+    R extends IClassResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    >,
+  >(
+    results: R,
+  ): IAdtCreatable<IClassConfig, ReturnType<R['created']>> &
+    IAdtReadable<
+      IClassConfig,
+      ReturnType<R['source']>,
+      ReturnType<R['metadata']>
+    > &
+    IAdtUpdatable<IClassConfig, ReturnType<R['updated']>> &
+    IAdtDeletable<IClassConfig, ReturnType<R['deletion']>> &
+    IAdtValidatable<IClassConfig, ReturnType<R['validation']>> &
+    IAdtCheckable<IClassConfig, ReturnType<R['check']>> &
+    IAdtActivatable<IClassConfig, ReturnType<R['activation']>> &
+    IAdtLockable<IClassConfig> &
+    IAdtVersionable<IClassConfig, ObjectVersion[], string>;
+  // The implementation is generic too. Erasing R here would build the object at
+  // `unknown` while the overload promised `ReturnType<R['source']>` — the
+  // factory telling the truth in its signature and lying in its body.
+  getClass<
+    R extends IClassResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    > = IClassResults,
+  >(results: R = classDocuments as unknown as R): AdtClass<R> {
     this.assertConnected();
-    return new AdtClass(
+    return new AdtClass<R>(
       this.connection,
       this.logger,
       this.systemContext,
       this.contentTypes,
       this.lockRegistry,
+      results,
     );
   }
 
@@ -955,21 +1004,53 @@ export class AdtClient {
    * `update`. The lock, activation, metadata and transport it exposes are the
    * **container class's**, which is what ADT locks and activates.
    */
-  getLocalTestClass(): IAdtReadable<ILocalTestClassConfig, IClassState> &
-    IAdtModifiable<ILocalTestClassConfig, IClassState> &
-    IAdtValidatable<ILocalTestClassConfig, IClassState> &
-    IAdtCheckable<ILocalTestClassConfig, IClassState> &
-    IAdtActivatable<ILocalTestClassConfig, IClassState> &
-    IAdtLockable<ILocalTestClassConfig, IClassState> &
-    IAdtVersionable<ILocalTestClassConfig> &
-    IAdtTransportAware<ILocalTestClassConfig, IClassState> {
+  getLocalTestClass(): AdtLocalTestClass;
+  getLocalTestClass<
+    R extends IClassResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    >,
+  >(
+    results: R,
+  ): IAdtReadable<
+    ILocalTestClassConfig,
+    ReturnType<R['source']>,
+    ReturnType<R['metadata']>
+  > &
+    IAdtUpdatable<ILocalTestClassConfig, ReturnType<R['updated']>> &
+    IAdtDeletable<ILocalTestClassConfig, ReturnType<R['updated']>> &
+    IAdtValidatable<ILocalTestClassConfig, ReturnType<R['validation']>> &
+    IAdtCheckable<ILocalTestClassConfig, ReturnType<R['check']>> &
+    IAdtActivatable<ILocalTestClassConfig, ReturnType<R['activation']>> &
+    IAdtLockable<ILocalTestClassConfig> &
+    IAdtVersionable<ILocalTestClassConfig, ObjectVersion[], string> &
+    IAdtTransportAware<ILocalTestClassConfig, string>;
+  getLocalTestClass<
+    R extends IClassResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    > = IClassResults,
+  >(results: R = classDocuments as unknown as R): AdtLocalTestClass<R> {
     this.assertConnected();
-    return new AdtLocalTestClass(
+    return new AdtLocalTestClass<R>(
       this.connection,
       this.logger,
       this.systemContext,
       this.contentTypes,
       this.lockRegistry,
+      results,
     );
   }
 
@@ -981,21 +1062,53 @@ export class AdtClient {
    * `update`. The lock, activation, metadata and transport it exposes are the
    * **container class's**, which is what ADT locks and activates.
    */
-  getLocalTypes(): IAdtReadable<ILocalTypesConfig, IClassState> &
-    IAdtModifiable<ILocalTypesConfig, IClassState> &
-    IAdtValidatable<ILocalTypesConfig, IClassState> &
-    IAdtCheckable<ILocalTypesConfig, IClassState> &
-    IAdtActivatable<ILocalTypesConfig, IClassState> &
-    IAdtLockable<ILocalTypesConfig, IClassState> &
-    IAdtVersionable<ILocalTypesConfig> &
-    IAdtTransportAware<ILocalTypesConfig, IClassState> {
+  getLocalTypes(): AdtLocalTypes;
+  getLocalTypes<
+    R extends IClassResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    >,
+  >(
+    results: R,
+  ): IAdtReadable<
+    ILocalTypesConfig,
+    ReturnType<R['source']>,
+    ReturnType<R['metadata']>
+  > &
+    IAdtUpdatable<ILocalTypesConfig, ReturnType<R['updated']>> &
+    IAdtDeletable<ILocalTypesConfig, ReturnType<R['updated']>> &
+    IAdtValidatable<ILocalTypesConfig, ReturnType<R['validation']>> &
+    IAdtCheckable<ILocalTypesConfig, ReturnType<R['check']>> &
+    IAdtActivatable<ILocalTypesConfig, ReturnType<R['activation']>> &
+    IAdtLockable<ILocalTypesConfig> &
+    IAdtVersionable<ILocalTypesConfig, ObjectVersion[], string> &
+    IAdtTransportAware<ILocalTypesConfig, string>;
+  getLocalTypes<
+    R extends IClassResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    > = IClassResults,
+  >(results: R = classDocuments as unknown as R): AdtLocalTypes<R> {
     this.assertConnected();
-    return new AdtLocalTypes(
+    return new AdtLocalTypes<R>(
       this.connection,
       this.logger,
       this.systemContext,
       this.contentTypes,
       this.lockRegistry,
+      results,
     );
   }
 
@@ -1007,21 +1120,53 @@ export class AdtClient {
    * `update`. The lock, activation, metadata and transport it exposes are the
    * **container class's**, which is what ADT locks and activates.
    */
-  getLocalDefinitions(): IAdtReadable<ILocalDefinitionsConfig, IClassState> &
-    IAdtModifiable<ILocalDefinitionsConfig, IClassState> &
-    IAdtValidatable<ILocalDefinitionsConfig, IClassState> &
-    IAdtCheckable<ILocalDefinitionsConfig, IClassState> &
-    IAdtActivatable<ILocalDefinitionsConfig, IClassState> &
-    IAdtLockable<ILocalDefinitionsConfig, IClassState> &
-    IAdtVersionable<ILocalDefinitionsConfig> &
-    IAdtTransportAware<ILocalDefinitionsConfig, IClassState> {
+  getLocalDefinitions(): AdtLocalDefinitions;
+  getLocalDefinitions<
+    R extends IClassResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    >,
+  >(
+    results: R,
+  ): IAdtReadable<
+    ILocalDefinitionsConfig,
+    ReturnType<R['source']>,
+    ReturnType<R['metadata']>
+  > &
+    IAdtUpdatable<ILocalDefinitionsConfig, ReturnType<R['updated']>> &
+    IAdtDeletable<ILocalDefinitionsConfig, ReturnType<R['updated']>> &
+    IAdtValidatable<ILocalDefinitionsConfig, ReturnType<R['validation']>> &
+    IAdtCheckable<ILocalDefinitionsConfig, ReturnType<R['check']>> &
+    IAdtActivatable<ILocalDefinitionsConfig, ReturnType<R['activation']>> &
+    IAdtLockable<ILocalDefinitionsConfig> &
+    IAdtVersionable<ILocalDefinitionsConfig, ObjectVersion[], string> &
+    IAdtTransportAware<ILocalDefinitionsConfig, string>;
+  getLocalDefinitions<
+    R extends IClassResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    > = IClassResults,
+  >(results: R = classDocuments as unknown as R): AdtLocalDefinitions<R> {
     this.assertConnected();
-    return new AdtLocalDefinitions(
+    return new AdtLocalDefinitions<R>(
       this.connection,
       this.logger,
       this.systemContext,
       this.contentTypes,
       this.lockRegistry,
+      results,
     );
   }
 
@@ -1033,21 +1178,53 @@ export class AdtClient {
    * `update`. The lock, activation, metadata and transport it exposes are the
    * **container class's**, which is what ADT locks and activates.
    */
-  getLocalMacros(): IAdtReadable<ILocalMacrosConfig, IClassState> &
-    IAdtModifiable<ILocalMacrosConfig, IClassState> &
-    IAdtValidatable<ILocalMacrosConfig, IClassState> &
-    IAdtCheckable<ILocalMacrosConfig, IClassState> &
-    IAdtActivatable<ILocalMacrosConfig, IClassState> &
-    IAdtLockable<ILocalMacrosConfig, IClassState> &
-    IAdtVersionable<ILocalMacrosConfig> &
-    IAdtTransportAware<ILocalMacrosConfig, IClassState> {
+  getLocalMacros(): AdtLocalMacros;
+  getLocalMacros<
+    R extends IClassResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    >,
+  >(
+    results: R,
+  ): IAdtReadable<
+    ILocalMacrosConfig,
+    ReturnType<R['source']>,
+    ReturnType<R['metadata']>
+  > &
+    IAdtUpdatable<ILocalMacrosConfig, ReturnType<R['updated']>> &
+    IAdtDeletable<ILocalMacrosConfig, ReturnType<R['updated']>> &
+    IAdtValidatable<ILocalMacrosConfig, ReturnType<R['validation']>> &
+    IAdtCheckable<ILocalMacrosConfig, ReturnType<R['check']>> &
+    IAdtActivatable<ILocalMacrosConfig, ReturnType<R['activation']>> &
+    IAdtLockable<ILocalMacrosConfig> &
+    IAdtVersionable<ILocalMacrosConfig, ObjectVersion[], string> &
+    IAdtTransportAware<ILocalMacrosConfig, string>;
+  getLocalMacros<
+    R extends IClassResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    > = IClassResults,
+  >(results: R = classDocuments as unknown as R): AdtLocalMacros<R> {
     this.assertConnected();
-    return new AdtLocalMacros(
+    return new AdtLocalMacros<R>(
       this.connection,
       this.logger,
       this.systemContext,
       this.contentTypes,
       this.lockRegistry,
+      results,
     );
   }
 }
