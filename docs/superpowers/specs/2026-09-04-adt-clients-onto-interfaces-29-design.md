@@ -143,15 +143,21 @@ answering<T>(
 
 **Composition, once per step and never per chain:**
 
-| what happened | default verdict | then | result |
-|---|---|---|---|
-| request threw | `recogniseFailure(error)` | `analyse(verdict, wire?)` | failure, unless `analyse` returns `undefined` |
-| request returned | `undefined` | `analyse(undefined, wire)` | failure if `analyse` returns an error |
-| `analyse` cleared a refusal | — | — | the value, produced from the same `wire` |
-| no `analyse` supplied | `recogniseFailure` or `undefined` | — | as the default decided |
+| what happened | wire in hand | default verdict | `analyse` may clear it | result |
+|---|---|---|---|---|
+| request returned | yes | `undefined` | — | the value, or a failure if `analyse` returns one |
+| threw, response attached | yes | `recogniseFailure(error)` | **yes** | cleared → the value from that wire; otherwise failure |
+| threw, no response | **no** | `recogniseFailure(error)` | **no** | always a failure |
+| no `analyse` supplied | either | as the default decided | — | as the default decided |
 
-The wire response is passed in both directions, which is what makes clearing a
-refusal possible: the value is produced from the answer that was already in hand.
+**A verdict can only be cleared when there is a wire response to produce a value
+from.** A socket that would not open, a session that is gone, an authentication
+that failed — none of these carries an answer, so there is nothing for the result
+strategy to read and no `IAdtSuccess<T>` that could honestly be built. `analyse`
+is still called for the record, but its `undefined` cannot turn "nothing came
+back" into a success. Enforced in code, not left to the caller, and covered by a
+negative test: an error with no `response`, an `analyse` that clears everything,
+and an assertion that the answer is still `ok: false`.
 A chain like `create` runs this per request, so `IAdtError.request` names the step
 that refused rather than the chain that contained it.
 
