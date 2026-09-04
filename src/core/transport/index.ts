@@ -2,10 +2,7 @@
  * Transport operations - exports
  */
 
-export { AdtRequest } from './AdtRequest';
+export { AdtRequest, hasDeferredResponses } from './AdtRequest';
 export { AdtRequestLegacy } from './AdtRequestLegacy';
-export type {
-  IListTransportsParams,
-  ITransportConfig,
-  ITransportState,
-} from './types';
+export { parseTransportTree } from './parseTransportTree';
+export * from './types';

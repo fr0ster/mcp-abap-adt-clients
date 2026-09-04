@@ -230,7 +230,12 @@ import {
   type ITransformationResults,
   transformationDocuments,
 } from '../core/transformation';
-import { AdtRequest } from '../core/transport';
+import {
+  AdtRequest,
+  type ITransportConfig,
+  type ITransportResults,
+  transportDocuments,
+} from '../core/transport';
 import {
   AdtCdsUnitTest,
   AdtUnitTest,
@@ -2132,9 +2137,36 @@ export class AdtClient {
    *
    * @returns the transport request contract
    */
-  getRequest(): IAdtRequest {
+  getRequest(): AdtRequest;
+  getRequest<
+    R extends ITransportResults<unknown, unknown, unknown, unknown, unknown>,
+  >(
+    results: R,
+  ): IAdtCreatable<ITransportConfig, ReturnType<R['created']>> &
+    IAdtReadable<
+      ITransportConfig,
+      ReturnType<R['read']>,
+      ReturnType<R['read']>
+    > &
+    IAdtUpdatable<ITransportConfig, ReturnType<R['updated']>> &
+    IAdtDeletable<ITransportConfig, ReturnType<R['deleted']>> &
+    IAdtRequest<ReturnType<R['list']>>;
+  getRequest<
+    R extends ITransportResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    > = ITransportResults,
+  >(results: R = transportDocuments as unknown as R): AdtRequest<R> {
     this.assertConnected();
-    return new AdtRequest(this.connection, this.logger, this.systemContext);
+    return new AdtRequest<R>(
+      this.connection,
+      this.logger,
+      this.systemContext,
+      results,
+    );
   }
 
   /**
