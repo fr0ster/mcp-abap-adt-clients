@@ -17,10 +17,6 @@
       "types": "./dist/index.runtime.d.ts",
       "default": "./dist/index.runtime.js"
     },
-    "./batch": {
-      "types": "./dist/index.batch.d.ts",
-      "default": "./dist/index.batch.js"
-    },
     "./ws": {
       "types": "./dist/index.ws.d.ts",
       "default": "./dist/index.ws.js"
@@ -41,9 +37,6 @@
       ],
       "runtime": [
         "dist/index.runtime.d.ts"
-      ],
-      "batch": [
-        "dist/index.batch.d.ts"
       ],
       "ws": [
         "dist/index.ws.d.ts"
@@ -116,7 +109,7 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "@mcp-abap-adt/interfaces": "^30.0.0",
+    "@mcp-abap-adt/interfaces": "^31.0.0",
     "@mcp-abap-adt/logger": "^0.1.3",
     "axios": "^1.18.1",
     "fast-xml-parser": "^5.9.3"

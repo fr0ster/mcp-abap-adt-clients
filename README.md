@@ -8,10 +8,8 @@ TypeScript clients for SAP ABAP Development Tools (ADT).
 
 - ✅ **Client API** – simplified interface for common operations:
   - `AdtClient` – high-level CRUD API with automatic operation chains
-  - `AdtClientBatch` – batch mode: multiple read operations in a single HTTP round-trip
   - `AdtExecutor` – execution API via `IExecutor` contracts (class/program, with profiling)
   - `AdtRuntimeClient` – stable runtime operations (ABAP debugger, traces, logs, dumps, ATC check runs)
-  - `AdtRuntimeClientBatch` – batch mode for runtime operations
   - `AdtRuntimeClientExperimental` – runtime APIs in progress (for example AMDP debugger)
   - `AdtClientsWS` – realtime WebSocket facade for event-driven workflows
   - `AdtAbapGitClient` – standalone client for SAP-official ADT-integrated abapGit (`/sap/bc/adt/abapgit/*`); available on cloud and modern on-prem (ABAP Platform 2022+)
@@ -117,12 +115,6 @@ npm install @mcp-abap-adt/adt-clients
    - Realtime request/event facade over `IWebSocketTransport`
    - Includes debugger-session facade: listen, attach, step, stack, variables
    - Example: `await wsClient.request('debugger.listen', { timeoutSeconds: 30 })`
-
-6. **AdtClientBatch** / **AdtRuntimeClientBatch**
-   - Execute multiple independent read operations in a single HTTP round-trip
-   - Uses SAP ADT batch endpoint (`POST /sap/bc/adt/debugger/batch`) with `multipart/mixed` payloads
-   - Same factory API as `AdtClient` / `AdtRuntimeClient` — record calls, then `batchExecute()`
-   - Example: `const batch = new AdtClientBatch(connection); batch.getClass().readMetadata({...}); await batch.batchExecute();`
 
 ## Supported Object Types
 
@@ -259,35 +251,6 @@ const debuggerSession = wsClient.getDebuggerSessionClient();
 await debuggerSession.listen({ timeoutSeconds: 60 });
 await debuggerSession.step({ action: 'step_over' });
 ```
-
-### Using AdtClientBatch (Batch Read Operations)
-
-`AdtClientBatch` sends multiple independent read operations in a single HTTP round-trip via `multipart/mixed` batch requests.
-
-```typescript
-import { AdtClientBatch } from '@mcp-abap-adt/adt-clients';
-
-const batch = new AdtClientBatch(connection, console);
-
-// Record operations (not yet executed)
-const classPromise = batch.getClass().readMetadata({ className: 'CL_ABAP_TYPEDESCR' });
-const domainPromise = batch.getDomain().readMetadata({ domainName: 'MANDT' });
-const dePromise = batch.getDataElement().readMetadata({ dataElementName: 'MANDT' });
-
-// Execute all in one HTTP request
-await batch.batchExecute();
-
-// Resolve individual results
-const classState = await classPromise;
-const domainState = await domainPromise;
-const deState = await dePromise;
-```
-
-**Batch-safe operations** (single-step, no chained awaits):
-- `read()`, `readMetadata()`, `readTransport()` — single GET
-- `check()`, `validate()`, `activate()` — single POST
-
-**NOT batch-safe** (multi-step chains): `create()`, `update()`, `delete()`.
 
 ### ABAP Debugger Step Operations via Batch Endpoint
 
@@ -698,7 +661,7 @@ What this package exports is what it owns: the clients, the handler classes, the
 
 `@mcp-abap-adt/interfaces` (`^17.1.0`) splits the fat `IAdtObject` contract into **capability atoms** — `IAdtCreatable`, `IAdtReadable`, `IAdtUpdatable`, `IAdtDeletable` (and `IAdtModifiable`/`IAdtCrud`, their composites), `IAdtValidatable`, `IAdtCheckable`, `IAdtActivatable`, `IAdtLockable`, `IAdtVersionable`, `IAdtTransportAware`, `IAdtSearchable` — each covering one slice of the lifecycle, plus one named composite, `IAdtSourceObject`. There is no composite for "everything but versions": a vocabulary states what an object supports, never what it lacks. Since interfaces 13.0.0 `IAdtObject` is itself assembled from the atoms, so the atoms are the definitions and the composite cannot drift from them.
 
-Since **8.0.0**, each handler `implements` only the atoms it genuinely supports, and `AdtClient.getXxx()` (and `AdtClientBatch.getXxx()`) return types are narrowed to match:
+Since **8.0.0**, each handler `implements` only the atoms it genuinely supports, and `AdtClient.getXxx()` return types are narrowed to match:
 
 ```typescript
 client.getClass().getVersions({ className: 'ZCL_X' });   // ✅ classes have version history

@@ -17,11 +17,8 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
-import {
-  createBatchBoundary,
-  createRequestId,
-} from '../../batch/buildBatchPayload';
 import { getTimeout } from '../../utils/timeouts';
+import { createBatchBoundary, createRequestId } from './batchPayload';
 
 /**
  * Launch debugger
