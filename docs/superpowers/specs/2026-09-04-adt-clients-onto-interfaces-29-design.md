@@ -34,12 +34,22 @@ transport request** produced a fabricated error instead of the one SAP sent.
 **One spec for the whole migration.** Decomposition happens in the plan, not by
 splitting the design.
 
-**A member answers its document; a parser is a separate parameter.** The default
-result is the body as it arrived — decision 5 leaves parsing to the consumer, and
-this library does not know which fields a caller needs. Where a caller wants a
-shape, the implementation takes a parser in the form already established by
-`search(criteria, parse)`. The strategy lives in the implementation; the contract
-says only that a result is answered.
+**`IAdtResult` is the strategy, and it is the only injection point for shape.**
+It is not a container holding a value — its *implementation* decides how the
+answer becomes a value. `adt-clients` ships the defaults, and two or three of them
+where an answer is large enough that a caller might reasonably want different
+amounts. A consumer supplies their own implementation and gets their own shape.
+
+This is why the atoms need no parser parameter and `interfaces` 29.0.0 does not
+change again: `create(config, options?)` is enough, because the substitution
+happens at `getResult()`, not in the signature. Any proposal that adds a `parse`
+argument, a `result` field on the options, or a type parameter to a member is the
+wrong proposal — each was tried and each was rejected for putting the choice
+somewhere the contract cannot carry it.
+
+The shipped default answers the body as it arrived; decision 5 leaves parsing to
+whoever wants a shape out of it, and this library does not know which fields a
+caller needs.
 
 Mutations that ADT answers with nothing return `void`. Success is `ok: true`; the
 reason for a failure is in `getError()`.
@@ -80,13 +90,39 @@ The implementation then declares the atoms it honours with those types, and each
 member returns `answering(...)` from `src/utils/adtResponse.ts` rather than
 building a state and throwing.
 
-### Failure classification
+### Failure classification, and how `analyse` composes
 
 `recogniseFailure` already distinguishes `refusal`, `parse` and `connection`, and
-`refusalAware` is installed once per connection. Neither changes. What changes is
-that a per-type implementation may pass `analyse` to override the verdict, which
-is how the "200 with an empty body" ambiguity is resolved per caller rather than
-guessed at centrally.
+`refusalAware` is installed once per connection. Neither changes.
+
+What does change is that `answering` cannot stay as it is. Today it takes a
+thunk and sees either a finished value or an exception — never the wire response
+of a *successful* call. So `analyse` would never be consulted on a 200 with an
+empty body, which is the case it exists for, and could not clear a refusal that
+`refusalAware` had already turned into a throw. The replacement takes the request
+and the extraction separately:
+
+```ts
+answering<T>(
+  run: () => Promise<IAdtWireResponse>,   // one request, unparsed
+  read: IAdtResult-producing strategy,    // how the answer becomes a value
+  analyse?: IAnalyse,                     // from the operation options
+): Promise<IAdtResponse<T>>
+```
+
+**Composition, once per step and never per chain:**
+
+| what happened | default verdict | then | result |
+|---|---|---|---|
+| request threw | `recogniseFailure(error)` | `analyse(verdict, wire?)` | failure, unless `analyse` returns `undefined` |
+| request returned | `undefined` | `analyse(undefined, wire)` | failure if `analyse` returns an error |
+| `analyse` cleared a refusal | — | — | the value, produced from the same `wire` |
+| no `analyse` supplied | `recogniseFailure` or `undefined` | — | as the default decided |
+
+The wire response is passed in both directions, which is what makes clearing a
+refusal possible: the value is produced from the answer that was already in hand.
+A chain like `create` runs this per request, so `IAdtError.request` names the step
+that refused rather than the chain that contained it.
 
 ### Casts
 
