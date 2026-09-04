@@ -20,14 +20,6 @@
     before the five broken documentation imports are fixed.
   - `npm run build` and `npm run test:check` are expected to fail from **Task 1
     through Task 12**, and exit 0 from Task 13 onward.
-  **`npm run build` and `npm run test:check` are both expected to fail from Task 1
-  until the `AdtUtils` task** — `test:check` is red today with the same migration
-  errors, in scripts, tests and implementations alike —
-  which is the first point where the whole package compiles. A migration of this
-  size cannot keep either type-check green at every step, and pretending otherwise
-  would mean one enormous commit or a false claim in each small one. Commits in
-  that window use `--no-verify` and say in their message that the type-checks are
-  still red and why.
 - `npm run lint:check` runs `check:docs`, and **it is red for Task 1 as well, for
   five broken documentation imports** — `README.md` and `docs/usage/CLIENT_API_REFERENCE.md`
   still say `AdtOperationError` and `IClassState` come from
@@ -1484,7 +1476,7 @@ would pass while the cache defect is still there.
 - Test: `src/__tests__/unit/shared/packageParserOverload.test.ts` — one call, two shapes, the parsed one typed rather than `unknown`
 
 **Interfaces:**
-- Consumes: `answering`, `rawDocument` (Task 2); `packageNames`, `packageStructure` (Task 12).
+- Consumes: `answering`, `rawDocument` (Task 2).
 - Produces:
   - **No `IUtilsResults`, and `AdtUtils` does not become generic.**
 
