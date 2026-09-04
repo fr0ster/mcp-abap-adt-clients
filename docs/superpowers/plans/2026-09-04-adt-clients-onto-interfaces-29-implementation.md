@@ -276,7 +276,43 @@ export const rawDocument: IResultStrategy<string> = (wire) =>
 export const nothing: IResultStrategy<void> = () => undefined;
 ```
 
-- [ ] **Step 4: Rewrite `answering` in `src/utils/adtResponse.ts`**
+- [ ] **Step 4: Migrate `succeeded` and `failed` to the new response shape**
+
+Both still answer `IAdtResponse<IAdtResult<T>>` — the extra layer 29.0.0 removed.
+Left as they are, `return succeeded(read(wire))` is not assignable to
+`IAdtResponse<T>`. In `src/utils/adtResponse.ts:36` and `:45`:
+
+```typescript
+/** An answer that succeeded, carrying the value the result strategy made. */
+export function succeeded<T>(value: T): IAdtResponse<T> {
+  return {
+    ok: true,
+    getResult: () => ({ value }),
+    getError: () => undefined,
+  };
+}
+
+/** An answer that failed, carrying what the error strategy made of it. */
+export function failed<T>(error: IAdtError): IAdtResponse<T> {
+  return {
+    ok: false,
+    getResult: () => undefined,
+    getError: () => error,
+  };
+}
+```
+
+`getResult()` still answers `IAdtResult<T>` — that is what the contract says. What
+changed is that `IAdtResult` is no longer written in the *response's* type
+argument. Then sweep for the old shape:
+
+```bash
+grep -rn "IAdtResponse<IAdtResult<" src --include='*.ts'
+```
+
+Expected after this step and Task 12: no matches.
+
+- [ ] **Step 5: Rewrite `answering` in `src/utils/adtResponse.ts`**
 
 Replace the existing `answering` (currently at line 115) with:
 
@@ -359,7 +395,7 @@ export { rawDocument, nothing } from './resultStrategy';
 export type { IResultStrategy } from './resultStrategy';
 ```
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [ ] **Step 8: Run the tests to verify they pass**
 
 ```bash
 MCP_ENV_PATH=/tmp/nonexistent-env npx jest src/__tests__/unit/shared/answeringComposition.test.ts 2>&1 | tee unit-run.log
@@ -367,11 +403,11 @@ MCP_ENV_PATH=/tmp/nonexistent-env npx jest src/__tests__/unit/shared/answeringCo
 
 Expected: 6 passed.
 
-- [ ] **Step 6: Red-proof the no-wire rule**
+- [ ] **Step 7: Red-proof the no-wire rule**
 
 Temporarily change the `if (!wire)` branch to `return succeeded(read(wire as never));`. Re-run. Expected: the "cannot be cleared into a success when nothing came back" case fails. Revert the change and re-run to green. A rule nobody has seen fail is a rule nobody has tested.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
 git add src/utils/resultStrategy.ts src/utils/adtResponse.ts src/__tests__/unit/shared/answeringComposition.test.ts
@@ -455,19 +491,28 @@ import { nothing, rawDocument } from '../../utils/resultStrategy';
  * A handler is given a whole set at the factory rather than a strategy per call:
  * a consumer that wants documents whole wants them for every member it touches.
  */
-export interface IClassResults {
-  readonly created: IResultStrategy<ClassCreated>;
-  readonly source: IResultStrategy<ClassSource>;
-  readonly metadata: IResultStrategy<ClassMetadata>;
-  readonly check: IResultStrategy<ClassCheckResult>;
-  readonly activation: IResultStrategy<ClassActivationResult>;
-  readonly validation: IResultStrategy<ClassValidationResult>;
-  readonly deletion: IResultStrategy<ClassDeletionResult>;
-  readonly updated: IResultStrategy<ClassUpdated>;
+export interface IClassResults<
+  TCreated = ClassCreated,
+  TSource = ClassSource,
+  TMetadata = ClassMetadata,
+  TCheck = ClassCheckResult,
+  TActivation = ClassActivationResult,
+  TValidation = ClassValidationResult,
+  TDeletion = ClassDeletionResult,
+  TUpdated = ClassUpdated,
+> {
+  readonly created: IResultStrategy<TCreated>;
+  readonly source: IResultStrategy<TSource>;
+  readonly metadata: IResultStrategy<TMetadata>;
+  readonly check: IResultStrategy<TCheck>;
+  readonly activation: IResultStrategy<TActivation>;
+  readonly validation: IResultStrategy<TValidation>;
+  readonly deletion: IResultStrategy<TDeletion>;
+  readonly updated: IResultStrategy<TUpdated>;
 }
 
 /** The shipped default: every member answers its document as it arrived. */
-export const classDocuments: IClassResults = {
+export const classDocuments: IClassResults = {  // all defaults
   created: rawDocument,
   source: rawDocument,
   metadata: rawDocument,
@@ -500,10 +545,48 @@ touches. The default answers each document as it arrived."
 
 ---
 
+### The migration inventory
+
+Every removed state type and every file naming it. A batch is not done until its
+rows are clear. Counts are from `grep -rl` on 2026-09-04; re-measure rather than
+trust them.
+
+| state | files | handlers beyond the obvious one |
+|---|---:|---|
+| `IClassState` | 12 | `AdtClassLegacy`, `AdtLocalDefinitions`, `AdtLocalMacros`, `AdtLocalTestClass`, `AdtLocalTypes`, `AdtClassMemberBase` |
+| `IDdlState`, `IFunctionGroupState`, `IFunctionModuleState`, `IInterfaceState`, `IPackageState`, `IProgramState` | 6 each | each has an `Adt<Type>Legacy` |
+| `IUnitTestState` | 6 | `AdtUnitTestLegacy`; `unitTestContractConformance.test.ts` |
+| `IAuthorizationFieldState`, `IFunctionIncludeState`, `ITransformationState` | 5 each | — |
+| `IIncludeState` | 4 | `__tests__/helpers/testTemplate.ts` |
+| `IAccessControlState`, `IBehaviorDefinitionState`, `IBehaviorImplementationState`, `IDataElementState`, `IDomainState`, `IMessageClassState`, `IMetadataExtensionState`, `IServiceDefinitionState`, `IStructureState`, `ITableState`, `ITableTypeState`, `IEnhancementState` | 4 each | — |
+| `IServiceBindingState` | 4 | `core/service/AdtService.ts` — **not** under a `<type>` directory |
+| `ICdsUnitTestState` | 4 | `core/unitTest/AdtCdsUnitTest.ts` — a second handler in one module |
+| `ITransportState` | 4 | `AdtRequest`, `AdtRequestLegacy` |
+| `IMessageClassMessageState` | 3 | `core/messageClass/AdtMessageClassMessage.ts` — a second handler |
+| `IAppendStructureState`, `IScalarFunctionState`, `IScalarFunctionImplementationState` | 3 each | — |
+| `IFeatureToggleState` | 3 | `core/featureToggle/AdtFeatureToggle.ts` |
+
+`IFeatureToggleRuntimeState` **survives** — it is an ADT payload shape, not a
+state bag, and is still declared in `interfaces`. Do not delete it.
+
+**Modules that hold more than one handler**, and are therefore easy to leave half
+migrated: `class` (six), `unitTest` (two), `messageClass` (two), `service` (one,
+under a name that does not match its directory).
+
+Every one of these appears in `src/clients/AdtClient.ts` as a factory return type,
+so that file is not finished until the last batch is.
+
+---
+
 ### Task 4: `AdtClass` answers the contract
 
 **Files:**
-- Modify: `src/core/class/AdtClass.ts`, `src/core/class/AdtClassMemberBase.ts`
+- Create: `src/core/shared/chain.ts`
+- Modify: `src/core/class/AdtClass.ts`, `src/core/class/AdtClassMemberBase.ts`,
+  `src/core/class/AdtLocalDefinitions.ts`, `src/core/class/AdtLocalMacros.ts`,
+  `src/core/class/AdtLocalTestClass.ts`, `src/core/class/AdtLocalTypes.ts`
+  (all four class-include handlers name `IClassState` and are written under the
+  parent class's lock — see `docs/architecture/`), and `src/core/class/AdtClassLegacy.ts`
 - Test: `src/__tests__/unit/core/classAnswersContract.test.ts`
 
 **Interfaces:**
@@ -604,17 +687,129 @@ async read(
 }
 ```
 
-`create`, `update` and `delete` keep their existing chains — the lock/unlock cleanup and `setSessionType` calls are unchanged — but each **request** inside the chain goes through `answering`, and the first failure is returned rather than thrown. That is what makes `IAdtError.request` name the step that refused.
+`create`, `update` and `delete` **cannot** keep their chains as they are, and this
+is the sharpest edge in the migration. Today the cleanup — unlock, restore
+stateless, end the critical section, `deleteOnFailure` — runs from a `catch`,
+because a refused request throws. Once a refusal is a returned value, that `catch`
+never fires: the lock stays held on the server, the session stays stateful, and
+nothing says so.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+So the chain gets an executor. Add to `src/core/shared/chain.ts` (new):
+
+```typescript
+/**
+ * Run a chain of requests, returning the first failure — and unwinding first.
+ *
+ * Cleanup used to run from a `catch`, which worked only because a refusal threw.
+ * A refusal is now a value, so an unguarded early return would leave the object
+ * locked on the server and the session stateful, with nothing raised to say so.
+ *
+ * `unwind` runs on failure **and** on an exception, in reverse order of
+ * registration, and its own errors are logged rather than raised: a failure to
+ * unlock must not replace the reason the chain failed, which is what the caller
+ * actually needs.
+ */
+export async function chain<T>(
+  logger: ILogger | undefined,
+  body: (
+    step: <S>(answer: Promise<IAdtResponse<S>>) => Promise<S>,
+    onUnwind: (undo: () => Promise<void>) => void,
+  ) => Promise<T>,
+): Promise<IAdtResponse<T>>;
+```
+
+`step()` awaits an answer, returns its value, and throws a private sentinel
+carrying the failure when it is not `ok`. `chain` catches that sentinel, runs the
+unwind stack, and returns the failure it carried. A real exception unwinds the
+same way and is then classified by `recogniseFailure`.
+
+`update` then reads as the chain it always was, with the cleanup registered where
+the resource is acquired rather than assumed at the bottom:
+
+```typescript
+return chain(this.logger, async (step, onUnwind) => {
+  const lockHandle = await lockClass(this.connection, name);   // still throws; no failure half
+  onUnwind(async () => {
+    await unlockClass(this.connection, name, lockHandle);
+    this.connection.setSessionType('stateless');
+  });
+
+  await step(answering(() => checkClass(...), this.results.check, options?.analyse));
+  await step(answering(() => updateClass(...), this.results.updated, options?.analyse));
+  // …
+  return this.results.updated(lastWire);
+});
+```
+
+Each **request** goes through `answering`, so `IAdtError.request` names the step
+that refused rather than the chain that contained it.
+
+- [ ] **Step 4: Test that a refusal mid-chain still unwinds**
+
+Add to the same file — this is the case the old `catch` covered and a naive early
+return loses:
+
+```typescript
+it('unlocks when a request refuses after the lock was taken', async () => {
+  const calls: string[] = [];
+  const connection = {
+    setSessionType: jest.fn((t: string) => calls.push(`session:${t}`)),
+    isConnected: () => true,
+    makeAdtRequest: jest.fn(async (r: { url: string }) => {
+      calls.push(r.url);
+      if (r.url.includes('lock')) {
+        return { data: '<LOCK_HANDLE>h1</LOCK_HANDLE>', status: 200, statusText: 'OK', headers: {} };
+      }
+      return { data: REFUSAL, status: 200, statusText: 'OK', headers: {} };
+    }),
+  } as unknown as IAbapConnection;
+
+  const response = await new AdtClass(connection, logger).update({
+    className: 'ZCL_X',
+    sourceCode: 'CLASS zcl_x.',
+  });
+
+  expect(response.ok).toBe(false);
+  // The lock was released even though nothing threw.
+  expect(calls.some((c) => c.includes('unlock') || c.includes('lockHandle'))).toBe(true);
+  expect(calls).toContain('session:stateless');
+});
+
+it('reports what SAP refused, not what the unlock did', async () => {
+  // An unlock that also fails must not replace the reason the chain failed.
+  const connection = {
+    setSessionType: jest.fn(),
+    isConnected: () => true,
+    makeAdtRequest: jest.fn(async (r: { url: string }) => {
+      if (r.url.includes('lock') && !r.url.includes('unlock')) {
+        return { data: '<LOCK_HANDLE>h1</LOCK_HANDLE>', status: 200, statusText: 'OK', headers: {} };
+      }
+      if (r.url.includes('unlock')) throw new Error('unlock exploded');
+      return { data: REFUSAL, status: 200, statusText: 'OK', headers: {} };
+    }),
+  } as unknown as IAbapConnection;
+
+  const response = await new AdtClass(connection, logger).update({
+    className: 'ZCL_X',
+    sourceCode: 'CLASS zcl_x.',
+  });
+
+  expect(response.ok).toBe(false);
+  if (response.ok) throw new Error('expected a failure');
+  expect(response.getError().message).toContain('XYZ');
+  expect(response.getError().message).not.toContain('unlock exploded');
+});
+```
+
+- [ ] **Step 5: Run the tests to verify they pass**
 
 ```bash
 MCP_ENV_PATH=/tmp/nonexistent-env npx jest src/__tests__/unit/core/classAnswersContract.test.ts 2>&1 | tee unit-run.log
 ```
 
-Expected: 2 passed.
+Expected: 4 passed.
 
-- [ ] **Step 5: Check the class module compiles**
+- [ ] **Step 6: Check the class module compiles**
 
 ```bash
 npx tsc --noEmit -p tsconfig.json 2>&1 | grep "^src/core/class/"
@@ -622,10 +817,10 @@ npx tsc --noEmit -p tsconfig.json 2>&1 | grep "^src/core/class/"
 
 Expected: no output. Errors elsewhere are expected until later tasks.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add src/core/class/ src/__tests__/unit/core/classAnswersContract.test.ts
+git add src/core/shared/chain.ts src/core/class/ src/__tests__/unit/core/classAnswersContract.test.ts
 git commit -m "feat(class)!: AdtClass answers the contract
 
 Every member returns IAdtResponse; the state object and errors: [] are gone, and
@@ -723,7 +918,11 @@ Replace `getClass()` in `src/clients/AdtClient.ts`:
  * no parser parameter and did not change to make this possible.
  */
 getClass(): AdtClass;
-getClass<R extends IClassResults>(
+getClass<
+  R extends IClassResults<
+    unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown
+  >,
+>(
   results: R,
 ): IAdtCreatable<IClassConfig, ReturnType<R['created']>> &
   IAdtReadable<IClassConfig, ReturnType<R['source']>, ReturnType<R['metadata']>> &
@@ -835,7 +1034,7 @@ get around the envelope and are gone with it."
 
 ---
 
-### Tasks 7–11: The remaining 27 object types, in batches
+### Tasks 7–11: The remaining 29 object types, in batches
 
 Five batches, each the same six steps as Tasks 3, 4 and 6 applied to its types. The pattern is proved; what is not proved is what each endpoint answers, so **read each type's low-level functions before naming its results**. Copy the shape, never the values.
 
@@ -843,9 +1042,9 @@ Five batches, each the same six steps as Tasks 3, 4 and 6 applied to its types. 
 |---|---|
 | 7 | `program`, `interface`, `include`, `functionGroup`, `functionModule`, `functionInclude` |
 | 8 | `table`, `structure`, `domain`, `dataElement`, `tabletype`, `appendStructure` |
-| 9 | `ddl`, `metadataExtension`, `accessControl`, `serviceDefinition`, `service`, `behaviorDefinition`, `behaviorImplementation` |
-| 10 | `package`, `transport`, `enhancement`, `transformation`, `messageClass` |
-| 11 | `unitTest`, `authorizationField`, `featureToggle`, `scalarFunction`, `scalarFunctionImplementation` |
+| 9 | `ddl`, `metadataExtension`, `accessControl`, `serviceDefinition`, `service` (handler is `AdtService`, state `IServiceBindingState`), `behaviorDefinition`, `behaviorImplementation` |
+| 10 | `package`, `transport` (`AdtRequest` **and** `AdtRequestLegacy`), `enhancement`, `transformation`, `messageClass` (`AdtMessageClass` **and** `AdtMessageClassMessage`) |
+| 11 | `unitTest` (`AdtUnitTest`, `AdtCdsUnitTest`, `AdtUnitTestLegacy`), `authorizationField`, `featureToggle`, `scalarFunction`, `scalarFunctionImplementation` |
 
 Per type, in order:
 
@@ -855,6 +1054,7 @@ Per type, in order:
 - [ ] **Step 4:** Add the factory overload in `src/clients/AdtClient.ts`, following `getClass`.
 - [ ] **Step 5:** Read the casts in that module; remove the redundant, fix what the rest hid.
 - [ ] **Step 6:** `npx tsc --noEmit -p tsconfig.json 2>&1 | grep "^src/core/<type>/"` — expect no output.
+- [ ] **Step 7:** `grep -rn "I<Type>State" src` — expect no matches. A module with two handlers is only done when both are clear; check the inventory row rather than the directory listing.
 
 At the end of each batch:
 
@@ -864,7 +1064,37 @@ At the end of each batch:
 
 ---
 
-### Task 12: `AdtUtils` and the legacy clients
+### Task 12: The short and full strategies the design promised
+
+The design names three answers large enough that callers want different amounts,
+and nothing so far creates them. Without this task the "two or three defaults"
+are a claim rather than a feature, and every consumer still gets one shape.
+
+**Files:**
+- Create: `src/core/transport/results.ts`, `src/runtime/dumps/results.ts`, `src/core/package/results.ts`
+- Modify: `src/index.ts` (export them; a strategy a consumer cannot import is not an option they have)
+- Test: `src/__tests__/unit/core/resultStrategies.test.ts`
+
+**Interfaces:**
+- Consumes: `IResultStrategy`, `rawDocument` (Task 2).
+- Produces, each an `IResultStrategy` and each exported from the package root:
+  - `transportNumbers: IResultStrategy<string[]>` — request numbers alone
+  - `transportTree: IResultStrategy<ITransportTree>` — containers, descriptions, and the **language** a request carries, which nothing currently exposes
+  - `dumpList: IResultStrategy<IDumpSummary[]>` — `{ id, at, program, message }`
+  - `dumpDocument = rawDocument`
+  - `packageNames: IResultStrategy<IAdtObjectHit[]>` — name and ADT type code
+  - `packageStructure: IResultStrategy<IRepositoryNodeContents>` — the full node structure
+
+- [ ] **Step 1:** Write the failing test: for each pair, the same captured document read by both strategies, asserting the short one carries the identifying fields and the full one carries what the short one drops. Assert the short is **not** a prefix or subset-by-truncation of the full — it is a different reading, and a test that only checks length would pass a truncation.
+- [ ] **Step 2:** Run it; expect FAIL on the missing exports.
+- [ ] **Step 3:** Implement, parsing with `fast-xml-parser` as the existing parsers do.
+- [ ] **Step 4:** Export from `src/index.ts`, and add each to the docs list `npm run check:docs` reads.
+- [ ] **Step 5:** Run the tests; expect pass. Run `npm run check:docs`; expect 0.
+- [ ] **Step 6:** Commit.
+
+---
+
+### Task 16: `AdtUtils` and the legacy clients
 
 **Files:**
 - Modify: `src/core/shared/AdtUtils.ts`, `src/core/shared/AdtUtilsLegacy.ts`, `src/clients/AdtClientLegacy.ts`, and the 13 `*Legacy.ts` files under `src/core/`
