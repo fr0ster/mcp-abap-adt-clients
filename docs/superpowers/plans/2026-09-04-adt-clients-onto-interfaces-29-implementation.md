@@ -50,6 +50,17 @@
   strategies. A low-level function obtains the answer; what it becomes is the
   strategy's, including the default one. A member that parses and then hands the
   parsed thing to a strategy has two readings and honours neither.
+
+  **One old reader becomes several strategies.** `getPackageContentsList` was one
+  reading nobody could choose; four replace it. A migration that moves one old
+  function into one new strategy has renamed something, not made it choosable.
+
+  **Only the pure half moves.** `IResultStrategy<T>` is
+  `(answer: IAdtWireResponse) => T` — synchronous, one document, no connection —
+  and the old package readers are walks, not parsers: they issue a request per
+  object type and recurse into sub-packages. The mapping functions move; the walk
+  is deleted, because the walk left the contract with `maxDepth` and a member
+  answers one read. Task 12 Step 3 has the file-by-file list.
 - **Contracts are composed, never inherited — decision 23.** No contract in
   `interfaces` extends another any more, so an implementation that used to get
   CRUD by declaring one wide contract must now list the atoms it satisfies:
@@ -1462,19 +1473,66 @@ package declares a second spelling of it, nothing converts between forms, and
 nothing fabricates a status.
 
 - [ ] **Step 1:** Write the failing test: for each pair, the same captured document read by both strategies, asserting the short one carries the identifying fields and the full one carries what the short one drops. Assert the short is **not** a prefix or subset-by-truncation of the full — it is a different reading, and a test that only checks length would pass a truncation.
+
+  **For the package readings, assert which nodes of one captured document reach
+  each result**, by name: the document's `objects` entries appear in `packageList`
+  and `packageShort`, its `childNodes` appear in `packageTree` as references and
+  in neither of the other two, and `packageRaw` is byte-identical to `wire.data`.
+  Their semantics are new — the old members answered a walk — so this is the test
+  that defines them rather than one that confirms a port.
 - [ ] **Step 2:** Run it; expect FAIL on the missing exports.
-- [ ] **Step 3: Implement — and move the parsing, do not copy it**
+- [ ] **Step 3: Split the old readers into several strategies — and move only what is pure**
 
-The shapes these strategies return are already built somewhere: `packageList` and
-`packageTree` are what `packageContentsList.ts` and `packageHierarchy.ts` build
-today, `transportTree` is in the transport parser. **Move that code into the
-strategy and leave the low-level function obtaining the answer.** Copying it
-leaves two readings of one document, and the one that runs is decided by which
-call site a caller happened to reach — the defect this whole line of work is
-about, reintroduced one layer down.
+**One old function becomes several strategies, not one.** `getPackageContentsList`
+was a single reading nobody could choose; what replaces it is four —
+`packageList`, `packageTree`, `packageShort`, `packageRaw` — each reading the same
+document differently. The same split is what `transportNumbers`/`transportTree`
+and `dumpList`/`dumpDocument` are. A migration that moves one old function into
+one new strategy has renamed something, not made it choosable.
 
-A low-level function after this step issues its request and returns the answer.
-It does not parse. If it still does, the strategy above it is decoration.
+**What can move, and what cannot.** `IResultStrategy<T>` is
+`(answer: IAdtWireResponse) => T`: **synchronous, one document, no connection.**
+The old functions are not parsers — they are walks. `packageContentsList.ts:147`
+fetches the node structure, `:175` issues **another request per object type**, and
+`:248` recurses into sub-packages to `maxDepth`; `packageHierarchy.ts:311`, `:356`
+and `:397` do the same. None of that can live in a strategy, and none of it should
+live anywhere: the walk left the contract with `maxDepth`, and a member answers one
+read.
+
+So what moves is the **pure** half, and only it:
+
+| moves into a strategy | stays, or goes |
+|---|---|
+| `parseNodeStructure`, `toNodeContents` (`nodeStructure.ts:145`, `:204`) | — |
+| `parseNodesToItems`, `mapAdtTypeToSupported`, `isPackageType`, `readNodeValue` (`packageContentsList.ts`) | — |
+| `normalizeAdtType`, `mapAdtTypeToCodeFormat`, the tree builders (`packageHierarchy.ts`) | — |
+| — | `fetchNodeStructure` — it issues the request and returns the answer |
+| — | the per-type follow-ups and the recursion: **deleted**, not relocated |
+
+- [ ] **Step 3a: State what each reading yields from ONE document, because it is new**
+
+A single `POST /repository/nodestructure` response carries the objects at that
+level and the child-node pairs below it — that is what `IRepositoryNodeContents`
+names, `objects` and `childNodes`. The four readings of it are therefore:
+
+| strategy | from one document |
+|---|---|
+| `packageList` | `IPackageContentItem[]` built from that document's `objects` — **the level asked for, not the sub-tree**, because deeper levels are other requests |
+| `packageTree` | `IPackageHierarchyNode` for the node itself with its `childNodes` as **unexpanded references** — a caller who wants them expanded asks for them |
+| `packageShort` | `{ name, type }` per object, the same set as `packageList` |
+| `packageRaw` | the document |
+
+This is a behaviour change and the CHANGELOG says so: `getPackageContentsList`
+with `includeSubpackages` returned a flattened sub-tree, and no reading here does.
+The consumer walks, holding the references the tree gave them.
+
+- [ ] **Step 3b: Copying is the failure mode, not moving**
+
+A pure function left behind *and* used in a strategy is two readings of one
+document, with the one that runs decided by which call site a caller reached —
+the defect this whole line of work is about, one layer down. After this step a
+low-level function issues its request and returns the answer. If it still parses,
+the strategy above it is decoration.
 - [ ] **Step 4:** Export from `src/index.ts`, and add each to the docs list `npm run check:docs` reads.
 - [ ] **Step 5:** Run the tests; expect pass. Run `npm run check:docs`; expect 0.
 
@@ -1932,6 +1990,15 @@ should know which instruction was rewritten and why.
     every key, undoing what `satisfies` bought, and the no-argument `getUtils()`
     is the call almost every consumer makes. Written as
     `= typeof utilsDocuments`, and the same for `RuntimeDumps` and `AdtRequest`.
+
+11. **The move is into several strategies, and only the pure half moves.** Step 3
+    said "move that code into the strategy", which cannot be done: the old package
+    readers issue a request per object type and recurse into sub-packages, while
+    `IResultStrategy` is synchronous, sees one document and holds no connection.
+    The mapping functions move — named file by file — the walk is deleted, and
+    one old reader becomes four readings. What each yields from a single document
+    is stated in Step 3a and asserted in Step 1, because those semantics are new:
+    the old member answered a flattened sub-tree and no reading here does.
 
 **What did not change:** every task about `answering`, the two strategies, the
 per-type result types, the casts, the negative cases, the visible skips and the
