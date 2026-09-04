@@ -53,3 +53,6 @@ probe-e19-logs/
 shared-setup-verdict.json
 .jest-shared-session.json
 profiler-probe/
+
+# Probe output: raw ADT answers captured by integration tests, per run.
+refusal-visibility-evidence.json

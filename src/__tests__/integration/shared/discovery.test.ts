@@ -10,11 +10,15 @@ import * as path from 'node:path';
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import type {
   IAbapConnection,
+  IAdtResponse,
+  IAdtResult,
+  IAdtWireResponse,
   ILogger,
   ISessionLifecycleAware,
 } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
+import { expectResult } from '../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -73,10 +77,15 @@ describe('Shared - discovery', () => {
 
     logTestStep('fetch ADT discovery document', testsLogger);
 
-    const result = await withAcceptHandling(client.getUtils().discovery());
-
-    expect(result.status).toBe(200);
-    expect(result.data).toBeDefined();
+    // The verdict comes from the contract, not from the status: ADT answers a
+    // refusal inside a 200, so `status === 200` would pass over one.
+    // `withAcceptHandling` comes from a `require`d JS helper and returns `any`,
+    // so the contract has to be named here or the assertions below type as
+    // `unknown` and stop checking anything.
+    const answer = (await withAcceptHandling(
+      client.getUtils().discovery(),
+    )) as IAdtResponse<IAdtResult<IAdtWireResponse>>;
+    const result = expectResult(answer, 'discovery');
 
     const xml = String(result.data);
     expect(xml.length).toBeGreaterThan(0);
