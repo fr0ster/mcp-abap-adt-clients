@@ -61,6 +61,18 @@
   object type and recurse into sub-packages. The mapping functions move; the walk
   is deleted, because the walk left the contract with `maxDepth` and a member
   answers one read. Task 12 Step 3 has the file-by-file list.
+- **The shape a reading returns belongs to this package, not to `interfaces`.**
+  Decided by the maintainer, 2026-09-04. `interfaces` carries what is needed to
+  *use* the library or *replace* it — member signatures, request parameters,
+  `IAdtResponse`, `IAdtError`, `IResultStrategy`. What a shipped strategy builds
+  out of a document is this package's business, and a consumer who replaces us
+  declares their own.
+
+  Nothing is blocked by this: `TContents`, `TNode` and their kin are type
+  parameters, so `getUtils()` answering `IAdtPackageBrowsing<PackageItem[]>` with
+  **our** item type is exactly what the contract is shaped for. The default types
+  those parameters carry in 30.0.0 are conveniences for a caller who names
+  nothing, not shapes we owe anyone.
 - **Contracts are composed, never inherited — decision 23.** No contract in
   `interfaces` extends another any more, so an implementation that used to get
   CRUD by declaring one wide contract must now list the atoms it satisfies:
@@ -1456,7 +1468,14 @@ are a claim rather than a feature, and every consumer still gets one shape.
   - Four for package contents, over the single `getPackageContents` member that
     `interfaces` 30.0.0 leaves in place of `getPackageContentsList` and
     `getPackageHierarchy`:
-    - `packageList: IResultStrategy<IPackageContentItem[]>` — names and ADT type codes
+    - `packageList: IResultStrategy<PackageItem[]>` — names and ADT type codes,
+      where `PackageItem` is **declared in this package** and built wholly from the
+      document: `{ name, type, uri?, description?, isPackage }`. **No
+      `packageName`:** `IPackageContentItem` requires it, the node-structure
+      document does not carry it, and `parseNodesToItems` gets it today as a
+      separate argument from the request — which a strategy does not see. A
+      consumer who wants it on every item supplies a strategy that closes over the
+      name they passed.
     - **no `packageTree`** — the walkable reading is `nodeContents`, reused; see Step 3a
     - `packageShort: IResultStrategy<{ name: string; type: string }[]>` — the reading an MCP server can afford
     - `packageRaw = rawDocument` — the document untouched, which a backup consumer
@@ -1489,8 +1508,9 @@ nothing fabricates a status.
 
   **And assert a strategy needs nothing but the answer**: call each of them with a
   captured `IAdtWireResponse` alone, no client and no request context. Anything
-  that cannot be built from that is not a strategy's to return — which is how the
-  invented `node: IObjectReference` was caught.
+  that cannot be built from that is not a strategy's to return. This caught two
+  shapes before they were written — a `node: IObjectReference` I invented, and
+  `IPackageContentItem`, whose required `packageName` comes from the request.
 - [ ] **Step 2:** Run it; expect FAIL on the missing exports.
 - [ ] **Step 3: Split the old readers into several strategies — and move only what is pure**
 
@@ -1528,7 +1548,7 @@ names, `objects` and `childNodes`. The four readings of it are therefore:
 
 | strategy | from one document |
 |---|---|
-| `packageList` | `IPackageContentItem[]` built from that document's `objects` — **the level asked for, not the sub-tree**, because deeper levels are other requests |
+| `packageList` | `PackageItem[]` built from that document's `objects` — **the level asked for, not the sub-tree**, because deeper levels are other requests |
 | `nodeContents` (reused as a package reading) | `IRepositoryNodeContents` — `objects` and `childNodes`, the measured shape of this document, and the only shipped reading a caller can walk on from |
 | `packageShort` | `{ name, type }` per object, the same set as `packageList` |
 | `packageRaw` | the document |
@@ -2030,6 +2050,28 @@ should know which instruction was rewritten and why.
     every key, undoing what `satisfies` bought, and the no-argument `getUtils()`
     is the call almost every consumer makes. Written as
     `= typeof utilsDocuments`, and the same for `RuntimeDumps` and `AdtRequest`.
+
+13. **The shapes a reading returns move to this package, and `packageList` stops
+    promising `IPackageContentItem[]`.** Decided by the maintainer, 2026-09-04:
+    `interfaces` carries what is needed to use the library or replace it, and a
+    minimal contract is the point — declaring every shape there, and every field
+    of them required, is how a contract package bloats into a schema catalogue.
+    `IPackageContentItem` is the instance that forced it: `packageName` is
+    **required** there, the node-structure document does not carry it, and
+    `parseNodesToItems` receives it as a request argument — so no honest strategy
+    can build the type the contract defaults to.
+
+    Nothing is blocked. `TContents` is a type parameter, so `getUtils()` answering
+    `IAdtPackageBrowsing<PackageItem[]>` with our own item type is what the
+    contract is shaped for; the defaults it carries are a convenience for a caller
+    who names nothing.
+
+    **Named and not taken here:** whether `IPackageContentItem`,
+    `IPackageHierarchyNode`, `IRepositoryNodeContents` and the rest of the result
+    shapes should leave `interfaces` in a later contracts release. That is a
+    decision about the whole contract surface and it is the maintainer's, not a
+    detail of this migration — the same way decision 17 named its open question
+    rather than answering it in passing.
 
 12. **No reading answers `IPackageHierarchyNode`, and there is no `packageTree`
     strategy.** Two findings, one root — I twice named a shape a strategy cannot
