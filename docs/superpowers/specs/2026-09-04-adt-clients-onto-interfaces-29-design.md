@@ -121,9 +121,25 @@ A type parameter on the **atom** is the opposite move and is what 30.0.0 does:
 strategy the implementation was constructed with. Nothing is decided at the call,
 and an implementation that wants only the default writes nothing at all.
 
-The shipped default answers the body as it arrived; decision 5 leaves parsing to
-whoever wants a shape out of it, and this library does not know which fields a
-caller needs.
+**The shipped default is what that member answered before.** Decided by the
+maintainer, 2026-09-04, after `interfaces@30.0.0` shipped with exactly that rule
+in its own type parameters — `IAdtPackageBrowsing<TContents = IPackageContentItem[]>`,
+`IAdtRequest<TList = ITransportTree>`, `IRuntimeDumps<TList = string, TDump = string>`.
+The defaults are therefore not uniform, and deliberately so: each is what its own
+member answered, so a consumer who names no strategy is not moved by this release
+at all.
+
+An earlier draft of this design said the default answers the body as it arrived,
+uniformly. That was written before the contract existed and would now contradict
+it: a no-argument `getUtils()` answering `string` where `IAdtPackageBrowsing`
+declares `IPackageContentItem[]` makes the factory disagree with the contract it
+returns, and silently retypes every existing call to `string`.
+
+What decision 5 settles is untouched — parsing is the consumer's, and this library
+does not know which fields a caller needs. That is why `packageRaw`, `dumpDocument`
+and the rest exist and are exported: the document is one strategy away, named and
+importable, rather than being the shape everyone is given whether they wanted it
+or not.
 
 **What more than one default is for.** The same request serves callers who want
 very different amounts, and today the library picks for them:

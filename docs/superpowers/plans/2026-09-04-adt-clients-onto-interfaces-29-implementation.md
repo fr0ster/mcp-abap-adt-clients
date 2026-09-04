@@ -316,11 +316,20 @@ Create `src/utils/resultStrategy.ts`:
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces';
 
 /**
- * The shipped default: the body as it arrived.
+ * The body as it arrived.
  *
  * Not parsed, not trimmed. Decision 5 in `@mcp-abap-adt/interfaces` leaves the
  * document to whoever wants a shape out of it, and this library does not know
  * which fields a caller needs.
+ *
+ * **It is the default only where the member answered a document before** — dumps
+ * are the case, and package contents and the transport tree are not. Each shipped
+ * set defaults to what its own member already answered, which is the rule
+ * `interfaces@30.0.0` encodes in its own type parameters
+ * (`IAdtPackageBrowsing<TContents = IPackageContentItem[]>`,
+ * `IRuntimeDumps<TList = string>`), so a consumer who names no strategy is not
+ * moved by this release. Where the document is not the default it is one named,
+ * exported strategy away.
  */
 export const rawDocument: IResultStrategy<string> = (wire) =>
   typeof wire.data === 'string' ? wire.data : String(wire.data ?? '');
@@ -1465,7 +1474,7 @@ getRequest<R extends ITransportResults<unknown>>(results: R): /* atoms over R */
 // declares `kind` and `list` itself. The class therefore KEEPS `implements` —
 // and if it cannot satisfy it, that is a defect here, not a reason to stop
 // declaring the contract.
-export class RuntimeDumps<R extends IDumpResults<unknown> = IDumpResults>
+export class RuntimeDumps<R extends IDumpResults<unknown> = typeof dumpDocuments>
   implements IRuntimeDumps<ReturnType<R['list']>, ReturnType<R['document']>>
 {
   readonly kind = 'runtimeDumps' as const;
@@ -1501,7 +1510,7 @@ private readonly dumpHandlers = new WeakMap<object, RuntimeDumps<never>>();
 
 getDumps(): RuntimeDumps;
 getDumps<R extends IDumpResults<unknown>>(results: R): RuntimeDumps<R>;
-getDumps<R extends IDumpResults<unknown> = IDumpResults>(
+getDumps<R extends IDumpResults<unknown> = typeof dumpDocuments>(
   results: R = dumpDocuments as unknown as R,
 ): RuntimeDumps<R> {
   const cached = this.dumpHandlers.get(results as object);
@@ -1571,8 +1580,18 @@ and `dumpShort` in the two `results.ts` files above: **shape checked by
 answers `unknown` for everything, and the compiler will not say so — every call
 still compiles, and every caller gets `unknown`.
 
-Then `AdtUtils<R extends IUtilsResults>` instantiates each atom with the matching
-key: `IAdtPackageBrowsing<ReturnType<R['packageContents']>>`,
+**The default is `typeof utilsDocuments`, never `IUtilsResults`.** A type
+parameter cannot default to a *value*, and defaulting it to its own constraint
+undoes everything `satisfies` just bought: `R = IUtilsResults` makes every
+`ReturnType<R[k]>` `unknown` again, so the no-argument `getUtils()` — the call
+almost every consumer makes — answers `unknown` for everything while the explicit
+sets answer precisely. Write `AdtUtils<R extends IUtilsResults = typeof utilsDocuments>`
+and `getUtils(): AdtUtils<typeof utilsDocuments>`. The same holds for
+`RuntimeDumps` and `AdtRequest`: the default is `typeof dumpDocuments` and
+`typeof transportDocuments`.
+
+Then `AdtUtils<R extends IUtilsResults = typeof utilsDocuments>` instantiates each
+atom with the matching key: `IAdtPackageBrowsing<ReturnType<R['packageContents']>>`,
 `IAdtRepositoryStructure<ReturnType<R['nodeContents']>>`, and so on. A set that
 declares a strategy no atom reads, or an atom instantiated with a key the set does
 not carry, is the defect this list exists to prevent — `packageTree` was declared
@@ -1710,8 +1729,9 @@ construction, and nothing in this package offers a per-call parser.
   substitutes for that.
 
 - [ ] **Step 2:** `npx tsc --noEmit -p tsconfig.json 2>&1 | grep -E "AdtUtils|Legacy"` — this is the work list.
-- [ ] **Step 3:** Make `AdtUtils` generic in `IUtilsResults`, defaulting to
-`utilsDocuments`, and instantiate **every** atom it declares with the matching
+- [ ] **Step 3:** Make `AdtUtils` generic — `AdtUtils<R extends IUtilsResults = typeof utilsDocuments>`,
+the default written with `typeof` because a type parameter cannot default to a
+value and defaulting to the constraint answers `unknown` — and instantiate **every** atom it declares with the matching
 key — `IAdtPackageBrowsing<ReturnType<R['packageContents']>>`,
 `IAdtRepositoryStructure<ReturnType<R['nodeContents']>>`,
 `IAdtInformationSystem<ReturnType<R['search']>, ReturnType<R['whereUsed']>, ReturnType<R['allTypes']>>`,
@@ -1729,7 +1749,7 @@ member reaches the same resource internally was never the contract's business.
 // src/clients/AdtClient.ts — keyed by the set's identity, exactly as getDumps is
 private readonly utilsHandlers = new WeakMap<object, AdtUtils<never>>();
 
-getUtils(): AdtUtils;
+getUtils(): AdtUtils<typeof utilsDocuments>;
 getUtils<R extends IUtilsResults>(results: R): AdtUtils<R>;
 ```
 
@@ -1858,6 +1878,22 @@ should know which instruction was rewritten and why.
    either the test could not build or half of Task 14 ran early under a heading
    that did not say so. Task 12 keeps the strategies and the sets; Task 14 binds
    them and carries the `getUtils` half of the cache test.
+
+9. **The no-argument default is what the member answered before**, not the raw
+   document. Decided by the maintainer, 2026-09-04. The design spec said "the
+   shipped default answers the body as it arrived" — written before the contract
+   existed, and now contradicting it: `IAdtPackageBrowsing<TContents = IPackageContentItem[]>`
+   and `IAdtRequest<TList = ITransportTree>` declare parsed defaults, while
+   `IRuntimeDumps<TList = string>` declares the document, each because that is
+   what its member answered. A factory disagreeing with the contract it returns
+   would retype every existing call to `string` and say nothing. The spec is
+   corrected; `packageRaw` and `dumpDocument` remain exported, one strategy away.
+
+10. **A type parameter defaults with `typeof`, never with its constraint.**
+    `AdtUtils<R extends IUtilsResults = IUtilsResults>` answers `unknown` for
+    every key, undoing what `satisfies` bought, and the no-argument `getUtils()`
+    is the call almost every consumer makes. Written as
+    `= typeof utilsDocuments`, and the same for `RuntimeDumps` and `AdtRequest`.
 
 **What did not change:** every task about `answering`, the two strategies, the
 per-type result types, the casts, the negative cases, the visible skips and the
