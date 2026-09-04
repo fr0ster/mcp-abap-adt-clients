@@ -121,9 +121,21 @@ A type parameter on the **atom** is the opposite move and is what 30.0.0 does:
 strategy the implementation was constructed with. Nothing is decided at the call,
 and an implementation that wants only the default writes nothing at all.
 
-**The shipped default is what that member answered before.** Decided by the
-maintainer, 2026-09-04, after `interfaces@30.0.0` shipped with exactly that rule
-in its own type parameters — `IAdtPackageBrowsing<TContents = IPackageContentItem[]>`,
+**There is always a strategy, and the default is one.** This is architecture and
+it outranks anything written here: a member never builds a value on its own, and
+there is no branch that parses "because nobody asked for anything else". What a
+consumer chooses is *which* strategy, never *whether* there is one — so
+`utilsDocuments`, `transportDocuments` and `dumpDocuments` are default
+**strategies**, and the parsing that lives in this library's low-level functions
+today belongs inside them.
+
+That is what makes the answer replaceable rather than merely configurable: a
+consumer swapping the set is not overriding a built-in behaviour, they are
+supplying the one thing that was ever doing the reading.
+
+**Which shape that default strategy returns is what the member answered before.**
+Decided by the maintainer, 2026-09-04, after `interfaces@30.0.0` shipped with
+exactly that rule in its own type parameters — `IAdtPackageBrowsing<TContents = IPackageContentItem[]>`,
 `IAdtRequest<TList = ITransportTree>`, `IRuntimeDumps<TList = string, TDump = string>`.
 The defaults are therefore not uniform, and deliberately so: each is what its own
 member answered, so a consumer who names no strategy is not moved by this release
@@ -139,7 +151,9 @@ What decision 5 settles is untouched — parsing is the consumer's, and this lib
 does not know which fields a caller needs. That is why `packageRaw`, `dumpDocument`
 and the rest exist and are exported: the document is one strategy away, named and
 importable, rather than being the shape everyone is given whether they wanted it
-or not.
+or not. And because the default is itself a strategy, "the document" and "the
+parsed list" are two entries in one set rather than a behaviour and its escape
+hatch.
 
 **What more than one default is for.** The same request serves callers who want
 very different amounts, and today the library picks for them:

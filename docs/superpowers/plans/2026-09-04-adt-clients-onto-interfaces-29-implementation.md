@@ -35,6 +35,21 @@
 - **No member takes a strategy as an argument.** The choice is injected at
   construction — decision 22. A per-call parse overload was tried across 23
   members in the contracts package and reverted.
+- **There is always a strategy, and the default is one too.** No member builds a
+  value on its own and no branch says "nobody supplied a reading, so parse it
+  ourselves". Every member obtains the answer and hands it to a strategy; the
+  shipped sets — `utilsDocuments`, `transportDocuments`, `dumpDocuments` — are
+  **default strategies**, not a default behaviour that an injected strategy
+  replaces when one is present. Architecture decides this, not the spec: if the two ever disagree, the
+  spec is what gets corrected.
+
+  **What that costs, and it is the real work:** the parsing that lives in the
+  low-level functions today — `packageContentsList.ts` and `packageHierarchy.ts`
+  build their shapes with `XMLParser` before anything sees the answer, and 53
+  files under `src/core` and `src/runtime` import one — moves into the shipped
+  strategies. A low-level function obtains the answer; what it becomes is the
+  strategy's, including the default one. A member that parses and then hands the
+  parsed thing to a strategy has two readings and honours neither.
 - **Contracts are composed, never inherited — decision 23.** No contract in
   `interfaces` extends another any more, so an implementation that used to get
   CRUD by declaring one wide contract must now list the atoms it satisfies:
@@ -1448,9 +1463,32 @@ nothing fabricates a status.
 
 - [ ] **Step 1:** Write the failing test: for each pair, the same captured document read by both strategies, asserting the short one carries the identifying fields and the full one carries what the short one drops. Assert the short is **not** a prefix or subset-by-truncation of the full — it is a different reading, and a test that only checks length would pass a truncation.
 - [ ] **Step 2:** Run it; expect FAIL on the missing exports.
-- [ ] **Step 3:** Implement, parsing with `fast-xml-parser` as the existing parsers do.
+- [ ] **Step 3: Implement — and move the parsing, do not copy it**
+
+The shapes these strategies return are already built somewhere: `packageList` and
+`packageTree` are what `packageContentsList.ts` and `packageHierarchy.ts` build
+today, `transportTree` is in the transport parser. **Move that code into the
+strategy and leave the low-level function obtaining the answer.** Copying it
+leaves two readings of one document, and the one that runs is decided by which
+call site a caller happened to reach — the defect this whole line of work is
+about, reintroduced one layer down.
+
+A low-level function after this step issues its request and returns the answer.
+It does not parse. If it still does, the strategy above it is decoration.
 - [ ] **Step 4:** Export from `src/index.ts`, and add each to the docs list `npm run check:docs` reads.
 - [ ] **Step 5:** Run the tests; expect pass. Run `npm run check:docs`; expect 0.
+
+- [ ] **Step 5a: Prove the parsing moved rather than multiplied**
+
+```bash
+grep -rn "XMLParser" src/core/shared/packageContentsList.ts \
+  src/core/shared/packageHierarchy.ts src/core/transport/
+```
+
+Expect no hit outside the `results.ts` files. 53 files under `src/core` and
+`src/runtime` import `XMLParser` today; this task is responsible for the ones
+whose readings it just created, and the batches in Tasks 7–11 for theirs. A file
+that both parses and calls a strategy is the failure to look for.
 - [ ] **Step 6: Bind them to the strategy sets and the factories**
 
 A strategy nobody can select is a function, not an option. Each pair joins its
