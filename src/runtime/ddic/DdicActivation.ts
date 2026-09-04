@@ -1,13 +1,15 @@
 import type {
   IAbapConnection,
-  IAdtWireResponse,
+  IAdtResponse,
   IDdicActivation,
   IGetActivationGraphOptions,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
+import { answering } from '../../utils/adtResponse';
+import { rawDocument } from '../../utils/resultStrategy';
 import { getActivationGraph } from './activationGraph';
 
-export class DdicActivation implements IDdicActivation {
+export class DdicActivation implements IDdicActivation<string> {
   readonly kind = 'ddicActivation' as const;
 
   constructor(
@@ -17,7 +19,10 @@ export class DdicActivation implements IDdicActivation {
 
   async getGraph(
     options?: IGetActivationGraphOptions,
-  ): Promise<IAdtWireResponse> {
-    return getActivationGraph(this.connection, options);
+  ): Promise<IAdtResponse<string>> {
+    return answering(
+      () => getActivationGraph(this.connection, options),
+      rawDocument,
+    );
   }
 }

@@ -1,13 +1,15 @@
 import type {
   IAbapConnection,
-  IAdtWireResponse,
+  IAdtResponse,
   IAtcLog,
   IGetCheckFailureLogsOptions,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
+import { answering } from '../../utils/adtResponse';
+import { rawDocument } from '../../utils/resultStrategy';
 import { getCheckFailureLogs, getExecutionLog } from './logs';
 
-export class AtcLog implements IAtcLog {
+export class AtcLog implements IAtcLog<string, string> {
   readonly kind = 'atcLog' as const;
 
   constructor(
@@ -17,11 +19,17 @@ export class AtcLog implements IAtcLog {
 
   async getCheckFailureLogs(
     options?: IGetCheckFailureLogsOptions,
-  ): Promise<IAdtWireResponse> {
-    return getCheckFailureLogs(this.connection, options);
+  ): Promise<IAdtResponse<string>> {
+    return answering(
+      () => getCheckFailureLogs(this.connection, options),
+      rawDocument,
+    );
   }
 
-  async getExecutionLog(executionId: string): Promise<IAdtWireResponse> {
-    return getExecutionLog(this.connection, executionId);
+  async getExecutionLog(executionId: string): Promise<IAdtResponse<string>> {
+    return answering(
+      () => getExecutionLog(this.connection, executionId),
+      rawDocument,
+    );
   }
 }
