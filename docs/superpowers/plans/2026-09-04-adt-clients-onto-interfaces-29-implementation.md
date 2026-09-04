@@ -226,6 +226,47 @@ can use."
 
 ---
 
+### Task 1a: The debugger, memory snapshots and batch move to a research branch
+
+Decided by the maintainer, 2026-09-04, and it is the other half of what
+`interfaces@30.0.0` did: what left the contract for research leaves the working
+branch here too, and its **implementation** goes to a research branch rather than
+being migrated onto contracts it no longer has.
+
+**Branch:** `research/debugger-memory-batch`, cut from the working branch before
+the deletions, so the code and its history survive with nothing to reconstruct.
+
+**Files (working branch):**
+- Delete: `src/runtime/debugger/` (8 files), `src/runtime/memory/` (3),
+  `src/clients/DebuggerSessionClient.ts`
+- Delete: the unit and integration tests for all three
+- Modify: `src/index.runtime.ts`, `src/index.ws.ts`, `src/runtime/index.ts`,
+  `src/clients/AdtRuntimeClient.ts` (`getDebugger`, its cache field and its
+  import), `src/clients/AdtClientsWS.ts` (`getDebuggerSessionClient`),
+  `src/clients/AdtRuntimeClientExperimental.ts` (its header)
+- Modify: `src/__tests__/unit/publicApiSurface.test.ts` (five names),
+  `AdtRuntimeClient.factory.test.ts`, `AdtClientsWS.test.ts`
+- Modify: `README.md`, `docs/README.md`, `docs/usage/CLIENT_API_REFERENCE.md`
+
+**Interfaces:** consumes nothing, produces nothing. This task only removes — and
+it removes 22 of the errors the migration would otherwise have to answer for.
+
+- [ ] **Step 1:** `git branch research/debugger-memory-batch` **before** deleting
+  anything. A branch cut afterwards preserves nothing.
+- [ ] **Step 2:** Delete the three implementations and their tests.
+- [ ] **Step 3:** Remove every usage — factories, barrels, the WS accessor, the
+  public-API surface list and the factory tests that name them.
+- [ ] **Step 4:** `grep -rn "Debugger\|MemorySnapshot" src README.md docs/` —
+  expected: nothing outside a changelog entry.
+- [ ] **Step 5:** Commit with `--no-verify`; the build is still red on the
+  migration itself.
+
+**When they come back**, they come back measured: one member per endpoint, and
+results named rather than framed — which is what `IDebugger`'s 39
+envelope-answering members could not do, and why they left in the first place.
+
+---
+
 ### Task 2: `answering()` composes the two strategies
 
 The mechanism the whole migration rests on. The current `answering(produce)` sees a finished value or an exception and never the wire response of a **successful** call, so `analyse` could never be consulted on the 200-with-empty-body it exists for.

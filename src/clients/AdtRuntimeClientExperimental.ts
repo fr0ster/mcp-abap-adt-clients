@@ -2,7 +2,7 @@
  * AdtRuntimeClientExperimental
  *
  * Experimental runtime APIs that are still in progress and may change.
- * AMDP debugger is now accessible via getDebugger().getAmdp() on the base client.
+ * The AMDP debugger moved to the research branch with the rest of the debugger; base client.
  */
 
 import { AdtRuntimeClient } from './AdtRuntimeClient';

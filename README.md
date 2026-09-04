@@ -95,9 +95,8 @@ npm install @mcp-abap-adt/adt-clients
 
 2. **AdtRuntimeClient**
    - Stable runtime operations for ABAP debugging, traces, dumps, logs, feeds, ATC check runs, and more
-   - Factory accessors: `getProfiler()`, `getCrossTrace()`, `getSt05Trace()`, `getDebugger()`, `getApplicationLog()`, `getAtc()`, `getAtcLog()`, `getDdicActivation()`, `getDumps()`, `getFeeds()`, `getSystemMessages()`, `getGatewayErrorLog()`
+   - Factory accessors: `getProfiler()`, `getCrossTrace()`, `getSt05Trace()`, `getApplicationLog()`, `getAtc()`, `getAtcLog()`, `getDdicActivation()`, `getDumps()`, `getFeeds()`, `getSystemMessages()`, `getGatewayErrorLog()`
    - `getAtc()` runs ATC checks; `getAtcLog()` reads the execution and check-failure logs. Same subject, different resources — see [ATC check runs](docs/usage/CLIENT_API_REFERENCE.md#atc-check-runs)
-   - Example: `await runtimeClient.getDebugger().getAbap().launch()`
 
 3. **AdtExecutor**
    - Typed execution API based on `IExecutor`
@@ -108,7 +107,7 @@ npm install @mcp-abap-adt/adt-clients
 
 4. **AdtRuntimeClientExperimental**
    - Runtime APIs in progress that may change without backward-compatibility guarantees
-   - Current scope: AMDP data preview (AMDP debugger is now part of `AdtRuntimeClient.getDebugger().getAmdp()`)
+   - Current scope: AMDP data preview
    - Example: `await experimentalRuntime.startAmdpDataPreview(...)`
 
 5. **AdtClientsWS**
@@ -247,31 +246,9 @@ const wsClient = new AdtClientsWS(transport, console, {
 
 await wsClient.connect('wss://your-realtime-endpoint');
 
-const debuggerSession = wsClient.getDebuggerSessionClient();
 await debuggerSession.listen({ timeoutSeconds: 60 });
 await debuggerSession.step({ action: 'step_over' });
 ```
-
-### ABAP Debugger Step Operations via Batch Endpoint
-
-`AdtRuntimeClient` executes step operations through debugger batch requests (`POST /sap/bc/adt/debugger/batch`) using `multipart/mixed` payloads.
-
-```typescript
-import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
-
-const runtime = new AdtRuntimeClient(connection);
-const abapDebugger = runtime.getDebugger().getAbap();
-
-// Executes stepInto + getStack in one batch request
-const batchResponse = await abapDebugger.stepIntoBatch();
-
-// Also available:
-await abapDebugger.stepOutBatch();
-await abapDebugger.stepContinueBatch();
-```
-
-For non-step actions use `executeAction(action, value?)`.
-Step actions (`stepInto`, `stepOut`, `stepContinue`) are reserved for batch-only execution.
 
 ### Using AdtExecutor (Execution API)
 

@@ -898,37 +898,6 @@ const state = await st05.getState();
 const directory = await st05.getDirectory();
 ```
 
-### Debugger (Composite)
-
-`getDebugger()` returns a composite object exposing three sub-domains: ABAP debugger, AMDP debugger, and memory snapshots.
-
-```typescript
-const debugger = runtime.getDebugger();
-
-// ABAP debugger
-const abap = debugger.getAbap();
-await abap.launch({ debuggingMode: 'external' });
-await abap.stop();
-const state = await abap.get();
-const callStack = await abap.getCallStack();
-await abap.executeAction('stepOver');
-
-// Step operations (batch endpoint — stepInto + getStack in one request)
-const stepIntoResult = await abap.stepIntoBatch();
-const stepOutResult = await abap.stepOutBatch();
-const continueResult = await abap.stepContinueBatch();
-
-// AMDP debugger
-await debugger.getAmdp().start();
-
-// Memory snapshots
-const snapshots = await debugger.getMemorySnapshots().list();
-```
-
-Contract notes:
-- Step batch operations use `POST /sap/bc/adt/debugger/batch` with `multipart/mixed` payload.
-- `executeAction()` must be used for non-step actions; step actions are reserved for batch-only execution.
-
 ### Application Log
 
 ```typescript
@@ -1099,10 +1068,6 @@ Contract notes:
 - `getById()` requires a plain dump ID (not full URI) and throws for empty/invalid IDs.
 - Methods return raw ADT payload (`IAdtResponse`) so consumers can parse XML according to their needs.
 
-### Runtime Memory Snapshots
-
-Memory snapshots are accessed via the composite debugger: `runtime.getDebugger().getMemorySnapshots().list()`.
-
 ### Feed Repository
 
 ```typescript
@@ -1147,4 +1112,3 @@ const runtimeExperimental = new AdtRuntimeClientExperimental(connection);
 await runtimeExperimental.startAmdpDataPreview();
 ```
 
-`AdtRuntimeClientExperimental` contains APIs marked in progress and may change between releases. AMDP debugger functionality has been promoted to `AdtRuntimeClient.getDebugger().getAmdp()`.

@@ -5,7 +5,6 @@
  * - getProfiler() — Profiler traces
  * - getCrossTrace() — Cross trace analysis
  * - getSt05Trace() — ST05 performance traces
- * - getDebugger() — Composite debugger (ABAP, AMDP, memory snapshots)
  * - getApplicationLog() — Application log analysis
  * - getAtc() — ATC check runs: start one, poll it, read the worklist
  * - getAtcLog() — ATC check failure and execution logs
@@ -26,8 +25,6 @@
  * const traceParams = await client.getProfiler().getParameters();
  *
  * // Debugging
- * await client.getDebugger().getAbap().launch({ debuggingMode: 'external' });
- * const callStack = await client.getDebugger().getAbap().getCallStack();
  *
  * // Logs
  * const appLog = await client.getApplicationLog().getObject('Z_MY_LOG');
@@ -50,7 +47,6 @@ import type {
   IAtcRunTarget,
   ICrossTrace,
   IDdicActivation,
-  IDebugger,
   IFeedRepository,
   IGatewayErrorLog,
   ILogger,
@@ -63,7 +59,6 @@ import { ApplicationLog } from '../runtime/applicationLog/ApplicationLog';
 import { AdtAtc } from '../runtime/atc/AdtAtc';
 import { AtcLog } from '../runtime/atc/AtcLog';
 import { DdicActivation } from '../runtime/ddic/DdicActivation';
-import { Debugger } from '../runtime/debugger/Debugger';
 import { RuntimeDumps } from '../runtime/dumps/RuntimeDumps';
 import { FeedRepository } from '../runtime/feeds/FeedRepository';
 import { GatewayErrorLog } from '../runtime/gatewayErrorLog/GatewayErrorLog';
@@ -80,7 +75,6 @@ export class AdtRuntimeClient {
   private _profiler?: Profiler;
   private _crossTrace?: CrossTrace;
   private _st05Trace?: St05Trace;
-  private _debugger?: Debugger;
   private _applicationLog?: ApplicationLog;
   private _atc?: AdtAtc;
   private _atcLog?: AtcLog;
@@ -151,13 +145,6 @@ export class AdtRuntimeClient {
       this._st05Trace = new St05Trace(this.connection, this.logger);
     }
     return this._st05Trace;
-  }
-
-  getDebugger(): IDebugger {
-    if (!this._debugger) {
-      this._debugger = new Debugger(this.connection, this.logger);
-    }
-    return this._debugger;
   }
 
   getApplicationLog(): IApplicationLog {

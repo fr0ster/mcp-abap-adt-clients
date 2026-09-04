@@ -109,7 +109,6 @@ const RUNTIME_EXPORTS = [
   // name, so it is part of the surface rather than an internal detail.
   // Public since 15.0.0: the replacement for the removed `latestTraceId()`.
   // Thrown by every client since the refusal check; a consumer catches it by
-  'AbapDebugger',
   'AdtAbapGitClient',
   'AdtAppendStructure',
   'AdtAtc',
@@ -130,7 +129,6 @@ const RUNTIME_EXPORTS = [
   'AdtScalarFunctionImplementation',
   'AdtService',
   'AdtServiceBinding',
-  'AmdpDebugger',
   'ApplicationLog',
   'AtcLog',
   'buildDumpIdPrefix',
@@ -140,15 +138,12 @@ const RUNTIME_EXPORTS = [
   'CrossTrace',
   'CT_INCLUDE',
   'DdicActivation',
-  'Debugger',
-  'DebuggerSessionClient',
   'FeedRepository',
   'fetchDiscoveryEndpoints',
   'GatewayErrorLog',
   'getSystemInformation',
   'isEndpointInDiscovery',
   'isModernAdtSystem',
-  'MemorySnapshots',
   'parseSearchResults',
   'parseTransportTree',
   'Profiler',
