@@ -40,12 +40,37 @@ answer becomes a value. `adt-clients` ships the defaults, and two or three of th
 where an answer is large enough that a caller might reasonably want different
 amounts. A consumer supplies their own implementation and gets their own shape.
 
-This is why the atoms need no parser parameter and `interfaces` 29.0.0 does not
-change again: `create(config, options?)` is enough, because the substitution
-happens at `getResult()`, not in the signature. Any proposal that adds a `parse`
-argument, a `result` field on the options, or a type parameter to a member is the
-wrong proposal — each was tried and each was rejected for putting the choice
-somewhere the contract cannot carry it.
+**The substitution happens at the factory, and the factory is ours.**
+`@mcp-abap-adt/interfaces` is not touched: `IAdtResult<T>` stays
+`{ readonly value: T }`, the atoms keep the signatures 29.0.0 published, and no
+member gains a parameter. What varies is the **type arguments the factory
+instantiates the atoms with** — and the factory lives in `adt-clients`, so its
+return type is ours to declare:
+
+```ts
+// the default: each member answers its document
+getClass(): IAdtCreatable<IClassConfig, ClassCreated> &
+            IAdtReadable<IClassConfig, ClassSource, ClassMetadata> & …
+
+// a caller who wants a different shape names the strategy
+getClass(results: ClassResultStrategy<R>): IAdtCreatable<IClassConfig, R['created']> &
+                                           IAdtReadable<IClassConfig, R['source'], R['metadata']> & …
+```
+
+The strategy is chosen once per handler rather than per call, which fits how
+these consumers work: a backup tool wants documents whole for everything it
+touches, a script wants two fields from every read, an MCP server picks by what
+its model is about to do. None of them changes its mind between `create` and
+`read` of the same object.
+
+Two or three defaults ship for the answers large enough to be worth reading
+differently — transport requests, dumps, package contents — and a consumer
+supplies their own for anything else.
+
+Rejected on the way here, each for putting the choice where the contract cannot
+carry it: a `parse` argument on a member, a `result` field on the operation
+options, and a type parameter on a member — the last because it obliges all 28
+implementations to honour a strategy most of them will never be given.
 
 The shipped default answers the body as it arrived; decision 5 leaves parsing to
 whoever wants a shape out of it, and this library does not know which fields a
