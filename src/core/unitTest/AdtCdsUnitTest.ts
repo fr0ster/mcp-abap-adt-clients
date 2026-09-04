@@ -1,418 +1,350 @@
 /**
- * AdtCdsUnitTest - High-level CRUD operations for CDS Unit Test objects
+ * AdtCdsUnitTest — unit tests for a CDS view.
  *
- * Extends AdtUnitTest with CDS-specific functionality:
- * - Checks CDS view availability for unit test doubles
- * - Creates test classes with CDS templates
- * - Manages test class lifecycle (create, update, delete)
- * - Runs unit tests for CDS views
+ * A view cannot hold a test class, so the tests live in a global class written
+ * for the purpose: `create` makes that class from a template, activates it, and
+ * writes the tests into its `testclasses` include. Everything else is
+ * {@link AdtUnitTest}'s, because everything else is the same.
  *
- * Uses AdtClass for test class lifecycle operations and AdtUnitTest for test execution.
+ * What is genuinely CDS-specific is the test-doubles check — whether the view
+ * can be tested with `cl_cds_test_environment` at all — and it is asked before
+ * there is anything to create.
  */
 
-import {
-  AdtObjectErrorCodes,
-  AdtOperationError,
-  type HttpError,
-  type IAbapConnection,
-  type ICdsTestDoubleCheckable,
-  type ICdsUnitTestConfig,
-  type ICdsUnitTestState,
-  type ILogger,
+import type {
+  AdtNoFailure,
+  IAbapConnection,
+  IAdtError,
+  IAdtOperationOptions,
+  IAdtResponse,
+  IAdtWireResponse,
+  ICdsTestDoubleCheckable,
+  ICdsUnitTestConfig,
+  ILogger,
+  IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
-import {
-  headerValueToString,
-  safeErrorMessage,
-  safeStringify,
-} from '../../utils/internalUtils';
+import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces';
+import { XMLParser } from 'fast-xml-parser';
+import { answering } from '../../utils/adtResponse';
 import { startClassUnitTestRunByObject } from '../class/run';
 import { validateClassName } from '../class/validation';
 import { AdtDdl } from '../ddl/AdtDdl';
+import { chain } from '../shared/chain';
 import { AdtUnitTest } from './AdtUnitTest';
 import { checkCdsTestDoublesAvailability } from './checkCdsTestDoublesAvailability';
-import type {
-  IClassUnitTestDefinition,
-  IClassUnitTestRunOptions,
+import {
+  type IClassUnitTestDefinition,
+  type IClassUnitTestRunOptions,
+  type IUnitTestResults,
+  runId,
+  unitTestDocuments,
 } from './types';
 
-// Types defined in @mcp-abap-adt/interfaces
-export type {
-  ICdsUnitTestConfig,
-  ICdsUnitTestState,
-} from '@mcp-abap-adt/interfaces';
+const severityParser = new XMLParser({ ignoreAttributes: false });
 
 /**
- * AdtCdsUnitTest - CDS-specific unit test operations
+ * The shipped reading of the CDS test-doubles check.
  *
- * Combines AdtClass for test class lifecycle and AdtUnitTest for test execution
+ * Measured: the check reports its verdict inside a 200, as
+ * `<SEVERITY>` with the reason in `<SHORT_TEXT>` or `<LONG_TEXT>`. Anything but
+ * `OK` means the view cannot be tested with doubles, and a caller who went on
+ * to create a test class against it would find out from a later, less obvious
+ * failure.
  */
-export class AdtCdsUnitTest
-  extends AdtUnitTest
-  implements ICdsTestDoubleCheckable
+export const testDoublesVerdict = (
+  verdict: IAdtError | AdtNoFailure,
+  answer?: IAdtWireResponse,
+): IAdtError | AdtNoFailure => {
+  if (verdict !== ADT_NO_FAILURE) return verdict;
+  const data = severityParser.parse(String(answer?.data ?? ''))?.['asx:abap']?.[
+    'asx:values'
+  ]?.DATA;
+  const severity = data?.SEVERITY;
+  if (severity === 'OK') return ADT_NO_FAILURE;
+  return {
+    origin: 'refusal',
+    message:
+      data?.SHORT_TEXT ||
+      data?.LONG_TEXT ||
+      `CDS test doubles check failed with severity: ${severity ?? '(none)'}`,
+    response: answer,
+  };
+};
+
+export class AdtCdsUnitTest<
+    R extends IUnitTestResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    > = IUnitTestResults,
+  >
+  extends AdtUnitTest<R>
+  implements ICdsTestDoubleCheckable<ReturnType<R['cdsCheck']>>
 {
   protected adtView: AdtDdl;
   private cdsViewName?: string;
   private className?: string;
 
-  constructor(connection: IAbapConnection, logger?: ILogger) {
-    super(connection, logger);
-    // adtClass and adtLocalTestClass are already available from parent class
-    // adtView is for working with CDS views
+  constructor(
+    connection: IAbapConnection,
+    logger?: ILogger,
+    // The one cast in this file, and it is on the default. See AdtClass.
+    results: R = unitTestDocuments as unknown as R,
+  ) {
+    super(connection, logger, results);
+    // adtClass and adtLocalTestClass come from the parent; this one is for the
+    // view the tests are written against.
     this.adtView = new AdtDdl(connection, logger);
   }
 
   /**
-   * Check CDS view availability for unit test doubles
-   * This check is required before creating a CDS unit test class.
+   * Whether the view can be tested with test doubles.
    *
-   * Unlike validate() (which checks name/params before create), this checks whether
-   * a CDS view can be used with the test doubles framework (cl_cds_test_environment).
+   * Unlike `validate`, which checks a name before a create, this asks about the
+   * view itself — and it is asked first, because a view the doubles framework
+   * cannot handle makes everything after it pointless.
    */
-  async checkCdsTestDoubles(cdsViewName: string): Promise<ICdsUnitTestState> {
-    try {
-      this.logger?.info?.(
-        'Checking CDS view for unit test doubles:',
-        cdsViewName,
-      );
-      const response = await checkCdsTestDoublesAvailability(
-        this.connection,
-        cdsViewName,
-      );
+  async checkCdsTestDoubles(
+    cdsViewName: string,
+  ): Promise<IAdtResponse<ReturnType<R['cdsCheck']>>> {
+    this.logger?.info?.(
+      'Checking CDS view for unit test doubles:',
+      cdsViewName,
+    );
 
-      // Check if the check succeeded (SEVERITY=OK)
-      if (response?.status === 200) {
-        const { XMLParser } = require('fast-xml-parser');
-        const parser = new XMLParser({ ignoreAttributes: false });
-        const parsed = parser.parse(response.data);
-        const severity = parsed?.['asx:abap']?.['asx:values']?.DATA?.SEVERITY;
+    const answer = await answering(
+      () => checkCdsTestDoublesAvailability(this.connection, cdsViewName),
+      this.results.cdsCheck as IResultStrategy<ReturnType<R['cdsCheck']>>,
+      testDoublesVerdict,
+    );
 
-        if (severity !== 'OK') {
-          const shortText =
-            parsed?.['asx:abap']?.['asx:values']?.DATA?.SHORT_TEXT || '';
-          const longText =
-            parsed?.['asx:abap']?.['asx:values']?.DATA?.LONG_TEXT || '';
-          const errorMessage =
-            shortText ||
-            longText ||
-            `CDS test doubles check failed with severity: ${severity}`;
-          throw new Error(
-            `CDS view ${cdsViewName} is not available for unit test doubles: ${errorMessage}`,
-          );
-        }
-
-        this.logger?.info?.('CDS view available for unit test doubles');
-        this.cdsViewName = cdsViewName;
-        const state: ICdsUnitTestState = {
-          cdsCheckResponse: response,
-          errors: [],
-        };
-        return state;
-      } else {
-        throw new Error(
-          `CDS test doubles check failed with HTTP ${response.status}`,
-        );
-      }
-    } catch (error: unknown) {
-      this.logger?.error(
-        'checkCdsTestDoubles failed:',
-        safeErrorMessage(error),
-      );
-      throw error;
+    if (answer.ok) {
+      this.logger?.info?.('CDS view available for unit test doubles');
+      this.cdsViewName = cdsViewName;
     }
+    return answer;
   }
 
   /**
-   * Override: Validate what `create()` is about to build.
+   * Validate what `create` is about to build.
    *
-   * When `className`, `classTemplate` and `testClassSource` are all present —
-   * the same combination `create()` uses to pick its class-creation path —
-   * this checks both halves of what that path builds:
-   *
-   * 1. `validateClassName` for the dummy global class Step 1 of `create()`
-   *    creates. This is the one place in unit testing where a name is
-   *    genuinely new, unlike the container class `AdtUnitTest.validate()`
-   *    checks (which already exists).
-   * 2. `checkClassLocalTestClass`, via `this.adtLocalTestClass`, for the
-   *    local test class Step 2 of `create()` puts inside it — the same check
-   *    `AdtLocalTestClass.validate()` performs.
-   *
-   * Otherwise this is a plain test run (no class being created), so it
-   * defers to the parent's validate (confirms the container class exists).
+   * With a template there are two halves, both new: the global class's name,
+   * and the test source that goes inside it. Without one this is a plain run
+   * against a class that already exists, which is the parent's question.
    */
-  async validate(
+  override async validate(
     config: Partial<ICdsUnitTestConfig>,
-  ): Promise<ICdsUnitTestState> {
-    if (config.className && config.classTemplate && config.testClassSource) {
-      this.logger?.info?.(
-        'Validating CDS unit test class name:',
-        config.className,
+    options?: IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['validation']>>> {
+    if (!(config.className && config.classTemplate && config.testClassSource)) {
+      return super.validate(config, options);
+    }
+
+    const name = config.className;
+    const source = config.testClassSource;
+    // The validation endpoint requires `packagename`; without it the server
+    // answers 400, so this cannot be left to the wire.
+    if (!config.packageName) {
+      throw new Error('Package name is required for validation');
+    }
+    const packageName = config.packageName;
+
+    return chain(this.logger, async ({ step }) => {
+      this.logger?.info?.('Validating CDS unit test class name:', name);
+      const named = await step(
+        answering(
+          () =>
+            validateClassName(
+              this.connection,
+              name,
+              packageName,
+              config.description || `CDS unit test for ${name}`,
+            ),
+          this.results.validation as IResultStrategy<
+            ReturnType<R['validation']>
+          >,
+          options?.analyse,
+        ),
       );
-
-      // The validation endpoint requires `packagename`; without it the server
-      // answers 400, so this cannot be left to the wire.
-      if (!config.packageName) {
-        throw new Error('Package name is required for validation');
-      }
-
-      let validationResponse: Awaited<ReturnType<typeof validateClassName>>;
-      try {
-        validationResponse = await validateClassName(
-          this.connection,
-          config.className,
-          config.packageName,
-          config.description || `CDS unit test for ${config.className}`,
-        );
-      } catch (error: unknown) {
-        // Mirrors AdtClass.validate()'s catch block: a 4xx here means the
-        // name itself was rejected, so it is reported the same way.
-        const e = error as HttpError;
-        const status = e.response?.status;
-        const statusText = e.response?.statusText;
-        const errorMessage = e.response?.data
-          ? typeof e.response.data === 'string'
-            ? e.response.data.substring(0, 500)
-            : safeStringify(e.response.data).substring(0, 500)
-          : e.message || 'Unknown error';
-
-        this.logger?.error?.(
-          `Validate failed: HTTP ${status || '?'} ${statusText || ''}`,
-          { status, statusText, message: errorMessage },
-        );
-
-        if (status && status >= 400 && status < 500) {
-          const customError = new AdtOperationError(
-            `Validation failed for object '${config.className}': ${errorMessage}`,
-          );
-          customError.code = AdtObjectErrorCodes.VALIDATION_FAILED;
-          customError.status = status;
-          customError.statusText = statusText;
-          customError.originalError = error;
-          throw customError;
-        }
-
-        throw error;
-      }
 
       this.logger?.info?.('Validating CDS local test class code');
-      const testClassState = await this.adtLocalTestClass.validate({
+      await step(
+        this.adtLocalTestClass.validate(
+          { className: name, testClassCode: source },
+          options,
+        ),
+      );
+
+      return named;
+    });
+  }
+
+  /**
+   * Create the test class from a CDS template, and write the tests into it.
+   *
+   * Without a template there is no CDS-specific chain: creating the container
+   * class and writing the tests into it is what the parent does.
+   */
+  override async create(
+    config: ICdsUnitTestConfig,
+    options?: IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['created']>>> {
+    if (!(config.className && config.classTemplate && config.testClassSource)) {
+      return super.create(config, options);
+    }
+
+    const name = config.className;
+    const source = config.testClassSource;
+    this.className = name;
+
+    return chain(this.logger, async ({ step }) => {
+      this.logger?.info?.('Step 1: Creating global class with template');
+      const created = (await step(
+        this.adtClass.create(
+          {
+            className: name,
+            packageName: config.packageName as string,
+            description: config.description || `CDS unit test for ${name}`,
+            classTemplate: config.classTemplate,
+            transportRequest: config.transportRequest,
+            final: true,
+          },
+          options,
+        ),
+      )) as ReturnType<R['created']>;
+
+      // Activation is required before the testclasses include can be locked.
+      this.logger?.info?.('Step 1.5: Activating global class');
+      await step(this.adtClass.activate({ className: name }, options));
+
+      // An include is not created — it exists because its class does — so this
+      // is update, and adtLocalTestClass handles the locking internally.
+      this.logger?.info?.('Step 2: Writing test class into global class');
+      await step(
+        this.adtLocalTestClass.update(
+          {
+            className: name,
+            testClassCode: source,
+            transportRequest: config.transportRequest,
+          },
+          { activateOnUpdate: true },
+        ),
+      );
+
+      return created;
+    });
+  }
+
+  /**
+   * Replace the tests, and activate the container after the write.
+   *
+   * The forced activation is the difference from the parent: a CDS test class
+   * that is written but not активated cannot be run.
+   */
+  override async update(
+    config: Partial<ICdsUnitTestConfig>,
+    options?: IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['updated']>>> {
+    if (!(config.className && config.testClassSource)) {
+      return super.update(config, options);
+    }
+
+    this.logger?.info?.('Updating CDS test class source:', config.className);
+    return this.adtLocalTestClass.update(
+      {
         className: config.className,
         testClassCode: config.testClassSource,
-      });
-
-      return {
-        validationResponse,
-        testClassState,
-        errors: [],
-      };
-    }
-
-    // Otherwise, use parent's validate (confirms the container class exists
-    // for a plain test run).
-    return await super.validate(config);
+        transportRequest: config.transportRequest,
+      },
+      { ...options, activateOnUpdate: true },
+    ) as Promise<IAdtResponse<ReturnType<R['updated']>>>;
   }
 
   /**
-   * Override: Create test class with CDS template and test class source
-   * For CDS: creates a global minimal class and adds local test class to it
-   * If className and classTemplate are provided, creates test class; otherwise uses parent's create for test run
+   * Delete the whole container class.
+   *
+   * The difference from the parent, which empties the include and leaves the
+   * class: a CDS test class exists only to hold these tests, so removing the
+   * tests means removing it.
    */
-  async create(
-    config: ICdsUnitTestConfig,
-    options?: import('@mcp-abap-adt/interfaces').IAdtOperationOptions,
-  ): Promise<ICdsUnitTestState> {
-    // If className and classTemplate are provided, create test class
-    if (config.className && config.classTemplate && config.testClassSource) {
-      try {
-        this.logger?.info?.('Creating CDS unit test class:', config.className);
-        this.className = config.className;
-
-        // Step 1: Create empty global class with CDS template
-        // Uses parent's adtClass for creating the global class
-        this.logger?.info?.('Step 1: Creating global class with template');
-        const createState = await this.adtClass.create({
-          className: config.className,
-          packageName: config.packageName as string,
-          description:
-            config.description || `CDS unit test for ${config.className}`,
-          classTemplate: config.classTemplate,
-          transportRequest: config.transportRequest,
-          final: true,
-        });
-
-        // Step 1.5: Activate the class after creation (required before lock test classes)
-        this.logger?.info?.('Step 1.5: Activating global class');
-        const _activateState = await this.adtClass.activate({
-          className: config.className,
-        });
-        this.logger?.info?.('Global class activated');
-
-        // Step 2: Write the tests into the global class's testclasses include.
-        // An include is not created — it exists because its class does — so this
-        // is update, and adtLocalTestClass handles locking/unlocking internally.
-        this.logger?.info?.('Step 2: Writing test class into global class');
-        const testClassState = await this.adtLocalTestClass.update(
-          {
-            className: config.className,
-            testClassCode: config.testClassSource,
-            transportRequest: config.transportRequest,
-          },
-          {
-            activateOnUpdate: true, // Activate the parent class after writing the tests
-          },
-        );
-
-        return {
-          createResult: createState.createResult,
-          testClassState: {
-            ...createState,
-            ...testClassState,
-          },
-          errors: [],
-        };
-      } catch (error: unknown) {
-        this.logger?.error('create failed:', safeErrorMessage(error));
-        throw error;
-      }
-    }
-
-    // Without a template there is no CDS-specific chain: creating the
-    // container class and writing the tests into it is what the parent does.
-    return await super.create(config, options);
-  }
-
-  /**
-   * Override: Update test class source
-   * If className and testClassSource are provided, updates test class; otherwise uses parent's update
-   */
-  async update(
+  override async delete(
     config: Partial<ICdsUnitTestConfig>,
-    options?: import('@mcp-abap-adt/interfaces').IAdtOperationOptions,
-  ): Promise<ICdsUnitTestState> {
-    // If className and testClassSource are provided, update test class
-    if (config.className && config.testClassSource) {
-      try {
-        this.logger?.info?.(
-          'Updating CDS test class source:',
-          config.className,
-        );
-        // Uses parent's adtLocalTestClass which handles locking/unlocking and activation internally
-        const testClassState = await this.adtLocalTestClass.update(
-          {
-            className: config.className,
-            testClassCode: config.testClassSource,
-            transportRequest: config.transportRequest,
-          },
-          {
-            activateOnUpdate: true, // Activate the parent class after updating test class
-          },
-        );
-        return {
-          testClassState,
-          errors: [],
-        };
-      } catch (error: unknown) {
-        this.logger?.error('update failed:', safeErrorMessage(error));
-        throw error;
-      }
+    options?: IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['deleted']>>> {
+    if (!config.className) {
+      return super.delete(config, options);
     }
 
-    // Otherwise the parent writes the include, which is the same operation
-    // without the CDS-specific activation this branch forces.
-    return await super.update(config, options);
+    this.logger?.info?.(
+      'Deleting CDS test class (global class):',
+      config.className,
+    );
+    const answer = await this.adtClass.delete(
+      {
+        className: config.className,
+        transportRequest: config.transportRequest,
+      },
+      options,
+    );
+    if (answer.ok) this.className = undefined;
+    return answer as IAdtResponse<ReturnType<R['deleted']>>;
   }
 
   /**
-   * Override: Delete test class
-   * If className is provided, deletes test class; otherwise uses parent's delete
-   * For CDS: deletes the entire global class (not just the local test class)
+   * Run the tests.
+   *
+   * A class name runs every test in that class by object name; an array of test
+   * definitions is the parent's route.
    */
-  async delete(
-    config: Partial<ICdsUnitTestConfig>,
-  ): Promise<ICdsUnitTestState> {
-    // If className is provided, delete test class
-    if (config.className) {
-      try {
-        this.logger?.info?.(
-          'Deleting CDS test class (global class):',
-          config.className,
-        );
-        // Uses parent's adtClass for deleting the global class
-        const deleteState = await this.adtClass.delete({
-          className: config.className,
-          transportRequest: config.transportRequest,
-        });
-        this.className = undefined;
-        return {
-          testClassState: deleteState,
-          errors: [],
-        };
-      } catch (error: unknown) {
-        this.logger?.error('delete failed:', safeErrorMessage(error));
-        throw error;
-      }
-    }
-
-    // Otherwise the parent empties the include, leaving the class in place.
-    return await super.delete(config);
-  }
-
-  /**
-   * Override: Run unit tests
-   * For CDS: if className is provided, runs tests for that class by object name
-   * Otherwise, uses parent's run method with tests array
-   */
-  async run(
+  override async run(
     testsOrClassName: IClassUnitTestDefinition[] | string,
     options?: IClassUnitTestRunOptions,
-  ): Promise<string> {
-    // If className is provided (string), run tests for that class by object name
-    if (typeof testsOrClassName === 'string') {
-      const className = testsOrClassName;
-      if (!className) {
-        throw new Error('Class name is required');
-      }
-      try {
-        this.logger?.info?.('Starting unit test run for object:', className);
-        const response = await startClassUnitTestRunByObject(
-          this.connection,
-          className,
-          options,
-        );
-        const runId =
-          headerValueToString(response.headers?.location)?.split('/').pop() ||
-          headerValueToString(response.headers?.['content-location'])
-            ?.split('/')
-            .pop() ||
-          headerValueToString(response.headers?.['sap-adt-location'])
-            ?.split('/')
-            .pop() ||
-          this.extractRunId(response);
-        if (!runId) {
-          throw new Error('Failed to extract run ID from response');
-        }
-        this.lastRunId = runId;
-        this.logger?.info?.('Unit test run started, runId:', runId);
-        return runId;
-      } catch (error: unknown) {
-        this.logger?.error('run failed:', safeErrorMessage(error));
-        throw error;
-      }
+  ): Promise<IAdtResponse<ReturnType<R['run']>>> {
+    if (typeof testsOrClassName !== 'string') {
+      return super.run(testsOrClassName, options);
     }
 
-    // Otherwise, use parent's run method with tests array
-    return await super.run(testsOrClassName, options);
+    const className = testsOrClassName;
+    if (!className) {
+      throw new Error('Class name is required');
+    }
+
+    this.logger?.info?.('Starting unit test run for object:', className);
+    const answer = await answering(
+      () => startClassUnitTestRunByObject(this.connection, className, options),
+      this.results.run as IResultStrategy<ReturnType<R['run']>>,
+      (verdict, wire) => {
+        if (verdict !== ADT_NO_FAILURE) return verdict;
+        return wire && runId(wire)
+          ? ADT_NO_FAILURE
+          : {
+              origin: 'refusal' as const,
+              message: 'Failed to start unit test run: run ID not returned',
+              response: wire,
+            };
+      },
+    );
+
+    if (answer.ok) {
+      this.lastRunId = String(answer.getResult().value);
+      this.logger?.info?.('Unit test run started, runId:', this.lastRunId);
+    }
+    return answer;
   }
 
-  /**
-   * Get test class name
-   */
+  /** The container class this instance created, if it made one. */
   getClassName(): string | undefined {
     return this.className;
   }
 
-  /**
-   * Get CDS view name
-   */
+  /** The view this instance checked, if it checked one. */
   getCdsViewName(): string | undefined {
     return this.cdsViewName;
   }

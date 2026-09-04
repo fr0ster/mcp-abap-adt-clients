@@ -235,9 +235,9 @@ import {
   AdtCdsUnitTest,
   AdtUnitTest,
   type ICdsUnitTestConfig,
-  type ICdsUnitTestState,
   type IUnitTestConfig,
-  type IUnitTestState,
+  type IUnitTestResults,
+  unitTestDocuments,
 } from '../core/unitTest';
 import { withRefusalDetection } from '../utils/refusalAware';
 
@@ -2006,16 +2006,54 @@ export class AdtClient {
    * its outcome is the reason this handler exists, and until interfaces 13.1.0
    * no contract described it, so callers cast past the type to reach it.
    */
-  getUnitTest(): IAdtCreatable<IUnitTestConfig, IUnitTestState> &
-    IAdtReadable<IUnitTestConfig, IUnitTestState> &
-    IAdtUpdatable<IUnitTestConfig, IUnitTestState> &
-    IAdtDeletable<IUnitTestConfig, IUnitTestState> &
-    IAdtValidatable<IUnitTestConfig, IUnitTestState> &
-    IAdtLockable<IUnitTestConfig, IUnitTestState> &
-    IAdtRunnable<IClassUnitTestDefinition[], string, IClassUnitTestRunOptions> &
-    ITestRunInformation {
+  getUnitTest(): AdtUnitTest;
+  getUnitTest<
+    R extends IUnitTestResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    >,
+  >(
+    results: R,
+  ): IAdtCreatable<IUnitTestConfig, ReturnType<R['created']>> &
+    IAdtReadable<
+      IUnitTestConfig,
+      ReturnType<R['source']>,
+      ReturnType<R['metadata']>
+    > &
+    IAdtUpdatable<IUnitTestConfig, ReturnType<R['updated']>> &
+    IAdtDeletable<IUnitTestConfig, ReturnType<R['deleted']>> &
+    IAdtValidatable<IUnitTestConfig, ReturnType<R['validation']>> &
+    IAdtLockable<IUnitTestConfig> &
+    IAdtRunnable<
+      IClassUnitTestDefinition[],
+      ReturnType<R['run']>,
+      IClassUnitTestRunOptions
+    > &
+    ITestRunInformation<ReturnType<R['status']>, ReturnType<R['result']>>;
+  getUnitTest<
+    R extends IUnitTestResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    > = IUnitTestResults,
+  >(results: R = unitTestDocuments as unknown as R): AdtUnitTest<R> {
     this.assertConnected();
-    return new AdtUnitTest(this.connection, this.logger);
+    return new AdtUnitTest<R>(this.connection, this.logger, results);
   }
 
   /**
@@ -2024,21 +2062,55 @@ export class AdtClient {
    * Same capability set as {@link getUnitTest}; the CDS-specific surface
    * (`checkCdsTestDoubles`, `getCdsViewName`) is on the concrete class.
    */
-  getCdsUnitTest(): IAdtCreatable<ICdsUnitTestConfig, ICdsUnitTestState> &
-    IAdtReadable<ICdsUnitTestConfig, ICdsUnitTestState> &
-    IAdtUpdatable<ICdsUnitTestConfig, ICdsUnitTestState> &
-    IAdtDeletable<ICdsUnitTestConfig, ICdsUnitTestState> &
-    IAdtValidatable<ICdsUnitTestConfig, ICdsUnitTestState> &
-    IAdtLockable<ICdsUnitTestConfig, ICdsUnitTestState> &
+  getCdsUnitTest(): AdtCdsUnitTest;
+  getCdsUnitTest<
+    R extends IUnitTestResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    >,
+  >(
+    results: R,
+  ): IAdtCreatable<ICdsUnitTestConfig, ReturnType<R['created']>> &
+    IAdtReadable<
+      ICdsUnitTestConfig,
+      ReturnType<R['source']>,
+      ReturnType<R['metadata']>
+    > &
+    IAdtUpdatable<ICdsUnitTestConfig, ReturnType<R['updated']>> &
+    IAdtDeletable<ICdsUnitTestConfig, ReturnType<R['deleted']>> &
+    IAdtValidatable<ICdsUnitTestConfig, ReturnType<R['validation']>> &
+    IAdtLockable<ICdsUnitTestConfig> &
     IAdtRunnable<
       IClassUnitTestDefinition[] | string,
-      string,
+      ReturnType<R['run']>,
       IClassUnitTestRunOptions
     > &
-    ITestRunInformation &
-    ICdsTestDoubleCheckable {
+    ITestRunInformation<ReturnType<R['status']>, ReturnType<R['result']>> &
+    ICdsTestDoubleCheckable<ReturnType<R['cdsCheck']>>;
+  getCdsUnitTest<
+    R extends IUnitTestResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    > = IUnitTestResults,
+  >(results: R = unitTestDocuments as unknown as R): AdtCdsUnitTest<R> {
     this.assertConnected();
-    return new AdtCdsUnitTest(this.connection, this.logger);
+    return new AdtCdsUnitTest<R>(this.connection, this.logger, results);
   }
 
   /**
