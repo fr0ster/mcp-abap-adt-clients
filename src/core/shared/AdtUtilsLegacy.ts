@@ -12,13 +12,10 @@
  * mentioned `getTransaction` was its own doc comment and this refusal of it.
  */
 
-import type {
-  IAdtResponse,
-  IAdtResult,
-  IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+import type { IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { buildObjectUri } from '../../utils/activationUtils';
 import { answering, failed } from '../../utils/adtResponse';
+import { rawDocument } from '../../utils/resultStrategy';
 import { getTimeout } from '../../utils/timeouts';
 import { AdtUtils } from './AdtUtils';
 import type {
@@ -26,6 +23,7 @@ import type {
   IGetTableContentsParams,
   IObjectReference,
 } from './types';
+import type { IUtilResults } from './utilResultSet';
 
 function unsupportedError(operation: string, endpoint: string): string {
   return (
@@ -35,7 +33,9 @@ function unsupportedError(operation: string, endpoint: string): string {
   );
 }
 
-export class AdtUtilsLegacy extends AdtUtils {
+export class AdtUtilsLegacy<
+  R extends IUtilResults<unknown, unknown, unknown> = IUtilResults,
+> extends AdtUtils<R> {
   /**
    * Legacy group activation — synchronous POST to /sap/bc/adt/activation
    *
@@ -45,7 +45,7 @@ export class AdtUtilsLegacy extends AdtUtils {
   override async activateObjectsGroup(
     objects: IObjectReference[],
     preauditRequested: boolean = false,
-  ): Promise<IAdtResponse<IAdtResult<IAdtWireResponse>>> {
+  ): Promise<IAdtResponse<string>> {
     const url = `/sap/bc/adt/activation?method=activate&preauditRequested=${preauditRequested}`;
 
     const objectReferences = objects
@@ -60,17 +60,19 @@ export class AdtUtilsLegacy extends AdtUtils {
 ${objectReferences}
 </adtcore:objectReferences>`;
 
-    return answering(() =>
-      this.connection.makeAdtRequest({
-        url,
-        method: 'POST',
-        timeout: getTimeout('default'),
-        data: xmlBody,
-        headers: {
-          Accept: 'application/xml',
-          'Content-Type': 'application/xml',
-        },
-      }),
+    return answering(
+      () =>
+        this.connection.makeAdtRequest({
+          url,
+          method: 'POST',
+          timeout: getTimeout('default'),
+          data: xmlBody,
+          headers: {
+            Accept: 'application/xml',
+            'Content-Type': 'application/xml',
+          },
+        }),
+      rawDocument,
     );
   }
 
@@ -90,20 +92,17 @@ ${objectReferences}
    */
   override async getTableContents(
     _params: IGetTableContentsParams,
-  ): Promise<IAdtResponse<IAdtResult<IAdtWireResponse>>> {
+  ): Promise<IAdtResponse<string>> {
     return this.refuse('Table contents', '/sap/bc/adt/datapreview/ddic');
   }
 
   override async getSqlQuery(
     _params: IGetSqlQueryParams,
-  ): Promise<IAdtResponse<IAdtResult<IAdtWireResponse>>> {
+  ): Promise<IAdtResponse<string>> {
     return this.refuse('SQL query', '/sap/bc/adt/datapreview/freestyle');
   }
 
-  private refuse<T>(
-    operation: string,
-    endpoint: string,
-  ): IAdtResponse<IAdtResult<T>> {
+  private refuse<T>(operation: string, endpoint: string): IAdtResponse<T> {
     return failed<T>({
       origin: 'connection',
       message: unsupportedError(operation, endpoint),

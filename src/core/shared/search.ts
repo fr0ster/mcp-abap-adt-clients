@@ -5,12 +5,12 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-  ISearchResult,
 } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { ISearchObjectsParams } from './types';
+import type { ISearchResult } from './utilResults';
 
 /**
  * Search for ABAP objects by name pattern

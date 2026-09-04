@@ -422,7 +422,6 @@ export async function getWhereUsedList(
       totalReferences: 0,
       resultDescription: '',
       references: [],
-      rawXml: params.includeRawXml ? xml : undefined,
     };
   }
 
@@ -494,6 +493,5 @@ export async function getWhereUsedList(
         : numberOfResults,
     resultDescription,
     references: resultRefs,
-    rawXml: params.includeRawXml ? xml : undefined,
   };
 }

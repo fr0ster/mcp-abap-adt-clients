@@ -8,11 +8,11 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
   ILogger,
-  INamedItem,
 } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
 import { AdtParseError, throwIfSapError } from '../../utils/adtErrors';
 import { getTimeout } from '../../utils/timeouts';
+import type { INamedItem } from './utilResults';
 
 /**
  * Get all valid ADT object types
