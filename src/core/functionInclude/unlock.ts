@@ -3,7 +3,10 @@
  * NOTE: Caller should call connection.setSessionType("stateless") after unlocking.
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
@@ -16,7 +19,7 @@ export async function unlockFunctionInclude(
   groupName: string,
   includeName: string,
   lockHandle: string,
-): Promise<void> {
+): Promise<IAdtWireResponse> {
   if (!groupName) {
     throw new Error('Function group name is required');
   }
@@ -31,7 +34,7 @@ export async function unlockFunctionInclude(
   const encodedInclude = encodeSapObjectName(includeName.toUpperCase());
   const url = `/sap/bc/adt/functions/groups/${groupLower}/includes/${encodedInclude}?_action=UNLOCK&lockHandle=${encodeURIComponent(lockHandle)}`;
 
-  await connection.makeAdtRequest({
+  return connection.makeAdtRequest({
     url,
     method: 'POST',
     timeout: getTimeout('default'),

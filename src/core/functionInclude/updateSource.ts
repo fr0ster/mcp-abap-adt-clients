@@ -5,7 +5,10 @@
  * Does NOT lock/unlock — assumes the object is already locked.
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_SOURCE,
   ACCEPT_SOURCE_UTF8,
@@ -27,7 +30,7 @@ export async function uploadFunctionIncludeSource(
   lockHandle: string,
   unicode: boolean,
   transportRequest?: string,
-): Promise<void> {
+): Promise<IAdtWireResponse> {
   if (!groupName) {
     throw new Error('Function group name is required');
   }
@@ -47,7 +50,10 @@ export async function uploadFunctionIncludeSource(
 
   const contentType = unicode ? ACCEPT_SOURCE_UTF8 : ACCEPT_SOURCE;
 
-  await connection.makeAdtRequest({
+  // The answer is returned rather than discarded: what a write becomes is the
+  // consumer's result strategy to decide, and a function that swallowed it left
+  // that strategy nothing to read.
+  return connection.makeAdtRequest({
     url,
     method: 'PUT',
     timeout: getTimeout('default'),

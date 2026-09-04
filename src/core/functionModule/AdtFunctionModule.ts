@@ -1,36 +1,43 @@
-import { beginCriticalSection } from '../../utils/criticalSection';
-import { assertDeletable } from '../../utils/deletionCheck';
 /**
- * AdtFunctionModule - High-level CRUD operations for Function Module objects
+ * AdtFunctionModule - CRUD for `FUGR/FF` function modules.
  *
- * Implements IAdtObject interface with automatic operation chains,
- * error handling, and resource cleanup.
+ * A module lives inside its function group, so every request needs both names
+ * and the lock is registered under the pair.
  *
- * Uses low-level functions directly (not Builder classes).
- *
- * Session management:
- * - stateful: only when doing lock/update/unlock operations
- * - stateless: obligatory after unlock
- * - If no lock/unlock, no stateful needed
- * - activate uses same session/cookies (no stateful needed)
+ * Every member answers `IAdtResponse<T>`, where T is what the result set given
+ * at construction makes of that endpoint's answer.
  *
  * Operation chains:
- * - Create: validate → create → check → lock → check(inactive) → update → unlock → check → activate
+ * - Create: create
  * - Update: lock → check(inactive) → update → unlock → check → activate
  * - Delete: check(deletion) → delete
  */
 
 import type {
-  HttpError,
   IAbapConnection,
+  IAdtActivatable,
+  IAdtCheckable,
   IAdtContentTypes,
+  IAdtCreatable,
+  IAdtDeletable,
+  IAdtLockable,
   IAdtOperationOptions,
-  IAdtSourceObject,
+  IAdtReadable,
+  IAdtResponse,
   IAdtSystemContext,
+  IAdtTransportAware,
+  IAdtUpdatable,
+  IAdtValidatable,
+  IAdtVersionable,
   ILogger,
+  IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
-import { safeErrorMessage } from '../../utils/internalUtils';
+import { answering } from '../../utils/adtResponse';
+import { beginCriticalSection } from '../../utils/criticalSection';
+import { deletionRefusal } from '../../utils/deletionCheck';
+import { chain } from '../shared/chain';
 import type { LockRegistry } from '../shared/LockRegistry';
+import type { ObjectVersion } from '../shared/results';
 import type { IReadOptions } from '../shared/types';
 import { activateFunctionModule } from './activation';
 import { checkFunctionModule } from './check';
@@ -42,17 +49,46 @@ import {
   getFunctionModuleTransport,
   getFunctionSource,
 } from './read';
-import type { IFunctionModuleConfig, IFunctionModuleState } from './types';
+import {
+  functionModuleDocuments,
+  type IFunctionModuleConfig,
+  type IFunctionModuleResults,
+} from './types';
 import { unlockFunctionModule } from './unlock';
 import { update } from './update';
 import { validateFunctionModuleName } from './validation';
-
 import {
   getFunctionModuleVersionSource,
   getFunctionModuleVersions,
 } from './versions';
-export class AdtFunctionModule
-  implements IAdtSourceObject<IFunctionModuleConfig, IFunctionModuleState>
+
+export class AdtFunctionModule<
+  R extends IFunctionModuleResults<
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown
+  > = IFunctionModuleResults,
+> implements
+    IAdtCreatable<IFunctionModuleConfig, ReturnType<R['created']>>,
+    IAdtReadable<
+      IFunctionModuleConfig,
+      ReturnType<R['source']>,
+      ReturnType<R['metadata']>
+    >,
+    IAdtUpdatable<IFunctionModuleConfig, ReturnType<R['updated']>>,
+    IAdtDeletable<IFunctionModuleConfig, ReturnType<R['deletion']>>,
+    IAdtValidatable<IFunctionModuleConfig, ReturnType<R['validation']>>,
+    IAdtCheckable<IFunctionModuleConfig, ReturnType<R['check']>>,
+    IAdtActivatable<IFunctionModuleConfig, ReturnType<R['activation']>>,
+    IAdtLockable<IFunctionModuleConfig>,
+    IAdtTransportAware<IFunctionModuleConfig, ReturnType<R['transport']>>,
+    IAdtVersionable<IFunctionModuleConfig, ObjectVersion[], string>
 {
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
@@ -67,6 +103,8 @@ export class AdtFunctionModule
     systemContext?: IAdtSystemContext,
     contentTypes?: IAdtContentTypes,
     lockRegistry?: LockRegistry,
+    // The one cast in this file, and it is on the default. See AdtClass.
+    protected readonly results: R = functionModuleDocuments as unknown as R,
   ) {
     this.connection = connection;
     this.logger = logger;
@@ -82,11 +120,10 @@ export class AdtFunctionModule
 
   /** Record a held lock; the unlock thunk needs the parent function group. */
   private trackLock(
-    group: string | undefined,
-    moduleName: string | undefined,
+    group: string,
+    moduleName: string,
     lockHandle: string,
   ): void {
-    if (!group || !moduleName) return;
     // Raw unlock — LockRegistry.unlockAll() manages the session for the batch.
     this.lockRegistry?.track(this.lockKey(group, moduleName), () =>
       unlockFunctionModule(this.connection, group, moduleName, lockHandle),
@@ -94,650 +131,471 @@ export class AdtFunctionModule
   }
 
   /** Drop a lock from the registry after a clean unlock. */
-  private untrackLock(
-    group: string | undefined,
-    moduleName: string | undefined,
-  ): void {
-    if (!group || !moduleName) return;
+  private untrackLock(group: string, moduleName: string): void {
     this.lockRegistry?.untrack(this.lockKey(group, moduleName));
   }
 
-  /**
-   * Validate function module configuration before creation
-   */
-  async validate(
-    config: Partial<IFunctionModuleConfig>,
-  ): Promise<IFunctionModuleState> {
-    if (!config.functionModuleName) {
-      throw new Error('Function module name is required for validation');
-    }
-    if (!config.functionGroupName) {
-      throw new Error('Function group name is required for validation');
-    }
-
-    return {
-      validationResponse: await validateFunctionModuleName(
-        this.connection,
-        config.functionGroupName,
-        config.functionModuleName,
-        config.description,
-      ),
-      errors: [],
-    };
-  }
-
-  /**
-   * Create function module with full operation chain
-   */
-  async create(
-    config: IFunctionModuleConfig,
-    options?: IAdtOperationOptions,
-  ): Promise<IFunctionModuleState> {
+  /** Both names, or the caller's mistake. */
+  private names(config: Partial<IFunctionModuleConfig>): {
+    group: string;
+    module: string;
+  } {
     if (!config.functionModuleName) {
       throw new Error('Function module name is required');
     }
     if (!config.functionGroupName) {
       throw new Error('Function group name is required');
     }
+    return {
+      group: config.functionGroupName,
+      module: config.functionModuleName,
+    };
+  }
+
+  /** Validate a function module name before creating it. */
+  async validate(
+    config: Partial<IFunctionModuleConfig>,
+    options?: IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['validation']>>> {
+    const { group, module } = this.names(config);
+
+    return answering(
+      () =>
+        validateFunctionModuleName(
+          this.connection,
+          group,
+          module,
+          config.description,
+        ),
+      this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
+      options?.analyse,
+    );
+  }
+
+  /** Create the function module. */
+  async create(
+    config: IFunctionModuleConfig,
+    options?: IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['created']>>> {
+    const { group, module } = this.names(config);
     if (!config.description) {
       throw new Error('Description is required');
     }
 
-    let objectCreated = false;
-    const state: IFunctionModuleState = {
-      errors: [],
-    };
-
-    try {
-      // Create function module
-      this.logger?.info?.('Creating function module');
-      const createResult = await createFunctionModule(this.connection, {
-        functionGroupName: config.functionGroupName,
-        functionModuleName: config.functionModuleName,
-        transportRequest: config.transportRequest,
-        description: config.description,
-        masterSystem: config.masterSystem ?? this.systemContext.masterSystem,
-        responsible: config.responsible ?? this.systemContext.responsible,
+    return chain(this.logger, async ({ step, onScopeEnd }) => {
+      onScopeEnd(async () => {
+        this.connection.setSessionType('stateless');
       });
-      objectCreated = true;
-      state.createResult = createResult;
-      this.logger?.info?.('Function module created');
 
-      return state;
-    } catch (error: unknown) {
-      // Cleanup on error - ensure stateless
-      this.connection.setSessionType('stateless');
-
-      if (objectCreated && options?.deleteOnFailure) {
-        try {
+      let created = false;
+      if (options?.deleteOnFailure) {
+        onScopeEnd(async () => {
+          if (!created) return;
           this.logger?.warn?.('Deleting function module after failure');
-          // No stateful needed - delete doesn't use lock/unlock
+          // No stateful needed — the delete uses no lock.
           await deleteFunctionModule(this.connection, {
-            function_module_name: config.functionModuleName,
-            function_group_name: config.functionGroupName,
+            function_module_name: module,
+            function_group_name: group,
             transport_request: config.transportRequest,
           });
-        } catch (deleteError) {
-          this.logger?.warn?.(
-            'Failed to delete function module after failure:',
-            safeErrorMessage(deleteError),
-          );
-        }
+        });
       }
 
-      this.logger?.error('Create failed:', safeErrorMessage(error));
-      throw error;
-    }
+      this.logger?.info?.('Creating function module');
+      const value = await step(
+        answering(
+          () =>
+            createFunctionModule(this.connection, {
+              functionGroupName: group,
+              functionModuleName: module,
+              transportRequest: config.transportRequest,
+              description: config.description as string,
+              masterSystem:
+                config.masterSystem ?? this.systemContext.masterSystem,
+              responsible: config.responsible ?? this.systemContext.responsible,
+            }),
+          this.results.created as IResultStrategy<ReturnType<R['created']>>,
+          options?.analyse,
+        ),
+      );
+      created = true;
+      this.logger?.info?.('Function module created');
+      return value;
+    });
   }
 
-  /**
-   * Read function module
-   */
+  /** Read the module's source. */
   async read(
     config: Partial<IFunctionModuleConfig>,
     version?: 'active' | 'inactive',
-    options?: IReadOptions,
-  ): Promise<IFunctionModuleState | undefined> {
-    if (!config.functionModuleName) {
-      throw new Error('Function module name is required');
-    }
-    if (!config.functionGroupName) {
-      throw new Error('Function group name is required');
-    }
+    options?: IReadOptions & IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['source']>>> {
+    const { group, module } = this.names(config);
 
-    try {
-      const response = await getFunctionSource(
-        this.connection,
-        config.functionModuleName,
-        config.functionGroupName,
-        version,
-        options,
-      );
-      return {
-        readResult: response,
-        errors: [],
-      };
-    } catch (error: unknown) {
-      const e = error as HttpError;
-      if (e.response?.status === 404) {
-        return undefined;
-      }
-      throw error;
-    }
+    // No 404 special case: whether an empty answer *is* absence is the caller's
+    // reading, supplied through `analyse`.
+    return answering(
+      () => getFunctionSource(this.connection, module, group, version, options),
+      this.results.source as IResultStrategy<ReturnType<R['source']>>,
+      options?.analyse,
+    );
   }
 
-  /**
-   * Read function module metadata (object characteristics: package, responsible, description, etc.)
-   */
+  /** Read the module's metadata. */
   async readMetadata(
     config: Partial<IFunctionModuleConfig>,
-    options?: IReadOptions,
-  ): Promise<IFunctionModuleState> {
-    const state: IFunctionModuleState = { errors: [] };
-    if (!config.functionModuleName) {
-      const error = new Error('Function module name is required');
-      state.errors.push({
-        method: 'readMetadata',
-        error,
-        timestamp: new Date(),
-      });
-      throw error;
-    }
-    if (!config.functionGroupName) {
-      const error = new Error('Function group name is required');
-      state.errors.push({
-        method: 'readMetadata',
-        error,
-        timestamp: new Date(),
-      });
-      throw error;
-    }
-    try {
-      const response = await getFunctionMetadata(
-        this.connection,
-        config.functionModuleName,
-        config.functionGroupName,
-        options,
-      );
-      state.metadataResult = response;
-      this.logger?.info?.('Function module metadata read successfully');
-      return state;
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({
-        method: 'readMetadata',
-        error: err,
-        timestamp: new Date(),
-      });
-      this.logger?.error('readMetadata', safeErrorMessage(err));
-      throw err;
-    }
+    options?: IReadOptions & IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['metadata']>>> {
+    const { group, module } = this.names(config);
+
+    return answering(
+      () => getFunctionMetadata(this.connection, module, group, options),
+      this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
+      options?.analyse,
+    );
   }
 
-  /**
-   * Read transport request information for the function module
-   */
+  /** The transport request the module belongs to. */
   async readTransport(
     config: Partial<IFunctionModuleConfig>,
-    options?: { withLongPolling?: boolean },
-  ): Promise<IFunctionModuleState> {
-    const state: IFunctionModuleState = { errors: [] };
-    if (!config.functionModuleName) {
-      const error = new Error('Function module name is required');
-      state.errors.push({
-        method: 'readTransport',
-        error,
-        timestamp: new Date(),
-      });
-      throw error;
-    }
-    if (!config.functionGroupName) {
-      const error = new Error('Function group name is required');
-      state.errors.push({
-        method: 'readTransport',
-        error,
-        timestamp: new Date(),
-      });
-      throw error;
-    }
-    try {
-      const response = await getFunctionModuleTransport(
-        this.connection,
-        config.functionModuleName,
-        config.functionGroupName,
-        options?.withLongPolling !== undefined
-          ? { withLongPolling: options.withLongPolling }
-          : undefined,
-      );
-      state.transportResult = response;
-      this.logger?.info?.(
-        'Function module transport request read successfully',
-      );
-      return state;
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({
-        method: 'readTransport',
-        error: err,
-        timestamp: new Date(),
-      });
-      this.logger?.error('readTransport', safeErrorMessage(err));
-      throw err;
-    }
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['transport']>>> {
+    const { group, module } = this.names(config);
+
+    return answering(
+      () =>
+        getFunctionModuleTransport(
+          this.connection,
+          module,
+          group,
+          options?.withLongPolling !== undefined
+            ? { withLongPolling: options.withLongPolling }
+            : undefined,
+        ),
+      this.results.transport as IResultStrategy<ReturnType<R['transport']>>,
+      options?.analyse,
+    );
   }
 
   /**
-   * Update function module with full operation chain
-   * Always starts with lock
-   * If options.lockHandle is provided, performs only low-level update without lock/check/unlock chain
+   * Write the module's source.
+   *
+   * With `options.lockHandle` the caller holds the lock and owns the chain, so
+   * this is one request. Without it, this locks, checks, writes and unlocks —
+   * and the unlock happens on every path out.
    */
   async update(
     config: Partial<IFunctionModuleConfig>,
     options?: IAdtOperationOptions,
-  ): Promise<IFunctionModuleState> {
-    if (!config.functionModuleName) {
-      throw new Error('Function module name is required');
-    }
-    if (!config.functionGroupName) {
-      throw new Error('Function group name is required');
-    }
+  ): Promise<IAdtResponse<ReturnType<R['updated']>>> {
+    const { group, module } = this.names(config);
+    const source = options?.sourceCode || config.sourceCode;
 
-    // Low-level mode: if lockHandle is provided, perform only update operation
     if (options?.lockHandle) {
-      const codeToUpdate = options?.sourceCode || config.sourceCode;
-      if (!codeToUpdate) {
+      if (!source) {
         throw new Error('Source code is required for update');
       }
-
       this.logger?.info?.(
         'Low-level update: performing update only (lockHandle provided)',
       );
-      const updateResponse = await update(
-        this.connection,
-        {
-          functionModuleName: config.functionModuleName,
-          functionGroupName: config.functionGroupName,
-          sourceCode: codeToUpdate,
-          lockHandle: options.lockHandle,
-          transportRequest: config.transportRequest,
-        },
-        this.contentTypes,
+      return answering(
+        () =>
+          update(
+            this.connection,
+            {
+              functionModuleName: module,
+              functionGroupName: group,
+              sourceCode: source,
+              lockHandle: options.lockHandle as string,
+              transportRequest: config.transportRequest,
+            },
+            this.contentTypes,
+          ),
+        this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+        options?.analyse,
       );
-      this.logger?.info?.('Function module updated (low-level)');
-      return {
-        updateResult: updateResponse,
-        errors: [],
-      };
     }
 
-    let lockHandle: string | undefined;
-
-    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
-
-    // the lock but leaves the work half-done.
-
+    // A LOCK…UNLOCK window: a timeout in the middle releases the lock and
+    // leaves the work half done.
     const endCriticalSection = beginCriticalSection(this.connection);
 
-    try {
-      // 1. Lock (update always starts with lock, stateful ONLY before lock)
+    return chain(this.logger, async ({ step, onScopeEnd }) => {
+      onScopeEnd(async () => {
+        endCriticalSection();
+      });
+
       this.logger?.info?.('Step 1: Locking function module');
       this.connection.setSessionType('stateful');
-      lockHandle = await lockFunctionModule(
+      // Registered FIRST so it unwinds LAST: a handle is only valid inside a
+      // stateful request on older BASIS (#106).
+      onScopeEnd(async () => {
+        this.connection.setSessionType('stateless');
+      });
+
+      const lockHandle = await lockFunctionModule(
         this.connection,
-        config.functionGroupName,
-        config.functionModuleName,
+        group,
+        module,
       );
-      this.trackLock(
-        config.functionGroupName,
-        config.functionModuleName,
-        lockHandle,
-      );
+      this.trackLock(group, module, lockHandle);
+      const releaseLock = onScopeEnd(async () => {
+        await unlockFunctionModule(this.connection, group, module, lockHandle);
+        this.untrackLock(group, module);
+      });
       this.logger?.info?.('Function module locked, handle:', lockHandle);
 
-      // 2. Check inactive with code for update (from options or config)
-      const codeToCheck = options?.sourceCode || config.sourceCode;
-      if (codeToCheck) {
+      if (source) {
         this.logger?.info?.(
           'Step 2: Checking inactive version with update content',
         );
-        await checkFunctionModule(
-          this.connection,
-          config.functionGroupName,
-          config.functionModuleName,
-          'inactive',
-          codeToCheck,
-          this.contentTypes,
+        await step(
+          answering(
+            () =>
+              checkFunctionModule(
+                this.connection,
+                group,
+                module,
+                'inactive',
+                source,
+                this.contentTypes,
+              ),
+            this.results.check as IResultStrategy<ReturnType<R['check']>>,
+            options?.analyse,
+          ),
         );
-        this.logger?.info?.('Check inactive with update content passed');
       }
 
-      // 3. Update
-      if (codeToCheck && lockHandle) {
+      let updated = undefined as ReturnType<R['updated']>;
+      if (source) {
         this.logger?.info?.('Step 3: Updating function module');
-        await update(
-          this.connection,
-          {
-            functionGroupName: config.functionGroupName,
-            functionModuleName: config.functionModuleName,
-            sourceCode: codeToCheck,
-            lockHandle,
-            transportRequest: config.transportRequest,
-          },
-          this.contentTypes,
+        updated = await step(
+          answering(
+            () =>
+              update(
+                this.connection,
+                {
+                  functionGroupName: group,
+                  functionModuleName: module,
+                  sourceCode: source,
+                  lockHandle,
+                  transportRequest: config.transportRequest,
+                },
+                this.contentTypes,
+              ),
+            this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+            options?.analyse,
+          ),
         );
         this.logger?.info?.('Function module updated');
 
-        // Poll the inactive version: the write above produced it; the active version may not exist yet.
-        // 3.5. Read with long polling (wait for object to be ready after update)
-        this.logger?.info?.('read (wait for object ready after update)');
-        try {
-          await this.read(
-            {
-              functionModuleName: config.functionModuleName,
-              functionGroupName: config.functionGroupName,
-            },
-            'inactive',
-            { withLongPolling: true },
-          );
-          this.logger?.info?.('object is ready after update');
-        } catch (readError) {
+        // The write produced the inactive version; the active one may not exist
+        // yet. A failure here is not the update's failure, so it is logged and
+        // the chain continues — the unlock still has to happen.
+        const ready = await this.read(config, 'inactive', {
+          withLongPolling: true,
+        });
+        if (!ready.ok) {
           this.logger?.warn?.(
-            'read with long polling failed (object may not be ready yet):',
-            safeErrorMessage(readError),
+            'read with long polling failed after update:',
+            ready.getError().message,
           );
-          // Continue anyway - unlock might still work
         }
       }
 
-      // 4. Unlock (obligatory stateless after unlock)
-      if (lockHandle) {
-        this.logger?.info?.('Step 4: Unlocking function module');
-        this.connection.setSessionType('stateful');
-        await unlockFunctionModule(
-          this.connection,
-          config.functionGroupName,
-          config.functionModuleName,
-          lockHandle,
-        );
-        this.connection.setSessionType('stateless');
-        this.untrackLock(config.functionGroupName, config.functionModuleName);
-        lockHandle = undefined;
-        this.logger?.info?.('Function module unlocked');
-      }
+      this.logger?.info?.('Step 4: Unlocking function module');
+      this.connection.setSessionType('stateful');
+      await unlockFunctionModule(this.connection, group, module, lockHandle);
+      this.connection.setSessionType('stateless');
+      this.untrackLock(group, module);
+      releaseLock();
+      this.logger?.info?.('Function module unlocked');
 
-      // 5. Final check (no stateful needed)
       this.logger?.info?.('Step 5: Final check');
-      await checkFunctionModule(
-        this.connection,
-        config.functionGroupName,
-        config.functionModuleName,
-        'inactive',
-        undefined,
-        this.contentTypes,
-      );
-      this.logger?.info?.('Final check passed');
+      await step(this.check(config, 'inactive', options));
 
-      // 6. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnUpdate) {
         this.logger?.info?.('Step 6: Activating function module');
-        const activateResponse = await activateFunctionModule(
-          this.connection,
-          config.functionGroupName,
-          config.functionModuleName,
-        );
-        this.logger?.info?.(
-          'Function module activated, status:',
-          activateResponse.status,
-        );
+        await step(this.activate(config, options));
 
-        // 6.5. Read with long polling (wait for object to be ready after activation)
-        this.logger?.info?.('read (wait for object ready after activation)');
-        try {
-          await this.read(
-            {
-              functionModuleName: config.functionModuleName,
-              functionGroupName: config.functionGroupName,
-            },
-            'active',
-            { withLongPolling: true },
-          );
-          this.logger?.info?.('object is ready after activation');
-        } catch (readError) {
+        const ready = await this.read(config, 'active', {
+          withLongPolling: true,
+        });
+        if (!ready.ok) {
           this.logger?.warn?.(
-            'read with long polling failed (object may not be ready yet):',
-            safeErrorMessage(readError),
-          );
-          // Continue anyway - return activation response
-        }
-
-        return {
-          updateResult: activateResponse,
-          errors: [],
-        };
-      }
-
-      // Read and return result (no stateful needed)
-      const readResponse = await getFunctionSource(
-        this.connection,
-        config.functionModuleName,
-        config.functionGroupName,
-      );
-      const _sourceCode =
-        typeof readResponse.data === 'string'
-          ? readResponse.data
-          : JSON.stringify(readResponse.data);
-
-      return {
-        updateResult: readResponse,
-        errors: [],
-      };
-    } catch (error: unknown) {
-      // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
-      if (lockHandle) {
-        try {
-          this.logger?.warn?.('Unlocking function module during error cleanup');
-          this.connection.setSessionType('stateful');
-          await unlockFunctionModule(
-            this.connection,
-            config.functionGroupName,
-            config.functionModuleName,
-            lockHandle,
-          );
-          this.connection.setSessionType('stateless');
-          this.untrackLock(config.functionGroupName, config.functionModuleName);
-        } catch (unlockError) {
-          this.logger?.warn?.(
-            'Failed to unlock during cleanup:',
-            safeErrorMessage(unlockError),
-          );
-        }
-      } else {
-        // Ensure stateless if lock failed
-        this.connection.setSessionType('stateless');
-      }
-
-      if (options?.deleteOnFailure) {
-        try {
-          this.logger?.warn?.('Deleting function module after failure');
-          // No stateful needed - delete doesn't use lock/unlock
-          await deleteFunctionModule(this.connection, {
-            function_module_name: config.functionModuleName,
-            function_group_name: config.functionGroupName,
-            transport_request: config.transportRequest,
-          });
-        } catch (deleteError) {
-          this.logger?.warn?.(
-            'Failed to delete function module after failure:',
-            safeErrorMessage(deleteError),
+            'read with long polling failed after activation:',
+            ready.getError().message,
           );
         }
       }
 
-      this.logger?.error('Update failed:', safeErrorMessage(error));
-      throw error;
-    } finally {
-      endCriticalSection();
-    }
+      return updated;
+    });
   }
 
   /**
-   * Delete function module
+   * Delete the function module.
+   *
+   * The deletion check is read, not merely performed — see AdtProgram.delete.
    */
   async delete(
     config: Partial<IFunctionModuleConfig>,
-  ): Promise<IFunctionModuleState> {
-    if (!config.functionModuleName) {
-      throw new Error('Function module name is required');
-    }
-    if (!config.functionGroupName) {
-      throw new Error('Function group name is required');
-    }
+    options?: IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>>> {
+    const { group, module } = this.names(config);
 
-    try {
-      // Check for deletion (no stateful needed)
+    return chain(this.logger, async ({ step }) => {
       this.logger?.info?.('Checking function module for deletion');
-      const deletionCheck = await checkDeletion(this.connection, {
-        function_module_name: config.functionModuleName,
-        function_group_name: config.functionGroupName,
-        transport_request: config.transportRequest,
-      });
-      // ADT already said whether this may be deleted; refusing to read that
-      // answer is how a delete came to report success while the object
-      // stayed. Throws on isDeletable=false or a message of type E; a W
-      // is a warning and passes.
-      assertDeletable(deletionCheck.data);
+      await step(
+        answering(
+          () =>
+            checkDeletion(this.connection, {
+              function_module_name: module,
+              function_group_name: group,
+              transport_request: config.transportRequest,
+            }),
+          this.results.check as IResultStrategy<ReturnType<R['check']>>,
+          options?.analyse ?? deletionRefusal,
+        ),
+      );
       this.logger?.info?.('Deletion check passed');
 
-      // Delete (no stateful needed - no lock/unlock)
+      // No stateful session: this delete uses no lock.
       this.logger?.info?.('Deleting function module');
-      const result = await deleteFunctionModule(this.connection, {
-        function_module_name: config.functionModuleName,
-        function_group_name: config.functionGroupName,
-        transport_request: config.transportRequest,
-      });
+      const value = await step(
+        answering(
+          () =>
+            deleteFunctionModule(this.connection, {
+              function_module_name: module,
+              function_group_name: group,
+              transport_request: config.transportRequest,
+            }),
+          this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+          options?.analyse,
+        ),
+      );
       this.logger?.info?.('Function module deleted');
-
-      return { deleteResult: result, errors: [] };
-    } catch (error: unknown) {
-      this.logger?.error('Delete failed:', safeErrorMessage(error));
-      throw error;
-    }
+      return value;
+    });
   }
 
-  /**
-   * Activate function module
-   * No stateful needed - uses same session/cookies
-   */
+  /** Activate the function module. Needs no stateful session. */
   async activate(
     config: Partial<IFunctionModuleConfig>,
-  ): Promise<IFunctionModuleState> {
-    if (!config.functionModuleName) {
-      throw new Error('Function module name is required');
-    }
-    if (!config.functionGroupName) {
-      throw new Error('Function group name is required');
-    }
+    options?: IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['activation']>>> {
+    const { group, module } = this.names(config);
 
-    try {
-      const result = await activateFunctionModule(
-        this.connection,
-        config.functionGroupName,
-        config.functionModuleName,
-      );
-      return { activateResult: result, errors: [] };
-    } catch (error: unknown) {
-      this.logger?.error('Activate failed:', safeErrorMessage(error));
-      throw error;
-    }
+    return answering(
+      () => activateFunctionModule(this.connection, group, module),
+      this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
+      options?.analyse,
+    );
   }
 
-  /**
-   * Check function module
-   */
+  /** Check the function module. */
   async check(
     config: Partial<IFunctionModuleConfig>,
     status?: string,
-  ): Promise<IFunctionModuleState> {
-    if (!config.functionModuleName) {
-      throw new Error('Function module name is required');
-    }
-    if (!config.functionGroupName) {
-      throw new Error('Function group name is required');
-    }
-
-    // Map status to version
+    options?: IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['check']>>> {
+    const { group, module } = this.names(config);
     const version: 'active' | 'inactive' =
       status === 'active' ? 'active' : 'inactive';
-    return {
-      checkResult: await checkFunctionModule(
-        this.connection,
-        config.functionGroupName,
-        config.functionModuleName,
-        version,
-        undefined,
-        this.contentTypes,
-      ),
-      errors: [],
-    };
+
+    return answering(
+      () =>
+        checkFunctionModule(
+          this.connection,
+          group,
+          module,
+          version,
+          undefined,
+          this.contentTypes,
+        ),
+      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      options?.analyse,
+    );
   }
 
-  /**
-   * Lock function module for modification
-   */
-  async lock(config: Partial<IFunctionModuleConfig>): Promise<string> {
-    if (!config.functionModuleName || !config.functionGroupName) {
-      throw new Error(
-        'Function module name and function group name are required',
-      );
-    }
+  /** Lock the function module for modification. */
+  async lock(
+    config: Partial<IFunctionModuleConfig>,
+  ): Promise<IAdtResponse<string>> {
+    const { group, module } = this.names(config);
 
-    this.connection.setSessionType('stateful');
-    const lockHandle = await lockFunctionModule(
-      this.connection,
-      config.functionGroupName,
-      config.functionModuleName,
+    return answering(
+      async () => {
+        this.connection.setSessionType('stateful');
+        const lockHandle = await lockFunctionModule(
+          this.connection,
+          group,
+          module,
+        );
+        this.trackLock(group, module, lockHandle);
+        // The handle is the value, and the request does not keep the wire it
+        // came on — so the answer is built around what the request produced.
+        return {
+          data: lockHandle,
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+        };
+      },
+      (answer) => String(answer.data),
     );
-    this.trackLock(
-      config.functionGroupName,
-      config.functionModuleName,
-      lockHandle,
-    );
-    return lockHandle;
   }
 
-  /**
-   * Unlock function module
-   */
+  /** Unlock the function module. */
   async unlock(
     config: Partial<IFunctionModuleConfig>,
     lockHandle: string,
-  ): Promise<IFunctionModuleState> {
-    if (!config.functionModuleName || !config.functionGroupName) {
-      throw new Error(
-        'Function module name and function group name are required',
-      );
-    }
+  ): Promise<IAdtResponse<void>> {
+    const { group, module } = this.names(config);
 
-    this.connection.setSessionType('stateful');
-    const result = await unlockFunctionModule(
-      this.connection,
-      config.functionGroupName,
-      config.functionModuleName,
-      lockHandle,
+    return answering(
+      async () => {
+        // UNLOCK must run stateful (older BASIS #106); stateless after.
+        this.connection.setSessionType('stateful');
+        const result = await unlockFunctionModule(
+          this.connection,
+          group,
+          module,
+          lockHandle,
+        );
+        this.connection.setSessionType('stateless');
+        this.untrackLock(group, module);
+        return result;
+      },
+      () => undefined,
     );
-    this.connection.setSessionType('stateless');
-    this.untrackLock(config.functionGroupName, config.functionModuleName);
-    return {
-      unlockResult: result,
-      errors: [],
-    };
   }
 
-  getVersions(config: Partial<IFunctionModuleConfig>) {
-    return getFunctionModuleVersions(this.connection, config);
+  /** Version history of the module's source. */
+  async getVersions(
+    config: Partial<IFunctionModuleConfig>,
+  ): Promise<IAdtResponse<ObjectVersion[]>> {
+    return answering(
+      async () => ({
+        data: await getFunctionModuleVersions(this.connection, config),
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+      }),
+      (answer) => answer.data as ObjectVersion[],
+    );
   }
 
-  getVersionSource(contentUri: string) {
-    return getFunctionModuleVersionSource(this.connection, contentUri);
+  /** The source of one version, by the `contentUri` an entry carries. */
+  async getVersionSource(contentUri: string): Promise<IAdtResponse<string>> {
+    return answering(
+      async () => ({
+        data: await getFunctionModuleVersionSource(this.connection, contentUri),
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+      }),
+      (answer) => String(answer.data),
+    );
   }
 }

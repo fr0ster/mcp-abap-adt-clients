@@ -111,18 +111,21 @@ import {
 } from '../core/featureToggle';
 import {
   AdtFunctionGroup,
+  functionGroupDocuments,
   type IFunctionGroupConfig,
-  type IFunctionGroupState,
+  type IFunctionGroupResults,
 } from '../core/functionGroup';
 import {
   AdtFunctionInclude,
+  functionIncludeDocuments,
   type IFunctionIncludeConfig,
-  type IFunctionIncludeState,
+  type IFunctionIncludeResults,
 } from '../core/functionInclude';
 import {
   AdtFunctionModule,
+  functionModuleDocuments,
   type IFunctionModuleConfig,
-  type IFunctionModuleState,
+  type IFunctionModuleResults,
 } from '../core/functionModule';
 import { AdtInclude } from '../core/include';
 import {
@@ -697,19 +700,55 @@ export class AdtClient {
    * Get high-level operations for FunctionGroup objects
    * @returns IAdtObject instance for FunctionGroup operations
    */
-  getFunctionGroup(): IAdtCrud<IFunctionGroupConfig, IFunctionGroupState> &
-    IAdtValidatable<IFunctionGroupConfig, IFunctionGroupState> &
-    IAdtCheckable<IFunctionGroupConfig, IFunctionGroupState> &
-    IAdtActivatable<IFunctionGroupConfig, IFunctionGroupState> &
-    IAdtLockable<IFunctionGroupConfig, IFunctionGroupState> &
-    IAdtTransportAware<IFunctionGroupConfig, IFunctionGroupState> {
+  getFunctionGroup(): AdtFunctionGroup;
+  getFunctionGroup<
+    R extends IFunctionGroupResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    >,
+  >(
+    results: R,
+  ): IAdtCreatable<IFunctionGroupConfig, ReturnType<R['created']>> &
+    IAdtReadable<
+      IFunctionGroupConfig,
+      ReturnType<R['source']>,
+      ReturnType<R['metadata']>
+    > &
+    IAdtUpdatable<IFunctionGroupConfig, ReturnType<R['updated']>> &
+    IAdtDeletable<IFunctionGroupConfig, ReturnType<R['deletion']>> &
+    IAdtValidatable<IFunctionGroupConfig, ReturnType<R['validation']>> &
+    IAdtCheckable<IFunctionGroupConfig, ReturnType<R['check']>> &
+    IAdtActivatable<IFunctionGroupConfig, ReturnType<R['activation']>> &
+    IAdtLockable<IFunctionGroupConfig> &
+    IAdtTransportAware<IFunctionGroupConfig, ReturnType<R['transport']>>;
+  getFunctionGroup<
+    R extends IFunctionGroupResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    > = IFunctionGroupResults,
+  >(results: R = functionGroupDocuments as unknown as R): AdtFunctionGroup<R> {
     this.assertConnected();
-    return new AdtFunctionGroup(
+    return new AdtFunctionGroup<R>(
       this.connection,
       this.logger,
       this.systemContext,
       this.contentTypes,
       this.lockRegistry,
+      results,
     );
   }
 
@@ -717,17 +756,58 @@ export class AdtClient {
    * Get high-level operations for FunctionModule objects
    * @returns IAdtObject instance for FunctionModule operations
    */
-  getFunctionModule(): IAdtSourceObject<
-    IFunctionModuleConfig,
-    IFunctionModuleState
-  > {
+  getFunctionModule(): AdtFunctionModule;
+  getFunctionModule<
+    R extends IFunctionModuleResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    >,
+  >(
+    results: R,
+  ): IAdtCreatable<IFunctionModuleConfig, ReturnType<R['created']>> &
+    IAdtReadable<
+      IFunctionModuleConfig,
+      ReturnType<R['source']>,
+      ReturnType<R['metadata']>
+    > &
+    IAdtUpdatable<IFunctionModuleConfig, ReturnType<R['updated']>> &
+    IAdtDeletable<IFunctionModuleConfig, ReturnType<R['deletion']>> &
+    IAdtValidatable<IFunctionModuleConfig, ReturnType<R['validation']>> &
+    IAdtCheckable<IFunctionModuleConfig, ReturnType<R['check']>> &
+    IAdtActivatable<IFunctionModuleConfig, ReturnType<R['activation']>> &
+    IAdtLockable<IFunctionModuleConfig> &
+    IAdtTransportAware<IFunctionModuleConfig, ReturnType<R['transport']>> &
+    IAdtVersionable<IFunctionModuleConfig, ObjectVersion[], string>;
+  getFunctionModule<
+    R extends IFunctionModuleResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    > = IFunctionModuleResults,
+  >(
+    results: R = functionModuleDocuments as unknown as R,
+  ): AdtFunctionModule<R> {
     this.assertConnected();
-    return new AdtFunctionModule(
+    return new AdtFunctionModule<R>(
       this.connection,
       this.logger,
       this.systemContext,
       this.contentTypes,
       this.lockRegistry,
+      results,
     );
   }
 
@@ -735,22 +815,55 @@ export class AdtClient {
    * Get high-level operations for FunctionInclude objects
    * @returns IAdtObject instance for FunctionInclude operations
    */
-  getFunctionInclude(): IAdtCrud<
-    IFunctionIncludeConfig,
-    IFunctionIncludeState
-  > &
-    IAdtValidatable<IFunctionIncludeConfig, IFunctionIncludeState> &
-    IAdtCheckable<IFunctionIncludeConfig, IFunctionIncludeState> &
-    IAdtActivatable<IFunctionIncludeConfig, IFunctionIncludeState> &
-    IAdtLockable<IFunctionIncludeConfig, IFunctionIncludeState> &
-    IAdtVersionable<IFunctionIncludeConfig> {
+  getFunctionInclude(): AdtFunctionInclude;
+  getFunctionInclude<
+    R extends IFunctionIncludeResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    >,
+  >(
+    results: R,
+  ): IAdtCreatable<IFunctionIncludeConfig, ReturnType<R['created']>> &
+    IAdtReadable<
+      IFunctionIncludeConfig,
+      ReturnType<R['source']>,
+      ReturnType<R['metadata']>
+    > &
+    IAdtUpdatable<IFunctionIncludeConfig, ReturnType<R['updated']>> &
+    IAdtDeletable<IFunctionIncludeConfig, ReturnType<R['deletion']>> &
+    IAdtValidatable<IFunctionIncludeConfig, ReturnType<R['validation']>> &
+    IAdtCheckable<IFunctionIncludeConfig, ReturnType<R['check']>> &
+    IAdtActivatable<IFunctionIncludeConfig, ReturnType<R['activation']>> &
+    IAdtLockable<IFunctionIncludeConfig> &
+    IAdtVersionable<IFunctionIncludeConfig, ObjectVersion[], string>;
+  getFunctionInclude<
+    R extends IFunctionIncludeResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    > = IFunctionIncludeResults,
+  >(
+    results: R = functionIncludeDocuments as unknown as R,
+  ): AdtFunctionInclude<R> {
     this.assertConnected();
-    return new AdtFunctionInclude(
+    return new AdtFunctionInclude<R>(
       this.connection,
       this.logger,
       this.systemContext,
       this.contentTypes,
       this.lockRegistry,
+      results,
     );
   }
 

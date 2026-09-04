@@ -1,88 +1,101 @@
-import { beginCriticalSection } from '../../utils/criticalSection';
 /**
- * AdtFunctionModuleLegacy - FunctionModule handler for legacy SAP systems (BASIS < 7.50)
+ * AdtFunctionModuleLegacy - FunctionModule handler for legacy SAP systems
+ * (BASIS < 7.50).
  *
  * Overrides delete() to use direct DELETE instead of /sap/bc/adt/deletion/ API.
  */
 
-import {
-  encodeSapObjectName,
-  safeErrorMessage,
-} from '../../utils/internalUtils';
+import type {
+  IAdtOperationOptions,
+  IAdtResponse,
+  IResultStrategy,
+} from '@mcp-abap-adt/interfaces';
+import { answering } from '../../utils/adtResponse';
+import { beginCriticalSection } from '../../utils/criticalSection';
+import { encodeSapObjectName } from '../../utils/internalUtils';
+import { chain } from '../shared/chain';
 import { deleteObjectDirect } from '../shared/deleteLegacy';
 import { AdtFunctionModule } from './AdtFunctionModule';
 import { lockFunctionModule } from './lock';
-import type { IFunctionModuleConfig, IFunctionModuleState } from './types';
+import type { IFunctionModuleConfig, IFunctionModuleResults } from './types';
 import { unlockFunctionModule } from './unlock';
 
-export class AdtFunctionModuleLegacy extends AdtFunctionModule {
+export class AdtFunctionModuleLegacy<
+  R extends IFunctionModuleResults<
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown
+  > = IFunctionModuleResults,
+> extends AdtFunctionModule<R> {
   override async delete(
     config: Partial<IFunctionModuleConfig>,
-  ): Promise<IFunctionModuleState> {
+    options?: IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>>> {
     if (!config.functionModuleName) {
       throw new Error('Function module name is required');
     }
     if (!config.functionGroupName) {
       throw new Error('Function group name is required');
     }
-
-    const state: IFunctionModuleState = { errors: [] };
-    let lockHandle: string | undefined;
-
-    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
-
-    // the lock but leaves the work half-done.
+    const group = config.functionGroupName;
+    const module = config.functionModuleName;
 
     const endCriticalSection = beginCriticalSection(this.connection);
 
-    try {
+    return chain(this.logger, async ({ step, onScopeEnd }) => {
+      onScopeEnd(async () => {
+        endCriticalSection();
+      });
+
       this.logger?.info?.('Locking function module for deletion');
       this.connection.setSessionType('stateful');
-      lockHandle = await lockFunctionModule(
+      onScopeEnd(async () => {
+        this.connection.setSessionType('stateless');
+      });
+
+      // `(group, module)`, in that order. This class passed them the other way
+      // round, which built the lock URL as
+      // `/functions/groups/{module}/fmodules/{group}` — a resource that does
+      // not exist, so the legacy delete could never get past its own lock.
+      const lockHandle = await lockFunctionModule(
         this.connection,
-        config.functionModuleName,
-        config.functionGroupName,
+        group,
+        module,
       );
+      // Released on the way out only if the delete did not happen: a deleted
+      // object has nothing left to unlock.
+      let deleted = false;
+      onScopeEnd(async () => {
+        if (deleted) return;
+        await unlockFunctionModule(this.connection, group, module, lockHandle);
+      });
 
       this.logger?.info?.('Deleting function module (direct DELETE)');
-      const encodedGroup = encodeSapObjectName(
-        config.functionGroupName,
-      ).toLowerCase();
-      const encodedModule = encodeSapObjectName(
-        config.functionModuleName,
-      ).toLowerCase();
+      const encodedGroup = encodeSapObjectName(group).toLowerCase();
+      const encodedModule = encodeSapObjectName(module).toLowerCase();
       const objectUrl = `/sap/bc/adt/functions/groups/${encodedGroup}/fmodules/${encodedModule}`;
-      state.deleteResult = await deleteObjectDirect(
-        this.connection,
-        objectUrl,
-        lockHandle,
-        config.transportRequest,
+      const value = await step(
+        answering(
+          () =>
+            deleteObjectDirect(
+              this.connection,
+              objectUrl,
+              lockHandle,
+              config.transportRequest,
+            ),
+          this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+          options?.analyse,
+        ),
       );
+      deleted = true;
       this.logger?.info?.('Function module deleted');
-
-      return state;
-    } catch (error: unknown) {
-      this.logger?.error?.('Delete failed:', safeErrorMessage(error));
-      if (lockHandle) {
-        try {
-          await unlockFunctionModule(
-            this.connection,
-            config.functionModuleName,
-            config.functionGroupName,
-            lockHandle,
-          );
-        } catch (unlockError: unknown) {
-          this.logger?.error?.(
-            'Unlock after delete failure also failed:',
-            safeErrorMessage(unlockError),
-          );
-        }
-      }
-      throw error;
-    } finally {
-      this.connection.setSessionType('stateless');
-
-      endCriticalSection();
-    }
+      return value;
+    });
   }
 }
