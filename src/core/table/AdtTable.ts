@@ -1,40 +1,42 @@
-import type { CheckRunVersion } from '../../utils/checkRun';
-import { beginCriticalSection } from '../../utils/criticalSection';
-import { assertDeletable } from '../../utils/deletionCheck';
 /**
- * AdtTable - High-level CRUD operations for Table objects
+ * AdtTable - CRUD for `TABL/DT` tables.
  *
- * Implements IAdtObject interface with automatic operation chains,
- * error handling, and resource cleanup.
- *
- * Uses low-level functions directly (not Builder classes).
- *
- * Session management:
- * - stateful: only when doing lock/update/unlock operations
- * - stateless: obligatory after unlock
- * - If no lock/unlock, no stateful needed
- * - activate uses same session/cookies (no stateful needed)
+ * Every member answers `IAdtResponse<T>`, where T is what the result set given
+ * at construction makes of that endpoint's answer.
  *
  * Operation chains:
- * - Create: validate → create → check → lock → check(inactive) → update → unlock → check → activate
+ * - Create: create
  * - Update: lock → check(inactive) → update → unlock → check → activate
  * - Delete: check(deletion) → delete
  */
-
 import type {
-  HttpError,
   IAbapConnection,
+  IAdtActivatable,
+  IAdtCheckable,
+  IAdtCreatable,
+  IAdtDeletable,
+  IAdtLockable,
   IAdtOperationOptions,
-  IAdtSourceObject,
+  IAdtReadable,
+  IAdtResponse,
   IAdtSystemContext,
+  IAdtTransportAware,
+  IAdtUpdatable,
+  IAdtValidatable,
+  IAdtVersionable,
   ILogger,
+  IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
-import { safeErrorMessage } from '../../utils/internalUtils';
+import { answering } from '../../utils/adtResponse';
+import { beginCriticalSection } from '../../utils/criticalSection';
+import { deletionRefusal } from '../../utils/deletionCheck';
+import { chain } from '../shared/chain';
 import {
   createLockTracker,
   type LockRegistry,
   type LockTracker,
 } from '../shared/LockRegistry';
+import type { ObjectVersion } from '../shared/results';
 import type { IReadOptions } from '../shared/types';
 import { activateTable } from './activation';
 import { runTableCheckRun } from './check';
@@ -42,16 +44,43 @@ import { createTable } from './create';
 import { checkDeletion, deleteTable } from './delete';
 import { acquireTableLockHandle } from './lock';
 import { getTableMetadata, getTableSource, getTableTransport } from './read';
-import type { ITableConfig, ITableState } from './types';
+import { type ITableConfig, type ITableResults, tableDocuments } from './types';
 import { unlockTable } from './unlock';
 import { updateTable } from './update';
 import { validateTableName } from './validation';
 import { getTableVersionSource, getTableVersions } from './versions';
 
-export class AdtTable implements IAdtSourceObject<ITableConfig, ITableState> {
-  private readonly connection: IAbapConnection;
-  private readonly logger?: ILogger;
-  private readonly systemContext: IAdtSystemContext;
+export class AdtTable<
+  R extends ITableResults<
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown
+  > = ITableResults,
+> implements
+    IAdtCreatable<ITableConfig, ReturnType<R['created']>>,
+    IAdtReadable<
+      ITableConfig,
+      ReturnType<R['source']>,
+      ReturnType<R['metadata']>
+    >,
+    IAdtUpdatable<ITableConfig, ReturnType<R['updated']>>,
+    IAdtDeletable<ITableConfig, ReturnType<R['deletion']>>,
+    IAdtValidatable<ITableConfig, ReturnType<R['validation']>>,
+    IAdtCheckable<ITableConfig, ReturnType<R['check']>>,
+    IAdtActivatable<ITableConfig, ReturnType<R['activation']>>,
+    IAdtLockable<ITableConfig>,
+    IAdtTransportAware<ITableConfig, ReturnType<R['transport']>>,
+    IAdtVersionable<ITableConfig, ObjectVersion[], string>
+{
+  protected readonly connection: IAbapConnection;
+  protected readonly logger?: ILogger;
+  protected readonly systemContext: IAdtSystemContext;
   private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'Table';
 
@@ -60,6 +89,11 @@ export class AdtTable implements IAdtSourceObject<ITableConfig, ITableState> {
     logger?: ILogger,
     systemContext?: IAdtSystemContext,
     lockRegistry?: LockRegistry,
+    // The one cast in this file, and it is on the default: the shipped set
+    // satisfies the erased bound, which the compiler cannot see through the
+    // `unknown`s. A cast on a member would be the factory lying about what it
+    // answers.
+    protected readonly results: R = tableDocuments as unknown as R,
   ) {
     this.connection = connection;
     this.logger = logger;
@@ -71,538 +105,462 @@ export class AdtTable implements IAdtSourceObject<ITableConfig, ITableState> {
     );
   }
 
-  /**
-   * Validate table configuration before creation
-   */
-  async validate(config: Partial<ITableConfig>): Promise<ITableState> {
-    if (!config.tableName) {
-      throw new Error('Table name is required for validation');
-    }
-
-    const validationResponse = await validateTableName(
-      this.connection,
-      config.tableName,
-      config.description,
-    );
-    return { validationResponse, errors: [] };
-  }
-
-  /**
-   * Create table with full operation chain
-   */
-  async create(
-    config: ITableConfig,
-    options?: IAdtOperationOptions,
-  ): Promise<ITableState> {
+  /** The name, or the caller's mistake — nothing was asked of the server yet. */
+  private name(config: Partial<ITableConfig>): string {
     if (!config.tableName) {
       throw new Error('Table name is required');
     }
+    return config.tableName;
+  }
+
+  /** Validate the name before creating the object. */
+  async validate(
+    config: Partial<ITableConfig>,
+    options?: IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['validation']>>> {
+    const name = this.name(config);
+
+    return answering(
+      () => validateTableName(this.connection, name, config.description),
+      this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
+      options?.analyse,
+    );
+  }
+
+  /** Create the object. */
+  async create(
+    config: ITableConfig,
+    options?: IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['created']>>> {
+    const name = this.name(config);
     if (!config.packageName) {
       throw new Error('Package name is required');
     }
 
-    let objectCreated = false;
-    const state: ITableState = {
-      errors: [],
-    };
-
-    try {
-      // Create table
-      this.logger?.info?.('Creating table');
-      const createResponse = await createTable(this.connection, {
-        table_name: config.tableName,
-        package_name: config.packageName,
-        transport_request: config.transportRequest,
-        ddl_code: options?.sourceCode || config.ddlCode,
-        masterSystem: this.systemContext.masterSystem,
-        responsible: this.systemContext.responsible,
-        masterLanguage:
-          config.masterLanguage ?? this.systemContext.masterLanguage,
+    return chain(this.logger, async ({ step, onScopeEnd }) => {
+      onScopeEnd(async () => {
+        this.connection.setSessionType('stateless');
       });
-      objectCreated = true;
-      state.createResult = createResponse;
-      this.logger?.info?.('Table created');
 
-      return state;
-    } catch (error: unknown) {
-      // Cleanup on error - ensure stateless
-      this.connection.setSessionType('stateless');
-
-      if (objectCreated && options?.deleteOnFailure) {
-        try {
+      let created = false;
+      if (options?.deleteOnFailure) {
+        onScopeEnd(async () => {
+          if (!created) return;
           this.logger?.warn?.('Deleting table after failure');
           await deleteTable(this.connection, {
-            table_name: config.tableName,
+            table_name: name,
             transport_request: config.transportRequest,
           });
-        } catch (deleteError) {
-          this.logger?.warn?.(
-            'Failed to delete table after failure:',
-            safeErrorMessage(deleteError),
-          );
-        }
+        });
       }
 
-      this.logger?.error('Create failed:', safeErrorMessage(error));
-      throw error;
-    }
+      this.logger?.info?.('Creating table');
+      const value = await step(
+        answering(
+          () =>
+            createTable(this.connection, {
+              table_name: name,
+              package_name: config.packageName as string,
+              transport_request: config.transportRequest,
+              ddl_code: options?.sourceCode || config.ddlCode,
+              masterSystem: this.systemContext.masterSystem,
+              responsible: this.systemContext.responsible,
+              masterLanguage:
+                config.masterLanguage ?? this.systemContext.masterLanguage,
+            }),
+          this.results.created as IResultStrategy<ReturnType<R['created']>>,
+          options?.analyse,
+        ),
+      );
+      // Only past the step: a refused create leaves nothing to delete, and the
+      // cleanup above must not remove an object this call did not make.
+      created = true;
+      this.logger?.info?.('Table created');
+      return value;
+    });
   }
 
-  /**
-   * Read table
-   */
+  /** Read the object. */
   async read(
     config: Partial<ITableConfig>,
     version?: 'active' | 'inactive',
-    options?: IReadOptions,
-  ): Promise<ITableState> {
-    if (!config.tableName) {
-      throw new Error('Table name is required');
-    }
+    options?: IReadOptions & IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['source']>>> {
+    const name = this.name(config);
 
-    try {
-      const readResult = await getTableSource(
-        this.connection,
-        config.tableName,
-        version,
-        options,
-      );
-      return { readResult, errors: [] };
-    } catch (error: unknown) {
-      const e = error as HttpError;
-      if (e.response?.status === 404) {
-        return { readResult: undefined, errors: [] };
-      }
-      throw error;
-    }
+    // No 404 special case: ADT answers a read for a missing object with 200 and
+    // an empty body, so absence was never a status to branch on — and whether
+    // an empty body *is* absence is the caller's reading, through `analyse`.
+    return answering(
+      () => getTableSource(this.connection, name, version, options),
+      this.results.source as IResultStrategy<ReturnType<R['source']>>,
+      options?.analyse,
+    );
   }
 
-  /**
-   * Read table metadata (object characteristics: package, responsible, description, etc.)
-   */
+  /** Read the object's metadata document. */
   async readMetadata(
     config: Partial<ITableConfig>,
-    options?: IReadOptions,
-  ): Promise<ITableState> {
-    const state: ITableState = { errors: [] };
-    if (!config.tableName) {
-      const error = new Error('Table name is required');
-      state.errors.push({
-        method: 'readMetadata',
-        error,
-        timestamp: new Date(),
-      });
-      throw error;
-    }
-    try {
-      const response = await getTableMetadata(
-        this.connection,
-        config.tableName,
-        options,
-      );
-      state.metadataResult = response;
-      this.logger?.info?.('Table metadata read successfully');
-      return state;
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({
-        method: 'readMetadata',
-        error: err,
-        timestamp: new Date(),
-      });
-      this.logger?.error('readMetadata', safeErrorMessage(err));
-      throw err;
-    }
+    options?: IReadOptions & IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['metadata']>>> {
+    const name = this.name(config);
+
+    return answering(
+      () => getTableMetadata(this.connection, name, options),
+      this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
+      options?.analyse,
+    );
   }
 
-  /**
-   * Read transport request information for the table
-   */
+  /** The transport request the object belongs to. */
   async readTransport(
     config: Partial<ITableConfig>,
-    options?: { withLongPolling?: boolean },
-  ): Promise<ITableState> {
-    const state: ITableState = { errors: [] };
-    if (!config.tableName) {
-      const error = new Error('Table name is required');
-      state.errors.push({
-        method: 'readTransport',
-        error,
-        timestamp: new Date(),
-      });
-      throw error;
-    }
-    try {
-      const response = await getTableTransport(
-        this.connection,
-        config.tableName,
-        options?.withLongPolling !== undefined
-          ? { withLongPolling: options.withLongPolling }
-          : undefined,
-      );
-      state.transportResult = response;
-      this.logger?.info?.('Table transport request read successfully');
-      return state;
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({
-        method: 'readTransport',
-        error: err,
-        timestamp: new Date(),
-      });
-      this.logger?.error('readTransport', safeErrorMessage(err));
-      throw err;
-    }
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['transport']>>> {
+    const name = this.name(config);
+
+    return answering(
+      () =>
+        getTableTransport(
+          this.connection,
+          name,
+          options?.withLongPolling !== undefined
+            ? { withLongPolling: options.withLongPolling }
+            : undefined,
+        ),
+      this.results.transport as IResultStrategy<ReturnType<R['transport']>>,
+      options?.analyse,
+    );
   }
 
   /**
-   * Update table with full operation chain
-   * Always starts with lock
-   * If options.lockHandle is provided, performs only low-level update without lock/check/unlock chain
+   * Write the object.
+   *
+   * With `options.lockHandle` the caller holds the lock and owns the chain, so
+   * this is one request. Without it, this locks, checks, writes and unlocks —
+   * and the unlock happens on every path out.
    */
   async update(
     config: Partial<ITableConfig>,
     options?: IAdtOperationOptions,
-  ): Promise<ITableState> {
-    if (!config.tableName) {
-      throw new Error('Table name is required');
-    }
+  ): Promise<IAdtResponse<ReturnType<R['updated']>>> {
+    const name = this.name(config);
+    const source = options?.sourceCode || config.ddlCode;
 
-    // Low-level mode: if lockHandle is provided, perform only update operation
     if (options?.lockHandle) {
-      const codeToUpdate = options?.sourceCode || config.ddlCode;
-      if (!codeToUpdate) {
+      const lockHandle = options.lockHandle;
+      if (!source) {
         throw new Error('Source code (ddlCode) is required for update');
       }
-
       this.logger?.info?.(
         'Low-level update: performing update only (lockHandle provided)',
       );
-      const updateResponse = await updateTable(
-        this.connection,
-        {
-          table_name: config.tableName,
-          ddl_code: codeToUpdate,
-          transport_request: config.transportRequest,
-        },
-        options.lockHandle,
+      return answering(
+        () =>
+          updateTable(
+            this.connection,
+            {
+              table_name: name,
+              ddl_code: source as string,
+              transport_request: config.transportRequest,
+            },
+            lockHandle,
+          ),
+        this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+        options?.analyse,
       );
-      this.logger?.info?.('Table updated (low-level)');
-      return {
-        updateResult: updateResponse,
-        errors: [],
-      };
     }
 
-    let lockHandle: string | undefined;
-
-    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
-
-    // the lock but leaves the work half-done.
-
+    // A LOCK…UNLOCK window: a timeout in the middle releases the lock and
+    // leaves the work half done, so the connection is told this is critical.
     const endCriticalSection = beginCriticalSection(this.connection);
 
-    try {
-      // 1. Lock (update always starts with lock, stateful ONLY before lock)
+    return chain(this.logger, async ({ step, onScopeEnd }) => {
+      onScopeEnd(async () => {
+        endCriticalSection();
+      });
+
       this.logger?.info?.('Step 1: Locking table');
       this.connection.setSessionType('stateful');
-      lockHandle = await acquireTableLockHandle(
-        this.connection,
-        config.tableName,
-      );
-      this.lockTracker.track(config.tableName, lockHandle);
+      // Registered FIRST so it unwinds LAST: on older BASIS a lock handle is
+      // only valid inside a stateful request, so going stateless before the
+      // unlock would break the unlock (#106); and if the lock itself throws,
+      // the session is still restored.
+      onScopeEnd(async () => {
+        this.connection.setSessionType('stateless');
+      });
+
+      const lockHandle = await acquireTableLockHandle(this.connection, name);
+      this.lockTracker.track(name, lockHandle);
+      const releaseLock = onScopeEnd(async () => {
+        await unlockTable(this.connection, name, lockHandle);
+        this.lockTracker.untrack(name);
+      });
       this.logger?.info?.('Table locked, handle:', lockHandle);
 
-      // 2. Check inactive with code for update (from options or config)
-      const codeToCheck = options?.sourceCode || config.ddlCode;
-      if (codeToCheck) {
+      if (source) {
         this.logger?.info?.(
           'Step 2: Checking inactive version with update content',
         );
-        await runTableCheckRun(
-          this.connection,
-          'abapCheckRun',
-          config.tableName,
-          codeToCheck,
-          'inactive',
+        await step(
+          answering(
+            () =>
+              runTableCheckRun(
+                this.connection,
+                'abapCheckRun',
+                name,
+                source,
+                'inactive',
+              ),
+            this.results.check as IResultStrategy<ReturnType<R['check']>>,
+            options?.analyse,
+          ),
         );
-        this.logger?.info?.('Check inactive with update content passed');
       }
 
-      // 3. Update
-      if (codeToCheck && lockHandle) {
+      let updated = undefined as ReturnType<R['updated']>;
+      if (source) {
         this.logger?.info?.('Step 3: Updating table');
-        await updateTable(
-          this.connection,
-          {
-            table_name: config.tableName,
-            ddl_code: codeToCheck,
-            transport_request: config.transportRequest,
-          },
-          lockHandle,
+        updated = await step(
+          answering(
+            () =>
+              updateTable(
+                this.connection,
+                {
+                  table_name: name,
+                  ddl_code: source as string,
+                  transport_request: config.transportRequest,
+                },
+                lockHandle,
+              ),
+            this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+            options?.analyse,
+          ),
         );
         this.logger?.info?.('Table updated');
 
-        // Poll the inactive version: the write above produced it; the active version may not exist yet.
-        // 3.5. Read with long polling to ensure object is ready after update
-        this.logger?.info?.('read (wait for object ready after update)');
-        try {
-          await this.read({ tableName: config.tableName }, 'inactive', {
-            withLongPolling: true,
-          });
-          this.logger?.info?.('object is ready after update');
-        } catch (readError) {
+        // The write produced the inactive version; the active one may not exist
+        // yet. A failure here is not the update's failure, so it is logged and
+        // the chain continues — the unlock still has to happen.
+        const ready = await this.read(config, 'inactive', {
+          withLongPolling: true,
+        });
+        if (!ready.ok) {
           this.logger?.warn?.(
             'read with long polling failed after update:',
-            safeErrorMessage(readError),
+            ready.getError().message,
           );
-          // Continue anyway - unlock might still work
         }
       }
 
-      // 4. Unlock (obligatory stateless after unlock)
-      if (lockHandle) {
-        this.logger?.info?.('Step 4: Unlocking table');
-        this.connection.setSessionType('stateful');
-        await unlockTable(this.connection, config.tableName, lockHandle);
-        this.connection.setSessionType('stateless');
-        this.lockTracker.untrack(config.tableName);
-        lockHandle = undefined;
-        this.logger?.info?.('Table unlocked');
-      }
+      this.logger?.info?.('Step 4: Unlocking table');
+      this.connection.setSessionType('stateful');
+      await unlockTable(this.connection, name, lockHandle);
+      this.connection.setSessionType('stateless');
+      this.lockTracker.untrack(name);
+      // Unlocked as its own step, so the registration is discharged rather than
+      // run a second time when the scope unwinds.
+      releaseLock();
+      this.logger?.info?.('Table unlocked');
 
-      // 5. Final check (no stateful needed)
       this.logger?.info?.('Step 5: Final check');
-      await runTableCheckRun(
-        this.connection,
-        'abapCheckRun',
-        config.tableName,
-        undefined,
-        'inactive',
+      await step(
+        answering(
+          () =>
+            runTableCheckRun(
+              this.connection,
+              'abapCheckRun',
+              name,
+              undefined,
+              'inactive',
+            ),
+          this.results.check as IResultStrategy<ReturnType<R['check']>>,
+          options?.analyse,
+        ),
       );
-      this.logger?.info?.('Final check passed');
 
-      // 6. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnUpdate) {
         this.logger?.info?.('Step 6: Activating table');
-        const activateResponse = await activateTable(
-          this.connection,
-          config.tableName,
-        );
-        this.logger?.info?.(
-          'Table activated, status:',
-          activateResponse.status,
+        await step(
+          answering(
+            () => activateTable(this.connection, name),
+            this.results.activation as IResultStrategy<
+              ReturnType<R['activation']>
+            >,
+            options?.analyse,
+          ),
         );
 
-        // 6.5. Read with long polling to ensure object is ready after activation
-        this.logger?.info?.('read (wait for object ready after activation)');
-        try {
-          const readState = await this.read(
-            { tableName: config.tableName },
-            'active',
-            { withLongPolling: true },
-          );
-          if (readState) {
-            return {
-              activateResult: activateResponse,
-              readResult: readState.readResult,
-              errors: [],
-            };
-          }
-          this.logger?.info?.('object is ready after activation');
-        } catch (readError) {
+        const ready = await this.read(config, 'active', {
+          withLongPolling: true,
+        });
+        if (!ready.ok) {
           this.logger?.warn?.(
             'read with long polling failed after activation:',
-            safeErrorMessage(readError),
-          );
-          // Continue anyway - activation was successful
-        }
-        return {
-          activateResult: activateResponse,
-          errors: [],
-        };
-      }
-
-      // Read and return result (no stateful needed)
-      const readResponse = await getTableSource(
-        this.connection,
-        config.tableName,
-      );
-      return {
-        readResult: readResponse,
-        errors: [],
-      };
-    } catch (error: unknown) {
-      // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
-      if (lockHandle) {
-        try {
-          this.logger?.warn?.('Unlocking table during error cleanup');
-          this.connection.setSessionType('stateful');
-          await unlockTable(this.connection, config.tableName, lockHandle);
-          this.connection.setSessionType('stateless');
-          this.lockTracker.untrack(config.tableName);
-        } catch (unlockError) {
-          this.logger?.warn?.(
-            'Failed to unlock during cleanup:',
-            safeErrorMessage(unlockError),
-          );
-        }
-      } else {
-        // Ensure stateless if lock failed
-        this.connection.setSessionType('stateless');
-      }
-
-      if (options?.deleteOnFailure) {
-        try {
-          this.logger?.warn?.('Deleting table after failure');
-          // No stateful needed - delete doesn't use lock/unlock
-          await deleteTable(this.connection, {
-            table_name: config.tableName,
-            transport_request: config.transportRequest,
-          });
-        } catch (deleteError) {
-          this.logger?.warn?.(
-            'Failed to delete table after failure:',
-            safeErrorMessage(deleteError),
+            ready.getError().message,
           );
         }
       }
 
-      this.logger?.error('Update failed:', safeErrorMessage(error));
-      throw error;
-    } finally {
-      endCriticalSection();
-    }
+      return updated;
+    });
   }
 
   /**
-   * Delete table
+   * Delete the object.
+   *
+   * The deletion check is read, not merely performed: ADT answers a refusal
+   * with `del:isDeletable="false"` inside a 200, and a delete that ignored it
+   * reported success while the object stayed. {@link deletionRefusal} is the
+   * shipped reading of that answer; a caller who wants another passes their own
+   * `analyse`.
    */
-  async delete(config: Partial<ITableConfig>): Promise<ITableState> {
-    if (!config.tableName) {
-      throw new Error('Table name is required');
-    }
+  async delete(
+    config: Partial<ITableConfig>,
+    options?: IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>>> {
+    const name = this.name(config);
 
-    try {
-      // Check for deletion (no stateful needed)
+    return chain(this.logger, async ({ step }) => {
       this.logger?.info?.('Checking table for deletion');
-      const deletionCheck = await checkDeletion(this.connection, {
-        table_name: config.tableName,
-        transport_request: config.transportRequest,
-      });
-      // ADT already said whether this may be deleted; refusing to read that
-      // answer is how a delete came to report success while the object
-      // stayed. Throws on isDeletable=false or a message of type E; a W
-      // is a warning and passes.
-      assertDeletable(deletionCheck.data);
+      await step(
+        answering(
+          () =>
+            checkDeletion(this.connection, {
+              table_name: name,
+              transport_request: config.transportRequest,
+            }),
+          this.results.check as IResultStrategy<ReturnType<R['check']>>,
+          options?.analyse ?? deletionRefusal,
+        ),
+      );
       this.logger?.info?.('Deletion check passed');
 
-      // Delete (no stateful needed - no lock/unlock)
+      // No stateful session: this delete uses no lock.
       this.logger?.info?.('Deleting table');
-      const result = await deleteTable(this.connection, {
-        table_name: config.tableName,
-        transport_request: config.transportRequest,
-      });
+      const value = await step(
+        answering(
+          () =>
+            deleteTable(this.connection, {
+              table_name: name,
+              transport_request: config.transportRequest,
+            }),
+          this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+          options?.analyse,
+        ),
+      );
       this.logger?.info?.('Table deleted');
-
-      return { deleteResult: result, errors: [] };
-    } catch (error: unknown) {
-      this.logger?.error('Delete failed:', safeErrorMessage(error));
-      throw error;
-    }
+      return value;
+    });
   }
 
-  /**
-   * Activate table
-   * No stateful needed - uses same session/cookies
-   */
-  async activate(config: Partial<ITableConfig>): Promise<ITableState> {
-    if (!config.tableName) {
-      throw new Error('Table name is required');
-    }
+  /** Activate the object. Needs no stateful session. */
+  async activate(
+    config: Partial<ITableConfig>,
+    options?: IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['activation']>>> {
+    const name = this.name(config);
 
-    try {
-      const result = await activateTable(this.connection, config.tableName);
-      return { activateResult: result, errors: [] };
-    } catch (error: unknown) {
-      this.logger?.error('Activate failed:', safeErrorMessage(error));
-      throw error;
-    }
+    return answering(
+      () => activateTable(this.connection, name),
+      this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
+      options?.analyse,
+    );
   }
 
-  /**
-   * Check table
-   */
+  /** Check the object. */
   async check(
     config: Partial<ITableConfig>,
     status?: string,
-  ): Promise<ITableState> {
-    if (!config.tableName) {
-      throw new Error('Table name is required');
-    }
-
-    // Map status to version
-    const version: CheckRunVersion =
+    options?: IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['check']>>> {
+    const name = this.name(config);
+    const version: 'active' | 'inactive' =
       status === 'active' ? 'active' : 'inactive';
-    return {
-      checkResult: await runTableCheckRun(
-        this.connection,
-        'abapCheckRun',
-        config.tableName,
-        undefined,
-        version,
-      ),
-      errors: [],
-    };
-  }
 
-  /**
-   * Lock table for modification
-   */
-  async lock(config: Partial<ITableConfig>): Promise<string> {
-    if (!config.tableName) {
-      throw new Error('Table name is required');
-    }
-
-    this.connection.setSessionType('stateful');
-    const lockHandle = await acquireTableLockHandle(
-      this.connection,
-      config.tableName,
+    return answering(
+      () =>
+        runTableCheckRun(
+          this.connection,
+          'abapCheckRun',
+          name,
+          undefined,
+          version,
+        ),
+      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      options?.analyse,
     );
-    this.lockTracker.track(config.tableName, lockHandle);
-    return lockHandle;
   }
 
-  /**
-   * Unlock table
-   */
+  /** Lock the object for modification. */
+  async lock(config: Partial<ITableConfig>): Promise<IAdtResponse<string>> {
+    const name = this.name(config);
+
+    return answering(
+      async () => {
+        this.connection.setSessionType('stateful');
+        const lockHandle = await acquireTableLockHandle(this.connection, name);
+        this.lockTracker.track(name, lockHandle);
+        // The handle is the value, and the request does not keep the wire it
+        // came on — so the answer is built around what the request produced.
+        return {
+          data: lockHandle,
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+        };
+      },
+      (answer) => String(answer.data),
+    );
+  }
+
+  /** Unlock the object. */
   async unlock(
     config: Partial<ITableConfig>,
     lockHandle: string,
-  ): Promise<ITableState> {
-    if (!config.tableName) {
-      throw new Error('Table name is required');
-    }
+  ): Promise<IAdtResponse<void>> {
+    const name = this.name(config);
 
-    this.connection.setSessionType('stateful');
-    const result = await unlockTable(
-      this.connection,
-      config.tableName,
-      lockHandle,
+    return answering(
+      async () => {
+        // UNLOCK must run stateful (older BASIS #106); stateless after.
+        this.connection.setSessionType('stateful');
+        try {
+          return await unlockTable(this.connection, name, lockHandle);
+        } finally {
+          this.connection.setSessionType('stateless');
+          this.lockTracker.untrack(name);
+        }
+      },
+      () => undefined,
     );
-    this.connection.setSessionType('stateless');
-    this.lockTracker.untrack(config.tableName);
-    return {
-      unlockResult: result,
-      errors: [],
-    };
   }
 
-  getVersions(config: Partial<ITableConfig>) {
-    return getTableVersions(this.connection, config);
+  /** Version history of the object's source. */
+  async getVersions(
+    config: Partial<ITableConfig>,
+  ): Promise<IAdtResponse<ObjectVersion[]>> {
+    return answering(
+      async () => ({
+        data: await getTableVersions(this.connection, config),
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+      }),
+      (answer) => answer.data as ObjectVersion[],
+    );
   }
 
-  getVersionSource(contentUri: string) {
-    return getTableVersionSource(this.connection, contentUri);
+  /** The source of one version, by the `contentUri` an entry carries. */
+  async getVersionSource(contentUri: string): Promise<IAdtResponse<string>> {
+    return answering(
+      async () => ({
+        data: await getTableVersionSource(this.connection, contentUri),
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+      }),
+      (answer) => String(answer.data),
+    );
   }
 }

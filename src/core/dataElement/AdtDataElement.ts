@@ -1,45 +1,39 @@
-import { beginCriticalSection } from '../../utils/criticalSection';
-import { assertDeletable } from '../../utils/deletionCheck';
 /**
- * AdtDataElement - High-level CRUD operations for Data Element objects
+ * AdtDataElement - CRUD for `DTEL/DE` data elements.
  *
- * Implements IAdtObject interface with automatic operation chains,
- * error handling, and resource cleanup.
+ * A data element is an XML-based entity: it has no source, `read` and
+ * `readMetadata` fetch the same document, and `update` is a read-modify-write
+ * of that XML.
  *
- * Uses low-level functions directly (not Builder classes).
- *
- * Session management:
- * - stateful: only when doing lock/update/unlock operations
- * - stateless: obligatory after unlock
- * - If no lock/unlock, no stateful needed
- * - activate uses same session/cookies (no stateful needed)
- *
- * Operation chains:
- * - Create: validate → create → check → lock → check(inactive) → update → unlock → check → activate
- * - Update: lock → check(inactive) → update → unlock → check → activate
- * - Delete: check(deletion) → delete
+ * Every member answers `IAdtResponse<T>`, where T is what the result set given
+ * at construction makes of that endpoint's answer.
  */
-
 import type {
-  HttpError,
   IAbapConnection,
   IAdtActivatable,
   IAdtCheckable,
-  IAdtCrud,
+  IAdtCreatable,
+  IAdtDeletable,
   IAdtLockable,
   IAdtOperationOptions,
+  IAdtReadable,
+  IAdtResponse,
   IAdtSystemContext,
   IAdtTransportAware,
+  IAdtUpdatable,
   IAdtValidatable,
   ILogger,
+  IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
-import { safeErrorMessage } from '../../utils/internalUtils';
+import { answering } from '../../utils/adtResponse';
+import { beginCriticalSection } from '../../utils/criticalSection';
+import { deletionRefusal } from '../../utils/deletionCheck';
+import { chain } from '../shared/chain';
 import {
   createLockTracker,
   type LockRegistry,
   type LockTracker,
 } from '../shared/LockRegistry';
-import type { ObjectVersion } from '../shared/results';
 import type { IReadOptions } from '../shared/types';
 import { activateDataElement } from './activation';
 import { checkDataElement } from './check';
@@ -47,22 +41,45 @@ import { create as createDataElement } from './create';
 import { checkDeletion, deleteDataElement } from './delete';
 import { lockDataElement } from './lock';
 import { getDataElement, getDataElementTransport } from './read';
-import type { IDataElementConfig, IDataElementState } from './types';
+import {
+  dataElementDocuments,
+  type IDataElementConfig,
+  type IDataElementResults,
+} from './types';
 import { unlockDataElement } from './unlock';
 import { updateDataElement } from './update';
 import { validateDataElementName } from './validation';
-export class AdtDataElement
-  implements
-    IAdtCrud<IDataElementConfig, IDataElementState>,
-    IAdtValidatable<IDataElementConfig, IDataElementState>,
-    IAdtCheckable<IDataElementConfig, IDataElementState>,
-    IAdtActivatable<IDataElementConfig, IDataElementState>,
-    IAdtLockable<IDataElementConfig, IDataElementState>,
-    IAdtTransportAware<IDataElementConfig, IDataElementState>
+
+export class AdtDataElement<
+  R extends IDataElementResults<
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown
+  > = IDataElementResults,
+> implements
+    IAdtCreatable<IDataElementConfig, ReturnType<R['created']>>,
+    IAdtReadable<
+      IDataElementConfig,
+      ReturnType<R['source']>,
+      ReturnType<R['metadata']>
+    >,
+    IAdtUpdatable<IDataElementConfig, ReturnType<R['updated']>>,
+    IAdtDeletable<IDataElementConfig, ReturnType<R['deletion']>>,
+    IAdtValidatable<IDataElementConfig, ReturnType<R['validation']>>,
+    IAdtCheckable<IDataElementConfig, ReturnType<R['check']>>,
+    IAdtActivatable<IDataElementConfig, ReturnType<R['activation']>>,
+    IAdtLockable<IDataElementConfig>,
+    IAdtTransportAware<IDataElementConfig, ReturnType<R['transport']>>
 {
-  private readonly connection: IAbapConnection;
-  private readonly logger?: ILogger;
-  private readonly systemContext: IAdtSystemContext;
+  protected readonly connection: IAbapConnection;
+  protected readonly logger?: ILogger;
+  protected readonly systemContext: IAdtSystemContext;
   private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'DataElement';
 
@@ -71,6 +88,11 @@ export class AdtDataElement
     logger?: ILogger,
     systemContext?: IAdtSystemContext,
     lockRegistry?: LockRegistry,
+    // The one cast in this file, and it is on the default: the shipped set
+    // satisfies the erased bound, which the compiler cannot see through the
+    // `unknown`s. A cast on a member would be the factory lying about what it
+    // answers.
+    protected readonly results: R = dataElementDocuments as unknown as R,
   ) {
     this.connection = connection;
     this.logger = logger;
@@ -83,44 +105,45 @@ export class AdtDataElement
     );
   }
 
-  /**
-   * Validate data element configuration before creation
-   */
+  /** The name, or the caller's mistake — nothing was asked of the server yet. */
+  private name(config: Partial<IDataElementConfig>): string {
+    if (!config.dataElementName) {
+      throw new Error('Data element name is required');
+    }
+    return config.dataElementName;
+  }
+
+  /** Validate the name before creating the object. */
   async validate(
     config: Partial<IDataElementConfig>,
-  ): Promise<IDataElementState> {
-    if (!config.dataElementName) {
-      throw new Error('Data element name is required for validation');
-    }
-    // The endpoint refuses an empty one, so this is a caller error rather
-    // than a 400 to decode later.
+    options?: IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['validation']>>> {
+    const name = this.name(config);
+    // The endpoint refuses an empty one, so this is a caller error rather than a
+    // 400 to decode later.
     if (!config.description) {
       throw new Error('Description is required for validation');
     }
 
-    const validationResponse = await validateDataElementName(
-      this.connection,
-      config.dataElementName,
-      config.description,
-      config.packageName,
+    return answering(
+      () =>
+        validateDataElementName(
+          this.connection,
+          name,
+          config.description as string,
+          config.packageName,
+        ),
+      this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
+      options?.analyse,
     );
-
-    return {
-      validationResponse: validationResponse,
-      errors: [],
-    };
   }
 
-  /**
-   * Create data element with full operation chain
-   */
+  /** Create the object. */
   async create(
     config: IDataElementConfig,
     options?: IAdtOperationOptions,
-  ): Promise<IDataElementState> {
-    if (!config.dataElementName) {
-      throw new Error('Data element name is required');
-    }
+  ): Promise<IAdtResponse<ReturnType<R['created']>>> {
+    const name = this.name(config);
     if (!config.packageName) {
       throw new Error('Package name is required');
     }
@@ -131,598 +154,422 @@ export class AdtDataElement
       throw new Error('Type kind is required');
     }
 
-    let objectCreated = false;
-    const state: IDataElementState = {
-      errors: [],
-    };
-
-    try {
-      // Create data element
-      this.logger?.info?.('Creating data element');
-      const createResponse = await createDataElement(this.connection, {
-        data_element_name: config.dataElementName,
-        package_name: config.packageName,
-        transport_request: config.transportRequest,
-        description: config.description,
-        type_kind: config.typeKind,
-        type_name: config.typeName,
-        data_type: config.dataType,
-        length: config.length,
-        decimals: config.decimals,
-        short_label: config.shortLabel,
-        medium_label: config.mediumLabel,
-        long_label: config.longLabel,
-        heading_label: config.headingLabel,
-        search_help: config.searchHelp,
-        search_help_parameter: config.searchHelpParameter,
-        set_get_parameter: config.setGetParameter,
-        masterSystem: this.systemContext.masterSystem,
-        responsible: this.systemContext.responsible,
-        masterLanguage:
-          config.masterLanguage ?? this.systemContext.masterLanguage,
+    return chain(this.logger, async ({ step, onScopeEnd }) => {
+      onScopeEnd(async () => {
+        this.connection.setSessionType('stateless');
       });
-      state.createResult = createResponse;
-      objectCreated = true;
-      this.logger?.info?.('Data element created');
 
-      return state;
-    } catch (error: unknown) {
-      // Cleanup on error - ensure stateless
-      this.connection.setSessionType('stateless');
-
-      if (objectCreated && options?.deleteOnFailure) {
-        try {
+      let created = false;
+      if (options?.deleteOnFailure) {
+        onScopeEnd(async () => {
+          if (!created) return;
           this.logger?.warn?.('Deleting data element after failure');
-          // No stateful needed - delete doesn't use lock/unlock
           await deleteDataElement(this.connection, {
-            data_element_name: config.dataElementName,
+            data_element_name: name,
             transport_request: config.transportRequest,
           });
-        } catch (deleteError) {
-          this.logger?.warn?.(
-            'Failed to delete data element after failure:',
-            safeErrorMessage(deleteError),
-          );
-        }
+        });
       }
 
-      this.logger?.error('Create failed:', safeErrorMessage(error));
-      throw error;
-    }
+      this.logger?.info?.('Creating data element');
+      const value = await step(
+        answering(
+          () =>
+            createDataElement(this.connection, {
+              data_element_name: name,
+              package_name: config.packageName as string,
+              transport_request: config.transportRequest,
+              description: config.description as string,
+              type_kind: config.typeKind,
+              type_name: config.typeName,
+              data_type: config.dataType,
+              length: config.length,
+              decimals: config.decimals,
+              short_label: config.shortLabel,
+              medium_label: config.mediumLabel,
+              long_label: config.longLabel,
+              heading_label: config.headingLabel,
+              search_help: config.searchHelp,
+              search_help_parameter: config.searchHelpParameter,
+              set_get_parameter: config.setGetParameter,
+              masterSystem: this.systemContext.masterSystem,
+              responsible: this.systemContext.responsible,
+              masterLanguage:
+                config.masterLanguage ?? this.systemContext.masterLanguage,
+            }),
+          this.results.created as IResultStrategy<ReturnType<R['created']>>,
+          options?.analyse,
+        ),
+      );
+      // Only past the step: a refused create leaves nothing to delete, and the
+      // cleanup above must not remove an object this call did not make.
+      created = true;
+      this.logger?.info?.('Data element created');
+      return value;
+    });
   }
 
-  /**
-   * Read data element
-   */
+  /** Read the object.
+   *
+   * `version` is accepted and ignored: a data element is XML-based and has one
+   * document, not an active/inactive source pair. */
   async read(
     config: Partial<IDataElementConfig>,
     _version?: 'active' | 'inactive',
-    options?: IReadOptions,
-  ): Promise<IDataElementState | undefined> {
-    if (!config.dataElementName) {
-      throw new Error('Data element name is required');
-    }
+    options?: IReadOptions & IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['source']>>> {
+    const name = this.name(config);
 
-    try {
-      const response = await getDataElement(
-        this.connection,
-        config.dataElementName,
-        options?.withLongPolling !== undefined
-          ? { withLongPolling: options.withLongPolling }
-          : undefined,
-      );
-      return {
-        readResult: response,
-        errors: [],
-      };
-    } catch (error: unknown) {
-      const e = error as HttpError;
-      if (e.response?.status === 404) {
-        return undefined;
-      }
-      this.logger?.error('Read failed:', safeErrorMessage(error));
-      throw error;
-    }
+    // No 404 special case: ADT answers a read for a missing object with 200 and
+    // an empty body, so absence was never a status to branch on — and whether
+    // an empty body *is* absence is the caller's reading, through `analyse`.
+    return answering(
+      () => getDataElement(this.connection, name, options),
+      this.results.source as IResultStrategy<ReturnType<R['source']>>,
+      options?.analyse,
+    );
   }
 
-  /**
-   * Read data element metadata (object characteristics: package, responsible, description, etc.)
-   * For data elements, read() already returns metadata since there's no source code.
-   */
+  /** Read the object's metadata document. */
   async readMetadata(
     config: Partial<IDataElementConfig>,
-    options?: IReadOptions,
-  ): Promise<IDataElementState> {
-    const state: IDataElementState = { errors: [] };
-    if (!config.dataElementName) {
-      const error = new Error('Data element name is required');
-      state.errors.push({
-        method: 'readMetadata',
-        error,
-        timestamp: new Date(),
-      });
-      throw error;
-    }
-    try {
-      // For objects without source code, read() already returns metadata
-      const readState = await this.read(
-        config,
-        options?.version ?? 'active',
-        options,
-      );
-      if (readState) {
-        state.metadataResult = readState.readResult;
-        state.readResult = readState.readResult;
-      } else {
-        const error = new Error(
-          `Data element '${config.dataElementName}' not found`,
-        );
-        state.errors.push({
-          method: 'readMetadata',
-          error,
-          timestamp: new Date(),
-        });
-        throw error;
-      }
-      this.logger?.info?.('Data element metadata read successfully');
-      return state;
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({
-        method: 'readMetadata',
-        error: err,
-        timestamp: new Date(),
-      });
-      this.logger?.error('readMetadata', safeErrorMessage(err));
-      throw err;
-    }
+    options?: IReadOptions & IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['metadata']>>> {
+    const name = this.name(config);
+
+    return answering(
+      () => getDataElement(this.connection, name, options),
+      this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
+      options?.analyse,
+    );
+  }
+
+  /** The transport request the object belongs to. */
+  async readTransport(
+    config: Partial<IDataElementConfig>,
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['transport']>>> {
+    const name = this.name(config);
+
+    return answering(
+      () => getDataElementTransport(this.connection, name, options),
+      this.results.transport as IResultStrategy<ReturnType<R['transport']>>,
+      options?.analyse,
+    );
   }
 
   /**
-   * Update data element with full operation chain
-   * Always starts with lock
-   * If options.low is true, performs only low-level update without lock/check/unlock chain
+   * Write the object.
+   *
+   * With `options.lockHandle` the caller holds the lock and owns the chain, so
+   * this is one request. Without it, this locks, checks, writes and unlocks —
+   * and the unlock happens on every path out.
    */
   async update(
     config: Partial<IDataElementConfig>,
     options?: IAdtOperationOptions,
-  ): Promise<IDataElementState> {
-    if (!config.dataElementName) {
-      throw new Error('Data element name is required');
-    }
+  ): Promise<IAdtResponse<ReturnType<R['updated']>>> {
+    const name = this.name(config);
     if (!config.packageName) {
       throw new Error('Package name is required for update');
     }
     if (!config.typeKind) {
       throw new Error('Type kind is required for update');
     }
+    const source = options?.xmlContent;
 
-    // Low-level mode: if lockHandle is provided, perform only update operation
     if (options?.lockHandle) {
+      const lockHandle = options.lockHandle;
       this.logger?.info?.(
         'Low-level update: performing update only (lockHandle provided)',
       );
-      const _domainInfo = {
-        dataType: config.dataType || '',
-        length: config.length || 0,
-        decimals: config.decimals || 0,
-      };
-
-      const updateResponse = await updateDataElement(
-        this.connection,
-        {
-          data_element_name: config.dataElementName,
-          package_name: config.packageName,
-          transport_request: config.transportRequest,
-          description: config.description,
-          type_kind: config.typeKind,
-          type_name: config.typeName,
-          data_type: config.dataType,
-          length: config.length,
-          decimals: config.decimals,
-          short_label: config.shortLabel,
-          medium_label: config.mediumLabel,
-          long_label: config.longLabel,
-          heading_label: config.headingLabel,
-          search_help: config.searchHelp,
-          search_help_parameter: config.searchHelpParameter,
-          set_get_parameter: config.setGetParameter,
-        },
-        options.lockHandle,
-        this.logger,
+      return answering(
+        () =>
+          updateDataElement(
+            this.connection,
+            {
+              data_element_name: name,
+              package_name: config.packageName as string,
+              transport_request: config.transportRequest,
+              description: config.description,
+              type_kind: config.typeKind,
+              type_name: config.typeName,
+              data_type: config.dataType,
+              length: config.length,
+              decimals: config.decimals,
+              short_label: config.shortLabel,
+              medium_label: config.mediumLabel,
+              long_label: config.longLabel,
+              heading_label: config.headingLabel,
+              search_help: config.searchHelp,
+              search_help_parameter: config.searchHelpParameter,
+              set_get_parameter: config.setGetParameter,
+            },
+            lockHandle,
+            this.logger,
+          ),
+        this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+        options?.analyse,
       );
-      this.logger?.info?.('Data element updated (low-level)');
-      return {
-        updateResult: updateResponse,
-        errors: [],
-      };
     }
 
-    let lockHandle: string | undefined;
-    const state: IDataElementState = {
-      errors: [],
-    };
-
-    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
-
-    // the lock but leaves the work half-done.
-
+    // A LOCK…UNLOCK window: a timeout in the middle releases the lock and
+    // leaves the work half done, so the connection is told this is critical.
     const endCriticalSection = beginCriticalSection(this.connection);
 
-    try {
-      // 1. Lock (update always starts with lock, stateful ONLY before lock)
+    return chain(this.logger, async ({ step, onScopeEnd }) => {
+      onScopeEnd(async () => {
+        endCriticalSection();
+      });
+
       this.logger?.info?.('Step 1: Locking data element');
       this.connection.setSessionType('stateful');
-      lockHandle = await lockDataElement(
-        this.connection,
-        config.dataElementName,
-      );
-      state.lockHandle = lockHandle;
-      this.lockTracker.track(config.dataElementName, lockHandle);
+      // Registered FIRST so it unwinds LAST: on older BASIS a lock handle is
+      // only valid inside a stateful request, so going stateless before the
+      // unlock would break the unlock (#106); and if the lock itself throws,
+      // the session is still restored.
+      onScopeEnd(async () => {
+        this.connection.setSessionType('stateless');
+      });
+
+      const lockHandle = await lockDataElement(this.connection, name);
+      this.lockTracker.track(name, lockHandle);
+      const releaseLock = onScopeEnd(async () => {
+        await unlockDataElement(this.connection, name, lockHandle);
+        this.lockTracker.untrack(name);
+      });
       this.logger?.info?.('Data element locked, handle:', lockHandle);
 
-      // 2. Check inactive with XML for update (if provided)
-      const xmlToCheck = options?.xmlContent;
-      if (xmlToCheck) {
+      if (source) {
         this.logger?.info?.(
           'Step 2: Checking inactive version with update content',
         );
-        const deletionCheck = await checkDataElement(
-          this.connection,
-          config.dataElementName,
-          'inactive',
-          xmlToCheck,
+        await step(
+          answering(
+            () => checkDataElement(this.connection, name, 'inactive', source),
+            this.results.check as IResultStrategy<ReturnType<R['check']>>,
+            options?.analyse,
+          ),
         );
-        state.checkResult = deletionCheck;
-        this.logger?.info?.('Check inactive with update content passed');
       }
 
-      // 3. Update
-      if (lockHandle) {
-        this.logger?.info?.('Step 3: Updating data element');
-        await updateDataElement(
-          this.connection,
-          {
-            data_element_name: config.dataElementName,
-            package_name: config.packageName,
-            transport_request: config.transportRequest,
-            description: config.description,
-            type_kind: config.typeKind,
-            type_name: config.typeName,
-            data_type: config.dataType,
-            length: config.length,
-            decimals: config.decimals,
-            short_label: config.shortLabel,
-            medium_label: config.mediumLabel,
-            long_label: config.longLabel,
-            heading_label: config.headingLabel,
-            search_help: config.searchHelp,
-            search_help_parameter: config.searchHelpParameter,
-            set_get_parameter: config.setGetParameter,
-          },
-          lockHandle,
-          this.logger,
-        );
-        // updateDataElement returns void, so we don't store it in state
-        this.logger?.info?.('Data element updated');
-
-        // 3.5. Read with long polling to ensure object is ready after update
-        this.logger?.info?.('read (wait for object ready after update)');
-        try {
-          await this.read(
-            { dataElementName: config.dataElementName },
-            'active',
-            { withLongPolling: true },
-          );
-          this.logger?.info?.('object is ready after update');
-        } catch (readError) {
-          this.logger?.warn?.(
-            'read with long polling failed after update:',
-            safeErrorMessage(readError),
-          );
-          // Continue anyway - unlock might still work
-        }
-      }
-
-      // 4. Unlock (obligatory stateless after unlock)
-      if (lockHandle) {
-        this.logger?.info?.('Step 4: Unlocking data element');
-        this.connection.setSessionType('stateful');
-        const unlockResponse = await unlockDataElement(
-          this.connection,
-          config.dataElementName,
-          lockHandle,
-        );
-        state.unlockResult = unlockResponse;
-        this.connection.setSessionType('stateless');
-        this.lockTracker.untrack(config.dataElementName);
-        lockHandle = undefined;
-        this.logger?.info?.('Data element unlocked');
-      }
-
-      // 5. Final check (no stateful needed)
-      this.logger?.info?.('Step 5: Final check');
-      const checkResponse2 = await checkDataElement(
-        this.connection,
-        config.dataElementName,
-        'inactive',
+      // Always written: the fields come from the config, not from a
+      // source string a caller may or may not have passed, so there is
+      // nothing to skip and nothing to leave undefined.
+      this.logger?.info?.('Step 3: Updating data element');
+      const updated = await step(
+        answering(
+          () =>
+            updateDataElement(
+              this.connection,
+              {
+                data_element_name: name,
+                package_name: config.packageName as string,
+                transport_request: config.transportRequest,
+                description: config.description,
+                type_kind: config.typeKind,
+                type_name: config.typeName,
+                data_type: config.dataType,
+                length: config.length,
+                decimals: config.decimals,
+                short_label: config.shortLabel,
+                medium_label: config.mediumLabel,
+                long_label: config.longLabel,
+                heading_label: config.headingLabel,
+                search_help: config.searchHelp,
+                search_help_parameter: config.searchHelpParameter,
+                set_get_parameter: config.setGetParameter,
+              },
+              lockHandle,
+              this.logger,
+            ),
+          this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+          options?.analyse,
+        ),
       );
-      state.checkResult = checkResponse2;
-      this.logger?.info?.('Final check passed');
+      this.logger?.info?.('Data element updated');
 
-      // 6. Activate (if requested, no stateful needed - uses same session/cookies)
+      // The write produced the inactive version; the active one may not exist
+      // yet. A failure here is not the update's failure, so it is logged and
+      // the chain continues — the unlock still has to happen.
+      const ready = await this.read(config, 'active', {
+        withLongPolling: true,
+      });
+      if (!ready.ok) {
+        this.logger?.warn?.(
+          'read with long polling failed after update:',
+          ready.getError().message,
+        );
+      }
+
+      this.logger?.info?.('Step 4: Unlocking data element');
+      this.connection.setSessionType('stateful');
+      await unlockDataElement(this.connection, name, lockHandle);
+      this.connection.setSessionType('stateless');
+      this.lockTracker.untrack(name);
+      // Unlocked as its own step, so the registration is discharged rather than
+      // run a second time when the scope unwinds.
+      releaseLock();
+      this.logger?.info?.('Data element unlocked');
+
+      this.logger?.info?.('Step 5: Final check');
+      await step(
+        answering(
+          () => checkDataElement(this.connection, name, 'inactive'),
+          this.results.check as IResultStrategy<ReturnType<R['check']>>,
+          options?.analyse,
+        ),
+      );
+
       if (options?.activateOnUpdate) {
         this.logger?.info?.('Step 6: Activating data element');
-        const activateResponse = await activateDataElement(
-          this.connection,
-          config.dataElementName,
-        );
-        state.activateResult = activateResponse;
-        this.logger?.info?.(
-          'Data element activated, status:',
-          activateResponse.status,
+        await step(
+          answering(
+            () => activateDataElement(this.connection, name),
+            this.results.activation as IResultStrategy<
+              ReturnType<R['activation']>
+            >,
+            options?.analyse,
+          ),
         );
 
-        // 6.5. Read with long polling to ensure object is ready after activation
-        this.logger?.info?.('read (wait for object ready after activation)');
-        try {
-          const readState = await this.read(
-            { dataElementName: config.dataElementName },
-            'active',
-            { withLongPolling: true },
-          );
-          if (readState) {
-            state.readResult = readState.readResult;
-          }
-          this.logger?.info?.('object is ready after activation');
-        } catch (readError) {
+        const ready = await this.read(config, 'active', {
+          withLongPolling: true,
+        });
+        if (!ready.ok) {
           this.logger?.warn?.(
             'read with long polling failed after activation:',
-            safeErrorMessage(readError),
-          );
-          // Continue anyway - activation was successful
-        }
-      } else {
-        // Read if not activated
-        const readResponse = await getDataElement(
-          this.connection,
-          config.dataElementName,
-          undefined,
-        );
-        state.readResult = readResponse;
-      }
-
-      return state;
-    } catch (error: unknown) {
-      // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
-      if (lockHandle) {
-        try {
-          this.logger?.warn?.('Unlocking data element during error cleanup');
-          this.connection.setSessionType('stateful');
-          await unlockDataElement(
-            this.connection,
-            config.dataElementName,
-            lockHandle,
-          );
-          this.connection.setSessionType('stateless');
-          this.lockTracker.untrack(config.dataElementName);
-        } catch (unlockError) {
-          this.logger?.warn?.(
-            'Failed to unlock during cleanup:',
-            safeErrorMessage(unlockError),
-          );
-        }
-      } else {
-        // Ensure stateless if lock failed
-        this.connection.setSessionType('stateless');
-      }
-
-      if (options?.deleteOnFailure) {
-        try {
-          this.logger?.warn?.('Deleting data element after failure');
-          // No stateful needed - delete doesn't use lock/unlock
-          await deleteDataElement(this.connection, {
-            data_element_name: config.dataElementName,
-            transport_request: config.transportRequest,
-          });
-        } catch (deleteError) {
-          this.logger?.warn?.(
-            'Failed to delete data element after failure:',
-            safeErrorMessage(deleteError),
+            ready.getError().message,
           );
         }
       }
 
-      this.logger?.error('Update failed:', safeErrorMessage(error));
-      throw error;
-    } finally {
-      endCriticalSection();
-    }
+      return updated;
+    });
   }
 
   /**
-   * Delete data element
+   * Delete the object.
+   *
+   * The deletion check is read, not merely performed: ADT answers a refusal
+   * with `del:isDeletable="false"` inside a 200, and a delete that ignored it
+   * reported success while the object stayed. {@link deletionRefusal} is the
+   * shipped reading of that answer; a caller who wants another passes their own
+   * `analyse`.
    */
   async delete(
     config: Partial<IDataElementConfig>,
-  ): Promise<IDataElementState> {
-    if (!config.dataElementName) {
-      throw new Error('Data element name is required');
-    }
+    options?: IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>>> {
+    const name = this.name(config);
 
-    const state: IDataElementState = {
-      errors: [],
-    };
-
-    try {
-      // Check for deletion (no stateful needed)
+    return chain(this.logger, async ({ step }) => {
       this.logger?.info?.('Checking data element for deletion');
-      const deletionCheck = await checkDeletion(this.connection, {
-        data_element_name: config.dataElementName,
-        transport_request: config.transportRequest,
-      });
-      // ADT already said whether this may be deleted; refusing to read that
-      // answer is how a delete came to report success while the object
-      // stayed. Throws on isDeletable=false or a message of type E; a W
-      // is a warning and passes.
-      assertDeletable(deletionCheck.data);
-      state.checkResult = deletionCheck;
+      await step(
+        answering(
+          () =>
+            checkDeletion(this.connection, {
+              data_element_name: name,
+              transport_request: config.transportRequest,
+            }),
+          this.results.check as IResultStrategy<ReturnType<R['check']>>,
+          options?.analyse ?? deletionRefusal,
+        ),
+      );
       this.logger?.info?.('Deletion check passed');
 
-      // Delete (no stateful needed - no lock/unlock)
+      // No stateful session: this delete uses no lock.
       this.logger?.info?.('Deleting data element');
-      const deleteResponse = await deleteDataElement(this.connection, {
-        data_element_name: config.dataElementName,
-        transport_request: config.transportRequest,
-      });
-      state.deleteResult = deleteResponse;
+      const value = await step(
+        answering(
+          () =>
+            deleteDataElement(this.connection, {
+              data_element_name: name,
+              transport_request: config.transportRequest,
+            }),
+          this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+          options?.analyse,
+        ),
+      );
       this.logger?.info?.('Data element deleted');
-
-      return state;
-    } catch (error: unknown) {
-      this.logger?.error('Delete failed:', safeErrorMessage(error));
-      throw error;
-    }
+      return value;
+    });
   }
 
-  /**
-   * Activate data element
-   * No stateful needed - uses same session/cookies
-   */
+  /** Activate the object. Needs no stateful session. */
   async activate(
     config: Partial<IDataElementConfig>,
-  ): Promise<IDataElementState> {
-    if (!config.dataElementName) {
-      throw new Error('Data element name is required');
-    }
+    options?: IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['activation']>>> {
+    const name = this.name(config);
 
-    const state: IDataElementState = {
-      errors: [],
-    };
-
-    try {
-      const activateResponse = await activateDataElement(
-        this.connection,
-        config.dataElementName,
-      );
-      state.activateResult = activateResponse;
-      return state;
-    } catch (error: unknown) {
-      this.logger?.error('Activate failed:', safeErrorMessage(error));
-      throw error;
-    }
+    return answering(
+      () => activateDataElement(this.connection, name),
+      this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
+      options?.analyse,
+    );
   }
 
-  /**
-   * Check data element
-   */
+  /** Check the object. */
   async check(
     config: Partial<IDataElementConfig>,
     status?: string,
-  ): Promise<IDataElementState> {
-    if (!config.dataElementName) {
-      throw new Error('Data element name is required');
-    }
-
-    const state: IDataElementState = {
-      errors: [],
-    };
-
-    // Map status to version
+    options?: IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['check']>>> {
+    const name = this.name(config);
     const version: 'active' | 'inactive' =
       status === 'active' ? 'active' : 'inactive';
-    const deletionCheck = await checkDataElement(
-      this.connection,
-      config.dataElementName,
-      version,
+
+    return answering(
+      () => checkDataElement(this.connection, name, version),
+      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      options?.analyse,
     );
-    state.checkResult = deletionCheck;
-    return state;
   }
 
-  /**
-   * Read transport request information for the data element
-   */
-  async readTransport(
+  /** Lock the object for modification. */
+  async lock(
     config: Partial<IDataElementConfig>,
-    options?: { withLongPolling?: boolean },
-  ): Promise<IDataElementState> {
-    const state: IDataElementState = {
-      errors: [],
-    };
+  ): Promise<IAdtResponse<string>> {
+    const name = this.name(config);
 
-    if (!config.dataElementName) {
-      const error = new Error('Data element name is required');
-      state.errors.push({
-        method: 'readTransport',
-        error,
-        timestamp: new Date(),
-      });
-      throw error;
-    }
-
-    try {
-      const response = await getDataElementTransport(
-        this.connection,
-        config.dataElementName,
-        options?.withLongPolling !== undefined
-          ? { withLongPolling: options.withLongPolling }
-          : undefined,
-      );
-      state.transportResult = response;
-      this.logger?.info?.('Transport request read successfully');
-      return state;
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({
-        method: 'readTransport',
-        error: err,
-        timestamp: new Date(),
-      });
-      this.logger?.error('readTransport', safeErrorMessage(err));
-      throw err;
-    }
-  }
-
-  /**
-   * Lock data element for modification
-   */
-  async lock(config: Partial<IDataElementConfig>): Promise<string> {
-    if (!config.dataElementName) {
-      throw new Error('Data element name is required');
-    }
-
-    this.connection.setSessionType('stateful');
-    const lockHandle = await lockDataElement(
-      this.connection,
-      config.dataElementName,
+    return answering(
+      async () => {
+        this.connection.setSessionType('stateful');
+        const lockHandle = await lockDataElement(this.connection, name);
+        this.lockTracker.track(name, lockHandle);
+        // The handle is the value, and the request does not keep the wire it
+        // came on — so the answer is built around what the request produced.
+        return {
+          data: lockHandle,
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+        };
+      },
+      (answer) => String(answer.data),
     );
-    this.lockTracker.track(config.dataElementName, lockHandle);
-    return lockHandle;
   }
 
-  /**
-   * Unlock data element
-   */
+  /** Unlock the object. */
   async unlock(
     config: Partial<IDataElementConfig>,
     lockHandle: string,
-  ): Promise<IDataElementState> {
-    if (!config.dataElementName) {
-      throw new Error('Data element name is required');
-    }
+  ): Promise<IAdtResponse<void>> {
+    const name = this.name(config);
 
-    this.connection.setSessionType('stateful');
-    const result = await unlockDataElement(
-      this.connection,
-      config.dataElementName,
-      lockHandle,
+    return answering(
+      async () => {
+        // UNLOCK must run stateful (older BASIS #106); stateless after.
+        this.connection.setSessionType('stateful');
+        try {
+          return await unlockDataElement(this.connection, name, lockHandle);
+        } finally {
+          this.connection.setSessionType('stateless');
+          this.lockTracker.untrack(name);
+        }
+      },
+      () => undefined,
     );
-    this.connection.setSessionType('stateless');
-    this.lockTracker.untrack(config.dataElementName);
-    return {
-      unlockResult: result,
-      errors: [],
-    };
   }
 }

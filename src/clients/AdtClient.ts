@@ -57,8 +57,9 @@ import {
 } from '../core/accessControl';
 import {
   AdtAppendStructure,
+  appendStructureDocuments,
   type IAppendStructureConfig,
-  type IAppendStructureState,
+  type IAppendStructureResults,
 } from '../core/appendStructure';
 import {
   AdtAuthorizationField,
@@ -91,14 +92,16 @@ import {
 } from '../core/class';
 import {
   AdtDataElement,
+  dataElementDocuments,
   type IDataElementConfig,
-  type IDataElementState,
+  type IDataElementResults,
 } from '../core/dataElement';
 import { AdtDdl, type IDdlConfig, type IDdlState } from '../core/ddl';
 import {
   AdtDomain,
+  domainDocuments,
   type IDomainConfig,
-  type IDomainState,
+  type IDomainResults,
 } from '../core/domain';
 import {
   AdtEnhancement,
@@ -127,7 +130,11 @@ import {
   type IFunctionModuleConfig,
   type IFunctionModuleResults,
 } from '../core/functionModule';
-import { AdtInclude } from '../core/include';
+import {
+  AdtInclude,
+  type IIncludeResults,
+  includeDocuments,
+} from '../core/include';
 import {
   AdtInterface,
   type IInterfaceConfig,
@@ -180,13 +187,20 @@ import type { ObjectVersion } from '../core/shared/results';
 import {
   AdtStructure,
   type IStructureConfig,
-  type IStructureState,
+  type IStructureResults,
+  structureDocuments,
 } from '../core/structure';
-import { AdtTable, type ITableConfig, type ITableState } from '../core/table';
+import {
+  AdtTable,
+  type ITableConfig,
+  type ITableResults,
+  tableDocuments,
+} from '../core/table';
 import {
   AdtDdicTableType,
   type ITableTypeConfig,
-  type ITableTypeState,
+  type ITableTypeResults,
+  tableTypeDocuments,
 } from '../core/tabletype';
 import {
   AdtTransformation,
@@ -538,18 +552,54 @@ export class AdtClient {
    * Get high-level operations for Domain objects
    * @returns IAdtObject instance for Domain operations
    */
-  getDomain(): IAdtCrud<IDomainConfig, IDomainState> &
-    IAdtValidatable<IDomainConfig, IDomainState> &
-    IAdtCheckable<IDomainConfig, IDomainState> &
-    IAdtActivatable<IDomainConfig, IDomainState> &
-    IAdtLockable<IDomainConfig, IDomainState> &
-    IAdtTransportAware<IDomainConfig, IDomainState> {
+  getDomain(): AdtDomain;
+  getDomain<
+    R extends IDomainResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    >,
+  >(
+    results: R,
+  ): IAdtCreatable<IDomainConfig, ReturnType<R['created']>> &
+    IAdtReadable<
+      IDomainConfig,
+      ReturnType<R['source']>,
+      ReturnType<R['metadata']>
+    > &
+    IAdtUpdatable<IDomainConfig, ReturnType<R['updated']>> &
+    IAdtDeletable<IDomainConfig, ReturnType<R['deletion']>> &
+    IAdtValidatable<IDomainConfig, ReturnType<R['validation']>> &
+    IAdtCheckable<IDomainConfig, ReturnType<R['check']>> &
+    IAdtActivatable<IDomainConfig, ReturnType<R['activation']>> &
+    IAdtLockable<IDomainConfig> &
+    IAdtTransportAware<IDomainConfig, ReturnType<R['transport']>>;
+  getDomain<
+    R extends IDomainResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    > = IDomainResults,
+  >(results: R = domainDocuments as unknown as R): AdtDomain<R> {
     this.assertConnected();
-    return new AdtDomain(
+    return new AdtDomain<R>(
       this.connection,
       this.logger,
       this.systemContext,
       this.lockRegistry,
+      results,
     );
   }
 
@@ -601,18 +651,54 @@ export class AdtClient {
    * Get high-level operations for DataElement objects
    * @returns IAdtObject instance for DataElement operations
    */
-  getDataElement(): IAdtCrud<IDataElementConfig, IDataElementState> &
-    IAdtValidatable<IDataElementConfig, IDataElementState> &
-    IAdtCheckable<IDataElementConfig, IDataElementState> &
-    IAdtActivatable<IDataElementConfig, IDataElementState> &
-    IAdtLockable<IDataElementConfig, IDataElementState> &
-    IAdtTransportAware<IDataElementConfig, IDataElementState> {
+  getDataElement(): AdtDataElement;
+  getDataElement<
+    R extends IDataElementResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    >,
+  >(
+    results: R,
+  ): IAdtCreatable<IDataElementConfig, ReturnType<R['created']>> &
+    IAdtReadable<
+      IDataElementConfig,
+      ReturnType<R['source']>,
+      ReturnType<R['metadata']>
+    > &
+    IAdtUpdatable<IDataElementConfig, ReturnType<R['updated']>> &
+    IAdtDeletable<IDataElementConfig, ReturnType<R['deletion']>> &
+    IAdtValidatable<IDataElementConfig, ReturnType<R['validation']>> &
+    IAdtCheckable<IDataElementConfig, ReturnType<R['check']>> &
+    IAdtActivatable<IDataElementConfig, ReturnType<R['activation']>> &
+    IAdtLockable<IDataElementConfig> &
+    IAdtTransportAware<IDataElementConfig, ReturnType<R['transport']>>;
+  getDataElement<
+    R extends IDataElementResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    > = IDataElementResults,
+  >(results: R = dataElementDocuments as unknown as R): AdtDataElement<R> {
     this.assertConnected();
-    return new AdtDataElement(
+    return new AdtDataElement<R>(
       this.connection,
       this.logger,
       this.systemContext,
       this.lockRegistry,
+      results,
     );
   }
 
@@ -641,13 +727,55 @@ export class AdtClient {
    * Get high-level operations for Structure objects
    * @returns IAdtObject instance for Structure operations
    */
-  getStructure(): IAdtSourceObject<IStructureConfig, IStructureState> {
+  getStructure(): AdtStructure;
+  getStructure<
+    R extends IStructureResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    >,
+  >(
+    results: R,
+  ): IAdtCreatable<IStructureConfig, ReturnType<R['created']>> &
+    IAdtReadable<
+      IStructureConfig,
+      ReturnType<R['source']>,
+      ReturnType<R['metadata']>
+    > &
+    IAdtUpdatable<IStructureConfig, ReturnType<R['updated']>> &
+    IAdtDeletable<IStructureConfig, ReturnType<R['deletion']>> &
+    IAdtValidatable<IStructureConfig, ReturnType<R['validation']>> &
+    IAdtCheckable<IStructureConfig, ReturnType<R['check']>> &
+    IAdtActivatable<IStructureConfig, ReturnType<R['activation']>> &
+    IAdtLockable<IStructureConfig> &
+    IAdtTransportAware<IStructureConfig, ReturnType<R['transport']>> &
+    IAdtVersionable<IStructureConfig, ObjectVersion[], string>;
+  getStructure<
+    R extends IStructureResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    > = IStructureResults,
+  >(results: R = structureDocuments as unknown as R): AdtStructure<R> {
     this.assertConnected();
-    return new AdtStructure(
+    return new AdtStructure<R>(
       this.connection,
       this.logger,
       this.systemContext,
       this.lockRegistry,
+      results,
     );
   }
 
@@ -655,13 +783,55 @@ export class AdtClient {
    * Get high-level operations for Table objects
    * @returns IAdtObject instance for Table operations
    */
-  getTable(): IAdtSourceObject<ITableConfig, ITableState> {
+  getTable(): AdtTable;
+  getTable<
+    R extends ITableResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    >,
+  >(
+    results: R,
+  ): IAdtCreatable<ITableConfig, ReturnType<R['created']>> &
+    IAdtReadable<
+      ITableConfig,
+      ReturnType<R['source']>,
+      ReturnType<R['metadata']>
+    > &
+    IAdtUpdatable<ITableConfig, ReturnType<R['updated']>> &
+    IAdtDeletable<ITableConfig, ReturnType<R['deletion']>> &
+    IAdtValidatable<ITableConfig, ReturnType<R['validation']>> &
+    IAdtCheckable<ITableConfig, ReturnType<R['check']>> &
+    IAdtActivatable<ITableConfig, ReturnType<R['activation']>> &
+    IAdtLockable<ITableConfig> &
+    IAdtTransportAware<ITableConfig, ReturnType<R['transport']>> &
+    IAdtVersionable<ITableConfig, ObjectVersion[], string>;
+  getTable<
+    R extends ITableResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    > = ITableResults,
+  >(results: R = tableDocuments as unknown as R): AdtTable<R> {
     this.assertConnected();
-    return new AdtTable(
+    return new AdtTable<R>(
       this.connection,
       this.logger,
       this.systemContext,
       this.lockRegistry,
+      results,
     );
   }
 
@@ -669,13 +839,55 @@ export class AdtClient {
    * Get high-level operations for TableType (DDIC Table Type) objects
    * @returns IAdtObject instance for TableType operations
    */
-  getTableType(): IAdtSourceObject<ITableTypeConfig, ITableTypeState> {
+  getTableType(): AdtDdicTableType;
+  getTableType<
+    R extends ITableTypeResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    >,
+  >(
+    results: R,
+  ): IAdtCreatable<ITableTypeConfig, ReturnType<R['created']>> &
+    IAdtReadable<
+      ITableTypeConfig,
+      ReturnType<R['source']>,
+      ReturnType<R['metadata']>
+    > &
+    IAdtUpdatable<ITableTypeConfig, ReturnType<R['updated']>> &
+    IAdtDeletable<ITableTypeConfig, ReturnType<R['deletion']>> &
+    IAdtValidatable<ITableTypeConfig, ReturnType<R['validation']>> &
+    IAdtCheckable<ITableTypeConfig, ReturnType<R['check']>> &
+    IAdtActivatable<ITableTypeConfig, ReturnType<R['activation']>> &
+    IAdtLockable<ITableTypeConfig> &
+    IAdtTransportAware<ITableTypeConfig, ReturnType<R['transport']>> &
+    IAdtVersionable<ITableTypeConfig, ObjectVersion[], string>;
+  getTableType<
+    R extends ITableTypeResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    > = ITableTypeResults,
+  >(results: R = tableTypeDocuments as unknown as R): AdtDdicTableType<R> {
     this.assertConnected();
-    return new AdtDdicTableType(
+    return new AdtDdicTableType<R>(
       this.connection,
       this.logger,
       this.systemContext,
       this.lockRegistry,
+      results,
     );
   }
 
@@ -1004,16 +1216,57 @@ export class AdtClient {
   /**
    * Get high-level operations for Append Structure (TABL/DS) objects
    */
-  getAppendStructure(): IAdtSourceObject<
-    IAppendStructureConfig,
-    IAppendStructureState
-  > {
+  getAppendStructure(): AdtAppendStructure;
+  getAppendStructure<
+    R extends IAppendStructureResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    >,
+  >(
+    results: R,
+  ): IAdtCreatable<IAppendStructureConfig, ReturnType<R['created']>> &
+    IAdtReadable<
+      IAppendStructureConfig,
+      ReturnType<R['source']>,
+      ReturnType<R['metadata']>
+    > &
+    IAdtUpdatable<IAppendStructureConfig, ReturnType<R['updated']>> &
+    IAdtDeletable<IAppendStructureConfig, ReturnType<R['deletion']>> &
+    IAdtValidatable<IAppendStructureConfig, ReturnType<R['validation']>> &
+    IAdtCheckable<IAppendStructureConfig, ReturnType<R['check']>> &
+    IAdtActivatable<IAppendStructureConfig, ReturnType<R['activation']>> &
+    IAdtLockable<IAppendStructureConfig> &
+    IAdtTransportAware<IAppendStructureConfig, ReturnType<R['transport']>> &
+    IAdtVersionable<IAppendStructureConfig, ObjectVersion[], string>;
+  getAppendStructure<
+    R extends IAppendStructureResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    > = IAppendStructureResults,
+  >(
+    results: R = appendStructureDocuments as unknown as R,
+  ): AdtAppendStructure<R> {
     this.assertConnected();
-    return new AdtAppendStructure(
+    return new AdtAppendStructure<R>(
       this.connection,
       this.logger,
       this.systemContext,
       this.lockRegistry,
+      results,
     );
   }
 
