@@ -34,6 +34,41 @@ transport request** produced a fabricated error instead of the one SAP sent.
 **One spec for the whole migration.** Decomposition happens in the plan, not by
 splitting the design.
 
+**The interpretation of a server response belongs to the consumer, on two
+independent axes.** This is the principle the rest of the design is an
+implementation of, and both strategies below are instances of it rather than
+separate features.
+
+`adt-clients` does not decide what an ADT answer *means*. It obtains the wire
+response and hands the interpretation over:
+
+- the **error strategy** decides whether that answer is a failure at all, and how
+  it is presented as `IAdtError`;
+- the **result strategy** decides how the same answer is presented as
+  `IAdtResult<T>`, when no failure was established.
+
+The library ships defaults for both. They are defaults, not the meaning.
+
+```
+wire response
+  → error strategy   (consumer's, or the shipped default)
+      → failure  → IAdtError
+      → no failure
+          → result strategy   (consumer's, or the shipped default)
+              → IAdtResult<T>
+```
+
+The order is fixed: the failure question is answered first, because a result
+strategy must not be asked to make a value out of a refusal.
+
+**The two axes are genuinely independent**, which a missing class shows better
+than any argument. ADT answers a read for one with 200 and an empty body. One
+consumer calls that a failure and takes what it needs from `IAdtError` — a
+read-modify-write must, since writing back what it read would erase the object.
+Another accepts the same answer as legitimate and takes the raw body, or its own
+shape, through `IAdtResult`. Same bytes, opposite readings, and neither is this
+library's to impose.
+
 **`IAdtResult` is the strategy, and it is the only injection point for shape.**
 It is not a container holding a value — its *implementation* decides how the
 answer becomes a value. `adt-clients` ships the defaults, and two or three of them
