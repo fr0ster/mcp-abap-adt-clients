@@ -70,3 +70,27 @@ members that have none. **Two attempts to remove them failed on stale anchors an
 changed nothing** — the tree is clean, there is no half-applied state. Remove them
 by locating the passages rather than by pattern; everything else in both tasks
 (transport, dumps, `AdtUtils`' own migration, legacy) is independent and correct.
+
+## `IDebugger` leaves `interfaces` first
+
+Decided by the maintainer, 2026-09-04.
+
+It is **not** audited for one-member-per-endpoint and it is not going to be, not
+yet: it is still being researched. 39 of its members answer `IAdtWireResponse`,
+which is what a contract looks like before anyone knows what the endpoints
+actually return.
+
+So it moves to `@mcp-abap-adt/adt-clients` as a research branch of its own, and
+comes back to `interfaces` when the research is done and the shapes are known.
+The precedent is batch, removed for the same reason: a contract nobody can yet
+state is a contract that should not be published, because every consumer that
+adopts it has to be migrated again when it changes.
+
+**What this means concretely:**
+
+- Removing `IDebugger` and its neighbours from `interfaces` is part of 30.0.0.
+- The debugger implementation in `adt-clients` stops declaring them and states
+  its own types, the way `RuntimeDumps` does since 29.0.0.
+- Nothing about it blocks the endpoint audit above, or the 29.0.0 migration.
+- When it returns, it returns having been measured — one member per endpoint,
+  and results named rather than framed.
