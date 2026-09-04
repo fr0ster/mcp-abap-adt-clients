@@ -1,4 +1,7 @@
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { CT_FEATURE_TOGGLE_SOURCE } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -10,11 +13,11 @@ export async function uploadFeatureToggleSource(
   source: IFeatureToggleSource,
   lockHandle: string,
   transportRequest?: string,
-): Promise<void> {
+): Promise<IAdtWireResponse> {
   const encoded = encodeSapObjectName(name.toLowerCase());
   const params: Record<string, string> = { lockHandle };
   if (transportRequest) params.corrNr = transportRequest;
-  await connection.makeAdtRequest({
+  return connection.makeAdtRequest({
     method: 'PUT',
     url: `/sap/bc/adt/sfw/featuretoggles/${encoded}/source/main`,
     timeout: getTimeout('default'),

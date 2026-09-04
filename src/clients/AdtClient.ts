@@ -64,8 +64,9 @@ import {
 } from '../core/appendStructure';
 import {
   AdtAuthorizationField,
+  authorizationFieldDocuments,
   type IAuthorizationFieldConfig,
-  type IAuthorizationFieldState,
+  type IAuthorizationFieldResults,
 } from '../core/authorizationField';
 import {
   AdtBehaviorDefinition,
@@ -117,7 +118,10 @@ import {
 } from '../core/enhancement';
 import {
   AdtFeatureToggle,
-  type IFeatureToggleObject,
+  featureToggleDocuments,
+  type IFeatureToggleConfig,
+  type IFeatureToggleResults,
+  type IFeatureToggleRuntimeState,
 } from '../core/featureToggle';
 import {
   AdtFunctionGroup,
@@ -153,8 +157,10 @@ import {
   AdtMessageClassMessage,
   type IMessageClassConfig,
   type IMessageClassMessageConfig,
-  type IMessageClassMessageState,
-  type IMessageClassState,
+  type IMessageClassMessageResults,
+  type IMessageClassResults,
+  messageClassDocuments,
+  messageDocuments,
 } from '../core/messageClass';
 import {
   AdtMetadataExtension,
@@ -177,12 +183,14 @@ import {
 import {
   AdtScalarFunction,
   type IScalarFunctionConfig,
-  type IScalarFunctionState,
+  type IScalarFunctionResults,
+  scalarFunctionDocuments,
 } from '../core/scalarFunction';
 import {
   AdtScalarFunctionImplementation,
   type IScalarFunctionImplementationConfig,
-  type IScalarFunctionImplementationState,
+  type IScalarFunctionImplementationResults,
+  scalarFunctionImplementationDocuments,
 } from '../core/scalarFunctionImplementation';
 import {
   AdtServiceBinding,
@@ -721,20 +729,56 @@ export class AdtClient {
    * Get high-level operations for AuthorizationField objects
    * @returns IAdtObject instance for AuthorizationField operations
    */
-  getAuthorizationField(): IAdtCrud<
-    IAuthorizationFieldConfig,
-    IAuthorizationFieldState
-  > &
-    IAdtValidatable<IAuthorizationFieldConfig, IAuthorizationFieldState> &
-    IAdtCheckable<IAuthorizationFieldConfig, IAuthorizationFieldState> &
-    IAdtActivatable<IAuthorizationFieldConfig, IAuthorizationFieldState> &
-    IAdtLockable<IAuthorizationFieldConfig, IAuthorizationFieldState> {
+  getAuthorizationField(): AdtAuthorizationField;
+  getAuthorizationField<
+    R extends IAuthorizationFieldResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    >,
+  >(
+    results: R,
+  ): IAdtCreatable<IAuthorizationFieldConfig, ReturnType<R['created']>> &
+    IAdtReadable<
+      IAuthorizationFieldConfig,
+      ReturnType<R['source']>,
+      ReturnType<R['metadata']>
+    > &
+    IAdtUpdatable<IAuthorizationFieldConfig, ReturnType<R['updated']>> &
+    IAdtDeletable<IAuthorizationFieldConfig, ReturnType<R['deletion']>> &
+    IAdtValidatable<IAuthorizationFieldConfig, ReturnType<R['validation']>> &
+    IAdtCheckable<IAuthorizationFieldConfig, ReturnType<R['check']>> &
+    IAdtActivatable<IAuthorizationFieldConfig, ReturnType<R['activation']>> &
+    IAdtLockable<IAuthorizationFieldConfig> &
+    IAdtTransportAware<IAuthorizationFieldConfig, ReturnType<R['transport']>>;
+  getAuthorizationField<
+    R extends IAuthorizationFieldResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    > = IAuthorizationFieldResults,
+  >(
+    results: R = authorizationFieldDocuments as unknown as R,
+  ): AdtAuthorizationField<R> {
     this.assertConnected();
-    return new AdtAuthorizationField(
+    return new AdtAuthorizationField<R>(
       this.connection,
       this.logger,
       this.systemContext,
       this.lockRegistry,
+      results,
     );
   }
 
@@ -1192,15 +1236,45 @@ export class AdtClient {
    * Get high-level operations for MessageClass (MSAG/N) objects
    * @returns IAdtObject instance for MessageClass operations
    */
-  getMessageClass(): IAdtCrud<IMessageClassConfig, IMessageClassState> &
-    IAdtValidatable<IMessageClassConfig, IMessageClassState> &
-    IAdtLockable<IMessageClassConfig, IMessageClassState> {
+  getMessageClass(): AdtMessageClass;
+  getMessageClass<
+    R extends IMessageClassResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    >,
+  >(
+    results: R,
+  ): IAdtCreatable<IMessageClassConfig, ReturnType<R['created']>> &
+    IAdtReadable<
+      IMessageClassConfig,
+      ReturnType<R['source']>,
+      ReturnType<R['metadata']>
+    > &
+    IAdtUpdatable<IMessageClassConfig, ReturnType<R['updated']>> &
+    IAdtDeletable<IMessageClassConfig, ReturnType<R['deletion']>> &
+    IAdtValidatable<IMessageClassConfig, ReturnType<R['validation']>> &
+    IAdtLockable<IMessageClassConfig>;
+  getMessageClass<
+    R extends IMessageClassResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    > = IMessageClassResults,
+  >(results: R = messageClassDocuments as unknown as R): AdtMessageClass<R> {
     this.assertConnected();
-    return new AdtMessageClass(
+    return new AdtMessageClass<R>(
       this.connection,
       this.logger,
       this.systemContext,
       this.lockRegistry,
+      results,
     );
   }
 
@@ -1212,12 +1286,28 @@ export class AdtClient {
    * not exist until someone adds it. So this keeps `create` — unlike a class's
    * includes, which exist because their class does.
    */
-  getMessageClassMessage(): IAdtCrud<
-    IMessageClassMessageConfig,
-    IMessageClassMessageState
-  > {
+  getMessageClassMessage(): AdtMessageClassMessage;
+  getMessageClassMessage<
+    R extends IMessageClassMessageResults<unknown, unknown, unknown>,
+  >(
+    results: R,
+  ): IAdtCreatable<IMessageClassMessageConfig, ReturnType<R['written']>> &
+    IAdtReadable<
+      IMessageClassMessageConfig,
+      ReturnType<R['read']>,
+      ReturnType<R['read']>
+    > &
+    IAdtUpdatable<IMessageClassMessageConfig, ReturnType<R['written']>> &
+    IAdtDeletable<IMessageClassMessageConfig, ReturnType<R['deleted']>>;
+  getMessageClassMessage<
+    R extends IMessageClassMessageResults<
+      unknown,
+      unknown,
+      unknown
+    > = IMessageClassMessageResults,
+  >(results: R = messageDocuments as unknown as R): AdtMessageClassMessage<R> {
     this.assertConnected();
-    return new AdtMessageClassMessage(this.connection, this.logger);
+    return new AdtMessageClassMessage<R>(this.connection, this.logger, results);
   }
 
   /**
@@ -1396,32 +1486,136 @@ export class AdtClient {
   /**
    * Get high-level operations for CDS Scalar Function (DSFD/SCF) objects
    */
-  getScalarFunction(): IAdtSourceObject<
-    IScalarFunctionConfig,
-    IScalarFunctionState
-  > {
+  getScalarFunction(): AdtScalarFunction;
+  getScalarFunction<
+    R extends IScalarFunctionResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    >,
+  >(
+    results: R,
+  ): IAdtCreatable<IScalarFunctionConfig, ReturnType<R['created']>> &
+    IAdtReadable<
+      IScalarFunctionConfig,
+      ReturnType<R['source']>,
+      ReturnType<R['metadata']>
+    > &
+    IAdtUpdatable<IScalarFunctionConfig, ReturnType<R['updated']>> &
+    IAdtDeletable<IScalarFunctionConfig, ReturnType<R['deletion']>> &
+    IAdtValidatable<IScalarFunctionConfig, ReturnType<R['validation']>> &
+    IAdtCheckable<IScalarFunctionConfig, ReturnType<R['check']>> &
+    IAdtActivatable<IScalarFunctionConfig, ReturnType<R['activation']>> &
+    IAdtLockable<IScalarFunctionConfig> &
+    IAdtTransportAware<IScalarFunctionConfig, ReturnType<R['transport']>> &
+    IAdtVersionable<IScalarFunctionConfig, ObjectVersion[], string>;
+  getScalarFunction<
+    R extends IScalarFunctionResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    > = IScalarFunctionResults,
+  >(
+    results: R = scalarFunctionDocuments as unknown as R,
+  ): AdtScalarFunction<R> {
     this.assertConnected();
-    return new AdtScalarFunction(
+    return new AdtScalarFunction<R>(
       this.connection,
       this.logger,
       this.systemContext,
       this.lockRegistry,
+      results,
     );
   }
 
   /**
    * Get high-level operations for Scalar Function Implementation (DSFI/SFI) objects
    */
-  getScalarFunctionImplementation(): IAdtSourceObject<
+  getScalarFunctionImplementation(): AdtScalarFunctionImplementation;
+  getScalarFunctionImplementation<
+    R extends IScalarFunctionImplementationResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    >,
+  >(
+    results: R,
+  ): IAdtCreatable<
     IScalarFunctionImplementationConfig,
-    IScalarFunctionImplementationState
-  > {
+    ReturnType<R['created']>
+  > &
+    IAdtReadable<
+      IScalarFunctionImplementationConfig,
+      ReturnType<R['source']>,
+      ReturnType<R['metadata']>
+    > &
+    IAdtUpdatable<
+      IScalarFunctionImplementationConfig,
+      ReturnType<R['updated']>
+    > &
+    IAdtDeletable<
+      IScalarFunctionImplementationConfig,
+      ReturnType<R['deletion']>
+    > &
+    IAdtValidatable<
+      IScalarFunctionImplementationConfig,
+      ReturnType<R['validation']>
+    > &
+    IAdtCheckable<IScalarFunctionImplementationConfig, ReturnType<R['check']>> &
+    IAdtActivatable<
+      IScalarFunctionImplementationConfig,
+      ReturnType<R['activation']>
+    > &
+    IAdtLockable<IScalarFunctionImplementationConfig> &
+    IAdtTransportAware<
+      IScalarFunctionImplementationConfig,
+      ReturnType<R['transport']>
+    > &
+    IAdtVersionable<
+      IScalarFunctionImplementationConfig,
+      ObjectVersion[],
+      string
+    >;
+  getScalarFunctionImplementation<
+    R extends IScalarFunctionImplementationResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    > = IScalarFunctionImplementationResults,
+  >(
+    results: R = scalarFunctionImplementationDocuments as unknown as R,
+  ): AdtScalarFunctionImplementation<R> {
     this.assertConnected();
-    return new AdtScalarFunctionImplementation(
+    return new AdtScalarFunctionImplementation<R>(
       this.connection,
       this.logger,
       this.systemContext,
       this.lockRegistry,
+      results,
     );
   }
 
@@ -1750,13 +1944,54 @@ export class AdtClient {
    * Get high-level operations for FeatureToggle objects
    * @returns IFeatureToggleObject instance for FeatureToggle operations
    */
-  getFeatureToggle(): IFeatureToggleObject {
+  getFeatureToggle(): AdtFeatureToggle;
+  getFeatureToggle<
+    R extends IFeatureToggleResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    >,
+  >(
+    results: R,
+  ): IAdtCreatable<IFeatureToggleConfig, ReturnType<R['created']>> &
+    IAdtReadable<
+      IFeatureToggleConfig,
+      ReturnType<R['source']>,
+      ReturnType<R['metadata']>
+    > &
+    IAdtUpdatable<IFeatureToggleConfig, ReturnType<R['updated']>> &
+    IAdtDeletable<IFeatureToggleConfig, ReturnType<R['deletion']>> &
+    IAdtValidatable<IFeatureToggleConfig, ReturnType<R['validation']>> &
+    IAdtCheckable<IFeatureToggleConfig, ReturnType<R['check']>> &
+    IAdtActivatable<IFeatureToggleConfig, ReturnType<R['activation']>> &
+    IAdtLockable<IFeatureToggleConfig> &
+    IFeatureToggleObject<IFeatureToggleRuntimeState>;
+  getFeatureToggle<
+    R extends IFeatureToggleResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    > = IFeatureToggleResults,
+  >(results: R = featureToggleDocuments as unknown as R): AdtFeatureToggle<R> {
     this.assertConnected();
-    return new AdtFeatureToggle(
+    return new AdtFeatureToggle<R>(
       this.connection,
       this.logger,
       this.systemContext,
       this.lockRegistry,
+      results,
     );
   }
 
