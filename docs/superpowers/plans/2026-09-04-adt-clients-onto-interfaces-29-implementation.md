@@ -15,7 +15,11 @@
 - Never change `package.json` version. The number and `npm publish` are the maintainer's.
 - All diagnostics through the injected `ILogger`. `console.*` is banned by `noConsole`.
 - No `"link": true` in `package-lock.json`; everything resolves from the npm registry.
-- Gate for every commit: `npm run lint:check` exits 0.
+- Gate, stated once so the exceptions are not scattered:
+  - `npm run lint:check` exits 0 on every commit **except Task 1's**, which lands
+    before the five broken documentation imports are fixed.
+  - `npm run build` and `npm run test:check` are expected to fail from **Task 1
+    through Task 12**, and exit 0 from Task 13 onward.
   **`npm run build` and `npm run test:check` are both expected to fail from Task 1
   until the `AdtUtils` task** — `test:check` is red today with the same migration
   errors, in scripts, tests and implementations alike —
@@ -702,8 +706,24 @@ export abstract class AdtClassMemberBase<
 // src/core/class/AdtLocalTypes.ts — and the three beside it
 export class AdtLocalTypes<R extends IClassResults<…> = IClassResults>
   extends AdtClassMemberBase<R>
-  implements IAdtReadable<IClassConfig, ReturnType<R['source']>, ReturnType<R['metadata']>>,
-             IAdtUpdatable<IClassConfig, ReturnType<R['updated']>> { … }
+  implements
+    IAdtReadable<IClassConfig, ReturnType<R['source']>, ReturnType<R['metadata']>>,
+    IAdtUpdatable<IClassConfig, ReturnType<R['updated']>>
+{
+  // The base declares `protected abstract readonly results: R`, so every concrete
+  // subclass must carry it. Omitting it here leaves the class abstract-incompatible
+  // and it will not compile — the same trap in all four.
+  constructor(
+    connection: IAbapConnection,
+    logger?: ILogger,
+    contentTypes?: IAdtContentTypes,
+    lockRegistry?: LockRegistry,
+    protected readonly results: R = classDocuments as unknown as R,
+  ) {
+    super(connection, logger, contentTypes, lockRegistry);
+  }
+  // … read / readMetadata / update, each `answering(…, this.results.<member>)`
+}
 
 // src/clients/AdtClient.ts — each of the four takes the same pair of overloads
 getLocalTypes(): AdtLocalTypes;
@@ -1446,17 +1466,32 @@ would pass while the cache defect is still there.
 ### Task 13: `AdtUtils` and the legacy clients
 
 **Files:**
-- Modify: `src/core/shared/AdtUtils.ts`, `src/core/shared/AdtUtilsLegacy.ts`, `src/clients/AdtClientLegacy.ts`, and the 13 `*Legacy.ts` files under `src/core/`
+- Create: `src/core/shared/utilsResults.ts`
+- Modify: `src/core/shared/AdtUtils.ts`, `src/core/shared/AdtUtilsLegacy.ts`, `src/clients/AdtClient.ts`, `src/clients/AdtClientLegacy.ts`, and the 13 `*Legacy.ts` files under `src/core/`
+- Test: `src/__tests__/unit/shared/utilsResultStrategy.test.ts`
 
 **Interfaces:**
-- Consumes: `answering`, `rawDocument` (Task 2).
-- Produces: no new names; `AdtUtils`' 25 members keep theirs.
+- Consumes: `answering`, `rawDocument` (Task 2); `packageNames`, `packageStructure` (Task 12).
+- Produces:
+  - `interface IUtilsResults<TPackage = IRepositoryNodeContents, TSearch = ISearchResult[], …>` — one strategy per member of `AdtUtils` that answers something a caller might want differently; the rest keep `rawDocument`
+  - `const utilsDocuments: IUtilsResults` — the shipped default
+  - `class AdtUtils<R extends IUtilsResults<unknown, unknown> = IUtilsResults>` with `results` as its last constructor parameter, defaulting to `utilsDocuments`
+  - `AdtClient.getUtils()` / `getUtils<R>(results: R)`, and the same pair on `AdtClientLegacy`
+
+Without this, `packageNames` and `packageStructure` from Task 12 exist and cannot
+be selected — the strategies would be exported functions a consumer applies by
+hand, which is the rework the design removes.
 
 - [ ] **Step 1:** `npx tsc --noEmit -p tsconfig.json 2>&1 | grep -E "AdtUtils|Legacy"` — this is the work list.
-- [ ] **Step 2:** `AdtUtils`' members already answer `IAdtResponse`; they lose the extra `IAdtResult` layer and the twelve that answered `IAdtWireResponse` answer `rawDocument` of it instead.
-- [ ] **Step 3:** The legacy clients follow their non-legacy counterparts. Legacy systems answer differently, but the *contract* is the same — a separate implementation is the point of the contract existing.
-- [ ] **Step 4:** `npm run lint:check && npm run build && npm run test:check` — all 0. This is the first point where the whole package compiles.
-- [ ] **Step 5:** Commit.
+- [ ] **Step 2:** Create `IUtilsResults` and `utilsDocuments`, make `AdtUtils`
+generic in the set, and add the two `getUtils` overloads on both clients —
+`AdtUtilsLegacy` extends `AdtUtils` and inherits `R`, so it needs the parameter
+threaded through its constructor and nothing more. Test it the way Task 12 tests
+dumps: two sets on **one** client, asserting the second answers the second shape.
+- [ ] **Step 3:** `AdtUtils`' members already answer `IAdtResponse`; they lose the extra `IAdtResult` layer and the twelve that answered `IAdtWireResponse` answer `rawDocument` of it instead.
+- [ ] **Step 6:** The legacy clients follow their non-legacy counterparts. Legacy systems answer differently, but the *contract* is the same — a separate implementation is the point of the contract existing.
+- [ ] **Step 5:** `npm run lint:check && npm run build && npm run test:check` — all 0. This is the first point where the whole package compiles.
+- [ ] **Step 6:** Commit.
 
 ---
 
