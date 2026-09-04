@@ -403,11 +403,18 @@ MCP_ENV_PATH=/tmp/nonexistent-env npx jest src/__tests__/unit/shared/answeringCo
 
 Expected: 6 passed.
 
-- [ ] **Step 7: Red-proof the no-wire rule**
+- [ ] **Step 7: Export `recogniseFailure`**
+
+`chain` (Task 4) classifies a real exception and cannot reach a private function.
+Change `function recogniseFailure` at `src/utils/adtResponse.ts:68` to
+`export function recogniseFailure`, so the classification has one home rather
+than two copies that drift.
+
+- [ ] **Step 8: Red-proof the no-wire rule**
 
 Temporarily change the `if (!wire)` branch to `return succeeded(read(wire as never));`. Re-run. Expected: the "cannot be cleared into a success when nothing came back" case fails. Revert the change and re-run to green. A rule nobody has seen fail is a rule nobody has tested.
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
 git add src/utils/resultStrategy.ts src/utils/adtResponse.ts src/__tests__/unit/shared/answeringComposition.test.ts
@@ -591,7 +598,41 @@ so that file is not finished until the last batch is.
 
 **Interfaces:**
 - Consumes: `answering` (Task 2), `IClassResults` / `classDocuments` (Task 3), the low-level `create/read/update/delete/check/activation/validation` in `src/core/class/*.ts`, each `(connection, args, …) => Promise<IAdtWireResponse>`.
-- Produces: `class AdtClass implements IAdtCreatable<IClassConfig, ClassCreated>, IAdtReadable<IClassConfig, ClassSource, ClassMetadata>, IAdtUpdatable<IClassConfig, ClassUpdated>, IAdtDeletable<IClassConfig, ClassDeletionResult>, IAdtValidatable<IClassConfig, ClassValidationResult>, IAdtCheckable<IClassConfig, ClassCheckResult>, IAdtActivatable<IClassConfig, ClassActivationResult>, IAdtLockable<IClassConfig>, IAdtVersionable<IClassConfig>` with a constructor taking `(connection, logger, systemContext, contentTypes, lockRegistry, results: IClassResults = classDocuments)`.
+- Produces: **`AdtClass` is generic in its strategy set.** A class fixed to
+  `ClassSource` could not honestly return a consumer's shape, and the factory
+  overload would be lying about the runtime type. The declaration:
+
+```typescript
+export class AdtClass<R extends IClassResults<
+  unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown
+> = IClassResults>
+  implements
+    IAdtCreatable<IClassConfig, ReturnType<R['created']>>,
+    IAdtReadable<IClassConfig, ReturnType<R['source']>, ReturnType<R['metadata']>>,
+    IAdtUpdatable<IClassConfig, ReturnType<R['updated']>>,
+    IAdtDeletable<IClassConfig, ReturnType<R['deletion']>>,
+    IAdtValidatable<IClassConfig, ReturnType<R['validation']>>,
+    IAdtCheckable<IClassConfig, ReturnType<R['check']>>,
+    IAdtActivatable<IClassConfig, ReturnType<R['activation']>>,
+    IAdtLockable<IClassConfig>,
+    IAdtVersionable<IClassConfig>
+{
+  constructor(
+    connection: IAbapConnection,
+    logger?: ILogger,
+    systemContext?: IAdtSystemContext,
+    contentTypes?: IAdtContentTypes,
+    lockRegistry?: LockRegistry,
+    private readonly results: R = classDocuments as unknown as R,
+  ) { /* … */ }
+}
+```
+
+  Every member's return type follows from `R`: `read` answers
+  `Promise<IAdtResponse<ReturnType<R['source']>>>`, not `ClassSource`. The single
+  cast is on the default in the constructor, where `classDocuments` is known to
+  satisfy the erased bound, and it is the only one — a cast on the *members*
+  would be the factory lying, which is what this avoids.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -672,7 +713,7 @@ async read(
   config: Partial<IClassConfig>,
   version?: 'active' | 'inactive',
   options?: { withLongPolling?: boolean } & IAdtOperationOptions,
-): Promise<IAdtResponse<ClassSource>> {
+): Promise<IAdtResponse<ReturnType<R['source']>>> {
   if (!config.className) {
     return failed({
       origin: 'parse',
@@ -694,50 +735,105 @@ because a refused request throws. Once a refusal is a returned value, that `catc
 never fires: the lock stays held on the server, the session stays stateful, and
 nothing says so.
 
-So the chain gets an executor. Add to `src/core/shared/chain.ts` (new):
+So the chain gets an executor with **resource-scope** semantics — cleanup runs
+whatever happens, not only on the way out through a failure.
+
+`recogniseFailure` is currently private to `adtResponse.ts`. Export it there
+rather than duplicating the classification; `chain` needs it for a real exception.
+
+Add `src/core/shared/chain.ts`:
 
 ```typescript
 /**
- * Run a chain of requests, returning the first failure — and unwinding first.
+ * Run a chain of requests as a resource scope.
  *
  * Cleanup used to run from a `catch`, which worked only because a refusal threw.
  * A refusal is now a value, so an unguarded early return would leave the object
  * locked on the server and the session stateful, with nothing raised to say so.
  *
- * `unwind` runs on failure **and** on an exception, in reverse order of
- * registration, and its own errors are logged rather than raised: a failure to
- * unlock must not replace the reason the chain failed, which is what the caller
- * actually needs.
+ * **Cleanup runs on every path** — success, returned failure, and exception — in
+ * reverse order of registration. That is the difference between a cleanup and an
+ * error handler, and getting it wrong leaks a lock on the happy path, which is
+ * the one that runs most.
+ *
+ * A registration can be **discharged** when the resource is released normally:
+ * `onScopeEnd` returns a handle, and calling it removes that entry, so a chain
+ * that unlocks as its own step does not unlock twice.
+ *
+ * An error raised *by* cleanup is logged, never propagated: a failing unlock must
+ * not replace the reason the chain failed, which is what the caller needs.
  */
 export async function chain<T>(
   logger: ILogger | undefined,
-  body: (
-    step: <S>(answer: Promise<IAdtResponse<S>>) => Promise<S>,
-    onUnwind: (undo: () => Promise<void>) => void,
-  ) => Promise<T>,
-): Promise<IAdtResponse<T>>;
+  body: (scope: {
+    /** Await an answer; its value on success, or abandon the chain with its failure. */
+    step<S>(answer: Promise<IAdtResponse<S>>): Promise<S>;
+    /** Register cleanup. The returned function discharges it. */
+    onScopeEnd(undo: () => Promise<void>): () => void;
+  }) => Promise<T>,
+): Promise<IAdtResponse<T>> {
+  const undos: Array<() => Promise<void>> = [];
+  const scope = {
+    async step<S>(answer: Promise<IAdtResponse<S>>): Promise<S> {
+      const a = await answer;
+      if (!a.ok) throw new ChainAbandoned(a.getError());
+      return a.getResult().value;
+    },
+    onScopeEnd(undo: () => Promise<void>): () => void {
+      undos.push(undo);
+      return () => {
+        const at = undos.indexOf(undo);
+        if (at >= 0) undos.splice(at, 1);
+      };
+    },
+  };
+
+  try {
+    return succeeded(await body(scope));
+  } catch (error: unknown) {
+    return failed<T>(
+      error instanceof ChainAbandoned
+        ? error.failure
+        : recogniseFailure(error),
+    );
+  } finally {
+    for (const undo of undos.reverse()) {
+      try {
+        await undo();
+      } catch (cleanupError: unknown) {
+        logger?.warn?.('cleanup failed', { error: safeErrorMessage(cleanupError) });
+      }
+    }
+  }
+}
 ```
 
-`step()` awaits an answer, returns its value, and throws a private sentinel
-carrying the failure when it is not `ok`. `chain` catches that sentinel, runs the
-unwind stack, and returns the failure it carried. A real exception unwinds the
-same way and is then classified by `recogniseFailure`.
-
-`update` then reads as the chain it always was, with the cleanup registered where
-the resource is acquired rather than assumed at the bottom:
+`update` then reads as the chain it always was. The body returns the value it
+already has — it does not re-read a wire response it no longer holds — and the
+unlock is discharged when it happens normally:
 
 ```typescript
-return chain(this.logger, async (step, onUnwind) => {
-  const lockHandle = await lockClass(this.connection, name);   // still throws; no failure half
-  onUnwind(async () => {
+return chain(this.logger, async ({ step, onScopeEnd }) => {
+  this.connection.setSessionType('stateful');
+  const lockHandle = await lockClass(this.connection, name);   // throws; no failure half
+
+  const releaseLock = onScopeEnd(async () => {
     await unlockClass(this.connection, name, lockHandle);
+  });
+  // Guaranteed whatever happens, and registered before the lock so it runs last.
+  onScopeEnd(async () => {
     this.connection.setSessionType('stateless');
   });
 
   await step(answering(() => checkClass(...), this.results.check, options?.analyse));
-  await step(answering(() => updateClass(...), this.results.updated, options?.analyse));
-  // …
-  return this.results.updated(lastWire);
+  const updated = await step(
+    answering(() => updateClass(...), this.results.updated, options?.analyse),
+  );
+
+  await unlockClass(this.connection, name, lockHandle);
+  releaseLock();          // released normally; do not unlock twice
+
+  return updated;
 });
 ```
 
@@ -801,13 +897,39 @@ it('reports what SAP refused, not what the unlock did', async () => {
 });
 ```
 
+```typescript
+it('restores stateless on the success path too', async () => {
+  // The path that runs most. A cleanup that only fires on failure leaks the
+  // session on every successful update.
+  const calls: string[] = [];
+  const connection = {
+    setSessionType: jest.fn((t: string) => calls.push(`session:${t}`)),
+    isConnected: () => true,
+    makeAdtRequest: jest.fn(async (r: { url: string }) => ({
+      data: r.url.includes('lock') ? '<LOCK_HANDLE>h1</LOCK_HANDLE>' : '',
+      status: 200, statusText: 'OK', headers: {},
+    })),
+  } as unknown as IAbapConnection;
+
+  const response = await new AdtClass(connection, logger).update({
+    className: 'ZCL_X',
+    sourceCode: 'CLASS zcl_x.',
+  });
+
+  expect(response.ok).toBe(true);
+  expect(calls[calls.length - 1]).toBe('session:stateless');
+  // Discharged, so exactly one unlock.
+  expect(calls.filter((c) => c.includes('unlock')).length).toBe(1);
+});
+```
+
 - [ ] **Step 5: Run the tests to verify they pass**
 
 ```bash
 MCP_ENV_PATH=/tmp/nonexistent-env npx jest src/__tests__/unit/core/classAnswersContract.test.ts 2>&1 | tee unit-run.log
 ```
 
-Expected: 4 passed.
+Expected: 5 passed.
 
 - [ ] **Step 6: Check the class module compiles**
 
@@ -933,7 +1055,12 @@ getClass<
   IAdtActivatable<IClassConfig, ReturnType<R['activation']>> &
   IAdtLockable<IClassConfig> &
   IAdtVersionable<IClassConfig>;
-getClass(results: IClassResults = classDocuments): unknown {
+// implementation signature: the erased form both overloads collapse to
+getClass(
+  results: IClassResults<
+    unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown
+  > = classDocuments,
+): unknown {
   this.assertConnected();
   return new AdtClass(
     this.connection,
