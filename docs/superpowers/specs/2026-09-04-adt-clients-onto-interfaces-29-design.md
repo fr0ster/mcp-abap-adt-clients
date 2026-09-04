@@ -60,9 +60,21 @@ very different amounts, and today the library picks for them:
 | runtime dumps | a short list — id, time, program, message | the dump itself |
 | package contents | names and ADT type codes | the full node structure with descriptions and sub-package links |
 
-A short listing is not a truncated full one — it is a different reading of the
-same document, and which is wanted depends on whether the caller is showing a
-picker or opening an object. That is the case `IAdtResult` implementations exist
+**This library has several consumers, and they want different amounts.** An MCP
+server passes what it gets to a language model, where size is a budget: a whole
+node structure spent on a question that needed six names displaces what the model
+was reasoning about, while a listing too thin to answer forces a second call and
+another turn. A backup tool wants the document whole and unparsed, because
+anything this library dropped is data it cannot restore. A script wants two
+fields. A human-facing ABAP tool wants what it can render.
+
+None of those is more correct, and this library cannot tell which one is calling.
+That is the argument for injection — not that the far end is sometimes a model,
+but that the near end is several different programs with incompatible needs.
+
+A short listing is therefore not a truncated full one. It is a different reading
+of the same document, and the caller is the only one who knows which reading
+their own consumer needs. That is the case `IAdtResult` implementations exist
 for, and the reason the library ships more than one rather than making the
 smaller reading a lossy version of the larger.
 
