@@ -1457,7 +1457,7 @@ are a claim rather than a feature, and every consumer still gets one shape.
     `interfaces` 30.0.0 leaves in place of `getPackageContentsList` and
     `getPackageHierarchy`:
     - `packageList: IResultStrategy<IPackageContentItem[]>` — names and ADT type codes
-    - `packageTree: IResultStrategy<IPackageHierarchyNode>` — the structure with its descriptions and sub-package links
+    - **no `packageTree`** — the walkable reading is `nodeContents`, reused; see Step 3a
     - `packageShort: IResultStrategy<{ name: string; type: string }[]>` — the reading an MCP server can afford
     - `packageRaw = rawDocument` — the document untouched, which a backup consumer
       could not reach through the old members at all
@@ -1476,23 +1476,28 @@ nothing fabricates a status.
 
   **For the package readings, assert which nodes of one captured document reach
   each result**, by name: the document's `objects` entries appear in `packageList`
-  and `packageShort`, its `childNodes` appear in `packageTree.children` and in
+  and `packageShort`, its `childNodes` appear in `nodeContents.childNodes` and in
   neither of the other two, and `packageRaw` is byte-identical to `wire.data`.
   Their semantics are new — the old members answered a walk — so this is the test
   that defines them rather than one that confirms a port.
 
   **And assert the walk is possible**, because that is the whole claim: take a
-  `children` entry from `packageTree`, and check it carries both `objectType` and
-  a non-empty `nodeId` — the two things `fetchNodeStructure` needs for the next
-  request. A tree whose references cannot be followed passes every shape
-  assertion and fails the only one that matters.
+  `childNodes` entry from the `nodeContents` reading and check it carries both
+  `objectType` and a non-empty `nodeId` — the two things `fetchNodeStructure`
+  needs for the next request. A result whose references cannot be followed passes
+  every shape assertion and fails the only one that matters.
+
+  **And assert a strategy needs nothing but the answer**: call each of them with a
+  captured `IAdtWireResponse` alone, no client and no request context. Anything
+  that cannot be built from that is not a strategy's to return — which is how the
+  invented `node: IObjectReference` was caught.
 - [ ] **Step 2:** Run it; expect FAIL on the missing exports.
 - [ ] **Step 3: Split the old readers into several strategies — and move only what is pure**
 
 **One old function becomes several strategies, not one.** `getPackageContentsList`
 was a single reading nobody could choose; what replaces it is four —
-`packageList`, `packageTree`, `packageShort`, `packageRaw` — each reading the same
-document differently. The same split is what `transportNumbers`/`transportTree`
+`packageList`, `packageShort`, `packageRaw`, and `nodeContents` reused for the
+walkable shape — each reading the same document differently. The same split is what `transportNumbers`/`transportTree`
 and `dumpList`/`dumpDocument` are. A migration that moves one old function into
 one new strategy has renamed something, not made it choosable.
 
@@ -1524,46 +1529,38 @@ names, `objects` and `childNodes`. The four readings of it are therefore:
 | strategy | from one document |
 |---|---|
 | `packageList` | `IPackageContentItem[]` built from that document's `objects` — **the level asked for, not the sub-tree**, because deeper levels are other requests |
-| `packageTree` | `PackageTree` — declared in this package, below. **Not `IPackageHierarchyNode`**, and the reason is measured |
+| `nodeContents` (reused as a package reading) | `IRepositoryNodeContents` — `objects` and `childNodes`, the measured shape of this document, and the only shipped reading a caller can walk on from |
 | `packageShort` | `{ name, type }` per object, the same set as `packageList` |
 | `packageRaw` | the document |
 
-**Why `packageTree` does not answer `IPackageHierarchyNode`.** A tree we return is
-a tree we **built**, and how a consumer walks it further is theirs — but a built
-tree that cannot be walked is a decoration. `IRepositoryNodeChild` is
-`{ objectType, nodeId }`, and both halves are needed to ask the next question;
-`IPackageHierarchyNode` carries `name`, `type`, `isPackage`, `kind`, `codeFormat`,
-`restoreStatus` and `children`, and **no `nodeId`**. Mapping the child references
-into it drops the id and strands the caller at exactly the point the walk becomes
-theirs; keeping the id makes the value not that type. The contract's own comment
-on `IRepositoryNodeContents` says it: a result without `childNodes` forces the
-caller back to the raw document, "which is the coupling this contract removes".
+**Why no reading answers `IPackageHierarchyNode`, and why there is no fourth
+strategy.** A tree we return is one we **built**, and how a consumer walks it
+further is theirs — which is only true if what they are handed can be followed.
+`IRepositoryNodeChild` is `{ objectType, nodeId }`, both halves needed to ask the
+next question, and `IPackageHierarchyNode` carries `name`, `type`, `isPackage`,
+`kind`, `codeFormat`, `restoreStatus` and `children` — **no `nodeId`**. Mapping
+into it strands the caller exactly where the walk becomes theirs. It describes a
+recursive tree, one document cannot fill it, and filling it would take the walk
+that left the contract. It stays exported by `interfaces` for a consumer who
+assembles that shape from what they walked.
 
-So the strategy answers a type this package declares, because a strategy's return
-type is this package's to choose — `IAdtPackageBrowsing<TContents>` takes whatever
-it returns:
+`IRepositoryNodeContents` is what one document *is* — `objects` and `childNodes`,
+shipped in 27.0.0 for exactly this resource, with the comment that says why:
+a result without `childNodes` forces the caller back to the raw document, "which
+is the coupling this contract removes". So the walkable package reading is the
+`nodeContents` strategy, given to the `packageContents` key by a consumer who
+wants it. **One reading, one name** — a `packageTree` exporting the same function
+under a second name is the thing decision 20 in `interfaces` forbids.
 
-```typescript
-// src/core/shared/results.ts
-export interface PackageTree {
-  /** The package this level is of. */
-  readonly node: IObjectReference;
-  /** What sits at this level, built. */
-  readonly objects: IRepositoryObjectNode[];
-  /** How to ask for what is below — `{ objectType, nodeId }`, both halves. */
-  readonly children: IRepositoryNodeChild[];
-}
-```
-
-Every field is measured: it is `IRepositoryNodeContents` — the shape 27.0.0
-shipped for exactly this document — plus the identity of the node it was read
-for. Nothing here is invented, which decision 1 requires.
-
-**`IPackageHierarchyNode` is not returned by any shipped strategy**, and that is
-the honest outcome rather than an oversight: it describes a recursive tree, one
-document cannot fill it, and filling it would take the walk that left the
-contract. It stays exported by `interfaces` for a consumer who assembles that
-shape from what they walked.
+**A strategy sees the answer and nothing else.** An earlier draft of this step had
+`packageTree` answer a `PackageTree` carrying `node: IObjectReference`, the
+identity of the package the level belongs to. That cannot be built:
+`IResultStrategy<T>` is `(answer: IAdtWireResponse) => T`, and the package name is
+a *request* parameter — `fetchNodeStructure` sends it, the response does not carry
+it back, and the current hierarchy builder makes its root from the input argument
+for that reason. A strategy that needed it would have to invent it. The caller
+already holds the name they passed; handing it back was convenience bought with a
+field nothing could fill.
 
 This is a behaviour change and the CHANGELOG says so: `getPackageContentsList`
 with `includeSubpackages` returned a flattened sub-tree, and no reading here does.
@@ -1733,8 +1730,8 @@ Then `AdtUtils<R extends IUtilsResults = typeof utilsDocuments>` instantiates ea
 atom with the matching key: `IAdtPackageBrowsing<ReturnType<R['packageContents']>>`,
 `IAdtRepositoryStructure<ReturnType<R['nodeContents']>>`, and so on. A set that
 declares a strategy no atom reads, or an atom instantiated with a key the set does
-not carry, is the defect this list exists to prevent — `packageTree` was declared
-in Step 1 and reachable from nothing until this key existed.
+not carry, is the defect this list exists to prevent — the package readings were
+declared in Step 1 and reachable from nothing until this key existed.
 
 - [ ] **Step 7: Test the cache on every factory that has one, on one client instance**
 
@@ -2034,14 +2031,16 @@ should know which instruction was rewritten and why.
     is the call almost every consumer makes. Written as
     `= typeof utilsDocuments`, and the same for `RuntimeDumps` and `AdtRequest`.
 
-12. **`packageTree` answers `PackageTree`, declared here, not `IPackageHierarchyNode`.**
-    A built tree that cannot be walked is a decoration: `IRepositoryNodeChild` is
-    `{ objectType, nodeId }` and `IPackageHierarchyNode` has no `nodeId`, so
-    mapping into it strands the caller exactly where the walk becomes theirs. The
-    strategy's return type is this package's to choose, and the fields are
-    measured — `IRepositoryNodeContents` plus the identity of the node it was read
-    for. No shipped strategy returns `IPackageHierarchyNode`: it describes a
-    recursive tree that one document cannot fill.
+12. **No reading answers `IPackageHierarchyNode`, and there is no `packageTree`
+    strategy.** Two findings, one root — I twice named a shape a strategy cannot
+    produce. `IPackageHierarchyNode` has no `nodeId`, so mapping the child pairs
+    into it strands the caller where the walk becomes theirs. My replacement, a
+    `PackageTree` carrying the package's identity, was worse: a strategy is
+    `(answer) => T` and the package name is a *request* parameter the response
+    does not carry back — it would have had to invent it. The walkable reading is
+    `IRepositoryNodeContents`, which is what one document is, delivered by reusing
+    the `nodeContents` strategy rather than exporting the same function under a
+    second name. The caller already holds the name they passed.
 
 11. **The move is into several strategies, and only the pure half moves.** Step 3
     said "move that code into the strategy", which cannot be done: the old package

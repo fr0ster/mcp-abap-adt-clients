@@ -377,12 +377,20 @@ it asks for the node structure as itself, and that the package member reaches th
 same resource on its way is the implementation's business, not the contract's.
 
 **What this package then ships for package contents:** four readings of one
-answer — `packageList` (names and ADT type codes), `packageTree` (the structure
-with its descriptions and sub-package links), `packageShort` (the reading an MCP
-server can afford), and `packageRaw` (the document untouched, which a backup tool
-could not reach through the old members at all). They are chosen the way every
-other reading is: given to the implementation at construction, through
-`AdtClient.getUtils()`.
+answer — `packageList` (names and ADT type codes), `packageShort` (the reading an
+MCP server can afford), `packageRaw` (the document untouched, which a backup tool
+could not reach through the old members at all), and `nodeContents` reused, which
+answers `IRepositoryNodeContents`: the level's objects **and** the
+`{ objectType, nodeId }` pairs below it, so a consumer who wants to go deeper
+can. They are chosen the way every other reading is: given to the implementation
+at construction, through `AdtClient.getUtils()`.
+
+There is no `packageTree` beside them, and the reason is worth keeping: a reading
+that answered `IPackageHierarchyNode` would drop the `nodeId` that type has no
+field for, stranding the caller exactly where the walk becomes theirs — and a
+reading carrying the package's own identity cannot be built at all, since a
+strategy sees the answer and the package name is a request parameter. One
+document, read four ways; nothing a strategy would have to invent.
 
 **What does not come with them is the walk.** `maxDepth`, default 5, and the
 recursion into sub-packages described something the library did on the caller's
