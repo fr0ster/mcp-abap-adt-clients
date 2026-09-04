@@ -1382,8 +1382,18 @@ are a claim rather than a feature, and every consumer still gets one shape.
   - `transportTree: IResultStrategy<ITransportTree>` — containers, descriptions, and the **language** a request carries, which nothing currently exposes
   - `dumpList: IResultStrategy<IDumpSummary[]>` — `{ id, at, program, message }`
   - `dumpDocument = rawDocument`
-  - `packageNames: IResultStrategy<IAdtObjectHit[]>` — name and ADT type code
-  - `packageStructure: IResultStrategy<IRepositoryNodeContents>` — the full node structure
+  - **No package strategies.** They were planned here and are dropped: see Task 13
+    for why 29.0.0 cannot deliver them to a caller, and the CHANGELOG gap it adds.
+
+**One type note that applies to what remains.** `IResultStrategy<T>` is
+`(wire: IAdtWireResponse) => T` — it is handed the whole answer, because a
+strategy may need the status or a header. The `parse` overloads already in
+`interfaces` take `(data: unknown) => T` instead. The two are not
+interchangeable, and passing one where the other is expected type-checks nowhere
+useful: where a member offers the contract's `parse`, write
+`(data) => strategy({ data, status: 200, statusText: '', headers: {} })` at the
+call site, or give that member its own `(data: unknown) => T` strategy. Do not
+introduce a silent adapter that fabricates a status.
 
 - [ ] **Step 1:** Write the failing test: for each pair, the same captured document read by both strategies, asserting the short one carries the identifying fields and the full one carries what the short one drops. Assert the short is **not** a prefix or subset-by-truncation of the full — it is a different reading, and a test that only checks length would pass a truncation.
 - [ ] **Step 2:** Run it; expect FAIL on the missing exports.
@@ -1480,29 +1490,31 @@ would pass while the cache defect is still there.
 
 **Why, and this is a real limit rather than a simplification.** The utility
 contracts in 29.0.0 fix their results: `IAdtInformationSystem`,
-`IAdtRepositoryStructure` and their neighbours declare
-`fetchNodeStructure(...): Promise<IAdtResponse<IRepositoryNodeContents>>` and
-`search(...): Promise<IAdtResponse<ISearchResult[]>>` with no result parameter.
-Unlike the CRUD atoms, they were never parameterised. A generic `AdtUtils<R>`
-answering a consumer's shape from those members would stop satisfying the
-interfaces it declares — and `interfaces` is closed for this migration.
+`IAdtPackageBrowsing` and their neighbours declare `getPackageContentsList` and
+`getPackageHierarchy` with no result parameter and **no parser overload**, unlike
+`search`. `AdtClient.getUtils()` answers the intersection of those interfaces, so
+an overload added to the concrete `AdtUtils` is invisible to a consumer holding
+the contract.
 
-So the package strategies from Task 12 reach a caller by the route the contract
-already provides, which is the parser overload `search` has:
+**Therefore `packageNames` and `packageStructure` are dropped from Task 12** and
+recorded as a known gap. They cannot reach a caller through 29.0.0 by any route
+that does not either change `interfaces` — closed for this migration — or have
+`getUtils()` return a concrete class, which is what decision 12 forbids.
 
-```typescript
-// already in the contract, already implemented — extend the same shape to the
-// package members that answer a large document
-getPackageContents(name: string): Promise<IAdtResponse<IRepositoryNodeContents>>;
-getPackageContents<T>(
-  name: string,
-  parse: (data: unknown) => T,
-): Promise<IAdtResponse<T>>;
-```
+Transport and dumps are unaffected and stay: `getRequest` answers CRUD atoms,
+which *are* parameterised by their result, and `getDumps` answers `RuntimeDumps`,
+whose contract this package states itself.
 
-`packageNames` and `packageStructure` are then passed as that parser — they are
-`(wire) => T`, and a thin adapter reads `wire.data`. A consumer wanting names
-writes `getPackageContents('ZPKG', packageNames)`.
+- [ ] **Step 0: Record the gap**
+
+Add to the CHANGELOG under this release:
+
+> **Known gap: package contents answer one shape.** `getPackageContentsList` and
+> `getPackageHierarchy` are declared in `@mcp-abap-adt/interfaces` without a
+> parser overload, so a consumer wanting names alone — the case an MCP server has,
+> where a full node structure displaces what a model was reasoning about — must
+> parse the document themselves. Closing it means adding the overload to those
+> members, which is additive and belongs to a later `interfaces` release.
 
 - [ ] **Step 1:** Confirm against `node_modules/@mcp-abap-adt/interfaces/dist`
   which utility members already declare a parser overload and which do not. Only
@@ -1513,7 +1525,7 @@ writes `getPackageContents('ZPKG', packageNames)`.
 
 - [ ] **Step 2:** `npx tsc --noEmit -p tsconfig.json 2>&1 | grep -E "AdtUtils|Legacy"` — this is the work list.
 - [ ] **Step 3:** Add the parser overload to each package member the list from
-Step 2a allows, following `search(criteria, parse)` exactly. `AdtUtils` stays
+Step 1 allows, following `search(criteria, parse)` exactly. `AdtUtils` stays
 non-generic and keeps declaring the utility contracts it already satisfies.
 - [ ] **Step 4:** `AdtUtils`' members already answer `IAdtResponse`; they lose the extra `IAdtResult` layer and the twelve that answered `IAdtWireResponse` answer `rawDocument` of it instead.
 - [ ] **Step 5:** The legacy clients follow their non-legacy counterparts. Legacy systems answer differently, but the *contract* is the same — a separate implementation is the point of the contract existing.
