@@ -1,16 +1,33 @@
-# `adt-clients` onto the 29.0.0 contracts — implementation plan
+# `adt-clients` onto the 30.0.0 contracts — implementation plan
+
+> **Retargeted 2026-09-04.** This plan was written against `interfaces@29.0.0`
+> and against the assumption that the contracts package was closed. It is not:
+> 30.0.0 collapses the members that duplicated one endpoint at a different level
+> of doneness, and it ships **first** —
+> `docs/superpowers/plans/2026-09-04-interfaces-30-one-member-per-endpoint.md`.
+> `adt-clients` migrates **once**, onto 30.0.0. Nothing here is executed against
+> 29.0.0; the intermediate state would cost a second migration of the same files.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Bring `@mcp-abap-adt/adt-clients` onto the `@mcp-abap-adt/interfaces@29.0.0` contracts, so every member answers `IAdtResponse` with SAP's own message on failure instead of throwing a fabricated one.
+**Goal:** Bring `@mcp-abap-adt/adt-clients` onto the `@mcp-abap-adt/interfaces@30.0.0` contracts, so every member answers `IAdtResponse` with SAP's own message on failure instead of throwing a fabricated one.
 
-**Architecture:** A new `answering()` composes one request with two consumer-owned strategies — an error strategy that decides whether the answer is a failure, and a result strategy that decides how it becomes a value. Each object type declares one named result type per member in its own `types.ts`, replacing the deleted state bags. The result strategy is selected at the factory in `AdtClient`, whose return type is ours, so `@mcp-abap-adt/interfaces` is not touched.
+**Architecture:** A new `answering()` composes one request with two consumer-owned strategies — an error strategy that decides whether the answer is a failure, and a result strategy that decides how it becomes a value. Each object type declares one named result type per member in its own `types.ts`, replacing the deleted state bags. Both strategies are injected into the implementation, once: the result set is selected at the factory in `AdtClient`, and the atoms are instantiated with that set's types.
 
-**Tech Stack:** TypeScript (strict, CommonJS), Biome, Jest. `@mcp-abap-adt/interfaces@^29.0.0`. `@mcp-abap-adt/connection` dev-only, for integration tests against a real SAP system.
+**Tech Stack:** TypeScript (strict, CommonJS), Biome, Jest. `@mcp-abap-adt/interfaces@^30.0.0`. `@mcp-abap-adt/connection` dev-only, for integration tests against a real SAP system.
 
 ## Global Constraints
 
-- `@mcp-abap-adt/interfaces` **is not modified**. 29.0.0 is published and final for this work.
+- **`@mcp-abap-adt/interfaces@30.0.0` must be on npm before Task 3.** Tasks 1 and 2
+  touch nothing that 30.0.0 changes and may run first; everything after them is
+  blocked until the contracts release is published. No local tarball, no `file:`
+  bridge, no `link: true`.
+- `IResultStrategy<T>` is `(answer: IAdtWireResponse) => T` and **comes from
+  `interfaces`**. This package ships implementations of it and never a second
+  spelling of the type.
+- **No member takes a strategy as an argument.** The choice is injected at
+  construction — decision 22. A per-call parse overload was tried across 23
+  members in the contracts package and reverted.
 - All repository artifacts in English. Comments explain *why*.
 - Never change `package.json` version. The number and `npm publish` are the maintainer's.
 - All diagnostics through the injected `ILogger`. `console.*` is banned by `noConsole`.
@@ -40,7 +57,7 @@
 | File | Responsibility |
 |---|---|
 | `src/utils/adtResponse.ts` | `answering()`, `succeeded`, `failed`, `recogniseFailure`. The composition of the two strategies lives here and nowhere else. |
-| `src/utils/resultStrategy.ts` (new) | The `IResultStrategy` shape and the shipped defaults (`rawDocument`, and the short/full pairs for large answers). |
+| `src/utils/resultStrategy.ts` (new) | The shipped implementations of `IResultStrategy` — `rawDocument`, `nothing`, and the short/full pairs for large answers. The *type* comes from `interfaces`; this file never redeclares it. |
 | `src/core/<type>/types.ts` | One named result type per member for that object type, with the measured ADT behaviour in its doc comment. |
 | `src/core/<type>/Adt<Type>.ts` | Declares the atoms it honours with those types; every member returns `answering(...)`. |
 | `src/clients/AdtClient.ts` | The factory. Overloads select the result strategy; the return type is the intersection of atoms instantiated with that strategy's types. |
@@ -132,10 +149,10 @@ The mechanism the whole migration rests on. The current `answering(produce)` see
 - Test: `src/__tests__/unit/shared/answeringComposition.test.ts`
 
 **Interfaces:**
-- Consumes: `IAdtWireResponse`, `IAdtError`, `IAdtResponse`, `IAdtResult` from `@mcp-abap-adt/interfaces`; `recogniseFailure` (already in `adtResponse.ts`).
+- Consumes: `IAdtWireResponse`, `IAdtError`, `IAdtResponse`, `IAdtResult`, `IResultStrategy` from `@mcp-abap-adt/interfaces`; `recogniseFailure` (already in `adtResponse.ts`).
 - Produces:
-  - `type IResultStrategy<T> = (wire: IAdtWireResponse) => T`
   - `const rawDocument: IResultStrategy<string>`
+  - `const nothing: IResultStrategy<void>`
   - `type IAnalyse = (verdict: IAdtError | undefined, answer?: IAdtWireResponse) => IAdtError | undefined`
   - `answering<T>(run: () => Promise<IAdtWireResponse>, read: IResultStrategy<T>, analyse?: IAnalyse): Promise<IAdtResponse<T>>`
 
@@ -279,10 +296,7 @@ Create `src/utils/resultStrategy.ts`:
  * what its model is about to do. None changes its mind between `create` and
  * `read` of the same object.
  */
-import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces';
-
-/** Reads a value out of the answer ADT gave. */
-export type IResultStrategy<T> = (wire: IAdtWireResponse) => T;
+import type { IResultStrategy } from '@mcp-abap-adt/interfaces';
 
 /**
  * The shipped default: the body as it arrived.
@@ -414,8 +428,11 @@ And re-export the defaults so callers have one import site:
 
 ```typescript
 export { rawDocument, nothing } from './resultStrategy';
-export type { IResultStrategy } from './resultStrategy';
 ```
+
+`IResultStrategy` itself is **not** re-exported: consumers import types from
+`@mcp-abap-adt/interfaces` directly, which is the whole reason that package
+exists.
 
 - [ ] **Step 8: Run the tests to verify they pass**
 
@@ -1374,18 +1391,24 @@ are a claim rather than a feature, and every consumer still gets one shape.
   - `transportTree: IResultStrategy<ITransportTree>` — containers, descriptions, and the **language** a request carries, which nothing currently exposes
   - `dumpList: IResultStrategy<IDumpSummary[]>` — `{ id, at, program, message }`
   - `dumpDocument = rawDocument`
-  - **Nothing for package contents — the contract already carries both readings.**
-    `getPackageContentsList` answers `IPackageContentItem[]`: names and ADT type
-    codes, which is the short reading. `getPackageHierarchy` and
-    `fetchNodeStructure` answer the full structure. A caller chooses by **which
-    member they call** — decision 16 working as intended, since one endpoint with
-    two useful readings is already two members. A strategy here would be a second
-    way to express a choice the contract expresses already.
-**One type note.** `IResultStrategy<T>` is `(wire: IAdtWireResponse) => T` — it is
-handed the whole answer, because a strategy may need the status or a header.
-Transport and dumps take strategies in that form throughout, so nothing converts
-between it and the contract's `(data: unknown) => T` parsers, and nothing
-fabricates a status.
+  - Four for package contents, over the single `getPackageContents` member that
+    `interfaces` 30.0.0 leaves in place of `getPackageContentsList` and
+    `getPackageHierarchy`:
+    - `packageList: IResultStrategy<IPackageContentItem[]>` — names and ADT type codes
+    - `packageTree: IResultStrategy<IPackageHierarchyNode>` — the structure with its descriptions and sub-package links
+    - `packageShort: IResultStrategy<{ name: string; type: string }[]>` — the reading an MCP server can afford
+    - `packageRaw = rawDocument` — the document untouched, which a backup consumer
+      could not reach through the old members at all
+
+    The walk those two members performed — `maxDepth`, default 5, recursing into
+    sub-packages — does not come with them. A member answers one read; a consumer
+    holding a result with sub-package references walks them itself.
+
+**One type note.** `IResultStrategy<T>` is `(answer: IAdtWireResponse) => T` — it
+is handed the whole answer, because a reading may need the status or a header.
+The name and the signature come from `interfaces` 30.0.0, so nothing in this
+package declares a second spelling of it, nothing converts between forms, and
+nothing fabricates a status.
 
 - [ ] **Step 1:** Write the failing test: for each pair, the same captured document read by both strategies, asserting the short one carries the identifying fields and the full one carries what the short one drops. Assert the short is **not** a prefix or subset-by-truncation of the full — it is a different reading, and a test that only checks length would pass a truncation.
 - [ ] **Step 2:** Run it; expect FAIL on the missing exports.
@@ -1454,10 +1477,12 @@ getDumps<R extends IDumpResults<unknown> = IDumpResults>(
 }
 ```
 
-Package contents reach a caller through `AdtUtils.getPackageContents`, whose
-result set is given to `AdtUtils` at construction — so `AdtClient.getUtils()`
-gains the same pair of overloads, and `src/core/shared/AdtUtils.ts` takes
-the two package members it already declares. Nothing further is needed there.
+Package contents reach a caller through `AdtUtils.getPackageContents`, whose result
+set is given to `AdtUtils` at construction — so `AdtClient.getUtils()` gains the
+same pair of overloads, `AdtUtils` becomes generic in its set exactly as
+`RuntimeDumps` does above, and the cache in `getUtils` is keyed by the set's
+identity for the same reason. This is the injection point decision 22 names;
+there is no per-call parser argument anywhere in this package.
 
 - [ ] **Step 7:** Test each factory with both sets **on one client instance**:
 `client.getDumps(dumpShort)` then `client.getDumps(dumpDocuments)`, asserting the
@@ -1476,24 +1501,31 @@ would pass while the cache defect is still there.
 **Interfaces:**
 - Consumes: `answering`, `rawDocument` (Task 2).
 - Produces:
-  - **No `IUtilsResults`, and `AdtUtils` does not become generic.**
+  - `IUtilsResults`, the result set `AdtUtils` takes at construction, carrying
+    `nodeContents`, `search` and `inactiveObjects`.
+  - `utilsDocuments` (the shipped default) and `utilsShort`, bound to
+    `AdtClient.getUtils()` by the overload pair Task 12 establishes.
 
-`AdtUtils` stays non-generic and keeps declaring the utility contracts it already
-satisfies. No `IUtilsResults`, no `getUtils` overload, no parser overload on the
-package members: those members already answer the shapes a caller wants, and the
-choice between them is which one is called.
+`AdtUtils` becomes generic in that set and keeps declaring the utility contracts
+it satisfies — which it can, because the 30.0.0 atoms take their result type as a
+parameter. No member gains an argument: the choice is injected once, at
+construction, and nothing in this package offers a per-call parser.
 
 - [ ] **Step 1:** Confirm against `node_modules/@mcp-abap-adt/interfaces/dist`
-  which utility members already declare a parser overload and which do not. Only
-  those that do can take a strategy without changing `interfaces`. **Record the
-  list in this task before writing code**; if a member a consumer needs is not
-  among them, say so in the CHANGELOG as a known gap rather than inventing a
-  mechanism — that gap is a 30.0.0 question, not this migration's.
+  that the installed version is **30.0.0 or later** and that
+  `IAdtRepositoryStructure`, `IAdtInformationSystem` and `IAdtGroupLifecycle` each
+  take a type parameter. If the installed version is 29.0.0, stop: this task is
+  blocked until 30.0.0 is on npm, and no local tarball or `file:` bridge
+  substitutes for that.
 
 - [ ] **Step 2:** `npx tsc --noEmit -p tsconfig.json 2>&1 | grep -E "AdtUtils|Legacy"` — this is the work list.
-- [ ] **Step 3:** Add the parser overload to each package member the list from
-Step 1 allows, following `search(criteria, parse)` exactly. `AdtUtils` stays
-non-generic and keeps declaring the utility contracts it already satisfies.
+- [ ] **Step 3:** Make `AdtUtils` generic in `IUtilsResults`, defaulting to
+`utilsDocuments`, and instantiate the atoms it declares with the set's types —
+following `RuntimeDumps<R>` in Task 12 exactly. The two package members it used to
+declare are one now — `getPackageContents` — and the readings a caller used to pick
+by method name are the four strategies Task 12 ships. `fetchNodeStructure` stays
+where it is: it is the node structure asked for as itself, and that the package
+member reaches the same resource internally was never the contract's business.
 - [ ] **Step 4:** `AdtUtils`' members already answer `IAdtResponse`; they lose the extra `IAdtResult` layer and the twelve that answered `IAdtWireResponse` answer `rawDocument` of it instead.
 - [ ] **Step 5:** The legacy clients follow their non-legacy counterparts. Legacy systems answer differently, but the *contract* is the same — a separate implementation is the point of the contract existing.
 - [ ] **Step 6:** `npm run lint:check && npm run build && npm run test:check` — all 0. This is the first point where the whole package compiles.
@@ -1548,4 +1580,4 @@ The report this whole line of work started from. The cloud trial cannot show it:
 
 **Placeholders.** None: every code step carries the code, and the batches in Tasks 7–11 name their types and their six steps rather than saying "as above".
 
-**Type consistency.** `IResultStrategy<T>`, `IAnalyse`, `rawDocument`, `nothing` are defined in Task 2 and used under those names in 3, 4, 5 and the batches. `IClassResults` / `classDocuments` are defined in Task 3 and consumed in 4 and 5. `answering(run, read, analyse?)` keeps that argument order everywhere.
+**Type consistency.** `IResultStrategy<T>` comes from `interfaces@30.0.0` under that name; `IAnalyse`, `rawDocument`, `nothing` are defined in Task 2 and used under those names in 3, 4, 5 and the batches. `IClassResults` / `classDocuments` are defined in Task 3 and consumed in 4 and 5. `answering(run, read, analyse?)` keeps that argument order everywhere.

@@ -1,5 +1,12 @@
 # `adt-clients` onto the 29.0.0 contracts — design
 
+> **Amended 2026-09-04.** The migration target is now `interfaces@30.0.0`, which
+> ships first and collapses the members that duplicated one endpoint at a
+> different level of doneness. Everything below holds; what changed is that the
+> one gap this design had to record — package contents — is closed in the
+> contract instead of documented as a known cost. The file name keeps its date
+> and its 29; history lives in git.
+
 ## Why
 
 `@mcp-abap-adt/interfaces@29.0.0` is published. It removed the wide composites,
@@ -17,9 +24,11 @@ transport request** produced a fabricated error instead of the one SAP sent.
   `IAdtResult<TValue>`.
 - Eight members answer instead of throwing: `create`, `read`, `readMetadata`,
   `update`, `delete`, `validate`, `check`, `activate`.
-- `@throws` remains only on `lock`, `unlock`, `getVersions`, `getVersionSource` —
-  they answer a lock handle, nothing, a version list and a source string, so they
-  have no failure half.
+- `@throws` remained on `lock`, `unlock`, `getVersions` and `getVersionSource` in
+  29.0.0, on the grounds that they answer a lock handle, nothing, a version list
+  and a source string and so have no failure half. **Superseded 2026-09-04:** a
+  lock refused because another user holds it is a 403, so they do have one, and in
+  30.0.0 they answer like everything else. No member of the contract throws.
 - Each atom names its own result: `IAdtCreatable<TConfig, TCreated>`,
   `IAdtReadable<TConfig, TSource, TMetadata>`, and so on. There is no `IAdtCrud`,
   `IAdtModifiable`, `IAdtObject`, `IAdtSourceObject`.
@@ -76,11 +85,10 @@ where an answer is large enough that a caller might reasonably want different
 amounts. A consumer supplies their own implementation and gets their own shape.
 
 **The substitution happens at the factory, and the factory is ours.**
-`@mcp-abap-adt/interfaces` is not touched: `IAdtResult<T>` stays
-`{ readonly value: T }`, the atoms keep the signatures 29.0.0 published, and no
-member gains a parameter. What varies is the **type arguments the factory
-instantiates the atoms with** — and the factory lives in `adt-clients`, so its
-return type is ours to declare:
+`IAdtResult<T>` stays `{ readonly value: T }` and **no member gains a
+parameter** — the choice is never made at the call. What varies is the **type
+arguments the factory instantiates the atoms with**, and the factory lives in
+`adt-clients`, so its return type is ours to declare:
 
 ```ts
 // the default: each member answers its document
@@ -102,10 +110,16 @@ Two or three defaults ship for the answers large enough to be worth reading
 differently — transport requests, dumps, package contents — and a consumer
 supplies their own for anything else.
 
-Rejected on the way here, each for putting the choice where the contract cannot
-carry it: a `parse` argument on a member, a `result` field on the operation
-options, and a type parameter on a member — the last because it obliges all 28
-implementations to honour a strategy most of them will never be given.
+Rejected on the way here, each for putting the choice at the call rather than at
+the implementation: a `parse` argument on a member, a `result` field on the
+operation options, and a type parameter **on a member** — `search<T>(criteria,
+parse)` — which obliges every implementation to carry a second signature whether
+or not its callers use it.
+
+A type parameter on the **atom** is the opposite move and is what 30.0.0 does:
+`IAdtPackageBrowsing<TContents>` names one member whose result type follows the
+strategy the implementation was constructed with. Nothing is decided at the call,
+and an implementation that wants only the default writes nothing at all.
 
 The shipped default answers the body as it arrived; decision 5 leaves parsing to
 whoever wants a shape out of it, and this library does not know which fields a
@@ -290,10 +304,15 @@ holds types, interfaces and the constants they name, and since 29.0.0 emits no
 class and no function at all — 50 constants and otherwise empty modules.
 
 That is why the result strategies and the factory that selects them belong here
-rather than there, and why this migration needs no follow-up release of the
-contracts. When a design appears to need a change in `interfaces` to give a
-consumer flexibility, check first whether the concrete package's own surface can
-carry it. Here the factory's return type could.
+rather than there. When a design appears to need a change in `interfaces` to give
+a consumer flexibility, check first whether the concrete package's own surface can
+carry it — here the factory's return type carries the selection.
+
+**What it cannot carry is a member that should not exist.** Where the contract
+itself declares two members over one endpoint, no factory return type reaches a
+caller through them, and the fix is in the contract. That is the one change this
+design does require there, and it ships first as
+`@mcp-abap-adt/interfaces@30.0.0`.
 
 ## Out of scope
 
@@ -319,12 +338,24 @@ one resource, each walking the structure itself and discarding the document. Tha
 is two members for one endpoint — the shape decision 16 exists to prevent — and
 it is why no strategy can reach a caller through them.
 
-Collapsing them into one member carrying a result strategy is therefore a change
-to `@mcp-abap-adt/interfaces`, not to this migration. **It is a 30.0.0 question**,
-and this release ships package contents as they are.
+Collapsing them into one member is therefore a change to
+`@mcp-abap-adt/interfaces` rather than to this package — **and it happens first.**
+`interfaces@30.0.0` replaces `getPackageContentsList` and `getPackageHierarchy`
+with one `getPackageContents` on a type-parameterised atom, and `adt-clients`
+migrates once, onto that. `fetchNodeStructure` is untouched and stays where it is:
+it asks for the node structure as itself, and that the package member reaches the
+same resource on its way is the implementation's business, not the contract's.
 
-**What the implementation plan does in the meantime:** nothing for package
-contents. No strategy set on `AdtUtils`, no parser overload, no pretence that the
-two existing members are two readings of one answer. The gap is recorded in the
-CHANGELOG naming the consumer it costs — a backup tool cannot get the raw
-document through these members, and an MCP server cannot ask for names alone.
+**What this package then ships for package contents:** four readings of one
+answer — `packageList` (names and ADT type codes), `packageTree` (the structure
+with its descriptions and sub-package links), `packageShort` (the reading an MCP
+server can afford), and `packageRaw` (the document untouched, which a backup tool
+could not reach through the old members at all). They are chosen the way every
+other reading is: given to the implementation at construction, through
+`AdtClient.getUtils()`.
+
+**What does not come with them is the walk.** `maxDepth`, default 5, and the
+recursion into sub-packages described something the library did on the caller's
+behalf across many requests. A member answers one read; building a tree out of
+that answer is the result strategy's, and walking further with it is the
+consumer's. Recorded in the CHANGELOG as the behaviour change it is.
