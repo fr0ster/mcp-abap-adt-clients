@@ -1,13 +1,21 @@
 # `adt-clients` onto the 30.0.0 contracts — implementation plan
 
-> **Retargeted 2026-09-04, and 30.0.0 is published.** This plan was written
+> **Retargeted twice; 31.0.0 is published and installed.** The target moved from
+> 29.0.0 to 30.0.0 and then to 31.0.0, and each move was measured rather than
+> assumed. Read the section **What 31.0.0 obliges this package to do** at the end
+> before starting: it is the largest of the three deltas, because 31.0.0 removed
+> every result shape from the contract and this package must now declare its own.
+>
+> **Retargeted 2026-09-04, and 30.0.0 was published.** This plan was written
 > against `interfaces@29.0.0` and against the assumption that the contracts
 > package was closed. It was not: 30.0.0 collapsed the members that duplicated
 > one endpoint, made every ADT member answer the contract, and stopped contracts
 > inheriting from one another. It is on npm and installed here.
 >
-> **Measured against it, 2026-09-04:** `npx tsc --noEmit -p tsconfig.json` gives
-> **715 error lines across 102 files**. Most of it is the 29.0.0 migration this
+> **Measured against 31.0.0, 2026-09-04:** `npx tsc --noEmit -p tsconfig.json`
+> gives **454 error lines across 139 files** — fewer lines than against 30.0.0
+> (715/102) because most are now one-line "no exported member", and more files
+> because more of them named a shape that left. Most of it is the 29.0.0 migration this
 > plan describes and which was never executed — `IAdtCrud` (11), `IClassState`
 > (9), `AdtOperationError` (8), `IAdtSourceObject` (20). The 30.0.0 delta is
 > smaller than the tasks below assumed, and it changes three of them; see
@@ -2078,3 +2086,57 @@ per-type result types, the casts, the negative cases, the visible skips and the
 two acceptance runs. The 30.0.0 delta is real but small; most of the 715 errors
 are the 29.0.0 migration this plan already describes and which was never
 executed.
+
+---
+
+## What 31.0.0 obliges this package to do
+
+Measured against the published 31.0.0, not inferred: 454 error lines, 139 files.
+
+**1. Declare the shapes, because the contract no longer does.** Decision 24: the
+contract carries what is needed to use it or replace it, and what a reading
+builds out of a document is neither. Every name below was imported from
+`interfaces` and must now be declared here — with the count of places that break:
+
+| shape | places |
+|---|---|
+| `IObjectVersion` | 38 |
+| `INamedItem` | 6 |
+| `IAbapGitRepoStatus`, `IAbapGitErrorLogEntry`, `IAbapGitExternalRepoInfo` | 11 |
+| `ITraceRequestEntry`, `ITraceEntry` | 6 |
+| `ISearchResult`, `IRepositoryNodeContents`, `ITransportTree` | 7 |
+| the feed and gateway entries (`ISystemMessageEntry`, `IGatewayErrorEntry`, `IGatewayErrorDetail`, `IGatewayException`, `ICallStackEntry`, `ISourceCodeLine`) | 12 |
+
+They are the same shapes Task 12 already ships strategies for; what changes is
+that the **type** is declared here beside the strategy that produces it, in the
+`results.ts` files that task creates. A shape and the reading that builds it now
+live together, which is what decision 24 is for.
+
+**2. Give every parameterised contract its arguments.** 103 of the errors are
+TS2314, and no contract has a default any more: `IAdtLockable` (27),
+`IAdtReadable` (9), `IAdtVersionable` (7), `ITestRunInformation` (4), and three
+each for `IAdtServiceBinding`, `IAdtRepositoryStructure`, `IAdtPackageBrowsing`,
+`IAdtInformationSystem`, `IAdtGroupLifecycle`, `IAbapGitPullArgs`. Task 5 already
+owns this work; the count grew from 36 to 103 because the defaults left.
+
+**3. The error contract changed under `answering()`** — Task 2's subject:
+
+- `AdtFailureOrigin` is `'connection' | 'refusal'`. **`'parse'` is gone.**
+  `recogniseFailure` must stop producing it: a document this library cannot read
+  is *its own* failure, and it throws rather than reporting a server origin.
+  The negative test Task 2 already requires — an error with no `response` — gains
+  a sibling: an unreadable body **throws** rather than answering `ok: false`.
+- **`IAdtError.cause` is gone.** Whatever the transport threw is not part of the
+  failure a consumer reads; `message`, `response` and `request` are.
+- **`analyse` answers `ADT_NO_FAILURE`**, not `undefined`. Every place that wrote
+  `return undefined` to mean "not a failure" returns the token, and `answering()`
+  compares against it rather than against `undefined`.
+- **Neither half of `IAdtResponse` answers `undefined`.** `succeeded` and
+  `failed` build one method each, and any code reading `answer.getError()` before
+  checking `ok` no longer compiles — which is the point, and a free audit of every
+  call site that skipped the check.
+
+**4. Two removals that were 29.0.0 debt and are still the largest single
+counts:** `IAdtSourceObject` (20), `IAdtCrud` (11), `IClassState` (9),
+`AdtOperationError` (8), `AdtSourceObjectType` (20). Tasks 1–11 already cover
+them; they are named here so nobody reads the 454 as new work.
