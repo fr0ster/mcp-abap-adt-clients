@@ -713,14 +713,18 @@ export class AdtLocalTypes<R extends IClassResults<…> = IClassResults>
   // The base declares `protected abstract readonly results: R`, so every concrete
   // subclass must carry it. Omitting it here leaves the class abstract-incompatible
   // and it will not compile — the same trap in all four.
+  // The base takes five, in this order. Dropping systemContext would put
+  // IAdtContentTypes where IAdtSystemContext belongs and LockRegistry where
+  // contentTypes belongs — a mis-wiring a cast would hide rather than fix.
   constructor(
     connection: IAbapConnection,
     logger?: ILogger,
+    systemContext?: IAdtSystemContext,
     contentTypes?: IAdtContentTypes,
     lockRegistry?: LockRegistry,
     protected readonly results: R = classDocuments as unknown as R,
   ) {
-    super(connection, logger, contentTypes, lockRegistry);
+    super(connection, logger, systemContext, contentTypes, lockRegistry);
   }
   // … read / readMetadata / update, each `answering(…, this.results.<member>)`
 }
@@ -1466,32 +1470,55 @@ would pass while the cache defect is still there.
 ### Task 13: `AdtUtils` and the legacy clients
 
 **Files:**
-- Create: `src/core/shared/utilsResults.ts`
 - Modify: `src/core/shared/AdtUtils.ts`, `src/core/shared/AdtUtilsLegacy.ts`, `src/clients/AdtClient.ts`, `src/clients/AdtClientLegacy.ts`, and the 13 `*Legacy.ts` files under `src/core/`
-- Test: `src/__tests__/unit/shared/utilsResultStrategy.test.ts`
+- Test: `src/__tests__/unit/shared/packageParserOverload.test.ts` — one call, two shapes, the parsed one typed rather than `unknown`
 
 **Interfaces:**
 - Consumes: `answering`, `rawDocument` (Task 2); `packageNames`, `packageStructure` (Task 12).
 - Produces:
-  - `interface IUtilsResults<TPackage = IRepositoryNodeContents, TSearch = ISearchResult[], …>` — one strategy per member of `AdtUtils` that answers something a caller might want differently; the rest keep `rawDocument`
-  - `const utilsDocuments: IUtilsResults` — the shipped default
-  - `class AdtUtils<R extends IUtilsResults<unknown, unknown> = IUtilsResults>` with `results` as its last constructor parameter, defaulting to `utilsDocuments`
-  - `AdtClient.getUtils()` / `getUtils<R>(results: R)`, and the same pair on `AdtClientLegacy`
+  - **No `IUtilsResults`, and `AdtUtils` does not become generic.**
 
-Without this, `packageNames` and `packageStructure` from Task 12 exist and cannot
-be selected — the strategies would be exported functions a consumer applies by
-hand, which is the rework the design removes.
+**Why, and this is a real limit rather than a simplification.** The utility
+contracts in 29.0.0 fix their results: `IAdtInformationSystem`,
+`IAdtRepositoryStructure` and their neighbours declare
+`fetchNodeStructure(...): Promise<IAdtResponse<IRepositoryNodeContents>>` and
+`search(...): Promise<IAdtResponse<ISearchResult[]>>` with no result parameter.
+Unlike the CRUD atoms, they were never parameterised. A generic `AdtUtils<R>`
+answering a consumer's shape from those members would stop satisfying the
+interfaces it declares — and `interfaces` is closed for this migration.
 
-- [ ] **Step 1:** `npx tsc --noEmit -p tsconfig.json 2>&1 | grep -E "AdtUtils|Legacy"` — this is the work list.
-- [ ] **Step 2:** Create `IUtilsResults` and `utilsDocuments`, make `AdtUtils`
-generic in the set, and add the two `getUtils` overloads on both clients —
-`AdtUtilsLegacy` extends `AdtUtils` and inherits `R`, so it needs the parameter
-threaded through its constructor and nothing more. Test it the way Task 12 tests
-dumps: two sets on **one** client, asserting the second answers the second shape.
-- [ ] **Step 3:** `AdtUtils`' members already answer `IAdtResponse`; they lose the extra `IAdtResult` layer and the twelve that answered `IAdtWireResponse` answer `rawDocument` of it instead.
-- [ ] **Step 6:** The legacy clients follow their non-legacy counterparts. Legacy systems answer differently, but the *contract* is the same — a separate implementation is the point of the contract existing.
-- [ ] **Step 5:** `npm run lint:check && npm run build && npm run test:check` — all 0. This is the first point where the whole package compiles.
-- [ ] **Step 6:** Commit.
+So the package strategies from Task 12 reach a caller by the route the contract
+already provides, which is the parser overload `search` has:
+
+```typescript
+// already in the contract, already implemented — extend the same shape to the
+// package members that answer a large document
+getPackageContents(name: string): Promise<IAdtResponse<IRepositoryNodeContents>>;
+getPackageContents<T>(
+  name: string,
+  parse: (data: unknown) => T,
+): Promise<IAdtResponse<T>>;
+```
+
+`packageNames` and `packageStructure` are then passed as that parser — they are
+`(wire) => T`, and a thin adapter reads `wire.data`. A consumer wanting names
+writes `getPackageContents('ZPKG', packageNames)`.
+
+- [ ] **Step 1:** Confirm against `node_modules/@mcp-abap-adt/interfaces/dist`
+  which utility members already declare a parser overload and which do not. Only
+  those that do can take a strategy without changing `interfaces`. **Record the
+  list in this task before writing code**; if a member a consumer needs is not
+  among them, say so in the CHANGELOG as a known gap rather than inventing a
+  mechanism — that gap is a 30.0.0 question, not this migration's.
+
+- [ ] **Step 2:** `npx tsc --noEmit -p tsconfig.json 2>&1 | grep -E "AdtUtils|Legacy"` — this is the work list.
+- [ ] **Step 3:** Add the parser overload to each package member the list from
+Step 2a allows, following `search(criteria, parse)` exactly. `AdtUtils` stays
+non-generic and keeps declaring the utility contracts it already satisfies.
+- [ ] **Step 4:** `AdtUtils`' members already answer `IAdtResponse`; they lose the extra `IAdtResult` layer and the twelve that answered `IAdtWireResponse` answer `rawDocument` of it instead.
+- [ ] **Step 5:** The legacy clients follow their non-legacy counterparts. Legacy systems answer differently, but the *contract* is the same — a separate implementation is the point of the contract existing.
+- [ ] **Step 6:** `npm run lint:check && npm run build && npm run test:check` — all 0. This is the first point where the whole package compiles.
+- [ ] **Step 7:** Commit.
 
 ---
 
