@@ -1401,7 +1401,9 @@ and nothing so far creates them. Without this task the "two or three defaults"
 are a claim rather than a feature, and every consumer still gets one shape.
 
 **Files:**
-- Create: `src/core/transport/results.ts`, `src/runtime/dumps/results.ts`
+- Create: `src/core/transport/results.ts`, `src/runtime/dumps/results.ts`,
+  `src/core/shared/results.ts` (the four package readings and the utilities set —
+  they belong beside `AdtUtils`, which is what takes them)
 - Modify: `src/runtime/dumps/RuntimeDumps.ts` (generic in its set; three members),
   `src/clients/AdtRuntimeClient.ts` (overloads and the cache), `src/clients/AdtClient.ts`,
   `src/core/transport/types.ts`, `src/core/shared/AdtUtils.ts`
@@ -1516,10 +1518,69 @@ same pair of overloads, `AdtUtils` becomes generic in its set exactly as
 identity for the same reason. This is the injection point decision 22 names;
 there is no per-call parser argument anywhere in this package.
 
-- [ ] **Step 7:** Test each factory with both sets **on one client instance**:
-`client.getDumps(dumpShort)` then `client.getDumps(dumpDocuments)`, asserting the
-second is not the first and answers the second shape. Calling them on two clients
-would pass while the cache defect is still there.
+**`IUtilsResults` carries one key per parameterised atom, and `getPackageContents`
+is its own.** `IAdtPackageBrowsing<TContents>` is a separate atom with its own
+type parameter — a package reading cannot ride on `nodeContents`, which belongs to
+`IAdtRepositoryStructure<TNode>` and answers a different question. Read from the
+published contract, the utility atoms that take parameters are four, carrying six
+between them:
+
+```typescript
+// src/core/shared/results.ts
+export interface IUtilsResults {
+  readonly search: IResultStrategy<unknown>;          // IAdtInformationSystem #1
+  readonly whereUsed: IResultStrategy<unknown>;       // IAdtInformationSystem #2
+  readonly allTypes: IResultStrategy<unknown>;        // IAdtInformationSystem #3
+  readonly nodeContents: IResultStrategy<unknown>;    // IAdtRepositoryStructure
+  readonly packageContents: IResultStrategy<unknown>; // IAdtPackageBrowsing
+  readonly inactiveObjects: IResultStrategy<unknown>; // IAdtGroupLifecycle
+}
+
+export const utilsDocuments: IUtilsResults = { /* … */ packageContents: packageList };
+export const utilsShort: IUtilsResults     = { /* … */ packageContents: packageShort };
+export const utilsRaw: IUtilsResults       = { /* … */ packageContents: packageRaw };
+```
+
+and `AdtUtils<R extends IUtilsResults>` instantiates each atom with the matching
+key: `IAdtPackageBrowsing<ReturnType<R['packageContents']>>`,
+`IAdtRepositoryStructure<ReturnType<R['nodeContents']>>`, and so on. A set that
+declares a strategy no atom reads, or an atom instantiated with a key the set does
+not carry, is the defect this list exists to prevent — `packageTree` was declared
+in Step 1 and reachable from nothing until this key existed.
+
+- [ ] **Step 7: Test the cache on every factory that has one, on one client instance**
+
+Three factories take a set and memoise the implementation, so three tests, each
+asking the same client twice with different sets and asserting the second is not
+the first and answers the second shape. Calling them on two clients would pass
+while the cache defect is still there.
+
+```typescript
+const client = new AdtClient(connection, logger);
+
+// transport
+expect(client.getRequest(transportShort)).not.toBe(client.getRequest(transportDocuments));
+
+// dumps — AdtRuntimeClient
+expect(runtime.getDumps(dumpShort)).not.toBe(runtime.getDumps(dumpDocuments));
+
+// utilities — the one this task created, and the one most likely to be wrong,
+// because `getUtils()` memoised a single AdtUtils long before it took a set
+expect(client.getUtils(utilsShort)).not.toBe(client.getUtils(utilsRaw));
+```
+
+And one assertion past identity, for `getUtils` alone: the two implementations
+answer different shapes from the same call.
+
+```typescript
+const short = await client.getUtils(utilsShort).getPackageContents('ZPKG');
+const raw = await client.getUtils(utilsRaw).getPackageContents('ZPKG');
+expect(typeof expectResult(raw, 'getPackageContents')).toBe('string');
+expect(Array.isArray(expectResult(short, 'getPackageContents'))).toBe(true);
+```
+
+A test that only compares identities passes on a factory that caches correctly
+and reads wrongly.
 
 - [ ] **Step 8:** Commit.
 
@@ -1599,11 +1660,13 @@ exists so the type says which reading this implementation performs.
 
 **Interfaces:**
 - Consumes: `answering`, `rawDocument` (Task 2).
+- Consumes: `IUtilsResults`, `utilsDocuments`, `utilsShort` and `utilsRaw` from
+  `src/core/shared/results.ts` — **Task 12 creates them**, with one key per
+  parameterised atom: `search`, `whereUsed`, `allTypes`, `nodeContents`,
+  `packageContents`, `inactiveObjects`.
 - Produces:
-  - `IUtilsResults`, the result set `AdtUtils` takes at construction, carrying
-    `nodeContents`, `search` and `inactiveObjects`.
-  - `utilsDocuments` (the shipped default) and `utilsShort`, bound to
-    `AdtClient.getUtils()` by the overload pair Task 12 establishes.
+  - `AdtUtils<R extends IUtilsResults>`, each atom it declares instantiated with
+    the matching key, and the `getUtils` overload pair bound in Task 12.
 
 `AdtUtils` becomes generic in that set and keeps declaring the utility contracts
 it satisfies — which it can, because the 30.0.0 atoms take their result type as a
@@ -1619,8 +1682,12 @@ construction, and nothing in this package offers a per-call parser.
 
 - [ ] **Step 2:** `npx tsc --noEmit -p tsconfig.json 2>&1 | grep -E "AdtUtils|Legacy"` — this is the work list.
 - [ ] **Step 3:** Make `AdtUtils` generic in `IUtilsResults`, defaulting to
-`utilsDocuments`, and instantiate the atoms it declares with the set's types —
-following `RuntimeDumps<R>` in Task 12 exactly. The two package members it used to
+`utilsDocuments`, and instantiate **every** atom it declares with the matching
+key — `IAdtPackageBrowsing<ReturnType<R['packageContents']>>`,
+`IAdtRepositoryStructure<ReturnType<R['nodeContents']>>`,
+`IAdtInformationSystem<ReturnType<R['search']>, ReturnType<R['whereUsed']>, ReturnType<R['allTypes']>>`,
+`IAdtGroupLifecycle<ReturnType<R['inactiveObjects']>>` — following `RuntimeDumps<R>`
+in Task 12 exactly. An atom left bare here is TS2314 again, one layer down. The two package members it used to
 declare are one now — `getPackageContents` — and the readings a caller used to pick
 by method name are the four strategies Task 12 ships. `fetchNodeStructure` stays
 where it is: it is the node structure asked for as itself, and that the package
@@ -1704,6 +1771,21 @@ should know which instruction was rewritten and why.
 4. **Global constraints gained decision 23.** An implementation lists the atoms it
    satisfies; nothing in `interfaces` extends anything, so nothing is inherited
    into a class by declaring one wide contract.
+
+5. **The utilities result set carries six keys, not three.** Task 12 ships four
+   package readings and Task 14 declared a set without a `packageContents` key, so
+   nothing could reach them: `IAdtPackageBrowsing<TContents>` is its own atom with
+   its own parameter, and a package reading cannot ride on `nodeContents`. The set
+   is now one key per parameterised atom, read from the published contract, and it
+   is created in Task 12 where the strategies are, not in Task 14 where it was
+   only consumed.
+
+6. **The cache test covers all three factories.** It named `getDumps` alone, while
+   the factory the package work actually adds a set to is `getUtils` — which
+   memoised one `AdtUtils` long before it took one. Identity is asserted for
+   `getRequest`, `getDumps` and `getUtils`, and for `getUtils` also that the two
+   implementations answer different shapes, since a factory can cache correctly
+   and still read wrongly.
 
 **What did not change:** every task about `answering`, the two strategies, the
 per-type result types, the casts, the negative cases, the visible skips and the
