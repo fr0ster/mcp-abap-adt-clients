@@ -1191,7 +1191,7 @@ At the end of each batch:
 
 ---
 
-### Task 12: The short and full strategies the design promised
+### Task 7: The short and full strategies the design promised
 
 The design names three answers large enough that callers want different amounts,
 and nothing so far creates them. Without this task the "two or three defaults"
@@ -1217,11 +1217,36 @@ are a claim rather than a feature, and every consumer still gets one shape.
 - [ ] **Step 3:** Implement, parsing with `fast-xml-parser` as the existing parsers do.
 - [ ] **Step 4:** Export from `src/index.ts`, and add each to the docs list `npm run check:docs` reads.
 - [ ] **Step 5:** Run the tests; expect pass. Run `npm run check:docs`; expect 0.
-- [ ] **Step 6:** Commit.
+- [ ] **Step 6: Bind them to the strategy sets and the factories**
+
+A strategy nobody can select is a function, not an option. Each pair joins its
+type's result set and gets a factory overload, exactly as `getClass` has:
+
+```typescript
+// src/core/transport/types.ts
+export const transportDocuments: ITransportResults = { /* … */ list: transportTree };
+export const transportShort: ITransportResults<string[]> = { /* … */ list: transportNumbers };
+
+// src/clients/AdtClient.ts
+getRequest(): AdtRequest;
+getRequest<R extends ITransportResults<unknown>>(results: R): /* atoms over R */;
+
+// src/clients/AdtRuntimeClient.ts
+getDumps(): AdtDumps;                                            // dumpDocument
+getDumps<R extends IDumpResults<unknown>>(results: R): /* … */;  // dumpList
+```
+
+Package contents reach a caller through `AdtUtils`, whose members take the set
+the handler was built with — wired in Task 13 rather than here.
+
+- [ ] **Step 7:** Test each factory with both sets: one call, two shapes, and the
+short one typed as its own type rather than as `unknown`.
+
+- [ ] **Step 8:** Commit.
 
 ---
 
-### Task 16: `AdtUtils` and the legacy clients
+### Task 8: `AdtUtils` and the legacy clients
 
 **Files:**
 - Modify: `src/core/shared/AdtUtils.ts`, `src/core/shared/AdtUtilsLegacy.ts`, `src/clients/AdtClientLegacy.ts`, and the 13 `*Legacy.ts` files under `src/core/`
@@ -1238,7 +1263,7 @@ are a claim rather than a feature, and every consumer still gets one shape.
 
 ---
 
-### Task 13: The integration tests read the verdict from the contract
+### Task 9: The integration tests read the verdict from the contract
 
 **Files:**
 - Modify: `src/__tests__/integration/shared/{discovery,readSource,readMetadata,whereUsed,search,sqlQuery,tableContents}.test.ts`
@@ -1256,7 +1281,7 @@ are a claim rather than a feature, and every consumer still gets one shape.
 
 ---
 
-### Task 14: Full run against the cloud trial
+### Task 10: Full run against the cloud trial
 
 - [ ] **Step 1:** Confirm no other SAP-touching run is in flight, and that the token in `.env` is valid.
 - [ ] **Step 2:** `npm test 2>&1 | tee test-run.log`
@@ -1267,7 +1292,7 @@ are a claim rather than a feature, and every consumer still gets one shape.
 
 ---
 
-### Task 15: On-prem acceptance
+### Task 11: On-prem acceptance
 
 The report this whole line of work started from. The cloud trial cannot show it: `ZLOCAL` is local and `transport_request` is unset, which the last full run confirmed by skipping `read_transport`.
 
@@ -1281,7 +1306,7 @@ The report this whole line of work started from. The cloud trial cannot show it:
 
 ## Self-review
 
-**Spec coverage.** Consumer-owned interpretation on two axes → Tasks 2, 3, 5. `analyse` composition and the no-wire rule → Task 2, red-proofed. Result strategy at the factory → Task 5. Per-type result types → Tasks 3, 7–11. Legacy migrates, batch deleted → Tasks 1, 12. Casts → Task 6 and each batch. Both test directions and negative cases as their own body → Task 6. Visible skips → Task 13. Full trial run → Task 14. On-prem acceptance → Task 15. `interfaces` untouched → Global Constraints.
+**Spec coverage.** Consumer-owned interpretation on two axes → Tasks 2, 3, 5. `analyse` composition and the no-wire rule → Task 2, red-proofed; chain cleanup on every path → Task 4, three tests. Result strategy at the factory → Tasks 5 and 12, with the short/full pairs bound to factories in Task 12. Per-type result types → Tasks 3, 7–11. Legacy migrates, batch deleted → Tasks 1, 13. Casts → Task 6 and each batch. Both test directions and negative cases as their own body → Task 6. Visible skips → Task 14. Full trial run → Task 15. On-prem acceptance → Task 16. `interfaces` untouched → Global Constraints.
 
 **Placeholders.** None: every code step carries the code, and the batches in Tasks 7–11 name their types and their six steps rather than saying "as above".
 
