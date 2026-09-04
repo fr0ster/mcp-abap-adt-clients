@@ -24,8 +24,8 @@
   would mean one enormous commit or a false claim in each small one. Commits in
   that window use `--no-verify` and say in their message that the type-checks are
   still red and why.
-- `npm run lint:check` runs `check:docs`, and **it is red right now for five
-  broken documentation imports** — `README.md` and `docs/usage/CLIENT_API_REFERENCE.md`
+- `npm run lint:check` runs `check:docs`, and **it is red for Task 1 as well, for
+  five broken documentation imports** — `README.md` and `docs/usage/CLIENT_API_REFERENCE.md`
   still say `AdtOperationError` and `IClassState` come from
   `@mcp-abap-adt/interfaces`, which 29.0.0 removed. Task 2 fixes those, and from
   then on `lint:check` is green on every commit and is the gate that actually
@@ -98,10 +98,14 @@ Expected: no matches outside `CHANGELOG.md`. Fix any that appear, including comm
 - [ ] **Step 5: Verify the gate**
 
 ```bash
-npm run lint:check && npm run build
+npm run build 2>&1 | grep -i batch
 ```
 
-Expected: the batch errors are gone. Other migration errors remain — see the
+Run `build` **alone**. `lint:check` is red until Task 2 fixes the five broken
+documentation imports, so `lint:check && npm run build` would stop at the first
+and never tell you whether the batch errors went.
+
+Expected: no output — the batch errors are gone. Other migration errors remain — see the
 build exception in Global Constraints; this commit uses `--no-verify`.
 
 - [ ] **Step 6: Commit**
@@ -654,7 +658,7 @@ export class AdtClass<R extends IClassResults<
     systemContext?: IAdtSystemContext,
     contentTypes?: IAdtContentTypes,
     lockRegistry?: LockRegistry,
-    private readonly results: R = classDocuments as unknown as R,
+    protected readonly results: R = classDocuments as unknown as R,
   ) { /* … */ }
 }
 ```
@@ -758,7 +762,9 @@ Expected: FAIL — `read` returns a state, not a contract.
 
 - [ ] **Step 3: Rewrite the members**
 
-In `src/core/class/AdtClass.ts`: change the `implements` clause to the atom list in **Interfaces** above; add `private readonly results: IClassResults = classDocuments` to the constructor; delete every `state` object, every `errors: []`, and the `AdtOperationError` import and its four throw sites.
+In `src/core/class/AdtClass.ts`: change the `implements` clause to the atom list in **Interfaces** above; the constructor's `results` parameter is `protected readonly results: R` — it
+satisfies the base's `protected abstract readonly results: R`, and a `private`
+one would not compile against it; delete every `state` object, every `errors: []`, and the `AdtOperationError` import and its four throw sites.
 
 Each member becomes one shape — `read` shown, the rest follow it:
 
@@ -817,6 +823,20 @@ Add `src/core/shared/chain.ts`:
  * An error raised *by* cleanup is logged, never propagated: a failing unlock must
  * not replace the reason the chain failed, which is what the caller needs.
  */
+/**
+ * Raised by `step()` to abandon a chain, carrying the failure that caused it.
+ *
+ * Private to this module and never exported: it is a control-flow device, not a
+ * failure a caller should ever see. `chain` catches it and returns the failure
+ * it carries; anything else that escapes is a real exception and is classified.
+ */
+class ChainAbandoned extends Error {
+  constructor(readonly failure: IAdtError) {
+    super(failure.message);
+    this.name = 'ChainAbandoned';
+  }
+}
+
 export async function chain<T>(
   logger: ILogger | undefined,
   body: (scope: {
@@ -1287,6 +1307,9 @@ are a claim rather than a feature, and every consumer still gets one shape.
 
 **Files:**
 - Create: `src/core/transport/results.ts`, `src/runtime/dumps/results.ts`, `src/core/package/results.ts`
+- Modify: `src/runtime/dumps/RuntimeDumps.ts` (generic in its set; three members),
+  `src/clients/AdtRuntimeClient.ts` (overloads and the cache), `src/clients/AdtClient.ts`,
+  `src/core/transport/types.ts`, `src/core/shared/AdtUtils.ts`
 - Modify: `src/index.ts` (export them; a strategy a consumer cannot import is not an option they have)
 - Test: `src/__tests__/unit/core/resultStrategies.test.ts`
 
@@ -1347,8 +1370,24 @@ with `grep -rn "getDumps()" src`.
 ```typescript
 
 // src/clients/AdtRuntimeClient.ts
+//
+// The existing `getDumps()` memoises one handler in `_dumps` and returns it for
+// every later call. With a strategy that is a defect the overload hides: the
+// second consumer asks for a different shape, gets the first one's handler, and
+// the signature promises theirs. Key the cache by the set's identity instead.
+private readonly dumpHandlers = new WeakMap<object, RuntimeDumps<never>>();
+
 getDumps(): RuntimeDumps;
 getDumps<R extends IDumpResults<unknown>>(results: R): RuntimeDumps<R>;
+getDumps<R extends IDumpResults<unknown> = IDumpResults>(
+  results: R = dumpDocuments as unknown as R,
+): RuntimeDumps<R> {
+  const cached = this.dumpHandlers.get(results as object);
+  if (cached) return cached as unknown as RuntimeDumps<R>;
+  const made = new RuntimeDumps<R>(this.connection, this.logger, results);
+  this.dumpHandlers.set(results as object, made as unknown as RuntimeDumps<never>);
+  return made;
+}
 ```
 
 Package contents reach a caller through `AdtUtils.getPackageContents`, whose
@@ -1357,8 +1396,10 @@ gains the same pair of overloads, and `src/core/shared/AdtUtils.ts` takes
 `results: IUtilsResults` alongside its connection. Both are done in the
 `AdtUtils` task, and this step is not complete until that one names them.
 
-- [ ] **Step 7:** Test each factory with both sets: one call, two shapes, and the
-short one typed as its own type rather than as `unknown`.
+- [ ] **Step 7:** Test each factory with both sets **on one client instance**:
+`client.getDumps(dumpShort)` then `client.getDumps(dumpDocuments)`, asserting the
+second is not the first and answers the second shape. Calling them on two clients
+would pass while the cache defect is still there.
 
 - [ ] **Step 8:** Commit.
 
