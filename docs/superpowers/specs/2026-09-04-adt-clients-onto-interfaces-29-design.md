@@ -92,7 +92,7 @@ getClass(results: ClassResultStrategy<R>): IAdtCreatable<IClassConfig, R['create
                                            IAdtReadable<IClassConfig, R['source'], R['metadata']> & …
 ```
 
-The strategy is chosen once per handler rather than per call, which fits how
+The strategy is chosen once per implementation rather than per call, which fits how
 these consumers work: a backup tool wants documents whole for everything it
 touches, a script wants two fields from every read, an MCP server picks by what
 its model is about to do. None of them changes its mind between `create` and

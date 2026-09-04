@@ -18,7 +18,7 @@
 - Gate for every commit: `npm run lint:check` exits 0.
   **`npm run build` and `npm run test:check` are both expected to fail from Task 1
   until the `AdtUtils` task** — `test:check` is red today with the same migration
-  errors, in scripts, tests and handlers alike —
+  errors, in scripts, tests and implementations alike —
   which is the first point where the whole package compiles. A migration of this
   size cannot keep either type-check green at every step, and pretending otherwise
   would mean one enormous commit or a false claim in each small one. Commits in
@@ -98,14 +98,18 @@ Expected: no matches outside `CHANGELOG.md`. Fix any that appear, including comm
 - [ ] **Step 5: Verify the gate**
 
 ```bash
-npm run build 2>&1 | grep -i batch
+npm run build > build.log 2>&1; echo "build exit: $?"
+grep -ic batch build.log
 ```
 
-Run `build` **alone**. `lint:check` is red until Task 2 fixes the five broken
+Run `build` **alone**: `lint:check` is red until Task 2 fixes the five broken
 documentation imports, so `lint:check && npm run build` would stop at the first
-and never tell you whether the batch errors went.
+and never reach the second.
 
-Expected: no output — the batch errors are gone. Other migration errors remain — see the
+Expected: **exit 1** — the migration errors are still there, which is the state
+Global Constraints describes — and **0** batch matches. Piping straight into
+`grep` would return 1 on the wanted result and hide the build's own exit code, so
+a build that died before emitting any diagnostic would read as a pass. Other migration errors remain — see the
 build exception in Global Constraints; this commit uses `--no-verify`.
 
 - [ ] **Step 6: Commit**
@@ -273,7 +277,7 @@ Create `src/utils/resultStrategy.ts`:
  * is a failure, and this decides how the same answer is presented when it is
  * not. What ships here are defaults, not the meaning.
  *
- * A strategy is chosen per handler at the factory rather than per call, because
+ * A strategy is chosen per implementation at the factory rather than per call, because
  * that is how consumers work: a backup tool wants documents whole for everything
  * it touches, a script wants two fields from every read, an MCP server picks by
  * what its model is about to do. None changes its mind between `create` and
@@ -478,7 +482,7 @@ IAdtSuccess could honestly be built. Red-proofed by breaking that branch."
 
 **Interfaces:**
 - Consumes: `IResultStrategy`, `rawDocument`, `nothing` from Task 2.
-- Produces: `interface IClassResults { created; source; metadata; check; activation; validation; deletion; updated }` and `const classDocuments: IClassResults` — the default strategy set for a class handler.
+- Produces: `interface IClassResults { created; source; metadata; check; activation; validation; deletion; updated }` and `const classDocuments: IClassResults` — the default strategy set for a class implementation.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -528,9 +532,9 @@ import type { IResultStrategy } from '../../utils/resultStrategy';
 import { nothing, rawDocument } from '../../utils/resultStrategy';
 
 /**
- * One strategy per member of a class handler.
+ * One strategy per member of a class implementation.
  *
- * A handler is given a whole set at the factory rather than a strategy per call:
+ * A implementation is given a whole set at the factory rather than a strategy per call:
  * a consumer that wants documents whole wants them for every member it touches.
  */
 export interface IClassResults<
@@ -578,9 +582,9 @@ Expected: 3 passed.
 
 ```bash
 git add src/core/class/types.ts src/__tests__/unit/core/classResultStrategy.test.ts
-git commit -m "feat(class): the default result strategies for a class handler
+git commit -m "feat(class): the default result strategies for a class implementation
 
-One strategy per member, given to a handler as a set at the factory rather than
+One strategy per member, given to a implementation as a set at the factory rather than
 per call — a consumer wanting documents whole wants them for every member it
 touches. The default answers each document as it arrived."
 ```
@@ -593,7 +597,7 @@ Every removed state type and every file naming it. A batch is not done until its
 rows are clear. Counts are from `grep -rl` on 2026-09-04; re-measure rather than
 trust them.
 
-| state | files | handlers beyond the obvious one |
+| state | files | implementations beyond the obvious one |
 |---|---:|---|
 | `IClassState` | 12 | `AdtClassLegacy`, `AdtLocalDefinitions`, `AdtLocalMacros`, `AdtLocalTestClass`, `AdtLocalTypes`, `AdtClassMemberBase` |
 | `IDdlState`, `IFunctionGroupState`, `IFunctionModuleState`, `IInterfaceState`, `IPackageState`, `IProgramState` | 6 each | each has an `Adt<Type>Legacy` |
@@ -602,16 +606,16 @@ trust them.
 | `IIncludeState` | 4 | `__tests__/helpers/testTemplate.ts` |
 | `IAccessControlState`, `IBehaviorDefinitionState`, `IBehaviorImplementationState`, `IDataElementState`, `IDomainState`, `IMessageClassState`, `IMetadataExtensionState`, `IServiceDefinitionState`, `IStructureState`, `ITableState`, `ITableTypeState`, `IEnhancementState` | 4 each | — |
 | `IServiceBindingState` | 4 | `core/service/AdtService.ts` — **not** under a `<type>` directory |
-| `ICdsUnitTestState` | 4 | `core/unitTest/AdtCdsUnitTest.ts` — a second handler in one module |
+| `ICdsUnitTestState` | 4 | `core/unitTest/AdtCdsUnitTest.ts` — a second implementation in one module |
 | `ITransportState` | 4 | `AdtRequest`, `AdtRequestLegacy` |
-| `IMessageClassMessageState` | 3 | `core/messageClass/AdtMessageClassMessage.ts` — a second handler |
+| `IMessageClassMessageState` | 3 | `core/messageClass/AdtMessageClassMessage.ts` — a second implementation |
 | `IAppendStructureState`, `IScalarFunctionState`, `IScalarFunctionImplementationState` | 3 each | — |
 | `IFeatureToggleState` | 3 | `core/featureToggle/AdtFeatureToggle.ts` |
 
 `IFeatureToggleRuntimeState` **survives** — it is an ADT payload shape, not a
 state bag, and is still declared in `interfaces`. Do not delete it.
 
-**Modules that hold more than one handler**, and are therefore easy to leave half
+**Modules that hold more than one implementation**, and are therefore easy to leave half
 migrated: `class` (six), `unitTest` (two), `messageClass` (two), `service` (one,
 under a name that does not match its directory).
 
@@ -627,7 +631,7 @@ so that file is not finished until the last batch is.
 - Modify: `src/core/class/AdtClass.ts`, `src/core/class/AdtClassMemberBase.ts`,
   `src/core/class/AdtLocalDefinitions.ts`, `src/core/class/AdtLocalMacros.ts`,
   `src/core/class/AdtLocalTestClass.ts`, `src/core/class/AdtLocalTypes.ts`
-  (all four class-include handlers name `IClassState` and are written under the
+  (all four class-include implementations name `IClassState` and are written under the
   parent class's lock — see `docs/architecture/`), and `src/core/class/AdtClassLegacy.ts`
 - Test: `src/__tests__/unit/core/classAnswersContract.test.ts`
 
@@ -664,7 +668,8 @@ export class AdtClass<R extends IClassResults<
 ```
 
   **`AdtClassMemberBase` must be generic in the same `R`**, and so must the four
-  class-include handlers. `activate` and `readMetadata` are inherited from the
+  class-include implementations — `AdtLocalDefinitions`, `AdtLocalMacros`,
+  `AdtLocalTestClass`, `AdtLocalTypes`. `activate` and `readMetadata` are inherited from the
   base; leaving it fixed would bind them to the defaults while the `implements`
   clause promises `ReturnType<R['activation']>` and `ReturnType<R['metadata']>` —
   the class would not satisfy the atoms it claims, for exactly the members a
@@ -683,7 +688,31 @@ export abstract class AdtClassMemberBase<
 ```
 
   Every member's return type follows from `R`: `read` answers
-  `Promise<IAdtResponse<ReturnType<R['source']>>>`, not `ClassSource`. The single
+  `Promise<IAdtResponse<ReturnType<R['source']>>>`, not `ClassSource`.
+
+  **The four class-include implementations share the class's set.** They read and
+  write an include of a class — `testclasses`, `localtypes`, `definitions`,
+  `macros` — under the parent class's lock, so their source and their metadata are
+  the class's source and metadata. Giving them sets of their own would let a
+  caller ask for one shape from `getClass()` and a different one from
+  `getLocalTypes()` for the same bytes, which is a choice nobody wants and four
+  more sets to keep aligned:
+
+```typescript
+// src/core/class/AdtLocalTypes.ts — and the three beside it
+export class AdtLocalTypes<R extends IClassResults<…> = IClassResults>
+  extends AdtClassMemberBase<R>
+  implements IAdtReadable<IClassConfig, ReturnType<R['source']>, ReturnType<R['metadata']>>,
+             IAdtUpdatable<IClassConfig, ReturnType<R['updated']>> { … }
+
+// src/clients/AdtClient.ts — each of the four takes the same pair of overloads
+getLocalTypes(): AdtLocalTypes;
+getLocalTypes<R extends IClassResults<…>>(results: R): AdtLocalTypes<R>;
+```
+
+  Same for `getLocalDefinitions`, `getLocalMacros`, `getLocalTestClass`. A caller
+  wanting one shape for a class and its includes passes the same set to all five,
+  which is the point of it being one set. The single
   cast is on the default in the constructor, where `classDocuments` is known to
   satisfy the erased bound, and it is the only one — a cast on the *members*
   would be the factory lying, which is what this avoids.
@@ -721,7 +750,7 @@ describe('AdtClass', () => {
   it('answers a result when the read succeeded', async () => {
     // Through AdtClient, not `new AdtClass`: the refusal detection that turns an
     // <exc:exception> inside a 200 into a failure is installed on the connection
-    // by the client. Constructing the handler directly skips it, and every
+    // by the client. Constructing the implementation directly skips it, and every
     // refusal test would pass as a success while proving nothing.
     const cls = new AdtClient(answering('CLASS zcl_x.'), logger).getClass();
 
@@ -801,9 +830,18 @@ whatever happens, not only on the way out through a failure.
 `recogniseFailure` is currently private to `adtResponse.ts`. Export it there
 rather than duplicating the classification; `chain` needs it for a real exception.
 
-Add `src/core/shared/chain.ts`:
+Add `src/core/shared/chain.ts`. The imports are part of the file, not an exercise
+for the reader:
 
 ```typescript
+import type {
+  IAdtError,
+  IAdtResponse,
+  ILogger,
+} from '@mcp-abap-adt/interfaces';
+import { failed, recogniseFailure, succeeded } from '../../utils/adtResponse';
+import { safeErrorMessage } from '../../utils/internalUtils';
+
 /**
  * Run a chain of requests as a resource scope.
  *
@@ -813,7 +851,7 @@ Add `src/core/shared/chain.ts`:
  *
  * **Cleanup runs on every path** — success, returned failure, and exception — in
  * reverse order of registration. That is the difference between a cleanup and an
- * error handler, and getting it wrong leaks a lock on the happy path, which is
+ * error implementation, and getting it wrong leaks a lock on the happy path, which is
  * the one that runs most.
  *
  * A registration can be **discharged** when the resource is released normally:
@@ -1118,10 +1156,10 @@ Replace `getClass()` in `src/clients/AdtClient.ts`:
 
 ```typescript
 /**
- * A class handler, answering documents.
+ * A class implementation, answering documents.
  *
  * The result strategy is chosen here rather than per call because a consumer
- * that wants a particular shape wants it for every member of the handler. The
+ * that wants a particular shape wants it for every member of the implementation. The
  * return type is this package's, which is why `@mcp-abap-adt/interfaces` needs
  * no parser parameter and did not change to make this possible.
  */
@@ -1141,7 +1179,7 @@ getClass<
   IAdtActivatable<IClassConfig, ReturnType<R['activation']>> &
   IAdtLockable<IClassConfig> &
   IAdtVersionable<IClassConfig>;
-// The implementation is generic too. Erasing R here would build the handler at
+// The implementation is generic too. Erasing R here would build the implementation at
 // `unknown` while the overload promised `ReturnType<R['source']>` — the factory
 // telling the truth in its signature and lying in its body.
 getClass<
@@ -1161,18 +1199,18 @@ getClass<
 }
 ```
 
-- [ ] **Step 4: Prove the handler and the overload agree on `R`**
+- [ ] **Step 4: Prove the implementation and the overload agree on `R`**
 
 A compile-only assertion, in the same file. A runtime test cannot catch the
 factory building at `unknown` while its signature promises otherwise:
 
 ```typescript
-// Compile-only: if these stop compiling, the factory and the handler disagree.
+// Compile-only: if these stop compiling, the factory and the implementation disagree.
 const named = {
   ...classDocuments,
   source: (wire: IAdtWireResponse) => ({ name: String(wire.data) }),
 };
-type Handler = ReturnType<AdtClient['getClass']>;
+type Implementation = ReturnType<AdtClient['getClass']>;
 type FromNamed = ReturnType<typeof AdtClient.prototype.getClass<typeof named>>;
 const _readsTheirShape: (
   c: FromNamed,
@@ -1277,7 +1315,7 @@ Five batches, each the same six steps as Tasks 3, 4 and 6 applied to its types. 
 |---|---|
 | 7 | `program`, `interface`, `include`, `functionGroup`, `functionModule`, `functionInclude` |
 | 8 | `table`, `structure`, `domain`, `dataElement`, `tabletype`, `appendStructure` |
-| 9 | `ddl`, `metadataExtension`, `accessControl`, `serviceDefinition`, `service` (handler is `AdtService`, state `IServiceBindingState`), `behaviorDefinition`, `behaviorImplementation` |
+| 9 | `ddl`, `metadataExtension`, `accessControl`, `serviceDefinition`, `service` (implementation is `AdtService`, state `IServiceBindingState`), `behaviorDefinition`, `behaviorImplementation` |
 | 10 | `package`, `transport` (`AdtRequest` **and** `AdtRequestLegacy`), `enhancement`, `transformation`, `messageClass` (`AdtMessageClass` **and** `AdtMessageClassMessage`) |
 | 11 | `unitTest` (`AdtUnitTest`, `AdtCdsUnitTest`, `AdtUnitTestLegacy`), `authorizationField`, `featureToggle`, `scalarFunction`, `scalarFunctionImplementation` |
 
@@ -1289,7 +1327,7 @@ Per type, in order:
 - [ ] **Step 4:** Add the factory overload in `src/clients/AdtClient.ts`, following `getClass`.
 - [ ] **Step 5:** Read the casts in that module; remove the redundant, fix what the rest hid.
 - [ ] **Step 6:** `npx tsc --noEmit -p tsconfig.json 2>&1 | grep "^src/core/<type>/"` — expect no output.
-- [ ] **Step 7:** `grep -rn "I<Type>State" src` — expect no matches. A module with two handlers is only done when both are clear; check the inventory row rather than the directory listing.
+- [ ] **Step 7:** `grep -rn "I<Type>State" src` — expect no matches. A module with two implementations is only done when both are clear; check the inventory row rather than the directory listing.
 
 At the end of each batch:
 
@@ -1371,9 +1409,9 @@ with `grep -rn "getDumps()" src`.
 
 // src/clients/AdtRuntimeClient.ts
 //
-// The existing `getDumps()` memoises one handler in `_dumps` and returns it for
+// The existing `getDumps()` memoises one implementation in `_dumps` and returns it for
 // every later call. With a strategy that is a defect the overload hides: the
-// second consumer asks for a different shape, gets the first one's handler, and
+// second consumer asks for a different shape, gets the first one's implementation, and
 // the signature promises theirs. Key the cache by the set's identity instead.
 private readonly dumpHandlers = new WeakMap<object, RuntimeDumps<never>>();
 
