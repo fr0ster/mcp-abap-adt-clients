@@ -15,13 +15,16 @@
 - Never change `package.json` version. The number and `npm publish` are the maintainer's.
 - All diagnostics through the injected `ILogger`. `console.*` is banned by `noConsole`.
 - No `"link": true` in `package-lock.json`; everything resolves from the npm registry.
-- Gate for every commit: `npm run lint:check` and `npm run test:check` exit 0.
-  **`npm run build` is expected to fail from Task 1 until the `AdtUtils` task**,
-  which is the first point where the whole package compiles — a migration of this
-  size cannot keep the build green at every step, and pretending otherwise would
-  mean either one enormous commit or a false claim in each small one. Commits
-  during that window use `--no-verify` and say in their message that the build is
-  still red and why.
+- Gate for every commit: `npm run lint:check` exits 0.
+  **`npm run build` and `npm run test:check` are both expected to fail from Task 1
+  until the `AdtUtils` task** — `test:check` is red today with the same migration
+  errors, in scripts, tests and handlers alike —
+  which is the first point where the whole package compiles. A migration of this
+  size cannot keep either type-check green at every step, and pretending otherwise
+  would mean one enormous commit or a false claim in each small one. Commits in
+  that window use `--no-verify` and say in their message that the type-checks are
+  still red and why. `lint:check` stays green throughout and is the gate that
+  actually holds.
 - **One SAP-touching run at a time**, and no edits under `src/` while one is in flight.
 - Test output: `npm test 2>&1 | tee test-run.log`, then read the file. Never pipe through `grep`/`head`/`tail`.
 - Deleting or renaming a symbol: enumerate first, edit, then grep the repository for it **including comments, README and docs**, and compare counts before and after. Three regex sweeps in the contracts package silently deleted six types and the first field of three others while every check stayed green.
@@ -635,6 +638,25 @@ export class AdtClass<R extends IClassResults<
 }
 ```
 
+  **`AdtClassMemberBase` must be generic in the same `R`**, and so must the four
+  class-include handlers. `activate` and `readMetadata` are inherited from the
+  base; leaving it fixed would bind them to the defaults while the `implements`
+  clause promises `ReturnType<R['activation']>` and `ReturnType<R['metadata']>` —
+  the class would not satisfy the atoms it claims, for exactly the members a
+  consumer is least likely to test:
+
+```typescript
+export abstract class AdtClassMemberBase<
+  R extends IClassResults<
+    unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown
+  > = IClassResults,
+> {
+  protected abstract readonly results: R;
+  async activate(/* … */): Promise<IAdtResponse<ReturnType<R['activation']>>>;
+  async readMetadata(/* … */): Promise<IAdtResponse<ReturnType<R['metadata']>>>;
+}
+```
+
   Every member's return type follows from `R`: `read` answers
   `Promise<IAdtResponse<ReturnType<R['source']>>>`, not `ClassSource`. The single
   cast is on the default in the constructor, where `classDocuments` is known to
@@ -925,10 +947,13 @@ it('restores stateless on the success path too', async () => {
   const connection = {
     setSessionType: jest.fn((t: string) => calls.push(`session:${t}`)),
     isConnected: () => true,
-    makeAdtRequest: jest.fn(async (r: { url: string }) => ({
-      data: /_action=LOCK\b/i.test(r.url) ? '<LOCK_HANDLE>h1</LOCK_HANDLE>' : '',
-      status: 200, statusText: 'OK', headers: {},
-    })),
+    makeAdtRequest: jest.fn(async (r: { url: string }) => {
+      calls.push(r.url);   // without this the unlock count is always 0 and the
+      return {             // assertion below passes whatever cleanup does
+        data: /_action=LOCK\b/i.test(r.url) ? '<LOCK_HANDLE>h1</LOCK_HANDLE>' : '',
+        status: 200, statusText: 'OK', headers: {},
+      };
+    }),
   } as unknown as IAbapConnection;
 
   const response = await new AdtClient(connection, logger).getClass().update({
@@ -1273,13 +1298,32 @@ export const transportShort: ITransportResults<string[]> = { /* … */ list: tra
 getRequest(): AdtRequest;
 getRequest<R extends ITransportResults<unknown>>(results: R): /* atoms over R */;
 
-// src/runtime/dumps/RuntimeDumps.ts — the real class name; its members answer
-// IAdtWireResponse today and must take the set the handler was built with
+// src/runtime/dumps/RuntimeDumps.ts — the real class, with its three real
+// members. `IRuntimeDumps` in interfaces 29.0.0 declares them answering
+// IAdtWireResponse and is NOT changed by this work, so the class stops declaring
+// `implements IRuntimeDumps` and states its own contract instead. That is the
+// honest move: a class cannot both answer the contract and answer the frame, and
+// interfaces is closed for this migration.
 export class RuntimeDumps<R extends IDumpResults<unknown> = IDumpResults> {
   constructor(/* … */, private readonly results: R = dumpDocuments as unknown as R) {}
-  list(params?: IGetDumpsParams): Promise<IAdtResponse<ReturnType<R['list']>>>;
-  read(id: string): Promise<IAdtResponse<ReturnType<R['document']>>>;
+  list(options?: IRuntimeDumpsListOptions): Promise<IAdtResponse<ReturnType<R['list']>>>;
+  listByUser(
+    user?: string,
+    options?: Omit<IRuntimeDumpsListOptions, 'query'>,
+  ): Promise<IAdtResponse<ReturnType<R['list']>>>;
+  getById(
+    dumpId: string,
+    options?: IRuntimeDumpReadOptions,
+  ): Promise<IAdtResponse<ReturnType<R['document']>>>;
 }
+```
+
+`IDumpResults` therefore carries two strategies, not three: `list` serves both
+listing members because they answer the same shape from the same resource, and
+`document` serves `getById`. Callers of all three migrate in this task — find them
+with `grep -rn "getDumps()" src`.
+
+```typescript
 
 // src/clients/AdtRuntimeClient.ts
 getDumps(): RuntimeDumps;
