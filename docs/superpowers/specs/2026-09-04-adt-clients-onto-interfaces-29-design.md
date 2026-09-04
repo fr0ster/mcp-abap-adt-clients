@@ -248,6 +248,18 @@ So each step is verified three ways:
   confirmed by skipping that test — so it is verified on the machine with on-prem
   access before release.
 
+## The rule underneath all of this
+
+Every implementation lives in a concrete package. `@mcp-abap-adt/interfaces`
+holds types, interfaces and the constants they name, and since 29.0.0 emits no
+class and no function at all — 50 constants and otherwise empty modules.
+
+That is why the result strategies and the factory that selects them belong here
+rather than there, and why this migration needs no follow-up release of the
+contracts. When a design appears to need a change in `interfaces` to give a
+consumer flexibility, check first whether the concrete package's own surface can
+carry it. Here the factory's return type could.
+
 ## Out of scope
 
 The `adt-clients` version number, and publication. Both are the maintainer's.
