@@ -81,7 +81,7 @@ interface IWithResponse {
  * It is rethrown by {@link answering} rather than dressed as a verdict about
  * SAP.
  */
-function recogniseFailure(error: unknown): IAdtError {
+export function recogniseFailure(error: unknown): IAdtError {
   if (error instanceof AdtSAPError) {
     return {
       origin: 'refusal',

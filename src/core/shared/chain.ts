@@ -1,0 +1,88 @@
+/**
+ * Run a chain of requests as a resource scope.
+ *
+ * Cleanup used to run from a `catch`, and that worked only because a refusal
+ * threw. A refusal is a returned value now, so an unguarded early return would
+ * leave the object locked on the server and the session stateful, with nothing
+ * raised to say so.
+ *
+ * **Cleanup runs on every path** — success, returned failure, and exception — in
+ * reverse order of registration. That is the difference between a cleanup and an
+ * error handler, and getting it wrong leaks a lock on the happy path, which is
+ * the one that runs most.
+ *
+ * A registration can be **discharged** when the resource is released normally:
+ * `onScopeEnd` returns a handle, and calling it removes that entry, so a chain
+ * that unlocks as its own step does not unlock twice.
+ *
+ * An error raised *by* cleanup is logged, never propagated: a failing unlock must
+ * not replace the reason the chain failed, which is what the caller needs.
+ */
+import type {
+  IAdtError,
+  IAdtResponse,
+  ILogger,
+} from '@mcp-abap-adt/interfaces';
+import { failed, recogniseFailure, succeeded } from '../../utils/adtResponse';
+import { safeErrorMessage } from '../../utils/internalUtils';
+
+/**
+ * Raised by `step()` to abandon a chain, carrying the failure that caused it.
+ *
+ * Private to this module and never exported: it is a control-flow device, not a
+ * failure a caller should ever see. `chain` catches it and returns the failure it
+ * carries; anything else that escapes is a real exception and is classified.
+ */
+class ChainAbandoned extends Error {
+  constructor(readonly failure: IAdtError) {
+    super(failure.message);
+    this.name = 'ChainAbandoned';
+  }
+}
+
+/** What a chain body is given: a way to take a step, and a way to register cleanup. */
+export interface IChainScope {
+  /** Await an answer; its value on success, or abandon the chain with its failure. */
+  step<S>(answer: Promise<IAdtResponse<S>>): Promise<S>;
+  /** Register cleanup. The returned function discharges it. */
+  onScopeEnd(undo: () => Promise<void>): () => void;
+}
+
+export async function chain<T>(
+  logger: ILogger | undefined,
+  body: (scope: IChainScope) => Promise<T>,
+): Promise<IAdtResponse<T>> {
+  const undos: Array<() => Promise<void>> = [];
+  const scope: IChainScope = {
+    async step<S>(answer: Promise<IAdtResponse<S>>): Promise<S> {
+      const a = await answer;
+      if (!a.ok) throw new ChainAbandoned(a.getError());
+      return a.getResult().value;
+    },
+    onScopeEnd(undo: () => Promise<void>): () => void {
+      undos.push(undo);
+      return () => {
+        const at = undos.indexOf(undo);
+        if (at >= 0) undos.splice(at, 1);
+      };
+    },
+  };
+
+  try {
+    return succeeded(await body(scope));
+  } catch (error: unknown) {
+    return failed<T>(
+      error instanceof ChainAbandoned ? error.failure : recogniseFailure(error),
+    );
+  } finally {
+    for (const undo of undos.reverse()) {
+      try {
+        await undo();
+      } catch (cleanupError: unknown) {
+        logger?.warn?.('cleanup failed', {
+          error: safeErrorMessage(cleanupError),
+        });
+      }
+    }
+  }
+}
