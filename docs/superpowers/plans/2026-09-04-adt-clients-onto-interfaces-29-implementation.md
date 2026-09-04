@@ -61,18 +61,12 @@
   object type and recurse into sub-packages. The mapping functions move; the walk
   is deleted, because the walk left the contract with `maxDepth` and a member
   answers one read. Task 12 Step 3 has the file-by-file list.
-- **The shape a reading returns belongs to this package, not to `interfaces`.**
-  Decided by the maintainer, 2026-09-04. `interfaces` carries what is needed to
-  *use* the library or *replace* it — member signatures, request parameters,
-  `IAdtResponse`, `IAdtError`, `IResultStrategy`. What a shipped strategy builds
-  out of a document is this package's business, and a consumer who replaces us
-  declares their own.
-
-  Nothing is blocked by this: `TContents`, `TNode` and their kin are type
-  parameters, so `getUtils()` answering `IAdtPackageBrowsing<PackageItem[]>` with
-  **our** item type is exactly what the contract is shaped for. The default types
-  those parameters carry in 30.0.0 are conveniences for a caller who names
-  nothing, not shapes we owe anyone.
+- **The shape a reading returns is declared here** — `interfaces` decision 24,
+  which is the principle and where it is recorded: the contract carries what is
+  needed to use it or replace it, and what a reading builds out of a document is
+  neither. `TContents`, `TNode` and their kin are type parameters, so `getUtils()`
+  answering `IAdtPackageBrowsing<PackageItem[]>` with our own item type is what
+  those contracts are shaped for.
 - **Contracts are composed, never inherited — decision 23.** No contract in
   `interfaces` extends another any more, so an implementation that used to get
   CRUD by declaring one wide contract must now list the atoms it satisfies:
@@ -2051,27 +2045,13 @@ should know which instruction was rewritten and why.
     is the call almost every consumer makes. Written as
     `= typeof utilsDocuments`, and the same for `RuntimeDumps` and `AdtRequest`.
 
-13. **The shapes a reading returns move to this package, and `packageList` stops
-    promising `IPackageContentItem[]`.** Decided by the maintainer, 2026-09-04:
-    `interfaces` carries what is needed to use the library or replace it, and a
-    minimal contract is the point — declaring every shape there, and every field
-    of them required, is how a contract package bloats into a schema catalogue.
-    `IPackageContentItem` is the instance that forced it: `packageName` is
-    **required** there, the node-structure document does not carry it, and
-    `parseNodesToItems` receives it as a request argument — so no honest strategy
-    can build the type the contract defaults to.
-
-    Nothing is blocked. `TContents` is a type parameter, so `getUtils()` answering
-    `IAdtPackageBrowsing<PackageItem[]>` with our own item type is what the
-    contract is shaped for; the defaults it carries are a convenience for a caller
-    who names nothing.
-
-    **Named and not taken here:** whether `IPackageContentItem`,
-    `IPackageHierarchyNode`, `IRepositoryNodeContents` and the rest of the result
-    shapes should leave `interfaces` in a later contracts release. That is a
-    decision about the whole contract surface and it is the maintainer's, not a
-    detail of this migration — the same way decision 17 named its open question
-    rather than answering it in passing.
+13. **`packageList` answers `PackageItem[]`, declared here, not
+    `IPackageContentItem[]`.** The consequence of `interfaces` decision 24 — the
+    principle lives there, not in this plan. Its case is this one:
+    `IPackageContentItem.packageName` is **required**, the node-structure document
+    does not carry it, and `parseNodesToItems` receives it as a request argument,
+    so no honest strategy can build the type the contract defaults to. Nothing is
+    blocked; `TContents` is a type parameter.
 
 12. **No reading answers `IPackageHierarchyNode`, and there is no `packageTree`
     strategy.** Two findings, one root — I twice named a shape a strategy cannot
