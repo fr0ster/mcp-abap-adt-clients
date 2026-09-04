@@ -1,40 +1,51 @@
-import { beginCriticalSection } from '../../utils/criticalSection';
-import { assertDeletable } from '../../utils/deletionCheck';
 /**
- * AdtProgram - High-level CRUD operations for Program objects
+ * AdtProgram - CRUD for `PROG/P` programs.
  *
- * Implements IAdtObject interface with automatic operation chains,
- * error handling, and resource cleanup.
- *
- * Uses low-level functions directly (not Builder classes).
+ * Every member answers `IAdtResponse<T>`, where T is whatever the result set
+ * given at construction makes of that endpoint's answer. What runs before the
+ * member's own request — a lock, a check — is this implementation's business
+ * and is not in the answer: only its failures are, because a step that failed
+ * is why the member has no result.
  *
  * Session management:
- * - stateful: only when doing lock/update/unlock operations
- * - stateless: obligatory after unlock
- * - If no lock/unlock, no stateful needed
- * - activate uses same session/cookies (no stateful needed)
+ * - stateful only around a lock, restored on every path out of the chain
+ * - activate needs no stateful session; it uses the same cookies
  *
  * Operation chains:
- * - Create: validate → create → check → lock → check(inactive) → update → unlock → check → activate
+ * - Create: create (with source, if given)
  * - Update: lock → check(inactive) → update → unlock → check → activate
  * - Delete: check(deletion) → delete
  */
 
 import type {
-  HttpError,
   IAbapConnection,
+  IAdtActivatable,
+  IAdtCheckable,
   IAdtContentTypes,
+  IAdtCreatable,
+  IAdtDeletable,
+  IAdtLockable,
   IAdtOperationOptions,
-  IAdtSourceObject,
+  IAdtReadable,
+  IAdtResponse,
   IAdtSystemContext,
+  IAdtTransportAware,
+  IAdtUpdatable,
+  IAdtValidatable,
+  IAdtVersionable,
   ILogger,
+  IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
-import { safeErrorMessage, safeStringify } from '../../utils/internalUtils';
+import { answering } from '../../utils/adtResponse';
+import { beginCriticalSection } from '../../utils/criticalSection';
+import { deletionRefusal } from '../../utils/deletionCheck';
+import { chain } from '../shared/chain';
 import {
   createLockTracker,
   type LockRegistry,
   type LockTracker,
 } from '../shared/LockRegistry';
+import type { ObjectVersion } from '../shared/results';
 import type { IReadOptions } from '../shared/types';
 import { activateProgram } from './activation';
 import { checkProgram } from './check';
@@ -46,14 +57,43 @@ import {
   getProgramSource,
   getProgramTransport,
 } from './read';
-import type { IProgramConfig, IProgramState } from './types';
+import {
+  type IProgramConfig,
+  type IProgramResults,
+  programDocuments,
+} from './types';
 import { unlockProgram } from './unlock';
 import { uploadProgramSource } from './update';
 import { validateProgramName } from './validation';
-
 import { getProgramVersionSource, getProgramVersions } from './versions';
-export class AdtProgram
-  implements IAdtSourceObject<IProgramConfig, IProgramState>
+
+export class AdtProgram<
+  R extends IProgramResults<
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown
+  > = IProgramResults,
+> implements
+    IAdtCreatable<IProgramConfig, ReturnType<R['created']>>,
+    IAdtReadable<
+      IProgramConfig,
+      ReturnType<R['source']>,
+      ReturnType<R['metadata']>
+    >,
+    IAdtUpdatable<IProgramConfig, ReturnType<R['updated']>>,
+    IAdtDeletable<IProgramConfig, ReturnType<R['deletion']>>,
+    IAdtValidatable<IProgramConfig, ReturnType<R['validation']>>,
+    IAdtCheckable<IProgramConfig, ReturnType<R['check']>>,
+    IAdtActivatable<IProgramConfig, ReturnType<R['activation']>>,
+    IAdtLockable<IProgramConfig>,
+    IAdtTransportAware<IProgramConfig, ReturnType<R['transport']>>,
+    IAdtVersionable<IProgramConfig, ObjectVersion[], string>
 {
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
@@ -68,6 +108,11 @@ export class AdtProgram
     systemContext?: IAdtSystemContext,
     contentTypes?: IAdtContentTypes,
     lockRegistry?: LockRegistry,
+    // The one cast in this file, and it is on the default: `programDocuments`
+    // satisfies the erased bound, which the compiler cannot see through the
+    // `unknown`s. A cast on a member would be the factory lying about what it
+    // answers.
+    protected readonly results: R = programDocuments as unknown as R,
   ) {
     this.connection = connection;
     this.logger = logger;
@@ -81,10 +126,13 @@ export class AdtProgram
     );
   }
 
-  /**
-   * Validate program configuration before creation
-   */
-  async validate(config: Partial<IProgramConfig>): Promise<IProgramState> {
+  /** Validate a program name before creating it. */
+  async validate(
+    config: Partial<IProgramConfig>,
+    options?: IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['validation']>>> {
+    // Nothing was asked of the server, so there is no answer to describe: a
+    // missing required argument is the caller's mistake and it throws.
     if (!config.programName) {
       throw new Error('Program name is required for validation');
     }
@@ -95,603 +143,496 @@ export class AdtProgram
       throw new Error('Package name is required for validation');
     }
 
-    try {
-      const validationResponse = await validateProgramName(
-        this.connection,
-        config.programName,
-        config.packageName,
-        config.description,
-      );
-
-      return {
-        validationResponse: validationResponse,
-        errors: [],
-      };
-    } catch (error: unknown) {
-      const e = error as HttpError;
-      const status = e.response?.status;
-      const statusText = e.response?.statusText;
-      const errorMessage = e.response?.data
-        ? typeof e.response.data === 'string'
-          ? e.response.data.substring(0, 500)
-          : safeStringify(e.response.data).substring(0, 500)
-        : e.message || 'Unknown error';
-
-      this.logger?.error?.(
-        `Validation failed: HTTP ${status} ${statusText} - ${errorMessage}`,
-      );
-
-      if (status && (status === 400 || (status >= 400 && status < 500))) {
-        throw new Error(`Validation failed: ${errorMessage}`);
-      }
-
-      throw error;
-    }
+    return answering(
+      () =>
+        validateProgramName(
+          this.connection,
+          config.programName as string,
+          config.packageName as string,
+          config.description,
+        ),
+      this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
+      options?.analyse,
+    );
   }
 
-  /**
-   * Create program with full operation chain
-   */
+  /** Create the program. */
   async create(
     config: IProgramConfig,
     options?: IAdtOperationOptions,
-  ): Promise<IProgramState> {
+  ): Promise<IAdtResponse<ReturnType<R['created']>>> {
     if (!config.programName) {
       throw new Error('Program name is required');
     }
     if (!config.packageName) {
       throw new Error('Package name is required');
     }
+    const name = config.programName;
 
-    let objectCreated = false;
-    const _sessionId = this.connection.getSessionId?.() || '';
-    const state: IProgramState = {
-      errors: [],
-    };
-
-    try {
-      // Create program (requires stateful)
-      this.logger?.info?.('Creating program');
+    return chain(this.logger, async ({ step, onScopeEnd }) => {
       this.connection.setSessionType('stateful');
-      const createResponse = await createProgram(
-        this.connection,
-        {
-          programName: config.programName,
-          packageName: config.packageName,
-          transportRequest: config.transportRequest,
-          description: config.description,
-          programType: config.programType,
-          application: config.application,
-          sourceCode: options?.sourceCode || config.sourceCode,
-          masterSystem: this.systemContext.masterSystem,
-          responsible: this.systemContext.responsible,
-          masterLanguage:
-            config.masterLanguage ?? this.systemContext.masterLanguage,
-        },
-        this.contentTypes,
-      );
-      state.createResult = createResponse;
-      objectCreated = true;
-      this.connection.setSessionType('stateless');
-      this.logger?.info?.('Program created');
+      // Registered before anything can fail, so the session is restored on
+      // every path — including the one where the create itself is refused,
+      // which used to reach a `catch` and now does not.
+      onScopeEnd(async () => {
+        this.connection.setSessionType('stateless');
+      });
 
-      return state;
-    } catch (error: unknown) {
-      // Cleanup on error - ensure stateless
-      this.connection.setSessionType('stateless');
-
-      if (objectCreated && options?.deleteOnFailure) {
-        try {
+      let created = false;
+      if (options?.deleteOnFailure) {
+        onScopeEnd(async () => {
+          if (!created) return;
           this.logger?.warn?.('Deleting program after failure');
           this.connection.setSessionType('stateful');
           await deleteProgram(this.connection, {
-            programName: config.programName,
+            programName: name,
             transportRequest: config.transportRequest,
           });
-          this.connection.setSessionType('stateless');
-        } catch (deleteError) {
-          this.logger?.warn?.(
-            'Failed to delete program after failure:',
-            safeErrorMessage(deleteError),
-          );
-        }
+        });
       }
 
-      this.logger?.error('Create failed:', safeErrorMessage(error));
-      throw error;
-    }
+      this.logger?.info?.('Creating program');
+      const value = await step(
+        answering(
+          () =>
+            createProgram(
+              this.connection,
+              {
+                programName: name,
+                packageName: config.packageName as string,
+                transportRequest: config.transportRequest,
+                description: config.description,
+                programType: config.programType,
+                application: config.application,
+                sourceCode: options?.sourceCode || config.sourceCode,
+                masterSystem: this.systemContext.masterSystem,
+                responsible: this.systemContext.responsible,
+                masterLanguage:
+                  config.masterLanguage ?? this.systemContext.masterLanguage,
+              },
+              this.contentTypes,
+            ),
+          this.results.created as IResultStrategy<ReturnType<R['created']>>,
+          options?.analyse,
+        ),
+      );
+      // Only past the step: a refused create leaves nothing to delete, and the
+      // cleanup above must not remove an object this call did not make.
+      created = true;
+      this.logger?.info?.('Program created');
+      return value;
+    });
   }
 
-  /**
-   * Read program
-   */
+  /** Read the program's source. */
   async read(
     config: Partial<IProgramConfig>,
     version?: 'active' | 'inactive',
-    options?: IReadOptions,
-  ): Promise<IProgramState | undefined> {
+    options?: IReadOptions & IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['source']>>> {
     if (!config.programName) {
       throw new Error('Program name is required');
     }
 
-    try {
-      const response = await getProgramSource(
-        this.connection,
-        config.programName,
-        version,
-        options,
-      );
-      return {
-        readResult: response,
-        errors: [],
-      };
-    } catch (error: unknown) {
-      const e = error as HttpError;
-      if (e.response?.status === 404) {
-        return undefined;
-      }
-      throw error;
-    }
+    // No 404 special case any more. ADT answers a read for a missing program
+    // with 200 and an empty body, so absence was never a status to branch on —
+    // and whether an empty body *is* absence is the caller's reading, supplied
+    // through `analyse`.
+    return answering(
+      () =>
+        getProgramSource(
+          this.connection,
+          config.programName as string,
+          version,
+          options,
+        ),
+      this.results.source as IResultStrategy<ReturnType<R['source']>>,
+      options?.analyse,
+    );
   }
 
-  /**
-   * Read program metadata (object characteristics: package, responsible, description, etc.)
-   */
+  /** Read the program's metadata: package, responsible, description. */
   async readMetadata(
     config: Partial<IProgramConfig>,
-    options?: IReadOptions,
-  ): Promise<IProgramState> {
-    const state: IProgramState = { errors: [] };
+    options?: IReadOptions & IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['metadata']>>> {
     if (!config.programName) {
-      const error = new Error('Program name is required');
-      state.errors.push({
-        method: 'readMetadata',
-        error,
-        timestamp: new Date(),
-      });
-      throw error;
+      throw new Error('Program name is required');
     }
-    try {
-      const response = await getProgramMetadata(
-        this.connection,
-        config.programName,
-        options,
-      );
-      state.metadataResult = response;
-      this.logger?.info?.('Program metadata read successfully');
-      return state;
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({
-        method: 'readMetadata',
-        error: err,
-        timestamp: new Date(),
-      });
-      this.logger?.error('readMetadata', safeErrorMessage(err));
-      throw err;
-    }
+
+    return answering(
+      () =>
+        getProgramMetadata(
+          this.connection,
+          config.programName as string,
+          options,
+        ),
+      this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
+      options?.analyse,
+    );
   }
 
   /**
-   * Update program with full operation chain
-   * Always starts with lock
-   * If options.lockHandle is provided, performs only low-level update without lock/check/unlock chain
+   * Write the program's source.
+   *
+   * With `options.lockHandle` the caller holds the lock and owns the chain, so
+   * this is one request. Without it, this locks, checks, writes and unlocks —
+   * and the unlock happens on every path out.
    */
   async update(
     config: Partial<IProgramConfig>,
     options?: IAdtOperationOptions,
-  ): Promise<IProgramState> {
+  ): Promise<IAdtResponse<ReturnType<R['updated']>>> {
     if (!config.programName) {
       throw new Error('Program name is required');
     }
+    const name = config.programName;
+    const source = options?.sourceCode || config.sourceCode;
+    const sessionId = this.connection.getSessionId?.() || '';
 
-    // Low-level mode: if lockHandle is provided, perform only update operation
     if (options?.lockHandle) {
-      const codeToUpdate = options?.sourceCode || config.sourceCode;
-      if (!codeToUpdate) {
+      if (!source) {
         throw new Error('Source code is required for update');
       }
-
       this.logger?.info?.(
         'Low-level update: performing update only (lockHandle provided)',
       );
-      const sessionId = this.connection.getSessionId?.() || '';
-      const updateResponse = await uploadProgramSource(
-        this.connection,
-        config.programName,
-        codeToUpdate,
-        options.lockHandle,
-        sessionId,
-        config.transportRequest,
+      return answering(
+        () =>
+          uploadProgramSource(
+            this.connection,
+            name,
+            source,
+            options.lockHandle as string,
+            sessionId,
+            config.transportRequest,
+          ),
+        this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+        options?.analyse,
       );
-      this.logger?.info?.('Program updated (low-level)');
-      return {
-        updateResult: updateResponse,
-        errors: [],
-      };
     }
 
-    let lockHandle: string | undefined;
-    const sessionId = this.connection.getSessionId?.() || '';
-    const state: IProgramState = {
-      errors: [],
-    };
-
-    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
-
-    // the lock but leaves the work half-done.
-
+    // A LOCK…UNLOCK window: a timeout in the middle releases the lock and
+    // leaves the work half done, so the connection is told this is critical.
     const endCriticalSection = beginCriticalSection(this.connection);
 
-    try {
-      // 1. Lock (update always starts with lock, stateful only for lock)
+    return chain(this.logger, async ({ step, onScopeEnd }) => {
+      onScopeEnd(async () => {
+        endCriticalSection();
+      });
+
       this.logger?.info?.('Step 1: Locking program');
       this.connection.setSessionType('stateful');
-      lockHandle = await lockProgram(this.connection, config.programName);
-      state.lockHandle = lockHandle;
-      this.lockTracker.track(config.programName, lockHandle);
+      // Registered FIRST so it unwinds LAST: on older BASIS a lock handle is
+      // only valid inside a stateful request, so going stateless before the
+      // unlock would break the unlock (#106); and if the lock itself throws,
+      // the session is still restored.
+      onScopeEnd(async () => {
+        this.connection.setSessionType('stateless');
+      });
+
+      const lockHandle = await lockProgram(this.connection, name);
+      this.lockTracker.track(name, lockHandle);
+      const releaseLock = onScopeEnd(async () => {
+        await unlockProgram(this.connection, name, lockHandle);
+        this.lockTracker.untrack(name);
+      });
       this.logger?.info?.('Program locked, handle:', lockHandle);
 
-      // 2. Check inactive with code for update (from options or config)
-      const codeToCheck = options?.sourceCode || config.sourceCode;
-      if (codeToCheck) {
+      if (source) {
         this.logger?.info?.(
           'Step 2: Checking inactive version with update content',
         );
-        const deletionCheck = await checkProgram(
-          this.connection,
-          config.programName,
-          'inactive',
-          codeToCheck,
-          this.contentTypes?.sourceArtifactContentType(),
+        await step(
+          answering(
+            () =>
+              checkProgram(
+                this.connection,
+                name,
+                'inactive',
+                source,
+                this.contentTypes?.sourceArtifactContentType(),
+              ),
+            this.results.check as IResultStrategy<ReturnType<R['check']>>,
+            options?.analyse,
+          ),
         );
-        state.checkResult = deletionCheck;
-        this.logger?.info?.('Check inactive with update content passed');
       }
 
-      // 3. Update
-      if (codeToCheck && lockHandle) {
+      let updated = undefined as ReturnType<R['updated']>;
+      if (source) {
         this.logger?.info?.('Step 3: Updating program');
-        const updateResponse = await uploadProgramSource(
-          this.connection,
-          config.programName,
-          codeToCheck,
-          lockHandle,
-          sessionId,
-          config.transportRequest,
+        updated = await step(
+          answering(
+            () =>
+              uploadProgramSource(
+                this.connection,
+                name,
+                source,
+                lockHandle,
+                sessionId,
+                config.transportRequest,
+              ),
+            this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+            options?.analyse,
+          ),
         );
-        state.updateResult = updateResponse;
         this.logger?.info?.('Program updated');
 
-        // Poll the inactive version: the write above produced it; the active version may not exist yet.
-        // 3.5. Read with long polling to ensure object is ready after update
-        this.logger?.info?.('read (wait for object ready after update)');
-        try {
-          await this.read({ programName: config.programName }, 'inactive', {
-            withLongPolling: true,
-          });
-          this.logger?.info?.('object is ready after update');
-        } catch (readError) {
+        // The write produced the inactive version; the active one may not
+        // exist yet. A failure here is not the update's failure, so it is
+        // logged and the chain continues — the unlock still has to happen.
+        const ready = await this.read({ programName: name }, 'inactive', {
+          withLongPolling: true,
+        });
+        if (!ready.ok) {
           this.logger?.warn?.(
             'read with long polling failed after update:',
-            safeErrorMessage(readError),
+            ready.getError().message,
           );
-          // Continue anyway - unlock might still work
         }
       }
 
-      // 4. Unlock (obligatory stateless after unlock)
-      if (lockHandle) {
-        this.logger?.info?.('Step 4: Unlocking program');
-        this.connection.setSessionType('stateful');
-        const unlockResponse = await unlockProgram(
-          this.connection,
-          config.programName,
-          lockHandle,
-        );
-        state.unlockResult = unlockResponse;
-        this.connection.setSessionType('stateless');
-        this.lockTracker.untrack(config.programName);
-        lockHandle = undefined;
-        this.logger?.info?.('Program unlocked');
-      }
+      this.logger?.info?.('Step 4: Unlocking program');
+      this.connection.setSessionType('stateful');
+      await unlockProgram(this.connection, name, lockHandle);
+      this.connection.setSessionType('stateless');
+      this.lockTracker.untrack(name);
+      // Unlocked as its own step, so the registration is discharged rather
+      // than run a second time when the scope unwinds.
+      releaseLock();
+      this.logger?.info?.('Program unlocked');
 
-      // 5. Final check (no stateful needed)
       this.logger?.info?.('Step 5: Final check');
-      const checkResponse2 = await checkProgram(
-        this.connection,
-        config.programName,
-        'inactive',
+      await step(
+        answering(
+          () => checkProgram(this.connection, name, 'inactive'),
+          this.results.check as IResultStrategy<ReturnType<R['check']>>,
+          options?.analyse,
+        ),
       );
-      state.checkResult = checkResponse2;
-      this.logger?.info?.('Final check passed');
 
-      // 6. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnUpdate) {
         this.logger?.info?.('Step 6: Activating program');
-        const activateResponse = await activateProgram(
-          this.connection,
-          config.programName,
-        );
-        state.activateResult = activateResponse;
-        this.logger?.info?.(
-          'Program activated, status:',
-          activateResponse.status,
+        await step(
+          answering(
+            () => activateProgram(this.connection, name),
+            this.results.activation as IResultStrategy<
+              ReturnType<R['activation']>
+            >,
+            options?.analyse,
+          ),
         );
 
-        // 6.5. Read with long polling to ensure object is ready after activation
-        this.logger?.info?.('read (wait for object ready after activation)');
-        try {
-          const readState = await this.read(
-            { programName: config.programName },
-            'active',
-            { withLongPolling: true },
-          );
-          if (readState) {
-            state.readResult = readState.readResult;
-          }
-          this.logger?.info?.('object is ready after activation');
-        } catch (readError) {
+        const ready = await this.read({ programName: name }, 'active', {
+          withLongPolling: true,
+        });
+        if (!ready.ok) {
           this.logger?.warn?.(
             'read with long polling failed after activation:',
-            safeErrorMessage(readError),
-          );
-          // Continue anyway - activation was successful
-        }
-      }
-
-      return state;
-    } catch (error: unknown) {
-      // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
-      if (lockHandle) {
-        try {
-          this.logger?.warn?.('Unlocking program during error cleanup');
-          this.connection.setSessionType('stateful');
-          await unlockProgram(this.connection, config.programName, lockHandle);
-          this.connection.setSessionType('stateless');
-          this.lockTracker.untrack(config.programName);
-        } catch (unlockError) {
-          this.logger?.warn?.(
-            'Failed to unlock during cleanup:',
-            safeErrorMessage(unlockError),
-          );
-        }
-      } else {
-        // Ensure stateless if lock failed
-        this.connection.setSessionType('stateless');
-      }
-
-      if (options?.deleteOnFailure) {
-        try {
-          this.logger?.warn?.('Deleting program after failure');
-          this.connection.setSessionType('stateful');
-          await deleteProgram(this.connection, {
-            programName: config.programName,
-            transportRequest: config.transportRequest,
-          });
-          this.connection.setSessionType('stateless');
-        } catch (deleteError) {
-          this.logger?.warn?.(
-            'Failed to delete program after failure:',
-            safeErrorMessage(deleteError),
+            ready.getError().message,
           );
         }
       }
 
-      this.logger?.error('Update failed:', safeErrorMessage(error));
-      throw error;
-    } finally {
-      endCriticalSection();
-    }
+      return updated;
+    });
   }
 
   /**
-   * Delete program
+   * Delete the program.
+   *
+   * The deletion check is read, not merely performed: ADT answers a refusal
+   * with `del:isDeletable="false"` inside a 200, and a delete that ignored it
+   * reported success while the object stayed. {@link deletionRefusal} is the
+   * shipped reading of that answer; a caller who wants another passes their own
+   * `analyse`.
    */
-  async delete(config: Partial<IProgramConfig>): Promise<IProgramState> {
+  async delete(
+    config: Partial<IProgramConfig>,
+    options?: IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>>> {
     if (!config.programName) {
       throw new Error('Program name is required');
     }
+    const name = config.programName;
 
-    const state: IProgramState = {
-      errors: [],
-    };
-
-    try {
-      // Check for deletion (no stateful needed)
-      this.logger?.info?.('Checking program for deletion');
-      const deletionCheck = await checkDeletion(this.connection, {
-        programName: config.programName,
-        transportRequest: config.transportRequest,
+    return chain(this.logger, async ({ step, onScopeEnd }) => {
+      onScopeEnd(async () => {
+        this.connection.setSessionType('stateless');
       });
-      // ADT already said whether this may be deleted; refusing to read that
-      // answer is how a delete came to report success while the object
-      // stayed. Throws on isDeletable=false or a message of type E; a W
-      // is a warning and passes.
-      assertDeletable(deletionCheck.data);
-      state.checkResult = deletionCheck;
+
+      this.logger?.info?.('Checking program for deletion');
+      await step(
+        answering(
+          () =>
+            checkDeletion(this.connection, {
+              programName: name,
+              transportRequest: config.transportRequest,
+            }),
+          this.results.check as IResultStrategy<ReturnType<R['check']>>,
+          options?.analyse ?? deletionRefusal,
+        ),
+      );
       this.logger?.info?.('Deletion check passed');
 
-      // Delete (requires stateful, but no lock)
       this.logger?.info?.('Deleting program');
       this.connection.setSessionType('stateful');
-      const deleteResponse = await deleteProgram(this.connection, {
-        programName: config.programName,
-        transportRequest: config.transportRequest,
-      });
-      state.deleteResult = deleteResponse;
+      const value = await step(
+        answering(
+          () =>
+            deleteProgram(this.connection, {
+              programName: name,
+              transportRequest: config.transportRequest,
+            }),
+          this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+          options?.analyse,
+        ),
+      );
       this.logger?.info?.('Program deleted');
-
-      return state;
-    } catch (error: unknown) {
-      this.logger?.error('Delete failed:', safeErrorMessage(error));
-      throw error;
-    } finally {
-      this.connection.setSessionType('stateless');
-    }
+      return value;
+    });
   }
 
-  /**
-   * Activate program
-   * No stateful needed - uses same session/cookies
-   */
-  async activate(config: Partial<IProgramConfig>): Promise<IProgramState> {
+  /** Activate the program. Needs no stateful session. */
+  async activate(
+    config: Partial<IProgramConfig>,
+    options?: IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['activation']>>> {
     if (!config.programName) {
       throw new Error('Program name is required');
     }
 
-    const state: IProgramState = {
-      errors: [],
-    };
-
-    try {
-      const activateResponse = await activateProgram(
-        this.connection,
-        config.programName,
-      );
-      state.activateResult = activateResponse;
-      return state;
-    } catch (error: unknown) {
-      const e = error as HttpError;
-      const status = e.response?.status;
-      const statusText = e.response?.statusText;
-      const errorMessage = e.response?.data
-        ? typeof e.response.data === 'string'
-          ? e.response.data.substring(0, 500)
-          : safeStringify(e.response.data).substring(0, 500)
-        : e.message || 'Unknown error';
-
-      this.logger?.error?.(
-        `Activate failed: HTTP ${status} ${statusText} - ${errorMessage}`,
-      );
-
-      this.logger?.error('Activate failed:', safeErrorMessage(error));
-      throw error;
-    }
+    return answering(
+      () => activateProgram(this.connection, config.programName as string),
+      this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
+      options?.analyse,
+    );
   }
 
-  /**
-   * Check program
-   */
+  /** Check the program. */
   async check(
     config: Partial<IProgramConfig>,
     status?: string,
-  ): Promise<IProgramState> {
+    options?: IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['check']>>> {
     if (!config.programName) {
       throw new Error('Program name is required');
     }
+    const version: 'active' | 'inactive' =
+      status === 'active' ? 'active' : 'inactive';
 
-    const state: IProgramState = {
-      errors: [],
-    };
-
-    try {
-      // Map status to version
-      const version: 'active' | 'inactive' =
-        status === 'active' ? 'active' : 'inactive';
-      const deletionCheck = await checkProgram(
-        this.connection,
-        config.programName,
-        version,
-        config.sourceCode,
-        this.contentTypes?.sourceArtifactContentType(),
-      );
-      state.checkResult = deletionCheck;
-      return state;
-    } catch (error: unknown) {
-      this.logger?.error('Check failed:', safeErrorMessage(error));
-      throw error;
-    }
+    return answering(
+      () =>
+        checkProgram(
+          this.connection,
+          config.programName as string,
+          version,
+          config.sourceCode,
+          this.contentTypes?.sourceArtifactContentType(),
+        ),
+      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      options?.analyse,
+    );
   }
 
-  /**
-   * Read transport request information for the program
-   */
+  /** The transport request the program belongs to. */
   async readTransport(
     config: Partial<IProgramConfig>,
-    options?: { withLongPolling?: boolean },
-  ): Promise<IProgramState> {
-    const state: IProgramState = {
-      errors: [],
-    };
-
-    if (!config.programName) {
-      const error = new Error('Program name is required');
-      state.errors.push({
-        method: 'readTransport',
-        error,
-        timestamp: new Date(),
-      });
-      throw error;
-    }
-
-    try {
-      const response = await getProgramTransport(
-        this.connection,
-        config.programName,
-        options?.withLongPolling !== undefined
-          ? { withLongPolling: options.withLongPolling }
-          : undefined,
-      );
-      state.transportResult = response;
-      this.logger?.info?.('Transport request read successfully');
-      return state;
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({
-        method: 'readTransport',
-        error: err,
-        timestamp: new Date(),
-      });
-      this.logger?.error('readTransport', safeErrorMessage(err));
-      throw err;
-    }
-  }
-
-  /**
-   * Lock program for modification
-   */
-  async lock(config: Partial<IProgramConfig>): Promise<string> {
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['transport']>>> {
     if (!config.programName) {
       throw new Error('Program name is required');
     }
 
-    this.connection.setSessionType('stateful');
-    const lockHandle = await lockProgram(this.connection, config.programName);
-    this.lockTracker.track(config.programName, lockHandle);
-    return lockHandle;
+    return answering(
+      () =>
+        getProgramTransport(
+          this.connection,
+          config.programName as string,
+          options?.withLongPolling !== undefined
+            ? { withLongPolling: options.withLongPolling }
+            : undefined,
+        ),
+      this.results.transport as IResultStrategy<ReturnType<R['transport']>>,
+      options?.analyse,
+    );
   }
 
-  /**
-   * Unlock program
-   */
+  /** Lock the program for modification. */
+  async lock(config: Partial<IProgramConfig>): Promise<IAdtResponse<string>> {
+    if (!config.programName) {
+      throw new Error('Program name is required');
+    }
+    const name = config.programName;
+
+    return answering(
+      async () => {
+        this.connection.setSessionType('stateful');
+        const lockHandle = await lockProgram(this.connection, name);
+        this.lockTracker.track(name, lockHandle);
+        // The handle is the value, and the request that produced it does not
+        // keep the wire it came on — so this is the one place the answer is
+        // built around what the request produced.
+        return {
+          data: lockHandle,
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+        };
+      },
+      (answer) => String(answer.data),
+    );
+  }
+
+  /** Unlock the program. */
   async unlock(
     config: Partial<IProgramConfig>,
     lockHandle: string,
-  ): Promise<IProgramState> {
+  ): Promise<IAdtResponse<void>> {
     if (!config.programName) {
       throw new Error('Program name is required');
     }
+    const name = config.programName;
 
-    this.connection.setSessionType('stateful');
-    const result = await unlockProgram(
-      this.connection,
-      config.programName,
-      lockHandle,
+    return answering(
+      async () => {
+        // UNLOCK must run stateful (older BASIS #106); stateless after.
+        this.connection.setSessionType('stateful');
+        const result = await unlockProgram(this.connection, name, lockHandle);
+        this.connection.setSessionType('stateless');
+        this.lockTracker.untrack(name);
+        return result;
+      },
+      () => undefined,
     );
-    this.connection.setSessionType('stateless');
-    this.lockTracker.untrack(config.programName);
-    return {
-      unlockResult: result,
-      errors: [],
-    };
   }
 
-  getVersions(config: Partial<IProgramConfig>) {
-    return getProgramVersions(this.connection, config);
+  /** Version history of the program's source. */
+  async getVersions(
+    config: Partial<IProgramConfig>,
+  ): Promise<IAdtResponse<ObjectVersion[]>> {
+    return answering(
+      async () => ({
+        data: await getProgramVersions(this.connection, config),
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+      }),
+      (answer) => answer.data as ObjectVersion[],
+    );
   }
 
-  getVersionSource(contentUri: string) {
-    return getProgramVersionSource(this.connection, contentUri);
+  /** The source of one version, by the `contentUri` an entry carries. */
+  async getVersionSource(contentUri: string): Promise<IAdtResponse<string>> {
+    return answering(
+      async () => ({
+        data: await getProgramVersionSource(this.connection, contentUri),
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+      }),
+      (answer) => String(answer.data),
+    );
   }
 }

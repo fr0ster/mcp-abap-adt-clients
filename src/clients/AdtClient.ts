@@ -152,7 +152,8 @@ import {
 import {
   AdtProgram,
   type IProgramConfig,
-  type IProgramState,
+  type IProgramResults,
+  programDocuments,
 } from '../core/program';
 import {
   AdtScalarFunction,
@@ -365,14 +366,56 @@ export class AdtClient {
    * Get high-level operations for Program objects
    * @returns IAdtObject instance for Program operations
    */
-  getProgram(): IAdtSourceObject<IProgramConfig, IProgramState> {
+  getProgram(): AdtProgram;
+  getProgram<
+    R extends IProgramResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    >,
+  >(
+    results: R,
+  ): IAdtCreatable<IProgramConfig, ReturnType<R['created']>> &
+    IAdtReadable<
+      IProgramConfig,
+      ReturnType<R['source']>,
+      ReturnType<R['metadata']>
+    > &
+    IAdtUpdatable<IProgramConfig, ReturnType<R['updated']>> &
+    IAdtDeletable<IProgramConfig, ReturnType<R['deletion']>> &
+    IAdtValidatable<IProgramConfig, ReturnType<R['validation']>> &
+    IAdtCheckable<IProgramConfig, ReturnType<R['check']>> &
+    IAdtActivatable<IProgramConfig, ReturnType<R['activation']>> &
+    IAdtLockable<IProgramConfig> &
+    IAdtTransportAware<IProgramConfig, ReturnType<R['transport']>> &
+    IAdtVersionable<IProgramConfig, ObjectVersion[], string>;
+  getProgram<
+    R extends IProgramResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    > = IProgramResults,
+  >(results: R = programDocuments as unknown as R): AdtProgram<R> {
     this.assertConnected();
-    return new AdtProgram(
+    return new AdtProgram<R>(
       this.connection,
       this.logger,
       this.systemContext,
       this.contentTypes,
       this.lockRegistry,
+      results,
     );
   }
 

@@ -18,6 +18,14 @@
  *   <del:message del:priority="0" del:type="S"><del:text/></del:message>
  * ```
  */
+
+import type {
+  AdtNoFailure,
+  IAdtError,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
+import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces';
+
 export interface IDeletionVerdict {
   /** Object the verdict is about, as ADT names it. */
   objectName: string;
@@ -114,3 +122,30 @@ export function assertDeletable(responseData: unknown): IDeletionVerdict {
   }
   return verdict;
 }
+
+/**
+ * ADT's own deletion verdict, as a failure rather than an exception.
+ *
+ * The shipped `analyse` for the deletion-check step of a delete chain. The
+ * refusal is the server's — `del:isDeletable="false"`, or a message of type
+ * `E`, both of which arrive inside a 200 — so reading it is not this library
+ * judging a document, it is this library not throwing the judgement away.
+ *
+ * {@link assertDeletable} still throws, for the call sites that are not chains.
+ * This one returns, because a chain's failures are answered, and a consumer who
+ * wants a different reading passes their own `analyse` instead.
+ */
+export const deletionRefusal = (
+  verdict: IAdtError | AdtNoFailure,
+  answer?: IAdtWireResponse,
+): IAdtError | AdtNoFailure => {
+  if (verdict !== ADT_NO_FAILURE) return verdict;
+  const read = parseDeletionCheck(answer?.data);
+  const refused = !read.isDeletable || read.messageType?.toUpperCase() === 'E';
+  if (!refused) return ADT_NO_FAILURE;
+  return {
+    origin: 'refusal',
+    message: new DeletionNotPermittedError(read.objectName, read).message,
+    response: answer,
+  };
+};

@@ -26,13 +26,11 @@ export async function getStructureMetadata(
   structureName: string,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  return orThrow(
-    getUtils(connection).readObjectMetadata(
-      'structure',
-      structureName,
-      undefined,
-      options,
-    ),
+  return getUtils(connection).objectMetadataWire(
+    'structure',
+    structureName,
+    undefined,
+    options,
   );
 }
 
@@ -45,14 +43,12 @@ export async function getStructureSource(
   version?: 'active' | 'inactive',
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  return orThrow(
-    getUtils(connection).readObjectSource(
-      'structure',
-      structureName,
-      undefined,
-      version,
-      options,
-    ),
+  return getUtils(connection).objectSourceWire(
+    'structure',
+    structureName,
+    undefined,
+    version,
+    options,
   );
 }
 
