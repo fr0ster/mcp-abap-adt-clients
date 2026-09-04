@@ -1,6 +1,7 @@
-import type { IAbapConnection, IObjectVersion } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
+import type { ObjectVersion } from '../shared/results';
 import { parseVersionsFeed, throwVersionsError } from '../shared/versions';
 import type { ITransformationConfig } from './types';
 
@@ -10,7 +11,7 @@ const ACCEPT_VERSION_FEED = 'application/atom+xml;type=feed';
 export async function getTransformationVersions(
   connection: IAbapConnection,
   config: Partial<ITransformationConfig>,
-): Promise<IObjectVersion[]> {
+): Promise<ObjectVersion[]> {
   if (!config.transformationName)
     throw new Error('transformationName is required');
   const encodedName = encodeSapObjectName(

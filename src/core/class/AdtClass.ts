@@ -19,30 +19,39 @@ import { beginCriticalSection } from '../../utils/criticalSection';
  * - Delete: check(deletion) → delete
  */
 
-import type { IAdtSystemContext } from '@mcp-abap-adt/interfaces';
-import {
-  AdtObjectErrorCodes,
-  AdtOperationError,
-  type HttpError,
-  type IAbapConnection,
-  type IAdtContentTypes,
-  type IAdtOperationOptions,
-  type IAdtSourceObject,
-  type IAdtWireResponse,
-  type ILogger,
-  type IObjectVersion,
+import type {
+  IAbapConnection,
+  IAdtActivatable,
+  IAdtCheckable,
+  IAdtContentTypes,
+  IAdtCreatable,
+  IAdtDeletable,
+  IAdtLockable,
+  IAdtOperationOptions,
+  IAdtReadable,
+  IAdtResponse,
+  IAdtSystemContext,
+  IAdtUpdatable,
+  IAdtValidatable,
+  IAdtVersionable,
+  IAdtWireResponse,
+  ILogger,
+  IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
+import { answering } from '../../utils/adtResponse';
 import { safeErrorMessage, safeStringify } from '../../utils/internalUtils';
 import {
   type ICapabilityContext,
   LockCapability,
   VersionsCapability,
 } from '../shared/capabilities';
+import { chain } from '../shared/chain';
 import {
   createLockTracker,
   type LockRegistry,
   type LockTracker,
 } from '../shared/LockRegistry';
+import type { ObjectVersion } from '../shared/results';
 import type { IReadOptions } from '../shared/types';
 import { AdtClassMemberBase } from './AdtClassMemberBase';
 import { activateClass } from './activation';
@@ -55,7 +64,7 @@ import {
   activateClassTestClasses,
   updateClassTestInclude,
 } from './testclasses';
-import type { IClassConfig, IClassState } from './types';
+import { classDocuments, type IClassConfig, type IClassResults } from './types';
 import { unlockClass } from './unlock';
 import { updateClass } from './update';
 import { validateClassName } from './validation';
@@ -65,16 +74,60 @@ import {
   getClassVersionSource,
 } from './versions';
 
-export class AdtClass
-  extends AdtClassMemberBase
-  implements IAdtSourceObject<IClassConfig, IClassState>
+export class AdtClass<
+    R extends IClassResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    > = IClassResults,
+  >
+  extends AdtClassMemberBase<R>
+  implements
+    IAdtCreatable<IClassConfig, ReturnType<R['created']>>,
+    IAdtReadable<
+      IClassConfig,
+      ReturnType<R['source']>,
+      ReturnType<R['metadata']>
+    >,
+    IAdtUpdatable<IClassConfig, ReturnType<R['updated']>>,
+    IAdtDeletable<IClassConfig, ReturnType<R['deletion']>>,
+    IAdtValidatable<IClassConfig, ReturnType<R['validation']>>,
+    IAdtCheckable<IClassConfig, ReturnType<R['check']>>,
+    IAdtActivatable<IClassConfig, ReturnType<R['activation']>>,
+    IAdtLockable<IClassConfig>,
+    IAdtVersionable<IClassConfig, ObjectVersion[], string>
 {
   public readonly objectType: string = 'Class';
+
+  constructor(
+    connection: IAbapConnection,
+    logger?: ILogger,
+    systemContext?: IAdtSystemContext,
+    contentTypes?: IAdtContentTypes,
+    lockRegistry?: LockRegistry,
+    // The one cast in this file, and it is on the default: `classDocuments`
+    // satisfies the erased bound, which the compiler cannot see through the
+    // eight `unknown`s. A cast on a *member* would be the factory lying about
+    // what it answers, which is exactly what this shape avoids.
+    protected readonly results: R = classDocuments as unknown as R,
+  ) {
+    super(connection, logger, systemContext, contentTypes, lockRegistry);
+  }
 
   /**
    * Validate class configuration before creation
    */
-  async validate(config: Partial<IClassConfig>): Promise<IClassState> {
+  async validate(
+    config: Partial<IClassConfig>,
+    options?: IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['validation']>>> {
+    // Nothing was asked of the server, so there is no answer to describe: a
+    // missing required argument is the caller's mistake and it throws.
     if (!config.className) {
       throw new Error('Class name is required for validation');
     }
@@ -82,47 +135,18 @@ export class AdtClass
       throw new Error('Package name is required for validation');
     }
 
-    try {
-      const validationResponse = await validateClassName(
-        this.connection,
-        config.className,
-        config.packageName,
-        config.description,
-        config.superclass,
-      );
-
-      return {
-        validationResponse: validationResponse,
-        errors: [],
-      };
-    } catch (error: unknown) {
-      const e = error as HttpError;
-      const status = e.response?.status;
-      const statusText = e.response?.statusText;
-      const errorMessage = e.response?.data
-        ? typeof e.response.data === 'string'
-          ? e.response.data.substring(0, 500)
-          : safeStringify(e.response.data).substring(0, 500)
-        : e.message || 'Unknown error';
-
-      this.logger?.error?.(
-        `Validate failed: HTTP ${status || '?'} ${statusText || ''}`,
-        { status, statusText, message: errorMessage },
-      );
-
-      if (status && status >= 400 && status < 500) {
-        const customError = new AdtOperationError(
-          `Validation failed for object '${config.className}': ${errorMessage}`,
-        );
-        customError.code = AdtObjectErrorCodes.VALIDATION_FAILED;
-        customError.status = status;
-        customError.statusText = statusText;
-        customError.originalError = error;
-        throw customError;
-      }
-
-      throw error;
-    }
+    return answering(
+      () =>
+        validateClassName(
+          this.connection,
+          config.className as string,
+          config.packageName as string,
+          config.description,
+          config.superclass,
+        ),
+      this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
+      options?.analyse,
+    );
   }
 
   /**
@@ -131,7 +155,7 @@ export class AdtClass
   async create(
     config: IClassConfig,
     options?: IAdtOperationOptions,
-  ): Promise<IClassState> {
+  ): Promise<IAdtResponse<ReturnType<R['created']>>> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
@@ -139,64 +163,65 @@ export class AdtClass
       throw new Error('Package name is required');
     }
 
-    let objectCreated = false;
-    const state: IClassState = {
-      errors: [],
-    };
-
-    try {
-      // Create class (requires stateful)
-      this.logger?.info?.('Creating class');
+    const name = config.className;
+    return chain(this.logger, async ({ step, onScopeEnd }) => {
       this.connection.setSessionType('stateful');
-      state.createResult = await createClass(
-        this.connection,
-        {
-          class_name: config.className,
-          package_name: config.packageName,
-          transport_request: config.transportRequest,
-          description: config.description,
-          superclass: config.superclass,
-          final: config.final,
-          abstract: config.abstract,
-          create_protected: config.createProtected,
-          master_system: config.masterSystem ?? this.systemContext.masterSystem,
-          responsible: config.responsible ?? this.systemContext.responsible,
-          masterLanguage:
-            config.masterLanguage ?? this.systemContext.masterLanguage,
-          template_xml: config.classTemplate,
-        },
-        this.logger,
-        this.contentTypes,
-      );
-      objectCreated = true;
-      this.connection.setSessionType('stateless');
-      this.logger?.info?.('Class created');
+      // Registered before anything can fail, so the session is restored on every
+      // path — including the one where the create itself is refused, which used
+      // to reach a `catch` and now does not.
+      onScopeEnd(async () => {
+        this.connection.setSessionType('stateless');
+      });
 
-      return state;
-    } catch (error: unknown) {
-      // Cleanup on error - ensure stateless
-      this.connection.setSessionType('stateless');
-
-      if (objectCreated && options?.deleteOnFailure) {
-        try {
+      let created = false;
+      if (options?.deleteOnFailure) {
+        onScopeEnd(async () => {
+          if (!created) return;
           this.logger?.warn?.('Deleting class after failure');
           this.connection.setSessionType('stateful');
           await deleteClass(this.connection, {
-            class_name: config.className,
+            class_name: name,
             transport_request: config.transportRequest,
           });
-          this.connection.setSessionType('stateless');
-        } catch (deleteError) {
-          this.logger?.warn?.(
-            'Failed to delete class after failure:',
-            safeErrorMessage(deleteError),
-          );
-        }
+        });
       }
 
-      this.logger?.error('Create failed:', safeErrorMessage(error));
-      throw error;
-    }
+      this.logger?.info?.('Creating class');
+      const value = await step(
+        answering(
+          () =>
+            createClass(
+              this.connection,
+              {
+                class_name: name,
+                package_name: config.packageName as string,
+                transport_request: config.transportRequest,
+                description: config.description,
+                superclass: config.superclass,
+                final: config.final,
+                abstract: config.abstract,
+                create_protected: config.createProtected,
+                master_system:
+                  config.masterSystem ?? this.systemContext.masterSystem,
+                responsible:
+                  config.responsible ?? this.systemContext.responsible,
+                masterLanguage:
+                  config.masterLanguage ?? this.systemContext.masterLanguage,
+                template_xml: config.classTemplate,
+              },
+              this.logger,
+              this.contentTypes,
+            ),
+          this.results.created as IResultStrategy<ReturnType<R['created']>>,
+          options?.analyse,
+        ),
+      );
+      // Only past the step: a refused create leaves nothing to delete, and the
+      // cleanup above must not remove an object this call did not make.
+      created = true;
+      this.logger?.info?.('Class created');
+      return value;
+    });
   }
 
   /**
@@ -205,58 +230,27 @@ export class AdtClass
   async read(
     config: Partial<IClassConfig>,
     version?: 'active' | 'inactive',
-    options?: IReadOptions,
-  ): Promise<IClassState | undefined> {
+    options?: IReadOptions & IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['source']>>> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
 
-    try {
-      const response = await getClassSource(
-        this.connection,
-        config.className,
-        version,
-        options,
-      );
-      return {
-        readResult: response,
-        errors: [],
-      };
-    } catch (error: unknown) {
-      const e = error as HttpError;
-      const status = e.response?.status;
-      const statusText = e.response?.statusText;
-      const errorMessage = e.response?.data
-        ? typeof e.response.data === 'string'
-          ? e.response.data.substring(0, 500)
-          : safeStringify(e.response.data).substring(0, 500)
-        : e.message || 'Unknown error';
-
-      // Log error details
-      this.logger?.error?.(
-        `Read failed: HTTP ${status || '?'} ${statusText || ''}`,
-        { status, statusText, message: errorMessage },
-      );
-
-      // 404 - object doesn't exist
-      if (status === 404) {
-        return undefined;
-      }
-
-      // 4** errors - throw with error code
-      if (status && status >= 400 && status < 500) {
-        const customError = new AdtOperationError(
-          `Failed to read object '${config.className}': ${errorMessage}`,
-        );
-        customError.code = AdtObjectErrorCodes.OBJECT_NOT_FOUND;
-        customError.status = status;
-        customError.statusText = statusText;
-        customError.originalError = error;
-        throw customError;
-      }
-
-      throw error;
-    }
+    // No 404 special case any more. ADT answers a read for a missing class with
+    // 200 and an empty body, so absence was never a status to branch on — and
+    // whether an empty body *is* absence is the caller's reading, supplied
+    // through `analyse`. Returning `undefined` here made every caller guess.
+    return answering(
+      () =>
+        getClassSource(
+          this.connection,
+          config.className as string,
+          version,
+          options,
+        ),
+      this.results.source as IResultStrategy<ReturnType<R['source']>>,
+      options?.analyse,
+    );
   }
 
   /**
@@ -267,268 +261,206 @@ export class AdtClass
   async update(
     config: Partial<IClassConfig>,
     options?: IAdtOperationOptions,
-  ): Promise<IClassState> {
+  ): Promise<IAdtResponse<ReturnType<R['updated']>>> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
+    const name = config.className;
+    const sourceCode = options?.sourceCode ?? config.sourceCode;
 
-    // Low-level mode: if lockHandle is provided, perform only update operation
+    // Low-level mode: the caller holds the lock and owns the chain, so this is
+    // one request and nothing else.
     if (options?.lockHandle) {
-      const codeToUpdate = options?.sourceCode || config.sourceCode;
-      if (!codeToUpdate) {
+      if (!sourceCode) {
         throw new Error('Source code is required for update');
       }
-
-      this.logger?.info?.(
-        'Low-level update: performing update only (lockHandle provided)',
+      return answering(
+        () =>
+          updateClass(
+            this.connection,
+            name,
+            sourceCode,
+            options.lockHandle as string,
+            config.transportRequest,
+            this.contentTypes?.sourceArtifactContentType(),
+          ),
+        this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+        options?.analyse,
       );
-      const updateResponse = await updateClass(
-        this.connection,
-        config.className,
-        codeToUpdate,
-        options.lockHandle,
-        config.transportRequest,
-        this.contentTypes?.sourceArtifactContentType(),
-      );
-      this.logger?.info?.('Class updated (low-level)');
-      return {
-        updateResult: updateResponse,
-        errors: [],
-      };
     }
 
-    let lockHandle: string | undefined;
-    const state: IClassState = {
-      errors: [],
-    };
-
-    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
-
-    // the lock but leaves the work half-done.
-
+    // A LOCK…UNLOCK window: a timeout in the middle releases the lock and
+    // leaves the work half done, so the connection is told this is critical.
     const endCriticalSection = beginCriticalSection(this.connection);
 
-    try {
-      // 1. Lock — stay stateful for the whole lock→check→update→unlock chain.
-      // On older BASIS (#106) the lock handle is only valid inside stateful
-      // requests; a stateless write in between fails with 423. unlock() below
-      // restores stateless.
+    return chain(this.logger, async ({ step, onScopeEnd }) => {
+      onScopeEnd(async () => {
+        endCriticalSection();
+      });
+
       this.logger?.info?.('Step 1: Locking class');
       this.connection.setSessionType('stateful');
-      lockHandle = await lockClass(this.connection, config.className);
-      state.lockHandle = lockHandle;
-      this.lockTracker.track(config.className, lockHandle);
+      // Registered FIRST so it unwinds LAST. Order matters twice over: on older
+      // BASIS a lock handle is only valid inside a stateful request, so going
+      // stateless before the unlock would break the unlock (#106); and if the
+      // lock itself throws, the session is still restored.
+      onScopeEnd(async () => {
+        this.connection.setSessionType('stateless');
+      });
+
+      const lockHandle = await lockClass(this.connection, name);
+      this.lockTracker.track(name, lockHandle);
+      const releaseLock = onScopeEnd(async () => {
+        await unlockClass(this.connection, name, lockHandle);
+        this.lockTracker.untrack(name);
+      });
       this.logger?.info?.('Class locked, handle:', lockHandle);
 
-      // 2. Check inactive with code/xml for update (from options or config)
-      const codeToCheck = options?.sourceCode || config.sourceCode;
-      if (codeToCheck) {
+      if (sourceCode) {
         this.logger?.info?.(
           'Step 2: Checking inactive version with update content',
         );
-        state.checkResult = await checkClass(
-          this.connection,
-          config.className,
-          'inactive',
-          codeToCheck,
-          this.contentTypes?.sourceArtifactContentType(),
+        await step(
+          answering(
+            () =>
+              checkClass(
+                this.connection,
+                name,
+                'inactive',
+                sourceCode,
+                this.contentTypes?.sourceArtifactContentType(),
+              ),
+            this.results.check as IResultStrategy<ReturnType<R['check']>>,
+            options?.analyse,
+          ),
         );
-        this.logger?.info?.('Check inactive with update content passed');
       }
 
-      // 3. Update
-      if (codeToCheck && lockHandle) {
+      let updated = undefined as ReturnType<R['updated']>;
+      if (sourceCode) {
         this.logger?.info?.('Step 3: Updating class');
-        state.updateResult = await updateClass(
-          this.connection,
-          config.className,
-          codeToCheck,
-          lockHandle,
-          config.transportRequest,
-          this.contentTypes?.sourceArtifactContentType(),
+        updated = await step(
+          answering(
+            () =>
+              updateClass(
+                this.connection,
+                name,
+                sourceCode,
+                lockHandle,
+                config.transportRequest,
+                this.contentTypes?.sourceArtifactContentType(),
+              ),
+            this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+            options?.analyse,
+          ),
         );
-        this.logger?.info?.('Class updated');
 
-        // Poll the inactive version: the write above produced it; the active version may not exist yet.
-        // 3.5. Read with long polling to ensure object is ready after update
-        this.logger?.info?.('read (wait for object ready after update)');
-        try {
-          await this.read({ className: config.className }, 'inactive', {
-            withLongPolling: true,
-          });
-          this.logger?.info?.('object is ready after update');
-        } catch (readError) {
+        // The write produced the inactive version; the active one may not exist
+        // yet. A failure here is not the update's failure, so it is logged and
+        // the chain continues — the unlock still has to happen.
+        const ready = await this.read({ className: name }, 'inactive', {
+          withLongPolling: true,
+        });
+        if (!ready.ok) {
           this.logger?.warn?.(
             'read with long polling failed after update:',
-            safeErrorMessage(readError),
+            ready.getError().message,
           );
-          // Continue anyway - unlock might still work
         }
       }
 
-      // 4. Unlock (obligatory stateless after unlock)
-      if (lockHandle) {
-        this.logger?.info?.('Step 4: Unlocking class');
-        this.connection.setSessionType('stateful');
-        state.unlockResult = await unlockClass(
-          this.connection,
-          config.className,
-          lockHandle,
-        );
-        this.connection.setSessionType('stateless');
-        this.lockTracker.untrack(config.className);
-        lockHandle = undefined;
-        this.logger?.info?.('Class unlocked');
-      }
+      this.logger?.info?.('Step 4: Unlocking class');
+      this.connection.setSessionType('stateful');
+      await unlockClass(this.connection, name, lockHandle);
+      this.connection.setSessionType('stateless');
+      this.lockTracker.untrack(name);
+      // Unlocked as its own step, so the registration is discharged rather than
+      // run a second time when the scope unwinds.
+      releaseLock();
+      this.logger?.info?.('Class unlocked');
 
-      // 5. Final check (no stateful needed)
       this.logger?.info?.('Step 5: Final check');
-      state.checkResult = await checkClass(
-        this.connection,
-        config.className,
-        'inactive',
+      await step(
+        answering(
+          () => checkClass(this.connection, name, 'inactive'),
+          this.results.check as IResultStrategy<ReturnType<R['check']>>,
+          options?.analyse,
+        ),
       );
-      this.logger?.info?.('Final check passed');
 
-      // 6. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnUpdate) {
         this.logger?.info?.('Step 6: Activating class');
-        const activateResult = await activateClass(
-          this.connection,
-          config.className,
+        await step(
+          answering(
+            () => activateClass(this.connection, name),
+            this.results.activation as IResultStrategy<
+              ReturnType<R['activation']>
+            >,
+            options?.analyse,
+          ),
         );
-        state.activateResult = activateResult;
-        this.logger?.info?.('Class activated, status:', activateResult.status);
 
-        // 6.5. Read with long polling to ensure object is ready after activation
-        this.logger?.info?.('read (wait for object ready after activation)');
-        try {
-          const readState = await this.read(
-            { className: config.className },
-            'active',
-            { withLongPolling: true },
-          );
-          if (readState) {
-            state.readResult = readState.readResult;
-          }
-          this.logger?.info?.('object is ready after activation');
-        } catch (readError) {
+        const ready = await this.read({ className: name }, 'active', {
+          withLongPolling: true,
+        });
+        if (!ready.ok) {
           this.logger?.warn?.(
             'read with long polling failed after activation:',
-            safeErrorMessage(readError),
-          );
-          // Continue anyway - activation was successful
-        }
-      }
-
-      return state;
-    } catch (error: unknown) {
-      // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
-      if (lockHandle) {
-        try {
-          this.logger?.warn?.('Unlocking class during error cleanup');
-          this.connection.setSessionType('stateful');
-          await unlockClass(this.connection, config.className, lockHandle);
-          this.connection.setSessionType('stateless');
-          this.lockTracker.untrack(config.className);
-        } catch (unlockError) {
-          this.logger?.warn?.(
-            'Failed to unlock during cleanup:',
-            safeErrorMessage(unlockError),
-          );
-        }
-      } else {
-        // Ensure stateless if lock failed
-        this.connection.setSessionType('stateless');
-      }
-
-      if (options?.deleteOnFailure) {
-        try {
-          this.logger?.warn?.('Deleting class after failure');
-          this.connection.setSessionType('stateful');
-          await deleteClass(this.connection, {
-            class_name: config.className,
-            transport_request: config.transportRequest,
-          });
-          this.connection.setSessionType('stateless');
-        } catch (deleteError) {
-          this.logger?.warn?.(
-            'Failed to delete class after failure:',
-            safeErrorMessage(deleteError),
+            ready.getError().message,
           );
         }
       }
 
-      this.logger?.error('Update failed:', safeErrorMessage(error));
-      throw error;
-    } finally {
-      endCriticalSection();
-    }
+      return updated;
+    });
   }
 
   /**
    * Delete class
    */
-  async delete(config: Partial<IClassConfig>): Promise<IClassState> {
+  async delete(
+    config: Partial<IClassConfig>,
+    options?: IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>>> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
+    const name = config.className;
 
-    const state: IClassState = {
-      errors: [],
-    };
+    return chain(this.logger, async ({ step, onScopeEnd }) => {
+      onScopeEnd(async () => {
+        this.connection.setSessionType('stateless');
+      });
 
-    try {
-      // Check for deletion (no stateful needed)
       this.logger?.info?.('Checking class for deletion');
-      const checkResult = await checkDeletion(this.connection, {
-        class_name: config.className,
-        transport_request: config.transportRequest,
-      });
-      state.checkResult = checkResult;
-      this.logger?.info?.('Deletion check passed');
-
-      // Delete (requires stateful, but no lock)
-      this.logger?.info?.('Deleting class');
-      this.connection.setSessionType('stateful');
-      const deleteResult = await deleteClass(this.connection, {
-        class_name: config.className,
-        transport_request: config.transportRequest,
-      });
-      state.deleteResult = deleteResult;
-      this.logger?.info?.('Class deleted');
-
-      return state;
-    } catch (error: unknown) {
-      const e = error as HttpError;
-      const status = e.response?.status;
-      const statusText = e.response?.statusText;
-      const errorMessage = e.response?.data
-        ? typeof e.response.data === 'string'
-          ? e.response.data.substring(0, 500)
-          : safeStringify(e.response.data).substring(0, 500)
-        : e.message || 'Unknown error';
-
-      this.logger?.error?.(
-        `Delete failed: HTTP ${status || '?'} ${statusText || ''}`,
-        { status, statusText, message: errorMessage },
+      await step(
+        answering(
+          () =>
+            checkDeletion(this.connection, {
+              class_name: name,
+              transport_request: config.transportRequest,
+            }),
+          this.results.check as IResultStrategy<ReturnType<R['check']>>,
+          options?.analyse,
+        ),
       );
 
-      if (status && status >= 400 && status < 500) {
-        const customError = new AdtOperationError(
-          `Deletion failed for object '${config.className}': ${errorMessage}`,
-        );
-        customError.code = AdtObjectErrorCodes.DELETE_FAILED;
-        customError.status = status;
-        customError.statusText = statusText;
-        customError.originalError = error;
-        throw customError;
-      }
-
-      throw error;
-    } finally {
-      this.connection.setSessionType('stateless');
-    }
+      this.logger?.info?.('Deleting class');
+      this.connection.setSessionType('stateful');
+      const value = await step(
+        answering(
+          () =>
+            deleteClass(this.connection, {
+              class_name: name,
+              transport_request: config.transportRequest,
+            }),
+          this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+          options?.analyse,
+        ),
+      );
+      this.logger?.info?.('Class deleted');
+      return value;
+    });
   }
 
   /**
@@ -537,81 +469,31 @@ export class AdtClass
   async check(
     config: Partial<IClassConfig>,
     status?: string,
-  ): Promise<IClassState> {
+    options?: IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['check']>>> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
+    const version: 'active' | 'inactive' =
+      status === 'active' ? 'active' : 'inactive';
 
-    try {
-      // Map status to version
-      const version: 'active' | 'inactive' =
-        status === 'active' ? 'active' : 'inactive';
-      const response = await checkClass(
-        this.connection,
-        config.className,
-        version,
-        config.sourceCode,
-        this.contentTypes?.sourceArtifactContentType(),
-      );
-
-      // Parse response to check for type E errors
-      const { parseCheckRunResponse } = await import('../../utils/checkRun');
-      const checkResult = parseCheckRunResponse(response);
-
-      // If there are errors (type E), throw error
-      if (checkResult.has_errors) {
-        const errorMessages = checkResult.errors
-          .map((e: { text?: string }) => e.text || '')
-          .join('; ');
-        const customError = new AdtOperationError(
-          `Check failed for object '${config.className}': ${errorMessages || checkResult.message}`,
-        );
-        customError.code = AdtObjectErrorCodes.CHECK_FAILED;
-        customError.status = response.status;
-        customError.statusText = response.statusText;
-        customError.checkResult = checkResult;
-        throw customError;
-      }
-
-      const state: IClassState = {
-        checkResult: response,
-        errors: [],
-      };
-      return state;
-    } catch (error: unknown) {
-      const e = error as HttpError;
-      const status = e.response?.status;
-      const statusText = e.response?.statusText;
-      const errorMessage = e.response?.data
-        ? typeof e.response.data === 'string'
-          ? e.response.data.substring(0, 500)
-          : safeStringify(e.response.data).substring(0, 500)
-        : e.message || 'Unknown error';
-
-      this.logger?.error?.(
-        `Check failed: HTTP ${status || '?'} ${statusText || ''}`,
-        { status, statusText, message: errorMessage },
-      );
-
-      // If error already has code (from checkResult parsing), rethrow
-      if ((error as { code?: string }).code) {
-        throw error;
-      }
-
-      // 4** errors - throw with error code
-      if (status && status >= 400 && status < 500) {
-        const customError = new AdtOperationError(
-          `Check failed for object '${config.className}': ${errorMessage}`,
-        );
-        customError.code = AdtObjectErrorCodes.CHECK_FAILED;
-        customError.status = status;
-        customError.statusText = statusText;
-        customError.originalError = error;
-        throw customError;
-      }
-
-      throw error;
-    }
+    // No parse-and-throw on `has_errors`. A `<msg type="E">` inside a 200 is a
+    // refusal, and recognising it is the error strategy's job — done once, on
+    // the connection, for every member — rather than this member's, done again
+    // and differently. A caller who reads check messages some other way says so
+    // through `analyse`.
+    return answering(
+      () =>
+        checkClass(
+          this.connection,
+          config.className as string,
+          version,
+          config.sourceCode,
+          this.contentTypes?.sourceArtifactContentType(),
+        ),
+      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      options?.analyse,
+    );
   }
 
   /**
@@ -763,8 +645,19 @@ export class AdtClass
     );
   }
 
-  getVersions(config: Partial<IClassConfig>): Promise<IObjectVersion[]> {
+  async getVersions(
+    config: Partial<IClassConfig>,
+  ): Promise<IAdtResponse<ObjectVersion[]>> {
     if (!config.className) throw new Error('className is required');
-    return this.getIncludeVersions(config.className, 'main');
+    const name = config.className;
+    return answering(
+      async () => ({
+        data: await this.getIncludeVersions(name, 'main'),
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+      }),
+      (answer) => answer.data as ObjectVersion[],
+    );
   }
 }

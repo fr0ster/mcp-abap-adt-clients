@@ -1,6 +1,7 @@
-import type { IAbapConnection, IObjectVersion } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
+import type { ObjectVersion } from '../shared/results';
 import { parseVersionsFeed, throwVersionsError } from '../shared/versions';
 import type { IStructureConfig } from './types';
 
@@ -10,7 +11,7 @@ const ACCEPT_VERSION_FEED = 'application/atom+xml;type=feed';
 export async function getStructureVersions(
   connection: IAbapConnection,
   config: Partial<IStructureConfig>,
-): Promise<IObjectVersion[]> {
+): Promise<ObjectVersion[]> {
   if (!config.structureName) throw new Error('structureName is required');
   const encodedName = encodeSapObjectName(config.structureName);
   const url = `/sap/bc/adt/ddic/structures/${encodedName}/source/main/versions`;

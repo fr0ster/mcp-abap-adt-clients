@@ -32,7 +32,6 @@ import type {
   IAdtCrud,
   IAdtOperationOptions,
   ILogger,
-  IObjectVersion,
 } from '@mcp-abap-adt/interfaces';
 import {
   AdtObjectErrorCodes,
@@ -44,6 +43,7 @@ import {
   safeErrorMessage,
 } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
+import type { ObjectVersion } from '../shared/results';
 import { lockClassForMessageOrPlain, lockMessageIfGranted } from './lock';
 import { getMessageClassSource } from './read';
 import type {

@@ -36,11 +36,11 @@ import {
   type IAdtReadable,
   type IListTransportsOptions,
   type ILogger,
-  type IObjectVersion,
   TRANSPORT_SEARCH_CONFIGURATIONS_URL,
 } from '@mcp-abap-adt/interfaces';
 import { TransportSearchConfigurationMissing } from '../../utils/adtErrors';
 import { safeErrorMessage } from '../../utils/internalUtils';
+import type { ObjectVersion } from '../shared/results';
 import { createTransport } from './create';
 import { deleteTransport } from './delete';
 import { getTransportSearchConfigurations, listTransports } from './list';

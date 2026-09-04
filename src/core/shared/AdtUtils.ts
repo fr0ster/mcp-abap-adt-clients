@@ -95,6 +95,7 @@ import { throwIfSapError } from '../../utils/adtErrors';
 import { answering, answeringWith } from '../../utils/adtResponse';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { withRefusalDetection } from '../../utils/refusalAware';
+import { rawDocument } from '../../utils/resultStrategy';
 import { getTimeout } from '../../utils/timeouts';
 import { getAllTypes as getAllTypesUtil, parseNamedItems } from './allTypes';
 import { getDiscovery as getDiscoveryUtil } from './discovery';
@@ -506,36 +507,55 @@ export class AdtUtils
     objectName: string,
     functionGroup?: string,
     options?: IReadOptions,
-  ): Promise<IAdtResponse<IAdtResult<IAdtWireResponse>>> {
-    return answering(async () => {
-      let uri = getObjectMetadataUri(objectType, objectName, functionGroup);
-      const params = [];
-      if (options?.version) {
-        params.push(`version=${options.version}`);
-      }
-      if (options?.withLongPolling) {
-        params.push('withLongPolling=true');
-      }
-      if (params.length > 0) {
-        uri += `?${params.join('&')}`;
-      }
-      const acceptHeader =
-        options?.accept ?? getMetadataAcceptHeader(objectType);
-      return makeAdtRequestWithAcceptNegotiation(
-        this.connection,
-        {
-          url: uri,
-          method: 'GET',
-          timeout: getTimeout('default'),
-          headers: {
-            Accept: acceptHeader,
-          },
+  ): Promise<IAdtResponse<string>> {
+    return answering(
+      () =>
+        this.objectMetadataWire(objectType, objectName, functionGroup, options),
+      rawDocument,
+    );
+  }
+
+  /**
+   * The metadata answer itself, for callers inside this package.
+   *
+   * The contract member above answers a document, because that is what a
+   * consumer of {@link IAdtObjectAccess} reads. The per-type request functions
+   * need the answer whole — status and headers included — so that the handler
+   * can apply *its* consumer's strategy to it, and reading it here would throw
+   * that away and make them read it back out of a string.
+   */
+  async objectMetadataWire(
+    objectType: AdtObjectType,
+    objectName: string,
+    functionGroup?: string,
+    options?: IReadOptions,
+  ): Promise<IAdtWireResponse> {
+    let uri = getObjectMetadataUri(objectType, objectName, functionGroup);
+    const params = [];
+    if (options?.version) {
+      params.push(`version=${options.version}`);
+    }
+    if (options?.withLongPolling) {
+      params.push('withLongPolling=true');
+    }
+    if (params.length > 0) {
+      uri += `?${params.join('&')}`;
+    }
+    const acceptHeader = options?.accept ?? getMetadataAcceptHeader(objectType);
+    return makeAdtRequestWithAcceptNegotiation(
+      this.connection,
+      {
+        url: uri,
+        method: 'GET',
+        timeout: getTimeout('default'),
+        headers: {
+          Accept: acceptHeader,
         },
-        {
-          logger: this.logger,
-        },
-      );
-    });
+      },
+      {
+        logger: this.logger,
+      },
+    );
   }
 
   /**
@@ -557,41 +577,60 @@ export class AdtUtils
     functionGroup?: string,
     version?: 'active' | 'inactive',
     options?: IReadOptions,
-  ): Promise<IAdtResponse<IAdtResult<IAdtWireResponse>>> {
-    return answering(async () => {
-      if (!supportsSourceCode(objectType)) {
-        throw new Error(
-          `Object type ${objectType} does not support source code reading`,
-        );
-      }
+  ): Promise<IAdtResponse<string>> {
+    return answering(
+      () =>
+        this.objectSourceWire(
+          objectType,
+          objectName,
+          functionGroup,
+          version,
+          options,
+        ),
+      rawDocument,
+    );
+  }
 
-      let uri = getObjectSourceUri(
-        objectType,
-        objectName,
-        functionGroup,
-        version,
+  /** The source answer itself — see {@link objectMetadataWire}. */
+  async objectSourceWire(
+    objectType: AdtSourceObjectType,
+    objectName: string,
+    functionGroup?: string,
+    version?: 'active' | 'inactive',
+    options?: IReadOptions,
+  ): Promise<IAdtWireResponse> {
+    if (!supportsSourceCode(objectType)) {
+      throw new Error(
+        `Object type ${objectType} does not support source code reading`,
       );
-      if (options?.withLongPolling) {
-        const separator = uri.includes('?') ? '&' : '?';
-        uri += `${separator}withLongPolling=true`;
-      }
+    }
 
-      const acceptHeader = options?.accept ?? 'text/plain';
-      return makeAdtRequestWithAcceptNegotiation(
-        this.connection,
-        {
-          url: uri,
-          method: 'GET',
-          timeout: getTimeout('default'),
-          headers: {
-            Accept: acceptHeader,
-          },
+    let uri = getObjectSourceUri(
+      objectType,
+      objectName,
+      functionGroup,
+      version,
+    );
+    if (options?.withLongPolling) {
+      const separator = uri.includes('?') ? '&' : '?';
+      uri += `${separator}withLongPolling=true`;
+    }
+
+    const acceptHeader = options?.accept ?? 'text/plain';
+    return makeAdtRequestWithAcceptNegotiation(
+      this.connection,
+      {
+        url: uri,
+        method: 'GET',
+        timeout: getTimeout('default'),
+        headers: {
+          Accept: acceptHeader,
         },
-        {
-          logger: this.logger,
-        },
-      );
-    });
+      },
+      {
+        logger: this.logger,
+      },
+    );
   }
 
   /**
@@ -771,7 +810,7 @@ export class AdtUtils
    */
   async getPackageContents(
     packageName: string,
-  ): Promise<IAdtResponse<IAdtResult<IAdtWireResponse>>> {
+  ): Promise<IAdtResponse<IAdtWireResponse>> {
     return answering(async () => {
       return fetchNodeStructureUtil(
         this.connection,

@@ -30,13 +30,11 @@ export async function getClassMetadata(
   className: string,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  return orThrow(
-    getUtils(connection).readObjectMetadata(
-      'class',
-      className,
-      undefined,
-      options,
-    ),
+  return getUtils(connection).objectMetadataWire(
+    'class',
+    className,
+    undefined,
+    options,
   );
 }
 
@@ -52,14 +50,12 @@ export async function getClassSource(
   version?: 'active' | 'inactive',
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  return orThrow(
-    getUtils(connection).readObjectSource(
-      'class',
-      className,
-      undefined,
-      version,
-      options,
-    ),
+  return getUtils(connection).objectSourceWire(
+    'class',
+    className,
+    undefined,
+    version,
+    options,
   );
 }
 

@@ -32,7 +32,6 @@ import type {
   IAdtTransportAware,
   IAdtValidatable,
   ILogger,
-  IObjectVersion,
 } from '@mcp-abap-adt/interfaces';
 import { safeErrorMessage } from '../../utils/internalUtils';
 import {
@@ -44,6 +43,7 @@ import {
   type LockRegistry,
   type LockTracker,
 } from '../shared/LockRegistry';
+import type { ObjectVersion } from '../shared/results';
 import type { IReadOptions } from '../shared/types';
 import { activateDomain } from './activation';
 import { checkDomainSyntax } from './check';

@@ -1,4 +1,6 @@
-import type { IAdtLockable } from '@mcp-abap-adt/interfaces';
+import type { IAdtLockable, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import { answering } from '../../../utils/adtResponse';
+import { nothing } from '../../../utils/resultStrategy';
 import type { ICapabilityContext, ILockStrategy } from './types';
 
 /**
@@ -28,8 +30,8 @@ import type { ICapabilityContext, ILockStrategy } from './types';
  * activate/check error unification), where all three layers are reconciled
  * rather than double-cleaned.
  */
-export class LockCapability<TConfig, TReadResult>
-  implements IAdtLockable<TConfig, TReadResult>
+export class LockCapability<TConfig, TReadResult = void>
+  implements IAdtLockable<TConfig>
 {
   constructor(
     // LAZY: read at method-call time, so the handler can build this capability
@@ -38,10 +40,26 @@ export class LockCapability<TConfig, TReadResult>
     private readonly strategy: ILockStrategy<TConfig, TReadResult>,
   ) {}
 
-  async lock(config: Partial<TConfig>): Promise<string> {
+  async lock(config: Partial<TConfig>): Promise<IAdtResponse<string>> {
+    return answering(
+      async () => {
+        const ctx = this.getCtx();
+        const name = this.strategy.nameOf(config);
+        // Stay stateful while the lock is held; the caller releases via unlock().
+        ctx.connection.setSessionType('stateful');
+        const { lockHandle } = await this.strategy.acquire(ctx, name);
+        // The handle is what the caller needs, and the strategy hands it over
+        // without the wire it came on — so the answer is built around it.
+        return { data: lockHandle, status: 200, statusText: 'OK', headers: {} };
+      },
+      (answer) => String(answer.data),
+    );
+  }
+
+  /** The handle alone, for callers inside this package that hold a chain open. */
+  async lockHandle(config: Partial<TConfig>): Promise<string> {
     const ctx = this.getCtx();
     const name = this.strategy.nameOf(config);
-    // Stay stateful while the lock is held; the caller releases via unlock().
     ctx.connection.setSessionType('stateful');
     const { lockHandle } = await this.strategy.acquire(ctx, name);
     return lockHandle;
@@ -50,13 +68,20 @@ export class LockCapability<TConfig, TReadResult>
   async unlock(
     config: Partial<TConfig>,
     lockHandle: string,
-  ): Promise<TReadResult> {
+  ): Promise<IAdtResponse<void>> {
+    return answering(async () => {
+      await this.release(config, lockHandle);
+      return { data: '', status: 200, statusText: 'OK', headers: {} };
+    }, nothing);
+  }
+
+  /** The release itself, for a chain that owns its own cleanup. */
+  async release(config: Partial<TConfig>, lockHandle: string): Promise<void> {
     const ctx = this.getCtx();
     const name = this.strategy.nameOf(config);
     // UNLOCK must run stateful (older BASIS #106); restore stateless after.
     ctx.connection.setSessionType('stateful');
-    const state = await this.strategy.release(ctx, name, lockHandle);
+    await this.strategy.release(ctx, name, lockHandle);
     ctx.connection.setSessionType('stateless');
-    return state;
   }
 }

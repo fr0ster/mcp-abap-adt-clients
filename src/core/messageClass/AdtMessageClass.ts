@@ -26,7 +26,6 @@ import type {
   IAdtSystemContext,
   IAdtValidatable,
   ILogger,
-  IObjectVersion,
 } from '@mcp-abap-adt/interfaces';
 import { safeErrorMessage } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -35,6 +34,7 @@ import {
   type LockRegistry,
   type LockTracker,
 } from '../shared/LockRegistry';
+import type { ObjectVersion } from '../shared/results';
 import { createMessageClass } from './create';
 import { checkDeletion, deleteMessageClass } from './delete';
 import { lockMessageClass } from './lock';

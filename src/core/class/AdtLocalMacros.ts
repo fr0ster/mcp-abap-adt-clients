@@ -1,34 +1,90 @@
 /**
- * AdtLocalMacros - High-level CRUD operations for Local Macros
+ * The macros include of a class.
  *
- * Local macros are defined in the macros include of an ABAP class.
- * Note: Macros are supported in older ABAP versions but not in newer ones.
- * All operations require the parent class to be locked.
+ * ADT addresses the include, not one macro inside it, and it is written under
+ * the **class's** lock: everything here is one class, seen through one of its
+ * source resources. What that means for the atoms this handler declares is that
+ * `delete` is a write of an empty include, and `activate` activates the class.
+ * Both say so in their own comment rather than pretending the include is an
+ * object of its own.
  */
 
 import type {
-  HttpError,
+  IAbapConnection,
+  IAdtActivatable,
+  IAdtCheckable,
+  IAdtContentTypes,
+  IAdtDeletable,
   IAdtOperationOptions,
+  IAdtReadable,
+  IAdtResponse,
+  IAdtSystemContext,
+  IAdtUpdatable,
+  IAdtValidatable,
   ILocalMacrosConfig,
-  IObjectVersion,
+  ILogger,
+  IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
-import { safeErrorMessage } from '../../utils/internalUtils';
+import { answering } from '../../utils/adtResponse';
+import { chain } from '../shared/chain';
+import type { LockRegistry } from '../shared/LockRegistry';
+import type { ObjectVersion } from '../shared/results';
 import type { IReadOptions } from '../shared/types';
 import { AdtClassMemberBase } from './AdtClassMemberBase';
 import { checkClassMacros } from './check';
 import { updateClassMacros } from './includes';
-import type { IClassState } from './types';
+import { getClassMacrosInclude } from './read';
+import { classDocuments, type IClassResults } from './types';
 
 // Types defined in @mcp-abap-adt/interfaces
 export type { ILocalMacrosConfig } from '@mcp-abap-adt/interfaces';
 
-export class AdtLocalMacros extends AdtClassMemberBase {
+export class AdtLocalMacros<
+    R extends IClassResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    > = IClassResults,
+  >
+  extends AdtClassMemberBase<R>
+  implements
+    IAdtReadable<
+      ILocalMacrosConfig,
+      ReturnType<R['source']>,
+      ReturnType<R['metadata']>
+    >,
+    IAdtUpdatable<ILocalMacrosConfig, ReturnType<R['updated']>>,
+    IAdtDeletable<ILocalMacrosConfig, ReturnType<R['updated']>>,
+    IAdtValidatable<ILocalMacrosConfig, ReturnType<R['validation']>>,
+    IAdtCheckable<ILocalMacrosConfig, ReturnType<R['check']>>,
+    IAdtActivatable<ILocalMacrosConfig, ReturnType<R['activation']>>
+{
   public readonly objectType: string = 'LocalMacros';
 
-  /**
-   * Validate local macros code
-   */
-  async validate(config: Partial<ILocalMacrosConfig>): Promise<IClassState> {
+  constructor(
+    connection: IAbapConnection,
+    logger?: ILogger,
+    systemContext?: IAdtSystemContext,
+    contentTypes?: IAdtContentTypes,
+    lockRegistry?: LockRegistry,
+    // See AdtClass: the one cast is on the default, never on a member.
+    protected readonly results: R = classDocuments as unknown as R,
+  ) {
+    super(connection, logger, systemContext, contentTypes, lockRegistry);
+  }
+
+  /** Syntax-check the source a caller is about to write. */
+  async validate(
+    config: Partial<ILocalMacrosConfig>,
+    options?: IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['validation']>>> {
+    // Nothing was asked of the server yet, so there is no answer to describe:
+    // a missing required argument is the caller's mistake and it throws.
     if (!config.className) {
       throw new Error('Class name is required for validation');
     }
@@ -36,63 +92,59 @@ export class AdtLocalMacros extends AdtClassMemberBase {
       throw new Error('Macros code is required for validation');
     }
 
-    const checkResponse = await checkClassMacros(
-      this.connection,
-      config.className,
-      config.macrosCode,
-      'inactive',
-      this.contentTypes?.sourceArtifactContentType(),
+    return answering(
+      () =>
+        checkClassMacros(
+          this.connection,
+          config.className as string,
+          config.macrosCode as string,
+          'inactive',
+          this.contentTypes?.sourceArtifactContentType(),
+        ),
+      this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
+      options?.analyse,
     );
-
-    return {
-      validationResponse: checkResponse,
-      errors: [],
-    };
   }
 
-  /**
-   * Read local macros code
-   */
+  /** Read the include's source. */
   async read(
     config: Partial<ILocalMacrosConfig>,
     version: 'active' | 'inactive' = 'active',
-    options?: IReadOptions,
-  ): Promise<IClassState | undefined> {
+    options?: IReadOptions & IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['source']>>> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
 
-    try {
-      const { getClassMacrosInclude } = await import('./read');
-      const response = await getClassMacrosInclude(
-        this.connection,
-        config.className,
-        version,
-        this.logger,
-        options,
-      );
-      return {
-        readResult: response,
-        errors: [],
-      };
-    } catch (error: unknown) {
-      const e = error as HttpError;
-      if (e.response?.status === 404) {
-        return undefined;
-      }
-      this.logger?.error('Read LocalMacros failed:', safeErrorMessage(error));
-      throw error;
-    }
+    // No 404 special case any more: ADT answers a read for an include that was
+    // never written with 200 and an empty body, so absence was never a status
+    // to branch on, and whether an empty body *is* absence is the caller's
+    // reading — supplied through `analyse`.
+    return answering(
+      () =>
+        getClassMacrosInclude(
+          this.connection,
+          config.className as string,
+          version,
+          this.logger,
+          options,
+        ),
+      this.results.source as IResultStrategy<ReturnType<R['source']>>,
+      options?.analyse,
+    );
   }
+
   /**
-   * Update local macros with full operation chain
-   * Requires parent class to be locked
-   * If options.lockHandle is provided, performs only low-level update without lock/check/unlock chain
+   * Write the include.
+   *
+   * With `options.lockHandle` the caller holds the class's lock and owns the
+   * chain, so this is one request. Without it, this locks the class, checks,
+   * writes and unlocks — and the unlock happens on every path out.
    */
   async update(
     config: Partial<ILocalMacrosConfig>,
     options?: IAdtOperationOptions,
-  ): Promise<IClassState> {
+  ): Promise<IAdtResponse<ReturnType<R['updated']>>> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
@@ -102,132 +154,121 @@ export class AdtLocalMacros extends AdtClassMemberBase {
       throw new Error('Macros code is required');
     }
 
-    // Low-level mode: if lockHandle is provided, perform only update operation
-    if (options?.lockHandle) {
-      const codeToUpdate = options?.sourceCode ?? config.macrosCode ?? '';
+    const name = config.className;
+    const source = options?.sourceCode ?? config.macrosCode ?? '';
 
+    if (options?.lockHandle) {
       this.logger?.info?.(
         'Low-level update: performing update only (lockHandle provided)',
       );
-      const updateResponse = await updateClassMacros(
-        this.connection,
-        config.className,
-        codeToUpdate,
-        options.lockHandle,
-        config.transportRequest,
-        this.contentTypes?.sourceArtifactContentType(),
+      return answering(
+        () =>
+          updateClassMacros(
+            this.connection,
+            name,
+            source,
+            options.lockHandle as string,
+            config.transportRequest,
+            this.contentTypes?.sourceArtifactContentType(),
+          ),
+        this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+        options?.analyse,
       );
-      this.logger?.info?.('Local macros updated (low-level)');
-      return {
-        updateResult: updateResponse,
-        errors: [],
-      };
     }
 
-    let lockHandle: string | undefined;
-    const state: IClassState = {
-      errors: [],
-    };
-
-    try {
-      // 1. Lock parent class (stateful only for lock)
+    return chain(this.logger, async ({ step, onScopeEnd }) => {
       this.logger?.info?.('Step 1: Locking parent class');
-      lockHandle = await super.lock({ className: config.className });
-      state.lockHandle = lockHandle;
+      // Registered before the lock is taken, so the session is restored even if
+      // the lock itself is refused; and last to unwind, because on older BASIS
+      // a handle is only valid inside a stateful request (#106).
+      onScopeEnd(async () => {
+        this.connection.setSessionType('stateless');
+      });
+      const lockHandle = await this.lockCap.lockHandle({ className: name });
+      this.lockTracker.track(name, lockHandle);
+      const releaseLock = onScopeEnd(async () => {
+        await this.lockCap.release({ className: name }, lockHandle);
+        this.lockTracker.untrack(name);
+      });
       this.logger?.info?.('Parent class locked, handle:', lockHandle);
 
-      // 2. Check local macros code
-      // Empty source is a deletion — nothing to syntax-check.
-      const codeToCheck = options?.sourceCode ?? config.macrosCode ?? '';
-      if (codeToCheck !== '') {
-        this.logger?.info?.('Step 2: Checking local macros code');
-        const checkResponse = await checkClassMacros(
-          this.connection,
-          config.className,
-          codeToCheck,
-          'inactive',
-          this.contentTypes?.sourceArtifactContentType(),
+      // Empty source is a deletion — there is nothing to syntax-check, and ADT
+      // refuses an empty body on the check resource.
+      if (source !== '') {
+        this.logger?.info?.('Step 2: Checking macros code');
+        await step(
+          answering(
+            () =>
+              checkClassMacros(
+                this.connection,
+                name,
+                source,
+                'inactive',
+                this.contentTypes?.sourceArtifactContentType(),
+              ),
+            this.results.check as IResultStrategy<ReturnType<R['check']>>,
+            options?.analyse,
+          ),
         );
-        state.checkResult = checkResponse;
-        this.logger?.info?.('Local macros check passed');
       }
 
-      // 3. Update local macros
-      this.logger?.info?.('Step 3: Updating local macros');
-      const updateResponse = await updateClassMacros(
-        this.connection,
-        config.className,
-        codeToCheck,
-        lockHandle,
-        config.transportRequest,
-        this.contentTypes?.sourceArtifactContentType(),
+      this.logger?.info?.('Step 3: Updating macros');
+      const updated = await step(
+        answering(
+          () =>
+            updateClassMacros(
+              this.connection,
+              name,
+              source,
+              lockHandle,
+              config.transportRequest,
+              this.contentTypes?.sourceArtifactContentType(),
+            ),
+          this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+          options?.analyse,
+        ),
       );
-      state.updateResult = updateResponse;
-      this.logger?.info?.('Local macros updated');
+      this.logger?.info?.('Macros updated');
 
-      // 4. Unlock parent class (obligatory stateless after unlock)
       this.logger?.info?.('Step 4: Unlocking parent class');
-      const unlockState = await super.unlock(
-        { className: config.className },
-        lockHandle,
-      );
-      state.unlockResult = unlockState.unlockResult;
-      lockHandle = undefined;
+      await this.lockCap.release({ className: name }, lockHandle);
+      this.lockTracker.untrack(name);
+      // Unlocked as its own step, so the registration is discharged rather than
+      // run a second time when the scope unwinds.
+      releaseLock();
 
-      return state;
-    } catch (error: unknown) {
-      // Cleanup on error
-      if (lockHandle) {
-        try {
-          this.logger?.warn?.('Unlocking parent class during error cleanup');
-          await super.unlock({ className: config.className }, lockHandle);
-        } catch (unlockError) {
-          this.logger?.warn?.(
-            'Failed to unlock parent class after error:',
-            safeErrorMessage(unlockError),
-          );
-        }
+      if (options?.activateOnUpdate) {
+        this.logger?.info?.('Step 5: Activating parent class');
+        await step(this.activate({ className: name }, options));
       }
 
-      this.logger?.error('Update LocalMacros failed:', safeErrorMessage(error));
-      throw error;
-    }
-  }
-
-  /**
-   * Delete local macros
-   * Performs update with empty code to remove the local macros
-   */
-  async delete(config: Partial<ILocalMacrosConfig>): Promise<IClassState> {
-    if (!config.className) {
-      throw new Error('Class name is required');
-    }
-
-    // Delete by updating with empty code
-    return await this.update({
-      ...config,
-      macrosCode: '',
+      return updated;
     });
   }
 
   /**
-   * Activate parent class (local macros are activated with parent class)
+   * Empty the include.
+   *
+   * There is no DELETE for a class include: ADT removes macros source by writing
+   * the include empty, so this answers what that write answered.
    */
-  async activate(config: Partial<ILocalMacrosConfig>): Promise<IClassState> {
+  async delete(
+    config: Partial<ILocalMacrosConfig>,
+    options?: IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['updated']>>> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
 
-    return await super.activate({ className: config.className });
+    return await this.update({ ...config, macrosCode: '' }, options);
   }
 
-  /**
-   * Check local macros code
-   */
+  /** Syntax-check the include. */
   async check(
     config: Partial<ILocalMacrosConfig>,
-    version: 'active' | 'inactive' = 'inactive',
-  ): Promise<IClassState> {
+    status: string = 'inactive',
+    options?: IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['check']>>> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
@@ -235,30 +276,34 @@ export class AdtLocalMacros extends AdtClassMemberBase {
       throw new Error('Macros code is required');
     }
 
-    const checkResponse = await checkClassMacros(
-      this.connection,
-      config.className,
-      config.macrosCode,
-      version,
-      this.contentTypes?.sourceArtifactContentType(),
+    return answering(
+      () =>
+        checkClassMacros(
+          this.connection,
+          config.className as string,
+          config.macrosCode as string,
+          status === 'active' ? 'active' : 'inactive',
+          this.contentTypes?.sourceArtifactContentType(),
+        ),
+      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      options?.analyse,
     );
-
-    return {
-      checkResult: checkResponse,
-      errors: [],
-    };
   }
 
-  // TODO: Investigate lock/unlock/delete operations for local macros
-  // - Currently uses parent class lock (lockClass) for all operations
-  // - Eclipse ADT logs show parent class lock is used before updating local includes
-  // - Delete operation currently uses update() with empty code, but validation prevents empty strings
-  // - Consider: Should delete() bypass validation or use a different approach?
-
-  getVersions(
-    config: Partial<{ className: string }>,
-  ): Promise<IObjectVersion[]> {
+  /** Version history of this include. */
+  async getVersions(
+    config: Partial<ILocalMacrosConfig>,
+  ): Promise<IAdtResponse<ObjectVersion[]>> {
     if (!config.className) throw new Error('className is required');
-    return this.getIncludeVersions(config.className, 'macros');
+    const name = config.className;
+    return answering(
+      async () => ({
+        data: await this.getIncludeVersions(name, 'macros'),
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+      }),
+      (answer) => answer.data as ObjectVersion[],
+    );
   }
 }

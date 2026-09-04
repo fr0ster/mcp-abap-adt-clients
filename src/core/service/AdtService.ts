@@ -4,7 +4,6 @@ import type {
   IAdtSystemContext,
   IAdtWireResponse,
   ILogger,
-  IObjectVersion,
 } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
 import {
@@ -26,6 +25,7 @@ import {
 } from '../../utils/internalUtils';
 import { getSystemInformation } from '../../utils/systemInfo';
 import { getTimeout } from '../../utils/timeouts';
+import type { ObjectVersion } from '../shared/results';
 import type {
   IActivateServiceBindingParams,
   IAdtServiceBinding,

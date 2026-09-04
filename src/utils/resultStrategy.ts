@@ -13,7 +13,10 @@
  * two fields from every read, an MCP server picks by what its model is about to
  * do. None changes its mind between `create` and `read` of the same object.
  */
-import type { IResultStrategy } from '@mcp-abap-adt/interfaces';
+import type {
+  IAdtWireResponse,
+  IResultStrategy,
+} from '@mcp-abap-adt/interfaces';
 
 /**
  * The body as it arrived.
@@ -37,3 +40,14 @@ export const rawDocument: IResultStrategy<string> = (answer) =>
  * still says whether it happened.
  */
 export const nothing: IResultStrategy<void> = () => undefined;
+
+/**
+ * The answer itself, unread.
+ *
+ * For a member whose caller does its own reading — the low-level per-type
+ * request functions hand the wire on to the handler, which applies the
+ * consumer's strategy to it. Status and headers survive, which `rawDocument`
+ * drops, and that is the whole reason it is separate: a reading that keeps
+ * everything is not the same as a reading that keeps the body.
+ */
+export const wireItself: IResultStrategy<IAdtWireResponse> = (answer) => answer;

@@ -1,6 +1,7 @@
-import type { IAbapConnection, IObjectVersion } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
+import type { ObjectVersion } from '../shared/results';
 import { parseVersionsFeed, throwVersionsError } from '../shared/versions';
 import type { IBehaviorDefinitionConfig } from './types';
 
@@ -10,7 +11,7 @@ const ACCEPT_VERSION_FEED = 'application/atom+xml;type=feed';
 export async function getBehaviorDefinitionVersions(
   connection: IAbapConnection,
   config: Partial<IBehaviorDefinitionConfig>,
-): Promise<IObjectVersion[]> {
+): Promise<ObjectVersion[]> {
   if (!config.name) throw new Error('name is required');
   const encodedName = encodeSapObjectName(config.name).toLowerCase();
   const url = `/sap/bc/adt/bo/behaviordefinitions/${encodedName}/source/main/versions`;

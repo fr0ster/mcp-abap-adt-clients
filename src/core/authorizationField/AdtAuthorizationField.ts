@@ -28,7 +28,6 @@ import type {
   IAdtSystemContext,
   IAdtValidatable,
   ILogger,
-  IObjectVersion,
 } from '@mcp-abap-adt/interfaces';
 import { safeErrorMessage } from '../../utils/internalUtils';
 import {
@@ -36,6 +35,7 @@ import {
   type LockRegistry,
   type LockTracker,
 } from '../shared/LockRegistry';
+import type { ObjectVersion } from '../shared/results';
 import { activateAuthorizationField } from './activation';
 import { checkAuthorizationField } from './check';
 import { create as createAuthorizationField } from './create';

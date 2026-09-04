@@ -27,7 +27,6 @@ import type {
   IAdtOperationOptions,
   IAdtSystemContext,
   ILogger,
-  IObjectVersion,
 } from '@mcp-abap-adt/interfaces';
 import { safeErrorMessage } from '../../utils/internalUtils';
 import {
@@ -35,6 +34,7 @@ import {
   type LockRegistry,
   type LockTracker,
 } from '../shared/LockRegistry';
+import type { ObjectVersion } from '../shared/results';
 import { activateFeatureToggle } from './activation';
 import { checkFeatureToggle } from './check';
 import { checkFeatureToggleState } from './checkState';

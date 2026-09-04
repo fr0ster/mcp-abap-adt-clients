@@ -1,6 +1,7 @@
-import type { IAbapConnection, IObjectVersion } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
+import type { ObjectVersion } from '../shared/results';
 import { parseVersionsFeed, throwVersionsError } from '../shared/versions';
 import type { ITableTypeConfig } from './types';
 
@@ -10,7 +11,7 @@ const ACCEPT_VERSION_FEED = 'application/atom+xml;type=feed';
 export async function getTableTypeVersions(
   connection: IAbapConnection,
   config: Partial<ITableTypeConfig>,
-): Promise<IObjectVersion[]> {
+): Promise<ObjectVersion[]> {
   if (!config.tableTypeName) throw new Error('tableTypeName is required');
   const encodedName = encodeSapObjectName(config.tableTypeName);
   const url = `/sap/bc/adt/ddic/tabletypes/${encodedName}/source/main/versions`;
