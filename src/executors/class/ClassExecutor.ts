@@ -1,21 +1,25 @@
 import type {
   IAbapConnection,
-  IAdtWireResponse,
+  IAdtResponse,
   IClassExecuteWithProfilerOptions,
   IClassExecuteWithProfilingOptions,
   IClassExecuteWithProfilingResult,
   IClassExecutionTarget,
   IClassExecutor,
   ILogger,
-  INamedItem,
   IProfilerTraceParameters,
-  ITraceRequestEntry,
 } from '@mcp-abap-adt/interfaces';
 import { runClass } from '../../core/class/run';
+import type { INamedItem } from '../../core/shared/utilResults';
+import type { ITraceRequestEntry } from '../../runtime/traces/types';
+import { answering, failed, succeeded } from '../../utils/adtResponse';
+import { rawDocument } from '../../utils/resultStrategy';
 import { getTimeout } from '../../utils/timeouts';
 import { TraceScheduling } from '../traceScheduling';
 
-export class ClassExecutor implements IClassExecutor {
+export class ClassExecutor
+  implements IClassExecutor<string, INamedItem[], ITraceRequestEntry[], string>
+{
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
   private readonly scheduling: TraceScheduling;
@@ -30,28 +34,34 @@ export class ClassExecutor implements IClassExecutor {
   // is what fulfils a scheduled request; not on IExecutor, because an ATC run
   // implements that too and has no business with traces.
 
-  listObjectTypes = (): Promise<INamedItem[]> =>
+  listObjectTypes = (): Promise<IAdtResponse<INamedItem[]>> =>
     this.scheduling.listObjectTypes();
-  listProcessTypes = (): Promise<INamedItem[]> =>
+  listProcessTypes = (): Promise<IAdtResponse<INamedItem[]>> =>
     this.scheduling.listProcessTypes();
-  listRequests = (): Promise<ITraceRequestEntry[]> =>
+  listRequests = (): Promise<IAdtResponse<ITraceRequestEntry[]>> =>
     this.scheduling.listRequests();
-  getRequestsByUri = (uri: string): Promise<ITraceRequestEntry[]> =>
+  getRequestsByUri = (
+    uri: string,
+  ): Promise<IAdtResponse<ITraceRequestEntry[]>> =>
     this.scheduling.getRequestsByUri(uri);
-  scheduleTrace = (options?: IProfilerTraceParameters): Promise<string> =>
-    this.scheduling.scheduleTrace(options);
+  scheduleTrace = (
+    options?: IProfilerTraceParameters,
+  ): Promise<IAdtResponse<string>> => this.scheduling.scheduleTrace(options);
 
-  async run(target: IClassExecutionTarget): Promise<IAdtWireResponse> {
+  async run(target: IClassExecutionTarget): Promise<IAdtResponse<string>> {
     if (!target.className) {
       throw new Error('Class name is required');
     }
-    return runClass(this.connection, target.className, true);
+    return answering(
+      () => runClass(this.connection, target.className, true),
+      rawDocument,
+    );
   }
 
   async runWithProfiler(
     target: IClassExecutionTarget,
     options: IClassExecuteWithProfilerOptions,
-  ): Promise<IAdtWireResponse> {
+  ): Promise<IAdtResponse<string>> {
     if (!target.className) {
       throw new Error('Class name is required');
     }
@@ -81,34 +91,45 @@ export class ClassExecutor implements IClassExecutor {
   async runWithProfiling(
     target: IClassExecutionTarget,
     options: IClassExecuteWithProfilingOptions = {},
-  ): Promise<IClassExecuteWithProfilingResult> {
+  ): Promise<IAdtResponse<IClassExecuteWithProfilingResult<string>>> {
     if (!target.className) {
       throw new Error('Class name is required');
     }
 
-    const profilerId = await this.scheduleTrace(options.profilerParameters);
+    const scheduled = await this.scheduleTrace(options.profilerParameters);
+    if (!scheduled.ok) {
+      // The measurement could not be configured, so there is nothing to run
+      // under it — the scheduling's own failure is the answer.
+      return failed(scheduled.getError());
+    }
+    const profilerId = scheduled.getResult().value;
     this.logger?.debug?.('Scheduled trace for class run', {
       className: target.className,
       profilerId,
     });
 
-    const response = await this.runWithProfilerId(target.className, profilerId);
-    return { response, profilerId };
+    const run = await this.runWithProfilerId(target.className, profilerId);
+    if (!run.ok) return failed(run.getError());
+    return succeeded({ run: run.getResult().value, profilerId });
   }
 
   private async runWithProfilerId(
     className: string,
     profilerId: string,
-  ): Promise<IAdtWireResponse> {
+  ): Promise<IAdtResponse<string>> {
     const encodedProfilerId = encodeURIComponent(profilerId);
-    return this.connection.makeAdtRequest({
-      url: `/sap/bc/adt/oo/classrun/${className}?profilerId=${encodedProfilerId}`,
-      method: 'POST',
-      timeout: getTimeout('default'),
-      headers: {
-        Accept: 'text/plain',
-        'X-sap-adt-profiling': 'server-time',
-      },
-    });
+    return answering(
+      () =>
+        this.connection.makeAdtRequest({
+          url: `/sap/bc/adt/oo/classrun/${className}?profilerId=${encodedProfilerId}`,
+          method: 'POST',
+          timeout: getTimeout('default'),
+          headers: {
+            Accept: 'text/plain',
+            'X-sap-adt-profiling': 'server-time',
+          },
+        }),
+      rawDocument,
+    );
   }
 }
