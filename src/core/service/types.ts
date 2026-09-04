@@ -1,3 +1,4 @@
+import type { IResultStrategy } from '@mcp-abap-adt/interfaces';
 import {
   type GeneratedServiceType,
   SERVICE_BINDING_VARIANT_MAP,
@@ -5,16 +6,14 @@ import {
   type ServiceBindingVariant,
   type ServiceBindingVersion,
 } from '@mcp-abap-adt/interfaces';
+import { rawDocument } from '../../utils/resultStrategy';
 
 // Types defined in @mcp-abap-adt/interfaces
 export type {
-  AdtServiceBindingType,
   DesiredPublicationState,
   GeneratedServiceType,
   IActivateServiceBindingParams,
-  IAdtService,
   IAdtServiceBinding,
-  IAdtServiceOperationOptions,
   ICheckServiceBindingParams,
   IClassifyServiceBindingParams,
   ICreateAndGenerateServiceBindingParams,
@@ -26,7 +25,7 @@ export type {
   IPublishODataV2Params,
   IReadServiceBindingParams,
   IServiceBindingConfig,
-  IServiceBindingState,
+  IServiceBindingResults,
   ITransportCheckServiceBindingParams,
   IUnpublishODataV2Params,
   IUpdateServiceBindingParams,
@@ -45,3 +44,64 @@ export function resolveBindingVariant(variant: ServiceBindingVariant): {
 } {
   return SERVICE_BINDING_VARIANT_MAP[variant];
 }
+
+/**
+ * One strategy per member of a service binding implementation.
+ *
+ * A record rather than fourteen positional type parameters — the fourteenth
+ * would be unnameable without spelling the thirteen before it, and a consumer
+ * overriding one reading writes the key. `IServiceBindingResults` in the
+ * contract names five of these; the rest belong to the capability atoms.
+ */
+export interface IServiceResults {
+  /** What the create answers: the binding's own document. */
+  readonly created: IResultStrategy<unknown>;
+  /** What a read answers: the binding document, active or inactive. */
+  readonly source: IResultStrategy<unknown>;
+  /** The same document, read as metadata — a binding has no second resource. */
+  readonly metadata: IResultStrategy<unknown>;
+  /** What a check run answers: `chkl:messages`, whose `E` entries are the verdict. */
+  readonly check: IResultStrategy<unknown>;
+  /** What activation answers. */
+  readonly activation: IResultStrategy<unknown>;
+  /** What the pre-create transport check answers. */
+  readonly validation: IResultStrategy<unknown>;
+  /** What the deletion answers. */
+  readonly deletion: IResultStrategy<unknown>;
+  /** What a publication change answers. */
+  readonly updated: IResultStrategy<unknown>;
+  /** What the transport check answers. */
+  readonly transport: IResultStrategy<unknown>;
+  /** The binding types this system offers. */
+  readonly bindingTypes: IResultStrategy<unknown>;
+  /** What generating the service answers. */
+  readonly generation: IResultStrategy<unknown>;
+  /** What an OData v2 or v4 read of the binding answers. */
+  readonly odata: IResultStrategy<unknown>;
+  /** What publishing or withdrawing answers. */
+  readonly publication: IResultStrategy<unknown>;
+  /** What classifying the binding answers. */
+  readonly classification: IResultStrategy<unknown>;
+}
+
+/**
+ * The shipped default: every member answers its document as it arrived.
+ *
+ * `satisfies`, never an annotation — see `classDocuments` for why.
+ */
+export const serviceDocuments = {
+  created: rawDocument,
+  source: rawDocument,
+  metadata: rawDocument,
+  check: rawDocument,
+  activation: rawDocument,
+  validation: rawDocument,
+  deletion: rawDocument,
+  updated: rawDocument,
+  transport: rawDocument,
+  bindingTypes: rawDocument,
+  generation: rawDocument,
+  odata: rawDocument,
+  publication: rawDocument,
+  classification: rawDocument,
+} satisfies IServiceResults;

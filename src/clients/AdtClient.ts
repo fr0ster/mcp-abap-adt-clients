@@ -182,7 +182,11 @@ import {
   type IScalarFunctionImplementationConfig,
   type IScalarFunctionImplementationState,
 } from '../core/scalarFunctionImplementation';
-import { AdtServiceBinding, type IAdtServiceBinding } from '../core/service';
+import {
+  AdtServiceBinding,
+  type IServiceResults,
+  serviceDocuments,
+} from '../core/service';
 import {
   AdtServiceDefinition,
   type IServiceDefinitionConfig,
@@ -1404,19 +1408,26 @@ export class AdtClient {
    * Get high-level operations for ServiceBinding objects
    * @returns IAdtServiceBinding instance for ServiceBinding CRUD and lifecycle operations
    */
-  getServiceBinding(): IAdtServiceBinding {
+  getServiceBinding(): AdtServiceBinding;
+  getServiceBinding<R extends IServiceResults>(
+    results: R,
+  ): AdtServiceBinding<R>;
+  getServiceBinding<R extends IServiceResults = typeof serviceDocuments>(
+    results: R = serviceDocuments as unknown as R,
+  ): AdtServiceBinding<R> {
     this.assertConnected();
-    return new AdtServiceBinding(
+    return new AdtServiceBinding<R>(
       this.connection,
       this.logger,
       this.systemContext,
+      results,
     );
   }
 
   /**
    * @deprecated Use getServiceBinding() instead.
    */
-  getService(): IAdtServiceBinding {
+  getService(): AdtServiceBinding {
     return this.getServiceBinding();
   }
 

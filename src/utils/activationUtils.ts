@@ -7,9 +7,12 @@
  */
 
 import type {
+  AdtNoFailure,
   IAbapConnection,
+  IAdtError,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
+import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
 import { CT_ACTIVATION } from '../constants/contentTypes';
 import { encodeSapObjectName } from './internalUtils';
@@ -133,6 +136,30 @@ function detectActivationFailure(responseData: unknown): string | null {
  * @param objectLabel prefix for the thrown message, e.g. `'Scalar function'`
  * @throws when the response carries at least one error-severity message
  */
+/**
+ * ADT's own activation verdict, as a failure rather than an exception.
+ *
+ * The shipped `analyse` for an activation step. Same rule as
+ * {@link assertActivationSucceeded} — an `<msg type="E">` is the verdict and
+ * `activationExecuted="false"` is not — but returned, because a chain's
+ * failures are answered. A consumer who reads activation messages some other
+ * way passes their own `analyse` instead.
+ */
+export const activationRefusal = (
+  verdict: IAdtError | AdtNoFailure,
+  answer?: IAdtWireResponse,
+): IAdtError | AdtNoFailure => {
+  if (verdict !== ADT_NO_FAILURE) return verdict;
+  const failure = detectActivationFailure(answer?.data);
+  return failure
+    ? {
+        origin: 'refusal',
+        message: `Activation failed: ${failure}`,
+        response: answer,
+      }
+    : ADT_NO_FAILURE;
+};
+
 export function assertActivationSucceeded(
   objectLabel: string,
   responseData: unknown,
