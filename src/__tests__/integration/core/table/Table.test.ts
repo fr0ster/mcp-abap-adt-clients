@@ -15,7 +15,7 @@ import * as path from 'node:path';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type { ITableConfig, ITableState } from '../../../../core/table';
+import type { ITableConfig } from '../../../../core/table';
 import { getTable } from '../../../../core/table/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
@@ -66,7 +66,7 @@ describe('Table (using AdtClient)', () => {
   let hasConfig = false;
   let isLegacy = false;
   let isCloudSystem = false;
-  let tester: BaseTester<ITableConfig, ITableState>;
+  let tester: BaseTester<ITableConfig>;
 
   beforeAll(async () => {
     try {

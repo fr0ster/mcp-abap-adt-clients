@@ -15,10 +15,7 @@ import * as path from 'node:path';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type {
-  IStructureConfig,
-  IStructureState,
-} from '../../../../core/structure';
+import type { IStructureConfig } from '../../../../core/structure';
 import { getStructure } from '../../../../core/structure/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
@@ -69,7 +66,7 @@ describe('Structure (using AdtClient)', () => {
   let hasConfig = false;
   let isLegacy = false;
   let isCloudSystem = false;
-  let tester: BaseTester<IStructureConfig, IStructureState>;
+  let tester: BaseTester<IStructureConfig>;
 
   beforeAll(async () => {
     try {

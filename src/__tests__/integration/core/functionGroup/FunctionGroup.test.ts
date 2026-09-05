@@ -12,17 +12,10 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type {
-  IAbapConnection,
-  IAdtObject,
-  ILogger,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type {
-  IFunctionGroupConfig,
-  IFunctionGroupState,
-} from '../../../../core/functionGroup';
+import type { IFunctionGroupConfig } from '../../../../core/functionGroup';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
 import {
@@ -73,7 +66,7 @@ describe('FunctionGroup (using AdtClient)', () => {
   let hasConfig = false;
   let isCloudSystem = false;
   let isLegacy = false;
-  let tester: BaseTester<IFunctionGroupConfig, IFunctionGroupState>;
+  let tester: BaseTester<IFunctionGroupConfig>;
 
   beforeAll(async () => {
     try {

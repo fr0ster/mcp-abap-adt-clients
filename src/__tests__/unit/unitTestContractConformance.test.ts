@@ -22,12 +22,10 @@ import type {
   IAdtValidatable,
   ICdsTestDoubleCheckable,
   ICdsUnitTestConfig,
-  ICdsUnitTestState,
   IClassUnitTestDefinition,
   IClassUnitTestRunOptions,
   ITestRunInformation,
   IUnitTestConfig,
-  IUnitTestState,
 } from '@mcp-abap-adt/interfaces';
 import type { AdtClient } from '../../clients/AdtClient';
 

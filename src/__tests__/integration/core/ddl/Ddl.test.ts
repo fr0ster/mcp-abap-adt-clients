@@ -15,7 +15,7 @@ import * as path from 'node:path';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type { IDdlConfig, IDdlState } from '../../../../core/ddl';
+import type { IDdlConfig } from '../../../../core/ddl';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
 import {
@@ -63,7 +63,7 @@ describe('View (using AdtClient)', () => {
   let defaultPackage: string = '';
   let defaultTransport: string = '';
   let systemContext: Awaited<ReturnType<typeof resolveSystemContext>>;
-  let tester: BaseTester<IDdlConfig, IDdlState>;
+  let tester: BaseTester<IDdlConfig>;
 
   beforeAll(async () => {
     try {

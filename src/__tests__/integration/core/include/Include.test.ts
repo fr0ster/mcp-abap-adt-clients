@@ -24,7 +24,6 @@ import * as path from 'node:path';
 import type {
   IAbapConnection,
   IIncludeConfig,
-  IIncludeState,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
@@ -73,7 +72,7 @@ describe('Include (PROG/I, using AdtClient)', () => {
   let hasConfig = false;
   let isCloudSystem = false;
   let systemContext: Awaited<ReturnType<typeof resolveSystemContext>>;
-  let tester: BaseTester<IIncludeConfig, IIncludeState>;
+  let tester: BaseTester<IIncludeConfig>;
 
   beforeAll(async () => {
     try {
@@ -88,7 +87,7 @@ describe('Include (PROG/I, using AdtClient)', () => {
       client = resolvedClient;
       hasConfig = true;
 
-      tester = new BaseTester<IIncludeConfig, IIncludeState>(
+      tester = new BaseTester<IIncludeConfig>(
         client.getInclude(),
         'Include',
         'create_include',

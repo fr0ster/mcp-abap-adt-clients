@@ -12,14 +12,10 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type {
-  IAbapConnection,
-  IAdtObject,
-  ILogger,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type { IDomainConfig, IDomainState } from '../../../../core/domain';
+import type { IDomainConfig } from '../../../../core/domain';
 import { getDomain } from '../../../../core/domain/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
@@ -70,7 +66,7 @@ describe('Domain (using AdtClient)', () => {
   let hasConfig = false;
   let isLegacy = false;
   let isCloudSystem = false;
-  let tester: BaseTester<IDomainConfig, IDomainState>;
+  let tester: BaseTester<IDomainConfig>;
 
   beforeAll(async () => {
     try {

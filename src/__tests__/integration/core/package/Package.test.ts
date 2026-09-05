@@ -8,14 +8,10 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type {
-  IAbapConnection,
-  IAdtObject,
-  ILogger,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type { IPackageConfig, IPackageState } from '../../../../core/package';
+import type { IPackageConfig } from '../../../../core/package';
 import { deletePackage } from '../../../../core/package/delete';
 import { getPackage } from '../../../../core/package/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
@@ -76,7 +72,7 @@ describe('Package (using AdtClient)', () => {
   let hasConfig = false;
   let isLegacy = false;
   let isCloudSystem = false;
-  let tester: BaseTester<IPackageConfig, IPackageState>;
+  let tester: BaseTester<IPackageConfig>;
 
   beforeAll(async () => {
     try {

@@ -116,12 +116,12 @@ describe('Class local includes (using BaseTester)', () => {
     }
   }
 
-  let definitionsTester: BaseTester<any, any>;
-  let localTypesTester: BaseTester<any, any>;
-  let localTestClassTester: BaseTester<any, any>;
-  let localMacrosTester: BaseTester<any, any>;
+  let definitionsTester: BaseTester<any>;
+  let localTypesTester: BaseTester<any>;
+  let localTestClassTester: BaseTester<any>;
+  let localMacrosTester: BaseTester<any>;
   const parentClassCreatedMap = new Map<
-    BaseTester<any, any>,
+    BaseTester<any>,
     { created: boolean; className: string | null }
   >();
 
@@ -169,7 +169,7 @@ describe('Class local includes (using BaseTester)', () => {
       );
 
       const setupCommon = (
-        tester: BaseTester<any, any>,
+        tester: BaseTester<any>,
         testDescription: string,
         codeField: string,
         options?: { skipEnsureParentClass?: () => boolean },

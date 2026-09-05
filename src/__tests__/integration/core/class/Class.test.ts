@@ -15,7 +15,7 @@ import * as path from 'node:path';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type { IClassConfig, IClassState } from '../../../../core/class';
+import type { IClassConfig } from '../../../../core/class';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
 import {
@@ -66,7 +66,7 @@ describe('Class (using AdtClient)', () => {
   let isCloudSystem = false;
   let isLegacy = false;
   let systemContext: Awaited<ReturnType<typeof resolveSystemContext>>;
-  let tester: BaseTester<IClassConfig, IClassState>;
+  let tester: BaseTester<IClassConfig>;
 
   beforeAll(async () => {
     try {

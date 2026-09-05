@@ -17,17 +17,10 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type {
-  IAbapConnection,
-  IAdtObject,
-  ILogger,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type {
-  IMessageClassConfig,
-  IMessageClassState,
-} from '../../../../core/messageClass';
+import type { IMessageClassConfig } from '../../../../core/messageClass';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
 import {
@@ -78,7 +71,7 @@ describe('MessageClass (using AdtClient)', () => {
   let hasConfig = false;
   let isLegacy = false;
   let isCloudSystem = false;
-  let tester: BaseTester<IMessageClassConfig, IMessageClassState>;
+  let tester: BaseTester<IMessageClassConfig>;
   // Transport resolved by buildConfig; reused by ensureObjectReady's cleanup
   // delete so a pre-existing object in a transportable package is deleted
   // with the same corrNr as the rest of the lifecycle.

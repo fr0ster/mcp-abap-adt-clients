@@ -9,7 +9,6 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type {
   IAbapConnection,
-  IAdtObject,
   IAdtOperationOptions,
   IAdtWireResponse,
   IGetVirtualFoldersContentsParams,
@@ -159,7 +158,7 @@ describe('Shared - getVirtualFoldersContents', () => {
   let hasConfig = false;
   let isLegacy = false;
   let isCloudSystem = false;
-  let tester: BaseTester<IGetVirtualFoldersContentsParams, IAdtWireResponse>;
+  let tester: BaseTester<IGetVirtualFoldersContentsParams>;
 
   beforeAll(async () => {
     try {

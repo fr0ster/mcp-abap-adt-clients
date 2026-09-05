@@ -11,8 +11,8 @@ import type {
   IAbapConnection,
   IAbapRequestOptions,
   IAdtWireResponse,
-  ITransportTree,
 } from '@mcp-abap-adt/interfaces';
+import type { ITransportTree } from '../../../../core/transport';
 import { AdtRequest } from '../../../../core/transport/AdtRequest';
 import { AdtRequestLegacy } from '../../../../core/transport/AdtRequestLegacy';
 

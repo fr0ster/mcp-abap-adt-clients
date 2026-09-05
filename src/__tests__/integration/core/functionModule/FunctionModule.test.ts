@@ -15,10 +15,7 @@ import * as path from 'node:path';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type {
-  IFunctionModuleConfig,
-  IFunctionModuleState,
-} from '../../../../core/functionModule';
+import type { IFunctionModuleConfig } from '../../../../core/functionModule';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
 import {
@@ -72,7 +69,7 @@ describe('FunctionModule (using AdtClient)', () => {
   let isCloudSystem = false;
   let isLegacy = false;
   let systemContext: Awaited<ReturnType<typeof resolveSystemContext>>;
-  let tester: BaseTester<IFunctionModuleConfig, IFunctionModuleState>;
+  let tester: BaseTester<IFunctionModuleConfig>;
 
   beforeAll(async () => {
     try {

@@ -30,14 +30,16 @@ import type {
   IAbapConnection,
   IAdtActivatable,
   IAdtCreatable,
-  IAdtModifiable,
+  IAdtDeletable,
   IAdtOperationOptions,
   IAdtReadable,
+  IAdtUpdatable,
   IAdtValidatable,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { LogLevel } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
+import { expectResult } from './contract';
 import { recycleTestSession, releaseTestConnection } from './sessionConfig';
 import { TestConfigResolver } from './TestConfigResolver';
 import {
@@ -95,18 +97,24 @@ export interface IBaseTesterSetupOptions {
  * It used to demand `IAdtObject`, the full set, which made this helper the last
  * place insisting every handler can do everything — a feature toggle has no
  * version history, a service binding has no lock, and neither could be tested
- * here once their types stopped claiming otherwise. These are the seven methods
+ * here once their types stopped claiming otherwise. These are the six methods
  * the class calls; `activate` is optional because not every object is
  * activated, and the call site already guards on it.
+ *
+ * Every member answers `IAdtResponse<unknown>` since interfaces 31.0.0: what a
+ * handler makes of an answer is its consumer's choice, and a test harness is
+ * one consumer among several. It reads the values through `expectResult`, which
+ * fails the test with SAP's own sentence when there is no value.
  */
-export type TestableObject<TConfig, TState> = IAdtCreatable<TConfig, TState> &
-  IAdtReadable<TConfig, TState> &
-  IAdtModifiable<TConfig, TState> &
-  IAdtValidatable<TConfig, TState> &
-  Partial<IAdtActivatable<TConfig, TState>>;
+export type TestableObject<TConfig> = IAdtCreatable<TConfig, unknown> &
+  IAdtReadable<TConfig, unknown, unknown> &
+  IAdtUpdatable<TConfig, unknown> &
+  IAdtDeletable<TConfig, unknown> &
+  IAdtValidatable<TConfig, unknown> &
+  Partial<IAdtActivatable<TConfig, unknown>>;
 
-export class BaseTester<TConfig, TState> {
-  private readonly adtObject: TestableObject<TConfig, TState>;
+export class BaseTester<TConfig, TState = unknown> {
+  private readonly adtObject: TestableObject<TConfig>;
   private readonly loggerPrefix: string;
   private readonly testCaseKey: string;
   private readonly testCaseName: string;
@@ -165,7 +173,7 @@ export class BaseTester<TConfig, TState> {
    *                Uses LogLevel enum from @mcp-abap-adt/logger for log level constants
    */
   constructor(
-    adtObject: TestableObject<TConfig, TState>,
+    adtObject: TestableObject<TConfig>,
     loggerPrefix: string,
     testCaseKey: string,
     testCaseName: string,
@@ -446,9 +454,9 @@ export class BaseTester<TConfig, TState> {
     ): Promise<string | undefined> => {
       logTestStep(label, this.logger);
       // No source URL logging by default (keep logs concise)
-      let readState: TState | undefined;
+      let answer: Awaited<ReturnType<TestableObject<TConfig>['read']>>;
       try {
-        readState = await this.adtObject.read(
+        answer = await this.adtObject.read(
           config as Partial<TConfig>,
           version,
           withLongPolling ? { withLongPolling: true } : undefined,
@@ -463,7 +471,7 @@ export class BaseTester<TConfig, TState> {
           );
           // Small delay before retry to allow ADT to finalize object state
           await new Promise((resolve) => setTimeout(resolve, 1000));
-          readState = await this.adtObject.read(
+          answer = await this.adtObject.read(
             config as Partial<TConfig>,
             version,
             undefined,
@@ -472,10 +480,9 @@ export class BaseTester<TConfig, TState> {
           throw error;
         }
       }
-      if (!readState || !(readState as any)?.readResult) {
-        throw new Error(`Read ${version} failed: no response`);
-      }
-      const payload = getPayloadText((readState as any)?.readResult?.data);
+      // A refusal is in the answer now, not thrown, so this is where a failed
+      // read stops the test — with SAP's own sentence rather than "no response".
+      const payload = getPayloadText(expectResult(answer, `read ${version}`));
       logTestStep(
         `${label} length: ${payload?.length || 0} characters`,
         this.logger,
@@ -488,14 +495,15 @@ export class BaseTester<TConfig, TState> {
       withLongPolling: boolean = false,
     ): Promise<string | undefined> => {
       logTestStep(label, this.logger);
-      const metadataState = await this.adtObject.readMetadata(
-        config as Partial<TConfig>,
-        withLongPolling ? { withLongPolling: true } : undefined,
+      const payload = getPayloadText(
+        expectResult(
+          await this.adtObject.readMetadata(
+            config as Partial<TConfig>,
+            withLongPolling ? { withLongPolling: true } : undefined,
+          ),
+          'readMetadata',
+        ),
       );
-      const metadataResult =
-        (metadataState as any)?.metadataResult ||
-        (metadataState as any)?.readResult;
-      const payload = getPayloadText(metadataResult?.data);
       logTestStep(
         `${label} length: ${payload?.length || 0} characters`,
         this.logger,
@@ -650,38 +658,25 @@ export class BaseTester<TConfig, TState> {
       // 1. Validate
       currentStep = 'validate';
       logTestStep(currentStep, this.logger);
-      const validationState = await this.adtObject.validate(
-        config as Partial<TConfig>,
+      // No status check: a non-2xx is a returned failure since 31.0.0, and
+      // `expectResult` reports it with what SAP said.
+      const validationDocument = String(
+        expectResult(
+          await this.adtObject.validate(config as Partial<TConfig>),
+          'validate',
+        ) ?? '',
       );
-      const validationResponse =
-        (validationState as any)?.validationResponse || validationState;
 
-      // Check HTTP status
-      if (validationResponse?.status !== 200) {
-        const errorData =
-          typeof validationResponse?.data === 'string'
-            ? validationResponse.data
-            : JSON.stringify(validationResponse?.data);
-        const error = new Error(
-          `Validation failed (HTTP ${validationResponse?.status}): ${errorData}`,
-        );
-        logTestStepError(currentStep, error);
-        throw error;
-      }
-
-      // Check for error tables in validation response (even if HTTP 200)
-      // Validation can return HTTP 200 but with error/warning tables in XML
-      if (
-        validationResponse?.data &&
-        typeof validationResponse.data === 'string'
-      ) {
+      // The document still has to be read: validation reports a rejected name
+      // inside a 200, in an error table.
+      if (validationDocument) {
         try {
           const { XMLParser } = require('fast-xml-parser');
           const parser = new XMLParser({
             ignoreAttributes: false,
             attributeNamePrefix: '@_',
           });
-          const parsed = parser.parse(validationResponse.data);
+          const parsed = parser.parse(validationDocument);
 
           // Check for error table (adtcore:errorTable or similar)
           const errorTable =
@@ -876,27 +871,12 @@ export class BaseTester<TConfig, TState> {
       ) {
         currentStep = 'activate';
         logTestStep(currentStep, this.logger);
-        const activateState = await this.adtObject.activate(
-          config as Partial<TConfig>,
+        // A refused activation is a failure in the answer — the handlers read
+        // `<msg type="E">` for it, which a status check never could.
+        expectResult(
+          await this.adtObject.activate(config as Partial<TConfig>),
+          'activate',
         );
-        // activate returns state object, check for errors
-        const activateResponse =
-          (activateState as any)?.activateResponse || activateState;
-        if (
-          activateResponse?.status &&
-          activateResponse.status !== 200 &&
-          activateResponse.status !== 204
-        ) {
-          const errorData =
-            typeof activateResponse?.data === 'string'
-              ? activateResponse.data
-              : JSON.stringify(activateResponse?.data);
-          const error = new Error(
-            `Activation failed (HTTP ${activateResponse.status}): ${errorData}`,
-          );
-          logTestStepError(currentStep, error);
-          throw error;
-        }
         // Delay after activate
         await this.waitDelay(
           this.getOperationDelay('activate', testCaseParams),
@@ -1026,7 +1006,7 @@ export class BaseTester<TConfig, TState> {
                   acceptHint ? `; ${acceptHint}` : ''
                 }`,
               );
-              return validationState;
+              return validationDocument as unknown as TState;
             }
           }
           logTestStepError(currentStep, error);
@@ -1089,7 +1069,7 @@ export class BaseTester<TConfig, TState> {
         );
       }
 
-      return validationState;
+      return validationDocument as unknown as TState;
     } catch (error: any) {
       // Log step error with details before failing test
       if (currentStep) {
@@ -1178,24 +1158,25 @@ export class BaseTester<TConfig, TState> {
   async readTest(
     config: Partial<TConfig>,
     options?: IReadTestOptions,
-  ): Promise<TState | undefined> {
+  ): Promise<unknown> {
     // Ensure connection is open (RFC connections may close after flowTest cleanup)
     await this.ensureConnection();
 
     try {
       logTestStep('read', this.logger);
-      const readState = await this.adtObject.read(
-        config,
-        options?.version || 'active',
-        options?.withLongPolling !== undefined
-          ? { withLongPolling: options.withLongPolling }
-          : undefined,
+      // The value, or the test fails with what SAP said. An object that is not
+      // there answers 200 with an empty body — the caller's `analyse` decides
+      // whether that is absence, and this harness reads it as an empty read.
+      const readState = expectResult(
+        await this.adtObject.read(
+          config,
+          options?.version || 'active',
+          options?.withLongPolling !== undefined
+            ? { withLongPolling: options.withLongPolling }
+            : undefined,
+        ),
+        'read',
       );
-
-      if (!readState) {
-        this.log(LogLevel.WARN, 'read failed: object not found');
-        return undefined;
-      }
 
       if (options?.skipReadMetadata) {
         return readState;
@@ -1853,7 +1834,7 @@ export class BaseTester<TConfig, TState> {
    * Read test with automatic config loading
    * Uses config from beforeEach
    */
-  async readTestAuto(options?: IReadTestOptions): Promise<TState | undefined> {
+  async readTestAuto(options?: IReadTestOptions): Promise<unknown> {
     const testName = `${this.loggerPrefix} - read standard object`;
     const definition = this.getTestCaseDefinition() || {
       name: this.testCaseKey,

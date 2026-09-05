@@ -15,10 +15,7 @@ import * as path from 'node:path';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type {
-  IInterfaceConfig,
-  IInterfaceState,
-} from '../../../../core/interface';
+import type { IInterfaceConfig } from '../../../../core/interface';
 import { getInterface } from '../../../../core/interface/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
@@ -69,7 +66,7 @@ describe('Interface (using AdtClient)', () => {
   let hasConfig = false;
   let isCloudSystem = false;
   let isLegacy = false;
-  let tester: BaseTester<IInterfaceConfig, IInterfaceState>;
+  let tester: BaseTester<IInterfaceConfig>;
 
   beforeAll(async () => {
     try {

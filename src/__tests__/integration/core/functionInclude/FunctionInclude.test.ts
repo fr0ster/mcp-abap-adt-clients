@@ -12,17 +12,10 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type {
-  IAbapConnection,
-  IAdtObject,
-  ILogger,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type {
-  IFunctionIncludeConfig,
-  IFunctionIncludeState,
-} from '../../../../core/functionInclude';
+import type { IFunctionIncludeConfig } from '../../../../core/functionInclude';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
 import {
@@ -68,7 +61,7 @@ describe('FunctionInclude (using AdtClient)', () => {
   let isCloudSystem = false;
   let isLegacy = false;
   let systemContext: Awaited<ReturnType<typeof resolveSystemContext>>;
-  let tester: BaseTester<IFunctionIncludeConfig, IFunctionIncludeState>;
+  let tester: BaseTester<IFunctionIncludeConfig>;
 
   beforeAll(async () => {
     try {
@@ -81,7 +74,7 @@ describe('FunctionInclude (using AdtClient)', () => {
       isLegacy = legacy;
       hasConfig = true;
 
-      tester = new BaseTester<IFunctionIncludeConfig, IFunctionIncludeState>(
+      tester = new BaseTester<IFunctionIncludeConfig>(
         // getFunctionInclude() is narrowed to its honest capability composite
         // (no readTransport); cast through the full interface.
         client.getFunctionInclude() as unknown as IAdtObject<

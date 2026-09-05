@@ -14,12 +14,10 @@
  * long anybody is willing to wait.
  */
 
-import type {
-  ILogger,
-  IProfiler,
-  IProfilerListOptions,
-} from '@mcp-abap-adt/interfaces';
+import type { ILogger, IProfilerListOptions } from '@mcp-abap-adt/interfaces';
+import type { Profiler } from '../../runtime/traces/ProfilerDomain';
 import { compareRecordedAt } from '../../runtime/traces/traceParsing';
+import { expectResult } from './contract';
 
 export interface IWaitForTraceOptions extends IProfilerListOptions {
   /** How many times to look. */
@@ -34,10 +32,14 @@ const sleep = (ms: number) =>
 
 /** The ids visible right now — what "new" is measured against. */
 export async function traceIdsNow(
-  profiler: IProfiler,
+  profiler: Profiler,
   options?: IProfilerListOptions,
 ): Promise<Set<string>> {
-  return new Set((await profiler.list(options)).map((entry) => entry.id));
+  return new Set(
+    expectResult(await profiler.list(options), 'profiler.list').map(
+      (entry) => entry.id,
+    ),
+  );
 }
 
 /**
@@ -48,14 +50,17 @@ export async function traceIdsNow(
  * otherwise somebody else's run can satisfy the wait.
  */
 export async function waitForNewTrace(
-  profiler: IProfiler,
+  profiler: Profiler,
   before: Set<string>,
   options: IWaitForTraceOptions = {},
 ): Promise<string | undefined> {
   const { attempts = 10, delayMs = 3000, logger, ...listOptions } = options;
 
   for (let attempt = 1; attempt <= attempts; attempt++) {
-    const entries = await profiler.list(listOptions);
+    const entries = expectResult(
+      await profiler.list(listOptions),
+      'profiler.list',
+    );
     const fresh = entries.filter((entry) => !before.has(entry.id));
     if (fresh.length > 0) {
       // Newest by timestamp, not by position — see the file comment.

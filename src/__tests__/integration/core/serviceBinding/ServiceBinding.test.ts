@@ -16,10 +16,7 @@ import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import { XMLParser } from 'fast-xml-parser';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type {
-  IServiceBindingConfig,
-  IServiceBindingState,
-} from '../../../../core/service';
+import type { IServiceBindingConfig } from '../../../../core/service';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
 import {
@@ -70,7 +67,7 @@ describe('ServiceBinding (using AdtClient)', () => {
   let hasConfig = false;
   let isCloudSystem = false;
   let isLegacy = false;
-  let tester: BaseTester<IServiceBindingConfig, IServiceBindingState>;
+  let tester: BaseTester<IServiceBindingConfig>;
 
   beforeAll(async () => {
     try {

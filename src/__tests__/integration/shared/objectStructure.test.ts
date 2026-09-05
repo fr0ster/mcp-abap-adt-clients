@@ -7,7 +7,6 @@
 
 import type {
   IAbapConnection,
-  IAdtObject,
   IAdtOperationOptions,
   IAdtWireResponse,
   ILogger,
@@ -156,7 +155,7 @@ describe('Shared - getObjectStructure', () => {
   let hasConfig = false;
   let isLegacy = false;
   let isCloudSystem = false;
-  let tester: BaseTester<IObjectStructureParams, IAdtWireResponse>;
+  let tester: BaseTester<IObjectStructureParams>;
 
   beforeAll(async () => {
     try {

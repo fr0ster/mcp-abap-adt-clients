@@ -7,15 +7,15 @@
 
 import type {
   IAbapConnection,
-  IAdtObject,
-  IAdtOperationOptions,
-  IAdtWireResponse,
+  IAdtResponse,
   ILogger,
-  IRepositoryNodeContents,
 } from '@mcp-abap-adt/interfaces';
+import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
 import type { AdtClient } from '../../../clients/AdtClient';
-import { orThrow } from '../../../utils/adtResponse';
+import type { IRepositoryNodeContents } from '../../../core/shared/utilResults';
+import { failed } from '../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
+import type { TestableObject } from '../../helpers/BaseTester';
 import { BaseTester } from '../../helpers/BaseTester';
 import {
   createTestAdtClient,
@@ -59,112 +59,65 @@ const testsLogger: ILogger = createTestsLogger();
  * answers the parsed level. A shim that still declared `IAdtWireResponse` would have
  * to invent a status to satisfy itself — so it declares what it actually gets.
  */
-class NodeStructureObject
-  implements IAdtObject<INodeStructureParams, IRepositoryNodeContents>
-{
+class NodeStructureObject implements TestableObject<INodeStructureParams> {
   private client: AdtClient;
 
   constructor(client: AdtClient) {
     this.client = client;
   }
 
-  private rejectUnsupported<T>(operation: string): Promise<T> {
-    return Promise.reject(
-      new Error(`Node structure does not support ${operation} operation`),
+  /**
+   * Every member this resource does not have.
+   *
+   * Answered, not thrown: the contract says a member answers `IAdtResponse`,
+   * and a shim that threw would make the harness treat "this resource has no
+   * create" differently from "the server refused the create".
+   */
+  private unsupported<T>(operation: string): Promise<IAdtResponse<T>> {
+    return Promise.resolve(
+      failed<T>({
+        origin: 'refusal',
+        code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION,
+        message: `Node structure does not support ${operation}`,
+      }),
     );
   }
 
-  getVersions() {
-    return this.rejectUnsupported<never>('getVersions');
+  validate() {
+    return this.unsupported<unknown>('validate');
   }
 
-  getVersionSource() {
-    return this.rejectUnsupported<never>('getVersionSource');
-  }
-
-  validate(
-    _config: Partial<INodeStructureParams>,
-  ): Promise<IRepositoryNodeContents> {
-    return this.rejectUnsupported('validate');
-  }
-
-  create(
-    _config: INodeStructureParams,
-    _options?: IAdtOperationOptions,
-  ): Promise<IRepositoryNodeContents> {
-    return this.rejectUnsupported('create');
+  create() {
+    return this.unsupported<unknown>('create');
   }
 
   read(
     config: Partial<INodeStructureParams>,
-    _version?: 'active' | 'inactive',
-    _options?: { withLongPolling?: boolean },
-  ): Promise<IRepositoryNodeContents | undefined> {
+  ): Promise<IAdtResponse<IRepositoryNodeContents>> {
     if (!config.parent_type || !config.parent_name) {
       return Promise.reject(new Error('parent_type and parent_name required'));
     }
-    return orThrow(
-      this.client
-        .getUtils()
-        // Three arguments: the contract does not take `withShortDescriptions`,
-        // because nothing has ever read a description out of this document.
-        .fetchNodeStructure(
-          config.parent_type,
-          config.parent_name,
-          config.node_id,
-        ),
-    );
+    return this.client
+      .getUtils()
+      .fetchNodeStructure(config.parent_type, config.parent_name, {
+        nodeId: config.node_id,
+      });
   }
 
-  readMetadata(
-    _config: Partial<INodeStructureParams>,
-    _options?: { withLongPolling?: boolean },
-  ): Promise<IRepositoryNodeContents> {
-    return this.rejectUnsupported('readMetadata');
+  readMetadata() {
+    return this.unsupported<unknown>('readMetadata');
   }
 
-  update(
-    _config: Partial<INodeStructureParams>,
-    _options?: IAdtOperationOptions,
-  ): Promise<IRepositoryNodeContents> {
-    return this.rejectUnsupported('update');
+  update() {
+    return this.unsupported<unknown>('update');
   }
 
-  delete(
-    _config: Partial<INodeStructureParams>,
-  ): Promise<IRepositoryNodeContents> {
-    return this.rejectUnsupported('delete');
+  delete() {
+    return this.unsupported<unknown>('delete');
   }
 
-  activate(
-    _config: Partial<INodeStructureParams>,
-  ): Promise<IRepositoryNodeContents> {
-    return this.rejectUnsupported('activate');
-  }
-
-  check(
-    _config: Partial<INodeStructureParams>,
-    _status?: string,
-  ): Promise<IRepositoryNodeContents> {
-    return this.rejectUnsupported('check');
-  }
-
-  readTransport(
-    _config: Partial<INodeStructureParams>,
-    _options?: { withLongPolling?: boolean },
-  ): Promise<IRepositoryNodeContents> {
-    return this.rejectUnsupported('readTransport');
-  }
-
-  lock(_config: Partial<INodeStructureParams>): Promise<string> {
-    return this.rejectUnsupported('lock');
-  }
-
-  unlock(
-    _config: Partial<INodeStructureParams>,
-    _lockHandle: string,
-  ): Promise<IRepositoryNodeContents> {
-    return this.rejectUnsupported('unlock');
+  activate() {
+    return this.unsupported<unknown>('activate');
   }
 }
 
@@ -174,7 +127,7 @@ describe('Shared - fetchNodeStructure', () => {
   let hasConfig = false;
   let isLegacy = false;
   let isCloudSystem = false;
-  let tester: BaseTester<INodeStructureParams, IRepositoryNodeContents>;
+  let tester: BaseTester<INodeStructureParams>;
 
   beforeAll(async () => {
     try {
@@ -284,10 +237,10 @@ describe('Shared - fetchNodeStructure', () => {
       }
 
       try {
-        const result = await tester.readTest(config, {
+        const result = (await tester.readTest(config, {
           skipReadMetadata: true,
-        });
-        // The contract's own shape, not the envelope's: a level is the objects
+        })) as IRepositoryNodeContents;
+        // The reading's own shape, not the envelope's: a level is the objects
         // it holds and the typed nodes below it.
         expect(result?.objects).toBeDefined();
         expect(result?.childNodes).toBeDefined();

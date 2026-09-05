@@ -15,10 +15,7 @@ import * as path from 'node:path';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type {
-  IServiceDefinitionConfig,
-  IServiceDefinitionState,
-} from '../../../../core/serviceDefinition';
+import type { IServiceDefinitionConfig } from '../../../../core/serviceDefinition';
 import { getServiceDefinition } from '../../../../core/serviceDefinition/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
@@ -74,7 +71,7 @@ describe('ServiceDefinition (using AdtClient)', () => {
   let hasConfig = false;
   let isCloudSystem = false;
   let isLegacy = false;
-  let tester: BaseTester<IServiceDefinitionConfig, IServiceDefinitionState>;
+  let tester: BaseTester<IServiceDefinitionConfig>;
 
   beforeAll(async () => {
     try {

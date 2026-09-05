@@ -14,16 +14,12 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type {
   IAbapConnection,
-  IAdtObject,
   ILogger,
   ISessionLifecycleAware,
 } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type {
-  IDataElementConfig,
-  IDataElementState,
-} from '../../../../core/dataElement';
+import type { IDataElementConfig } from '../../../../core/dataElement';
 import { getDataElement } from '../../../../core/dataElement/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
