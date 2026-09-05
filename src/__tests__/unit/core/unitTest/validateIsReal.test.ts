@@ -20,7 +20,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { AdtCdsUnitTest } from '../../../../core/unitTest/AdtCdsUnitTest';
 import { AdtUnitTest } from '../../../../core/unitTest/AdtUnitTest';
-import { expectResult } from '../../../helpers/contract';
+import { expectFailure, expectResult } from '../../../helpers/contract';
 import { createLibraryLogger } from '../../../helpers/testLogger';
 
 type Call = { url: string; method: string; data?: unknown };
@@ -145,9 +145,13 @@ describe('AdtUnitTest.validate()', () => {
     );
     const h = new AdtUnitTest(conn, createLibraryLogger());
 
-    await expect(h.validate({ className: 'ZCL_CONTAINER' })).rejects.toThrow(
-      /server error/i,
+    // Reported, and it stops the chain: one request, and the failure is the
+    // 500 rather than a name check nobody asked for.
+    const failure = expectFailure(
+      await h.validate({ className: 'ZCL_CONTAINER' }),
+      'validate against a server that failed',
     );
+    expect(failure.message).toMatch(/server error/i);
     expect(calls).toHaveLength(1);
   });
 });
@@ -199,8 +203,8 @@ describe('AdtCdsUnitTest.validate()', () => {
     );
     const h = new AdtCdsUnitTest(conn, createLibraryLogger());
 
-    await expect(
-      h.validate({
+    const failure = expectFailure(
+      await h.validate({
         className: 'BOGUS NAME',
         // Required since the endpoint was measured to demand it. Without it the
         // handler's own guard throws first and this test would pass while
@@ -210,7 +214,15 @@ describe('AdtCdsUnitTest.validate()', () => {
         classTemplate: '<template/>',
         testClassSource: 'CLASS ltcl_test DEFINITION FOR TESTING.',
       }),
-    ).rejects.toMatchObject({ code: 'ADT_VALIDATION_FAILED', status: 400 });
+      'validate a name the server rejects',
+    );
+
+    // The status is on `response`, where the answer it came on is — not on
+    // invented fields beside the message.
+    expect(failure.response?.status).toBe(400);
+    expect(failure.message).toContain('invalid object name');
+    // And it stopped: the local-test-class check never went out over a name
+    // the server had already refused.
     expect(calls).toHaveLength(1);
   });
 

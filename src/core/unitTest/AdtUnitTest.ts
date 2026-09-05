@@ -157,11 +157,20 @@ export class AdtUnitTest<
     const name = this.name(config);
 
     return chain(this.logger, async ({ step }) => {
-      // A read that comes back empty is how ADT says the class is not there —
-      // it answers 200 with no body rather than 404 — and that is the create
-      // path, where the name is genuinely new and gets the pre-creation check.
+      // Which half of this runs depends on whether the container is there, and
+      // only two answers mean "it is not": an empty body, which is how ADT says
+      // absence on the systems measured, and a 404 from one that answers that
+      // way instead. Anything else is a fact about the *request* — routing a
+      // 500 into the create path would validate a NAME for a class that exists
+      // and report something nobody asked (caught in review, 2026-08-14) — so
+      // it is returned as the failure it is.
       const container = await this.adtClass.read({ className: name });
-      const exists = container.ok && String(container.getResult().value) !== '';
+      const absent =
+        !container.ok && container.getError().response?.status === 404;
+      // Not `absent`, so `step` gets it: on success it is the source, and on
+      // any other failure it abandons the chain carrying what SAP said.
+      const source = absent ? '' : await step(Promise.resolve(container));
+      const exists = String(source) !== '';
 
       let verdict = undefined as ReturnType<R['validation']>;
       if (!exists) {
