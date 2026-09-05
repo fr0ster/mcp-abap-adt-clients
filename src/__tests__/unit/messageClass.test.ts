@@ -2,6 +2,7 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
+import { parseMessageClass } from '../../core/messageClass';
 import { AdtMessageClass } from '../../core/messageClass/AdtMessageClass';
 import { noopLogger } from '../../utils/noopLogger';
 import { expectResult } from '../helpers/contract';
@@ -212,8 +213,10 @@ describe('AdtMessageClass', () => {
       ),
       noopLogger,
     );
-    const st = expectResult(await mc.read({ name: 'ZT' }), 'st');
-    expect(st?.messageClass?.name).toBe('ZT');
+    // The document, as it arrived. `parseMessageClass` is the reading beside
+    // it — the member answers the class, not a shape chosen for the caller.
+    const document = expectResult(await mc.read({ name: 'ZT' }), 'read');
+    expect(parseMessageClass(String(document)).name).toBe('ZT');
   });
 
   it('carries no method for what a message class cannot do', () => {

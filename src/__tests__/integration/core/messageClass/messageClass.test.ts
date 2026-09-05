@@ -20,7 +20,11 @@ import * as path from 'node:path';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type { IMessageClassConfig } from '../../../../core/messageClass';
+import type {
+  IMessageClassConfig,
+  IMessageClassMessage,
+} from '../../../../core/messageClass';
+import { parseMessageClass } from '../../../../core/messageClass';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { expectResult } from '../../../helpers/contract';
@@ -93,14 +97,10 @@ describe('MessageClass (using AdtClient)', () => {
       hasConfig = true;
 
       tester = new BaseTester(
-        // getMessageClass() is narrowed to Crud & Validatable & Lockable
-        // (no activate/check/readTransport/getVersions); BaseTester's
-        // flowTest still exercises activate/check, which the concrete
-        // handler implements at runtime — cast through the full interface.
-        client.getMessageClass() as unknown as IAdtObject<
-          IMessageClassConfig,
-          IMessageClassState
-        >,
+        // Narrowed to what a message class has — no activate, no check, no
+        // transport, no versions. `BaseTester` guards on `activate` before
+        // calling it, so the narrow handler goes in as it is.
+        client.getMessageClass(),
         'MessageClass',
         'create_message_class',
         'adt_message_class',
@@ -227,7 +227,6 @@ describe('MessageClass (using AdtClient)', () => {
             await mcHandler.create(config),
             'createState',
           );
-          expect(createState.errors).toHaveLength(0);
 
           // ── Step 2: Read message class ─────────────────────────────────────
           logTestStep('read message class', testsLogger);
@@ -237,19 +236,22 @@ describe('MessageClass (using AdtClient)', () => {
           // is passed but does not cover this resource. So poll until the
           // object appears, bounded, instead of asking once and calling the
           // absence a failure.
-          let readState = expectResult(
-            await mcHandler.read({ name: msgClassName }),
-            'readState',
+          let readState = String(
+            expectResult(
+              await mcHandler.read({ name: msgClassName }),
+              'readState',
+            ) ?? '',
           );
           for (let attempt = 0; !readState && attempt < 15; attempt++) {
             await new Promise((resolve) => setTimeout(resolve, 2000));
-            readState = await mcHandler.read({ name: msgClassName });
+            const again = await mcHandler.read({ name: msgClassName });
+            readState = again.ok ? String(again.getResult().value ?? '') : '';
           }
-          expect(readState).toBeDefined();
-          if (!readState)
-            throw new Error('mcHandler.read() returned undefined');
-          expect(readState.messageClass).toBeDefined();
-          expect(readState.messageClass?.name).toBe(msgClassName);
+          // The class document, read into its parts. `parseMessageClass` is
+          // this module's own reading — a consumer that wants it composes it
+          // into a result strategy; a test composes it here.
+          const parsedClass = parseMessageClass(String(readState ?? ''));
+          expect(parsedClass.name).toBe(msgClassName);
 
           // ── Step 3: Create message ─────────────────────────────────────────
           logTestStep(`create message ${msgNo}`, testsLogger);
@@ -275,7 +277,6 @@ describe('MessageClass (using AdtClient)', () => {
           }
           if (created instanceof Error) throw created;
           const msgCreateState = created;
-          expect(msgCreateState.errors).toHaveLength(0);
 
           // ── Step 4: Read message ───────────────────────────────────────────
           logTestStep(`read message ${msgNo}`, testsLogger);
@@ -286,11 +287,12 @@ describe('MessageClass (using AdtClient)', () => {
             }),
             'msgReadState',
           );
-          expect(msgReadState).toBeDefined();
-          if (!msgReadState)
-            throw new Error('msgHandler.read() returned undefined');
-          expect(msgReadState.message).toBeDefined();
-          expect(msgReadState.message?.msgtext).toBe(msgTextInitial);
+          // A message is read through its class's document — there is no
+          // resource for one message — so the assertion picks it out.
+          const readMessage = parseMessageClass(
+            String(msgReadState ?? ''),
+          ).messages.find((m: IParsedMessage) => m.msgno === msgNo);
+          expect(readMessage?.msgtext).toBe(msgTextInitial);
 
           // ── Step 5: Update message ─────────────────────────────────────────
           logTestStep(`update message ${msgNo}`, testsLogger);
@@ -303,7 +305,6 @@ describe('MessageClass (using AdtClient)', () => {
             }),
             'msgUpdateState',
           );
-          expect(msgUpdateState.errors).toHaveLength(0);
 
           // ── Step 6: Read-back to verify update ────────────────────────────
           logTestStep(`read-back message ${msgNo} after update`, testsLogger);
@@ -314,12 +315,10 @@ describe('MessageClass (using AdtClient)', () => {
             }),
             'msgReadAfterUpdate',
           );
-          expect(msgReadAfterUpdate).toBeDefined();
-          if (!msgReadAfterUpdate)
-            throw new Error(
-              'msgHandler.read() after update returned undefined',
-            );
-          expect(msgReadAfterUpdate.message?.msgtext).toBe(msgTextUpdated);
+          const updatedMessage = parseMessageClass(
+            String(msgReadAfterUpdate ?? ''),
+          ).messages.find((m: IParsedMessage) => m.msgno === msgNo);
+          expect(updatedMessage?.msgtext).toBe(msgTextUpdated);
 
           // ── Step 7: Delete message ─────────────────────────────────────────
           logTestStep(`delete message ${msgNo}`, testsLogger);
@@ -331,7 +330,6 @@ describe('MessageClass (using AdtClient)', () => {
             }),
             'msgDeleteState',
           );
-          expect(msgDeleteState.errors).toHaveLength(0);
 
           // ── Step 8: Verify message is gone from class ──────────────────────
           logTestStep('verify message removal', testsLogger);
@@ -341,15 +339,12 @@ describe('MessageClass (using AdtClient)', () => {
             }),
             'readAfterMsgDelete',
           );
-          expect(readAfterMsgDelete).toBeDefined();
-          if (!readAfterMsgDelete)
-            throw new Error(
-              'mcHandler.read() after message delete returned undefined',
-            );
-          const remainingMessages =
-            readAfterMsgDelete.messageClass?.messages ?? [];
-          const msg001 = remainingMessages.find((m) => m.msgno === msgNo);
-          expect(msg001).toBeUndefined();
+          const remaining = parseMessageClass(
+            String(readAfterMsgDelete ?? ''),
+          ).messages;
+          expect(
+            remaining.find((m: IParsedMessage) => m.msgno === msgNo),
+          ).toBeUndefined();
 
           logTestSuccess(testsLogger, testName);
         } catch (error) {
