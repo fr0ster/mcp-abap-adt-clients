@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [18.0.0] - 2026-09-05
+
 Requires `@mcp-abap-adt/interfaces@^31.0.0`.
 
 **Every member answers the contract, and the reading is yours.** 17.0.0 moved

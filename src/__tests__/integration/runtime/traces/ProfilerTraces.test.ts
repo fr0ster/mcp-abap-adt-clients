@@ -180,7 +180,10 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
         const classExecutor = executor.getClassExecutor();
 
         logTestStep('list trace requests (the schedule)', testsLogger);
-        const requests = await classExecutor.listRequests();
+        const requests = expectResult(
+          await classExecutor.listRequests(),
+          'trace requests',
+        );
         // Empty means nothing is scheduled — the runs consume them — NOT that
         // the endpoint is dead. So this asserts a list, not a length.
         expect(Array.isArray(requests)).toBe(true);

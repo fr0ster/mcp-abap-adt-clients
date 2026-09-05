@@ -280,15 +280,13 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
           );
 
           // 5) Read implementation source (JSON) — must contain the amdpReference.
-          const readState = expectResult(
+          // The DSFI source resource answers JSON, which the transport parses
+          // on the way in — so the shipped reading re-serialises it rather than
+          // stringifying an object into `[object Object]`.
+          const sourceText = expectResult(
             await dsfi.read({ implementationName: implName }, 'active'),
-            'readState',
+            'read implementation source',
           );
-          expect(readState).toBeDefined();
-          const sourceText =
-            typeof readState === 'string'
-              ? readState
-              : JSON.stringify(readState);
           expect(sourceText).toContain(`${amdpName}=>GET_SUM`);
 
           // 6) Read metadata (blues v2 XML).

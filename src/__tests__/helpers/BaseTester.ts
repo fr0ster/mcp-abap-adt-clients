@@ -37,7 +37,7 @@ import type {
   IAdtValidatable,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
-import { LogLevel } from '@mcp-abap-adt/interfaces';
+import { AdtObjectErrorCodes, LogLevel } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 import { expectResult } from './contract';
 import { recycleTestSession, releaseTestConnection } from './sessionConfig';
@@ -660,12 +660,28 @@ export class BaseTester<TConfig, TState = unknown> {
       logTestStep(currentStep, this.logger);
       // No status check: a non-2xx is a returned failure since 31.0.0, and
       // `expectResult` reports it with what SAP said.
-      const validationDocument = String(
-        expectResult(
-          await this.adtObject.validate(config as Partial<TConfig>),
-          'validate',
-        ) ?? '',
+      //
+      // One failure is not the flow's: a system that has no validation resource
+      // at all answers `UNSUPPORTED_OPERATION`, and it has therefore not judged
+      // the name. There is nothing to read, and the rest of the flow is still
+      // worth running — so it is logged and stepped over. Every other failure
+      // still fails the test.
+      const validationAnswer = await this.adtObject.validate(
+        config as Partial<TConfig>,
       );
+      const validationUnavailable =
+        !validationAnswer.ok &&
+        validationAnswer.getError().code ===
+          AdtObjectErrorCodes.UNSUPPORTED_OPERATION;
+      if (validationUnavailable && !validationAnswer.ok) {
+        logTestStep(
+          `validate skipped: ${validationAnswer.getError().message}`,
+          this.logger,
+        );
+      }
+      const validationDocument = validationUnavailable
+        ? ''
+        : String(expectResult(validationAnswer, 'validate') ?? '');
 
       // The document still has to be read: validation reports a rejected name
       // inside a 200, in an error table.

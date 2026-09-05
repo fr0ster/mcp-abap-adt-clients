@@ -20,6 +20,7 @@ import type {
 import * as dotenv from 'dotenv';
 import { AdtRuntimeClient } from '../../../../clients/AdtRuntimeClient';
 import type { FeedRepository } from '../../../../runtime/feeds/FeedRepository';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestConnection,
   releaseTestConnection,
@@ -105,8 +106,10 @@ describe('FeedRepository (using AdtRuntimeClient)', () => {
 
       try {
         logTestStep('list feed catalog', testsLogger);
-        const feeds = await runtime.getFeeds().list();
-        expect(feeds).toBeDefined();
+        const feeds = expectResult(
+          await runtime.getFeeds().list(),
+          'feed catalog',
+        );
         expect(Array.isArray(feeds)).toBe(true);
 
         logTestSuccess(testsLogger, testName);
@@ -161,8 +164,10 @@ describe('FeedRepository (using AdtRuntimeClient)', () => {
         // this test used to call that a skip.
         // No cast since `@mcp-abap-adt/interfaces@26.0.0` — `IFeedRepository`
         // declares the parameter, so the contract and the endpoint agree.
-        const variants = await runtime.getFeeds().variants('dumps');
-        expect(variants).toBeDefined();
+        const variants = expectResult(
+          await runtime.getFeeds().variants('dumps'),
+          'feed variants',
+        );
         expect(Array.isArray(variants)).toBe(true);
 
         logTestSuccess(testsLogger, testName);
@@ -217,8 +222,10 @@ describe('FeedRepository (using AdtRuntimeClient)', () => {
 
       try {
         logTestStep('get dumps via feed', testsLogger);
-        const entries = await runtime.getFeeds().dumps();
-        expect(entries).toBeDefined();
+        const entries = expectResult(
+          await runtime.getFeeds().dumps(),
+          'dumps feed',
+        );
         expect(Array.isArray(entries)).toBe(true);
 
         logTestSuccess(testsLogger, testName);
@@ -269,10 +276,12 @@ describe('FeedRepository (using AdtRuntimeClient)', () => {
 
       try {
         logTestStep('fetch feed by URL /sap/bc/adt/runtime/dumps', testsLogger);
-        const entries = await (runtime.getFeeds() as FeedRepository).byUrl(
-          '/sap/bc/adt/runtime/dumps',
+        const entries = expectResult(
+          await (runtime.getFeeds() as FeedRepository).byUrl(
+            '/sap/bc/adt/runtime/dumps',
+          ),
+          'feed by URL',
         );
-        expect(entries).toBeDefined();
         expect(Array.isArray(entries)).toBe(true);
 
         logTestSuccess(testsLogger, testName);

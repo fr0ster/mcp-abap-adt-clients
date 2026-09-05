@@ -248,36 +248,44 @@ describe('Response contract - 17.0.0', () => {
     }, 60000);
   });
 
-  describe('the per-type handlers, which have not migrated', () => {
-    it('answers undefined for an object that does not exist', async () => {
+  describe('the per-type handlers', () => {
+    it('never reports an object that does not exist as one that does', async () => {
       if (!hasConfig) {
         logTestSkip(
           testsLogger,
-          'answers undefined for an object that does not exist',
+          'never reports an object that does not exist as one that does',
           'No SAP configuration',
         );
         return;
       }
       logTestStep(`read class ${NEVER_EXISTS}`, testsLogger);
 
-      // Not a defect, and this case asserted otherwise at first. `read()` is
-      // typed `Promise<IClassState | undefined>` and answers `undefined` for a
-      // 404 on purpose: for a read, "there is no such object" is an answer, and
-      // the type says so where a caller cannot miss it.
-      //
-      // What 17.0.0 changed is the *other* case — a refusal SAP delivers while
-      // the request itself succeeded, which used to be stored as a result with
-      // `errors: []`. That one is covered by unit tests against a stub, because
-      // it needs a server that answers 200 with an exception document.
       const answer = await client.getClass().read({ className: NEVER_EXISTS });
 
-      // ADT answers a read for an object that is not there with 200 and an
-      // empty body — never a 404 — so the shipped reading answers `''` and the
-      // call succeeds. Whether an empty body *is* absence is the caller's
-      // `analyse`, which is exactly why this library does not decide it here.
-      expect(answer.ok).toBe(true);
-      if (!answer.ok) throw new Error('expected a result');
-      expect(answer.getResult().value).toBe('');
+      // **Two shapes, both honest, and which one you get is the system's.**
+      // Some systems answer a read for an object that is not there with 200 and
+      // an empty body; others 404 it. Measured on the cloud trial: a class that
+      // does not exist at all is refused, while a class that exists without an
+      // active version answers the empty body. This library does not paper over
+      // the difference — whether an empty body *is* absence is the caller's
+      // `analyse` to decide, and a status the transport refused is a failure.
+      //
+      // What must never happen is the third thing: a populated result for an
+      // object nobody has. That is what this asserts.
+      if (answer.ok) {
+        const source = answer.getResult().value;
+        testsLogger.info?.(
+          `📄 absence reached the caller as an empty read (${String(source).length} bytes)`,
+        );
+        expect(String(source)).toBe('');
+      } else {
+        const failure = answer.getError();
+        testsLogger.info?.(
+          `📛 absence reached the caller as [${failure.origin}] ${failure.message}`,
+        );
+        expect(failure.message.length).toBeGreaterThan(0);
+        expect(['connection', 'refusal']).toContain(failure.origin);
+      }
     }, 60000);
 
     it('surfaces a refusal on a write rather than reporting success', async () => {

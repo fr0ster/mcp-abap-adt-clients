@@ -112,6 +112,7 @@ import { getSqlQuery } from './sqlQuery';
 import { getTableContents } from './tableContents';
 import { getVirtualFoldersContents } from './virtualFolders';
 import {
+  assertWhereUsedTarget,
   getWhereUsed,
   getWhereUsedList,
   getWhereUsedScope,
@@ -292,6 +293,11 @@ export class AdtUtils<
   async getWhereUsedScope(
     params: IGetWhereUsedScopeParams,
   ): Promise<IAdtResponse<string>> {
+    // Before `answering`, not inside the request: a missing name is the
+    // caller's mistake, and classified inside it comes back as
+    // `origin: 'connection'` — advice to check a network nothing reached.
+    assertWhereUsedTarget(params);
+
     return answering(
       () => getWhereUsedScope(this.connection, params),
       rawDocument,
@@ -376,6 +382,8 @@ export class AdtUtils<
   async getWhereUsed(
     params: IGetWhereUsedParams,
   ): Promise<IAdtResponse<string>> {
+    assertWhereUsedTarget(params);
+
     return answering(() => getWhereUsed(this.connection, params), rawDocument);
   }
 
@@ -405,6 +413,8 @@ export class AdtUtils<
   async getWhereUsedList(
     params: IGetWhereUsedListParams,
   ): Promise<IAdtResponse<IWhereUsedListResult>> {
+    assertWhereUsedTarget(params);
+
     return answeringValue(() => getWhereUsedList(this.connection, params));
   }
 
@@ -486,6 +496,12 @@ export class AdtUtils<
     functionGroup?: string,
     options?: IReadOptions,
   ): Promise<IAdtResponse<string>> {
+    // Built here, not inside the request: `getObjectMetadataUri` refuses a type
+    // it has no resource for, and that is the caller's mistake. Classified
+    // inside `answering` it would come back as `origin: 'connection'`, pointing
+    // at a network nothing reached.
+    getObjectMetadataUri(objectType, objectName, functionGroup);
+
     return answering(
       () =>
         this.objectMetadataWire(objectType, objectName, functionGroup, options),
@@ -556,6 +572,14 @@ export class AdtUtils<
     version?: 'active' | 'inactive',
     options?: IReadOptions,
   ): Promise<IAdtResponse<string>> {
+    // A type with no source resource is a caller error, raised before anything
+    // is asked rather than dressed as a verdict about the server.
+    if (!supportsSourceCode(objectType)) {
+      throw new Error(
+        `Object type ${objectType} does not support source code reading`,
+      );
+    }
+
     return answering(
       () =>
         this.objectSourceWire(
@@ -647,6 +671,10 @@ export class AdtUtils<
    * @returns Query result
    */
   async getSqlQuery(params: IGetSqlQueryParams): Promise<IAdtResponse<string>> {
+    if (!params.sql_query) {
+      throw new Error('SQL query is required');
+    }
+
     return answering(() => getSqlQuery(this.connection, params), rawDocument);
   }
 
@@ -660,6 +688,10 @@ export class AdtUtils<
   async getTableContents(
     params: IGetTableContentsParams,
   ): Promise<IAdtResponse<string>> {
+    if (!params.table_name) {
+      throw new Error('Table name is required');
+    }
+
     return answering(
       () => getTableContents(this.connection, params),
       rawDocument,
@@ -736,6 +768,10 @@ export class AdtUtils<
     objectType: 'PROG/P' | 'PROG/I' | 'FUGR' | 'CLAS/OC',
     timeout: number = 30000,
   ): Promise<IAdtResponse<string[]>> {
+    if (!objectName) {
+      throw new Error('Object name is required');
+    }
+
     return answeringValue(() =>
       getIncludesList(this.connection, objectName, objectType, timeout),
     );
@@ -751,6 +787,10 @@ export class AdtUtils<
   async listFunctionModules(
     functionGroupName: string,
   ): Promise<IAdtResponse<string[]>> {
+    if (!functionGroupName) {
+      throw new Error('Function group name is required');
+    }
+
     return answeringValue(() =>
       listFunctionModules(this.connection, functionGroupName),
     );
@@ -770,6 +810,10 @@ export class AdtUtils<
   async listFunctionGroupIncludes(
     functionGroupName: string,
   ): Promise<IAdtResponse<string[]>> {
+    if (!functionGroupName) {
+      throw new Error('Function group name is required');
+    }
+
     return answeringValue(() =>
       listFunctionGroupIncludes(this.connection, functionGroupName),
     );
@@ -889,6 +933,13 @@ export class AdtUtils<
     objectType: string,
     objectName: string,
   ): Promise<IAdtResponse<string>> {
+    if (!objectType) {
+      throw new Error('Object type is required');
+    }
+    if (!objectName) {
+      throw new Error('Object name is required');
+    }
+
     return answering(
       () => getObjectStructureUtil(this.connection, objectType, objectName),
       rawDocument,
@@ -910,6 +961,10 @@ export class AdtUtils<
    * ```
    */
   async getInclude(includeName: string): Promise<IAdtResponse<string>> {
+    if (!includeName) {
+      throw new Error('Include name is required');
+    }
+
     return answering(
       () => getIncludeUtil(this.connection, includeName),
       rawDocument,
