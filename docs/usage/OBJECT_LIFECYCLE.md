@@ -115,6 +115,83 @@ and it is the default at every `activate` call site.
 A locked object refuses activation with HTTP 403, not with a message in the
 body.
 
+## How to check a created object, and when
+
+Four of the checks in this library's own test suite were doing nothing, and all
+four passed. They are worth reading as a list of what not to do.
+
+### Check the answer, not the object
+
+Every member answers an object, whether it found anything or not. So this is a
+constant:
+
+```typescript
+const state = await client.getClass().read({ className });
+if (state) { /* always taken */ }
+```
+
+Three loops in this suite were written that way — two spun twenty round trips
+and ten seconds of sleeping every run, a third reported "the package is ready"
+on its first pass without waiting for anything. The compiler cannot catch it
+wherever the value is `any`, and the tests passed throughout. Read `.ok`:
+
+```typescript
+if (!state.ok) throw new Error(state.getError().message);
+```
+
+### What each step actually guarantees
+
+| After | The object is | A read answers |
+|---|---|---|
+| `create()` | named, and holding the name | **depends on the type** — see below |
+| `update()` | carrying an inactive version | `version=inactive` reads it, even under the lock |
+| `activate()` | carrying an active version | the plain read answers |
+
+What a create leaves varies: a domain is complete, an interface has a generated
+skeleton, a DDL source answers 200 with an empty body, and **a class refuses
+every read** until its source is written. So a read straight after a create
+proves nothing portable — and for a class the refusal describes your request
+rather than the object's state, which is why it invites a retry that can never
+succeed.
+
+**The first check worth making is after the source is written.** Read it back
+and compare it to what you sent.
+
+### Three things that are not existence checks
+
+- **A deletion check.** `del:isDeletable="true"` means nothing is blocking a
+  delete, and nothing blocks deleting what is not there. Measured, an absent
+  `MSAG/N` and an absent `FUGR/FF` both answer `true`; absent classes,
+  structures, data elements and scalar functions answer `false`. Read
+  `<del:text>` instead — it says "does not exist" in every case.
+- **A 2xx.** A refusal arrives with `200` often enough that the status settles
+  nothing: an activation that failed, a deletion that was refused and a
+  publication that was rejected all answer `200` with the verdict in the body.
+- **An empty body.** For several types, absence and emptiness are the same
+  answer: `200` with zero bytes. Which one it is, is your `analyse` to decide.
+
+### What to check instead
+
+Read the thing you actually care about and look at the content. After a create
+and an update, read the source back and compare it to what you wrote; after an
+activation, read the active version. For a message, read the message class —
+a message has no existence of its own to ask about.
+
+### When waiting is the right answer, and when it is not
+
+Waiting helps for exactly one thing: an activation whose effect has not landed
+yet. That is what `withLongPolling` is for, and this library uses it on the read
+that follows an activation.
+
+Waiting never helps for a read that refuses with **"wrong input data"** — the
+object has no version and will not grow one on its own — or for **"does not
+have a TMDIR entry"**, which means the object is not there at all. Both read
+like transient faults. Neither is one.
+
+And nothing in this library polls an asynchronous ADT job for you. A publish
+takes about two minutes of server time and answers its own verdict; if you want
+to watch the state settle afterwards, that loop is yours to write.
+
 ## Service bindings: publishing is the editing
 
 The one type where the flow above does not apply. A binding is created once and
@@ -163,46 +240,82 @@ with it.
 The third exception is the **transport request**, which is not a locked object at
 all: it is changed and deleted directly.
 
-## A bare `create()` leaves nothing to read
+## What a bare `create()` actually leaves, per type
 
-A POST makes the repository entry and no version of anything. There is no
-source in it, no active version and no inactive one — so a read has nothing to
-answer with, and it does not answer "empty": it refuses.
+A POST makes the repository entry. What is *in* it differs by type, and the
+differences are not guessable — measured on a cloud system, creating each and
+reading it back before anything else:
 
-```
-200  POST oo/classes                                     the create succeeds
-400  GET  oo/classes/ZAC_PROBE_INACT
-400  GET  oo/classes/ZAC_PROBE_INACT?version=inactive
-400  GET  oo/classes/ZAC_PROBE_INACT?version=active
-400  GET  oo/classes/ZAC_PROBE_INACT/source/main?version=inactive
-```
+| Type | A read straight after `create()` |
+|---|---|
+| `domain` | **2067 bytes.** Its create carries the content; there is nothing more to write |
+| `interface` | **53 bytes.** SAP generates a skeleton and it is readable at once |
+| `ddl` (DDL source) | **200 with an empty body** — the usual absence-or-emptiness answer |
+| `class` | **refused**, `400 ExceptionResourceWrongData` |
 
-`400 ExceptionResourceWrongData`, T100 `SADT_RESOURCE/007` — *"Resource
-ZAC_PROBE_INACT: wrong input data for processing"*, with the double space where
-the object type should be. It says nothing about versions, which is what makes
-it expensive: it reads as a malformed request, so the natural response is to
-retry, and retrying never works. This library's own test suite spent sixteen
-seconds a run on eight such retries before anyone measured it.
+So a class is the one that gives nothing back, and the refusal is
+*"Resource  ZAC_X: wrong input data for processing"* — T100 `SADT_RESOURCE/007`,
+with the double space where the object type should be. It says nothing about
+versions or activation, which is what makes it expensive: it reads as a
+malformed request, so the natural response is to retry.
 
-**A version is what makes it readable, and either one will do.** Writing the
-source is enough — from a full run, a class reads back at `version=inactive`
-while still under its lock and long before activation:
+**Retrying never works, and neither does anything else except writing source.**
+Measured on the same class:
 
 ```
-200  PUT  oo/classes/zac_bp_shr_bimp_ddls/source/main?lockHandle=…
-200  GET  oo/classes/ZAC_BP_SHR_BIMP_DDLS/source/main?version=inactive
-200  POST oo/classes/zac_bp_shr_bimp_ddls?_action=UNLOCK
-200  GET  oo/classes/ZAC_BP_SHR_BIMP_DDLS/source/main?version=inactive
-200  POST activation?method=activate&preauditRequested=true
+create              ok
+read after create   refused, wrong input data
+read after 30s      refused                       ← not timing
+lock                ok
+read while locked   refused
+read after unlock   refused                       ← not the lock either
 ```
 
-Tables, DDL sources and behaviour definitions all behave the same way.
-Activating the empty shell also works — it produces an active version, and the
-metadata reads 8 KB straight after — but it is the version that matters, not the
-activation.
+After a `update()` that writes source, every read answers — `version=inactive`
+(what you wrote), `version=active` (the generated skeleton), and the metadata.
+Activation is not required for any of them.
 
-So the flow at the top of this page is not a convention: `create` then `update`
-is what turns a repository entry into an object with something in it. A create
-on its own has not failed; it has just not finished.
+**`getVersions()` is not a readiness check.** It answers `ok` in every state
+above, including the one where all four reads refuse, because the feed lists
+version *slots* rather than content: `99999` for the inactive one and `00000`
+for the active. The count drops from two to one when activation consumes the
+inactive slot — real, but not an answer to "is there anything to read".
 
-Reproduce with `npx ts-node scripts/probe-inactive-metadata.ts`.
+## The name is taken from the POST onward, and `validate()` may not say so
+
+Whatever the create leaves behind, it holds the name. A second create is refused
+for every type measured — *"Resource Data Definition ZAC_X does already exist."*
+
+`validate()` is **not** a reliable way to find that out beforehand:
+
+| Type | `validate()` on a name that is already taken |
+|---|---|
+| `domain` | refused — "Domain with the name ZAC_X already exists" |
+| `interface` | refused — "Interface ZAC_X already exists" |
+| `ddl` | **ok** — and the create on the next line was refused as existing |
+
+So a validate that passes does not mean the create will. Treat the create's own
+answer as the verdict, and if you need to know whether a name is free, read it.
+
+**Which is why an abandoned create is worth cleaning up.** A create that failed
+partway, or one whose source was never written, leaves a name that nothing else
+can use and — for a class — an object that no read can see. `deleteOnFailure` in
+the operation options exists for the first case; the second is yours to notice.
+
+## Absence does not have one wording
+
+Deleting each object and reading it again produced three different sentences:
+
+```
+domain     Error while importing object ZAC_UNFIN_DOM from the database
+interface  Resource INTERFACE ZAC_UNFIN_INTF does not exist.
+ddl        Data definition ZAC_UNFIN_DDLS of version  does not exist
+```
+
+All three are refusals and all three mean the same thing. None of them is worth
+matching on: the text is the server's, it is language-dependent, and it varies
+by type. If you need to branch on absence, branch on the failure your own
+`analyse` decided, not on the sentence.
+
+Reproduce with `npx ts-node scripts/probe-inactive-metadata.ts` and
+`npx ts-node scripts/probe-unfinished-create.ts`.

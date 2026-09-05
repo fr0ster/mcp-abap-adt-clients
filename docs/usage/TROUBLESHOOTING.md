@@ -79,6 +79,72 @@ the same answer as a failure reports an error for an empty package.
 Neither reading can be the library's, which is why it is a decision you supply:
 pass `analyse` in the operation options to say which one applies to your call.
 
+## "Resource  ZCL_X: wrong input data for processing" on a read
+
+A `400` with an `<exc:exception>`, `adtType` `ExceptionResourceWrongData`, T100
+`SADT_RESOURCE/007`. Note the double space: the object type belongs there and
+the server left it out, which is the first sign the message is not about your
+request at all.
+
+It means **a class was created and no source has been written to it**. Every
+read of one refuses this way — `active`, `inactive`, or neither, metadata or
+source. Measured: waiting thirty seconds does not help, and neither does a
+lock/unlock cycle. Writing the source does, immediately and without activation.
+
+It is specific to classes. An interface created the same way reads back its
+generated skeleton, a domain is complete on creation, and a DDL source answers
+200 with an empty body.
+
+The trap is that it reads as "your request is malformed", so the natural
+response is to retry, and retrying never works. This library's own suite spent
+sixteen seconds a run on eight such retries before anyone measured it, and the
+assertion after them had never once executed.
+
+**What to do:** write the source. A class reads at `version=inactive` while
+still under its lock, long before any activation. Do not reach for
+`getVersions()` to test readiness — it answers `ok` in this state too, because
+the feed lists version slots rather than content. See
+[OBJECT_LIFECYCLE.md](OBJECT_LIFECYCLE.md#what-a-bare-create-actually-leaves-per-type).
+
+## "Class ZCL_X does not have a TMDIR entry" on an activation
+
+A `200` carrying `<msg type="E" code="OO(045)">`, alongside an informational
+`EU(239)` "Errors occurred during generation" — note that the summary of the
+errors is severity `I`, so counting by severity finds one error, not two.
+
+It means **the object does not exist**. The activation went straight to
+generation, looked for the class in the method directory, and found nothing.
+It does not say "not found", so it reads like a corrupt object; it is an absent
+one. The same message serves interfaces, with `Interface` in `T100KEY-V1`.
+
+Distinguish it from the entry above: `wrong input data` is an object that exists
+with nothing in it, `TMDIR` is an object that is not there at all.
+
+## A message class exists; its messages do not
+
+`getMessageClassMessage().read()` answering `OBJECT_NOT_FOUND` is **this library
+reading content**, not SAP reporting absence. A message class is a container and
+its messages are rows in it: only the container has existence on the wire — 404
+before it is created, 404 after it is deleted — while a row has none. Measured,
+`POST …/messages/001?_action=LOCK_MSG` answers `200` before message 001 exists,
+because the PUT after it is what creates it.
+
+So there is nothing to ask about a row, and nothing refuses. The member fetches
+the class document and looks for the number itself. A consumer who replaces the
+reading replaces that verdict along with it.
+
+## `validate()` passed and `create()` says the name is taken
+
+Measured on a DDL source: validating a name that an earlier create had already
+claimed answered **ok**, and the create on the very next line was refused —
+*"Resource Data Definition ZAC_X does already exist."* A domain and an interface
+both reported the collision from `validate()`; the DDL source did not.
+
+So a validate that passes is not a promise that the create will. The create's
+own answer is the verdict. And note what this means for an abandoned create: the
+name is held from the POST onward, whatever state the object is in — including
+the class that no read can see.
+
 ## A refusal can arrive with a 2xx
 
 ADT answers some refusals with **200** carrying an `<exc:exception>` document.
