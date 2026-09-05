@@ -200,6 +200,33 @@ implementation once rather than chosen at each call.
 
 - **`parseCreatedTransport`** — the reading of a transport create response.
 
+### Documentation
+
+- **[`docs/usage/OBJECT_LIFECYCLE.md`](docs/usage/OBJECT_LIFECYCLE.md)** — the
+  flow the members compose into: create → lock → update → unlock → activate.
+  What `create()` does and does not do (it makes the object shell; source,
+  activation and rollback are options that have to be asked for), that
+  `update()` owns the whole lock window and releases it on every path, that
+  `delete()` takes no lock, and the two places the flow does not hold — a
+  service binding, which is published rather than edited, and a transport
+  request, which is not a locked object.
+
+- **Which object types can be checked before they exist.** Measured, not
+  assumed: `program`, `function_group`, `table`, `structure`,
+  `metadata_extension`, `service_definition` and `scalar_function` compile a
+  source sent inside the checkrun request for a name the system has never heard
+  of. `class`, `interface`, DDL sources and `transformation` refuse
+  (`Resource CLASS … does not exist.`) under every version, while the same class
+  source for a class that exists is checked under all three — so it is the
+  object's absence being refused, not the payload. The version turns out not to
+  matter at all when a source is supplied. Probes:
+  `scripts/probe-checkrun-without-object.ts`, `scripts/probe-checkrun-version.ts`.
+
+  Recorded there too, because the page would otherwise describe something better
+  than what ships: a check that finds errors answers `origin: 'connection'` with
+  the report dropped, since the 18 low-level check functions still throw a plain
+  `Error` built from the message texts.
+
 ### Migration
 
 1. Narrow on `ok` at every call site. `answer.getResult()` does not exist on the
