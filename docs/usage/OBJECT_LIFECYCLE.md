@@ -148,6 +148,18 @@ container's lock is told which row is being saved. So a member that edits one
 message reads and rewrites the whole class, which is why a handful of message
 operations produce a great many class reads.
 
+**Only the container exists.** The class answers 404 before it is created and
+404 after it is deleted, and 200 in between — ordinary. A row has no existence
+of its own: in the trace above, `LOCK_MSG` on `messages/001` answers `200`
+*before* message 001 exists, because the PUT on the next line is what creates
+it. There is nothing to ask about a row, so nothing refuses.
+
+This is why `getMessageClassMessage().read()` decides for itself: it fetches the
+class document and looks for the number, answering `OBJECT_NOT_FOUND` when it is
+not among the messages. That verdict is this library reading content, not SAP
+reporting absence — and a consumer replacing the reading replaces the verdict
+with it.
+
 The third exception is the **transport request**, which is not a locked object at
 all: it is changed and deleted directly.
 
