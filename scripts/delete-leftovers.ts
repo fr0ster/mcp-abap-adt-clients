@@ -41,6 +41,12 @@ const KNOWN: Record<
     client
       .getServiceDefinition()
       .delete({ serviceDefinitionName: 'ZAC_SRVD01' }),
+  // Not a leftover: a shared fixture whose source drifted from the config.
+  // `shared:setup` only creates what is missing, so a shared object that is
+  // already there keeps whatever source it was first built with — delete it and
+  // let setup rebuild it from the config as it stands now.
+  ZAC_SHR_RUN01: (client) =>
+    client.getClass().delete({ className: 'ZAC_SHR_RUN01' }),
   Z_AC_FM03: (client) =>
     client.getFunctionModule().delete({
       functionGroupName: 'ZAC_SHR_FUGR',

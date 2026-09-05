@@ -280,9 +280,12 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
         // id rather than a response: reading the created resource back gives
         // `200` with an EMPTY body, measured, so the id is only ever in the
         // Location header.
-        const requestId = await executor.getClassExecutor().scheduleTrace({
-          description: 'adt-clients integration test',
-        });
+        const requestId = expectResult(
+          await executor.getClassExecutor().scheduleTrace({
+            description: 'adt-clients integration test',
+          }),
+          'schedule a trace',
+        );
 
         logTestStep(`trace request id: ${requestId}`, testsLogger);
         expect(requestId).toContain(

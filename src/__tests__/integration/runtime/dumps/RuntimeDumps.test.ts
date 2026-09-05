@@ -233,11 +233,11 @@ describe('Runtime Dumps (using AdtRuntimeClient)', () => {
             `run shared dump class ${className} (division by zero)`,
             testsLogger,
           );
-          try {
-            await executor.getClassExecutor().run({ className });
-          } catch (_runError) {
-            // Expected: run should fail and produce dump
-          }
+          // The answer is ignored on purpose: this run is *meant* to fail —
+          // a division by zero — and what the test is after is the dump SAP
+          // writes because of it, read below. A failure comes back in the
+          // answer now rather than being thrown, so there is nothing to catch.
+          await executor.getClassExecutor().run({ className });
 
           for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
             logTestStep(
