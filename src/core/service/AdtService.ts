@@ -1,9 +1,11 @@
 import type {
+  AdtNoFailure,
   IAbapConnection,
   IAdtActivatable,
   IAdtCheckable,
   IAdtCreatable,
   IAdtDeletable,
+  IAdtError,
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
@@ -60,6 +62,49 @@ import type {
   ServiceBindingVariant,
 } from './types';
 import { resolveBindingVariant, serviceDocuments } from './types';
+/**
+ * The verdict a publish or unpublish job answers with.
+ *
+ * `POST …/{serviceType}/publishjobs` (and `unpublishjobs`) does not just accept
+ * the work — it reports the outcome, in ADT's own `asx:abap` envelope:
+ *
+ * ```xml
+ * <asx:values><DATA>
+ *   <SEVERITY>OK</SEVERITY>
+ *   <SHORT_TEXT>ZAC_SRVB01 published locally</SHORT_TEXT>
+ * </DATA></asx:values>
+ * ```
+ *
+ * Nobody read it. The member answered the document and a caller who checked
+ * only `ok` learned that the request completed, never what it did — which is
+ * the shape this release removes everywhere else. Measured on the trial
+ * 2026-09-05: the POST takes ~130s of server time and then says exactly this.
+ *
+ * Conservative in the same way as its neighbours: a body with no `SEVERITY` is
+ * not a refusal, because inventing a "no" from silence is how an empty answer
+ * came to mean failure elsewhere. Only a severity that is not OK is one.
+ */
+export const publicationRefusal = (
+  verdict: IAdtError | AdtNoFailure,
+  answer?: IAdtWireResponse,
+): IAdtError | AdtNoFailure => {
+  if (verdict !== ADT_NO_FAILURE) return verdict;
+
+  const xml = typeof answer?.data === 'string' ? answer.data : '';
+  const severity = /<SEVERITY>([^<]*)<\/SEVERITY>/i.exec(xml)?.[1]?.trim();
+  if (!severity || severity.toUpperCase() === 'OK') return ADT_NO_FAILURE;
+
+  const shortText = /<SHORT_TEXT>([^<]*)<\/SHORT_TEXT>/i.exec(xml)?.[1]?.trim();
+  const longText = /<LONG_TEXT>([^<]*)<\/LONG_TEXT>/i.exec(xml)?.[1]?.trim();
+  return {
+    origin: 'refusal',
+    message:
+      `Publication ${severity}: ${shortText || 'the server gave no short text'}` +
+      (longText ? ` — ${longText}` : ''),
+    response: answer,
+  };
+};
+
 export class AdtServiceBinding<
   R extends IServiceResults = typeof serviceDocuments,
 > implements
@@ -564,7 +609,11 @@ export class AdtServiceBinding<
           serviceVersion: config.serviceVersion,
         }),
       this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
-      options?.analyse,
+      // A publication change IS this member's write: `update` on a binding
+      // changes nothing else. The job reports `SEVERITY` and `SHORT_TEXT` in
+      // its answer, and reading them here is what makes a refused publish a
+      // refusal rather than a document nobody looked at.
+      options?.analyse ?? publicationRefusal,
     );
   }
 
@@ -1176,6 +1225,7 @@ export class AdtServiceBinding<
     return answering(
       () => this.publishV2Request(params),
       this.results.publication as IResultStrategy<ReturnType<R['publication']>>,
+      publicationRefusal,
     );
   }
 
@@ -1208,6 +1258,7 @@ export class AdtServiceBinding<
     return answering(
       () => this.unpublishV2Request(params),
       this.results.publication as IResultStrategy<ReturnType<R['publication']>>,
+      publicationRefusal,
     );
   }
 
