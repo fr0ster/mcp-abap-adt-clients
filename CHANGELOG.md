@@ -163,7 +163,12 @@ implementation once rather than chosen at each call.
 
 1. Narrow on `ok` at every call site. `answer.getResult()` does not exist on the
    failure half and `answer.getError()` does not exist on the success half, so
-   the compiler finds them all for you.
+   the compiler finds them all for you — **in typed code**. It does not find
+   them in JavaScript, or anywhere a value is held as `any`: there,
+   `if (result !== undefined)` still compiles and is now always true, because a
+   member always answers an object. This package's own JavaScript test harness
+   broke exactly that way and reported creating objects it never created, so
+   search for `!== undefined` and `if (result)` around calls you migrate.
 2. Replace `state.errors` checks with `!answer.ok`, and `state.xxxResult` reads
    with `answer.getResult().value`.
 3. Replace `try/catch` around a refusal with the failure half. Keep a `catch` for
