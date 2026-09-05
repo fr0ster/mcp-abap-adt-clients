@@ -14,6 +14,7 @@ import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IBehaviorImplementationConfig } from '../../../../core/behaviorImplementation';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -112,7 +113,34 @@ describe('BehaviorImplementation (using AdtClient)', () => {
             sourceCode: params.source_code,
           };
         },
-        ensureObjectReady: async () => ({ success: true }),
+        // **Cleanup belongs at the start, not only at the end.** A run that is
+        // killed — out of memory, a dropped connection, a stopped process —
+        // never reaches its own teardown, and the next run then meets its
+        // leftovers. This one used to do nothing here and went straight into
+        // `validate`, which correctly answered "Class … already exists" and
+        // failed the suite over an object a previous run had made. Twenty other
+        // tests already clear the way like this.
+        ensureObjectReady: async (className: string) => {
+          if (!connection || !className) return { success: true };
+          const existing = presenceOf(
+            await client.getBehaviorImplementation().read({ className }),
+            `behavior implementation ${className}`,
+          );
+          if (existing.present !== true) return { success: true };
+          const removed = await client.getBehaviorImplementation().delete({
+            className,
+            transportRequest: tester.getTransportRequest(),
+          });
+          if (!removed.ok) {
+            testsLogger.warn?.(
+              `could not remove leftover ${className}: ${removed.getError().message}`,
+            );
+          }
+          // The deletion service is asynchronous; the create that follows meets
+          // a name still being freed otherwise.
+          await new Promise((resolve) => setTimeout(resolve, 3000));
+          return { success: true };
+        },
       });
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails

@@ -1496,11 +1496,26 @@ export class BaseTester<TConfig, TState = unknown> {
         const camelPrefix =
           this.loggerPrefix.charAt(0).toLowerCase() +
           this.loggerPrefix.slice(1);
+        // The last resort is what makes this reliable. The three lookups above
+        // derive the config key from the logger prefix, and two testers name
+        // themselves something their config does not use: `BehaviorImplementation`
+        // holds a `className`, and the DDL tester is called `View` and holds a
+        // `ddlName`. Neither derived key existed, so `objectName` was undefined
+        // and the hook was never called — silently, because a hook that does not
+        // run looks exactly like one that found nothing to clean.
+        //
+        // So fall back to whichever config key ends in `Name` and is the
+        // object's own. `packageName` is excluded by name: it is the parent, and
+        // deleting it would be a different and much worse bug.
+        const ownNameKey = Object.keys(this.config as object).find(
+          (key) => key.endsWith('Name') && key !== 'packageName',
+        );
         const objectName =
           (this.config as any)[`${camelPrefix}Name`] ||
           (this.config as any)[`${this.loggerPrefix.toLowerCase()}Name`] ||
           (this.config as any).name ||
-          (this.config as any).objectName;
+          (this.config as any).objectName ||
+          (ownNameKey ? (this.config as any)[ownNameKey] : undefined);
         if (objectName) {
           const cleanup = await this.ensureObjectReadyFn(objectName);
           if (!cleanup.success) {

@@ -19,6 +19,7 @@ import type { IDdlConfig } from '../../../../core/ddl';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { expectResult } from '../../../helpers/contract';
+import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -124,7 +125,28 @@ describe('View (using AdtClient)', () => {
             ddlSource: params.ddl_source,
           };
         },
-        ensureObjectReady: async () => ({ success: true }),
+        // See the note in BehaviorImplementation.test.ts: a killed run never
+        // reaches its teardown, so the reliable place to clear leftovers is the
+        // start of the next one.
+        ensureObjectReady: async (ddlName: string) => {
+          if (!connection || !ddlName) return { success: true };
+          const existing = presenceOf(
+            await client.getDdl().read({ ddlName }),
+            `DDL source ${ddlName}`,
+          );
+          if (existing.present !== true) return { success: true };
+          const removed = await client.getDdl().delete({
+            ddlName,
+            transportRequest: tester.getTransportRequest(),
+          });
+          if (!removed.ok) {
+            testsLogger.warn?.(
+              `could not remove leftover ${ddlName}: ${removed.getError().message}`,
+            );
+          }
+          await new Promise((resolve) => setTimeout(resolve, 3000));
+          return { success: true };
+        },
       });
     } catch (error) {
       const errorMessage =
