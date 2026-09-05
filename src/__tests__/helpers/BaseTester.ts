@@ -267,7 +267,7 @@ export class BaseTester<TConfig, TState = unknown> {
       if (this.cleanupObjectFn) {
         await this.cleanupObjectFn(config);
       } else {
-        await this.adtObject.delete(config as Partial<TConfig>);
+        await this.deleteOrRaise(config as Partial<TConfig>);
       }
       this.log(LogLevel.INFO, 'Pre-existing object deleted successfully');
       this.objectCreated = false;
@@ -287,6 +287,29 @@ export class BaseTester<TConfig, TState = unknown> {
   /**
    * Ensure object is unlocked if it was locked
    */
+  /**
+   * Delete, and raise what SAP said.
+   *
+   * `await this.adtObject.delete(config)` with the answer dropped was how a
+   * cleanup came to report success while the object stayed on the system: the
+   * delete stopped throwing when failures became the other half of the answer,
+   * so the `catch` blocks around these calls — written for a throw, and
+   * carrying a deliberate policy about what to do with a failed cleanup — never
+   * fired again. Measured twice: TEST_INNER_PKG02 on E19, and ZAC_INNER_PKG04
+   * on the trial, where the suite passed three runs in a row and left the
+   * package behind every time.
+   */
+  private async deleteOrRaise(config: Partial<TConfig>): Promise<void> {
+    const answer = await this.adtObject.delete(config);
+    if (!answer.ok) {
+      const failure = answer.getError();
+      throw new Error(
+        `[${failure.origin}] ${failure.message}` +
+          (failure.request?.url ? ` (${failure.request.url})` : ''),
+      );
+    }
+  }
+
   private async ensureUnlock(_config: Partial<TConfig>): Promise<void> {
     if (this.objectLocked && this.lockHandle) {
       try {
@@ -1042,7 +1065,16 @@ export class BaseTester<TConfig, TState = unknown> {
           if (cleanupSettings.cleanupSessionAfterTest && this.connection) {
             await recycleTestSession(this.connection);
           }
-          await this.adtObject.delete(config as Partial<TConfig>);
+          // The suite's own removal, when it declared one. It was declared and
+          // then ignored on this path — only the pre-existing-object cleanup
+          // used it — which left a type whose delete needs something extra
+          // (a package needs a fresh session: the PAK lock belongs to the ABAP
+          // session, measured on E19) with no way to say so.
+          if (this.cleanupObjectFn) {
+            await this.cleanupObjectFn(config);
+          } else {
+            await this.deleteOrRaise(config as Partial<TConfig>);
+          }
           // Delay after delete
           await this.waitDelay(
             this.getOperationDelay('delete', testCaseParams),
@@ -1106,7 +1138,7 @@ export class BaseTester<TConfig, TState = unknown> {
             await recycleTestSession(this.connection);
           }
           logTestStep('delete (cleanup)', this.logger);
-          await this.adtObject.delete(config as Partial<TConfig>);
+          await this.deleteOrRaise(config as Partial<TConfig>);
           // Delay after delete (cleanup on error)
           await this.waitDelay(
             this.getOperationDelay('delete', testCaseParams),

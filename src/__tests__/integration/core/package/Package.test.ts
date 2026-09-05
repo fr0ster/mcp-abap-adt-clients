@@ -22,6 +22,7 @@ import {
   createTestConnection,
   getConfig,
   getConnectionType,
+  recycleTestSession,
   resolveSystemContext,
   skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
@@ -155,12 +156,26 @@ describe('Package (using AdtClient)', () => {
           // If some system does show the delete failing from the creating
           // session, it comes back as `recycleTestSession(connection)` —
           // replacing the run's one session, never opening a second beside it.
+          // A fresh session first, and this is the one type that needs it.
+          // The PAK lock belongs to the ABAP session, so a package this session
+          // has just updated cannot be deleted by it — `deletion/check` answers
+          // `isDeletable="true"` and `deletion/delete` answers 200 carrying
+          // `isDeleted="false"` with PAK/058, "already locked". Measured on E19
+          // 2026-08-31 and again on the trial. Not a delay: retried for thirty
+          // seconds it never succeeds, and the same request one second after
+          // the run ends works first time.
+          //
+          // `recycleTestSession` replaces the run's one session and publishes
+          // the replacement — it never opens a second beside it.
+          if (connection) {
+            await recycleTestSession(connection);
+          }
+
           // Through the handler, not the low-level writer. The writer hands
           // the document on and says nothing about it — the verdict belongs to
           // `packageDeletionRefusal`, and only `delete()` applies it. Calling
-          // the writer here made a refused delete silent: the run before this
-          // one passed this flow and left ZAC_INNER_PKG04 behind, which is what
-          // the next run's setup then refused to work against.
+          // the writer here made a refused delete silent: three runs passed
+          // this flow and left ZAC_INNER_PKG04 behind every time.
           expectResult(
             await client.getPackage().delete({
               packageName: cfg.packageName,
