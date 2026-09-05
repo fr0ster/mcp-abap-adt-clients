@@ -22,14 +22,14 @@ describe('AdtFunctionInclude read() vs readMetadata()', () => {
   it('read() returns source (hits the /source/main endpoint)', async () => {
     const { connection, calls } = makeConn();
     const fi = new AdtFunctionInclude(connection);
-    const state = expectResult(
+    const source = expectResult(
       await fi.read({
         functionGroupName: 'ZG',
         includeName: 'LZG_C01',
       }),
-      'state',
+      'read include source',
     );
-    expect(state?.readResult).toBeDefined();
+    expect(source).toBe('DATA: gv TYPE i.');
     expect(
       calls.some((c) => c.url.toLowerCase().includes('/source/main')),
     ).toBe(true);

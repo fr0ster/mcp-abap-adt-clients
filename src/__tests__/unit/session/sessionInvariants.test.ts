@@ -15,6 +15,7 @@ import { AdtClass } from '../../../core/class/AdtClass';
 import { AdtDomain } from '../../../core/domain/AdtDomain';
 import { LockRegistry } from '../../../core/shared/LockRegistry';
 import { noopLogger } from '../../../utils/noopLogger';
+import { expectResult } from '../../helpers/contract';
 import { createSessionRecorder } from './sessionRecorder';
 
 // These tests talk to a local stub and finish in well under a second. The suite
@@ -183,7 +184,10 @@ describe('session invariants — two handlers on one connection', () => {
       registry,
     );
 
-    const handleA = await clsA.lock({ className: 'ZCL_A' });
+    const handleA = expectResult(
+      await clsA.lock({ className: 'ZCL_A' }),
+      'lock ZCL_A',
+    );
     expect(rec.mode).toBe('stateful');
     expect(registry.pending).toStrictEqual(['Class/ZCL_A']);
 

@@ -256,13 +256,12 @@ describe('Include (PROG/I, using AdtClient)', () => {
         });
 
         try {
-          const state = expectResult(
+          const body = expectResult(
             await client
               .getInclude()
               .readMetadata({ includeName: standard.name }),
-            'state',
+            'read include metadata',
           );
-          const body = String((state?.readResult as any)?.data ?? '');
 
           // The whole reason this is a separate module: an include answers with
           // its own root and type, and carries none of the program attributes.

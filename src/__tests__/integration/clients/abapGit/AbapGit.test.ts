@@ -17,12 +17,12 @@
 
 import type {
   IAbapConnection,
-  IAdtAbapGitClient,
   ISessionLifecycleAware,
 } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import { AdtAbapGitClient } from '../../../../clients/AdtAbapGitClient';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestConnection,
   releaseTestConnection,
@@ -43,7 +43,7 @@ const {
 
 describe('AbapGit (standalone AdtAbapGitClient)', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
-  let abapGit: IAdtAbapGitClient;
+  let abapGit: AdtAbapGitClient;
   let isCloudSystem = false;
   let hasConfig = false;
 
@@ -82,7 +82,7 @@ describe('AbapGit (standalone AdtAbapGitClient)', () => {
     'should list abapGit repositories',
     async () => {
       if (!hasConfig || !listCase || !isAvailable(listCase)) return;
-      const repos = await abapGit.listRepos();
+      const repos = expectResult(await abapGit.listRepos(), 'list repos');
       expect(Array.isArray(repos)).toBe(true);
       for (const r of repos) {
         expect(typeof r.package).toBe('string');
@@ -104,9 +104,10 @@ describe('AbapGit (standalone AdtAbapGitClient)', () => {
       ) {
         return;
       }
-      const info = await abapGit.checkExternalRepo({
-        url: checkCase.params.url,
-      });
+      const info = expectResult(
+        await abapGit.checkExternalRepo({ url: checkCase.params.url }),
+        'check external repo',
+      );
       expect(Array.isArray(info.branches)).toBe(true);
     },
     getTimeout('test'),
@@ -130,12 +131,15 @@ describe('AbapGit (standalone AdtAbapGitClient)', () => {
         branchName: flowCaseDef.params.branch,
       });
 
-      const pullResult = await abapGit.pull({
-        package: flowCaseDef.params.package,
-        branchName: flowCaseDef.params.branch,
-        pollIntervalMs: 2000,
-        maxPollDurationMs: 300_000,
-      });
+      const pullResult = expectResult(
+        await abapGit.pull({
+          package: flowCaseDef.params.package,
+          branchName: flowCaseDef.params.branch,
+          pollIntervalMs: 2000,
+          maxPollDurationMs: 300_000,
+        }),
+        'pull',
+      );
       expect(pullResult.finalStatus.status).not.toBe('R');
 
       if (typeof (abapGit as any).unlink === 'function') {

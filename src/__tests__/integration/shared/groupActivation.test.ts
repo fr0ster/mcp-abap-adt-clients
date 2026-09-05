@@ -21,6 +21,7 @@ import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
 import { orThrow } from '../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
+import { expectResult } from '../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -508,9 +509,10 @@ define structure ${structureName} {
         currentStep = 'update structure';
         logTestStep(currentStep, testsLogger);
         const structureHandler = client.getStructure();
-        const structureLockHandle = await structureHandler.lock({
-          structureName,
-        });
+        const structureLockHandle = expectResult(
+          await structureHandler.lock({ structureName }),
+          'lock structure',
+        );
         try {
           await structureHandler.update(
             {
@@ -537,11 +539,16 @@ define structure ${structureName} {
         ];
 
         // Step 4: Group activation - activate all objects together
-        const activationResult = await orThrow(
-          client.getUtils().activateObjectsGroup(objectsToActivate, false),
+        // The document, not a status: group activation answers `chkl:messages`
+        // inside a 200 whether or not it worked, so the status was never the
+        // verdict — and a refusal now comes back as the failure half instead.
+        const activationResult = expectResult(
+          await client
+            .getUtils()
+            .activateObjectsGroup(objectsToActivate, false),
+          'group activation',
         );
-        expect(activationResult).toBeDefined();
-        expect(activationResult.status).toBe(200);
+        expect(typeof activationResult).toBe('string');
         testsLogger.info?.('✅ Group activation completed successfully');
 
         // Wait a bit for activation to fully complete

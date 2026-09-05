@@ -255,7 +255,7 @@ describe('FunctionInclude (using AdtClient)', () => {
     );
 
     it(
-      'should read source via readSource()',
+      'should read source via read()',
       async () => {
         if (!tester || !hasConfig || !client) return;
         const testCase = tester.getTestCaseDefinition();
@@ -264,30 +264,18 @@ describe('FunctionInclude (using AdtClient)', () => {
         if (!functionGroupName || !includeName) return;
 
         try {
-          // readSource() is a method on the concrete AdtFunctionInclude handler
-          // (not part of the generic IAdtObject interface), so we cast.
-          const handler = client.getFunctionInclude() as unknown as {
-            readSource: (
-              config: Partial<IFunctionIncludeConfig>,
-            ) => Promise<IFunctionIncludeState | undefined>;
-          };
-          const result = expectResult(
-            await handler.readSource({
-              functionGroupName,
-              includeName,
-            }),
-            'result',
+          // There is no `readSource()` any more: `read()` is the source, as
+          // the contract says of an object that has one. The cast this used to
+          // need went with it.
+          const body = expectResult(
+            await client
+              .getFunctionInclude()
+              .read({ functionGroupName, includeName }),
+            'read include source',
           );
-          if (result === undefined) {
-            // Include not present (e.g. previous flow test was skipped). That's
-            // acceptable — the readSource path is what we're smoke-testing.
-            return;
-          }
-          expect(result).toBeDefined();
-          expect(result.errors).toEqual([]);
-          const payload = result;
-          const body =
-            typeof payload === 'string' ? payload : (payload as any)?.data;
+
+          // ADT answers a read for an include that is not there with 200 and an
+          // empty body, so an absent include is `''` rather than a skip.
           expect(typeof body).toBe('string');
         } catch (error: any) {
           const status = error?.response?.status;

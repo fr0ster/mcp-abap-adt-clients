@@ -131,13 +131,13 @@ describe('FunctionGroup (using AdtClient)', () => {
             if (existing) {
               // Try to release any stale lock before deleting
               try {
-                const lockHandle = await cleanupClient
+                const locked = await cleanupClient
                   .getFunctionGroup()
                   .lock({ functionGroupName });
-                if (lockHandle) {
+                if (locked.ok) {
                   await cleanupClient
                     .getFunctionGroup()
-                    .unlock({ functionGroupName }, lockHandle);
+                    .unlock({ functionGroupName }, locked.getResult().value);
                   testsLogger.info?.(
                     `Released stale lock on ${functionGroupName}`,
                   );

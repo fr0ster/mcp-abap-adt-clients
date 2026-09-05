@@ -287,7 +287,6 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
             'createState',
           );
           expect(createState).toBeDefined();
-          expect(createState).toBeDefined();
           testsLogger.info?.('CDS unit test class created successfully');
 
           // Step 3: Activate class
@@ -306,13 +305,11 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
             'readState',
           );
           expect(readState).toBeDefined();
-          expect(readState).toBeDefined();
           testsLogger.info?.('CDS unit test class read successfully');
           const metadataState = expectResult(
             await client.getClass().readMetadata({ className }),
             'metadataState',
           );
-          expect(metadataState).toBeDefined();
           expect(metadataState).toBeDefined();
           testsLogger.info?.('CDS unit test class metadata read successfully');
 
@@ -320,9 +317,12 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
           // update first — running is its own capability.
           logTestStep('run (unit test)', testsLogger);
           const unitTest = client.getUnitTest();
-          const runId = await unitTest.run(
-            [{ containerClass: className, testClass: testClassName }],
-            testCase.params.unit_test_options || {},
+          const runId = expectResult(
+            await unitTest.run(
+              [{ containerClass: className, testClass: testClassName }],
+              testCase.params.unit_test_options || {},
+            ),
+            'start CDS unit test run',
           );
           expect(runId).toBeDefined();
           testsLogger.info?.('CDS unit test run started, run ID:', runId);
@@ -337,7 +337,6 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
             'statusResponse',
           );
           expect(statusResponse).toBeDefined();
-          expect(statusResponse).toBeDefined();
           testsLogger.info?.('CDS unit test status retrieved');
 
           // Step 7: Fetch the result document
@@ -350,7 +349,6 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
             }),
             'resultResponse',
           );
-          expect(resultResponse).toBeDefined();
           expect(resultResponse).toBeDefined();
           testsLogger.info?.('CDS unit test result retrieved successfully');
 

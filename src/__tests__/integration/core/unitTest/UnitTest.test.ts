@@ -268,7 +268,6 @@ describe('AdtUnitTest (using AdtClient)', () => {
             'readState',
           );
           expect(readState).toBeDefined();
-          expect(readState).toBeDefined();
           testsLogger.info?.('Tests read back from the container class');
 
           const metadataState = expectResult(
@@ -278,14 +277,16 @@ describe('AdtUnitTest (using AdtClient)', () => {
             'metadataState',
           );
           expect(metadataState).toBeDefined();
-          expect(metadataState).toBeDefined();
 
           // Step 6: Run the tests. Needs no create and no update — they are in
           // the class already, which is the whole point of the two being apart.
           logTestStep('run (unit test)', testsLogger);
-          const runId = await unitTest.run(
-            [{ containerClass, testClass: testClassName }],
-            unitTestOptions,
+          const runId = expectResult(
+            await unitTest.run(
+              [{ containerClass, testClass: testClassName }],
+              unitTestOptions,
+            ),
+            'start unit test run',
           );
           expect(runId).toBeDefined();
           testsLogger.info?.('Unit test run started, run ID:', runId);
@@ -300,7 +301,6 @@ describe('AdtUnitTest (using AdtClient)', () => {
             ),
             'statusResponse',
           );
-          expect(statusResponse).toBeDefined();
           expect(statusResponse).toBeDefined();
 
           // Log detailed status information
@@ -348,7 +348,6 @@ describe('AdtUnitTest (using AdtClient)', () => {
             }),
             'resultResponse',
           );
-          expect(resultResponse).toBeDefined();
           expect(resultResponse).toBeDefined();
 
           // Log detailed result information

@@ -236,7 +236,10 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
             transportRequest,
             description: 'DSFI integration AMDP implementation',
           });
-          const amdpLock = await cls.lock({ className: amdpName });
+          const amdpLock = expectResult(
+            await cls.lock({ className: amdpName }),
+            'lock AMDP class',
+          );
           await cls.update(
             { className: amdpName, transportRequest, sourceCode: amdpSource },
             { lockHandle: amdpLock },
