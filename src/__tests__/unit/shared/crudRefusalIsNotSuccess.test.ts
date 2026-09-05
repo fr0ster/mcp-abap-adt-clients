@@ -140,14 +140,17 @@ describe('a refusal carried by a 2xx is not a result', () => {
       })),
     } as unknown as IAbapConnection;
 
-    const state = expectResult(
+    // A real document, and the read succeeds carrying it. The point of the
+    // file is the other direction — an exception document inside a 200 — and
+    // this is the case that must keep passing while that one fails.
+    const source = expectResult(
       await new AdtClient(connection, logger)
         .getClass()
         .read({ className: 'ZREAL' }),
-      'state',
+      'read a class that is really there',
     );
 
-    expect(state?.errors).toEqual([]);
+    expect(source).toContain('class:abapClass');
   });
 });
 

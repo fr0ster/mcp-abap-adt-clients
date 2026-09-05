@@ -69,13 +69,16 @@ describe('function group activation reports what the server said', () => {
   it('does not treat an empty message list as failure', async () => {
     const { connection } = connectionReturning('<chkl:messages/>');
 
-    const state = expectResult(
+    // An activation nothing complained about: `<chkl:messages/>` carries no
+    // `<msg type="E">`, so the shipped `analyse` lets it through and the answer
+    // is the document.
+    const document = expectResult(
       await new AdtFunctionGroup(connection).activate({
         functionGroupName: 'ZFG_TEST',
       }),
-      'state',
+      'activate function group',
     );
 
-    expect(state.errors).toEqual([]);
+    expect(document).toContain('chkl:messages');
   });
 });

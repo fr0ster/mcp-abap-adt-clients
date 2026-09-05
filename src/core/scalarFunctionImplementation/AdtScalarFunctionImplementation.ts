@@ -13,11 +13,13 @@
  * at construction makes of that endpoint's answer.
  */
 import type {
+  AdtNoFailure,
   IAbapConnection,
   IAdtActivatable,
   IAdtCheckable,
   IAdtCreatable,
   IAdtDeletable,
+  IAdtError,
   IAdtLockable,
   IAdtOperationOptions,
   IAdtReadable,
@@ -27,9 +29,11 @@ import type {
   IAdtUpdatable,
   IAdtValidatable,
   IAdtVersionable,
+  IAdtWireResponse,
   ILogger,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
+import { ADT_NO_FAILURE, AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
 import { answering } from '../../utils/adtResponse';
 import { beginCriticalSection } from '../../utils/criticalSection';
 import { deletionRefusal } from '../../utils/deletionCheck';
@@ -64,6 +68,33 @@ import {
   getScalarFunctionImplementationVersionSource,
   getScalarFunctionImplementationVersions,
 } from './versions';
+
+/** Statuses that mean the system has no validation resource, not a bad name. */
+const VALIDATION_UNSUPPORTED_STATUSES = new Set([404, 405, 501]);
+
+/**
+ * The shipped reading of a validation answer this system may not offer.
+ *
+ * Measured: some systems answer 404, 405 or 501 for the DSFI validation
+ * resource. That is not a verdict about the name — it comes back as a failure
+ * named {@link AdtObjectErrorCodes.UNSUPPORTED_OPERATION}, so a consumer
+ * branches on the code rather than on a status. The same reading the scalar
+ * function and the append structure ship, for the same measured reason.
+ */
+export const validationUnsupported = (
+  verdict: IAdtError | AdtNoFailure,
+  answer?: IAdtWireResponse,
+): IAdtError | AdtNoFailure => {
+  if (verdict === ADT_NO_FAILURE) return ADT_NO_FAILURE;
+  const status = verdict.response?.status ?? answer?.status;
+  return status && VALIDATION_UNSUPPORTED_STATUSES.has(status)
+    ? {
+        ...verdict,
+        code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION,
+        message: `This system does not offer scalar-function-implementation name validation (HTTP ${status})`,
+      }
+    : verdict;
+};
 
 export class AdtScalarFunctionImplementation<
   R extends IScalarFunctionImplementationResults<
@@ -166,7 +197,7 @@ export class AdtScalarFunctionImplementation<
           config.description,
         ),
       this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
-      options?.analyse,
+      options?.analyse ?? validationUnsupported,
     );
   }
 

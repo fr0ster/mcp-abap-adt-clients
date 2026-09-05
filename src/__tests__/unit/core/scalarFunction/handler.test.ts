@@ -2,8 +2,9 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
+import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
 import { AdtScalarFunction } from '../../../../core/scalarFunction/AdtScalarFunction';
-import { expectResult } from '../../../helpers/contract';
+import { expectFailure, expectResult } from '../../../helpers/contract';
 
 type Call = { url: string; method?: string };
 function makeConn(handler: (r: any) => Partial<IAdtWireResponse> | Error) {
@@ -47,26 +48,34 @@ describe('AdtScalarFunction handler', () => {
     expect(calls[0].url).toBe('/sap/bc/adt/ddic/dsfd/sources');
   });
 
-  it('read() returns undefined on 404', async () => {
+  it('read() answers a failure on 404', async () => {
     const { conn } = makeConn(() =>
       Object.assign(new Error('not found'), { response: { status: 404 } }),
     );
     const sf = new AdtScalarFunction(conn);
-    const result = await sf.read({ scalarFunctionName: 'ZOK_F' });
-    expect(result).toBeUndefined();
+    // `undefined` for a 404 used to be the answer, and it read like an empty
+    // object. It is a failure the caller can see in the type now.
+    const failure = expectFailure(
+      await sf.read({ scalarFunctionName: 'ZOK_F' }),
+      'read a scalar function that is not there',
+    );
+    expect(failure.origin).toBe('connection');
   });
 
-  it('validate() maps 404/405/501 to validationSupported:false without throwing', async () => {
+  it('validate() names 404/405/501 as unsupported, not as a bad name', async () => {
     const { conn } = makeConn(() =>
       Object.assign(new Error('nope'), { response: { status: 405 } }),
     );
     const sf = new AdtScalarFunction(conn);
-    const state = expectResult(
+    // Some systems have no validation resource at all. That is not a verdict
+    // about the name — the shipped `analyse` names it, so a consumer branches
+    // on the code rather than decoding a status.
+    const failure = expectFailure(
       await sf.validate({ scalarFunctionName: 'ZOK_F' }),
-      'state',
+      'validate where the resource is absent',
     );
-    expect(state.validationSupported).toBe(false);
-    expect(state.errors).toHaveLength(0);
+    expect(failure.code).toBe(AdtObjectErrorCodes.UNSUPPORTED_OPERATION);
+    expect(failure.message).toContain('405');
   });
 
   it('validate() rethrows non-unsupported errors (e.g. 403)', async () => {

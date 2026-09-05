@@ -2,8 +2,9 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
+import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
 import { AdtAppendStructure } from '../../../../core/appendStructure/AdtAppendStructure';
-import { expectResult } from '../../../helpers/contract';
+import { expectFailure, expectResult } from '../../../helpers/contract';
 
 function makeConn(handler: (r: any) => Partial<IAdtWireResponse> | Error) {
   const sessionTypes: string[] = [];
@@ -68,16 +69,20 @@ describe('AdtAppendStructure handler', () => {
     expect(sessionTypes[sessionTypes.length - 1]).toBe('stateless');
   });
 
-  it('validate() maps 501 to validationSupported:false', async () => {
+  it('validate() names 501 as unsupported, not as a bad name', async () => {
     const { conn } = makeConn(() =>
       Object.assign(new Error('nope'), { response: { status: 501 } }),
     );
     const as = new AdtAppendStructure(conn);
-    const state = expectResult(
+    // A system with no validation resource has not looked at the name. The
+    // shipped `analyse` says so with a code, so a consumer branches on that
+    // rather than on a status they would have to dig out themselves.
+    const failure = expectFailure(
       await as.validate({ appendStructureName: 'ZOK_S' }),
-      'state',
+      'validate where the resource is absent',
     );
-    expect(state.validationSupported).toBe(false);
+    expect(failure.code).toBe(AdtObjectErrorCodes.UNSUPPORTED_OPERATION);
+    expect(failure.message).toContain('501');
   });
 
   it('update() happy path: lock→check→PUT→long-poll-read→unlock→check→read, ends stateless', async () => {
