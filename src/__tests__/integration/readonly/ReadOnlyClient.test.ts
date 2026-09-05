@@ -178,7 +178,6 @@ describe('AdtClient read operations', () => {
           'readActiveState',
         );
         expect(readActiveState).toBeDefined();
-        expect(readActiveState).toBeDefined();
         logTestStep(
           `active length: ${getDataLength(readActiveState)}`,
           testsLogger,
@@ -189,7 +188,6 @@ describe('AdtClient read operations', () => {
           await adtObject.read(params, 'inactive'),
           'readInactiveState',
         );
-        expect(readInactiveState).toBeDefined();
         expect(readInactiveState).toBeDefined();
         logTestStep(
           `inactive length: ${getDataLength(readInactiveState)}`,
@@ -204,10 +202,8 @@ describe('AdtClient read operations', () => {
           'metadataActiveState',
         );
         expect(metadataActiveState).toBeDefined();
-        expect(metadataActiveState || metadataActiveState).toBeDefined();
-        const metadataActiveResult = metadataActiveState || metadataActiveState;
         logTestStep(
-          `metadata active length: ${getDataLength(metadataActiveResult?.data)}`,
+          `metadata active length: ${getDataLength(metadataActiveState)}`,
           testsLogger,
         );
 
@@ -219,13 +215,8 @@ describe('AdtClient read operations', () => {
           'metadataInactiveState',
         );
         expect(metadataInactiveState).toBeDefined();
-        expect(metadataInactiveState || metadataInactiveState).toBeDefined();
-        const metadataInactiveResult =
-          metadataInactiveState || metadataInactiveState;
         logTestStep(
-          `metadata inactive length: ${getDataLength(
-            metadataInactiveResult?.data,
-          )}`,
+          `metadata inactive length: ${getDataLength(metadataInactiveState)}`,
           testsLogger,
         );
 
@@ -397,7 +388,6 @@ describe('AdtClient read operations', () => {
               'readActiveState',
             );
             expect(readActiveState).toBeDefined();
-            expect(readActiveState).toBeDefined();
             logTestStep(
               `active length: ${getDataLength(readActiveState)}`,
               testsLogger,
@@ -408,7 +398,6 @@ describe('AdtClient read operations', () => {
               await viewClient.read({ ddlName }, 'inactive'),
               'readInactiveState',
             );
-            expect(readInactiveState).toBeDefined();
             expect(readInactiveState).toBeDefined();
             logTestStep(
               `inactive length: ${getDataLength(readInactiveState)}`,
@@ -421,13 +410,8 @@ describe('AdtClient read operations', () => {
               'metadataActiveState',
             );
             expect(metadataActiveState).toBeDefined();
-            expect(metadataActiveState || metadataActiveState).toBeDefined();
-            const metadataActiveResult =
-              metadataActiveState || metadataActiveState;
             logTestStep(
-              `metadata active length: ${getDataLength(
-                metadataActiveResult?.data,
-              )}`,
+              `metadata active length: ${getDataLength(metadataActiveState)}`,
               testsLogger,
             );
 
@@ -440,14 +424,10 @@ describe('AdtClient read operations', () => {
               'metadataInactiveState',
             );
             expect(metadataInactiveState).toBeDefined();
-            expect(
-              metadataInactiveState || metadataInactiveState,
-            ).toBeDefined();
-            const metadataInactiveResult =
-              metadataInactiveState || metadataInactiveState;
+            expect(metadataInactiveState).toBeDefined();
             logTestStep(
               `metadata inactive length: ${getDataLength(
-                metadataInactiveResult?.data,
+                metadataInactiveState,
               )}`,
               testsLogger,
             );
@@ -493,7 +473,6 @@ describe('AdtClient read operations', () => {
               'readActiveState',
             );
             expect(readActiveState).toBeDefined();
-            expect(readActiveState).toBeDefined();
             logTestStep(
               `active length: ${getDataLength(readActiveState)}`,
               testsLogger,
@@ -504,7 +483,6 @@ describe('AdtClient read operations', () => {
               await tableClient.read({ tableName }, 'inactive'),
               'readInactiveState',
             );
-            expect(readInactiveState).toBeDefined();
             expect(readInactiveState).toBeDefined();
             logTestStep(
               `inactive length: ${getDataLength(readInactiveState)}`,
@@ -520,13 +498,8 @@ describe('AdtClient read operations', () => {
               'metadataActiveState',
             );
             expect(metadataActiveState).toBeDefined();
-            expect(metadataActiveState || metadataActiveState).toBeDefined();
-            const metadataActiveResult =
-              metadataActiveState || metadataActiveState;
             logTestStep(
-              `metadata active length: ${getDataLength(
-                metadataActiveResult?.data,
-              )}`,
+              `metadata active length: ${getDataLength(metadataActiveState)}`,
               testsLogger,
             );
 
@@ -539,14 +512,10 @@ describe('AdtClient read operations', () => {
               'metadataInactiveState',
             );
             expect(metadataInactiveState).toBeDefined();
-            expect(
-              metadataInactiveState || metadataInactiveState,
-            ).toBeDefined();
-            const metadataInactiveResult =
-              metadataInactiveState || metadataInactiveState;
+            expect(metadataInactiveState).toBeDefined();
             logTestStep(
               `metadata inactive length: ${getDataLength(
-                metadataInactiveResult?.data,
+                metadataInactiveState,
               )}`,
               testsLogger,
             );
@@ -692,7 +661,6 @@ describe('AdtClient read operations', () => {
             'readActiveState',
           );
           expect(readActiveState).toBeDefined();
-          expect(readActiveState).toBeDefined();
           logTestStep(
             `active length: ${getDataLength(readActiveState)}`,
             testsLogger,
@@ -709,7 +677,6 @@ describe('AdtClient read operations', () => {
             'readInactiveState',
           );
           expect(readInactiveState).toBeDefined();
-          expect(readInactiveState).toBeDefined();
           logTestStep(
             `inactive length: ${getDataLength(readInactiveState)}`,
             testsLogger,
@@ -722,7 +689,6 @@ describe('AdtClient read operations', () => {
             }),
             'metadataState',
           );
-          expect(metadataState).toBeDefined();
           expect(metadataState).toBeDefined();
           logTestStep(
             `metadata length: ${getDataLength(metadataState)}`,

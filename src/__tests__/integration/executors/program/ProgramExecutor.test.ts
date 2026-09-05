@@ -8,13 +8,15 @@ import * as path from 'node:path';
 import type {
   IAbapConnection,
   ILogger,
-  IProfiler,
   ISessionLifecycleAware,
 } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import { AdtExecutor } from '../../../../clients/AdtExecutor';
 import { AdtRuntimeClient } from '../../../../clients/AdtRuntimeClient';
-import type { IProfilerTraceParameters } from '../../../../runtime/traces';
+import type {
+  IProfilerTraceParameters,
+  Profiler,
+} from '../../../../runtime/traces';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { expectResult } from '../../../helpers/contract';
 import { resolveRunnableProgramName } from '../../../helpers/runnableProgramHelper';
@@ -114,7 +116,7 @@ describe('ProgramExecutor (integration)', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let executor: AdtExecutor;
   let runtime: AdtRuntimeClient;
-  let profiler: IProfiler;
+  let profiler: Profiler;
   let hasConfig = false;
   let isCloudSystem = false;
   let isLegacy = false;
@@ -145,8 +147,9 @@ describe('ProgramExecutor (integration)', () => {
       traceUser = systemContext.responsible;
       executor = new AdtExecutor(connection, libraryLogger);
       runtime = new AdtRuntimeClient(connection, libraryLogger);
-      // No cast since 15.0.0: it reached `latestTraceId()`, which is gone, and
-      // this file only ever needed what `IProfiler` already declares.
+      // The concrete implementation, not `IProfiler`: the contract is generic
+      // in what its readings answer, and naming it here would mean spelling
+      // those parameters out only to repeat what the factory already knows.
       profiler = runtime.getProfiler();
       hasConfig = true;
     } catch (error) {
@@ -330,15 +333,14 @@ describe('ProgramExecutor (integration)', () => {
           'result',
         );
 
-        expect(result.response.status).toBe(200);
-        const runOutput = String(result.response);
+        const runOutput = String(result.run);
         expect(runOutput).toMatch(/PROGRAM_EXECUTOR_RUN_PROBE\(\s*\)\s*=\s*1/i);
         expect(result.profilerId).toContain(
           '/sap/bc/adt/runtime/traces/abaptraces/parameters/',
         );
 
         logTestStep(
-          `run output: ${toShortText(result.response)}; profilerId=${result.profilerId}`,
+          `run output: ${toShortText(result.run)}; profilerId=${result.profilerId}`,
           testsLogger,
         );
 
@@ -372,15 +374,22 @@ describe('ProgramExecutor (integration)', () => {
         logTestStep(`traceId=${traceId}`, testsLogger);
 
         logTestStep('read all three views', testsLogger);
-        const hitlist = await profiler.read(traceId, 'hitlist', {
-          withSystemEvents: false,
-        });
-        const statements = await profiler.read(traceId, 'statements', {
-          withSystemEvents: false,
-        });
-        const dbAccesses = await profiler.read(traceId, 'dbAccesses', {
-          withSystemEvents: false,
-        });
+        const hitlist = expectResult(
+          await profiler.read(traceId, 'hitlist', { withSystemEvents: false }),
+          'read hitlist',
+        );
+        const statements = expectResult(
+          await profiler.read(traceId, 'statements', {
+            withSystemEvents: false,
+          }),
+          'read statements',
+        );
+        const dbAccesses = expectResult(
+          await profiler.read(traceId, 'dbAccesses', {
+            withSystemEvents: false,
+          }),
+          'read dbAccesses',
+        );
 
         // Parsed rows, not a status code: a 200 with a body nothing could read
         // used to satisfy this.

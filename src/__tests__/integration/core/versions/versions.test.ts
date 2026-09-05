@@ -12,10 +12,12 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type {
   IAbapConnection,
+  IAdtResponse,
   ISessionLifecycleAware,
 } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
+import type { ObjectVersion } from '../../../../core/shared/results';
 import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
@@ -55,7 +57,10 @@ describe('Object version history', () => {
     if (connection) await releaseTestConnection(connection);
   });
 
-  const cases: Array<{ label: string; list: () => Promise<any[]> }> = [
+  const cases: Array<{
+    label: string;
+    list: () => Promise<IAdtResponse<ObjectVersion[]>>;
+  }> = [
     {
       label: 'table',
       list: () => client.getTable().getVersions({ tableName: 'ZAC_SHR_BTABL' }),
@@ -81,7 +86,7 @@ describe('Object version history', () => {
   for (const tc of cases) {
     it(`lists versions and fetches a version's source for ${tc.label}`, async () => {
       if (!hasConfig) return;
-      const versions = await tc.list();
+      const versions = expectResult(await tc.list(), `${tc.label} versions`);
       expect(Array.isArray(versions)).toBe(true);
       expect(versions.length).toBeGreaterThan(0);
       const v = versions[0];

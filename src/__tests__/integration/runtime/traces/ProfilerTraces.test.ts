@@ -361,10 +361,12 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
           'result',
         );
 
-        expect(result.response.status).toBe(200);
-        expect(result.response.data).toBeDefined();
+        // The run's own answer, read by the shipped strategy. There is no
+        // status to check here any more — a run that failed would have come
+        // back as the failure half and `expectResult` would have said so.
+        expect(result.run).toBeDefined();
         logTestStep(
-          `run output: ${String(result.response.data).replace(/\s+/g, ' ').trim().slice(0, 140)}`,
+          `run output: ${String(result.run).replace(/\s+/g, ' ').trim().slice(0, 140)}`,
           testsLogger,
         );
 

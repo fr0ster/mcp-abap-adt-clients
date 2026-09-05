@@ -3,6 +3,7 @@ import type {
   IVersionsStrategy,
 } from '../../../../core/shared/capabilities/types';
 import { VersionsCapability } from '../../../../core/shared/capabilities/VersionsCapability';
+import { expectResult } from '../../../helpers/contract';
 
 type Cfg = { name?: string };
 const ctx: ICapabilityContext = { connection: {} as any, logger: undefined };
@@ -20,21 +21,23 @@ const strategy: IVersionsStrategy<Cfg> = {
 describe('VersionsCapability', () => {
   it('getVersions delegates to the strategy', async () => {
     const cap = new VersionsCapability<Cfg>(getCtx, strategy);
-    const v = await cap.getVersions({ name: 'ZBAR' });
+    const v = expectResult(await cap.getVersions({ name: 'ZBAR' }), 'versions');
     expect(v).toHaveLength(1);
     expect(v[0].title).toBe('ZBAR');
   });
 
   it('getVersionSource delegates to the strategy', async () => {
     const cap = new VersionsCapability<Cfg>(getCtx, strategy);
-    expect(await cap.getVersionSource('/uri/1')).toBe('source-of:/uri/1');
+    expect(
+      expectResult(await cap.getVersionSource('/uri/1'), 'version source'),
+    ).toBe('source-of:/uri/1');
   });
 
-  it('getVersions rethrows a missing name', () => {
+  it('getVersions rethrows a missing name', async () => {
     const cap = new VersionsCapability<Cfg>(getCtx, strategy);
-    // getVersions is NOT async (byte-identical to the current handlers, whose
-    // getVersions throws synchronously on a missing name), so nameOf's throw
-    // propagates synchronously — assert a sync throw, not a rejection.
-    expect(() => cap.getVersions({})).toThrow('name is required');
+    // A caller error, not a verdict about the server: the name is missing
+    // before anything is asked, so it throws rather than coming back as the
+    // failure half of an answer about a request that never happened.
+    await expect(cap.getVersions({})).rejects.toThrow('name is required');
   });
 });
