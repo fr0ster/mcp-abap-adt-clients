@@ -370,7 +370,13 @@ describe('ServiceBinding (using AdtClient)', () => {
         const testCase = tester.getTestCaseDefinition();
         const params = testCase?.params || {};
         const testSubpackage = await ensureTestSubpackage(params);
-        const updatePublicationState = 'published';
+        // From the config, not a constant. This read `'published'` outright,
+        // so `desired_publication_state` in test-config.yaml was decoration:
+        // the flow published every run whatever the file said, and then could
+        // not delete what it had published. Publishing is ~130s of server time
+        // and belongs in a case somebody turns on deliberately.
+        const updatePublicationState =
+          params.desired_publication_state || 'unchanged';
         const updateDetails = `serviceType=${config.serviceType}, serviceName=${config.serviceName}, serviceVersion=${config.serviceVersion}`;
         logTestStep(
           `update publication state: ${updatePublicationState} :: ${updateDetails}`,

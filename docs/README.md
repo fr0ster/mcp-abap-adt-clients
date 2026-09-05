@@ -14,6 +14,7 @@ Complete documentation for the `@mcp-abap-adt/adt-clients` package.
 
 ## Usage Guides
 
+- [**OBJECT_LIFECYCLE.md**](usage/OBJECT_LIFECYCLE.md) — create → lock → update → unlock → activate: what each member does, what is opt-in, where the flow does not hold, and which types can have their code checked before the object exists
 - [**CLIENT_API_REFERENCE.md**](usage/CLIENT_API_REFERENCE.md) - Complete API reference for `AdtClient`
 - [**RFC_CONNECTION.md**](usage/RFC_CONNECTION.md) - RFC connection guide for legacy systems
 - [**STATEFUL_SESSION_GUIDE.md**](usage/STATEFUL_SESSION_GUIDE.md) - Guide for stateful session management
@@ -39,6 +40,7 @@ docs/
 │   ├── discovery.md                  # ADT Discovery documentation
 │   └── discovery.xml                 # Pretty-printed ADT discovery XML
 ├── usage/
+│   ├── OBJECT_LIFECYCLE.md           # The create → … → activate flow and its exceptions
 │   ├── CLIENT_API_REFERENCE.md       # Client API reference
 │   ├── STATEFUL_SESSION_GUIDE.md     # Session management
 │   ├── CHECK_LOCAL_TEST_CLASS.md     # Local test class validation

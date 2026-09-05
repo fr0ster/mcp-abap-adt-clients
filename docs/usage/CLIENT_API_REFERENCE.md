@@ -7,6 +7,10 @@ This project exposes the following client classes:
 
 `ReadOnlyClient` and `CrudClient` have been removed in the builderless API.
 
+For the flow these members compose into — create → lock → update → unlock →
+activate, what each step actually does, and the two types where it does not
+hold — see [OBJECT_LIFECYCLE.md](OBJECT_LIFECYCLE.md).
+
 ## AdtClient
 
 ```typescript
