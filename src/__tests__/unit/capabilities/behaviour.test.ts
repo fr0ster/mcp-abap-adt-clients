@@ -18,6 +18,7 @@
 
 import type {
   IAbapConnection,
+  IAdtResponse,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
 import { AdtClient } from '../../../clients/AdtClient';
@@ -356,12 +357,15 @@ describe('capability guard — activation reports failure', () => {
       >;
       const activate = handler.activate as (
         c: unknown,
-      ) => Promise<{ errors?: unknown[] }>;
+      ) => Promise<IAdtResponse<unknown>>;
 
+      // The failure half, or a throw. Either reaches the caller; what must not
+      // happen is a success — which is what `errors: []` was, and why this
+      // assertion exists at all. ADT answers a refused activation with 200 and
+      // a `<msg type="E">`, so nothing below the contract can tell.
       let reached = false;
       try {
-        const state = await activate.call(handler, entry.config);
-        reached = (state?.errors?.length ?? 0) > 0;
+        reached = !(await activate.call(handler, entry.config)).ok;
       } catch {
         reached = true;
       }

@@ -42,7 +42,11 @@ import { checkTransformation } from './check';
 import { create as createTransformation } from './create';
 import { checkDeletion, deleteTransformation } from './delete';
 import { lockTransformation } from './lock';
-import { getTransformation, getTransformationSource } from './read';
+import {
+  getTransformation,
+  getTransformationSource,
+  getTransformationTransport,
+} from './read';
 import {
   type ITransformationConfig,
   type ITransformationResults,
@@ -280,10 +284,9 @@ export class AdtTransformation<
 
     return answering(
       () =>
-        getTransformation(
+        getTransformationTransport(
           this.connection,
           name,
-          'active',
           options?.withLongPolling !== undefined
             ? { withLongPolling: options.withLongPolling }
             : undefined,

@@ -42,7 +42,11 @@ import { check as checkEnhancementSource } from './check';
 import { create as createEnhancement } from './create';
 import { checkDeletion, deleteEnhancement } from './delete';
 import { lockEnhancement } from './lock';
-import { getEnhancementMetadata, getEnhancementSource } from './read';
+import {
+  getEnhancementMetadata,
+  getEnhancementSource,
+  getEnhancementTransport,
+} from './read';
 import {
   type EnhancementType,
   enhancementDocuments,
@@ -283,14 +287,13 @@ export class AdtEnhancement<
 
     return answering(
       () =>
-        getEnhancementMetadata(
+        getEnhancementTransport(
           this.connection,
           this.enhancementType(config),
           name,
           options?.withLongPolling !== undefined
             ? { withLongPolling: options.withLongPolling }
             : undefined,
-          this.logger,
         ),
       this.results.transport as IResultStrategy<ReturnType<R['transport']>>,
       options?.analyse,
