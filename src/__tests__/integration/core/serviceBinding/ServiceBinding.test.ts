@@ -19,6 +19,7 @@ import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IServiceBindingConfig } from '../../../../core/service';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -136,14 +137,17 @@ describe('ServiceBinding (using AdtClient)', () => {
           }
 
           try {
-            const existingActive = await client
-              .getServiceBinding()
-              .read({ bindingName }, 'active');
-            const existingInactive = await client
-              .getServiceBinding()
-              .read({ bindingName }, 'inactive');
-            const hasExisting =
-              !!existingActive?.readResult || !!existingInactive?.readResult;
+            const existingActive = expectResult(
+              await client.getServiceBinding().read({ bindingName }, 'active'),
+              'existingActive',
+            );
+            const existingInactive = expectResult(
+              await client
+                .getServiceBinding()
+                .read({ bindingName }, 'inactive'),
+              'existingInactive',
+            );
+            const hasExisting = !!existingActive || !!existingInactive;
             if (!hasExisting) {
               return { success: true };
             }
@@ -157,7 +161,7 @@ describe('ServiceBinding (using AdtClient)', () => {
               params.service_name || params.service_definition_name;
             const serviceVersion = params.service_version || '0001';
 
-            if (existingActive?.readResult) {
+            if (existingActive) {
               try {
                 await client.getServiceBinding().update({
                   bindingName,
@@ -222,10 +226,11 @@ describe('ServiceBinding (using AdtClient)', () => {
     let parentResponsible = params.responsible;
 
     try {
-      const parentState = await client
-        .getPackage()
-        .readMetadata({ packageName: parentPackage });
-      const raw = parentState?.metadataResult?.data;
+      const parentState = expectResult(
+        await client.getPackage().readMetadata({ packageName: parentPackage }),
+        'parentState',
+      );
+      const raw = parentState;
       if (typeof raw === 'string') {
         const parsed = xmlParser.parse(raw) as Record<string, any>;
         const pkg = parsed?.['pak:package'] ?? parsed?.package ?? {};
@@ -411,9 +416,12 @@ describe('ServiceBinding (using AdtClient)', () => {
         });
 
         try {
-          const resultState = await tester.readTest({
-            bindingName,
-          });
+          const resultState = expectResult(
+            await tester.readTest({
+              bindingName,
+            }),
+            'resultState',
+          );
           if (!resultState) {
             logTestSkip(
               testsLogger,
@@ -422,7 +430,7 @@ describe('ServiceBinding (using AdtClient)', () => {
             );
             return;
           }
-          expect(resultState?.readResult).toBeDefined();
+          expect(resultState).toBeDefined();
 
           logTestSuccess(testsLogger, 'ServiceBinding - read standard object');
         } catch (error) {

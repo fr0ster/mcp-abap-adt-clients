@@ -11,6 +11,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
 import { AdtFunctionGroup } from '../../../../core/functionGroup/AdtFunctionGroup';
+import { expectResult } from '../../../helpers/contract';
 
 const FAILED = `<?xml version="1.0" encoding="utf-8"?>
 <chkl:messages xmlns:chkl="http://www.sap.com/abapxml/checklist">
@@ -68,9 +69,12 @@ describe('function group activation reports what the server said', () => {
   it('does not treat an empty message list as failure', async () => {
     const { connection } = connectionReturning('<chkl:messages/>');
 
-    const state = await new AdtFunctionGroup(connection).activate({
-      functionGroupName: 'ZFG_TEST',
-    });
+    const state = expectResult(
+      await new AdtFunctionGroup(connection).activate({
+        functionGroupName: 'ZFG_TEST',
+      }),
+      'state',
+    );
 
     expect(state.errors).toEqual([]);
   });

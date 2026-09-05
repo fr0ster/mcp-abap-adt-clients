@@ -23,6 +23,7 @@ import type { IDataElementConfig } from '../../../../core/dataElement';
 import { getDataElement } from '../../../../core/dataElement/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -482,14 +483,17 @@ describe('DataElement (using AdtClient)', () => {
           );
 
           // Use BaseTester.readTest() for standardized read operation
-          const resultState = await tester.readTest({
-            dataElementName: standardDataElementName,
-          });
+          const resultState = expectResult(
+            await tester.readTest({
+              dataElementName: standardDataElementName,
+            }),
+            'resultState',
+          );
 
           expect(resultState).toBeDefined();
-          expect(resultState?.readResult).toBeDefined();
+          expect(resultState).toBeDefined();
           // DataElement read returns data element config - check if dataElementName is present
-          const dataElementConfig = resultState?.readResult;
+          const dataElementConfig = resultState;
           if (
             dataElementConfig &&
             typeof dataElementConfig === 'object' &&

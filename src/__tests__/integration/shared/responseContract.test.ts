@@ -34,6 +34,7 @@ import type {
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
 import { AdtParseError, AdtSAPError } from '../../../utils/adtErrors';
+import { expectResult } from '../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -227,7 +228,10 @@ describe('Response contract - 17.0.0', () => {
       // the request itself succeeded, which used to be stored as a result with
       // `errors: []`. That one is covered by unit tests against a stub, because
       // it needs a server that answers 200 with an exception document.
-      const state = await client.getClass().read({ className: NEVER_EXISTS });
+      const state = expectResult(
+        await client.getClass().read({ className: NEVER_EXISTS }),
+        'state',
+      );
 
       expect(state).toBeUndefined();
     }, 60000);
@@ -238,13 +242,16 @@ describe('Response contract - 17.0.0', () => {
 
       // A write is where reporting success on a refusal costs something: the
       // caller believes an object exists, or was activated, and it was not.
-      const outcome = await client
-        .getClass()
-        .activate({ className: NEVER_EXISTS })
-        .then(
-          (state) => ({ threw: false as const, state }),
-          (error: unknown) => ({ threw: true as const, error }),
-        );
+      const outcome = expectResult(
+        await client
+          .getClass()
+          .activate({ className: NEVER_EXISTS })
+          .then(
+            (state) => ({ threw: false as const, state }),
+            (error: unknown) => ({ threw: true as const, error }),
+          ),
+        'outcome',
+      );
 
       if (outcome.threw) {
         const error = outcome.error as Error;

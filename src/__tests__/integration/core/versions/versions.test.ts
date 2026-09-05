@@ -16,6 +16,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -89,7 +90,10 @@ describe('Object version history', () => {
       expect(v.contentUri.length).toBeGreaterThan(0);
 
       // getVersionSource is the same opaque-URI fetch on every handler.
-      const src = await client.getTable().getVersionSource(v.contentUri);
+      const src = expectResult(
+        await client.getTable().getVersionSource(v.contentUri),
+        'src',
+      );
       expect(typeof src).toBe('string');
       expect(src.length).toBeGreaterThan(0);
     }, 60000);

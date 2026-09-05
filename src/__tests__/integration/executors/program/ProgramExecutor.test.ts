@@ -16,6 +16,7 @@ import { AdtExecutor } from '../../../../clients/AdtExecutor';
 import { AdtRuntimeClient } from '../../../../clients/AdtRuntimeClient';
 import type { IProfilerTraceParameters } from '../../../../runtime/traces';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { expectResult } from '../../../helpers/contract';
 import { resolveRunnableProgramName } from '../../../helpers/runnableProgramHelper';
 import {
   createTestAdtClient,
@@ -242,15 +243,15 @@ describe('ProgramExecutor (integration)', () => {
       try {
         const programName = sharedRunnableProgram(testCase);
         logTestStep('run', testsLogger);
-        const response = await executor
-          .getProgramExecutor()
-          .run({ programName });
+        const response = expectResult(
+          await executor.getProgramExecutor().run({ programName }),
+          'response',
+        );
 
-        expect(response.status).toBe(200);
-        expect(response.data).toBeDefined();
-        const runOutput = String(response.data);
+        expect(response).toBeDefined();
+        const runOutput = String(response);
         expect(runOutput).toMatch(/PROGRAM_EXECUTOR_RUN_PROBE\(\s*\)\s*=\s*1/i);
-        logTestStep(`run output: ${toShortText(response.data)}`, testsLogger);
+        logTestStep(`run output: ${toShortText(response)}`, testsLogger);
 
         logTestSuccess(testsLogger, testName);
       } catch (error) {
@@ -322,19 +323,22 @@ describe('ProgramExecutor (integration)', () => {
         const tracesBefore = await traceIdsNow(profiler, { user: traceUser });
 
         logTestStep('create trace parameters + run with profiler', testsLogger);
-        const result = await executor
-          .getProgramExecutor()
-          .runWithProfiling({ programName }, { profilerParameters });
+        const result = expectResult(
+          await executor
+            .getProgramExecutor()
+            .runWithProfiling({ programName }, { profilerParameters }),
+          'result',
+        );
 
         expect(result.response.status).toBe(200);
-        const runOutput = String(result.response.data);
+        const runOutput = String(result.response);
         expect(runOutput).toMatch(/PROGRAM_EXECUTOR_RUN_PROBE\(\s*\)\s*=\s*1/i);
         expect(result.profilerId).toContain(
           '/sap/bc/adt/runtime/traces/abaptraces/parameters/',
         );
 
         logTestStep(
-          `run output: ${toShortText(result.response.data)}; profilerId=${result.profilerId}`,
+          `run output: ${toShortText(result.response)}; profilerId=${result.profilerId}`,
           testsLogger,
         );
 

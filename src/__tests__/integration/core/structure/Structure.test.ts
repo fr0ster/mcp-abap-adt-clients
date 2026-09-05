@@ -19,6 +19,7 @@ import type { IStructureConfig } from '../../../../core/structure';
 import { getStructure } from '../../../../core/structure/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -220,11 +221,14 @@ describe('Structure (using AdtClient)', () => {
         }
 
         try {
-          const resultState = await tester.readTest({
-            structureName: standardStructureName,
-          });
-          expect(resultState?.readResult).toBeDefined();
-          const structureConfig = resultState?.readResult;
+          const resultState = expectResult(
+            await tester.readTest({
+              structureName: standardStructureName,
+            }),
+            'resultState',
+          );
+          expect(resultState).toBeDefined();
+          const structureConfig = resultState;
           if (
             structureConfig &&
             typeof structureConfig === 'object' &&

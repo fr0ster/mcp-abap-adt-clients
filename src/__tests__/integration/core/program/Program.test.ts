@@ -19,6 +19,7 @@ import type { IProgramConfig } from '../../../../core/program';
 import { getProgramSource } from '../../../../core/program/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -257,14 +258,17 @@ describe('Program (using AdtClient)', () => {
         });
 
         try {
-          const resultState = await tester.readTest({
-            programName: standardProgramName,
-          });
-          expect(resultState?.readResult).toBeDefined();
+          const resultState = expectResult(
+            await tester.readTest({
+              programName: standardProgramName,
+            }),
+            'resultState',
+          );
+          expect(resultState).toBeDefined();
           const sourceCode =
-            typeof resultState?.readResult === 'string'
-              ? resultState.readResult
-              : (resultState?.readResult as any)?.data || '';
+            typeof resultState === 'string'
+              ? resultState
+              : (resultState as any)?.data || '';
           expect(typeof sourceCode).toBe('string');
 
           logTestSuccess(testsLogger, 'Program - read standard object');
@@ -331,21 +335,25 @@ describe('Program (using AdtClient)', () => {
         });
 
         try {
-          const result = await client
-            .getRequest()
-            .read({ transportNumber: transportRequest });
+          const result = expectResult(
+            await client
+              .getRequest()
+              .read({ transportNumber: transportRequest }),
+            'result',
+          );
           expect(result).toBeDefined();
-          expect(
-            result?.transportNumber ||
-              result?.readResult?.data?.transport_request,
-          ).toBe(transportRequest);
-          const metadataState = await client
-            .getRequest()
-            .readMetadata({ transportNumber: transportRequest });
+          expect(result?.transportNumber || result?.transport_request).toBe(
+            transportRequest,
+          );
+          const metadataState = expectResult(
+            await client
+              .getRequest()
+              .readMetadata({ transportNumber: transportRequest }),
+            'metadataState',
+          );
           expect(metadataState).toBeDefined();
           expect(
-            metadataState.transportNumber ||
-              metadataState.readResult?.data?.transport_request,
+            metadataState.transportNumber || metadataState?.transport_request,
           ).toBe(transportRequest);
 
           logTestSuccess(testsLogger, 'Program - read transport request');

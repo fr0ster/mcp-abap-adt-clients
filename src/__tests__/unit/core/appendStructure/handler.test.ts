@@ -3,6 +3,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
 import { AdtAppendStructure } from '../../../../core/appendStructure/AdtAppendStructure';
+import { expectResult } from '../../../helpers/contract';
 
 function makeConn(handler: (r: any) => Partial<IAdtWireResponse> | Error) {
   const sessionTypes: string[] = [];
@@ -72,7 +73,10 @@ describe('AdtAppendStructure handler', () => {
       Object.assign(new Error('nope'), { response: { status: 501 } }),
     );
     const as = new AdtAppendStructure(conn);
-    const state = await as.validate({ appendStructureName: 'ZOK_S' });
+    const state = expectResult(
+      await as.validate({ appendStructureName: 'ZOK_S' }),
+      'state',
+    );
     expect(state.validationSupported).toBe(false);
   });
 

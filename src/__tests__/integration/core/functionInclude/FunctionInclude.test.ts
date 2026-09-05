@@ -18,6 +18,7 @@ import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IFunctionIncludeConfig } from '../../../../core/functionInclude';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -273,10 +274,13 @@ describe('FunctionInclude (using AdtClient)', () => {
               config: Partial<IFunctionIncludeConfig>,
             ) => Promise<IFunctionIncludeState | undefined>;
           };
-          const result = await handler.readSource({
-            functionGroupName,
-            includeName,
-          });
+          const result = expectResult(
+            await handler.readSource({
+              functionGroupName,
+              includeName,
+            }),
+            'result',
+          );
           if (result === undefined) {
             // Include not present (e.g. previous flow test was skipped). That's
             // acceptable — the readSource path is what we're smoke-testing.
@@ -284,7 +288,7 @@ describe('FunctionInclude (using AdtClient)', () => {
           }
           expect(result).toBeDefined();
           expect(result.errors).toEqual([]);
-          const payload = result.readResult;
+          const payload = result;
           const body =
             typeof payload === 'string' ? payload : (payload as any)?.data;
           expect(typeof body).toBe('string');

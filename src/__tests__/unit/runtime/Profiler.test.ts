@@ -1,6 +1,7 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { Profiler } from '../../../runtime/traces/ProfilerDomain';
 import { compareRecordedAt } from '../../../runtime/traces/traceParsing';
+import { expectResult } from '../../helpers/contract';
 
 describe('Profiler', () => {
   // Real documents rather than empty bodies, so these cases test the
@@ -95,7 +96,10 @@ describe('Profiler', () => {
         .mockResolvedValue({ status: 200, data: feed, headers: {} }),
     } as unknown as IAbapConnection;
 
-    const entries = await new Profiler(connection, createLogger()).list();
+    const entries = expectResult(
+      await new Profiler(connection, createLogger()).list(),
+      'entries',
+    );
     // Exactly the snippet the CHANGELOG and the reference publish, guard and
     // all — so the documented migration is what is under test here.
     const newest = entries.length
@@ -118,7 +122,10 @@ describe('Profiler', () => {
       }),
     } as unknown as IAbapConnection;
 
-    const entries = await new Profiler(connection, createLogger()).list();
+    const entries = expectResult(
+      await new Profiler(connection, createLogger()).list(),
+      'entries',
+    );
     expect(entries).toEqual([]);
 
     const newest = entries.length

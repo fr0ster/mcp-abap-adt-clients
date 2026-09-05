@@ -4,6 +4,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { AdtMessageClassMessage } from '../../core/messageClass/AdtMessageClassMessage';
 import { noopLogger } from '../../utils/noopLogger';
+import { expectResult } from '../helpers/contract';
 
 // Two-message class: 001 + 002. Both are needed for the delete test so we can
 // assert 001 moves to <mc:deletedmessages> while 002 stays in <mc:messages>.
@@ -45,7 +46,10 @@ describe('AdtMessageClassMessage', () => {
   it('read extracts the message from the class', async () => {
     const { conn } = recorder();
     const m = new AdtMessageClassMessage(conn, noopLogger);
-    const st = await m.read({ className: 'ZT', msgno: '001' });
+    const st = expectResult(
+      await m.read({ className: 'ZT', msgno: '001' }),
+      'st',
+    );
     expect(st?.message?.msgtext).toBe('T1');
   });
 

@@ -19,6 +19,7 @@ import type { IDomainConfig } from '../../../../core/domain';
 import { getDomain } from '../../../../core/domain/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -229,11 +230,14 @@ describe('Domain (using AdtClient)', () => {
         }
 
         try {
-          const resultState = await tester.readTest({
-            domainName: standardDomainName,
-          });
-          expect(resultState?.readResult).toBeDefined();
-          const domainConfig = resultState?.readResult;
+          const resultState = expectResult(
+            await tester.readTest({
+              domainName: standardDomainName,
+            }),
+            'resultState',
+          );
+          expect(resultState).toBeDefined();
+          const domainConfig = resultState;
           if (
             domainConfig &&
             typeof domainConfig === 'object' &&

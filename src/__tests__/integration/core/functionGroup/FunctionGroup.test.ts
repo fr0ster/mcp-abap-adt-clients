@@ -18,6 +18,7 @@ import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IFunctionGroupConfig } from '../../../../core/functionGroup';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -270,13 +271,16 @@ describe('FunctionGroup (using AdtClient)', () => {
         }
 
         try {
-          const resultState = await tester.readTest({
-            functionGroupName: standardFunctionGroupName,
-          });
+          const resultState = expectResult(
+            await tester.readTest({
+              functionGroupName: standardFunctionGroupName,
+            }),
+            'resultState',
+          );
           expect(resultState).toBeDefined();
-          expect(resultState?.readResult).toBeDefined();
+          expect(resultState).toBeDefined();
           // FunctionGroup read returns function group config - check if functionGroupName is present
-          const functionGroupConfig = resultState?.readResult;
+          const functionGroupConfig = resultState;
           if (
             functionGroupConfig &&
             typeof functionGroupConfig === 'object' &&

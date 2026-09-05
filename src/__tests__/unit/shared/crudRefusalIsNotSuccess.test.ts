@@ -24,6 +24,7 @@
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import { AdtClient } from '../../../clients/AdtClient';
 import { AdtSAPError } from '../../../utils/adtErrors';
+import { expectResult } from '../../helpers/contract';
 
 const HOLDER = 'Object ZNOPE is locked by user XYZ';
 
@@ -139,9 +140,12 @@ describe('a refusal carried by a 2xx is not a result', () => {
       })),
     } as unknown as IAbapConnection;
 
-    const state = await new AdtClient(connection, logger)
-      .getClass()
-      .read({ className: 'ZREAL' });
+    const state = expectResult(
+      await new AdtClient(connection, logger)
+        .getClass()
+        .read({ className: 'ZREAL' }),
+      'state',
+    );
 
     expect(state?.errors).toEqual([]);
   });

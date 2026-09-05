@@ -9,6 +9,7 @@
 
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import { AdtInclude } from '../../../core/include';
+import { expectResult } from '../../helpers/contract';
 
 const LOCK_XML = `<?xml version="1.0" encoding="utf-8"?><asx:abap xmlns:asx="http://www.sap.com/abapxml"><asx:values><DATA><LOCK_HANDLE>LH1</LOCK_HANDLE></DATA></asx:values></asx:abap>`;
 
@@ -132,9 +133,12 @@ describe('AdtInclude', () => {
 
     it('uses a caller-held lock and neither locks nor unlocks around it', async () => {
       const { connection, calls } = createConnection();
-      const state = await new AdtInclude(connection, logger).update(
-        { includeName: 'ZMY_INC' },
-        { sourceCode: '" code', lockHandle: 'CALLER_HANDLE' },
+      const state = expectResult(
+        await new AdtInclude(connection, logger).update(
+          { includeName: 'ZMY_INC' },
+          { sourceCode: '" code', lockHandle: 'CALLER_HANDLE' },
+        ),
+        'state',
       );
 
       expect(calls.some((c) => c.url.includes('_action=LOCK'))).toBe(false);
@@ -203,9 +207,12 @@ describe('AdtInclude', () => {
 
     it('removes the half-made include when asked', async () => {
       const { connection, calls } = createWithFailingUpload();
-      const state = await new AdtInclude(connection, logger).create(
-        { ...BASE, sourceCode: '" code' },
-        { deleteOnFailure: true },
+      const state = expectResult(
+        await new AdtInclude(connection, logger).create(
+          { ...BASE, sourceCode: '" code' },
+          { deleteOnFailure: true },
+        ),
+        'state',
       );
 
       expect(calls.some((c) => c.method === 'DELETE')).toBe(true);
@@ -249,9 +256,12 @@ describe('AdtInclude', () => {
         },
       );
 
-      const state = await new AdtInclude(connection, logger).update(
-        { includeName: 'ZMY_INC', sourceCode: '" code' },
-        { activateOnUpdate: true },
+      const state = expectResult(
+        await new AdtInclude(connection, logger).update(
+          { includeName: 'ZMY_INC', sourceCode: '" code' },
+          { activateOnUpdate: true },
+        ),
+        'state',
       );
 
       // Reported as 'releaseLock' once, which sent the reader looking at lock

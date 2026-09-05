@@ -19,6 +19,7 @@ import type { IServiceDefinitionConfig } from '../../../../core/serviceDefinitio
 import { getServiceDefinition } from '../../../../core/serviceDefinition/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -288,9 +289,12 @@ describe('ServiceDefinition (using AdtClient)', () => {
         }
 
         try {
-          const resultState = await tester.readTest({
-            serviceDefinitionName: serviceDefinitionName,
-          });
+          const resultState = expectResult(
+            await tester.readTest({
+              serviceDefinitionName: serviceDefinitionName,
+            }),
+            'resultState',
+          );
           if (!resultState) {
             logTestSkip(
               testsLogger,
@@ -299,9 +303,9 @@ describe('ServiceDefinition (using AdtClient)', () => {
             );
             return;
           }
-          expect(resultState.readResult).toBeDefined();
+          expect(resultState).toBeDefined();
           // ServiceDefinition read returns service definition config - check if serviceDefinitionName is present
-          const serviceDefinitionConfig = resultState.readResult;
+          const serviceDefinitionConfig = resultState;
           if (
             serviceDefinitionConfig &&
             typeof serviceDefinitionConfig === 'object' &&

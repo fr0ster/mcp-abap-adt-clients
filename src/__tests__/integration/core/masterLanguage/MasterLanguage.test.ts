@@ -18,6 +18,7 @@ import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -123,8 +124,11 @@ describe('Master language on create (#105)', () => {
         let persisted: string | undefined;
         for (let attempt = 0; attempt < 8 && !persisted; attempt++) {
           try {
-            const meta = await cls.readMetadata({ className });
-            persisted = masterLangOf(String(meta.metadataResult?.data ?? ''));
+            const meta = expectResult(
+              await cls.readMetadata({ className }),
+              'meta',
+            );
+            persisted = masterLangOf(String(meta ?? ''));
           } catch {
             /* not ready yet */
           }

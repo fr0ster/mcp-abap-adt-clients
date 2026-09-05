@@ -18,6 +18,7 @@ import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IFunctionModuleConfig } from '../../../../core/functionModule';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -298,15 +299,18 @@ describe('FunctionModule (using AdtClient)', () => {
         }
 
         try {
-          const resultState = await tester.readTest({
-            functionModuleName: standardFunctionModuleName,
-            functionGroupName: standardFunctionGroupName,
-          });
-          expect(resultState?.readResult).toBeDefined();
+          const resultState = expectResult(
+            await tester.readTest({
+              functionModuleName: standardFunctionModuleName,
+              functionGroupName: standardFunctionGroupName,
+            }),
+            'resultState',
+          );
+          expect(resultState).toBeDefined();
           const sourceCode =
-            typeof resultState?.readResult === 'string'
-              ? resultState.readResult
-              : (resultState?.readResult as any)?.data || '';
+            typeof resultState === 'string'
+              ? resultState
+              : (resultState as any)?.data || '';
           expect(typeof sourceCode).toBe('string');
 
           logTestSuccess(testsLogger, 'FunctionModule - read standard object');

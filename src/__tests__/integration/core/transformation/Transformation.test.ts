@@ -19,6 +19,7 @@ import type { ITransformationConfig } from '../../../../core/transformation';
 import { getTransformation } from '../../../../core/transformation/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -285,9 +286,12 @@ describe('Transformation - SimpleTransformation (using AdtClient)', () => {
         }
 
         try {
-          const resultState = await tester.readTest({
-            transformationName: transformationName,
-          });
+          const resultState = expectResult(
+            await tester.readTest({
+              transformationName: transformationName,
+            }),
+            'resultState',
+          );
           if (!resultState) {
             logTestSkip(
               testsLogger,
@@ -296,7 +300,7 @@ describe('Transformation - SimpleTransformation (using AdtClient)', () => {
             );
             return;
           }
-          expect(resultState.readResult).toBeDefined();
+          expect(resultState).toBeDefined();
 
           logTestSuccess(testsLogger, 'Transformation - read standard object');
         } catch (error: any) {

@@ -18,6 +18,7 @@ import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IClassConfig } from '../../../../core/class';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -244,12 +245,15 @@ describe('Class (using AdtClient)', () => {
         }
 
         try {
-          const resultState = await tester.readTest({
-            className: standardClassName,
-          });
+          const resultState = expectResult(
+            await tester.readTest({
+              className: standardClassName,
+            }),
+            'resultState',
+          );
           expect(resultState).toBeDefined();
           // IClassState doesn't have className directly, check readResult
-          expect(resultState?.readResult).toBeDefined();
+          expect(resultState).toBeDefined();
 
           logTestSuccess(testsLogger, 'Class - read standard object');
         } catch (error) {
@@ -337,21 +341,25 @@ describe('Class (using AdtClient)', () => {
         }
 
         try {
-          const result = await client
-            .getRequest()
-            .read({ transportNumber: transportRequest });
+          const result = expectResult(
+            await client
+              .getRequest()
+              .read({ transportNumber: transportRequest }),
+            'result',
+          );
           expect(result).toBeDefined();
-          expect(
-            result?.transportNumber ||
-              result?.readResult?.data?.transport_request,
-          ).toBe(transportRequest);
-          const metadataState = await client
-            .getRequest()
-            .readMetadata({ transportNumber: transportRequest });
+          expect(result?.transportNumber || result?.transport_request).toBe(
+            transportRequest,
+          );
+          const metadataState = expectResult(
+            await client
+              .getRequest()
+              .readMetadata({ transportNumber: transportRequest }),
+            'metadataState',
+          );
           expect(metadataState).toBeDefined();
           expect(
-            metadataState.transportNumber ||
-              metadataState.readResult?.data?.transport_request,
+            metadataState.transportNumber || metadataState?.transport_request,
           ).toBe(transportRequest);
 
           logTestSuccess(testsLogger, 'Class - read transport request');

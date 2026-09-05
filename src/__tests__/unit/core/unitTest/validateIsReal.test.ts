@@ -20,6 +20,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { AdtCdsUnitTest } from '../../../../core/unitTest/AdtCdsUnitTest';
 import { AdtUnitTest } from '../../../../core/unitTest/AdtUnitTest';
+import { expectResult } from '../../../helpers/contract';
 import { createLibraryLogger } from '../../../helpers/testLogger';
 
 type Call = { url: string; method: string; data?: unknown };
@@ -67,7 +68,10 @@ describe('AdtUnitTest.validate()', () => {
     });
     const h = new AdtUnitTest(conn, createLibraryLogger());
 
-    const state = await h.validate({ className: 'ZCL_CONTAINER' });
+    const state = expectResult(
+      await h.validate({ className: 'ZCL_CONTAINER' }),
+      'state',
+    );
 
     expect(calls).toHaveLength(1);
     expect(state.errors).toEqual([]);
@@ -86,10 +90,13 @@ describe('AdtUnitTest.validate()', () => {
     });
     const h = new AdtUnitTest(conn, createLibraryLogger());
 
-    const state = await h.validate({
-      className: 'ZCL_CONTAINER',
-      testClassSource: 'CLASS ltcl_test DEFINITION FOR TESTING.',
-    });
+    const state = expectResult(
+      await h.validate({
+        className: 'ZCL_CONTAINER',
+        testClassSource: 'CLASS ltcl_test DEFINITION FOR TESTING.',
+      }),
+      'state',
+    );
 
     expect(calls).toHaveLength(2);
     expect(state.checkResult?.data).toBe('<code-ok/>');
@@ -109,11 +116,14 @@ describe('AdtUnitTest.validate()', () => {
     });
     const h = new AdtUnitTest(conn, createLibraryLogger());
 
-    const state = await h.validate({
-      className: 'ZCL_NEW_TESTS',
-      packageName: 'ZPKG',
-      description: 'tests',
-    });
+    const state = expectResult(
+      await h.validate({
+        className: 'ZCL_NEW_TESTS',
+        packageName: 'ZPKG',
+        description: 'tests',
+      }),
+      'state',
+    );
 
     expect(calls).toHaveLength(2);
     expect(state.validationResponse?.data).toBe('<name-ok/>');
@@ -158,12 +168,15 @@ describe('AdtCdsUnitTest.validate()', () => {
     });
     const h = new AdtCdsUnitTest(conn, createLibraryLogger());
 
-    const state = await h.validate({
-      className: 'ZCL_CDS_DUMMY',
-      packageName: 'ZPKG',
-      classTemplate: '<template/>',
-      testClassSource: 'CLASS ltcl_test DEFINITION FOR TESTING.',
-    });
+    const state = expectResult(
+      await h.validate({
+        className: 'ZCL_CDS_DUMMY',
+        packageName: 'ZPKG',
+        classTemplate: '<template/>',
+        testClassSource: 'CLASS ltcl_test DEFINITION FOR TESTING.',
+      }),
+      'state',
+    );
 
     expect(calls).toHaveLength(2);
     expect(state.errors).toEqual([]);
@@ -228,7 +241,10 @@ describe('AdtCdsUnitTest.validate()', () => {
     });
     const h = new AdtCdsUnitTest(conn, createLibraryLogger());
 
-    const state = await h.validate({ className: 'ZCL_CONTAINER' });
+    const state = expectResult(
+      await h.validate({ className: 'ZCL_CONTAINER' }),
+      'state',
+    );
 
     expect(calls).toHaveLength(1);
     expect(state.errors).toEqual([]);

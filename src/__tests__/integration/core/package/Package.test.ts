@@ -16,6 +16,7 @@ import { deletePackage } from '../../../../core/package/delete';
 import { getPackage } from '../../../../core/package/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -338,11 +339,14 @@ describe('Package (using AdtClient)', () => {
         }
 
         try {
-          const resultState = await tester.readTest({
-            packageName: standardPackageName,
-          });
-          expect(resultState?.readResult).toBeDefined();
-          const packageConfig = resultState?.readResult;
+          const resultState = expectResult(
+            await tester.readTest({
+              packageName: standardPackageName,
+            }),
+            'resultState',
+          );
+          expect(resultState).toBeDefined();
+          const packageConfig = resultState;
           if (
             packageConfig &&
             typeof packageConfig === 'object' &&

@@ -11,6 +11,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
 import { AdtRequestLegacy } from '../../../../core/transport/AdtRequestLegacy';
+import { expectResult } from '../../../helpers/contract';
 
 const recordingConnection = () => {
   const calls: IAbapRequestOptions[] = [];
@@ -36,7 +37,10 @@ describe('legacy transport list', () => {
   it('calls the legacy CTS path, not the ADT one', async () => {
     const { connection, calls } = recordingConnection();
 
-    const state = await new AdtRequestLegacy(connection).list();
+    const state = expectResult(
+      await new AdtRequestLegacy(connection).list(),
+      'state',
+    );
 
     expect(calls).toHaveLength(1);
     expect(calls[0].url).toBe('/sap/bc/cts/transportrequests');

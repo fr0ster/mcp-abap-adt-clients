@@ -19,6 +19,7 @@ import type { ITableConfig } from '../../../../core/table';
 import { getTable } from '../../../../core/table/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -220,11 +221,14 @@ describe('Table (using AdtClient)', () => {
         }
 
         try {
-          const resultState = await tester.readTest({
-            tableName: standardTableName,
-          });
-          expect(resultState?.readResult).toBeDefined();
-          const tableConfig = resultState?.readResult;
+          const resultState = expectResult(
+            await tester.readTest({
+              tableName: standardTableName,
+            }),
+            'resultState',
+          );
+          expect(resultState).toBeDefined();
+          const tableConfig = resultState;
           if (
             tableConfig &&
             typeof tableConfig === 'object' &&

@@ -23,6 +23,7 @@ import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IMessageClassConfig } from '../../../../core/messageClass';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -222,7 +223,10 @@ describe('MessageClass (using AdtClient)', () => {
         try {
           // ── Step 1: Create message class ───────────────────────────────────
           logTestStep('create message class', testsLogger);
-          const createState = await mcHandler.create(config);
+          const createState = expectResult(
+            await mcHandler.create(config),
+            'createState',
+          );
           expect(createState.errors).toHaveLength(0);
 
           // ── Step 2: Read message class ─────────────────────────────────────
@@ -233,7 +237,10 @@ describe('MessageClass (using AdtClient)', () => {
           // is passed but does not cover this resource. So poll until the
           // object appears, bounded, instead of asking once and calling the
           // absence a failure.
-          let readState = await mcHandler.read({ name: msgClassName });
+          let readState = expectResult(
+            await mcHandler.read({ name: msgClassName }),
+            'readState',
+          );
           for (let attempt = 0; !readState && attempt < 15; attempt++) {
             await new Promise((resolve) => setTimeout(resolve, 2000));
             readState = await mcHandler.read({ name: msgClassName });
@@ -272,10 +279,13 @@ describe('MessageClass (using AdtClient)', () => {
 
           // ── Step 4: Read message ───────────────────────────────────────────
           logTestStep(`read message ${msgNo}`, testsLogger);
-          const msgReadState = await msgHandler.read({
-            className: msgClassName,
-            msgno: msgNo,
-          });
+          const msgReadState = expectResult(
+            await msgHandler.read({
+              className: msgClassName,
+              msgno: msgNo,
+            }),
+            'msgReadState',
+          );
           expect(msgReadState).toBeDefined();
           if (!msgReadState)
             throw new Error('msgHandler.read() returned undefined');
@@ -284,20 +294,26 @@ describe('MessageClass (using AdtClient)', () => {
 
           // ── Step 5: Update message ─────────────────────────────────────────
           logTestStep(`update message ${msgNo}`, testsLogger);
-          const msgUpdateState = await msgHandler.update({
-            className: msgClassName,
-            msgno: msgNo,
-            msgtext: msgTextUpdated,
-            transportRequest: config.transportRequest,
-          });
+          const msgUpdateState = expectResult(
+            await msgHandler.update({
+              className: msgClassName,
+              msgno: msgNo,
+              msgtext: msgTextUpdated,
+              transportRequest: config.transportRequest,
+            }),
+            'msgUpdateState',
+          );
           expect(msgUpdateState.errors).toHaveLength(0);
 
           // ── Step 6: Read-back to verify update ────────────────────────────
           logTestStep(`read-back message ${msgNo} after update`, testsLogger);
-          const msgReadAfterUpdate = await msgHandler.read({
-            className: msgClassName,
-            msgno: msgNo,
-          });
+          const msgReadAfterUpdate = expectResult(
+            await msgHandler.read({
+              className: msgClassName,
+              msgno: msgNo,
+            }),
+            'msgReadAfterUpdate',
+          );
           expect(msgReadAfterUpdate).toBeDefined();
           if (!msgReadAfterUpdate)
             throw new Error(
@@ -307,18 +323,24 @@ describe('MessageClass (using AdtClient)', () => {
 
           // ── Step 7: Delete message ─────────────────────────────────────────
           logTestStep(`delete message ${msgNo}`, testsLogger);
-          const msgDeleteState = await msgHandler.delete({
-            className: msgClassName,
-            msgno: msgNo,
-            transportRequest: config.transportRequest,
-          });
+          const msgDeleteState = expectResult(
+            await msgHandler.delete({
+              className: msgClassName,
+              msgno: msgNo,
+              transportRequest: config.transportRequest,
+            }),
+            'msgDeleteState',
+          );
           expect(msgDeleteState.errors).toHaveLength(0);
 
           // ── Step 8: Verify message is gone from class ──────────────────────
           logTestStep('verify message removal', testsLogger);
-          const readAfterMsgDelete = await mcHandler.read({
-            name: msgClassName,
-          });
+          const readAfterMsgDelete = expectResult(
+            await mcHandler.read({
+              name: msgClassName,
+            }),
+            'readAfterMsgDelete',
+          );
           expect(readAfterMsgDelete).toBeDefined();
           if (!readAfterMsgDelete)
             throw new Error(

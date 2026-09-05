@@ -24,6 +24,7 @@ import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import { orThrow } from '../../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -276,29 +277,35 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
           );
 
           // 5) Read implementation source (JSON) — must contain the amdpReference.
-          const readState = await dsfi.read(
-            { implementationName: implName },
-            'active',
+          const readState = expectResult(
+            await dsfi.read({ implementationName: implName }, 'active'),
+            'readState',
           );
-          expect(readState?.readResult).toBeDefined();
+          expect(readState).toBeDefined();
           const sourceText =
-            typeof readState?.readResult?.data === 'string'
-              ? readState.readResult.data
-              : JSON.stringify(readState?.readResult?.data);
+            typeof readState === 'string'
+              ? readState
+              : JSON.stringify(readState);
           expect(sourceText).toContain(`${amdpName}=>GET_SUM`);
 
           // 6) Read metadata (blues v2 XML).
-          const metaState = await dsfi.readMetadata({
-            implementationName: implName,
-          });
-          expect(metaState.metadataResult).toBeDefined();
+          const metaState = expectResult(
+            await dsfi.readMetadata({
+              implementationName: implName,
+            }),
+            'metaState',
+          );
+          expect(metaState).toBeDefined();
 
           // 7) Delete the trio.
-          const del = await dsfi.delete({
-            implementationName: implName,
-            transportRequest,
-          });
-          expect(del.deleteResult).toBeDefined();
+          const del = expectResult(
+            await dsfi.delete({
+              implementationName: implName,
+              transportRequest,
+            }),
+            'del',
+          );
+          expect(del).toBeDefined();
           await cls.delete({ className: amdpName, transportRequest });
           await sf.delete({ scalarFunctionName: funcName, transportRequest });
 

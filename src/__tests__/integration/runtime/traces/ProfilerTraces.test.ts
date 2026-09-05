@@ -31,6 +31,7 @@ import { AdtExecutor } from '../../../../clients/AdtExecutor';
 import { AdtRuntimeClient } from '../../../../clients/AdtRuntimeClient';
 import type { Profiler } from '../../../../runtime/traces/ProfilerDomain';
 import { compareRecordedAt } from '../../../../runtime/traces/traceParsing';
+import { expectResult } from '../../../helpers/contract';
 import { resolveRunnableClassName } from '../../../helpers/runnableClassHelper';
 import {
   createTestConnection,
@@ -161,7 +162,10 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
 
       try {
         logTestStep('list profiler traces', testsLogger);
-        const traces = await runtime.getProfiler().list();
+        const traces = expectResult(
+          await runtime.getProfiler().list(),
+          'traces',
+        );
         expect(Array.isArray(traces)).toBe(true);
         // Every entry the contract promises: an id and when it was recorded.
         // A parsed listing that silently yields shapeless objects is the defect
@@ -182,7 +186,10 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
         expect(Array.isArray(requests)).toBe(true);
 
         logTestStep('list profiler object types', testsLogger);
-        const objectTypes = await classExecutor.listObjectTypes();
+        const objectTypes = expectResult(
+          await classExecutor.listObjectTypes(),
+          'objectTypes',
+        );
         expect(objectTypes.length).toBeGreaterThan(0);
         // Measured: the name is a URI, not a short code, and it is the same
         // string a stored request echoes back as its objectTypeId.
@@ -192,7 +199,10 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
         expect(typeof objectTypes[0]?.description).toBe('string');
 
         logTestStep('list profiler process types', testsLogger);
-        const processTypes = await classExecutor.listProcessTypes();
+        const processTypes = expectResult(
+          await classExecutor.listProcessTypes(),
+          'processTypes',
+        );
         expect(processTypes.length).toBeGreaterThan(0);
         expect(processTypes[0]?.name).toContain(
           '/sap/bc/adt/runtime/traces/abaptraces/processtypes/',
@@ -346,9 +356,10 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
           `run shared class ${className} with profiling`,
           testsLogger,
         );
-        const result = await executor
-          .getClassExecutor()
-          .runWithProfiling({ className });
+        const result = expectResult(
+          await executor.getClassExecutor().runWithProfiling({ className }),
+          'result',
+        );
 
         expect(result.response.status).toBe(200);
         expect(result.response.data).toBeDefined();
@@ -443,7 +454,10 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
           resolvedTraceId = configuredTraceId;
         } else if (!resolvedTraceId) {
           logTestStep('discover trace id from the trace feed', testsLogger);
-          const traces = await runtime.getProfiler().list();
+          const traces = expectResult(
+            await runtime.getProfiler().list(),
+            'traces',
+          );
           expect(Array.isArray(traces)).toBe(true);
 
           // Newest by timestamp. Position in the feed is NOT age — measured,
@@ -536,9 +550,12 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
         // fallback empty result the parser used to invent from an unreadable
         // body. A real trace has rows, and a row has the fields the contract
         // names — that is what proves the document was understood.
-        const hitlist = await runtime
-          .getProfiler()
-          .read(traceId, 'hitlist', { withSystemEvents: false });
+        const hitlist = expectResult(
+          await runtime
+            .getProfiler()
+            .read(traceId, 'hitlist', { withSystemEvents: false }),
+          'hitlist',
+        );
         expect(hitlist.entries.length).toBeGreaterThan(0);
         expect(typeof hitlist.entries[0]?.index).toBe('number');
 
@@ -546,22 +563,31 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
           `read trace hitlist with system events for ${traceId}`,
           testsLogger,
         );
-        const hitlistWithEvents = await runtime
-          .getProfiler()
-          .read(traceId, 'hitlist', { withSystemEvents: true });
+        const hitlistWithEvents = expectResult(
+          await runtime
+            .getProfiler()
+            .read(traceId, 'hitlist', { withSystemEvents: true }),
+          'hitlistWithEvents',
+        );
         expect(Array.isArray(hitlistWithEvents.entries)).toBe(true);
 
         logTestStep(`read trace statements for ${traceId}`, testsLogger);
-        const statements = await runtime
-          .getProfiler()
-          .read(traceId, 'statements', { withSystemEvents: false });
+        const statements = expectResult(
+          await runtime
+            .getProfiler()
+            .read(traceId, 'statements', { withSystemEvents: false }),
+          'statements',
+        );
         expect(statements.statements.length).toBeGreaterThan(0);
         expect(typeof statements.statements[0]?.id).toBe('string');
 
         logTestStep(`read trace db accesses for ${traceId}`, testsLogger);
-        const dbAccesses = await runtime
-          .getProfiler()
-          .read(traceId, 'dbAccesses', { withSystemEvents: false });
+        const dbAccesses = expectResult(
+          await runtime
+            .getProfiler()
+            .read(traceId, 'dbAccesses', { withSystemEvents: false }),
+          'dbAccesses',
+        );
         expect(Array.isArray(dbAccesses.accesses)).toBe(true);
 
         logTestStep(

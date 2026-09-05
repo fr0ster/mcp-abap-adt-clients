@@ -3,6 +3,7 @@ import type {
   ICapabilityContext,
   ILockStrategy,
 } from '../../../../core/shared/capabilities/types';
+import { expectResult } from '../../../helpers/contract';
 
 type Cfg = { name?: string };
 
@@ -46,7 +47,10 @@ describe('LockCapability', () => {
   it('unlock is stateful during release, restores stateless, returns state', async () => {
     const ctx = fakeCtx();
     const cap = new LockCapability<Cfg, State>(() => ctx, strategy);
-    const state = await cap.unlock({ name: 'ZFOO' }, 'H1');
+    const state = expectResult(
+      await cap.unlock({ name: 'ZFOO' }, 'H1'),
+      'state',
+    );
     // stateful BEFORE the UNLOCK (older BASIS), stateless AFTER.
     expect(ctx.calls).toEqual([
       'session:stateful',

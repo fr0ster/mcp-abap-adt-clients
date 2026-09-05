@@ -19,6 +19,7 @@ import type { IAccessControlConfig } from '../../../../core/accessControl';
 import { getAccessControl } from '../../../../core/accessControl/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -271,9 +272,12 @@ describe('AccessControl (using AdtClient)', () => {
         }
 
         try {
-          const resultState = await tester.readTest({
-            accessControlName: accessControlName,
-          });
+          const resultState = expectResult(
+            await tester.readTest({
+              accessControlName: accessControlName,
+            }),
+            'resultState',
+          );
           if (!resultState) {
             logTestSkip(
               testsLogger,
@@ -282,7 +286,7 @@ describe('AccessControl (using AdtClient)', () => {
             );
             return;
           }
-          expect(resultState.readResult).toBeDefined();
+          expect(resultState).toBeDefined();
 
           logTestSuccess(testsLogger, 'AccessControl - read standard object');
         } catch (error: any) {

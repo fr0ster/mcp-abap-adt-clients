@@ -3,6 +3,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
 import { AdtScalarFunction } from '../../../../core/scalarFunction/AdtScalarFunction';
+import { expectResult } from '../../../helpers/contract';
 
 type Call = { url: string; method?: string };
 function makeConn(handler: (r: any) => Partial<IAdtWireResponse> | Error) {
@@ -60,7 +61,10 @@ describe('AdtScalarFunction handler', () => {
       Object.assign(new Error('nope'), { response: { status: 405 } }),
     );
     const sf = new AdtScalarFunction(conn);
-    const state = await sf.validate({ scalarFunctionName: 'ZOK_F' });
+    const state = expectResult(
+      await sf.validate({ scalarFunctionName: 'ZOK_F' }),
+      'state',
+    );
     expect(state.validationSupported).toBe(false);
     expect(state.errors).toHaveLength(0);
   });

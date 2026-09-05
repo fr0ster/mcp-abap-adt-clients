@@ -31,6 +31,7 @@ import type { AdtClient } from '../../../../clients/AdtClient';
 import { getIncludeSource } from '../../../../core/include';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -255,9 +256,12 @@ describe('Include (PROG/I, using AdtClient)', () => {
         });
 
         try {
-          const state = await client
-            .getInclude()
-            .readMetadata({ includeName: standard.name });
+          const state = expectResult(
+            await client
+              .getInclude()
+              .readMetadata({ includeName: standard.name }),
+            'state',
+          );
           const body = String((state?.readResult as any)?.data ?? '');
 
           // The whole reason this is a separate module: an include answers with

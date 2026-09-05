@@ -15,6 +15,7 @@ import type { AdtClient } from '../../../../clients/AdtClient';
 import { AdtExecutor } from '../../../../clients/AdtExecutor';
 import { AdtRuntimeClient } from '../../../../clients/AdtRuntimeClient';
 import type { IProfilerTraceParameters } from '../../../../runtime/traces';
+import { expectResult } from '../../../helpers/contract';
 import { resolveRunnableClassName } from '../../../helpers/runnableClassHelper';
 import {
   createTestAdtClient,
@@ -257,13 +258,15 @@ describe('ClassExecutor (integration)', () => {
       try {
         const className = sharedRunnableClass(testCase);
         logTestStep('run', testsLogger);
-        const response = await runClassWithReadinessRetry(className);
+        const response = expectResult(
+          await runClassWithReadinessRetry(className),
+          'response',
+        );
 
-        expect(response.status).toBe(200);
-        expect(response.data).toBeDefined();
-        const runOutput = String(response.data);
+        expect(response).toBeDefined();
+        const runOutput = String(response);
         expectRunnableRunOutput(runOutput);
-        logTestStep(`run output: ${toShortText(response.data)}`, testsLogger);
+        logTestStep(`run output: ${toShortText(response)}`, testsLogger);
 
         logTestSuccess(testsLogger, testName);
       } catch (error) {
@@ -332,10 +335,13 @@ describe('ClassExecutor (integration)', () => {
         const before = await traceIdsNow(profiler);
 
         logTestStep('schedule a trace + run with profiler', testsLogger);
-        let result = await executor
-          .getClassExecutor()
-          .runWithProfiling({ className }, { profilerParameters });
-        if (isMissingClassRunMainMessage(result.response.data)) {
+        let result = expectResult(
+          await executor
+            .getClassExecutor()
+            .runWithProfiling({ className }, { profilerParameters }),
+          'result',
+        );
+        if (isMissingClassRunMainMessage(result.response)) {
           await client.getClass().read({ className }, 'active', {
             withLongPolling: true,
           });
@@ -347,7 +353,7 @@ describe('ClassExecutor (integration)', () => {
         }
 
         expect(result.response.status).toBe(200);
-        const runOutput = String(result.response.data);
+        const runOutput = String(result.response);
         expectRunnableRunOutput(runOutput);
         expect(result.profilerId).toContain(
           '/sap/bc/adt/runtime/traces/abaptraces/parameters/',
@@ -355,10 +361,7 @@ describe('ClassExecutor (integration)', () => {
         // The run promises no trace, so the result must not carry one.
         expect(result).not.toHaveProperty('traceId');
 
-        logTestStep(
-          `run output: ${toShortText(result.response.data)}`,
-          testsLogger,
-        );
+        logTestStep(`run output: ${toShortText(result.response)}`, testsLogger);
 
         logTestStep('wait for the trace this run produced', testsLogger);
         const traceId = await waitForNewTrace(profiler, before, {
@@ -371,15 +374,24 @@ describe('ClassExecutor (integration)', () => {
         tracesCreated.push(traceId);
 
         logTestStep('read all three views', testsLogger);
-        const hitlist = await profiler.read(traceId, 'hitlist', {
-          withSystemEvents: false,
-        });
-        const statements = await profiler.read(traceId, 'statements', {
-          withSystemEvents: false,
-        });
-        const dbAccesses = await profiler.read(traceId, 'dbAccesses', {
-          withSystemEvents: false,
-        });
+        const hitlist = expectResult(
+          await profiler.read(traceId, 'hitlist', {
+            withSystemEvents: false,
+          }),
+          'hitlist',
+        );
+        const statements = expectResult(
+          await profiler.read(traceId, 'statements', {
+            withSystemEvents: false,
+          }),
+          'statements',
+        );
+        const dbAccesses = expectResult(
+          await profiler.read(traceId, 'dbAccesses', {
+            withSystemEvents: false,
+          }),
+          'dbAccesses',
+        );
 
         // Parsed, not a status code: a 200 carrying an unparseable body used to
         // pass here, and the whole point of the typed views is that it no

@@ -4,6 +4,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { AdtMessageClass } from '../../core/messageClass/AdtMessageClass';
 import { noopLogger } from '../../utils/noopLogger';
+import { expectResult } from '../helpers/contract';
 
 const CLASS_XML = `<?xml version="1.0"?><mc:messageClass xmlns:mc="http://www.sap.com/adt/MessageClass" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZT" adtcore:type="MSAG/N" adtcore:description="D"><adtcore:packageRef adtcore:name="ZP"/></mc:messageClass>`;
 const CLASS_XML_WITH_MSG = `<?xml version="1.0"?><mc:messageClass xmlns:mc="http://www.sap.com/adt/MessageClass" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZT" adtcore:type="MSAG/N" adtcore:description="OLD"><adtcore:packageRef adtcore:name="ZP"/><mc:messages mc:msgno="001" mc:msgtext="Hello"/></mc:messageClass>`;
@@ -211,7 +212,7 @@ describe('AdtMessageClass', () => {
       ),
       noopLogger,
     );
-    const st = await mc.read({ name: 'ZT' });
+    const st = expectResult(await mc.read({ name: 'ZT' }), 'st');
     expect(st?.messageClass?.name).toBe('ZT');
   });
 

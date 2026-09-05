@@ -19,6 +19,7 @@ import type { IInterfaceConfig } from '../../../../core/interface';
 import { getInterface } from '../../../../core/interface/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -216,11 +217,14 @@ describe('Interface (using AdtClient)', () => {
         }
 
         try {
-          const resultState = await tester.readTest({
-            interfaceName: standardInterfaceName,
-          });
-          expect(resultState?.readResult).toBeDefined();
-          const interfaceConfig = resultState?.readResult;
+          const resultState = expectResult(
+            await tester.readTest({
+              interfaceName: standardInterfaceName,
+            }),
+            'resultState',
+          );
+          expect(resultState).toBeDefined();
+          const interfaceConfig = resultState;
           if (
             interfaceConfig &&
             typeof interfaceConfig === 'object' &&

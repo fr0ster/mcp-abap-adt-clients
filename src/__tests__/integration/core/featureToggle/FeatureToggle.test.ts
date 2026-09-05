@@ -22,6 +22,7 @@ import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IFeatureToggleObject } from '../../../../core/featureToggle';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -499,22 +500,21 @@ describe('FeatureToggle (using AdtClient)', () => {
           testCase?.params?.transport_request,
         );
         const handler: IFeatureToggleObject = client.getFeatureToggle();
-        const onState = await handler.switchOn(
-          { featureToggleName },
-          { transportRequest },
+        const onState = expectResult(
+          await handler.switchOn({ featureToggleName }, { transportRequest }),
+          'onState',
         );
         expect(
-          onState.runtimeState?.clientState === 'on' ||
-            onState.runtimeState?.clientState === 'undefined',
+          onState?.clientState === 'on' || onState?.clientState === 'undefined',
         ).toBe(true);
 
-        const offState = await handler.switchOff(
-          { featureToggleName },
-          { transportRequest },
+        const offState = expectResult(
+          await handler.switchOff({ featureToggleName }, { transportRequest }),
+          'offState',
         );
         expect(
-          offState.runtimeState?.clientState === 'off' ||
-            offState.runtimeState?.clientState === 'undefined',
+          offState?.clientState === 'off' ||
+            offState?.clientState === 'undefined',
         ).toBe(true);
       },
       getTimeout('test'),

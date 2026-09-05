@@ -20,6 +20,7 @@ import type {
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -174,11 +175,12 @@ describe('AdtRequest', () => {
 
         try {
           logTestStep('create', testsLogger);
-          const createState = await client
-            .getRequest()
-            .create(buildConfig(testCase) as any);
+          const createState = expectResult(
+            await client.getRequest().create(buildConfig(testCase) as any),
+            'createState',
+          );
 
-          expect(createState.createResult).toBeDefined();
+          expect(createState).toBeDefined();
           expect(createState.transportNumber).toBeDefined();
           expect(createState.errors.length).toBe(0);
 
@@ -215,16 +217,22 @@ describe('AdtRequest', () => {
           if (transportNumber) {
             try {
               logTestStep('read', testsLogger);
-              const readState = await client.getRequest().read({
-                transportNumber,
-              });
+              const readState = expectResult(
+                await client.getRequest().read({
+                  transportNumber,
+                }),
+                'readState',
+              );
               expect(readState).toBeDefined();
-              expect(readState?.readResult).toBeDefined();
-              const metadataState = await client.getRequest().readMetadata({
-                transportNumber,
-              });
+              expect(readState).toBeDefined();
+              const metadataState = expectResult(
+                await client.getRequest().readMetadata({
+                  transportNumber,
+                }),
+                'metadataState',
+              );
               expect(metadataState).toBeDefined();
-              expect(metadataState.readResult).toBeDefined();
+              expect(metadataState).toBeDefined();
             } catch (readError: any) {
               testsLogger.warn?.(
                 `Failed to read transport ${transportNumber}:`,
@@ -280,9 +288,10 @@ describe('AdtRequest', () => {
           if (testCase) {
             try {
               logTestStep('create (discriminator transport)', testsLogger);
-              const createState = await client
-                .getRequest()
-                .create(buildConfig(testCase) as any);
+              const createState = expectResult(
+                await client.getRequest().create(buildConfig(testCase) as any),
+                'createState',
+              );
               knownTransportNumber = createState.transportNumber || null;
             } catch (createError: any) {
               testsLogger.warn?.(
@@ -294,12 +303,15 @@ describe('AdtRequest', () => {
           }
 
           logTestStep('list', testsLogger);
-          const listState = await client.getRequest().list();
+          const listState = expectResult(
+            await client.getRequest().list(),
+            'listState',
+          );
 
           expect(listState.errors.length).toBe(0);
-          expect(listState.listResult).toBeDefined();
+          expect(listState).toBeDefined();
 
-          const body = String(listState.listResult?.data ?? '');
+          const body = String(listState ?? '');
           expect(body).toContain('tm:root');
 
           const requestCount = (body.match(/<tm:request /g) ?? []).length;

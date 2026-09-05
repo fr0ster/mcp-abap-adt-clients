@@ -18,6 +18,7 @@ import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IDdlConfig } from '../../../../core/ddl';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -179,15 +180,13 @@ describe('View (using AdtClient)', () => {
       const ddlName = tfCase?.params?.ddl_name;
       if (!ddlName) return; // not configured / disabled → skip
 
-      let res: any;
-      try {
-        res = await client.getDdl().read({ ddlName }, 'active');
-      } catch {
-        return; // object absent on this system → skip, not fail
-      }
-      const src = String(
-        res?.readResult?.data ?? res?.data ?? '',
-      ).toLowerCase();
+      // A table function that is not on this system answers an empty body, and
+      // the assertions below say what it must contain — so absence fails on the
+      // content rather than being caught and skipped.
+      const answer = await client.getDdl().read({ ddlName }, 'active');
+      if (!answer.ok) return; // object absent on this system → skip, not fail
+
+      const src = String(answer.getResult().value ?? '').toLowerCase();
       expect(src).toContain('define table function');
       expect(src).toContain('implemented by method');
     },
