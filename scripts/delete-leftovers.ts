@@ -37,6 +37,8 @@ const KNOWN: Record<
 > = {
   ZAC_INNER_PKG03: (client) =>
     client.getPackage().delete({ packageName: 'ZAC_INNER_PKG03' }),
+  ZAC_INNER_PKG04: (client) =>
+    client.getPackage().delete({ packageName: 'ZAC_INNER_PKG04' }),
   ZAC_SRVD01: (client) =>
     client
       .getServiceDefinition()

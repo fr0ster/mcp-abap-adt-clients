@@ -13,10 +13,10 @@ import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IPackageConfig } from '../../../../core/package';
 import { deletePackage } from '../../../../core/package/delete';
-import { getPackage } from '../../../../core/package/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { expectResult } from '../../../helpers/contract';
+import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -155,28 +155,40 @@ describe('Package (using AdtClient)', () => {
           // If some system does show the delete failing from the creating
           // session, it comes back as `recycleTestSession(connection)` —
           // replacing the run's one session, never opening a second beside it.
-          await deletePackage(connection, {
-            package_name: cfg.packageName,
-            transport_request: cfg.transportRequest,
-          });
+          // Through the handler, not the low-level writer. The writer hands
+          // the document on and says nothing about it — the verdict belongs to
+          // `packageDeletionRefusal`, and only `delete()` applies it. Calling
+          // the writer here made a refused delete silent: the run before this
+          // one passed this flow and left ZAC_INNER_PKG04 behind, which is what
+          // the next run's setup then refused to work against.
+          expectResult(
+            await client.getPackage().delete({
+              packageName: cfg.packageName,
+              transportRequest: cfg.transportRequest,
+            }),
+            `delete package ${cfg.packageName}`,
+          );
         },
         ensureObjectReady: async (packageName: string) => {
-          if (!connection) return { success: true };
-          try {
-            await getPackage(connection, packageName);
+          if (!connection || !client) return { success: true };
+          // The answer decides — see `presenceOf`. "Could not find out" stays
+          // apart from "it is not there": creating over a package that may be
+          // there is the irreversible half of that guess.
+          const presence = presenceOf(
+            await client.getPackage().read({ packageName }),
+            `package ${packageName}`,
+          );
+          if (presence.present === 'unknown') {
+            return { success: false, reason: `⚠️ SAFETY: ${presence.reason}` };
+          }
+          if (presence.present) {
             return {
               success: false,
               objectExists: true,
               reason: `⚠️ SAFETY: Package ${packageName} already exists!`,
             };
-          } catch (error: any) {
-            const status = error.response?.status;
-            if (status === 404) return { success: true };
-            return {
-              success: false,
-              reason: `⚠️ SAFETY: Cannot verify package ${packageName} doesn't exist (HTTP ${status})`,
-            };
           }
+          return { success: true };
         },
       });
     } catch (error) {
@@ -187,53 +199,6 @@ describe('Package (using AdtClient)', () => {
   });
 
   afterAll(() => tester?.afterAll()());
-
-  /**
-   * Pre-check: Verify test package doesn't exist
-   * Safety: Skip test if object exists to avoid accidental deletion
-   */
-  async function _ensurePackageReady(
-    packageName: string,
-  ): Promise<{ success: boolean; reason?: string }> {
-    if (!connection) {
-      return { success: true };
-    }
-
-    // Check if package exists
-    try {
-      await getPackage(connection, packageName);
-      // Package exists - skip test for safety
-      return {
-        success: false,
-        reason:
-          `⚠️ SAFETY: Package ${packageName} already exists! ` +
-          `Delete manually or use different test name to avoid accidental deletion.`,
-      };
-    } catch (error: any) {
-      const status = error.response?.status;
-
-      // 404 is expected - object doesn't exist, we can proceed
-      if (status === 404) {
-        return { success: true };
-      }
-
-      // Any other error (including locked state) means package might exist
-      // Better to skip test for safety
-      const errorMsg = error.message || 'Unknown error';
-      if (debugEnabled) {
-        libraryLogger.warn?.(
-          `[PRE-CHECK] Package ${packageName} check failed with status ${status}: ${errorMsg}`,
-        );
-      }
-
-      return {
-        success: false,
-        reason:
-          `⚠️ SAFETY: Cannot verify package ${packageName} doesn't exist (HTTP ${status}). ` +
-          `May be locked or inaccessible. Delete/unlock manually to proceed.`,
-      };
-    }
-  }
 
   describe('Full workflow', () => {
     beforeEach(() => tester?.beforeEach()());
