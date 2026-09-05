@@ -1,23 +1,29 @@
 /**
- * `search` is one member over one endpoint, and the caller may read the answer.
+ * `search` is one member over one endpoint, and the reading is the caller's.
  *
  * The old shape had two members over `/repository/informationsystem/search` —
- * `searchObjects` handing back the envelope and `search` handing back the hits —
- * which made "how far the answer was parsed" a property of which method was
- * called rather than of the contract. `IAdtInformationSystem` therefore names one
- * member with a strategy overload, and these cases assert the two things a
- * consumer moving off `searchObjects` depends on:
+ * `searchObjects` handing back the envelope and `search` handing back the hits
+ * — and then `search` itself took a `parse` argument. "How far the answer was
+ * parsed" was therefore a property of which method you called and what you
+ * passed it, rather than of the implementation you were handed.
  *
- * - the parser is handed the **raw body**, untouched, not a re-serialised parse;
- * - the same request goes out either way, so choosing the strategy changes the
- *   reading and nothing else.
+ * 31.0.0 removed both. The reading is injected once, when the implementation is
+ * built, and these cases assert the two things a consumer moving off the old
+ * shape depends on:
  *
- * The second is the one worth a test. A strategy that quietly issued a different
+ * - an injected reading is handed the **raw body**, untouched, not a
+ *   re-serialised parse;
+ * - the same request goes out either way, so the reading changes what comes
+ *   back and nothing else.
+ *
+ * The second is the one worth a test. A reading that quietly issued a different
  * request would still return the caller's type and still compile.
  */
 
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import { AdtUtils } from '../../../core/shared/AdtUtils';
+import { utilDocuments } from '../../../core/shared/utilResultSet';
+import { expectResult } from '../../helpers/contract';
 
 const SEARCH_XML =
   '<?xml version="1.0" encoding="utf-8"?>' +
@@ -53,54 +59,54 @@ const logger = {
   debug: jest.fn(),
 } as unknown as ILogger;
 
-describe('AdtUtils.search — one endpoint, the reading chosen by the caller', () => {
-  it('hands the parser the raw body, and returns what the parser returned', async () => {
+describe('AdtUtils.search — one endpoint, the reading injected once', () => {
+  it('hands an injected reading the raw body, and answers what it returned', async () => {
     const { connection } = createConnection();
 
     const seen: unknown[] = [];
-    const result = await new AdtUtils(connection, logger).search(
-      { query: 'ZCL_*' },
-      (data) => {
-        seen.push(data);
-        return { length: String(data).length };
+    const utils = new AdtUtils(connection, logger, {
+      ...utilDocuments,
+      search: (answer) => {
+        seen.push(answer.data);
+        return { length: String(answer.data).length };
       },
+    });
+
+    const value = expectResult(
+      await utils.search({ query: 'ZCL_*' }),
+      'search',
     );
 
     // Untouched: the document the server sent, not a parse of it re-emitted.
     expect(seen).toEqual([SEARCH_XML]);
-    expect(result.ok).toBe(true);
-    if (!result.ok) throw new Error('expected a result');
-    expect(result.getResult().value).toEqual({ length: SEARCH_XML.length });
+    expect(value).toEqual({ length: SEARCH_XML.length });
   });
 
-  it('issues the same request with the strategy as without it', async () => {
-    const withParser = createConnection();
-    await new AdtUtils(withParser.connection, logger).search(
-      { query: 'ZCL_*' },
-      (data) => String(data),
-    );
+  it('issues the same request whichever reading it was built with', async () => {
+    const injected = createConnection();
+    await new AdtUtils(injected.connection, logger, {
+      ...utilDocuments,
+      search: (answer) => String(answer.data),
+    }).search({ query: 'ZCL_*' });
 
-    const withoutParser = createConnection();
-    await new AdtUtils(withoutParser.connection, logger).search({
-      query: 'ZCL_*',
-    });
+    const shipped = createConnection();
+    await new AdtUtils(shipped.connection, logger).search({ query: 'ZCL_*' });
 
-    expect(withParser.sent).toHaveLength(1);
-    // The choice is about reading the answer. If these ever diverge, the
-    // overload has become a second capability wearing one name.
-    expect(withParser.sent).toEqual(withoutParser.sent);
+    expect(injected.sent).toHaveLength(1);
+    // The reading is about the answer. If these ever diverge, it has become a
+    // second capability wearing one name.
+    expect(injected.sent).toEqual(shipped.sent);
   });
 
-  it('without a parser still answers the parsed hits', async () => {
+  it('the shipped reading answers the parsed hits', async () => {
     const { connection } = createConnection();
 
-    const hits = await new AdtUtils(connection, logger).search({
-      query: 'ZCL_*',
-    });
+    const hits = expectResult(
+      await new AdtUtils(connection, logger).search({ query: 'ZCL_*' }),
+      'search',
+    );
 
-    expect(hits.ok).toBe(true);
-    if (!hits.ok) throw new Error('expected a result');
-    expect(hits.getResult().value).toEqual([
+    expect(hits).toEqual([
       expect.objectContaining({ name: 'ZCL_A', type: 'CLAS/OC' }),
     ]);
   });

@@ -20,6 +20,7 @@
 
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import { AdtUtils } from '../../../core/shared/AdtUtils';
+import { utilDocuments } from '../../../core/shared/utilResultSet';
 import { AdtSAPError } from '../../../utils/adtErrors';
 import { orThrow } from '../../../utils/adtResponse';
 
@@ -214,21 +215,28 @@ describe('200 with a genuinely empty result stays an empty result', () => {
   });
 });
 
-describe('a strategy must not become a place a refusal can hide', () => {
-  it('never runs the parser on an exception document', async () => {
-    const utils = new AdtUtils(connectionAnswering(200, EXCEPTION_XML), logger);
-
+describe('a reading must not become a place a refusal can hide', () => {
+  it('never runs the reading on an exception document', async () => {
     const seen: unknown[] = [];
-    const response = await utils.search({ query: 'Z*' }, (data) => {
-      seen.push(data);
-      return String(data);
-    });
+    const utils = new AdtUtils(
+      connectionAnswering(200, EXCEPTION_XML),
+      logger,
+      {
+        ...utilDocuments,
+        search: (answer) => {
+          seen.push(answer.data);
+          return String(answer.data);
+        },
+      },
+    );
 
-    // The parser is not called at all. Handing it the refusal would look
-    // harmless — the document arrives — but a parser looking for hits in an
-    // exception document finds none and answers "nothing found". The strategy is
-    // there to control how much of a large answer the caller takes, not to
-    // decide whether the request was refused.
+    const response = await utils.search({ query: 'Z*' });
+
+    // The reading is not called at all. Handing it the refusal would look
+    // harmless — the document arrives — but a reading looking for hits in an
+    // exception document finds none and answers "nothing found". The two axes
+    // are separate on purpose: `analyse` decides whether this is a failure, and
+    // only then does a reading get to say what the answer becomes.
     expect(seen).toEqual([]);
     expect(response.ok).toBe(false);
     if (response.ok) throw new Error('expected a failure');
@@ -238,11 +246,12 @@ describe('a strategy must not become a place a refusal can hide', () => {
 
   it('still hands over a real answer untouched', async () => {
     const document = '<adtcore:objectReferences/>';
-    const utils = new AdtUtils(connectionAnswering(200, document), logger);
+    const utils = new AdtUtils(connectionAnswering(200, document), logger, {
+      ...utilDocuments,
+      search: (answer) => String(answer.data),
+    });
 
-    const response = await utils.search({ query: 'Z*' }, (data) =>
-      String(data),
-    );
+    const response = await utils.search({ query: 'Z*' });
     expect(response.ok).toBe(true);
     if (!response.ok) throw new Error('expected a result');
     expect(response.getResult().value).toBe(document);
