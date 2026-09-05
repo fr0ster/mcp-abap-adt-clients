@@ -90,10 +90,41 @@ describe('AdtRequest', () => {
   });
 
   afterAll(async () => {
+    // Outermost, and before the connection goes back: an inner `describe`'s
+    // `afterAll` runs when that block finishes, so a cleanup placed there ran
+    // before the later blocks had created anything — measured, one of three
+    // transports deleted.
+    //
+    // They *can* be deleted, and this suite is why the system had nine of them.
+    // "Transports cannot be deleted, so no cleanup needed" is what stood here,
+    // and it is not true: ADT deletes an EMPTY request, which is what these are
+    // — created, read, never written to.
+    //
+    // A refusal is logged, not thrown: cleanup must not turn a green run red,
+    // and a request that holds objects is the server protecting them.
+    for (const number of createdTransports) {
+      const answer = await client
+        .getRequest()
+        .delete({ transportNumber: number });
+      if (answer.ok) {
+        testsLogger.info?.(`Deleted test transport ${number}`);
+      } else {
+        testsLogger.warn?.(
+          `Could not delete test transport ${number}: ${answer.getError().message}`,
+        );
+      }
+    }
+    createdTransports.length = 0;
+
     if (connection) {
       await releaseTestConnection(connection);
     }
   });
+
+  /**
+   * Every transport this suite created, so `afterAll` can take them back out.
+   */
+  const createdTransports: string[] = [];
 
   function getTestDefinition() {
     return getTestCaseDefinition('create_transport', 'builder_transport');
@@ -140,15 +171,6 @@ describe('AdtRequest', () => {
       }
 
       testCase = tc;
-      // Transports are created dynamically, no cleanup needed
-    });
-
-    afterAll(async () => {
-      // Transports cannot be deleted, so no cleanup needed
-      // Just log if needed
-      testsLogger.debug?.(
-        '[BUILDER TESTS] Transport was created (cannot be deleted)',
-      );
     });
 
     it(
@@ -184,6 +206,7 @@ describe('AdtRequest', () => {
           expect(created.transportNumber).toMatch(/\S/);
 
           transportNumber = created.transportNumber || null;
+          if (transportNumber) createdTransports.push(transportNumber);
 
           logTestSuccess(testsLogger, 'AdtRequest - full workflow');
         } catch (error: any) {
@@ -292,6 +315,9 @@ describe('AdtRequest', () => {
                 'createState',
               );
               knownTransportNumber = createState.transportNumber || null;
+              if (knownTransportNumber) {
+                createdTransports.push(knownTransportNumber);
+              }
             } catch (createError: any) {
               testsLogger.warn?.(
                 'Could not create a discriminator transport for the list ' +
