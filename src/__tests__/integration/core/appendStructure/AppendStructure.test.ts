@@ -268,15 +268,12 @@ describe('AppendStructure (TABL/DS) integration', () => {
             //   }
             //
             // Assert the field actually arrived.
-            const readState = expectResult(
+            const writtenSource = expectResult(
               await as.read({ appendStructureName }, 'active'),
-              'readState',
+              'read append structure source',
             );
-            expect(typeof readState).toBe('string');
+            expect(typeof writtenSource).toBe('string');
 
-            const writtenSource = String(
-              (readState as { data?: unknown })?.data ?? '',
-            );
             const fieldName = /^\s*(zz_\w+)\s*:/m.exec(source)?.[1];
             expect(fieldName).toBeDefined();
             expect(writtenSource).toContain(fieldName as string);

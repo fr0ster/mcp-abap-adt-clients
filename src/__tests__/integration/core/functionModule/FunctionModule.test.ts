@@ -303,12 +303,10 @@ describe('FunctionModule (using AdtClient)', () => {
             functionModuleName: standardFunctionModuleName,
             functionGroupName: standardFunctionGroupName,
           });
-          expect(resultState).toBeDefined();
-          const sourceCode =
-            typeof resultState === 'string'
-              ? resultState
-              : (resultState as any)?.data || '';
-          expect(typeof sourceCode).toBe('string');
+          // `readTest` unwraps the contract, so this is the document itself —
+          // the `.data` fallback beside it was reaching into an envelope that
+          // no longer arrives.
+          expect(typeof resultState).toBe('string');
 
           logTestSuccess(testsLogger, 'FunctionModule - read standard object');
         } catch (error: any) {

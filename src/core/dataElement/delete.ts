@@ -99,14 +99,10 @@ export async function deleteDataElement(
     headers,
   });
 
-  return {
-    ...response,
-    data: {
-      success: true,
-      data_element_name,
-      object_uri: objectUri,
-      transport_request: transport_request || 'local',
-      message: `Data element ${data_element_name} deleted successfully`,
-    },
-  } as IAdtWireResponse;
+  // The response, as it arrived. This used to replace the server's document
+  // with `{ success: true, …, message: '… deleted successfully' }` — prose this
+  // library wrote about a call it had not read, handed to a caller in place of
+  // what SAP said. What a caller wants out of the answer is the reading's
+  // question; the writer's job is to hand the answer over.
+  return response;
 }

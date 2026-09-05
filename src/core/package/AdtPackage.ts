@@ -41,7 +41,11 @@ import {
 import type { IReadOptions } from '../shared/types';
 import { checkPackage } from './check';
 import { createPackage } from './create';
-import { checkPackageDeletion, deletePackage } from './delete';
+import {
+  checkPackageDeletion,
+  deletePackage,
+  packageDeletionRefusal,
+} from './delete';
 import { lockPackage } from './lock';
 import { getPackage, getPackageTransport } from './read';
 import {
@@ -483,8 +487,11 @@ export class AdtPackage<
             }),
           this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
           // `isDeleted="false"` with PAK/058 arrives inside a 200, so the
-          // document decides here as it does for the check.
-          options?.analyse ?? deletionRefusal,
+          // document decides here too — but it is a *deletion* result, whose
+          // verdict is `del:isDeleted`. `deletionRefusal` reads a check's
+          // `del:isDeletable`, found none, and reported every successful
+          // package delete as a refusal.
+          options?.analyse ?? packageDeletionRefusal,
         ),
       );
       this.logger?.info?.('Package deleted');

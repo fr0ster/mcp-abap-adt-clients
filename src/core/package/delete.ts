@@ -3,11 +3,14 @@
  */
 
 import type {
+  AdtNoFailure,
   HttpError,
   IAbapConnection,
+  IAdtError,
   IAdtWireResponse,
   IDeletePackageParams,
 } from '@mcp-abap-adt/interfaces';
+import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
 import {
   ACCEPT_DELETION,
@@ -97,6 +100,76 @@ export function parsePackageDeletionCheck(response: IAdtWireResponse): {
 }
 
 /**
+ * The verdict a package **deletion** carries, as an error strategy.
+ *
+ * Not {@link deletionRefusal}: that reads a *check* response, whose verdict is
+ * `del:isDeletable`. A deletion answers `del:deletionResult` with
+ * `del:isDeleted`, and running the check parser over it found no `isDeletable`
+ * at all — so a successful delete was reported as a refusal, on the one handler
+ * that used it for both steps.
+ *
+ * The message id travels in the longtext link — `…/messageclass/PAK/messages/
+ * 058/longtext?…` for "package is already locked" — and is the only part that
+ * does not change with the logon language, so it is carried into the message a
+ * caller reads.
+ */
+export const packageDeletionRefusal = (
+  verdict: IAdtError | AdtNoFailure,
+  answer?: IAdtWireResponse,
+): IAdtError | AdtNoFailure => {
+  if (verdict !== ADT_NO_FAILURE) return verdict;
+
+  const xml = typeof answer?.data === 'string' ? answer.data : '';
+  // Nothing to read is not a refusal. ADT answers some deletions with an empty
+  // body, and inventing a "no" from silence is what the check parser did here.
+  if (!xml.trim()) return ADT_NO_FAILURE;
+
+  let deleteObject: Record<string, unknown> | undefined;
+  try {
+    const parsed = new XMLParser({
+      ignoreAttributes: false,
+      attributeNamePrefix: '@_',
+    }).parse(xml) as Record<string, Record<string, unknown>>;
+    deleteObject = (parsed['del:deletionResult']?.['del:object'] ??
+      parsed.deletionResult?.object) as Record<string, unknown> | undefined;
+  } catch {
+    // A body that will not parse says nothing about the deletion either.
+    return ADT_NO_FAILURE;
+  }
+
+  if (!deleteObject) return ADT_NO_FAILURE;
+  const isDeleted =
+    deleteObject['@_del:isDeleted'] === 'true' ||
+    deleteObject['@_isDeleted'] === 'true';
+  if (isDeleted) return ADT_NO_FAILURE;
+
+  const messageNode = (deleteObject['del:message'] ??
+    deleteObject.message ??
+    {}) as Record<string, unknown>;
+  const text =
+    (messageNode['del:text'] as string) ??
+    (messageNode.text as string) ??
+    'Deletion failed';
+  const longtext =
+    ((messageNode['atom:link'] as Record<string, unknown>)?.['@_href'] as
+      | string
+      | undefined) ??
+    ((messageNode.link as Record<string, unknown>)?.['@_href'] as
+      | string
+      | undefined);
+  const id =
+    typeof longtext === 'string'
+      ? /messageclass\/([A-Z0-9_]+)\/messages\/(\d+)/i.exec(longtext)
+      : null;
+
+  return {
+    origin: 'refusal',
+    message: `Package deletion failed${id ? ` [${id[1]}/${id[2]}]` : ''}: ${text}`,
+    response: answer,
+  };
+};
+
+/**
  * Delete ABAP package using ADT deletion API
  * For packages, empty transportNumber tag may be required
  */
@@ -143,64 +216,10 @@ export async function deletePackage(
     headers,
   });
 
-  // Parse response to check if deletion was successful
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: '@_',
-  });
-
-  try {
-    const result = parser.parse(response.data);
-    const deleteObject =
-      result['del:deletionResult']?.['del:object'] ||
-      result.deletionResult?.object;
-    const isDeleted =
-      deleteObject?.['@_del:isDeleted'] === 'true' ||
-      deleteObject?.['@_isDeleted'] === 'true';
-
-    if (!isDeleted) {
-      const messageNode =
-        deleteObject?.['del:message'] || deleteObject?.message || {};
-      const message =
-        messageNode['del:text'] || messageNode.text || 'Deletion failed';
-      // The message id travels in the longtext link — `…/messageclass/PAK/
-      // messages/058/longtext?…` for "package is already locked" — and it is
-      // the only part of this that does not change with the logon language.
-      // Carried into the error so a caller can act on the id rather than on
-      // English prose.
-      const longtext =
-        messageNode['atom:link']?.['@_href'] || messageNode.link?.['@_href'];
-      const id =
-        typeof longtext === 'string'
-          ? /messageclass\/([A-Z0-9_]+)\/messages\/(\d+)/i.exec(longtext)
-          : null;
-      const idPart = id ? ` [${id[1]}/${id[2]}]` : '';
-      throw new Error(`Package deletion failed${idPart}: ${message}`);
-    }
-  } catch (error: unknown) {
-    const e = error as HttpError;
-    // If parsing fails or isDeleted is false, throw error
-    if (e.message?.includes('Package deletion failed')) {
-      throw error;
-    }
-    // If it's a parse error, check HTTP status
-    if (response.status >= 400) {
-      throw new Error(
-        `Package deletion failed: HTTP ${response.status} ${response.statusText}`,
-      );
-    }
-  }
-
-  // Return success response
-  return {
-    ...response,
-    data: {
-      success: true,
-      package_name: params.package_name,
-      object_type: 'DEVC/K',
-      object_uri: objectUri,
-      transport_request: params.transport_request || 'local',
-      message: `Package ${params.package_name} deleted successfully`,
-    },
-  } as IAdtWireResponse;
+  // The response, as it arrived. This used to replace the server's document
+  // with `{ success: true, …, message: '… deleted successfully' }` — prose this
+  // library wrote about a call it had not read, handed to a caller in place of
+  // what SAP said. What a caller wants out of the answer is the reading's
+  // question; the writer's job is to hand the answer over.
+  return response;
 }
