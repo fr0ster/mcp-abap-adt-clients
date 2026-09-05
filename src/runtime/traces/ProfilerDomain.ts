@@ -88,9 +88,8 @@ export class Profiler implements IProfiler<IAbapTraceEntry, IAbapTraceViews> {
   /**
    * The raw response for a view, before anything is made of it.
    *
-   * Shared by {@link read} and {@link readWith}, so the two differ in exactly
-   * one thing — who turns the document into a value — and cannot drift apart on
-   * which URL or which options they send.
+   * One place that knows which URL and which options a view sends, so nothing
+   * built on top of it can drift from what {@link read} asks for.
    */
   private async viewResponse<K extends keyof IAbapTraceViews>(
     traceId: string,
@@ -123,11 +122,14 @@ export class Profiler implements IProfiler<IAbapTraceEntry, IAbapTraceViews> {
   }
 
   /**
-   * What is inside one trace, read the plain way.
+   * What is inside one trace.
    *
    * The mapping is deliberately plain: document onto the view's type, nothing
    * more. No filtering, no reshaping — those belong to the server, which has
-   * endpoints for them, and to the caller, which has {@link readWith}.
+   * endpoints for them. A `readWith(parse, …)` sat beside this until 31.0.0,
+   * making how far the answer was read a property of which method was called;
+   * a consumer who wants another reading implements `IProfiler`, which is
+   * generic in what its views answer for exactly that reason.
    */
   async read<K extends keyof IAbapTraceViews>(
     traceId: string,

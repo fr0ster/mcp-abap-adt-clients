@@ -22,7 +22,7 @@ import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import type {
   IMessageClassConfig,
-  IMessageClassMessage,
+  IParsedMessage,
 } from '../../../../core/messageClass';
 import { parseMessageClass } from '../../../../core/messageClass';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';

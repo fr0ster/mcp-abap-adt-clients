@@ -153,12 +153,12 @@ describe('answering', () => {
     // library cannot read is its own failure, not the server's.
     await expect(
       answering(async () => {
-        throw new AdtParseError('could not read the response');
+        throw new AdtParseError('adtcore:objectReferences', '<html/>');
       }, rawDocument),
     ).resolves.toMatchObject({ ok: false });
 
     const answer = await answering(async () => {
-      throw new AdtParseError('could not read the response');
+      throw new AdtParseError('adtcore:objectReferences', '<html/>');
     }, rawDocument);
     if (answer.ok) throw new Error('expected a failure');
     // It is reported as what it is at the transport boundary — never 'parse',

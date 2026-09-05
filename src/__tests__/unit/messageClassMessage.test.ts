@@ -3,6 +3,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
 import { AdtMessageClassMessage } from '../../core/messageClass/AdtMessageClassMessage';
+import { parseMessageClass } from '../../core/messageClass/xml';
 import { noopLogger } from '../../utils/noopLogger';
 import { expectResult } from '../helpers/contract';
 
@@ -43,14 +44,20 @@ function recorder(classXml = CLASS_XML) {
 }
 
 describe('AdtMessageClassMessage', () => {
-  it('read extracts the message from the class', async () => {
+  it('reads the class document the message lives in, and refuses when it is absent', async () => {
     const { conn } = recorder();
     const m = new AdtMessageClassMessage(conn, noopLogger);
-    const st = expectResult(
+    // There is no resource for one message: it is read through its class's
+    // document, so that document is what comes back. Whether the message is in
+    // it is the shipped `analyse`'s question — the read below succeeds only
+    // because 001 is there.
+    const document = expectResult(
       await m.read({ className: 'ZT', msgno: '001' }),
-      'st',
+      'read message 001',
     );
-    expect(st?.message?.msgtext).toBe('T1');
+    expect(parseMessageClass(document).messages).toContainEqual(
+      expect.objectContaining({ msgno: '001', msgtext: 'T1' }),
+    );
   });
 
   it('update does LOCK_MSG + class LOCK + PUT(full class, lockhandle) + UNLOCK + UNLOCK_ALL', async () => {
