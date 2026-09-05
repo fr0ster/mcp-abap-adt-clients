@@ -318,7 +318,7 @@ export class AdtAppendStructure<
       });
 
       let created = false;
-      if (options?.deleteOnFailure) {
+      if (options?.deleteOnFailure ?? true) {
         onFailure(async () => {
           if (!created) return;
           await deleteAppendStructure(this.connection, {

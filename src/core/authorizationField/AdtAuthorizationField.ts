@@ -161,7 +161,7 @@ export class AdtAuthorizationField<
       });
 
       let created = false;
-      if (options?.deleteOnFailure) {
+      if (options?.deleteOnFailure ?? true) {
         onFailure(async () => {
           if (!created) return;
           this.logger?.warn?.('Deleting authorization field after failure');

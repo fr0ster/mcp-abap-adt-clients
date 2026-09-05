@@ -223,12 +223,27 @@ describe('AdtInclude', () => {
       expect(failure.message).toContain('source rejected');
     });
 
-    it('leaves it in place when not asked — the contract default is false', async () => {
+    it('rolls back without being asked — the default is on', async () => {
+      // It used to be off, and this test asserted that. The reason it changed:
+      // a create that fails after the object exists leaves a name taken, and
+      // the caller asked for a created-and-written include rather than for
+      // whatever this left. The object removed is one this call made moments
+      // earlier, so there is nothing of the caller's to lose.
       const { connection, calls } = createWithFailingUpload();
       await new AdtInclude(connection, logger).create({
         ...BASE,
         sourceCode: '" code',
       });
+
+      expect(calls.some((c) => c.method === 'DELETE')).toBe(true);
+    });
+
+    it('leaves it in place when told not to', async () => {
+      const { connection, calls } = createWithFailingUpload();
+      await new AdtInclude(connection, logger).create(
+        { ...BASE, sourceCode: '" code' },
+        { deleteOnFailure: false },
+      );
 
       expect(calls.some((c) => c.method === 'DELETE')).toBe(false);
     });

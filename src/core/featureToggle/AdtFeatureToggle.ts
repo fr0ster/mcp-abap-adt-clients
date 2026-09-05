@@ -191,7 +191,7 @@ export class AdtFeatureToggle<
       });
 
       let created = false;
-      if (options?.deleteOnFailure) {
+      if (options?.deleteOnFailure ?? true) {
         onFailure(async () => {
           if (!created) return;
           this.logger?.warn?.('Deleting feature toggle after failure');

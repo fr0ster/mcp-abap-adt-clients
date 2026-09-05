@@ -222,7 +222,25 @@ export class AdtUnitTest<
     }
     const source = config.testClassSource;
 
-    return chain(this.logger, async ({ step }) => {
+    return chain(this.logger, async ({ step, onFailure }) => {
+      // The container class is made here and then activated and written to, so
+      // two steps can fail after it exists. `AdtClass.create`'s own rollback
+      // does not reach them — it covers its own chain, and these are this one's.
+      // `classMade`, not `created`: that name is the created value below.
+      let classMade = false;
+      if (options?.deleteOnFailure ?? true) {
+        onFailure(async () => {
+          if (!classMade) return;
+          this.logger?.warn?.(
+            'Deleting unit test container class after failure',
+          );
+          await this.adtClass.delete(
+            { className: name, transportRequest: config.transportRequest },
+            options,
+          );
+        });
+      }
+
       this.logger?.info?.('Step 1: Creating container class', name);
       const created = (await step(
         this.adtClass.create(
@@ -236,6 +254,9 @@ export class AdtUnitTest<
           options,
         ),
       )) as ReturnType<R['created']>;
+
+      // Past the create, like every other handler's rollback flag.
+      classMade = true;
 
       this.logger?.info?.('Step 2: Activating container class');
       await step(this.adtClass.activate({ className: name }, options));

@@ -88,14 +88,17 @@ export async function chain<T, E extends IAdtError = IAdtError>(
     onFailure: (undo) => register(rollbacks, undo),
   };
 
-  const unwind = async (list: Array<() => Promise<void>>): Promise<void> => {
+  const unwind = async (
+    list: Array<() => Promise<void>>,
+    collect?: (reason: string) => void,
+  ): Promise<void> => {
     for (const undo of list.reverse()) {
       try {
         await undo();
       } catch (cleanupError: unknown) {
-        logger?.warn?.('cleanup failed', {
-          error: safeErrorMessage(cleanupError),
-        });
+        const reason = safeErrorMessage(cleanupError);
+        logger?.warn?.('cleanup failed', { error: reason });
+        collect?.(reason);
       }
     }
   };
@@ -110,15 +113,27 @@ export async function chain<T, E extends IAdtError = IAdtError>(
     // outlive. A delete issued while the chain still holds the object's lock is
     // answered 403.
     await unwind(undos);
-    await unwind(rollbacks);
+    const unrolled: string[] = [];
+    await unwind(rollbacks, (reason) => unrolled.push(reason));
+
     // The same cast `answering` makes, for the same reason: a chain abandons
     // with whatever failure its failing step answered, and a step that had no
     // strategy answered the library's own `IAdtError` — which is what every `E`
     // extends. Nothing a caller sees is cast.
-    return failed<T, E>(
-      (error instanceof ChainAbandoned
-        ? error.failure
-        : recogniseFailure(error)) as E,
-    );
+    const failure =
+      error instanceof ChainAbandoned ? error.failure : recogniseFailure(error);
+
+    if (unrolled.length === 0) return failed<T, E>(failure as E);
+
+    // **A rollback that failed has to reach the caller.** It used to end in a
+    // `logger.warn` and nowhere else, so the answer carried the original
+    // failure alone and a caller had every reason to believe the system was
+    // left clean. It was not: what the rollback could not remove is still
+    // there, holding its name. Said in the message rather than in a new field —
+    // a failure type grows a field per special case, and this is one.
+    return failed<T, E>({
+      ...failure,
+      message: `${failure.message} — and the rollback did not complete, so something this call made may still exist: ${unrolled.join('; ')}`,
+    } as E);
   }
 }

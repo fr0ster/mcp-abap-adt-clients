@@ -198,7 +198,7 @@ export class AdtTransformation<
       });
 
       let created = false;
-      if (options?.deleteOnFailure) {
+      if (options?.deleteOnFailure ?? true) {
         onFailure(async () => {
           if (!created) return;
           this.logger?.warn?.('Deleting transformation after failure');

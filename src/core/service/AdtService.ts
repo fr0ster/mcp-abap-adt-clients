@@ -471,7 +471,21 @@ export class AdtServiceBinding<
     const serviceDefinitionName = config.serviceDefinitionName;
     const bindingVariant = config.bindingVariant;
 
-    return chain(this.logger, async ({ step }) => {
+    return chain(this.logger, async ({ step, onFailure }) => {
+      // A binding's create is the longest chain here — check, activate, a read
+      // of the service group, another check — and every one of those runs after
+      // the binding exists. Without this, a failure at any of them left a
+      // binding behind holding its name, which is the one thing a later create
+      // cannot work around.
+      let created = false;
+      if (options?.deleteOnFailure ?? true) {
+        onFailure(async () => {
+          if (!created) return;
+          this.logger?.warn?.('Deleting service binding after failure');
+          await this.delete({ bindingName: name }, options);
+        });
+      }
+
       await step(this.assertVariantAvailable(bindingVariant));
 
       if (config.runTransportCheck ?? true) {
@@ -512,6 +526,10 @@ export class AdtServiceBinding<
           options?.analyse,
         ),
       );
+
+      // Past the create: a refused create leaves nothing to remove, and the
+      // rollback above must not delete a binding this call did not make.
+      created = true;
 
       await step(this.check({ bindingName: name }, 'inactive', options));
 

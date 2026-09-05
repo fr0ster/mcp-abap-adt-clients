@@ -137,7 +137,7 @@ export class AdtInclude<
 
     return chain(this.logger, async ({ step, onFailure }) => {
       let created = false;
-      if (options?.deleteOnFailure) {
+      if (options?.deleteOnFailure ?? true) {
         // The object exists from the create on, so a later failure leaves a
         // half-made include behind unless the caller asked otherwise.
         onFailure(async () => {

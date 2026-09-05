@@ -189,7 +189,7 @@ export class AdtScalarFunction<
       });
 
       let created = false;
-      if (options?.deleteOnFailure) {
+      if (options?.deleteOnFailure ?? true) {
         onFailure(async () => {
           if (!created) return;
           this.logger?.warn?.('Deleting scalar function after failure');

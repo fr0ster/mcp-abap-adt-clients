@@ -162,7 +162,7 @@ export class AdtDdl<
       });
 
       let created = false;
-      if (options?.deleteOnFailure) {
+      if (options?.deleteOnFailure ?? true) {
         onFailure(async () => {
           if (!created) return;
           this.logger?.warn?.('Deleting DDL source after failure');
