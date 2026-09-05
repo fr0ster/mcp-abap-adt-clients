@@ -161,6 +161,42 @@ name validates fine either way. And note what an abandoned create leaves — the
 name is held from the POST onward whatever state the object is in, including a
 class that no read can see.
 
+## An object that exists, holds its name, and cannot be deleted
+
+`delete()` works on anything you can name — with one exception, and it is the
+expensive one: **an object that was created but never bound to a package.** It
+holds its name against every future create, and nothing removes it.
+
+The mechanism shows in the deletion check's own answer. When it can resolve the
+object it names the package:
+
+```xml
+<del:object del:isDeletable="true"  adtcore:name="ZAC_X" adtcore:packageName="ZADT_BLD_PKG03"/>
+<del:object del:isDeletable="false" adtcore:name="ZAC_X">
+  <del:message del:type="E"><del:text>Object does not exist</del:text></del:message>
+```
+
+The second shape is what an absent object gets — and an unbound one gets it too,
+because the check resolves through the package. So the system reports "does not
+exist" about something whose name is demonstrably taken, and the delete has
+nothing to work on.
+
+**This page does not reproduce it on purpose.** The experiment succeeds by
+leaving exactly the undeletable object it is describing.
+
+**Prevention is the whole remedy this library offers:**
+
+- pass `deleteOnFailure` in the operation options on a create, so a chain that
+  fails after the POST removes what it made;
+- treat a create as unfinished until you have seen the object *in its package* —
+  `getUtils().search({ query: name })` answers `adtcore:packageName` for an
+  object that resolved, and that is the attribute to look for;
+- do not abandon a create halfway on purpose.
+
+There is no member for re-binding an object to a package, and adding one would
+not help: the resource that would accept it is reached the same way. Cleaning up
+an object already in this state is SAP GUI territory.
+
 ## A refusal can arrive with a 2xx
 
 ADT answers some refusals with **200** carrying an `<exc:exception>` document.

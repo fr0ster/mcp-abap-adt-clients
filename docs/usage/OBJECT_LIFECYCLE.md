@@ -92,7 +92,7 @@ await client.getClass().update({ className: 'ZCL_TEST' }, {
 This is what you want when one lock covers several writes — a class and its test
 include, say, which are written under the *class's* lock.
 
-## `delete()` does not lock
+## `delete()` does not lock, and works on all but one thing
 
 ```
 check(deletion) → delete
@@ -104,6 +104,14 @@ is no lock to take and none to release.
 The check is a question, and the delete is the answer to a different one. A
 refusal arrives as `del:isDeleted` on the delete — not as `del:isDeletable`,
 which belongs to the check — and `packageDeletionRefusal` reads the right one.
+
+**The one thing it cannot remove** is an object that was created and never bound
+to a package. The deletion check resolves an object through its package — its
+answer carries `adtcore:packageName` when it found one and says "Object does not
+exist" when it did not — so an unbound object is reported absent while its name
+stays taken, and there is nothing for the delete to act on. `deleteOnFailure`
+exists for the case that produces it; see
+[TROUBLESHOOTING.md](TROUBLESHOOTING.md#an-object-that-exists-holds-its-name-and-cannot-be-deleted).
 
 ## `activate()` and what counts as a failure
 
