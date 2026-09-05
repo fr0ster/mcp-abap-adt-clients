@@ -26,6 +26,7 @@ import type {
   IAbapConnection,
   IAdtCreatable,
   IAdtDeletable,
+  IAdtError,
   IAdtOperationOptions,
   IAdtReadable,
   IAdtRequest,
@@ -39,7 +40,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { TRANSPORT_SEARCH_CONFIGURATIONS_URL } from '@mcp-abap-adt/interfaces';
 import { TransportSearchConfigurationMissing } from '../../utils/adtErrors';
-import { answering } from '../../utils/adtResponse';
+import { answering, type IAdtOptions } from '../../utils/adtResponse';
 import { createTransport } from './create';
 import { deleteTransport } from './delete';
 import { getTransportSearchConfigurations, listTransports } from './list';
@@ -122,10 +123,10 @@ export class AdtRequest<
    * The number is the system's to generate, so there is nothing to validate
    * before the POST — which is why this module has no `validate`.
    */
-  async create(
+  async create<E extends IAdtError = IAdtError>(
     config: ITransportConfig,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['created']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     if (!config.description) {
       throw new Error('Transport request description is required');
     }
@@ -254,10 +255,10 @@ export class AdtRequest<
    * XML, patch the description into it, PUT it back — building the body from
    * scratch would drop every server-managed field the client does not model.
    */
-  async update(
+  async update<E extends IAdtError = IAdtError>(
     config: Partial<ITransportConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     const number = this.number(config);
     if (!config.description) {
       throw new Error('Transport request description is required for update');
@@ -278,10 +279,10 @@ export class AdtRequest<
    * ADT accepts this only for a request that holds no objects; a non-empty
    * request is rejected by the server, not by this client.
    */
-  async delete(
+  async delete<E extends IAdtError = IAdtError>(
     config: Partial<ITransportConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['deleted']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deleted']>, E>> {
     const number = this.number(config);
 
     this.logger?.info?.('Deleting transport request:', number);

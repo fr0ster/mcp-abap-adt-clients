@@ -35,7 +35,11 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { ADT_NO_FAILURE, AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
 import { activationRefusal } from '../../utils/activationUtils';
-import { answering } from '../../utils/adtResponse';
+import {
+  answering,
+  type IAdtOptions,
+  type IAnalyse,
+} from '../../utils/adtResponse';
 import { beginCriticalSection } from '../../utils/criticalSection';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import { chain } from '../shared/chain';
@@ -184,10 +188,10 @@ export class AdtScalarFunctionImplementation<
   }
 
   /** Validate the name before creating the object. */
-  async validate(
+  async validate<E extends IAdtError = IAdtError>(
     config: Partial<IScalarFunctionImplementationConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['validation']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
     const name = this.name(config);
 
     return answering(
@@ -198,15 +202,15 @@ export class AdtScalarFunctionImplementation<
           config.description,
         ),
       this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
-      options?.analyse ?? validationUnsupported,
+      (options?.analyse ?? validationUnsupported) as IAnalyse<E>,
     );
   }
 
   /** Create the object. */
-  async create(
+  async create<E extends IAdtError = IAdtError>(
     config: IScalarFunctionImplementationConfig,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['created']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     const name = this.name(config);
     if (!config.scalarFunctionName) {
       throw new Error('Scalar function name is required');
@@ -339,10 +343,10 @@ export class AdtScalarFunctionImplementation<
    * this is one request. Without it, this locks, checks, writes and unlocks —
    * and the unlock happens on every path out.
    */
-  async update(
+  async update<E extends IAdtError = IAdtError>(
     config: Partial<IScalarFunctionImplementationConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     const name = this.name(config);
     const source = options?.sourceCode || config.sourceCode;
 
@@ -475,7 +479,7 @@ export class AdtScalarFunctionImplementation<
             this.results.activation as IResultStrategy<
               ReturnType<R['activation']>
             >,
-            options?.analyse ?? activationRefusal,
+            (options?.analyse ?? activationRefusal) as IAnalyse<E>,
           ),
         );
 
@@ -500,10 +504,10 @@ export class AdtScalarFunctionImplementation<
    *
    * The same lock window, for the same reason.
    */
-  async updateMetadata(
+  async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IScalarFunctionImplementationConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['metadata']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
     const name = this.name(config);
     const source = options?.sourceCode ?? config.sourceCode;
     if (!source) {
@@ -591,10 +595,10 @@ export class AdtScalarFunctionImplementation<
    * shipped reading of that answer; a caller who wants another passes their own
    * `analyse`.
    */
-  async delete(
+  async delete<E extends IAdtError = IAdtError>(
     config: Partial<IScalarFunctionImplementationConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['deletion']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     const name = this.name(config);
 
     return chain(this.logger, async ({ step }) => {
@@ -609,7 +613,7 @@ export class AdtScalarFunctionImplementation<
               transport_request: config.transportRequest,
             }),
           this.results.check as IResultStrategy<ReturnType<R['check']>>,
-          options?.analyse ?? deletionRefusal,
+          (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
         ),
       );
       this.logger?.info?.('Deletion check passed');
@@ -633,25 +637,25 @@ export class AdtScalarFunctionImplementation<
   }
 
   /** Activate the object. Needs no stateful session. */
-  async activate(
+  async activate<E extends IAdtError = IAdtError>(
     config: Partial<IScalarFunctionImplementationConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['activation']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     const name = this.name(config);
 
     return answering(
       () => activateScalarFunctionImplementation(this.connection, name),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
-      options?.analyse ?? activationRefusal,
+      (options?.analyse ?? activationRefusal) as IAnalyse<E>,
     );
   }
 
   /** Check the object. */
-  async check(
+  async check<E extends IAdtError = IAdtError>(
     config: Partial<IScalarFunctionImplementationConfig>,
     status?: string,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['check']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     const name = this.name(config);
     const version: 'active' | 'inactive' =
       status === 'active' ? 'active' : 'inactive';

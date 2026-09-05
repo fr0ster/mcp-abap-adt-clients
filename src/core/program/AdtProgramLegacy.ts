@@ -5,11 +5,12 @@
  */
 
 import type {
+  IAdtError,
   IAdtOperationOptions,
   IAdtResponse,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
-import { answering } from '../../utils/adtResponse';
+import { answering, type IAdtOptions } from '../../utils/adtResponse';
 import { beginCriticalSection } from '../../utils/criticalSection';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { chain } from '../shared/chain';
@@ -32,10 +33,10 @@ export class AdtProgramLegacy<
     unknown
   > = IProgramResults,
 > extends AdtProgram<R> {
-  override async delete(
+  override async delete<E extends IAdtError = IAdtError>(
     config: Partial<IProgramConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['deletion']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     if (!config.programName) {
       throw new Error('Program name is required');
     }

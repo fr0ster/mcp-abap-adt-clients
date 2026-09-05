@@ -17,6 +17,7 @@ import type {
   IAdtContentTypes,
   IAdtCreatable,
   IAdtDeletable,
+  IAdtError,
   IAdtLockable,
   IAdtOperationOptions,
   IAdtReadable,
@@ -30,7 +31,11 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
 import { activationRefusal } from '../../utils/activationUtils';
-import { answering } from '../../utils/adtResponse';
+import {
+  answering,
+  type IAdtOptions,
+  type IAnalyse,
+} from '../../utils/adtResponse';
 import { beginCriticalSection } from '../../utils/criticalSection';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import { chain } from '../shared/chain';
@@ -189,10 +194,10 @@ export class AdtFunctionInclude<
    * There is no validation resource for a function include, so this is the only
    * thing that can be checked before the POST.
    */
-  async validate(
+  async validate<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionIncludeConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['validation']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
     const { group, include } = this.names(config);
 
     return answering(
@@ -203,10 +208,10 @@ export class AdtFunctionInclude<
   }
 
   /** Create the include, and write and activate its source if any was given. */
-  async create(
+  async create<E extends IAdtError = IAdtError>(
     config: IFunctionIncludeConfig,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['created']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     const { group, include } = this.names(config);
     if (!config.description) {
       throw new Error('Description is required');
@@ -374,10 +379,10 @@ export class AdtFunctionInclude<
    *
    * With `options.lockHandle` the caller holds the lock and owns the chain.
    */
-  async update(
+  async update<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionIncludeConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     const { group, include } = this.names(config);
     const fullConfig: IFunctionIncludeConfig = {
       ...(config as IFunctionIncludeConfig),
@@ -567,10 +572,10 @@ export class AdtFunctionInclude<
    *
    * The deletion check is read, not merely performed — see AdtProgram.delete.
    */
-  async delete(
+  async delete<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionIncludeConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['deletion']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     this.names(config);
 
     return chain(this.logger, async ({ step }) => {
@@ -579,7 +584,7 @@ export class AdtFunctionInclude<
         answering(
           () => checkDeletion(this.connection, this.buildDeleteParams(config)),
           this.results.check as IResultStrategy<ReturnType<R['check']>>,
-          options?.analyse ?? deletionRefusal,
+          (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
         ),
       );
       this.logger?.info?.('Deletion check passed');
@@ -602,25 +607,25 @@ export class AdtFunctionInclude<
   }
 
   /** Activate the include. */
-  async activate(
+  async activate<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionIncludeConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['activation']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     const { group, include } = this.names(config);
 
     return answering(
       () => activateFunctionInclude(this.connection, group, include),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
-      options?.analyse ?? activationRefusal,
+      (options?.analyse ?? activationRefusal) as IAnalyse<E>,
     );
   }
 
   /** Check the include. */
-  async check(
+  async check<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionIncludeConfig>,
     status?: string,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['check']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     const { group, include } = this.names(config);
     const version: 'active' | 'inactive' =
       status === 'active' ? 'active' : 'inactive';

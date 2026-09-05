@@ -32,7 +32,11 @@ import {
   CT_TRANSPORT_CHECK,
 } from '../../constants/contentTypes';
 import { activationRefusal } from '../../utils/activationUtils';
-import { answering } from '../../utils/adtResponse';
+import {
+  answering,
+  type IAdtOptions,
+  type IAnalyse,
+} from '../../utils/adtResponse';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import {
   buildQueryString,
@@ -398,10 +402,10 @@ export class AdtServiceBinding<
    * the system's own catalogue, and posting a variant the system does not offer
    * produces a failure the caller cannot interpret.
    */
-  async validate(
+  async validate<E extends IAdtError = IAdtError>(
     config: Partial<IServiceBindingConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['validation']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
     const name = this.name(config);
     if (!config.serviceDefinitionName) {
       throw new Error('serviceDefinitionName is required for validation');
@@ -443,10 +447,10 @@ export class AdtServiceBinding<
    * the activation, the generation — is this implementation's business and
    * reaches a caller only if it fails.
    */
-  async create(
+  async create<E extends IAdtError = IAdtError>(
     config: IServiceBindingConfig,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['created']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     const name = this.name(config);
     if (!config.packageName) throw new Error('packageName is required');
     if (!config.description) throw new Error('description is required');
@@ -585,10 +589,10 @@ export class AdtServiceBinding<
    * That is the only thing an update does to a binding: publish it, withdraw
    * it, or leave it as it is.
    */
-  async update(
+  async update<E extends IAdtError = IAdtError>(
     config: Partial<IServiceBindingConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     const name = this.name(config);
     if (!config.desiredPublicationState) {
       throw new Error('desiredPublicationState is required');
@@ -615,7 +619,7 @@ export class AdtServiceBinding<
       // changes nothing else. The job reports `SEVERITY` and `SHORT_TEXT` in
       // its answer, and reading them here is what makes a refused publish a
       // refusal rather than a document nobody looked at.
-      options?.analyse ?? publicationRefusal,
+      (options?.analyse ?? publicationRefusal) as IAnalyse<E>,
     );
   }
 
@@ -686,10 +690,10 @@ export class AdtServiceBinding<
    * alone deleted without asking, and a delete the server never approved is one
    * a caller has no reason to believe happened.
    */
-  async delete(
+  async delete<E extends IAdtError = IAdtError>(
     config: Partial<IServiceBindingConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['deletion']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     const name = this.name(config);
 
     return chain(this.logger, async ({ step }) => {
@@ -699,7 +703,7 @@ export class AdtServiceBinding<
         answering(
           () => this.deletionCheckRequest(name),
           this.results.check as IResultStrategy<ReturnType<R['check']>>,
-          options?.analyse ?? deletionRefusal,
+          (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
         ),
       );
 
@@ -766,26 +770,26 @@ export class AdtServiceBinding<
    * Judged by the messages, never by the status: ADT answers 200 with a
    * `<msg type="E">` when it refuses.
    */
-  async activate(
+  async activate<E extends IAdtError = IAdtError>(
     config: Partial<IServiceBindingConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['activation']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     const name = this.name(config);
 
     return answering(
       () =>
         this.activateRequest({ bindingName: name, preauditRequested: true }),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
-      options?.analyse ?? activationRefusal,
+      (options?.analyse ?? activationRefusal) as IAnalyse<E>,
     );
   }
 
   /** Check the binding. */
-  async check(
+  async check<E extends IAdtError = IAdtError>(
     config: Partial<IServiceBindingConfig>,
     status?: string,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['check']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     const name = this.name(config);
     const version = status === 'active' ? 'active' : 'inactive';
 

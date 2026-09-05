@@ -30,7 +30,11 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { ADT_NO_FAILURE, AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
 import { activationRefusal } from '../../utils/activationUtils';
-import { answering } from '../../utils/adtResponse';
+import {
+  answering,
+  type IAdtOptions,
+  type IAnalyse,
+} from '../../utils/adtResponse';
 import { beginCriticalSection } from '../../utils/criticalSection';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import { chain } from '../shared/chain';
@@ -154,25 +158,25 @@ export class AdtAppendStructure<
   }
 
   /** Validate the name, where the system offers the resource. */
-  async validate(
+  async validate<E extends IAdtError = IAdtError>(
     config: Partial<IAppendStructureConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['validation']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
     const name = this.name(config);
 
     return answering(
       () =>
         validateAppendStructureName(this.connection, name, config.description),
       this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
-      options?.analyse ?? validationUnsupported,
+      (options?.analyse ?? validationUnsupported) as IAnalyse<E>,
     );
   }
 
   /** Create the append structure. Metadata only — the fields come via update. */
-  async create(
+  async create<E extends IAdtError = IAdtError>(
     config: IAppendStructureConfig,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['created']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     const name = this.name(config);
     if (!config.baseObject) throw new Error('Base object is required');
     if (!config.packageName) throw new Error('Package name is required');
@@ -272,10 +276,10 @@ export class AdtAppendStructure<
    * that; this member does not insert an opinion between the caller and the
    * write.
    */
-  async update(
+  async update<E extends IAdtError = IAdtError>(
     config: Partial<IAppendStructureConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     const name = this.name(config);
     const source = options?.sourceCode || config.sourceCode;
 
@@ -391,10 +395,10 @@ export class AdtAppendStructure<
    *
    * The deletion check is read, not merely performed — see AdtProgram.delete.
    */
-  async delete(
+  async delete<E extends IAdtError = IAdtError>(
     config: Partial<IAppendStructureConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['deletion']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     const name = this.name(config);
 
     return chain(this.logger, async ({ step }) => {
@@ -406,7 +410,7 @@ export class AdtAppendStructure<
               transport_request: config.transportRequest,
             }),
           this.results.check as IResultStrategy<ReturnType<R['check']>>,
-          options?.analyse ?? deletionRefusal,
+          (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
         ),
       );
 
@@ -425,25 +429,25 @@ export class AdtAppendStructure<
   }
 
   /** Activate the append structure. */
-  async activate(
+  async activate<E extends IAdtError = IAdtError>(
     config: Partial<IAppendStructureConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['activation']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     const name = this.name(config);
 
     return answering(
       () => activateAppendStructure(this.connection, name),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
-      options?.analyse ?? activationRefusal,
+      (options?.analyse ?? activationRefusal) as IAnalyse<E>,
     );
   }
 
   /** Check the append structure. */
-  async check(
+  async check<E extends IAdtError = IAdtError>(
     config: Partial<IAppendStructureConfig>,
     status?: string,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['check']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     const name = this.name(config);
     const version: 'active' | 'inactive' =
       status === 'active' ? 'active' : 'inactive';

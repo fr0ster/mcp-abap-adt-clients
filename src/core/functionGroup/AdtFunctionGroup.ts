@@ -36,7 +36,11 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces';
 import { activationRefusal } from '../../utils/activationUtils';
-import { answering } from '../../utils/adtResponse';
+import {
+  answering,
+  type IAdtOptions,
+  type IAnalyse,
+} from '../../utils/adtResponse';
 import { beginCriticalSection } from '../../utils/criticalSection';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import { requestOf } from '../../utils/requestTrace';
@@ -155,10 +159,10 @@ export class AdtFunctionGroup<
   }
 
   /** Validate a function group name before creating it. */
-  async validate(
+  async validate<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionGroupConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['validation']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
     if (!config.functionGroupName) {
       throw new Error('Function group name is required for validation');
     }
@@ -172,15 +176,15 @@ export class AdtFunctionGroup<
           config.description,
         ),
       this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
-      options?.analyse ?? validationSeverity,
+      (options?.analyse ?? validationSeverity) as IAnalyse<E>,
     );
   }
 
   /** Create the function group. */
-  async create(
+  async create<E extends IAdtError = IAdtError>(
     config: IFunctionGroupConfig,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['created']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     if (!config.functionGroupName) {
       throw new Error('Function group name is required');
     }
@@ -350,10 +354,10 @@ export class AdtFunctionGroup<
    * With `options.lockHandle` the caller holds the lock and owns the chain, so
    * this is one request.
    */
-  async update(
+  async update<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionGroupConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     if (!config.functionGroupName) {
       throw new Error('Function group name is required');
     }
@@ -469,10 +473,10 @@ export class AdtFunctionGroup<
    *
    * The deletion check is read, not merely performed — see AdtProgram.delete.
    */
-  async delete(
+  async delete<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionGroupConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['deletion']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     if (!config.functionGroupName) {
       throw new Error('Function group name is required');
     }
@@ -488,7 +492,7 @@ export class AdtFunctionGroup<
               transport_request: config.transportRequest,
             }),
           this.results.check as IResultStrategy<ReturnType<R['check']>>,
-          options?.analyse ?? deletionRefusal,
+          (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
         ),
       );
       this.logger?.info?.('Deletion check passed');
@@ -512,10 +516,10 @@ export class AdtFunctionGroup<
   }
 
   /** Activate the function group. Needs no stateful session. */
-  async activate(
+  async activate<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionGroupConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['activation']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     if (!config.functionGroupName) {
       throw new Error('Function group name is required');
     }
@@ -527,16 +531,16 @@ export class AdtFunctionGroup<
           config.functionGroupName as string,
         ),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
-      options?.analyse ?? activationRefusal,
+      (options?.analyse ?? activationRefusal) as IAnalyse<E>,
     );
   }
 
   /** Check the function group. */
-  async check(
+  async check<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionGroupConfig>,
     status?: string,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['check']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     if (!config.functionGroupName) {
       throw new Error('Function group name is required');
     }

@@ -13,12 +13,17 @@
  */
 
 import type {
+  IAdtError,
   IAdtOperationOptions,
   IAdtResponse,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
 import { activationRefusal } from '../../utils/activationUtils';
-import { answering } from '../../utils/adtResponse';
+import {
+  answering,
+  type IAdtOptions,
+  type IAnalyse,
+} from '../../utils/adtResponse';
 import { beginCriticalSection } from '../../utils/criticalSection';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { chain } from '../shared/chain';
@@ -49,10 +54,10 @@ export class AdtClassLegacy<
    * Keeps lock→check→update→unlock in a single stateful session so the
    * lock handle remains valid (legacy stores locks in ABAP session memory).
    */
-  override async update(
+  override async update<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
@@ -154,7 +159,7 @@ export class AdtClassLegacy<
             this.results.activation as IResultStrategy<
               ReturnType<R['activation']>
             >,
-            options?.analyse ?? activationRefusal,
+            (options?.analyse ?? activationRefusal) as IAnalyse<E>,
           ),
         );
 
@@ -182,10 +187,10 @@ export class AdtClassLegacy<
    * A direct DELETE on the object under its own lock: the `/sap/bc/adt/deletion/`
    * resource the modern path uses does not exist on these systems.
    */
-  override async delete(
+  override async delete<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['deletion']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     if (!config.className) {
       throw new Error('Class name is required');
     }

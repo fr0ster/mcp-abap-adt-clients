@@ -19,6 +19,7 @@ import type {
   IAdtContentTypes,
   IAdtCreatable,
   IAdtDeletable,
+  IAdtError,
   IAdtLockable,
   IAdtOperationOptions,
   IAdtReadable,
@@ -32,7 +33,11 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
 import { activationRefusal } from '../../utils/activationUtils';
-import { answering } from '../../utils/adtResponse';
+import {
+  answering,
+  type IAdtOptions,
+  type IAnalyse,
+} from '../../utils/adtResponse';
 import { beginCriticalSection } from '../../utils/criticalSection';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import { chain } from '../shared/chain';
@@ -120,10 +125,10 @@ export class AdtInterface<
   }
 
   /** Validate an interface name before creating it. */
-  async validate(
+  async validate<E extends IAdtError = IAdtError>(
     config: Partial<IInterfaceConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['validation']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
     if (!config.interfaceName) {
       throw new Error('Interface name is required for validation');
     }
@@ -145,10 +150,10 @@ export class AdtInterface<
   }
 
   /** Create the interface. */
-  async create(
+  async create<E extends IAdtError = IAdtError>(
     config: IInterfaceConfig,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['created']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     if (!config.interfaceName) {
       throw new Error('Interface name is required');
     }
@@ -260,10 +265,10 @@ export class AdtInterface<
    * this is one request. Without it, this locks, checks, writes and unlocks —
    * and the unlock happens on every path out.
    */
-  async update(
+  async update<E extends IAdtError = IAdtError>(
     config: Partial<IInterfaceConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     if (!config.interfaceName) {
       throw new Error('Interface name is required');
     }
@@ -403,7 +408,7 @@ export class AdtInterface<
             this.results.activation as IResultStrategy<
               ReturnType<R['activation']>
             >,
-            options?.analyse ?? activationRefusal,
+            (options?.analyse ?? activationRefusal) as IAnalyse<E>,
           ),
         );
 
@@ -427,10 +432,10 @@ export class AdtInterface<
    *
    * The deletion check is read, not merely performed — see AdtProgram.delete.
    */
-  async delete(
+  async delete<E extends IAdtError = IAdtError>(
     config: Partial<IInterfaceConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['deletion']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     if (!config.interfaceName) {
       throw new Error('Interface name is required');
     }
@@ -450,7 +455,7 @@ export class AdtInterface<
               transport_request: config.transportRequest,
             }),
           this.results.check as IResultStrategy<ReturnType<R['check']>>,
-          options?.analyse ?? deletionRefusal,
+          (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
         ),
       );
       this.logger?.info?.('Deletion check passed');
@@ -474,10 +479,10 @@ export class AdtInterface<
   }
 
   /** Activate the interface. Needs no stateful session. */
-  async activate(
+  async activate<E extends IAdtError = IAdtError>(
     config: Partial<IInterfaceConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['activation']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     if (!config.interfaceName) {
       throw new Error('Interface name is required');
     }
@@ -485,16 +490,16 @@ export class AdtInterface<
     return answering(
       () => activateInterface(this.connection, config.interfaceName as string),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
-      options?.analyse ?? activationRefusal,
+      (options?.analyse ?? activationRefusal) as IAnalyse<E>,
     );
   }
 
   /** Check the interface. */
-  async check(
+  async check<E extends IAdtError = IAdtError>(
     config: Partial<IInterfaceConfig>,
     status?: string,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['check']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     if (!config.interfaceName) {
       throw new Error('Interface name is required');
     }

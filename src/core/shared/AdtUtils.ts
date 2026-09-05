@@ -76,6 +76,7 @@ import type {
   IAbapConnection,
   IAdtDataPreview,
   IAdtDiscovery,
+  IAdtError,
   IAdtGroupLifecycle,
   IAdtInformationSystem,
   IAdtObjectAccess,
@@ -88,7 +89,11 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
-import { answering, answeringValue } from '../../utils/adtResponse';
+import {
+  answering,
+  answeringValue,
+  type IAdtOptions,
+} from '../../utils/adtResponse';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { withRefusalDetection } from '../../utils/refusalAware';
 import { rawDocument } from '../../utils/resultStrategy';
@@ -232,10 +237,10 @@ export class AdtUtils<
    * with: a recorded hit list runs to 473 rows and 1.3MB. A consumer who wants
    * the document passes `rawDocument` for `search` when constructing this.
    */
-  async search(
+  async search<E extends IAdtError = IAdtError>(
     criteria: ISearchObjectsParams,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['search']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['search']>, E>> {
     return answering(
       () => searchObjects(this.connection, criteria),
       this.results.search as IResultStrategy<ReturnType<R['search']>>,

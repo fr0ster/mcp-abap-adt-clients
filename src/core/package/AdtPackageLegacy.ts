@@ -39,31 +39,39 @@ export class AdtPackageLegacy<
     unknown
   > = IPackageResults,
 > extends AdtPackage<R> {
-  override async create(): Promise<IAdtResponse<ReturnType<R['created']>>> {
-    return failed(UNSUPPORTED);
-  }
-
-  override async read(): Promise<IAdtResponse<ReturnType<R['source']>>> {
-    return failed(UNSUPPORTED);
-  }
-
-  override async readMetadata(): Promise<
-    IAdtResponse<ReturnType<R['metadata']>>
+  override async create<E extends IAdtError = IAdtError>(): Promise<
+    IAdtResponse<ReturnType<R['created']>, E>
   > {
-    return failed(UNSUPPORTED);
+    return failed<ReturnType<R['created']>, E>(UNSUPPORTED as E);
   }
 
-  override async validate(): Promise<
-    IAdtResponse<ReturnType<R['validation']>>
+  override async read<E extends IAdtError = IAdtError>(): Promise<
+    IAdtResponse<ReturnType<R['source']>, E>
   > {
-    return failed(UNSUPPORTED);
+    return failed<ReturnType<R['source']>, E>(UNSUPPORTED as E);
   }
 
-  override async update(): Promise<IAdtResponse<ReturnType<R['updated']>>> {
-    return failed(UNSUPPORTED);
+  override async readMetadata<E extends IAdtError = IAdtError>(): Promise<
+    IAdtResponse<ReturnType<R['metadata']>, E>
+  > {
+    return failed<ReturnType<R['metadata']>, E>(UNSUPPORTED as E);
   }
 
-  override async delete(): Promise<IAdtResponse<ReturnType<R['deletion']>>> {
-    return failed(UNSUPPORTED);
+  override async validate<E extends IAdtError = IAdtError>(): Promise<
+    IAdtResponse<ReturnType<R['validation']>, E>
+  > {
+    return failed<ReturnType<R['validation']>, E>(UNSUPPORTED as E);
+  }
+
+  override async update<E extends IAdtError = IAdtError>(): Promise<
+    IAdtResponse<ReturnType<R['updated']>, E>
+  > {
+    return failed<ReturnType<R['updated']>, E>(UNSUPPORTED as E);
+  }
+
+  override async delete<E extends IAdtError = IAdtError>(): Promise<
+    IAdtResponse<ReturnType<R['deletion']>, E>
+  > {
+    return failed<ReturnType<R['deletion']>, E>(UNSUPPORTED as E);
   }
 }

@@ -10,6 +10,7 @@ import type {
   IAdtCheckable,
   IAdtCreatable,
   IAdtDeletable,
+  IAdtError,
   IAdtLockable,
   IAdtOperationOptions,
   IAdtReadable,
@@ -23,7 +24,11 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
 import { activationRefusal } from '../../utils/activationUtils';
-import { answering } from '../../utils/adtResponse';
+import {
+  answering,
+  type IAdtOptions,
+  type IAnalyse,
+} from '../../utils/adtResponse';
 import { beginCriticalSection } from '../../utils/criticalSection';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import { chain } from '../shared/chain';
@@ -123,10 +128,10 @@ export class AdtBehaviorDefinition<
   }
 
   /** Validate the name before creating the object. */
-  async validate(
+  async validate<E extends IAdtError = IAdtError>(
     config: Partial<IBehaviorDefinitionConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['validation']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
     const name = this.name(config);
     // The endpoint takes all five: a validation with fewer is a 400 to decode
     // later rather than a caller error named here.
@@ -159,10 +164,10 @@ export class AdtBehaviorDefinition<
   }
 
   /** Create the object. */
-  async create(
+  async create<E extends IAdtError = IAdtError>(
     config: IBehaviorDefinitionConfig,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['created']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     const name = this.name(config);
     if (!config.packageName) {
       throw new Error('Package name is required');
@@ -291,10 +296,10 @@ export class AdtBehaviorDefinition<
    * this is one request. Without it, this locks, checks, writes and unlocks —
    * and the unlock happens on every path out.
    */
-  async update(
+  async update<E extends IAdtError = IAdtError>(
     config: Partial<IBehaviorDefinitionConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     const name = this.name(config);
     const source = options?.sourceCode || config.sourceCode;
 
@@ -433,7 +438,7 @@ export class AdtBehaviorDefinition<
             this.results.activation as IResultStrategy<
               ReturnType<R['activation']>
             >,
-            options?.analyse ?? activationRefusal,
+            (options?.analyse ?? activationRefusal) as IAnalyse<E>,
           ),
         );
 
@@ -461,10 +466,10 @@ export class AdtBehaviorDefinition<
    * shipped reading of that answer; a caller who wants another passes their own
    * `analyse`.
    */
-  async delete(
+  async delete<E extends IAdtError = IAdtError>(
     config: Partial<IBehaviorDefinitionConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['deletion']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     const name = this.name(config);
 
     return chain(this.logger, async ({ step }) => {
@@ -473,7 +478,7 @@ export class AdtBehaviorDefinition<
         answering(
           () => checkDeletion(this.connection, name),
           this.results.check as IResultStrategy<ReturnType<R['check']>>,
-          options?.analyse ?? deletionRefusal,
+          (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
         ),
       );
       this.logger?.info?.('Deletion check passed');
@@ -498,25 +503,25 @@ export class AdtBehaviorDefinition<
   }
 
   /** Activate the object. Needs no stateful session. */
-  async activate(
+  async activate<E extends IAdtError = IAdtError>(
     config: Partial<IBehaviorDefinitionConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['activation']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     const name = this.name(config);
 
     return answering(
       () => activateBehaviorDefinition(this.connection, name),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
-      options?.analyse ?? activationRefusal,
+      (options?.analyse ?? activationRefusal) as IAnalyse<E>,
     );
   }
 
   /** Check the object. */
-  async check(
+  async check<E extends IAdtError = IAdtError>(
     config: Partial<IBehaviorDefinitionConfig>,
     status?: string,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['check']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     const name = this.name(config);
     const version: 'active' | 'inactive' =
       status === 'active' ? 'active' : 'inactive';

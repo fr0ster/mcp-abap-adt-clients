@@ -16,6 +16,7 @@
 import type {
   IAbapConnection,
   IAdtContentTypes,
+  IAdtError,
   IAdtOperationOptions,
   IAdtResponse,
   IAdtSystemContext,
@@ -23,7 +24,11 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
 import { activationRefusal } from '../../utils/activationUtils';
-import { answering } from '../../utils/adtResponse';
+import {
+  answering,
+  type IAdtOptions,
+  type IAnalyse,
+} from '../../utils/adtResponse';
 import { nothing, rawDocument } from '../../utils/resultStrategy';
 import {
   type ICapabilityContext,
@@ -172,10 +177,10 @@ export abstract class AdtClassMemberBase<
    * An include has no activation of its own — activating the class publishes
    * whatever its includes now contain.
    */
-  async activate(
+  async activate<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['activation']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     // No server was asked anything, so there is no answer to describe. A missing
     // required argument is the caller's mistake, and it throws.
     if (!config.className) {
@@ -185,7 +190,7 @@ export abstract class AdtClassMemberBase<
     return answering(
       () => activateClass(this.connection, config.className as string),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
-      options?.analyse ?? activationRefusal,
+      (options?.analyse ?? activationRefusal) as IAnalyse<E>,
     );
   }
 

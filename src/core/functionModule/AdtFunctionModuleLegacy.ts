@@ -6,11 +6,12 @@
  */
 
 import type {
+  IAdtError,
   IAdtOperationOptions,
   IAdtResponse,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
-import { answering } from '../../utils/adtResponse';
+import { answering, type IAdtOptions } from '../../utils/adtResponse';
 import { beginCriticalSection } from '../../utils/criticalSection';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { chain } from '../shared/chain';
@@ -33,10 +34,10 @@ export class AdtFunctionModuleLegacy<
     unknown
   > = IFunctionModuleResults,
 > extends AdtFunctionModule<R> {
-  override async delete(
+  override async delete<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionModuleConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['deletion']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     if (!config.functionModuleName) {
       throw new Error('Function module name is required');
     }

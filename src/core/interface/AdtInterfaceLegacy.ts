@@ -5,11 +5,12 @@
  */
 
 import type {
+  IAdtError,
   IAdtOperationOptions,
   IAdtResponse,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
-import { answering } from '../../utils/adtResponse';
+import { answering, type IAdtOptions } from '../../utils/adtResponse';
 import { beginCriticalSection } from '../../utils/criticalSection';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { chain } from '../shared/chain';
@@ -32,10 +33,10 @@ export class AdtInterfaceLegacy<
     unknown
   > = IInterfaceResults,
 > extends AdtInterface<R> {
-  override async delete(
+  override async delete<E extends IAdtError = IAdtError>(
     config: Partial<IInterfaceConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['deletion']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     if (!config.interfaceName) {
       throw new Error('Interface name is required');
     }

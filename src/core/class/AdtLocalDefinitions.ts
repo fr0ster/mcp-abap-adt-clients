@@ -16,6 +16,7 @@ import type {
   IAdtCheckable,
   IAdtContentTypes,
   IAdtDeletable,
+  IAdtError,
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
@@ -26,7 +27,7 @@ import type {
   ILogger,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
-import { answering } from '../../utils/adtResponse';
+import { answering, type IAdtOptions } from '../../utils/adtResponse';
 import { chain } from '../shared/chain';
 import type { LockRegistry } from '../shared/LockRegistry';
 import type { ObjectVersion } from '../shared/results';
@@ -80,10 +81,10 @@ export class AdtLocalDefinitions<
   }
 
   /** Syntax-check the source a caller is about to write. */
-  async validate(
+  async validate<E extends IAdtError = IAdtError>(
     config: Partial<ILocalDefinitionsConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['validation']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
     // Nothing was asked of the server yet, so there is no answer to describe:
     // a missing required argument is the caller's mistake and it throws.
     if (!config.className) {
@@ -142,10 +143,10 @@ export class AdtLocalDefinitions<
    * chain, so this is one request. Without it, this locks the class, checks,
    * writes and unlocks — and the unlock happens on every path out.
    */
-  async update(
+  async update<E extends IAdtError = IAdtError>(
     config: Partial<ILocalDefinitionsConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
@@ -256,10 +257,10 @@ export class AdtLocalDefinitions<
    * There is no DELETE for a class include: ADT removes local definitions source by writing
    * the include empty, so this answers what that write answered.
    */
-  async delete(
+  async delete<E extends IAdtError = IAdtError>(
     config: Partial<ILocalDefinitionsConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
@@ -268,11 +269,11 @@ export class AdtLocalDefinitions<
   }
 
   /** Syntax-check the include. */
-  async check(
+  async check<E extends IAdtError = IAdtError>(
     config: Partial<ILocalDefinitionsConfig>,
     status: string = 'inactive',
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['check']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     if (!config.className) {
       throw new Error('Class name is required');
     }

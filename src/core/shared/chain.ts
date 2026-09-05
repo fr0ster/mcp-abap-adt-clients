@@ -61,10 +61,10 @@ export interface IChainScope {
   onFailure(undo: () => Promise<void>): () => void;
 }
 
-export async function chain<T>(
+export async function chain<T, E extends IAdtError = IAdtError>(
   logger: ILogger | undefined,
   body: (scope: IChainScope) => Promise<T>,
-): Promise<IAdtResponse<T>> {
+): Promise<IAdtResponse<T, E>> {
   const undos: Array<() => Promise<void>> = [];
   const rollbacks: Array<() => Promise<void>> = [];
   const register = (
@@ -103,7 +103,7 @@ export async function chain<T>(
   try {
     const value = await body(scope);
     await unwind(undos);
-    return succeeded(value);
+    return succeeded<T, E>(value);
   } catch (error: unknown) {
     // Cleanups first, rollbacks after — the order a single reverse-ordered list
     // already produced, since a rollback is registered before the lock it must
@@ -111,8 +111,14 @@ export async function chain<T>(
     // answered 403.
     await unwind(undos);
     await unwind(rollbacks);
-    return failed<T>(
-      error instanceof ChainAbandoned ? error.failure : recogniseFailure(error),
+    // The same cast `answering` makes, for the same reason: a chain abandons
+    // with whatever failure its failing step answered, and a step that had no
+    // strategy answered the library's own `IAdtError` — which is what every `E`
+    // extends. Nothing a caller sees is cast.
+    return failed<T, E>(
+      (error instanceof ChainAbandoned
+        ? error.failure
+        : recogniseFailure(error)) as E,
     );
   }
 }

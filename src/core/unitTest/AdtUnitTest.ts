@@ -42,7 +42,7 @@ import type {
   IUnitTestResultOptions,
 } from '@mcp-abap-adt/interfaces';
 import { ADT_NO_FAILURE, AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
-import { answering } from '../../utils/adtResponse';
+import { answering, type IAdtOptions } from '../../utils/adtResponse';
 import { requestOf } from '../../utils/requestTrace';
 import { AdtClass, AdtLocalTestClass } from '../class';
 import { getClassUnitTestResult, getClassUnitTestStatus } from '../class/run';
@@ -152,10 +152,10 @@ export class AdtUnitTest<
    * nothing for an object already in the system. The test source is checked
    * whenever there is source to check.
    */
-  async validate(
+  async validate<E extends IAdtError = IAdtError>(
     config: Partial<IUnitTestConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['validation']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
     const name = this.name(config);
 
     return chain(this.logger, async ({ step }) => {
@@ -212,10 +212,10 @@ export class AdtUnitTest<
    * is this implementation's business — and a failure there is still returned,
    * because it is why the tests are not what was asked for.
    */
-  async create(
+  async create<E extends IAdtError = IAdtError>(
     config: IUnitTestConfig,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['created']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     const name = this.name(config);
     if (config.testClassSource === undefined) {
       throw new Error('Test class source is required');
@@ -289,10 +289,10 @@ export class AdtUnitTest<
    * the point of having both this and {@link create}: the container's lock is
    * taken once and a caller can update the class and its tests in one window.
    */
-  async update(
+  async update<E extends IAdtError = IAdtError>(
     config: Partial<IUnitTestConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     const name = this.name(config);
     if (
       config.testClassSource === undefined &&
@@ -308,7 +308,7 @@ export class AdtUnitTest<
         transportRequest: config.transportRequest,
       },
       options,
-    ) as Promise<IAdtResponse<ReturnType<R['updated']>>>;
+    ) as Promise<IAdtResponse<ReturnType<R['updated']>, E>>;
   }
 
   /**
@@ -317,15 +317,15 @@ export class AdtUnitTest<
    * This deletes no ADT object: the container class stays, and every local test
    * class in the include goes, because the include is what ADT addresses.
    */
-  async delete(
+  async delete<E extends IAdtError = IAdtError>(
     config: Partial<IUnitTestConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['deleted']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deleted']>, E>> {
     const name = this.name(config);
     return this.adtLocalTestClass.delete(
       { className: name, transportRequest: config.transportRequest },
       options,
-    ) as Promise<IAdtResponse<ReturnType<R['deleted']>>>;
+    ) as Promise<IAdtResponse<ReturnType<R['deleted']>, E>>;
   }
 
   /** Lock the container class — an include has no lock of its own. */

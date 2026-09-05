@@ -17,6 +17,7 @@ import type {
   IAdtCheckable,
   IAdtCreatable,
   IAdtDeletable,
+  IAdtError,
   IAdtLockable,
   IAdtOperationOptions,
   IAdtReadable,
@@ -28,7 +29,7 @@ import type {
   ILogger,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
-import { answering } from '../../utils/adtResponse';
+import { answering, type IAdtOptions } from '../../utils/adtResponse';
 import { getSystemInformation } from '../../utils/systemInfo';
 import { AdtClass } from '../class/AdtClass';
 import { updateClass } from '../class/update';
@@ -132,10 +133,10 @@ export class AdtBehaviorImplementation<
   }
 
   /** Validate the class name and its behavior definition before creating. */
-  async validate(
+  async validate<E extends IAdtError = IAdtError>(
     config: Partial<IBehaviorImplementationConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['validation']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
     const name = this.name(config);
     if (!config.behaviorDefinition) {
       throw new Error('Behavior definition is required for validation');
@@ -165,10 +166,10 @@ export class AdtBehaviorImplementation<
    * plain and `update` writes both sources, because the include the clause
    * refers to does not exist until then.
    */
-  async create(
+  async create<E extends IAdtError = IAdtError>(
     config: IBehaviorImplementationConfig,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['created']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     const name = this.name(config);
     if (!config.packageName) {
       throw new Error('Package name is required');
@@ -271,10 +272,10 @@ export class AdtBehaviorImplementation<
    *
    * The answer is the include write's — that is the source a caller passed.
    */
-  async update(
+  async update<E extends IAdtError = IAdtError>(
     config: Partial<IBehaviorImplementationConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     const name = this.name(config);
     const source =
       options?.sourceCode || config.implementationCode || config.sourceCode;
@@ -416,10 +417,10 @@ export class AdtBehaviorImplementation<
   }
 
   /** Delete the implementation class — the class's own delete, checks and all. */
-  async delete(
+  async delete<E extends IAdtError = IAdtError>(
     config: Partial<IBehaviorImplementationConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['deletion']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     const name = this.name(config);
 
     this.logger?.info?.('Deleting behavior implementation class');
@@ -430,19 +431,19 @@ export class AdtBehaviorImplementation<
   }
 
   /** Activate the implementation class. */
-  async activate(
+  async activate<E extends IAdtError = IAdtError>(
     config: Partial<IBehaviorImplementationConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['activation']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     return this.class.activate({ className: this.name(config) }, options);
   }
 
   /** Check the implementation class. */
-  async check(
+  async check<E extends IAdtError = IAdtError>(
     config: Partial<IBehaviorImplementationConfig>,
     status?: string,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['check']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     return this.class.check({ className: this.name(config) }, status, options);
   }
 

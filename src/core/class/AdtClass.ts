@@ -26,6 +26,7 @@ import type {
   IAdtContentTypes,
   IAdtCreatable,
   IAdtDeletable,
+  IAdtError,
   IAdtLockable,
   IAdtOperationOptions,
   IAdtReadable,
@@ -39,7 +40,11 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
 import { activationRefusal } from '../../utils/activationUtils';
-import { answering } from '../../utils/adtResponse';
+import {
+  answering,
+  type IAdtOptions,
+  type IAnalyse,
+} from '../../utils/adtResponse';
 import { safeErrorMessage, safeStringify } from '../../utils/internalUtils';
 import {
   type ICapabilityContext,
@@ -123,10 +128,10 @@ export class AdtClass<
   /**
    * Validate class configuration before creation
    */
-  async validate(
+  async validate<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['validation']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
     // Nothing was asked of the server, so there is no answer to describe: a
     // missing required argument is the caller's mistake and it throws.
     if (!config.className) {
@@ -153,10 +158,10 @@ export class AdtClass<
   /**
    * Create class with full operation chain
    */
-  async create(
+  async create<E extends IAdtError = IAdtError>(
     config: IClassConfig,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['created']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
@@ -259,10 +264,10 @@ export class AdtClass<
    * Always starts with lock
    * If options.lockHandle is provided, performs only low-level update without lock/check/unlock chain
    */
-  async update(
+  async update<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
@@ -397,7 +402,7 @@ export class AdtClass<
             this.results.activation as IResultStrategy<
               ReturnType<R['activation']>
             >,
-            options?.analyse ?? activationRefusal,
+            (options?.analyse ?? activationRefusal) as IAnalyse<E>,
           ),
         );
 
@@ -419,10 +424,10 @@ export class AdtClass<
   /**
    * Delete class
    */
-  async delete(
+  async delete<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['deletion']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
@@ -467,11 +472,11 @@ export class AdtClass<
   /**
    * Check class
    */
-  async check(
+  async check<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig>,
     status?: string,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['check']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     if (!config.className) {
       throw new Error('Class name is required');
     }

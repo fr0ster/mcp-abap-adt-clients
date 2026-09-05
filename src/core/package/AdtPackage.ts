@@ -18,6 +18,7 @@ import type {
   IAdtCheckable,
   IAdtCreatable,
   IAdtDeletable,
+  IAdtError,
   IAdtLockable,
   IAdtOperationOptions,
   IAdtReadable,
@@ -29,7 +30,11 @@ import type {
   ILogger,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
-import { answering } from '../../utils/adtResponse';
+import {
+  answering,
+  type IAdtOptions,
+  type IAnalyse,
+} from '../../utils/adtResponse';
 import { beginCriticalSection } from '../../utils/criticalSection';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import { chain } from '../shared/chain';
@@ -115,10 +120,10 @@ export class AdtPackage<
   }
 
   /** Validate the package's configuration before creating it. */
-  async validate(
+  async validate<E extends IAdtError = IAdtError>(
     config: Partial<IPackageConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['validation']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
     const name = this.name(config);
     if (!config.superPackage) {
       throw new Error('Super package is required for validation');
@@ -151,10 +156,10 @@ export class AdtPackage<
    * validates, creates, then posts `/sap/bc/adt/checkruns` on the created
    * package before it is ever locked.
    */
-  async create(
+  async create<E extends IAdtError = IAdtError>(
     config: IPackageConfig,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['created']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     const name = this.name(config);
     if (!config.superPackage) {
       throw new Error('Super package is required');
@@ -338,10 +343,10 @@ export class AdtPackage<
    * systems, and rfc exists for BASIS < 7.50, where package CRUD is not
    * supported regardless.
    */
-  async update(
+  async update<E extends IAdtError = IAdtError>(
     config: Partial<IPackageConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     const name = this.name(config);
     if (!config.superPackage) {
       throw new Error('Super package is required for update');
@@ -456,10 +461,10 @@ export class AdtPackage<
    * well. Recycling is the consumer's call. See
    * docs/usage/STATEFUL_SESSION_GUIDE.md.
    */
-  async delete(
+  async delete<E extends IAdtError = IAdtError>(
     config: Partial<IPackageConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['deletion']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     const name = this.name(config);
 
     return chain(this.logger, async ({ step }) => {
@@ -472,7 +477,7 @@ export class AdtPackage<
               transport_request: config.transportRequest,
             }),
           this.results.check as IResultStrategy<ReturnType<R['check']>>,
-          options?.analyse ?? deletionRefusal,
+          (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
         ),
       );
       this.logger?.info?.('Deletion check passed');
@@ -491,7 +496,7 @@ export class AdtPackage<
           // verdict is `del:isDeleted`. `deletionRefusal` reads a check's
           // `del:isDeletable`, found none, and reported every successful
           // package delete as a refusal.
-          options?.analyse ?? packageDeletionRefusal,
+          (options?.analyse ?? packageDeletionRefusal) as IAnalyse<E>,
         ),
       );
       this.logger?.info?.('Package deleted');
@@ -500,11 +505,11 @@ export class AdtPackage<
   }
 
   /** Check the package. */
-  async check(
+  async check<E extends IAdtError = IAdtError>(
     config: Partial<IPackageConfig>,
     status?: string,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['check']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     const name = this.name(config);
     const version: 'active' | 'inactive' =
       status === 'active' ? 'active' : 'inactive';

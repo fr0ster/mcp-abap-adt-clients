@@ -20,6 +20,7 @@ import type {
   IAdtContentTypes,
   IAdtCreatable,
   IAdtDeletable,
+  IAdtError,
   IAdtLockable,
   IAdtOperationOptions,
   IAdtReadable,
@@ -33,7 +34,11 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
 import { activationRefusal } from '../../utils/activationUtils';
-import { answering } from '../../utils/adtResponse';
+import {
+  answering,
+  type IAdtOptions,
+  type IAnalyse,
+} from '../../utils/adtResponse';
 import { beginCriticalSection } from '../../utils/criticalSection';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import { chain } from '../shared/chain';
@@ -154,10 +159,10 @@ export class AdtFunctionModule<
   }
 
   /** Validate a function module name before creating it. */
-  async validate(
+  async validate<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionModuleConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['validation']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
     const { group, module } = this.names(config);
 
     return answering(
@@ -174,10 +179,10 @@ export class AdtFunctionModule<
   }
 
   /** Create the function module. */
-  async create(
+  async create<E extends IAdtError = IAdtError>(
     config: IFunctionModuleConfig,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['created']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     const { group, module } = this.names(config);
     if (!config.description) {
       throw new Error('Description is required');
@@ -285,10 +290,10 @@ export class AdtFunctionModule<
    * this is one request. Without it, this locks, checks, writes and unlocks —
    * and the unlock happens on every path out.
    */
-  async update(
+  async update<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionModuleConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     const { group, module } = this.names(config);
     const source = options?.sourceCode || config.sourceCode;
 
@@ -439,10 +444,10 @@ export class AdtFunctionModule<
    *
    * The deletion check is read, not merely performed — see AdtProgram.delete.
    */
-  async delete(
+  async delete<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionModuleConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['deletion']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     const { group, module } = this.names(config);
 
     return chain(this.logger, async ({ step }) => {
@@ -456,7 +461,7 @@ export class AdtFunctionModule<
               transport_request: config.transportRequest,
             }),
           this.results.check as IResultStrategy<ReturnType<R['check']>>,
-          options?.analyse ?? deletionRefusal,
+          (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
         ),
       );
       this.logger?.info?.('Deletion check passed');
@@ -481,25 +486,25 @@ export class AdtFunctionModule<
   }
 
   /** Activate the function module. Needs no stateful session. */
-  async activate(
+  async activate<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionModuleConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['activation']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     const { group, module } = this.names(config);
 
     return answering(
       () => activateFunctionModule(this.connection, group, module),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
-      options?.analyse ?? activationRefusal,
+      (options?.analyse ?? activationRefusal) as IAnalyse<E>,
     );
   }
 
   /** Check the function module. */
-  async check(
+  async check<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionModuleConfig>,
     status?: string,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['check']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     const { group, module } = this.names(config);
     const version: 'active' | 'inactive' =
       status === 'active' ? 'active' : 'inactive';

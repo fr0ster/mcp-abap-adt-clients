@@ -13,6 +13,7 @@ import type {
   IAdtContentTypes,
   IAdtCreatable,
   IAdtDeletable,
+  IAdtError,
   IAdtLockable,
   IAdtOperationOptions,
   IAdtReadable,
@@ -24,7 +25,11 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
 import { activationRefusal } from '../../utils/activationUtils';
-import { answering } from '../../utils/adtResponse';
+import {
+  answering,
+  type IAdtOptions,
+  type IAnalyse,
+} from '../../utils/adtResponse';
 import { chain } from '../shared/chain';
 import { activateInclude } from './activation';
 import { create } from './create';
@@ -81,10 +86,10 @@ export class AdtInclude<
    * optional. Eclipse does not call it in the captured create, so this is
    * available rather than obligatory.
    */
-  async validate(
+  async validate<E extends IAdtError = IAdtError>(
     config: Partial<IIncludeConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['validation']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
     const includeName = requireName(config);
     if (!config.packageName) {
       throw new Error('packageName is required for validation');
@@ -120,10 +125,10 @@ export class AdtInclude<
    * transcript — and a failure in that write is still returned, because it is
    * why the include is not what was asked for.
    */
-  async create(
+  async create<E extends IAdtError = IAdtError>(
     config: IIncludeConfig,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['created']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     const includeName = requireName(config);
     if (!config.packageName) {
       throw new Error('packageName is required to create an include');
@@ -212,10 +217,10 @@ export class AdtInclude<
    * caller already holds the lock and manages it — this then writes only, and
    * neither locks nor unlocks. Activation is `options.activateOnUpdate`.
    */
-  async update(
+  async update<E extends IAdtError = IAdtError>(
     config: Partial<IIncludeConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     // Absence, not emptiness: clearing an include to empty is a real edit, and
     // a truthiness check made it impossible to express.
     const sourceCode = options?.sourceCode ?? config.sourceCode;
@@ -249,10 +254,10 @@ export class AdtInclude<
    * object is gone, so it is not a failure of the delete — which is exactly
    * what `chain` does with a cleanup that throws.
    */
-  async delete(
+  async delete<E extends IAdtError = IAdtError>(
     config: Partial<IIncludeConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['deletion']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     const includeName = requireName(config);
 
     return chain(this.logger, async ({ step, onScopeEnd }) => {
@@ -284,15 +289,15 @@ export class AdtInclude<
   }
 
   /** Activate the include. */
-  async activate(
+  async activate<E extends IAdtError = IAdtError>(
     config: Partial<IIncludeConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['activation']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     const includeName = requireName(config);
     return answering(
       () => activateInclude(this.connection, includeName),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
-      options?.analyse ?? activationRefusal,
+      (options?.analyse ?? activationRefusal) as IAnalyse<E>,
     );
   }
 
@@ -343,11 +348,11 @@ export class AdtInclude<
    * under it and does NOT unlock, because releasing somebody else's lock is how
    * a caller's own next request starts failing.
    */
-  private async writeSource(
+  private async writeSource<E extends IAdtError = IAdtError>(
     config: Partial<IIncludeConfig>,
     sourceCode: string,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     const includeName = requireName(config);
     const borrowed = options?.lockHandle;
 

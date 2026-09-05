@@ -24,6 +24,7 @@ import type {
   IAdtContentTypes,
   IAdtCreatable,
   IAdtDeletable,
+  IAdtError,
   IAdtLockable,
   IAdtOperationOptions,
   IAdtReadable,
@@ -37,7 +38,11 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
 import { activationRefusal } from '../../utils/activationUtils';
-import { answering } from '../../utils/adtResponse';
+import {
+  answering,
+  type IAdtOptions,
+  type IAnalyse,
+} from '../../utils/adtResponse';
 import { beginCriticalSection } from '../../utils/criticalSection';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import { chain } from '../shared/chain';
@@ -128,10 +133,10 @@ export class AdtProgram<
   }
 
   /** Validate a program name before creating it. */
-  async validate(
+  async validate<E extends IAdtError = IAdtError>(
     config: Partial<IProgramConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['validation']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
     // Nothing was asked of the server, so there is no answer to describe: a
     // missing required argument is the caller's mistake and it throws.
     if (!config.programName) {
@@ -158,10 +163,10 @@ export class AdtProgram<
   }
 
   /** Create the program. */
-  async create(
+  async create<E extends IAdtError = IAdtError>(
     config: IProgramConfig,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['created']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     if (!config.programName) {
       throw new Error('Program name is required');
     }
@@ -280,10 +285,10 @@ export class AdtProgram<
    * this is one request. Without it, this locks, checks, writes and unlocks —
    * and the unlock happens on every path out.
    */
-  async update(
+  async update<E extends IAdtError = IAdtError>(
     config: Partial<IProgramConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     if (!config.programName) {
       throw new Error('Program name is required');
     }
@@ -421,7 +426,7 @@ export class AdtProgram<
             this.results.activation as IResultStrategy<
               ReturnType<R['activation']>
             >,
-            options?.analyse ?? activationRefusal,
+            (options?.analyse ?? activationRefusal) as IAnalyse<E>,
           ),
         );
 
@@ -449,10 +454,10 @@ export class AdtProgram<
    * shipped reading of that answer; a caller who wants another passes their own
    * `analyse`.
    */
-  async delete(
+  async delete<E extends IAdtError = IAdtError>(
     config: Partial<IProgramConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['deletion']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     if (!config.programName) {
       throw new Error('Program name is required');
     }
@@ -472,7 +477,7 @@ export class AdtProgram<
               transportRequest: config.transportRequest,
             }),
           this.results.check as IResultStrategy<ReturnType<R['check']>>,
-          options?.analyse ?? deletionRefusal,
+          (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
         ),
       );
       this.logger?.info?.('Deletion check passed');
@@ -496,10 +501,10 @@ export class AdtProgram<
   }
 
   /** Activate the program. Needs no stateful session. */
-  async activate(
+  async activate<E extends IAdtError = IAdtError>(
     config: Partial<IProgramConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['activation']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     if (!config.programName) {
       throw new Error('Program name is required');
     }
@@ -507,16 +512,16 @@ export class AdtProgram<
     return answering(
       () => activateProgram(this.connection, config.programName as string),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
-      options?.analyse ?? activationRefusal,
+      (options?.analyse ?? activationRefusal) as IAnalyse<E>,
     );
   }
 
   /** Check the program. */
-  async check(
+  async check<E extends IAdtError = IAdtError>(
     config: Partial<IProgramConfig>,
     status?: string,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['check']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     if (!config.programName) {
       throw new Error('Program name is required');
     }

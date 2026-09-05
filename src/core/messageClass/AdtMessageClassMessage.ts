@@ -29,6 +29,7 @@ import type {
   IAbapConnection,
   IAdtCreatable,
   IAdtDeletable,
+  IAdtError,
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
@@ -38,7 +39,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { ADT_NO_FAILURE, AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
 import { MESSAGE_CLASS_UPDATE_CONTENT_TYPE } from '../../constants/contentTypes';
-import { answering, failed } from '../../utils/adtResponse';
+import { answering, failed, type IAdtOptions } from '../../utils/adtResponse';
 import { beginCriticalSection } from '../../utils/criticalSection';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { requestOf } from '../../utils/requestTrace';
@@ -148,18 +149,18 @@ export class AdtMessageClassMessage<
   // ── create / update (upsert) ───────────────────────────────────────────────
 
   /** Create the message — the same write as `update`; ADT upserts. */
-  async create(
+  async create<E extends IAdtError = IAdtError>(
     config: IMessageClassMessageConfig,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['written']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['written']>, E>> {
     return this.writeClass(config, false, options);
   }
 
   /** Update the message — see `create`. */
-  async update(
+  async update<E extends IAdtError = IAdtError>(
     config: Partial<IMessageClassMessageConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['written']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['written']>, E>> {
     return this.writeClass(config, false, options);
   }
 
@@ -171,12 +172,12 @@ export class AdtMessageClassMessage<
    * target message in `<mc:deletedmessages>`, carrying its own message lock
    * handle, while every other message stays in `<mc:messages>`.
    */
-  async delete(
+  async delete<E extends IAdtError = IAdtError>(
     config: Partial<IMessageClassMessageConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['deleted']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deleted']>, E>> {
     return this.writeClass(config, true, options) as Promise<
-      IAdtResponse<ReturnType<R['deleted']>>
+      IAdtResponse<ReturnType<R['deleted']>, E>
     >;
   }
 
@@ -188,11 +189,11 @@ export class AdtMessageClassMessage<
    * two locks, the stateless PUT between them, the order they are released in —
    * is the same, and was duplicated twice before.
    */
-  private async writeClass(
+  private async writeClass<E extends IAdtError = IAdtError>(
     config: Partial<IMessageClassMessageConfig>,
     deleting: boolean,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['written']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['written']>, E>> {
     const { name, no } = this.names(config);
     const label = deleting ? 'deleteMessage' : 'upsertMessage';
 

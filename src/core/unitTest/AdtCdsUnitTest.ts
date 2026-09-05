@@ -25,7 +25,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
-import { answering } from '../../utils/adtResponse';
+import { answering, type IAdtOptions } from '../../utils/adtResponse';
 import { requestOf } from '../../utils/requestTrace';
 import { startClassUnitTestRunByObject } from '../class/run';
 import { validateClassName } from '../class/validation';
@@ -141,10 +141,10 @@ export class AdtCdsUnitTest<
    * and the test source that goes inside it. Without one this is a plain run
    * against a class that already exists, which is the parent's question.
    */
-  override async validate(
+  override async validate<E extends IAdtError = IAdtError>(
     config: Partial<ICdsUnitTestConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['validation']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
     if (!(config.className && config.classTemplate && config.testClassSource)) {
       return super.validate(config, options);
     }
@@ -194,10 +194,10 @@ export class AdtCdsUnitTest<
    * Without a template there is no CDS-specific chain: creating the container
    * class and writing the tests into it is what the parent does.
    */
-  override async create(
+  override async create<E extends IAdtError = IAdtError>(
     config: ICdsUnitTestConfig,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['created']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     if (!(config.className && config.classTemplate && config.testClassSource)) {
       return super.create(config, options);
     }
@@ -250,10 +250,10 @@ export class AdtCdsUnitTest<
    * The forced activation is the difference from the parent: a CDS test class
    * that is written but not активated cannot be run.
    */
-  override async update(
+  override async update<E extends IAdtError = IAdtError>(
     config: Partial<ICdsUnitTestConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     if (!(config.className && config.testClassSource)) {
       return super.update(config, options);
     }
@@ -266,7 +266,7 @@ export class AdtCdsUnitTest<
         transportRequest: config.transportRequest,
       },
       { ...options, activateOnUpdate: true },
-    ) as Promise<IAdtResponse<ReturnType<R['updated']>>>;
+    ) as Promise<IAdtResponse<ReturnType<R['updated']>, E>>;
   }
 
   /**
@@ -276,10 +276,10 @@ export class AdtCdsUnitTest<
    * class: a CDS test class exists only to hold these tests, so removing the
    * tests means removing it.
    */
-  override async delete(
+  override async delete<E extends IAdtError = IAdtError>(
     config: Partial<ICdsUnitTestConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['deleted']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deleted']>, E>> {
     if (!config.className) {
       return super.delete(config, options);
     }
@@ -296,7 +296,7 @@ export class AdtCdsUnitTest<
       options,
     );
     if (answer.ok) this.className = undefined;
-    return answer as IAdtResponse<ReturnType<R['deleted']>>;
+    return answer as IAdtResponse<ReturnType<R['deleted']>, E>;
   }
 
   /**

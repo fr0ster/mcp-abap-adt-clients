@@ -13,6 +13,7 @@ import type {
   IAbapConnection,
   IAdtCreatable,
   IAdtDeletable,
+  IAdtError,
   IAdtLockable,
   IAdtOperationOptions,
   IAdtReadable,
@@ -23,7 +24,11 @@ import type {
   ILogger,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
-import { answering } from '../../utils/adtResponse';
+import {
+  answering,
+  type IAdtOptions,
+  type IAnalyse,
+} from '../../utils/adtResponse';
 import { beginCriticalSection } from '../../utils/criticalSection';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import { getTimeout } from '../../utils/timeouts';
@@ -107,10 +112,10 @@ export class AdtMessageClass<
    * POST with the params in the query string and an empty body — that is what
    * Eclipse sends, and what the other types' validation endpoints take.
    */
-  async validate(
+  async validate<E extends IAdtError = IAdtError>(
     config: Partial<IMessageClassConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['validation']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
     const name = this.name(config);
     const params = new URLSearchParams({ objname: name });
     if (config.description) {
@@ -130,10 +135,10 @@ export class AdtMessageClass<
   }
 
   /** Create the message class shell. No activation — message classes have none. */
-  async create(
+  async create<E extends IAdtError = IAdtError>(
     config: IMessageClassConfig,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['created']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     const name = this.name(config);
     if (!config.packageName) {
       throw new Error('Package name is required');
@@ -203,10 +208,10 @@ export class AdtMessageClass<
   }
 
   /** Update the message class's own metadata: lock → PUT → unlock. */
-  async update(
+  async update<E extends IAdtError = IAdtError>(
     config: Partial<IMessageClassConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     const name = this.name(config);
 
     if (options?.lockHandle) {
@@ -285,10 +290,10 @@ export class AdtMessageClass<
    * The check is read, not merely performed — ADT states a refusal inside a
    * 200.
    */
-  async delete(
+  async delete<E extends IAdtError = IAdtError>(
     config: Partial<IMessageClassConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['deletion']>>> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     const name = this.name(config);
 
     return chain(this.logger, async ({ step }) => {
@@ -297,7 +302,7 @@ export class AdtMessageClass<
         answering(
           () => checkDeletion(this.connection, name),
           this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
-          options?.analyse ?? deletionRefusal,
+          (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
         ),
       );
 

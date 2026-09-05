@@ -123,6 +123,30 @@ export { unitTestDocuments } from './core/unitTest/types';
  * re-deriving what it knows.
  */
 export { activationRefusal } from './utils/activationUtils';
+/**
+ * The two types an error strategy is written against.
+ *
+ * `IAnalyse<E>` is the strategy: handed the library's own verdict and the
+ * answer it was reached from, answering `ADT_NO_FAILURE` or a failure of the
+ * caller's own type. `IAdtOptions<E>` is what a member takes, and it is what
+ * carries `E` from the strategy to `getError()` — declare a failure type of
+ * your own, and it comes back as itself:
+ *
+ * ```typescript
+ * interface IT100Failure extends IAdtError {
+ *   readonly t100: { msgid: string; msgno: string };
+ * }
+ * const t100: IAnalyse<IT100Failure> = (verdict, answer) => …;
+ *
+ * const answer = await client.getClass().activate(config, { analyse: t100 });
+ * if (!answer.ok) answer.getError().t100;   // typed, no cast
+ * ```
+ *
+ * `IAdtOptions` exists because `IAdtOperationOptions` in the contracts package
+ * pins `analyse` to `IAdtError`. Both live here while the shape is proven; they
+ * move into the contracts before release.
+ */
+export type { IAdtOptions, IAnalyse } from './utils/adtResponse';
 export { deletionRefusal } from './utils/deletionCheck';
 /** The readings this package ships, as building blocks for your own sets. */
 export { nothing, rawDocument, wireItself } from './utils/resultStrategy';
