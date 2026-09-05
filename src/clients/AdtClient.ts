@@ -746,7 +746,6 @@ export class AdtClient {
       unknown,
       unknown,
       unknown,
-      unknown,
       unknown
     >,
   >(
@@ -762,11 +761,9 @@ export class AdtClient {
     IAdtValidatable<IAuthorizationFieldConfig, ReturnType<R['validation']>> &
     IAdtCheckable<IAuthorizationFieldConfig, ReturnType<R['check']>> &
     IAdtActivatable<IAuthorizationFieldConfig, ReturnType<R['activation']>> &
-    IAdtLockable<IAuthorizationFieldConfig> &
-    IAdtTransportAware<IAuthorizationFieldConfig, ReturnType<R['transport']>>;
+    IAdtLockable<IAuthorizationFieldConfig>;
   getAuthorizationField<
     R extends IAuthorizationFieldResults<
-      unknown,
       unknown,
       unknown,
       unknown,

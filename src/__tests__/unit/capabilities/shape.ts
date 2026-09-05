@@ -74,7 +74,7 @@ type Offers<T, A> = T extends A ? true : false;
 type OffersAtom<T, A extends string> = A extends 'creatable'
   ? Offers<T, IAdtCreatable<any, any>>
   : A extends 'readable'
-    ? Offers<T, IAdtReadable<any, any>>
+    ? Offers<T, IAdtReadable<any, any, any>>
     : A extends 'updatable'
       ? Offers<T, IAdtUpdatable<any, any>>
       : A extends 'deletable'
@@ -86,9 +86,9 @@ type OffersAtom<T, A extends string> = A extends 'creatable'
             : A extends 'activatable'
               ? Offers<T, IAdtActivatable<any, any>>
               : A extends 'lockable'
-                ? Offers<T, IAdtLockable<any, any>>
+                ? Offers<T, IAdtLockable<any>>
                 : A extends 'versionable'
-                  ? Offers<T, IAdtVersionable<any>>
+                  ? Offers<T, IAdtVersionable<any, any, any>>
                   : A extends 'transportAware'
                     ? Offers<T, IAdtTransportAware<any, any>>
                     : // An atom this chain does not know resolves to `never`,

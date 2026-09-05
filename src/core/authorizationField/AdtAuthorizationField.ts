@@ -58,7 +58,6 @@ export class AdtAuthorizationField<
     unknown,
     unknown,
     unknown,
-    unknown,
     unknown
   > = IAuthorizationFieldResults,
 > implements
@@ -73,8 +72,7 @@ export class AdtAuthorizationField<
     IAdtValidatable<IAuthorizationFieldConfig, ReturnType<R['validation']>>,
     IAdtCheckable<IAuthorizationFieldConfig, ReturnType<R['check']>>,
     IAdtActivatable<IAuthorizationFieldConfig, ReturnType<R['activation']>>,
-    IAdtLockable<IAuthorizationFieldConfig>,
-    IAdtTransportAware<IAuthorizationFieldConfig, ReturnType<R['transport']>>
+    IAdtLockable<IAuthorizationFieldConfig>
 {
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
@@ -245,28 +243,6 @@ export class AdtAuthorizationField<
           options,
         ),
       this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
-      options?.analyse,
-    );
-  }
-
-  /** The transport request the object belongs to. */
-  async readTransport(
-    config: Partial<IAuthorizationFieldConfig>,
-    options?: { withLongPolling?: boolean } & IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['transport']>>> {
-    const name = this.name(config);
-
-    return answering(
-      () =>
-        readAuthorizationField(
-          this.connection,
-          name,
-          'active',
-          options?.withLongPolling !== undefined
-            ? { withLongPolling: options.withLongPolling }
-            : undefined,
-        ),
-      this.results.transport as IResultStrategy<ReturnType<R['transport']>>,
       options?.analyse,
     );
   }

@@ -64,11 +64,6 @@ export type AuthorizationFieldDeletionResult = string;
  */
 export type AuthorizationFieldUpdated = string;
 
-/**
- * The transport document for the field.
- */
-export type AuthorizationFieldTransport = string;
-
 /** One strategy per member of a authorizationField implementation. See `IClassResults`. */
 export interface IAuthorizationFieldResults<
   TCreated = AuthorizationFieldCreated,
@@ -79,7 +74,6 @@ export interface IAuthorizationFieldResults<
   TValidation = AuthorizationFieldValidationResult,
   TDeletion = AuthorizationFieldDeletionResult,
   TUpdated = AuthorizationFieldUpdated,
-  TTransport = AuthorizationFieldTransport,
 > {
   readonly created: IResultStrategy<TCreated>;
   readonly source: IResultStrategy<TSource>;
@@ -89,7 +83,6 @@ export interface IAuthorizationFieldResults<
   readonly validation: IResultStrategy<TValidation>;
   readonly deletion: IResultStrategy<TDeletion>;
   readonly updated: IResultStrategy<TUpdated>;
-  readonly transport: IResultStrategy<TTransport>;
 }
 
 /**
@@ -106,5 +99,4 @@ export const authorizationFieldDocuments = {
   validation: rawDocument,
   deletion: rawDocument,
   updated: rawDocument,
-  transport: rawDocument,
 } satisfies IAuthorizationFieldResults;
