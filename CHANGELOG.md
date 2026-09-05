@@ -5,6 +5,153 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+Requires `@mcp-abap-adt/interfaces@^31.0.0`.
+
+**Every member answers the contract, and the reading is yours.** 17.0.0 moved
+`getUtils()` onto `IAdtResponse` and said the per-type handlers had not followed;
+this is them following, plus the two decisions the contracts made in 30.0.0 and
+31.0.0 — one member per endpoint, and the result shape injected into the
+implementation once rather than chosen at each call.
+
+### Breaking
+
+- **Every member answers `IAdtResponse<T>`.** `client.getClass().create(...)`
+  and its neighbours return a result or a failure instead of a state object, and
+  signal a refusal in the answer instead of throwing. Reading the result without
+  narrowing on `ok` does not compile.
+
+  ```typescript
+  // before
+  const state = await client.getClass().create(config);
+  if (state.errors.length) { /* … */ }
+
+  // after
+  const answer = await client.getClass().create(config);
+  if (!answer.ok) throw new Error(answer.getError().message);
+  answer.getResult().value;
+  ```
+
+- **The `IXxxState` types are gone**, all twenty-eight of them, along with the
+  stored envelopes on them (`createResult`, `updateResult`, `checkResult`,
+  `readResult`, `validationResponse`, `transportResult`, …) and the `errors`
+  array. A member answers one value; a failure is the other half of the answer.
+  A chain answers for the operation asked for, not for each of its steps.
+
+- **`AdtFailureOrigin` has two values**, `'connection'` and `'refusal'`, and
+  `IAdtError.cause` is gone. `'parse'` described *this library* failing to read a
+  document, which is not a verdict about the server — it pointed callers at a
+  system that had answered them correctly. That case throws `AdtParseError` as
+  itself now, and so does a consumer's own reading.
+
+- **The reading is injected once, at construction.** Every `parse` parameter and
+  every overload taking one is gone: `readWith(parse, …)`, `listNodes(parse)`,
+  `search(query, parse)`. Pass a result set to the factory instead:
+
+  ```typescript
+  import { classDocuments } from '@mcp-abap-adt/adt-clients';
+
+  const parsed = client.getClass({
+    ...classDocuments,
+    source: (answer) => myParser(String(answer.data)),
+  });
+  ```
+
+- **One endpoint, one member.** Removed for having a twin over the same request:
+  `AdtUtils.searchObjects` (use `search`), `AdtRequest.listNodes` (use `list`),
+  `Profiler.readWith` (implement `IProfiler`), `AdtServiceBinding`'s eight
+  `xxxServiceBinding` duplicates (use the atoms: `create`, `read`, `update`,
+  `delete`, `activate`, `check`), and `getWhereUsedList`'s `includeRawXml` flag
+  (use `getWhereUsed`, which answers the document).
+
+- **Result shapes moved to this package.** `ISearchResult`, `IWhereUsedListResult`,
+  `ITransportTree` and its four node types, `IRepositoryNodeContents`,
+  `INamedItem`, `IPackageHierarchyNode`, `IObjectReference`,
+  `IInactiveObjectsResponse`, `ObjectVersion`, the feed/ATC/trace shapes and the
+  abapGit ones now come from `@mcp-abap-adt/adt-clients` rather than from
+  `@mcp-abap-adt/interfaces`. A contract carries what is needed to use or replace
+  it; a shape a replacement reading would not produce is neither.
+
+- **`AdtRuntimeClientExperimental` is deleted.** It was `class X extends
+  AdtRuntimeClient {}` — an empty body, a rename wearing a class. Use
+  `AdtRuntimeClient`.
+
+- **`AdtAuthorizationField` no longer claims `IAdtTransportAware`.** The APS IAM
+  endpoint exposes no transport resource; `readTransport()` re-read the object at
+  its own URL and returned that.
+
+- **`AdtFunctionInclude.readSource()` is gone.** `read()` is the source, as the
+  contract says of an object that has one.
+
+- **`AdtRequest.create()` answers the created request**, not its document:
+  `{ transportNumber, description, type, targetSystem, owner, uri, … }`. The
+  low-level `createTransport` hands the document on and `parseCreatedTransport`
+  is its shipped reading — it used to parse inside the writer and return the
+  object in place of the response, so the reading had nothing to read.
+
+### Fixed
+
+- **A `deleteOnFailure` create deleted the object it had just made.** The
+  rollback was registered with `chain`'s `onScopeEnd`, which runs on every path
+  including success, and its `created` guard was true by then. Twenty-four
+  handlers. `chain` now has `onFailure` beside `onScopeEnd` and the two kinds are
+  named apart; cleanups unwind first, rollbacks after, because a delete issued
+  while the chain still holds the lock is answered 403.
+
+- **A refused activation was reported as a connection failure.** Every activation
+  path threw a plain `Error` for the `<msg type="E">` ADT delivers inside a 200,
+  and `recogniseFailure` classified it `origin: 'connection'` — a caller told to
+  check a network that had worked. The writers hand the answer on, and all
+  forty-four `activate` call sites default to `activationRefusal`.
+
+- **`AdtEnhancement.readTransport` and `AdtTransformation.readTransport` read the
+  object**, not the transport. `getEnhancementTransport` and
+  `getTransformationTransport` were still there, unused.
+
+- **The authorization field and the feature toggle polled `version=active` after
+  a write they had not activated** — the version the update cannot have changed.
+
+- **`AdtUnitTest.validate` took the create path on any failed read**, so a 500
+  validated a NAME for a class that already existed. Only an empty body and a 404
+  mean absence.
+
+- **`AdtScalarFunctionImplementation.validate` lost its `validationUnsupported`
+  default**, reporting a rejected name where the system simply has no validation
+  resource.
+
+- **`AdtFunctionModuleLegacy.delete` passed `(module, group)`** to a lock taking
+  `(group, module)`.
+
+- **`LockCapability.lock` and `Profiler.read` classified caller errors as
+  connection failures.** A missing name and a view the family does not have are
+  the caller's mistake and throw before any request.
+
+### Added
+
+- **`src/index.readings.ts`** — the injection surface. The strategy
+  implementations (`rawDocument`, `nothing`, `wireItself`), one `IXxxResults`
+  interface and `<type>Documents` default per object type, the shapes those
+  readings build, and the two error strategies a caller's own `analyse` can defer
+  to (`activationRefusal`, `deletionRefusal`). Without it the seam the contracts
+  name is unreachable from outside the package.
+
+- **`chain`'s `onFailure`** — a rollback that runs only when the chain fails.
+
+- **`parseCreatedTransport`** — the reading of a transport create response.
+
+### Migration
+
+1. Narrow on `ok` at every call site. `answer.getResult()` does not exist on the
+   failure half and `answer.getError()` does not exist on the success half, so
+   the compiler finds them all for you.
+2. Replace `state.errors` checks with `!answer.ok`, and `state.xxxResult` reads
+   with `answer.getResult().value`.
+3. Replace `try/catch` around a refusal with the failure half. Keep a `catch` for
+   `AdtParseError` — an answer this library could not read still throws.
+4. Move result-shape imports from `@mcp-abap-adt/interfaces` to
+   `@mcp-abap-adt/adt-clients`; the shapes themselves are unchanged.
+5. Replace a `parse` argument with a result set passed to the factory.
+6. If you branched on `origin === 'parse'`, catch `AdtParseError` instead.
+
 ## [17.0.0] - 2026-09-02
 
 Requires `@mcp-abap-adt/interfaces@^28.0.0`.

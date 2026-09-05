@@ -58,8 +58,7 @@ docs/
 The package provides the main client classes:
 
 - **AdtClient** - High-level CRUD API with automatic operation chains (recommended)
-- **AdtRuntimeClient** - Stable runtime operations (ABAP debugger, traces, dumps, logs, feeds, ATC check runs)
-- **AdtRuntimeClientExperimental** - Runtime APIs in progress (AMDP debugger/data preview)
+- **AdtRuntimeClient** - Runtime operations (ABAP debugger, traces, dumps, logs, feeds, ATC check runs)
 
 See [CLIENT_API_REFERENCE.md](usage/CLIENT_API_REFERENCE.md) for complete method documentation.
 
@@ -69,12 +68,17 @@ See [CLIENT_API_REFERENCE.md](usage/CLIENT_API_REFERENCE.md) for complete method
 ```typescript
 const client = new AdtClient(connection, logger);
 
-// CRUD operations via IAdtObject
-await client.getClass().create({ className: 'ZCL_TEST', packageName: 'ZPACKAGE', description: 'Test' });
+// Every member answers a contract: a result or a failure, never both.
+const created = await client.getClass().create({
+  className: 'ZCL_TEST',
+  packageName: 'ZPACKAGE',
+  description: 'Test',
+});
+if (!created.ok) throw new Error(created.getError().message);
 
 // Utility operations
-const utils = client.getUtils();
-await utils.searchObjects({ query: 'Z*', objectType: 'CLAS' });
+const found = await client.getUtils().search({ query: 'Z*', objectType: 'CLAS' });
+if (found.ok) found.getResult().value;   // ISearchResult[]
 ```
 
 ### Type System

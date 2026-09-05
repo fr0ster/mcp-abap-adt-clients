@@ -23,5 +23,6 @@ export { AdtInclude, CT_INCLUDE } from './core/include';
 export * from './index.abapgit';
 export * from './index.core';
 export * from './index.executors';
+export * from './index.readings';
 export * from './index.runtime';
 export * from './index.ws';

@@ -298,7 +298,8 @@ Create `src/__tests__/unit/shared/answeringComposition.test.ts`:
  */
 import type { IAdtError, IAdtWireResponse } from '@mcp-abap-adt/interfaces';
 import { AdtSAPError } from '../../../utils/adtErrors';
-import { answering, rawDocument } from '../../../utils/adtResponse';
+import { answering } from '../../../utils/adtResponse';
+import { rawDocument } from '../../../utils/resultStrategy';
 
 const wire = (data: string, status = 200): IAdtWireResponse => ({
   data,
@@ -582,7 +583,7 @@ export async function answering<T>(
 Add to the imports at the top of the file:
 
 ```typescript
-import type { IResultStrategy } from './resultStrategy';
+import type { IResultStrategy } from '@mcp-abap-adt/interfaces';
 ```
 
 And re-export the defaults so callers have one import site:
@@ -702,7 +703,7 @@ Expected: FAIL — `classDocuments` is not exported.
 Append to `src/core/class/types.ts`:
 
 ```typescript
-import type { IResultStrategy } from '../../utils/resultStrategy';
+import type { IResultStrategy } from '@mcp-abap-adt/interfaces';
 import { nothing, rawDocument } from '../../utils/resultStrategy';
 
 /**
