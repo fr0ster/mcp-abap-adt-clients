@@ -163,10 +163,11 @@ with it.
 The third exception is the **transport request**, which is not a locked object at
 all: it is changed and deleted directly.
 
-## A newly created object cannot be read until it is activated
+## A bare `create()` leaves nothing to read
 
-Not a delay — a refusal, and the same one however you ask. Measured against a
-live system by creating a class and reading it before activating:
+A POST makes the repository entry and no version of anything. There is no
+source in it, no active version and no inactive one — so a read has nothing to
+answer with, and it does not answer "empty": it refuses.
 
 ```
 200  POST oo/classes                                     the create succeeds
@@ -174,18 +175,34 @@ live system by creating a class and reading it before activating:
 400  GET  oo/classes/ZAC_PROBE_INACT?version=inactive
 400  GET  oo/classes/ZAC_PROBE_INACT?version=active
 400  GET  oo/classes/ZAC_PROBE_INACT/source/main?version=inactive
-200  POST activation?method=activate&preauditRequested=true
-200  GET  oo/classes/ZAC_PROBE_INACT                     8 KB, and correct
 ```
 
-The refusal is `400 ExceptionResourceWrongData`, `SADT_RESOURCE/007` —
-*"Resource  ZAC_PROBE_INACT: wrong input data for processing"*, with the double
-space where the object type should be. It says nothing about activation, which
-is what makes it expensive: it reads as a malformed request, so the natural
-response is to retry, and retrying never works. This library's own test suite
-spent sixteen seconds a run on eight such retries before it was measured.
+`400 ExceptionResourceWrongData`, T100 `SADT_RESOURCE/007` — *"Resource
+ZAC_PROBE_INACT: wrong input data for processing"*, with the double space where
+the object type should be. It says nothing about versions, which is what makes
+it expensive: it reads as a malformed request, so the natural response is to
+retry, and retrying never works. This library's own test suite spent sixteen
+seconds a run on eight such retries before anyone measured it.
 
-**What to do instead:** activate, then read. If you want the object left
-inactive, do not expect to read it back — the write is what you have.
+**A version is what makes it readable, and either one will do.** Writing the
+source is enough — from a full run, a class reads back at `version=inactive`
+while still under its lock and long before activation:
+
+```
+200  PUT  oo/classes/zac_bp_shr_bimp_ddls/source/main?lockHandle=…
+200  GET  oo/classes/ZAC_BP_SHR_BIMP_DDLS/source/main?version=inactive
+200  POST oo/classes/zac_bp_shr_bimp_ddls?_action=UNLOCK
+200  GET  oo/classes/ZAC_BP_SHR_BIMP_DDLS/source/main?version=inactive
+200  POST activation?method=activate&preauditRequested=true
+```
+
+Tables, DDL sources and behaviour definitions all behave the same way.
+Activating the empty shell also works — it produces an active version, and the
+metadata reads 8 KB straight after — but it is the version that matters, not the
+activation.
+
+So the flow at the top of this page is not a convention: `create` then `update`
+is what turns a repository entry into an object with something in it. A create
+on its own has not failed; it has just not finished.
 
 Reproduce with `npx ts-node scripts/probe-inactive-metadata.ts`.

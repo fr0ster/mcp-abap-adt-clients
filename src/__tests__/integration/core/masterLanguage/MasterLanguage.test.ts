@@ -120,15 +120,18 @@ describe('Master language on create (#105)', () => {
         //    when the configured language is installed on the system (else SAP
         //    normalizes it).
         //
-        //    **Activate first.** This used to retry the read eight times over
-        //    sixteen seconds, believing a freshly created object was "not
-        //    immediately readable". It is not a timing problem: measured on a
-        //    live system, a class that exists only as an inactive version
-        //    refuses every read — metadata with no version, with
-        //    `version=inactive`, with `version=active`, and `source/main` too —
-        //    all with `400 ExceptionResourceWrongData`, "Resource  ZAC_…:
-        //    wrong input data for processing". Activation is what makes it
-        //    readable, and the same read answers 8 KB straight after.
+        //    **Give it a version first.** This used to retry the read eight
+        //    times over sixteen seconds, believing a freshly created object was
+        //    "not immediately readable". It is not a timing problem. A bare
+        //    POST makes a repository entry with no version of anything in it —
+        //    no source, no active version, no inactive one — and a read of that
+        //    refuses with `400 ExceptionResourceWrongData`, "Resource  ZAC_…:
+        //    wrong input data for processing", however the version is asked
+        //    for. A version is what makes it readable, and either one will do:
+        //    writing the source is enough (a class reads at
+        //    `version=inactive` while still under its lock), and activating the
+        //    empty shell works too. This test has no source to write, so it
+        //    activates.
         //
         //    So all eight attempts failed on every run, this assertion never
         //    ran, and the run paid sixteen seconds for the privilege.

@@ -1,12 +1,15 @@
 /**
- * How does a class that exists only as an inactive version answer a metadata
- * read?
+ * When does a class become readable — and is it activation, or is it having a
+ * body at all?
  *
- * The master-language test reads one back right after `create()` and retries
- * eight times over sixteen seconds, on the belief that a freshly created object
- * is "not immediately readable". Every attempt in a full run answered
- * `400 ExceptionResourceWrongData`, which is not a not-ready-yet shape — so the
- * belief is worth testing rather than waiting on.
+ * A POST creates an empty shell: no source has been written to it yet. Reading
+ * one back answers `400 ExceptionResourceWrongData`, and the first pass at this
+ * concluded "a never-activated object cannot be read". That conflates two
+ * things, because the shell had never been written to either.
+ *
+ * So this walks the whole flow and reads after every step: created, then
+ * written under a lock, then activated. Whichever read first answers 200 is the
+ * one that matters, and "inactive" and "empty" stop being the same claim.
  *
  * Creates ZAC_PROBE_INACT in the default package and deletes it again.
  *
@@ -65,6 +68,7 @@ async function main(): Promise<void> {
       }),
     );
 
+    say('--- after POST, an empty shell -----------------------------------');
     report('metadata, no version', await cls.readMetadata({ className: NAME }));
     report(
       'metadata, inactive',
@@ -76,12 +80,42 @@ async function main(): Promise<void> {
     );
     report('source, inactive', await cls.read({ className: NAME }, 'inactive'));
 
-    report('activate', await cls.activate({ className: NAME }));
-
+    say('--- after the source is written, still inactive -------------------');
     report(
-      'metadata after activate',
-      await cls.readMetadata({ className: NAME }),
+      'update (lock, PUT, unlock)',
+      await cls.update(
+        { className: NAME },
+        {
+          sourceCode: [
+            `CLASS ${NAME.toLowerCase()} DEFINITION PUBLIC FINAL CREATE PUBLIC.`,
+            '  PUBLIC SECTION.',
+            '    METHODS probe.',
+            'ENDCLASS.',
+            '',
+            `CLASS ${NAME.toLowerCase()} IMPLEMENTATION.`,
+            '  METHOD probe.',
+            '  ENDMETHOD.',
+            'ENDCLASS.',
+          ].join('\n'),
+        },
+      ),
     );
+    report('metadata, no version', await cls.readMetadata({ className: NAME }));
+    report(
+      'metadata, inactive',
+      await cls.readMetadata({ className: NAME }, { version: 'inactive' }),
+    );
+    report(
+      'metadata, active',
+      await cls.readMetadata({ className: NAME }, { version: 'active' }),
+    );
+    report('source, inactive', await cls.read({ className: NAME }, 'inactive'));
+    report('source, active', await cls.read({ className: NAME }, 'active'));
+
+    say('--- after activation ----------------------------------------------');
+    report('activate', await cls.activate({ className: NAME }));
+    report('metadata, no version', await cls.readMetadata({ className: NAME }));
+    report('source, active', await cls.read({ className: NAME }, 'active'));
   } finally {
     await cls.delete({ className: NAME }).catch(() => undefined);
     await releaseTestConnection(connection);
