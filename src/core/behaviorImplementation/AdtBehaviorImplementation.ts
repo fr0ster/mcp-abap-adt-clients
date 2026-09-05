@@ -29,8 +29,13 @@ import type {
   ILogger,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
-import { answering, type IAdtOptions } from '../../utils/adtResponse';
+import {
+  answering,
+  type IAdtOptions,
+  type IAnalyse,
+} from '../../utils/adtResponse';
 import { getSystemInformation } from '../../utils/systemInfo';
+import { validationRefusal } from '../../utils/validationRefusal';
 import { AdtClass } from '../class/AdtClass';
 import { updateClass } from '../class/update';
 import { chain } from '../shared/chain';
@@ -155,7 +160,7 @@ export class AdtBehaviorImplementation<
           config.behaviorDefinition,
         ),
       this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
-      options?.analyse,
+      (options?.analyse ?? validationRefusal) as IAnalyse<E>,
     );
   }
 

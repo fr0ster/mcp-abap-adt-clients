@@ -150,3 +150,4 @@ export type { IAdtOptions, IAnalyse } from './utils/adtResponse';
 export { deletionRefusal } from './utils/deletionCheck';
 /** The readings this package ships, as building blocks for your own sets. */
 export { nothing, rawDocument, wireItself } from './utils/resultStrategy';
+export { validationRefusal } from './utils/validationRefusal';

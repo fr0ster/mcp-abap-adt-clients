@@ -189,7 +189,7 @@ never neither. Two strategies decide what that is, and the order is fixed:
    failure at all. It is asked first, so a reading is never handed a refusal to
    make a value out of. The shipped defaults read what ADT delivers inside a 200
    — `deletionRefusal`, `activationRefusal`, `validationUnsupported`,
-   `validationSeverity`, `testDoublesVerdict`, `startedRun` — because nothing
+   `validationRefusal`, `testDoublesVerdict`, `startedRun` — because nothing
    below the contract can tell those from a success.
 2. **The result strategy** (injected into the implementation once, at
    construction) decides what a non-failure becomes. Defaults ship per object

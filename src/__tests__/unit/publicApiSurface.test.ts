@@ -196,6 +196,7 @@ const RUNTIME_EXPORTS = [
   'transportDocuments',
   'unitTestDocuments',
   'utilDocuments',
+  'validationRefusal',
   'wireItself',
 ];
 

@@ -138,18 +138,28 @@ So there is nothing to ask about a row, and nothing refuses. The member fetches
 the class document and looks for the number itself. A consumer who replaces the
 reading replaces that verdict along with it.
 
-## `validate()` passed and the create says otherwise
+## `validate()` passed and the create says the name is taken
 
-`validate()` answers neither "this name is free" nor "this object exists".
-Measured across five types: a DDL source validated **ok** for a name whose create
-was then refused as already existing, and a service definition and a program
-validated **ok** while no such object existed at all — the service definition's
-own create had been refused moments earlier. A domain and an interface did
-report their collisions.
+Fixed in this package, and worth knowing if you are on an older version or
+reading raw ADT traffic: a validation refuses a taken name two different ways.
+A domain, a structure, a table, a class and a service definition answer a
+failing status. A **function group and a DDL source answer `200`** with the
+verdict in the body:
 
-So the create's own answer is the verdict. And note what an abandoned create
-leaves: the name is held from the POST onward whatever state the object is in,
-including the class that no read can see.
+```xml
+<SEVERITY>ERROR</SEVERITY>
+<SHORT_TEXT>Data definition ZAC_X already exists</SHORT_TEXT>
+```
+
+Only the function group's reading looked at that, so `getDdl().validate()`
+reported success for a name the system had already rejected, and a caller who
+validates before creating was waved through into a create that then failed.
+`validationRefusal` is the default on every `validate()` now.
+
+Note what `validate()` still does not answer: whether the object exists. A free
+name validates fine either way. And note what an abandoned create leaves — the
+name is held from the POST onward whatever state the object is in, including a
+class that no read can see.
 
 ## A refusal can arrive with a 2xx
 

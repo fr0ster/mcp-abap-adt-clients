@@ -46,6 +46,7 @@ import { requestOf } from '../../utils/requestTrace';
 import { nothing, rawDocument } from '../../utils/resultStrategy';
 import { getSystemInformation } from '../../utils/systemInfo';
 import { getTimeout } from '../../utils/timeouts';
+import { validationRefusal } from '../../utils/validationRefusal';
 import { chain } from '../shared/chain';
 import type { ObjectVersion } from '../shared/results';
 import { lockServiceBinding, unlockServiceBinding } from './lock';
@@ -434,7 +435,7 @@ export class AdtServiceBinding<
           this.results.validation as IResultStrategy<
             ReturnType<R['validation']>
           >,
-          options?.analyse,
+          (options?.analyse ?? validationRefusal) as IAnalyse<E>,
         ),
       );
     });

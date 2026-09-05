@@ -46,6 +46,7 @@ import {
   type IAnalyse,
 } from '../../utils/adtResponse';
 import { safeErrorMessage, safeStringify } from '../../utils/internalUtils';
+import { validationRefusal } from '../../utils/validationRefusal';
 import {
   type ICapabilityContext,
   LockCapability,
@@ -151,7 +152,7 @@ export class AdtClass<
           config.superclass,
         ),
       this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
-      options?.analyse,
+      (options?.analyse ?? validationRefusal) as IAnalyse<E>,
     );
   }
 

@@ -297,19 +297,22 @@ is real but is not an answer to "is there anything to read".
 Whatever the create leaves behind, it holds the name. A second create is refused
 for every type measured — *"Resource Data Definition ZAC_X does already exist."*
 
-`validate()` is **not** a reliable way to find that out beforehand, and it is
-not an existence check either:
+`validate()` does answer it — that is what it is for — but the answer arrives
+two ways, and one of them was being dropped. Measured across seven types:
 
-| Type | `validate()` said | The truth |
-|---|---|---|
-| `domain` | refused, "already exists" | taken |
-| `interface` | refused, "already exists" | taken |
-| `ddl` | **ok** | taken — the create on the next line was refused |
-| `serviceDefinition` | **ok** | no such object; its create had been refused |
-| `program` | **ok** | no such object, and the system forbids the type |
+| Type | How a taken name is refused |
+|---|---|
+| `domain`, `structure`, `table`, `class`, `serviceDefinition` | a failing status |
+| `functionGroup`, `ddl` | **`200`** carrying `<SEVERITY>ERROR</SEVERITY>` |
 
-So a validate that passes says neither "the name is free" nor "the object is
-there". Treat the create's own answer as the verdict.
+Only the function group was reading that body, so `getDdl().validate()` answered
+"fine" for a name the system had already rejected. Fixed: `validationRefusal` is
+the shipped default on every `validate()` now, and it is deliberately narrow — a
+`200` without `<SEVERITY>ERROR</SEVERITY>` stays a success.
+
+What `validate()` does **not** answer is whether the object exists: a name that
+is free validates fine whether or not anything was ever created under it. For
+existence, read.
 
 **Which is why an abandoned create is worth cleaning up.** A create that failed
 partway, or one whose source was never written, leaves a name that nothing else

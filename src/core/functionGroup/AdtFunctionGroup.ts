@@ -44,6 +44,7 @@ import {
 import { beginCriticalSection } from '../../utils/criticalSection';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import { requestOf } from '../../utils/requestTrace';
+import { validationRefusal } from '../../utils/validationRefusal';
 import { chain } from '../shared/chain';
 import {
   createLockTracker,
@@ -67,41 +68,12 @@ import { updateFunctionGroup } from './update';
 import { validateFunctionGroupName } from './validation';
 
 /**
- * The shipped reading of a function-group validation answer.
- *
- * Measured: this endpoint reports a refusal inside a 200, as
- * `<SEVERITY>ERROR</SEVERITY>` with the reason in `<SHORT_TEXT>`. The status
- * says nothing, so a create that trusted it went on to POST a name the system
- * had already rejected.
- *
- * The Kerberos clause is not a workaround for SAP: `Kerberos library not
- * loaded` is what a trial system answers when it cannot reach its own
- * authentication library, and it says nothing about the name being validated.
- * It was cleared here before this migration and is cleared here still — a
- * consumer who disagrees passes their own `analyse`.
+ * Kept as the name this module has always exported. The reading is no longer
+ * function-group-specific: a DDL source answers the same `200` with
+ * `<SEVERITY>ERROR</SEVERITY>` and was not being read at all, so it lives in
+ * {@link validationRefusal} and is the default for every type now.
  */
-export const validationSeverity = (
-  verdict: IAdtError | AdtNoFailure,
-  answer?: IAdtWireResponse,
-): IAdtError | AdtNoFailure => {
-  const document = String(answer?.data ?? '');
-  if (verdict !== ADT_NO_FAILURE) {
-    return /kerberos library not loaded/i.test(`${verdict.message} ${document}`)
-      ? ADT_NO_FAILURE
-      : verdict;
-  }
-  if (/<SEVERITY>ERROR<\/SEVERITY>/.test(document)) {
-    return {
-      origin: 'refusal',
-      message:
-        /<SHORT_TEXT>([^<]+)<\/SHORT_TEXT>/.exec(document)?.[1] ??
-        'Function group validation failed',
-      response: answer,
-      request: requestOf(answer),
-    };
-  }
-  return ADT_NO_FAILURE;
-};
+export const validationSeverity = validationRefusal;
 
 export class AdtFunctionGroup<
   R extends IFunctionGroupResults<
@@ -176,7 +148,7 @@ export class AdtFunctionGroup<
           config.description,
         ),
       this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
-      (options?.analyse ?? validationSeverity) as IAnalyse<E>,
+      (options?.analyse ?? validationRefusal) as IAnalyse<E>,
     );
   }
 

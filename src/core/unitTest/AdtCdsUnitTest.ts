@@ -25,8 +25,13 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
-import { answering, type IAdtOptions } from '../../utils/adtResponse';
+import {
+  answering,
+  type IAdtOptions,
+  type IAnalyse,
+} from '../../utils/adtResponse';
 import { requestOf } from '../../utils/requestTrace';
+import { validationRefusal } from '../../utils/validationRefusal';
 import { startClassUnitTestRunByObject } from '../class/run';
 import { validateClassName } from '../class/validation';
 import { AdtDdl } from '../ddl/AdtDdl';
@@ -172,7 +177,7 @@ export class AdtCdsUnitTest<
           this.results.validation as IResultStrategy<
             ReturnType<R['validation']>
           >,
-          options?.analyse,
+          (options?.analyse ?? validationRefusal) as IAnalyse<E>,
         ),
       );
 

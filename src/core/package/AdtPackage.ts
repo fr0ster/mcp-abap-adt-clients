@@ -37,6 +37,7 @@ import {
 } from '../../utils/adtResponse';
 import { beginCriticalSection } from '../../utils/criticalSection';
 import { deletionRefusal } from '../../utils/deletionCheck';
+import { validationRefusal } from '../../utils/validationRefusal';
 import { chain } from '../shared/chain';
 import {
   createLockTracker,
@@ -144,7 +145,7 @@ export class AdtPackage<
           record_changes: config.recordChanges ?? false,
         }),
       this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
-      options?.analyse,
+      (options?.analyse ?? validationRefusal) as IAnalyse<E>,
     );
   }
 
