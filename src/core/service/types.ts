@@ -1,5 +1,6 @@
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces';
 import {
+  type DesiredPublicationState,
   type GeneratedServiceType,
   SERVICE_BINDING_VARIANT_MAP,
   type ServiceBindingType,
@@ -105,3 +106,33 @@ export const serviceDocuments = {
   publication: rawDocument,
   classification: rawDocument,
 } satisfies IServiceResults;
+
+/**
+ * What a publication change needs, as this package currently understands it.
+ *
+ * Declared **here** rather than in `@mcp-abap-adt/interfaces` on purpose: the
+ * shape is still being settled against measured ADT traffic, and a contract
+ * moves to the contracts package once it does what it needs to, not before.
+ *
+ * The difference from `IUpdateServiceBindingParams` there is that only the
+ * binding is required. Which service, which version and which protocol are
+ * **properties of the binding** — it states all three in its own document
+ * (`srvb:services srvb:name`, `srvb:content srvb:version`, `srvb:binding
+ * srvb:type`) — so requiring them from the caller asked them to repeat what the
+ * object already says, and let them pass a version that disagrees with it.
+ * They remain accepted as an override.
+ *
+ * There is no `publishODataV2` and no `publishODataV4`: the protocol is a
+ * **parameter**, not a method name. Two members that differ only by a value
+ * they could have taken as an argument are two names for one endpoint.
+ */
+export interface IServiceBindingPublicationParams {
+  bindingName: string;
+  desiredPublicationState: DesiredPublicationState;
+  /** Overrides the binding's own `srvb:binding srvb:type`/`srvb:version`. */
+  serviceType?: GeneratedServiceType;
+  /** Overrides the binding's own `srvb:services srvb:name`. */
+  serviceName?: string;
+  /** Overrides the binding's own `srvb:content srvb:version`. */
+  serviceVersion?: string;
+}

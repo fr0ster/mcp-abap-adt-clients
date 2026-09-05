@@ -43,7 +43,6 @@ import { chain } from '../shared/chain';
 import type { ObjectVersion } from '../shared/results';
 import type {
   IActivateServiceBindingParams,
-  IAdtServiceBinding,
   ICheckServiceBindingParams,
   IClassifyServiceBindingParams,
   ICreateAndGenerateServiceBindingParams,
@@ -54,6 +53,7 @@ import type {
   IPublishODataV2Params,
   IReadServiceBindingParams,
   IServiceBindingConfig,
+  IServiceBindingPublicationParams,
   IServiceResults,
   ITransportCheckServiceBindingParams,
   IUnpublishODataV2Params,
@@ -119,18 +119,15 @@ export class AdtServiceBinding<
     IAdtValidatable<IServiceBindingConfig, ReturnType<R['validation']>>,
     IAdtCheckable<IServiceBindingConfig, ReturnType<R['check']>>,
     IAdtActivatable<IServiceBindingConfig, ReturnType<R['activation']>>,
-    IAdtTransportAware<IServiceBindingConfig, ReturnType<R['transport']>>,
-    // The five the contract names. They are passed as the *shapes* the
-    // strategies produce, because `IServiceBindingResults` is a record of
-    // results, not of readings.
-    IAdtServiceBinding<{
-      bindingTypes: ReturnType<R['bindingTypes']>;
-      generation: ReturnType<R['generation']>;
-      odata: ReturnType<R['odata']>;
-      publication: ReturnType<R['publication']>;
-      classification: ReturnType<R['classification']>;
-    }>
+    IAdtTransportAware<IServiceBindingConfig, ReturnType<R['transport']>>
 {
+  // `IAdtServiceBinding` from the contracts package is deliberately NOT in the
+  // list above yet. It still declares `publishODataV2` and `unpublishODataV2` —
+  // two method names for what is one endpoint with a `serviceType` parameter,
+  // and both of them GET a `…jobs` URL that Eclipse POSTs to. The shape here is
+  // being settled against measured traffic first; it moves to
+  // `@mcp-abap-adt/interfaces` when it does what it needs to, not before.
+
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
   private readonly systemContext: IAdtSystemContext;
@@ -589,23 +586,21 @@ export class AdtServiceBinding<
     if (!config.desiredPublicationState) {
       throw new Error('desiredPublicationState is required');
     }
-    if (!config.serviceType) {
-      throw new Error('serviceType is required for update');
-    }
-    if (!config.serviceName) {
-      throw new Error('serviceName is required for update');
-    }
+    // Which service, which version and which protocol are **properties of the
+    // binding**, and it states all three in its own document:
+    // `srvb:services srvb:name`, `srvb:content srvb:version` and
+    // `srvb:binding srvb:type`. Requiring them from the caller asked them to
+    // repeat what the object already says, and let them pass a version that
+    // disagrees with it. They stay accepted as an override.
     const desiredPublicationState = config.desiredPublicationState;
-    const serviceType = config.serviceType;
-    const serviceName = config.serviceName;
 
     return answering(
       () =>
         this.updateRequest({
           bindingName: name,
           desiredPublicationState,
-          serviceType,
-          serviceName,
+          serviceType: config.serviceType,
+          serviceName: config.serviceName,
           serviceVersion: config.serviceVersion,
         }),
       this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
@@ -934,7 +929,7 @@ export class AdtServiceBinding<
   }
 
   private async updateRequest(
-    params: IUpdateServiceBindingParams,
+    params: IServiceBindingPublicationParams,
   ): Promise<IAdtWireResponse> {
     if (!params.bindingName) {
       throw new Error('bindingName is required');
@@ -942,18 +937,17 @@ export class AdtServiceBinding<
     if (!params.desiredPublicationState) {
       throw new Error('desiredPublicationState is required');
     }
-    if (!params.serviceType) {
-      throw new Error('serviceType is required');
-    }
-    if (!params.serviceName) {
-      throw new Error('serviceName is required');
-    }
-
     const readResponse = await this.readRequest({
       bindingName: params.bindingName,
       version: 'active',
     });
     const current = this.parseServiceBindingState(readResponse);
+    // The binding's own answer fills in what the caller did not say. This read
+    // already happens for the state check, so knowing which service is being
+    // published costs the server nothing extra.
+    const serviceType = params.serviceType ?? current.serviceType;
+    const serviceName = params.serviceName ?? current.serviceName;
+    const serviceVersion = params.serviceVersion ?? current.serviceVersion;
     this.logger?.info?.(
       `ServiceBinding update: ${params.bindingName} -> ${params.desiredPublicationState}`,
       {
@@ -979,11 +973,17 @@ export class AdtServiceBinding<
           `Invalid state transition: cannot publish service binding ${params.bindingName}. allowedAction=${current.allowedAction ?? 'UNKNOWN'}`,
         );
       }
+      if (!(serviceType && serviceName)) {
+        throw new Error(
+          `Cannot publish ${params.bindingName}: neither the caller nor the ` +
+            'binding names a service type and a service name.',
+        );
+      }
       return this.publishByServiceType(
-        params.serviceType,
+        serviceType,
         params.bindingName,
-        params.serviceName,
-        params.serviceVersion,
+        serviceName,
+        serviceVersion,
       );
     }
 
@@ -992,11 +992,17 @@ export class AdtServiceBinding<
         `Invalid state transition: cannot unpublish service binding ${params.bindingName}. allowedAction=${current.allowedAction ?? 'UNKNOWN'}`,
       );
     }
+    if (!(serviceType && serviceName)) {
+      throw new Error(
+        `Cannot unpublish ${params.bindingName}: neither the caller nor the ` +
+          'binding names a service type and a service name.',
+      );
+    }
     return this.unpublishByServiceType(
-      params.serviceType,
+      serviceType,
       params.bindingName,
-      params.serviceName,
-      params.serviceVersion,
+      serviceName,
+      serviceVersion,
     );
   }
 
@@ -1215,72 +1221,6 @@ export class AdtServiceBinding<
       timeout: getTimeout('default'),
       headers: {
         Accept: 'application/vnd.sap.adt.businessservices.odatav4.v2+xml',
-      },
-    });
-  }
-
-  async publishODataV2(
-    params: IPublishODataV2Params,
-  ): Promise<IAdtResponse<ReturnType<R['publication']>>> {
-    return answering(
-      () => this.publishV2Request(params),
-      this.results.publication as IResultStrategy<ReturnType<R['publication']>>,
-      publicationRefusal,
-    );
-  }
-
-  private async publishV2Request(
-    params: IPublishODataV2Params,
-  ): Promise<IAdtWireResponse> {
-    if (!params.servicename) {
-      throw new Error('servicename is required');
-    }
-
-    this.logger?.info?.('Publishing OData V2 service', params);
-    const pubV2Qs = buildQueryString({
-      servicename: params.servicename,
-      serviceversion: params.serviceversion,
-    });
-    return this.connection.makeAdtRequest({
-      url: `/sap/bc/adt/businessservices/odatav2/publishjobs?${pubV2Qs}`,
-      method: 'GET',
-      timeout: getTimeout('default'),
-      headers: {
-        Accept:
-          'application/vnd.sap.adt.businessservices.odatav2.v3+xml, application/json, text/plain',
-      },
-    });
-  }
-
-  async unpublishODataV2(
-    params: IUnpublishODataV2Params,
-  ): Promise<IAdtResponse<ReturnType<R['publication']>>> {
-    return answering(
-      () => this.unpublishV2Request(params),
-      this.results.publication as IResultStrategy<ReturnType<R['publication']>>,
-      publicationRefusal,
-    );
-  }
-
-  private async unpublishV2Request(
-    params: IUnpublishODataV2Params,
-  ): Promise<IAdtWireResponse> {
-    if (!params.servicename) {
-      throw new Error('servicename is required');
-    }
-
-    this.logger?.info?.('Unpublishing OData V2 service', params);
-    const unpubV2Qs = buildQueryString({
-      servicename: params.servicename,
-      serviceversion: params.serviceversion,
-    });
-    return this.connection.makeAdtRequest({
-      url: `/sap/bc/adt/businessservices/odatav2/unpublishjobs?${unpubV2Qs}`,
-      method: 'GET',
-      timeout: getTimeout('default'),
-      headers: {
-        Accept:
-          'application/vnd.sap.adt.businessservices.odatav2.v3+xml, application/json, text/plain',
       },
     });
   }
