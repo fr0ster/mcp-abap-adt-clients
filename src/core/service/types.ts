@@ -136,3 +136,25 @@ export interface IServiceBindingPublicationParams {
   /** Overrides the binding's own `srvb:content srvb:version`. */
   serviceVersion?: string;
 }
+
+/**
+ * What identifies the OData service group a binding publishes.
+ *
+ * Declared here for the same reason as
+ * {@link IServiceBindingPublicationParams}: the shape is being settled against
+ * measured traffic before it moves to `@mcp-abap-adt/interfaces`.
+ *
+ * The difference from `IGetServiceBindingODataParams` there is `serviceType`.
+ * The contract has none, so the protocol had to live in the method name —
+ * `getODataV2ServiceBinding` and `getODataV4ServiceBinding`, one endpoint under
+ * two names differing by a value they could have taken as an argument.
+ */
+export interface IServiceGroupParams {
+  /** The binding, as the URL addresses it. */
+  objectname: string;
+  /** Which protocol's service group to read. */
+  serviceType: GeneratedServiceType;
+  servicename?: string;
+  serviceversion?: string;
+  srvdname?: string;
+}

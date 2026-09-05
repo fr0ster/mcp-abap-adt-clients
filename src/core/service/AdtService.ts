@@ -49,11 +49,11 @@ import type {
   ICreateServiceBindingParams,
   IDeleteServiceBindingParams,
   IGenerateServiceBindingParams,
-  IGetServiceBindingODataParams,
   IPublishODataV2Params,
   IReadServiceBindingParams,
   IServiceBindingConfig,
   IServiceBindingPublicationParams,
+  IServiceGroupParams,
   IServiceResults,
   ITransportCheckServiceBindingParams,
   IUnpublishODataV2Params,
@@ -1163,64 +1163,52 @@ export class AdtServiceBinding<
     });
   }
 
-  async getODataV2ServiceBinding(
-    params: IGetServiceBindingODataParams,
+  /**
+   * The OData service group this binding publishes.
+   *
+   * `GET …/{serviceType}/{binding}?servicename=…&serviceversion=…&srvdname=…`,
+   * measured from Eclipse. It is a **read of another object** — the service
+   * group, with its URL prefix, its collections and its deployment state —
+   * which happens to carry `published`, which is why Eclipse reads it after a
+   * publish job. It is not a job-status endpoint.
+   *
+   * One member, not `getODataV2ServiceBinding` and `getODataV4ServiceBinding`:
+   * the protocol is a parameter. Accept carries v1 as well as v2, as Eclipse
+   * sends it — a system that only serves v1 answered 406 to the v2-only header
+   * this used to send.
+   */
+  async getServiceGroup(
+    params: IServiceGroupParams,
   ): Promise<IAdtResponse<ReturnType<R['odata']>>> {
     return answering(
-      () => this.v2Request(params),
+      () => this.serviceGroupRequest(params),
       this.results.odata as IResultStrategy<ReturnType<R['odata']>>,
     );
   }
 
-  private async v2Request(
-    params: IGetServiceBindingODataParams,
+  private async serviceGroupRequest(
+    params: IServiceGroupParams,
   ): Promise<IAdtWireResponse> {
     if (!params.objectname) {
       throw new Error('objectname is required');
     }
+    if (!params.serviceType) {
+      throw new Error('serviceType is required');
+    }
 
-    const v2Qs = buildQueryString({
+    const query = buildQueryString({
       servicename: params.servicename,
       serviceversion: params.serviceversion,
       srvdname: params.srvdname,
     });
     return this.connection.makeAdtRequest({
-      url: `/sap/bc/adt/businessservices/odatav2/${encodeURIComponent(params.objectname)}?${v2Qs}`,
+      url: `/sap/bc/adt/businessservices/${params.serviceType}/${encodeURIComponent(params.objectname)}?${query}`,
       method: 'GET',
       timeout: getTimeout('default'),
       headers: {
-        Accept: 'application/vnd.sap.adt.businessservices.odatav2.v3+xml',
-      },
-    });
-  }
-
-  async getODataV4ServiceBinding(
-    params: IGetServiceBindingODataParams,
-  ): Promise<IAdtResponse<ReturnType<R['odata']>>> {
-    return answering(
-      () => this.v4Request(params),
-      this.results.odata as IResultStrategy<ReturnType<R['odata']>>,
-    );
-  }
-
-  private async v4Request(
-    params: IGetServiceBindingODataParams,
-  ): Promise<IAdtWireResponse> {
-    if (!params.objectname) {
-      throw new Error('objectname is required');
-    }
-
-    const v4Qs = buildQueryString({
-      servicename: params.servicename,
-      serviceversion: params.serviceversion,
-      srvdname: params.srvdname,
-    });
-    return this.connection.makeAdtRequest({
-      url: `/sap/bc/adt/businessservices/odatav4/${encodeURIComponent(params.objectname)}?${v4Qs}`,
-      method: 'GET',
-      timeout: getTimeout('default'),
-      headers: {
-        Accept: 'application/vnd.sap.adt.businessservices.odatav4.v2+xml',
+        Accept:
+          `application/vnd.sap.adt.businessservices.${params.serviceType}.v1+xml, ` +
+          `application/vnd.sap.adt.businessservices.${params.serviceType}.v2+xml`,
       },
     });
   }
