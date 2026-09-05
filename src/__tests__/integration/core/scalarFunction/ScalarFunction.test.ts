@@ -206,18 +206,14 @@ describe('ScalarFunction (DSFD/SCF) integration', () => {
               await sf.read({ scalarFunctionName }, 'active'),
               'readState',
             );
-            expect(readState).toBeDefined();
-            expect(readState).toBeDefined();
-            expect((readState as any)?.status).toBe(200);
+            expect(typeof readState).toBe('string');
           } else {
             // ── 3b) Metadata-only validation: read the inactive object back ──
             const readState = expectResult(
               await sf.read({ scalarFunctionName }, 'inactive'),
               'readState',
             );
-            expect(readState).toBeDefined();
-            expect(readState).toBeDefined();
-            expect((readState as any)?.status).toBe(200);
+            expect(typeof readState).toBe('string');
           }
 
           // ── 5) Delete ──

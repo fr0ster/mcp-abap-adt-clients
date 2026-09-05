@@ -109,32 +109,34 @@ describe('Shared - getWhereUsed', () => {
     // `getWhereUsedList` builds its own scope from flags instead, so it cannot
     // stand in here — see the CHANGELOG entry for the gap and what closes it.
     const utils = new AdtUtils(connection, testsLogger);
-    const scopeResponse = await withAcceptHandling(
-      utils.getWhereUsedScope({
-        object_name: objectName,
-        object_type: objectType,
-      }),
-    );
+    const scopeXml = expectResult(
+      await withAcceptHandling(
+        utils.getWhereUsedScope({
+          object_name: objectName,
+          object_type: objectType,
+        }),
+      ),
+      'where-used scope',
+    ) as string;
 
-    expect(scopeResponse.status).toBe(200);
-    expect(scopeResponse.data).toBeDefined();
+    expect(scopeXml.length).toBeGreaterThan(0);
 
     // Step 2: Use scope WITHOUT modifications (exactly as SAP returned it)
     testsLogger.info?.(
       '🔍 Step 2: Executing where-used search with UNMODIFIED scope...',
     );
-    const result = await withAcceptHandling(
-      utils.getWhereUsed({
-        object_name: objectName,
-        object_type: objectType,
-        scopeXml: scopeResponse.data, // Pass scope as-is, no modifications
-      }),
-    );
+    const document = expectResult(
+      await withAcceptHandling(
+        utils.getWhereUsed({
+          object_name: objectName,
+          object_type: objectType,
+          scopeXml: scopeXml,
+        }),
+      ),
+      'where-used search',
+    ) as string;
 
-    expect(result.status).toBe(200);
-    expect(result.data).toBeDefined();
-
-    const match = result.data?.match(/numberOfResults="(\d+)"/);
+    const match = document.match(/numberOfResults="(\d+)"/);
     if (match) {
       testsLogger.info?.(
         `🎯 Found ${match[1]} usage references with default scope`,
@@ -187,21 +189,19 @@ describe('Shared - getWhereUsed', () => {
     // `getWhereUsedList` builds its own scope from flags instead, so it cannot
     // stand in here — see the CHANGELOG entry for the gap and what closes it.
     const utils = new AdtUtils(connection, testsLogger);
-    const scopeResponse = await withAcceptHandling(
-      utils.getWhereUsedScope({
-        object_name: objectName,
-        object_type: objectType,
-      }),
-    );
-
-    expect(scopeResponse.status).toBe(200);
+    const scopeXml = expectResult(
+      await withAcceptHandling(
+        utils.getWhereUsedScope({
+          object_name: objectName,
+          object_type: objectType,
+        }),
+      ),
+      'where-used scope',
+    ) as string;
 
     // Parse initial state
-    const allTypes = (scopeResponse.data.match(/<usagereferences:type/g) || [])
-      .length;
-    const initialSelected = (
-      scopeResponse.data.match(/isSelected="true"/g) || []
-    ).length;
+    const allTypes = (scopeXml.match(/<usagereferences:type/g) || []).length;
+    const initialSelected = (scopeXml.match(/isSelected="true"/g) || []).length;
 
     testsLogger.info?.(
       `📊 Initial scope: ${initialSelected}/${allTypes} types selected`,
@@ -209,7 +209,7 @@ describe('Shared - getWhereUsed', () => {
 
     // Step 2: Enable ALL types (like Eclipse "Select All" checkbox)
     testsLogger.info?.('🔧 Modifying scope - enabling ALL types...');
-    const modifiedScope = utils.modifyWhereUsedScope(scopeResponse.data, {
+    const modifiedScope = utils.modifyWhereUsedScope(scopeXml, {
       enableAll: true,
     });
 
@@ -225,18 +225,18 @@ describe('Shared - getWhereUsed', () => {
     testsLogger.info?.(
       '🔍 Step 3: Executing where-used search with ALL types...',
     );
-    const result = await withAcceptHandling(
-      utils.getWhereUsed({
-        object_name: objectName,
-        object_type: objectType,
-        scopeXml: modifiedScope,
-      }),
-    );
+    const document = expectResult(
+      await withAcceptHandling(
+        utils.getWhereUsed({
+          object_name: objectName,
+          object_type: objectType,
+          scopeXml: modifiedScope,
+        }),
+      ),
+      'where-used search',
+    ) as string;
 
-    expect(result.status).toBe(200);
-    expect(result.data).toBeDefined();
-
-    const match = result.data?.match(/numberOfResults="(\d+)"/);
+    const match = document.match(/numberOfResults="(\d+)"/);
     if (match) {
       testsLogger.info?.(
         `🎯 Found ${match[1]} usage references with ALL types enabled`,
@@ -284,26 +284,26 @@ describe('Shared - getWhereUsed', () => {
       testsLogger.info?.(`📋 Object: ${objectName} (${objectType})`);
       testsLogger.info?.('🔍 Step 1: Fetching scope configuration...');
 
-      const result = await withAcceptHandling(
-        new AdtUtils(connection, testsLogger).getWhereUsed({
-          object_name: objectName,
-          object_type: objectType,
-        }),
-      );
-
-      expect(result.status).toBe(200);
-      expect(result.data).toBeDefined();
+      const document = expectResult(
+        await withAcceptHandling(
+          new AdtUtils(connection, testsLogger).getWhereUsed({
+            object_name: objectName,
+            object_type: objectType,
+          }),
+        ),
+        'where-used for a table',
+      ) as string;
 
       testsLogger.info?.('✅ Where-used query completed (default types)');
-      testsLogger.info?.(`📊 Response size: ${result.data?.length || 0} bytes`);
+      testsLogger.info?.(`📊 Response size: ${document.length} bytes`);
 
       // Parse and log number of results
-      const match = result.data?.match(/numberOfResults="(\d+)"/);
+      const match = document.match(/numberOfResults="(\d+)"/);
       if (match) {
         testsLogger.info?.(`🎯 Found ${match[1]} usage references`);
 
         // Parse objectTypes to see which types were searched
-        const typeMatches = result.data?.matchAll(
+        const typeMatches = document.matchAll(
           /<usagereferences:type name="([^"]+)" isSelected="true"/g,
         );
         const searchedTypes: string[] = [];
@@ -317,7 +317,7 @@ describe('Shared - getWhereUsed', () => {
         }
 
         // Log result description if available
-        const descMatch = result.data?.match(/resultDescription="([^"]+)"/);
+        const descMatch = document.match(/resultDescription="([^"]+)"/);
         if (descMatch) {
           testsLogger.info?.(`📝 Result: ${descMatch[1]}`);
         }

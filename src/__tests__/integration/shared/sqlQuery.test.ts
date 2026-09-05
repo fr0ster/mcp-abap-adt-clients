@@ -18,6 +18,7 @@ import type {
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
+import { expectResult } from '../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -120,14 +121,19 @@ describe('Shared - getSqlQuery', () => {
     const rowNumber = resolver.getParam('row_number', 10);
 
     logTestStep('execute SQL query', testsLogger);
-    const result = await withAcceptHandling(
-      client.getUtils().getSqlQuery({
-        sql_query: sqlQuery,
-        row_number: rowNumber,
-      }),
-    );
-    expect(result.status).toBe(200);
-    expect(result.data).toBeDefined();
+    // The contract, not the status: ADT answers a refusal inside a 200, and
+    // on a legacy system this endpoint is absent altogether — both come back
+    // as the failure half, naming which.
+    const document = expectResult(
+      await withAcceptHandling(
+        client.getUtils().getSqlQuery({
+          sql_query: sqlQuery,
+          row_number: rowNumber,
+        }),
+      ),
+      'SQL query',
+    ) as string;
+    expect(typeof document).toBe('string');
   }, 30000);
 
   it('should use default row_number if not provided', async () => {
@@ -173,13 +179,18 @@ describe('Shared - getSqlQuery', () => {
     }
 
     logTestStep('execute SQL query with default row_number', testsLogger);
-    const result = await withAcceptHandling(
-      client.getUtils().getSqlQuery({
-        sql_query: sqlQuery,
-      }),
-    );
-    expect(result.status).toBe(200);
-    expect(result.data).toBeDefined();
+    // The contract, not the status: ADT answers a refusal inside a 200, and
+    // on a legacy system this endpoint is absent altogether — both come back
+    // as the failure half, naming which.
+    const document = expectResult(
+      await withAcceptHandling(
+        client.getUtils().getSqlQuery({
+          sql_query: sqlQuery,
+        }),
+      ),
+      'SQL query',
+    ) as string;
+    expect(typeof document).toBe('string');
   }, 30000);
 
   it('should throw error if SQL query is missing', async () => {

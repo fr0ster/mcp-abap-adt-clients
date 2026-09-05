@@ -26,6 +26,7 @@ import {
   skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
 import { createTestsLogger } from '../../../helpers/testLogger';
+import { logTestSkip } from '../../../helpers/testProgressLogger';
 
 const envPath =
   process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../../.env');
@@ -85,7 +86,10 @@ describe('Object version history', () => {
 
   for (const tc of cases) {
     it(`lists versions and fetches a version's source for ${tc.label}`, async () => {
-      if (!hasConfig) return;
+      if (!hasConfig) {
+        logTestSkip(logger, `versions - ${tc.label}`, 'No SAP configuration');
+        return;
+      }
       const versions = expectResult(await tc.list(), `${tc.label} versions`);
       expect(Array.isArray(versions)).toBe(true);
       expect(versions.length).toBeGreaterThan(0);

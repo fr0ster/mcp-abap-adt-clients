@@ -41,7 +41,7 @@ import {
   skipUnlessConfigured,
 } from '../../helpers/sessionConfig';
 import { createTestsLogger } from '../../helpers/testLogger';
-import { logTestStep } from '../../helpers/testProgressLogger';
+import { logTestSkip, logTestStep } from '../../helpers/testProgressLogger';
 
 const envPath =
   process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
@@ -85,7 +85,14 @@ describe('Response contract - 17.0.0', () => {
 
   describe('the successful half', () => {
     it('answers ok, and the result is the member’s own contract', async () => {
-      if (!hasConfig) return;
+      if (!hasConfig) {
+        logTestSkip(
+          testsLogger,
+          'answers ok, and the result is the member’s own contract',
+          'No SAP configuration',
+        );
+        return;
+      }
       logTestStep('search for objects that exist', testsLogger);
 
       const answer = await client.getUtils().search({ query: 'CL_ABAP*' });
@@ -107,7 +114,14 @@ describe('Response contract - 17.0.0', () => {
     }, 60000);
 
     it('has no error on the successful half', async () => {
-      if (!hasConfig) return;
+      if (!hasConfig) {
+        logTestSkip(
+          testsLogger,
+          'has no error on the successful half',
+          'No SAP configuration',
+        );
+        return;
+      }
 
       const answer = await client.getUtils().getAllTypes(50);
 
@@ -125,7 +139,14 @@ describe('Response contract - 17.0.0', () => {
 
   describe('the failing half — what a stub cannot prove', () => {
     it('recognises a refusal about an object the server has never heard of', async () => {
-      if (!hasConfig) return;
+      if (!hasConfig) {
+        logTestSkip(
+          testsLogger,
+          'recognises a refusal about an object the server has never heard of',
+          'No SAP configuration',
+        );
+        return;
+      }
       logTestStep(`read metadata for ${NEVER_EXISTS}`, testsLogger);
 
       const answer = await client
@@ -161,7 +182,14 @@ describe('Response contract - 17.0.0', () => {
     }, 60000);
 
     it('says what SAP said, not what this library guessed', async () => {
-      if (!hasConfig) return;
+      if (!hasConfig) {
+        logTestSkip(
+          testsLogger,
+          'says what SAP said, not what this library guessed',
+          'No SAP configuration',
+        );
+        return;
+      }
 
       const answer = await client
         .getUtils()
@@ -190,7 +218,14 @@ describe('Response contract - 17.0.0', () => {
     }, 60000);
 
     it('a package that does not exist is not an empty package', async () => {
-      if (!hasConfig) return;
+      if (!hasConfig) {
+        logTestSkip(
+          testsLogger,
+          'a package that does not exist is not an empty package',
+          'No SAP configuration',
+        );
+        return;
+      }
       logTestStep(`package hierarchy for ${NEVER_EXISTS}`, testsLogger);
 
       const answer = await client.getUtils().getPackageHierarchy(NEVER_EXISTS);
@@ -215,7 +250,14 @@ describe('Response contract - 17.0.0', () => {
 
   describe('the per-type handlers, which have not migrated', () => {
     it('answers undefined for an object that does not exist', async () => {
-      if (!hasConfig) return;
+      if (!hasConfig) {
+        logTestSkip(
+          testsLogger,
+          'answers undefined for an object that does not exist',
+          'No SAP configuration',
+        );
+        return;
+      }
       logTestStep(`read class ${NEVER_EXISTS}`, testsLogger);
 
       // Not a defect, and this case asserted otherwise at first. `read()` is
@@ -239,7 +281,14 @@ describe('Response contract - 17.0.0', () => {
     }, 60000);
 
     it('surfaces a refusal on a write rather than reporting success', async () => {
-      if (!hasConfig) return;
+      if (!hasConfig) {
+        logTestSkip(
+          testsLogger,
+          'surfaces a refusal on a write rather than reporting success',
+          'No SAP configuration',
+        );
+        return;
+      }
       logTestStep(`activate ${NEVER_EXISTS}`, testsLogger);
 
       // A write is where reporting success on a refusal costs something: the

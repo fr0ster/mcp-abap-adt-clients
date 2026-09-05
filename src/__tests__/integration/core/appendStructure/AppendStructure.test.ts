@@ -272,9 +272,7 @@ describe('AppendStructure (TABL/DS) integration', () => {
               await as.read({ appendStructureName }, 'active'),
               'readState',
             );
-            expect(readState).toBeDefined();
-            expect(readState).toBeDefined();
-            expect((readState as any)?.status).toBe(200);
+            expect(typeof readState).toBe('string');
 
             const writtenSource = String(
               (readState as { data?: unknown })?.data ?? '',
