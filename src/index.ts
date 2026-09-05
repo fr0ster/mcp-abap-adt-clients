@@ -4,7 +4,6 @@
  * Client APIs (Public API):
  * - AdtClient: High-level CRUD operations (validate/create/read/update/delete/activate/check)
  * - AdtRuntimeClient: Runtime operations (stable APIs)
- * - AdtRuntimeClientExperimental: Runtime APIs in progress (may change)
  *
  * @example
  * ```typescript

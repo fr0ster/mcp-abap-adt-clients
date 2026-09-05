@@ -1,10 +1,9 @@
 /**
  * ADT Clients — runtime barrel
- * Covers: AdtRuntimeClient, AdtRuntimeClientExperimental, and all runtime/** modules.
+ * Covers: AdtRuntimeClient and all runtime/** modules.
  */
 
 export { AdtRuntimeClient } from './clients/AdtRuntimeClient';
-export { AdtRuntimeClientExperimental } from './clients/AdtRuntimeClientExperimental';
 export { ApplicationLog } from './runtime/applicationLog/ApplicationLog';
 export { AdtAtc } from './runtime/atc/AdtAtc';
 export { AtcLog } from './runtime/atc/AtcLog';

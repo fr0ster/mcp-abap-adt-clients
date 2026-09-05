@@ -123,7 +123,6 @@ const RUNTIME_EXPORTS = [
   'AdtMessageClassMessage',
   'AdtParseError',
   'AdtRuntimeClient',
-  'AdtRuntimeClientExperimental',
   'AdtSAPError',
   'AdtScalarFunction',
   'AdtScalarFunctionImplementation',
