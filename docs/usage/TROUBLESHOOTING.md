@@ -86,14 +86,19 @@ A `400` with an `<exc:exception>`, `adtType` `ExceptionResourceWrongData`, T100
 the server left it out, which is the first sign the message is not about your
 request at all.
 
-It means **a class was created and no source has been written to it**. Every
+It means **a class was created and no source has been written to it yet**. Every
 read of one refuses this way — `active`, `inactive`, or neither, metadata or
-source. Measured: waiting thirty seconds does not help, and neither does a
-lock/unlock cycle. Writing the source does, immediately and without activation.
+source. Waiting thirty seconds does not help, and neither does a lock/unlock
+cycle. Writing the source does, immediately and without any activation.
 
-It is specific to classes. An interface created the same way reads back its
-generated skeleton, a domain is complete on creation, and a DDL source answers
-200 with an empty body.
+The object is not empty and it is not broken: SAP generated a minimal class and
+stored it as the active version, and you can read it back the moment the first
+write lands. It is unfinished, not absent.
+
+Specific to classes. An interface created the same way reads its generated
+skeleton at once, a domain is complete on creation, a DDL source answers 200
+with an empty body, and a service definition cannot be created bare at all —
+its POST is refused with "Check of condition failed".
 
 The trap is that it reads as "your request is malformed", so the natural
 response is to retry, and retrying never works. This library's own suite spent
@@ -102,8 +107,8 @@ assertion after them had never once executed.
 
 **What to do:** write the source. A class reads at `version=inactive` while
 still under its lock, long before any activation. Do not reach for
-`getVersions()` to test readiness — it answers `ok` in this state too, because
-the feed lists version slots rather than content. See
+`getVersions()` to test readiness — it answers `ok` in this state too, listing
+version slots rather than content. See
 [OBJECT_LIFECYCLE.md](OBJECT_LIFECYCLE.md#what-a-bare-create-actually-leaves-per-type).
 
 ## "Class ZCL_X does not have a TMDIR entry" on an activation
@@ -133,17 +138,18 @@ So there is nothing to ask about a row, and nothing refuses. The member fetches
 the class document and looks for the number itself. A consumer who replaces the
 reading replaces that verdict along with it.
 
-## `validate()` passed and `create()` says the name is taken
+## `validate()` passed and the create says otherwise
 
-Measured on a DDL source: validating a name that an earlier create had already
-claimed answered **ok**, and the create on the very next line was refused —
-*"Resource Data Definition ZAC_X does already exist."* A domain and an interface
-both reported the collision from `validate()`; the DDL source did not.
+`validate()` answers neither "this name is free" nor "this object exists".
+Measured across five types: a DDL source validated **ok** for a name whose create
+was then refused as already existing, and a service definition and a program
+validated **ok** while no such object existed at all — the service definition's
+own create had been refused moments earlier. A domain and an interface did
+report their collisions.
 
-So a validate that passes is not a promise that the create will. The create's
-own answer is the verdict. And note what this means for an abandoned create: the
-name is held from the POST onward, whatever state the object is in — including
-the class that no read can see.
+So the create's own answer is the verdict. And note what an abandoned create
+leaves: the name is held from the POST onward whatever state the object is in,
+including the class that no read can see.
 
 ## A refusal can arrive with a 2xx
 

@@ -242,25 +242,36 @@ all: it is changed and deleted directly.
 
 ## What a bare `create()` actually leaves, per type
 
-A POST makes the repository entry. What is *in* it differs by type, and the
-differences are not guessable — measured on a cloud system, creating each and
-reading it back before anything else:
+A POST sometimes builds a minimal working object and sometimes builds nothing.
+Which one you get is a property of the type, and it is not guessable — measured
+on a cloud system by creating each and asking every way of reading it:
 
-| Type | A read straight after `create()` |
-|---|---|
-| `domain` | **2067 bytes.** Its create carries the content; there is nothing more to write |
-| `interface` | **53 bytes.** SAP generates a skeleton and it is readable at once |
-| `ddl` (DDL source) | **200 with an empty body** — the usual absence-or-emptiness answer |
-| `class` | **refused**, `400 ExceptionResourceWrongData` |
+| Type | What the POST left | A read straight after |
+|---|---|---|
+| `domain` | a complete object — the create carries the content | 2067 bytes |
+| `interface` | a generated skeleton | 53 bytes |
+| `class` | a generated skeleton | **refused**, `400`, "wrong input data" |
+| `ddl` | an object with no content | `200`, empty |
+| `serviceDefinition` | **nothing — the create itself is refused** | — |
 
-So a class is the one that gives nothing back, and the refusal is
-*"Resource  ZAC_X: wrong input data for processing"* — T100 `SADT_RESOURCE/007`,
-with the double space where the object type should be. It says nothing about
-versions or activation, which is what makes it expensive: it reads as a
-malformed request, so the natural response is to retry.
+`serviceDefinition` is the clearest case of the second kind: there is nothing to
+generate a service from, so the POST answers *"Check of condition failed"* and
+no object is made. `program` could not be measured here — an ABAP Cloud system
+refuses it outright with `S_DEVELOP`.
 
-**Retrying never works, and neither does anything else except writing source.**
-Measured on the same class:
+### The class has a skeleton; you just cannot read it yet
+
+The class row above is the one to be careful with, because the refusal invites
+the wrong conclusion. SAP *did* generate a minimal class. It is stored as the
+active version, and it becomes readable the moment the first source is written:
+
+```
+GET …/source/main?version=active    200   class ZAC_PROBE_INACT definition      ← SAP's, lower case
+GET …/source/main?version=inactive  200   CLASS zac_probe_inact DEFINITION …    ← ours, as written
+```
+
+Before that first write, every read refuses — `active`, `inactive`, neither,
+metadata, source. And nothing else lifts it:
 
 ```
 create              ok
@@ -271,31 +282,34 @@ read while locked   refused
 read after unlock   refused                       ← not the lock either
 ```
 
-After a `update()` that writes source, every read answers — `version=inactive`
-(what you wrote), `version=active` (the generated skeleton), and the metadata.
-Activation is not required for any of them.
+So the object is not empty and it is not broken. It is unfinished, and the first
+`update()` is what finishes it. Activation is a separate matter again: it
+promotes what you wrote into the active version, replacing the skeleton.
 
-**`getVersions()` is not a readiness check.** It answers `ok` in every state
-above, including the one where all four reads refuse, because the feed lists
-version *slots* rather than content: `99999` for the inactive one and `00000`
-for the active. The count drops from two to one when activation consumes the
-inactive slot — real, but not an answer to "is there anything to read".
+**`getVersions()` will not tell you any of this.** It answers `ok` in every state
+above, listing version slots rather than content — `99999` for the inactive,
+`00000` for the active — so it reports two entries for the class nothing can
+read. The count drops to one when activation consumes the inactive slot, which
+is real but is not an answer to "is there anything to read".
 
 ## The name is taken from the POST onward, and `validate()` may not say so
 
 Whatever the create leaves behind, it holds the name. A second create is refused
 for every type measured — *"Resource Data Definition ZAC_X does already exist."*
 
-`validate()` is **not** a reliable way to find that out beforehand:
+`validate()` is **not** a reliable way to find that out beforehand, and it is
+not an existence check either:
 
-| Type | `validate()` on a name that is already taken |
-|---|---|
-| `domain` | refused — "Domain with the name ZAC_X already exists" |
-| `interface` | refused — "Interface ZAC_X already exists" |
-| `ddl` | **ok** — and the create on the next line was refused as existing |
+| Type | `validate()` said | The truth |
+|---|---|---|
+| `domain` | refused, "already exists" | taken |
+| `interface` | refused, "already exists" | taken |
+| `ddl` | **ok** | taken — the create on the next line was refused |
+| `serviceDefinition` | **ok** | no such object; its create had been refused |
+| `program` | **ok** | no such object, and the system forbids the type |
 
-So a validate that passes does not mean the create will. Treat the create's own
-answer as the verdict, and if you need to know whether a name is free, read it.
+So a validate that passes says neither "the name is free" nor "the object is
+there". Treat the create's own answer as the verdict.
 
 **Which is why an abandoned create is worth cleaning up.** A create that failed
 partway, or one whose source was never written, leaves a name that nothing else

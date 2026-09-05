@@ -86,13 +86,42 @@ async function main(): Promise<void> {
         description: 'unfinished create probe',
       },
     },
+    {
+      name: 'serviceDefinition ZAC_UNFIN_SRVD',
+      handler: client.getServiceDefinition(),
+      config: {
+        serviceDefinitionName: 'ZAC_UNFIN_SRVD',
+        packageName: PACKAGE,
+        description: 'unfinished create probe',
+      },
+    },
+    {
+      name: 'class ZAC_UNFIN_CLS',
+      handler: client.getClass(),
+      config: {
+        className: 'ZAC_UNFIN_CLS',
+        packageName: PACKAGE,
+        description: 'unfinished create probe',
+      },
+    },
+    {
+      name: 'program ZAC_UNFIN_PROG',
+      handler: client.getProgram(),
+      config: {
+        programName: 'ZAC_UNFIN_PROG',
+        packageName: PACKAGE,
+        description: 'unfinished create probe',
+      },
+    },
   ];
 
   try {
     for (const c of cases) {
       say(`\n### ${c.name}`);
       report('create', await c.handler.create(c.config));
-      report('read', await c.handler.read(c.config));
+      report('read (default)', await c.handler.read(c.config));
+      report('read active', await c.handler.read(c.config, 'active'));
+      report('read inactive', await c.handler.read(c.config, 'inactive'));
       report('validate again', await c.handler.validate(c.config));
       report('create again', await c.handler.create(c.config));
       report('delete', await c.handler.delete(c.config));
