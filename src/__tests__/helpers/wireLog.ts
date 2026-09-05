@@ -10,6 +10,15 @@
  *
  *   WIRE_LOG=/tmp/wire.txt npx jest --runInBand integration/core/package
  *
+ * Bodies are cut at 1200 characters by default, which is right for comparing
+ * headers and wrong for reading what SAP answered — a package read is 876 KB.
+ * `WIRE_LOG_BODY` sets the cut: a number of characters, or `full` for none.
+ *
+ *   WIRE_LOG=/tmp/wire.txt WIRE_LOG_BODY=full npm test
+ *
+ * At `full` the file runs to hundreds of megabytes over a whole suite. That is
+ * the point of it, but it is worth knowing before starting one.
+ *
  * It wraps the transport rather than the connection on purpose. By the time a
  * request reaches `send()` every header is on it — CSRF, cookies, session type,
  * connection id — which is exactly the set worth comparing. Above that they do
@@ -56,10 +65,26 @@ function headerLines(headers: unknown, indent = '  '): string {
     .join('');
 }
 
+/**
+ * How much of a body to write, from `WIRE_LOG_BODY`.
+ *
+ * Read once: an env var that changes mid-run would make two halves of the same
+ * file mean different things. `Number.POSITIVE_INFINITY` rather than a flag, so
+ * the one comparison below covers both cases.
+ */
+const BODY_LIMIT = (() => {
+  const asked = process.env.WIRE_LOG_BODY;
+  if (!asked) return undefined;
+  if (asked === 'full' || asked === '0') return Number.POSITIVE_INFINITY;
+  const parsed = Number.parseInt(asked, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+})();
+
 function bodyLine(data: unknown, limit = 1200): string {
   if (data === undefined || data === null || data === '') return '';
+  const cut = BODY_LIMIT ?? limit;
   const text = typeof data === 'string' ? data : JSON.stringify(data);
-  return `  body: ${text.length > limit ? `${text.slice(0, limit)}… (${text.length} chars)` : text}\n`;
+  return `  body: ${text.length > cut ? `${text.slice(0, cut)}… (${text.length} chars)` : text}\n`;
 }
 
 /**

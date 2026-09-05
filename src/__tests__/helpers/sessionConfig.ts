@@ -307,7 +307,12 @@ export async function createTestConnection(
       ? new SharedCloudConnector(
           config,
           credential,
-          new CloudHttpTransport(materialOf(credential), logger, wire),
+          // Wrapped like the on-prem transports are. Without this `WIRE_LOG`
+          // was silently a no-op against a cloud system — the flag was set, the
+          // file stayed empty, and the run looked like it had nothing to say.
+          withWireLog(
+            new CloudHttpTransport(materialOf(credential), logger, wire),
+          ),
           logger,
         )
       : new SharedOnPremConnector(
