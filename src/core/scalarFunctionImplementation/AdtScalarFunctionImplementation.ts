@@ -430,18 +430,10 @@ export class AdtScalarFunctionImplementation<
         );
         this.logger?.info?.('Scalar function implementation updated');
 
-        // The write produced the inactive version; the active one may not exist
-        // yet. A failure here is not the update's failure, so it is logged and
-        // the chain continues — the unlock still has to happen.
-        const ready = await this.read(config, 'inactive', {
-          withLongPolling: true,
-        });
-        if (!ready.ok) {
-          this.logger?.warn?.(
-            'read with long polling failed after update:',
-            ready.getError().message,
-          );
-        }
+        // No readiness poll here, unlike every neighbouring handler. The DSFI
+        // source resource is JSON on `/source/main` and was never measured to
+        // long-poll; a GET added by pattern would be a request nobody has seen
+        // this endpoint answer.
       }
 
       this.logger?.info?.('Step 4: Unlocking scalar function implementation');

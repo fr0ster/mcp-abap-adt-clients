@@ -380,10 +380,12 @@ export class AdtAuthorizationField<
       );
       this.logger?.info?.('Authorization field updated');
 
-      // The write produced the inactive version; the active one may not exist
-      // yet. A failure here is not the update's failure, so it is logged and
-      // the chain continues — the unlock still has to happen.
-      const ready = await this.read(config, 'active', {
+      // The write produced the inactive version, and that is the one polled:
+      // the active one still holds the pre-update content, so waiting on it
+      // returns something the update cannot have changed. A failure here is not
+      // the update's failure, so it is logged and the chain continues — the
+      // unlock still has to happen.
+      const ready = await this.read(config, 'inactive', {
         withLongPolling: true,
       });
       if (!ready.ok) {

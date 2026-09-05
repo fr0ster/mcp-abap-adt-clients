@@ -41,10 +41,15 @@ export class LockCapability<TConfig, TReadResult = void>
   ) {}
 
   async lock(config: Partial<TConfig>): Promise<IAdtResponse<string>> {
+    // Outside `answering`, and deliberately: a config with no name is a caller
+    // error, not a verdict about the server. Classified inside, it would come
+    // back as `origin: 'connection'` and send them to look at a system that was
+    // never asked anything.
+    const name = this.strategy.nameOf(config);
+
     return answering(
       async () => {
         const ctx = this.getCtx();
-        const name = this.strategy.nameOf(config);
         // Stay stateful while the lock is held; the caller releases via unlock().
         ctx.connection.setSessionType('stateful');
         const { lockHandle } = await this.strategy.acquire(ctx, name);

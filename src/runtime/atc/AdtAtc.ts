@@ -95,20 +95,18 @@ export class AdtAtc
       buildAtcObjectUri(o.objectType, o.objectName),
     );
 
-    const response = await startAtcRun(
-      this.connection,
-      worklistId,
-      uris,
-      maximumVerdicts,
-      wait,
-    );
-
     // The two shapes are read out of the same answer; which one depends on
-    // `wait`, which the caller chose.
-    return answeringValue(async () =>
-      wait
-        ? this.readWaitingRun(response, worklistId)
-        : this.readStartedRun(response, worklistId),
+    // `wait`, which the caller chose. Both are readings, so both sit in the
+    // reading half — a run the server refused comes back as the failure half,
+    // while an answer this library cannot read throws, which is the whole
+    // reason `answering` runs the reading outside its own catch.
+    return answering(
+      () =>
+        startAtcRun(this.connection, worklistId, uris, maximumVerdicts, wait),
+      (answer) =>
+        wait
+          ? this.readWaitingRun(answer, worklistId)
+          : this.readStartedRun(answer, worklistId),
     );
   }
 

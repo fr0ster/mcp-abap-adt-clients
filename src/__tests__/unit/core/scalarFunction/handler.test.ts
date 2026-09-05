@@ -78,30 +78,45 @@ describe('AdtScalarFunction handler', () => {
     expect(failure.message).toContain('405');
   });
 
-  it('validate() rethrows non-unsupported errors (e.g. 403)', async () => {
+  it('validate() reports non-unsupported errors as themselves (e.g. 403)', async () => {
     const { conn } = makeConn(() =>
       Object.assign(new Error('forbidden'), { response: { status: 403 } }),
     );
     const sf = new AdtScalarFunction(conn);
-    await expect(sf.validate({ scalarFunctionName: 'ZOK_F' })).rejects.toThrow(
-      'forbidden',
+
+    // 403 is not in the unsupported set, so the shipped `analyse` leaves it
+    // alone: a system that refused the caller is not a system without the
+    // resource, and giving it the unsupported code would hide an authorization
+    // problem behind a capability one.
+    const failure = expectFailure(
+      await sf.validate({ scalarFunctionName: 'ZOK_F' }),
+      'validate refused with 403',
     );
+
+    expect(failure.message).toContain('forbidden');
+    expect(failure.code).toBeUndefined();
   });
 
-  it('public unlock() resets session to stateless even when unlock throws', async () => {
+  it('public unlock() resets session to stateless even when the unlock is refused', async () => {
     const { conn, sessionTypes } = makeConn((r) =>
       r.url.includes('_action=UNLOCK')
         ? new Error('unlock boom')
         : { data: '' },
     );
     const sf = new AdtScalarFunction(conn);
-    await expect(
-      sf.unlock({ scalarFunctionName: 'ZOK_F' }, 'LH1'),
-    ).rejects.toThrow('unlock boom');
+
+    const failure = expectFailure(
+      await sf.unlock({ scalarFunctionName: 'ZOK_F' }, 'LH1'),
+      'unlock the server refused',
+    );
+
+    expect(failure.message).toContain('unlock boom');
+    // The session is what this case is about: a refused unlock that left the
+    // client stateful poisons every later request on it.
     expect(sessionTypes[sessionTypes.length - 1]).toBe('stateless');
   });
 
-  it('update() happy path: lock→check→PUT→long-poll-read→unlock→check→read, ends stateless', async () => {
+  it('update() happy path: lock→check→PUT→long-poll-read→unlock→check, ends stateless', async () => {
     const LOCK_HANDLE = 'LOCK_HANDLE_42';
     const lockXml = `<?xml version="1.0" encoding="utf-8"?>
 <asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
@@ -128,10 +143,13 @@ describe('AdtScalarFunction handler', () => {
     expect(putCall).toBeDefined();
     expect(putCall?.url).toContain('/source/main');
 
+    // The readiness poll waits on the version the write produced. It read
+    // `version=active` once, which is the version the update cannot have
+    // changed — see `updateNoActivateReadsInactive.test.ts` for the rule.
     const longPollCall = calls.find(
       (c) =>
         c.method === 'GET' &&
-        c.url.includes('version=active') &&
+        c.url.includes('version=inactive') &&
         c.url.includes('withLongPolling=true'),
     );
     expect(longPollCall).toBeDefined();

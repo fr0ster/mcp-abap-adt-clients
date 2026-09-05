@@ -359,9 +359,14 @@ describe('AdtAtc — what a started run answers with', () => {
       },
     });
 
-    await expect(
-      new AdtAtc(connection, logger() as never).run(TARGET, { wait: true }),
-    ).resolves.toMatchObject({
+    const result = expectResult(
+      await new AdtAtc(connection, logger() as never).run(TARGET, {
+        wait: true,
+      }),
+      'waiting run',
+    );
+
+    expect(result).toMatchObject({
       worklistId: WORKLIST_ID,
       findingStats: '1,2,3',
     });
@@ -567,9 +572,14 @@ describe('AdtAtc — the documents are read structurally', () => {
       },
     });
 
-    await expect(
-      new AdtAtc(connection, logger() as never).run(TARGET, { wait: true }),
-    ).resolves.toMatchObject({ findingStats: '4,5,6' });
+    const result = expectResult(
+      await new AdtAtc(connection, logger() as never).run(TARGET, {
+        wait: true,
+      }),
+      'waiting run',
+    );
+
+    expect(result.findingStats).toBe('4,5,6');
   });
 
   // An all-digit id is a string, not a number: `String(12345)` would round-trip

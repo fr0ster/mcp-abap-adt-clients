@@ -141,9 +141,14 @@ describe('AdtScalarFunctionImplementation handler', () => {
       r.url.includes('_action=UNLOCK') ? new Error('boom') : { data: '' },
     );
     const hu = new AdtScalarFunctionImplementation(u.conn);
-    await expect(
-      hu.unlock({ implementationName: 'ZI' }, 'LH1'),
-    ).rejects.toThrow('boom');
+    expect(
+      expectFailure(
+        await hu.unlock({ implementationName: 'ZI' }, 'LH1'),
+        'unlock the server refused',
+      ).message,
+    ).toContain('boom');
+    // A refused unlock that left the client stateful poisons every later
+    // request on the same connection.
     expect(u.sessionTypes[u.sessionTypes.length - 1]).toBe('stateless');
   });
 });

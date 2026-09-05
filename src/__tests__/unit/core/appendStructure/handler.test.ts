@@ -56,16 +56,22 @@ describe('AdtAppendStructure handler', () => {
     expect(calls[0].url).toBe('/sap/bc/adt/ddic/structures');
   });
 
-  it('public unlock() resets to stateless even when unlock throws', async () => {
+  it('public unlock() resets to stateless even when the unlock is refused', async () => {
     const { conn, sessionTypes } = makeConn((r) =>
       r.url.includes('_action=UNLOCK')
         ? new Error('unlock boom')
         : { data: '' },
     );
     const as = new AdtAppendStructure(conn);
-    await expect(
-      as.unlock({ appendStructureName: 'ZOK_S' }, 'LH1'),
-    ).rejects.toThrow('unlock boom');
+
+    const failure = expectFailure(
+      await as.unlock({ appendStructureName: 'ZOK_S' }, 'LH1'),
+      'unlock the server refused',
+    );
+
+    expect(failure.message).toContain('unlock boom');
+    // The session is what this case is about: a refused unlock that left the
+    // client stateful poisons every later request on it.
     expect(sessionTypes[sessionTypes.length - 1]).toBe('stateless');
   });
 
