@@ -43,6 +43,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { ADT_NO_FAILURE, AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
 import { answering } from '../../utils/adtResponse';
+import { requestOf } from '../../utils/requestTrace';
 import { AdtClass, AdtLocalTestClass } from '../class';
 import { getClassUnitTestResult, getClassUnitTestStatus } from '../class/run';
 import { chain } from '../shared/chain';
@@ -76,6 +77,7 @@ export const startedRun = (
         code: AdtObjectErrorCodes.CREATE_FAILED,
         message: 'Failed to start unit test run: run ID not returned',
         response: answer,
+        request: requestOf(answer),
       };
 };
 

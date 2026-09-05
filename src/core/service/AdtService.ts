@@ -38,6 +38,7 @@ import {
   buildQueryString,
   encodeSapObjectName,
 } from '../../utils/internalUtils';
+import { requestOf } from '../../utils/requestTrace';
 import { nothing, rawDocument } from '../../utils/resultStrategy';
 import { getSystemInformation } from '../../utils/systemInfo';
 import { getTimeout } from '../../utils/timeouts';
@@ -105,6 +106,7 @@ export const publicationRefusal = (
       `Publication ${severity}: ${shortText || 'the server gave no short text'}` +
       (longText ? ` — ${longText}` : ''),
     response: answer,
+    request: requestOf(answer),
   };
 };
 
@@ -195,6 +197,7 @@ export class AdtServiceBinding<
               origin: 'refusal' as const,
               message: `Binding variant ${variant} (${bindingType}/${bindingVersion}) is not available on current ADT system`,
               response: answer,
+              request: requestOf(answer),
             };
       },
     );

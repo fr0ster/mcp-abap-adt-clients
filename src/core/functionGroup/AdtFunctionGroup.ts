@@ -39,6 +39,7 @@ import { activationRefusal } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
 import { beginCriticalSection } from '../../utils/criticalSection';
 import { deletionRefusal } from '../../utils/deletionCheck';
+import { requestOf } from '../../utils/requestTrace';
 import { chain } from '../shared/chain';
 import {
   createLockTracker,
@@ -92,6 +93,7 @@ export const validationSeverity = (
         /<SHORT_TEXT>([^<]+)<\/SHORT_TEXT>/.exec(document)?.[1] ??
         'Function group validation failed',
       response: answer,
+      request: requestOf(answer),
     };
   }
   return ADT_NO_FAILURE;

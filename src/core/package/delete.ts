@@ -19,6 +19,7 @@ import {
   CT_DELETION_CHECK,
 } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
+import { requestOf } from '../../utils/requestTrace';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -166,6 +167,7 @@ export const packageDeletionRefusal = (
     origin: 'refusal',
     message: `Package deletion failed${id ? ` [${id[1]}/${id[2]}]` : ''}: ${text}`,
     response: answer,
+    request: requestOf(answer),
   };
 };
 

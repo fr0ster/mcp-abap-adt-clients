@@ -16,6 +16,7 @@ import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
 import { CT_ACTIVATION } from '../constants/contentTypes';
 import { encodeSapObjectName } from './internalUtils';
+import { requestOf } from './requestTrace';
 import { getTimeout } from './timeouts';
 
 /**
@@ -156,6 +157,7 @@ export const activationRefusal = (
         origin: 'refusal',
         message: `Activation failed: ${failure}`,
         response: answer,
+        request: requestOf(answer),
       }
     : ADT_NO_FAILURE;
 };

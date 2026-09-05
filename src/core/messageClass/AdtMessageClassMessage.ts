@@ -41,6 +41,7 @@ import { MESSAGE_CLASS_UPDATE_CONTENT_TYPE } from '../../constants/contentTypes'
 import { answering, failed } from '../../utils/adtResponse';
 import { beginCriticalSection } from '../../utils/criticalSection';
 import { encodeSapObjectName } from '../../utils/internalUtils';
+import { requestOf } from '../../utils/requestTrace';
 import { getTimeout } from '../../utils/timeouts';
 import { chain } from '../shared/chain';
 import { lockClassForMessageOrPlain, lockMessageIfGranted } from './lock';
@@ -130,6 +131,7 @@ export class AdtMessageClassMessage<
                 code: AdtObjectErrorCodes.OBJECT_NOT_FOUND,
                 message: `Message ${no} not found in class ${name}`,
                 response: answer,
+                request: requestOf(answer),
               };
         }),
     );

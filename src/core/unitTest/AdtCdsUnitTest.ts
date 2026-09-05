@@ -26,6 +26,7 @@ import type {
 import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
 import { answering } from '../../utils/adtResponse';
+import { requestOf } from '../../utils/requestTrace';
 import { startClassUnitTestRunByObject } from '../class/run';
 import { validateClassName } from '../class/validation';
 import { AdtDdl } from '../ddl/AdtDdl';
@@ -68,6 +69,7 @@ export const testDoublesVerdict = (
       data?.LONG_TEXT ||
       `CDS test doubles check failed with severity: ${severity ?? '(none)'}`,
     response: answer,
+    request: requestOf(answer),
   };
 };
 
@@ -328,6 +330,7 @@ export class AdtCdsUnitTest<
               origin: 'refusal' as const,
               message: 'Failed to start unit test run: run ID not returned',
               response: wire,
+              request: requestOf(wire),
             };
       },
     );

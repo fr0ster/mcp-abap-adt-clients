@@ -25,6 +25,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
 import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces';
+import { requestOf } from './requestTrace';
 
 export interface IDeletionVerdict {
   /** Object the verdict is about, as ADT names it. */
@@ -147,5 +148,6 @@ export const deletionRefusal = (
     origin: 'refusal',
     message: new DeletionNotPermittedError(read.objectName, read).message,
     response: answer,
+    request: requestOf(answer),
   };
 };
