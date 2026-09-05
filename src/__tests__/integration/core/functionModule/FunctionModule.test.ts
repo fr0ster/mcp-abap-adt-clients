@@ -19,6 +19,7 @@ import type { IFunctionModuleConfig } from '../../../../core/functionModule';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { expectResult } from '../../../helpers/contract';
+import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -123,30 +124,30 @@ describe('FunctionModule (using AdtClient)', () => {
           const functionGroupName = testCase?.params?.function_group_name;
           if (!functionGroupName) return { success: true };
 
-          // Check if function module already exists via metadata
-          try {
+          // The answer decides, not the absence of a throw: a read does not
+          // throw for a missing object any more, so the old `try` fell through
+          // to "it exists" every time and this flow refused to run against a
+          // system that was in exactly the state it wanted.
+          const presence = presenceOf(
             await client.getFunctionModule().readMetadata({
               functionGroupName,
               functionModuleName,
-            });
-            // FM exists — skip test, post-test cleanup will handle deletion
+            }),
+            `FM ${functionGroupName}/${functionModuleName}`,
+          );
+          if (presence.present === 'unknown') {
+            // Not "missing": we did not find out, and creating over an object
+            // that may be there is the irreversible half of that guess.
+            return { success: false, reason: `⚠️ ${presence.reason}` };
+          }
+          if (presence.present) {
             return {
               success: false,
               objectExists: true,
               reason: `⚠️ Function Module ${functionGroupName}/${functionModuleName} already exists. Post-test cleanup will delete it.`,
             };
-          } catch (readErr: any) {
-            const status = readErr?.response?.status ?? readErr?.status;
-            if (status === 404) {
-              // FM doesn't exist — safe to proceed
-              return { success: true };
-            }
-            // Other error (406, 500, etc.) — cannot determine existence, skip for safety
-            return {
-              success: false,
-              reason: `⚠️ Cannot verify FM ${functionGroupName}/${functionModuleName} (HTTP ${status}): ${readErr.message}`,
-            };
           }
+          return { success: true };
         },
       });
     } catch (error) {

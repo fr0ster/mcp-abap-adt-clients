@@ -572,13 +572,18 @@ export class AdtUtils<
     version?: 'active' | 'inactive',
     options?: IReadOptions,
   ): Promise<IAdtResponse<string>> {
-    // A type with no source resource is a caller error, raised before anything
-    // is asked rather than dressed as a verdict about the server.
+    // Raised before anything is asked, rather than dressed as a verdict about
+    // the server: a type with no source resource, and a function module with no
+    // function group, are both the caller's mistake. `getObjectSourceUri` is
+    // pure, so building the URI here is how its own guards surface as
+    // themselves — inside `answering` they came back as
+    // `origin: 'connection'`, advice to check a network nothing reached.
     if (!supportsSourceCode(objectType)) {
       throw new Error(
         `Object type ${objectType} does not support source code reading`,
       );
     }
+    getObjectSourceUri(objectType, objectName, functionGroup, version);
 
     return answering(
       () =>

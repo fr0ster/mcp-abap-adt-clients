@@ -22,6 +22,7 @@ import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IUnitTestConfig } from '../../../../core/unitTest';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { expectResult } from '../../../helpers/contract';
+import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -191,11 +192,14 @@ describe('AdtUnitTest (using AdtClient)', () => {
           // Step 0: Check if class already exists
           let classExists = false;
           try {
-            const existingClass = expectResult(
+            // `expectResult` failed the setup for a container class that is
+            // simply not there — which is the state this flow wants — and
+            // `if (existingClass)` was true either way. The answer decides.
+            const existingClass = presenceOf(
               await client.getClass().read({ className: containerClass }),
-              'existingClass',
+              `class ${containerClass}`,
             );
-            if (existingClass) {
+            if (existingClass.present === true) {
               classExists = true;
               testsLogger.info?.(
                 `Class ${containerClass} already exists, will reuse`,

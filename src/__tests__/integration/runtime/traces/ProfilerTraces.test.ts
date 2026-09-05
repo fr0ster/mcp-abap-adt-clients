@@ -667,9 +667,10 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
 
       try {
         logTestStep(`get trace requests by URI: ${objectUri}`, testsLogger);
-        const requests = await executor
-          .getClassExecutor()
-          .getRequestsByUri(objectUri);
+        const requests = expectResult(
+          await executor.getClassExecutor().getRequestsByUri(objectUri),
+          'trace requests by URI',
+        );
         // A list, possibly empty: nothing scheduled for that URI is a normal
         // answer, not a failure.
         expect(Array.isArray(requests)).toBe(true);

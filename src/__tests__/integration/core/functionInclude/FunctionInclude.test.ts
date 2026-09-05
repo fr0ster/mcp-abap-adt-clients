@@ -19,6 +19,7 @@ import type { IFunctionIncludeConfig } from '../../../../core/functionInclude';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { expectResult } from '../../../helpers/contract';
+import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -123,29 +124,27 @@ describe('FunctionInclude (using AdtClient)', () => {
           const includeName = testCase?.params?.include_name;
           if (!functionGroupName || !includeName) return { success: true };
 
-          // Probe existence of the include. readMetadata throws on 404, so we
-          // catch and map status codes the same way FunctionModule does.
-          try {
+          // The answer decides, not the absence of a throw — see
+          // `presenceOf` for what that mistake cost.
+          const presence = presenceOf(
             await client.getFunctionInclude().readMetadata({
               functionGroupName,
               includeName,
-            });
+            }),
+            `Function Include ${functionGroupName}/${includeName}`,
+          );
+          if (presence.present === 'unknown') {
+            return { success: false, reason: `⚠️ ${presence.reason}` };
+          }
+          if (presence.present) {
             // Include exists — let post-test cleanup handle it.
             return {
               success: false,
               objectExists: true,
               reason: `⚠️ Function Include ${functionGroupName}/${includeName} already exists. Post-test cleanup will delete it.`,
             };
-          } catch (readErr: any) {
-            const status = readErr?.response?.status ?? readErr?.status;
-            if (status === 404) {
-              return { success: true };
-            }
-            return {
-              success: false,
-              reason: `⚠️ Cannot verify Function Include ${functionGroupName}/${includeName} (HTTP ${status}): ${readErr.message}`,
-            };
           }
+          return { success: true };
         },
       });
     } catch (error) {

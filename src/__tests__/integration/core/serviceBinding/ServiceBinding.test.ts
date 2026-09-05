@@ -20,6 +20,7 @@ import type { IServiceBindingConfig } from '../../../../core/service';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { expectResult } from '../../../helpers/contract';
+import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -137,18 +138,27 @@ describe('ServiceBinding (using AdtClient)', () => {
           }
 
           try {
-            const existingActive = expectResult(
+            // `!!value` on an unwrapped answer was always true, and
+            // `expectResult` failed the whole setup for a binding that simply
+            // is not there — which is the state this flow wants. The answer
+            // decides, on either version.
+            const active = presenceOf(
               await client.getServiceBinding().read({ bindingName }, 'active'),
-              'existingActive',
+              `service binding ${bindingName} (active)`,
             );
-            const existingInactive = expectResult(
+            const inactive = presenceOf(
               await client
                 .getServiceBinding()
                 .read({ bindingName }, 'inactive'),
-              'existingInactive',
+              `service binding ${bindingName} (inactive)`,
             );
-            const hasExisting = !!existingActive || !!existingInactive;
-            if (!hasExisting) {
+            if (active.present === 'unknown') {
+              return { success: false, reason: `⚠️ ${active.reason}` };
+            }
+            if (inactive.present === 'unknown') {
+              return { success: false, reason: `⚠️ ${inactive.reason}` };
+            }
+            if (!(active.present || inactive.present)) {
               return { success: true };
             }
 
@@ -161,7 +171,7 @@ describe('ServiceBinding (using AdtClient)', () => {
               params.service_name || params.service_definition_name;
             const serviceVersion = params.service_version || '0001';
 
-            if (existingActive) {
+            if (active.present === true) {
               try {
                 await client.getServiceBinding().update({
                   bindingName,
@@ -277,10 +287,11 @@ describe('ServiceBinding (using AdtClient)', () => {
       );
     }
 
-    const existing = await client
-      .getPackage()
-      .read({ packageName: testSubpackage });
-    if (existing) {
+    const existing = presenceOf(
+      await client.getPackage().read({ packageName: testSubpackage }),
+      `package ${testSubpackage}`,
+    );
+    if (existing.present === true) {
       return testSubpackage;
     }
 

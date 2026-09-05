@@ -24,10 +24,10 @@ if (fs.existsSync(envPath)) {
 }
 
 async function main(): Promise<void> {
-  const [type, name] = process.argv.slice(2);
+  const [type, name, functionGroup] = process.argv.slice(2);
   if (!type || !name) {
     // biome-ignore lint/suspicious/noConsole: a probe reports to whoever ran it
-    console.log('usage: probe-object.ts <type> <NAME>');
+    console.log('usage: probe-object.ts <type> <NAME> [FUNCTION_GROUP]');
     return;
   }
   const logger = createConnectionLogger();
@@ -35,7 +35,7 @@ async function main(): Promise<void> {
   try {
     const answer = await new AdtClient(connection, logger)
       .getUtils()
-      .readObjectSource(type as AdtSourceObjectType, name);
+      .readObjectSource(type as AdtSourceObjectType, name, functionGroup);
     if (!answer.ok) {
       const failure = answer.getError();
       // biome-ignore lint/suspicious/noConsole: same

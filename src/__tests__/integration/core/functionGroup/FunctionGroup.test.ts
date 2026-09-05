@@ -19,6 +19,7 @@ import type { IFunctionGroupConfig } from '../../../../core/functionGroup';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { expectResult } from '../../../helpers/contract';
+import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -125,10 +126,13 @@ describe('FunctionGroup (using AdtClient)', () => {
               libraryLogger,
               systemContext,
             );
-            const existing = await cleanupClient
-              .getFunctionGroup()
-              .read({ functionGroupName });
-            if (existing) {
+            const existing = presenceOf(
+              await cleanupClient
+                .getFunctionGroup()
+                .read({ functionGroupName }),
+              `function group ${functionGroupName}`,
+            );
+            if (existing.present === true) {
               // Try to release any stale lock before deleting
               try {
                 const locked = await cleanupClient

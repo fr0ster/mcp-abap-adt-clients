@@ -19,6 +19,7 @@ import type { IClassConfig } from '../../../../core/class';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { expectResult } from '../../../helpers/contract';
+import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -120,11 +121,14 @@ describe('Class (using AdtClient)', () => {
               libraryLogger,
               systemContext,
             );
-            const existingClass = await cleanupClient
-              .getClass()
-              .read({ className });
-            if (existingClass) {
-              await cleanupClient.getClass().readMetadata({ className });
+            // `if (existingClass)` was always true once a read stopped
+            // throwing: it is an answer object either way. The answer decides —
+            // see `presenceOf`.
+            const existing = presenceOf(
+              await cleanupClient.getClass().read({ className }),
+              `class ${className}`,
+            );
+            if (existing.present === true) {
               try {
                 // Use BaseTester's config resolver to get transport request (allows overriding global params)
                 const transportRequest = tester.getTransportRequest();
