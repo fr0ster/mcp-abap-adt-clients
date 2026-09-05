@@ -137,6 +137,14 @@ export class Profiler implements IProfiler<IAbapTraceEntry, IAbapTraceViews> {
     ...args: ViewArgs<IAbapTraceViews, K>
   ): Promise<IAdtResponse<ViewResult<IAbapTraceViews, K>>> {
     const [options] = args;
+    // Before the request, not inside it: a view this family does not have is a
+    // caller error, and classified inside `answering` it would come back as
+    // `origin: 'connection'` — advice to check the network over a name the
+    // compiler already refuses.
+    if (view !== 'hitlist' && view !== 'statements' && view !== 'dbAccesses') {
+      throw new Error(`Unknown trace view: ${String(view)}`);
+    }
+
     return answering(
       () => this.viewResponse(traceId, view, options),
       (answer) => {

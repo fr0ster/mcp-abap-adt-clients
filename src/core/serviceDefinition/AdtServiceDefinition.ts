@@ -22,6 +22,7 @@ import type {
   ILogger,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
+import { activationRefusal } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
 import { beginCriticalSection } from '../../utils/criticalSection';
 import { deletionRefusal } from '../../utils/deletionCheck';
@@ -149,14 +150,14 @@ export class AdtServiceDefinition<
       throw new Error('Package name is required');
     }
 
-    return chain(this.logger, async ({ step, onScopeEnd }) => {
+    return chain(this.logger, async ({ step, onScopeEnd, onFailure }) => {
       onScopeEnd(async () => {
         this.connection.setSessionType('stateless');
       });
 
       let created = false;
       if (options?.deleteOnFailure) {
-        onScopeEnd(async () => {
+        onFailure(async () => {
           if (!created) return;
           this.logger?.warn?.('Deleting service definition after failure');
           await deleteServiceDefinition(this.connection, {
@@ -391,7 +392,7 @@ export class AdtServiceDefinition<
             this.results.activation as IResultStrategy<
               ReturnType<R['activation']>
             >,
-            options?.analyse,
+            options?.analyse ?? activationRefusal,
           ),
         );
 
@@ -468,7 +469,7 @@ export class AdtServiceDefinition<
     return answering(
       () => activateServiceDefinition(this.connection, name),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
-      options?.analyse,
+      options?.analyse ?? activationRefusal,
     );
   }
 

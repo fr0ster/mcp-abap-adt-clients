@@ -36,6 +36,7 @@ import type {
   ILogger,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
+import { activationRefusal } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
 import { beginCriticalSection } from '../../utils/criticalSection';
 import { deletionRefusal } from '../../utils/deletionCheck';
@@ -169,7 +170,7 @@ export class AdtProgram<
     }
     const name = config.programName;
 
-    return chain(this.logger, async ({ step, onScopeEnd }) => {
+    return chain(this.logger, async ({ step, onScopeEnd, onFailure }) => {
       this.connection.setSessionType('stateful');
       // Registered before anything can fail, so the session is restored on
       // every path — including the one where the create itself is refused,
@@ -180,7 +181,7 @@ export class AdtProgram<
 
       let created = false;
       if (options?.deleteOnFailure) {
-        onScopeEnd(async () => {
+        onFailure(async () => {
           if (!created) return;
           this.logger?.warn?.('Deleting program after failure');
           this.connection.setSessionType('stateful');
@@ -420,7 +421,7 @@ export class AdtProgram<
             this.results.activation as IResultStrategy<
               ReturnType<R['activation']>
             >,
-            options?.analyse,
+            options?.analyse ?? activationRefusal,
           ),
         );
 
@@ -506,7 +507,7 @@ export class AdtProgram<
     return answering(
       () => activateProgram(this.connection, config.programName as string),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
-      options?.analyse,
+      options?.analyse ?? activationRefusal,
     );
   }
 

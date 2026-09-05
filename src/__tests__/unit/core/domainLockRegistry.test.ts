@@ -10,7 +10,7 @@
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import { AdtDomain } from '../../../core/domain/AdtDomain';
 import { LockRegistry } from '../../../core/shared/LockRegistry';
-import { expectResult } from '../../helpers/contract';
+import { expectFailure, expectResult } from '../../helpers/contract';
 import { TestConfigResolver } from '../../helpers/TestConfigResolver';
 import { createTestsLogger } from '../../helpers/testLogger';
 import {
@@ -133,7 +133,10 @@ describe('AdtDomain lock registry wiring', () => {
     const registry = new LockRegistry();
     const domain = new AdtDomain(conn, undefined, undefined, registry);
 
-    await expect(domain.update({ domainName, packageName })).rejects.toThrow();
+    expectFailure(
+      await domain.update({ domainName, packageName }),
+      'update whose flow and cleanup both failed',
+    );
 
     expect(registry.pending).toEqual([lockKey]);
     logTestSuccess(testsLogger, 'Domain lock registry - managed retention');

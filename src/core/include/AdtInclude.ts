@@ -23,6 +23,7 @@ import type {
   ILogger,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
+import { activationRefusal } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
 import { chain } from '../shared/chain';
 import { activateInclude } from './activation';
@@ -128,12 +129,12 @@ export class AdtInclude<
       throw new Error('packageName is required to create an include');
     }
 
-    return chain(this.logger, async ({ step, onScopeEnd }) => {
+    return chain(this.logger, async ({ step, onFailure }) => {
       let created = false;
       if (options?.deleteOnFailure) {
         // The object exists from the create on, so a later failure leaves a
         // half-made include behind unless the caller asked otherwise.
-        onScopeEnd(async () => {
+        onFailure(async () => {
           if (!created) return;
           this.logger?.warn?.('Deleting include after a failed create', {
             includeName,
@@ -291,7 +292,7 @@ export class AdtInclude<
     return answering(
       () => activateInclude(this.connection, includeName),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
-      options?.analyse,
+      options?.analyse ?? activationRefusal,
     );
   }
 

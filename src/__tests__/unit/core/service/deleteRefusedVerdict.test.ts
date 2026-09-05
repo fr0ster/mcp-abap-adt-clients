@@ -17,6 +17,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
 import { AdtServiceBinding } from '../../../../core/service/AdtService';
+import { expectFailure } from '../../../helpers/contract';
 import { createLibraryLogger } from '../../../helpers/testLogger';
 
 /** ADT's answer when something still points at the object. */
@@ -61,13 +62,15 @@ function recording(verdict: string) {
 const config = { bindingName: 'ZGUARD_SRVB' };
 
 describe('service binding delete honours the verdict', () => {
-  it('a refusal rejects, and nothing is deleted', async () => {
+  it('a refusal comes back as a failure, and nothing is deleted', async () => {
     const { calls, connection } = recording(REFUSED);
     const binding = new AdtServiceBinding(connection, createLibraryLogger());
 
-    await expect(binding.delete(config)).rejects.toThrow(
-      /still used|ZGUARD_SRVB/i,
+    const failure = expectFailure(
+      await binding.delete(config),
+      'delete a binding the check refuses',
     );
+    expect(failure.message).toMatch(/still used|ZGUARD_SRVB/i);
 
     expect(
       calls.some((c) => c.url.includes('/sap/bc/adt/deletion/check')),
@@ -95,7 +98,7 @@ describe('service binding delete honours the verdict', () => {
     const { calls, connection } = recording('');
     const binding = new AdtServiceBinding(connection, createLibraryLogger());
 
-    await expect(binding.delete(config)).rejects.toThrow();
+    expectFailure(await binding.delete(config), 'delete on an empty verdict');
 
     expect(
       calls.some((c) => c.url.includes('/sap/bc/adt/deletion/delete')),

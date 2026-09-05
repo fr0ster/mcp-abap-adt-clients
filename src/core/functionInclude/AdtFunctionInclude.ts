@@ -29,6 +29,7 @@ import type {
   ILogger,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
+import { activationRefusal } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
 import { beginCriticalSection } from '../../utils/criticalSection';
 import { deletionRefusal } from '../../utils/deletionCheck';
@@ -215,7 +216,7 @@ export class AdtFunctionInclude<
     // The source upload below is a LOCK…UNLOCK window.
     const endCriticalSection = beginCriticalSection(this.connection);
 
-    return chain(this.logger, async ({ step, onScopeEnd }) => {
+    return chain(this.logger, async ({ step, onScopeEnd, onFailure }) => {
       onScopeEnd(async () => {
         endCriticalSection();
       });
@@ -225,7 +226,7 @@ export class AdtFunctionInclude<
 
       let created = false;
       if (options?.deleteOnFailure) {
-        onScopeEnd(async () => {
+        onFailure(async () => {
           if (!created) return;
           this.logger?.warn?.('Deleting function include after failure');
           await deleteFunctionInclude(
@@ -610,7 +611,7 @@ export class AdtFunctionInclude<
     return answering(
       () => activateFunctionInclude(this.connection, group, include),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
-      options?.analyse,
+      options?.analyse ?? activationRefusal,
     );
   }
 

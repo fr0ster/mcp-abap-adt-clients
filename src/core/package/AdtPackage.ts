@@ -167,14 +167,14 @@ export class AdtPackage<
       );
     }
 
-    return chain(this.logger, async ({ step, onScopeEnd }) => {
+    return chain(this.logger, async ({ step, onScopeEnd, onFailure }) => {
       onScopeEnd(async () => {
         this.connection.setSessionType('stateless');
       });
 
       let created = false;
       if (options?.deleteOnFailure) {
-        onScopeEnd(async () => {
+        onFailure(async () => {
           if (!created) return;
           this.logger?.warn?.('Deleting package after failure');
           await deletePackage(this.connection, {

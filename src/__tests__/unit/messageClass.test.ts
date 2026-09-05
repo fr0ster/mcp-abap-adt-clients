@@ -5,7 +5,7 @@ import type {
 import { parseMessageClass } from '../../core/messageClass';
 import { AdtMessageClass } from '../../core/messageClass/AdtMessageClass';
 import { noopLogger } from '../../utils/noopLogger';
-import { expectResult } from '../helpers/contract';
+import { expectFailure, expectResult } from '../helpers/contract';
 
 const CLASS_XML = `<?xml version="1.0"?><mc:messageClass xmlns:mc="http://www.sap.com/adt/MessageClass" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZT" adtcore:type="MSAG/N" adtcore:description="D"><adtcore:packageRef adtcore:name="ZP"/></mc:messageClass>`;
 const CLASS_XML_WITH_MSG = `<?xml version="1.0"?><mc:messageClass xmlns:mc="http://www.sap.com/adt/MessageClass" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZT" adtcore:type="MSAG/N" adtcore:description="OLD"><adtcore:packageRef adtcore:name="ZP"/><mc:messages mc:msgno="001" mc:msgtext="Hello"/></mc:messageClass>`;
@@ -350,9 +350,12 @@ describe('AdtMessageClass', () => {
     });
 
     const mc = new AdtMessageClass(c, noopLogger);
-    await expect(mc.update({ name: 'ZT', description: 'NEW' })).rejects.toThrow(
-      'PUT failed',
-    );
+    expect(
+      expectFailure(
+        await mc.update({ name: 'ZT', description: 'NEW' }),
+        'update whose PUT the server refused',
+      ).message,
+    ).toContain('PUT failed');
 
     // UNLOCK must still have been called (call index 3)
     expect(calls).toHaveLength(4);

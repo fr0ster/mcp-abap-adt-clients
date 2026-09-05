@@ -22,6 +22,7 @@ import type {
   ILogger,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
+import { activationRefusal } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
 import { nothing, rawDocument } from '../../utils/resultStrategy';
 import {
@@ -184,7 +185,7 @@ export abstract class AdtClassMemberBase<
     return answering(
       () => activateClass(this.connection, config.className as string),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
-      options?.analyse,
+      options?.analyse ?? activationRefusal,
     );
   }
 

@@ -15,6 +15,12 @@
  * `onScopeEnd` returns a handle, and calling it removes that entry, so a chain
  * that unlocks as its own step does not unlock twice.
  *
+ * **`onFailure` is the other kind**, and it is not a convenience: a rollback is
+ * not a cleanup. Every `deleteOnFailure` create registered its rollback with
+ * `onScopeEnd`, guarded by a `created` flag that was true by the time the scope
+ * ended — so a create that succeeded deleted the object it had just made. The
+ * two kinds are named apart here rather than left to each handler to remember.
+ *
  * An error raised *by* cleanup is logged, never propagated: a failing unlock must
  * not replace the reason the chain failed, which is what the caller needs.
  */
@@ -44,8 +50,15 @@ class ChainAbandoned extends Error {
 export interface IChainScope {
   /** Await an answer; its value on success, or abandon the chain with its failure. */
   step<S>(answer: Promise<IAdtResponse<S>>): Promise<S>;
-  /** Register cleanup. The returned function discharges it. */
+  /** Register cleanup that runs on every path. The returned function discharges it. */
   onScopeEnd(undo: () => Promise<void>): () => void;
+  /**
+   * Register a rollback that runs only when the chain fails.
+   *
+   * Not on success: undoing work the caller asked for, because it succeeded, is
+   * the defect this exists to make unrepresentable.
+   */
+  onFailure(undo: () => Promise<void>): () => void;
 }
 
 export async function chain<T>(
@@ -53,29 +66,30 @@ export async function chain<T>(
   body: (scope: IChainScope) => Promise<T>,
 ): Promise<IAdtResponse<T>> {
   const undos: Array<() => Promise<void>> = [];
+  const rollbacks: Array<() => Promise<void>> = [];
+  const register = (
+    list: Array<() => Promise<void>>,
+    undo: () => Promise<void>,
+  ): (() => void) => {
+    list.push(undo);
+    return () => {
+      const at = list.indexOf(undo);
+      if (at >= 0) list.splice(at, 1);
+    };
+  };
+
   const scope: IChainScope = {
     async step<S>(answer: Promise<IAdtResponse<S>>): Promise<S> {
       const a = await answer;
       if (!a.ok) throw new ChainAbandoned(a.getError());
       return a.getResult().value;
     },
-    onScopeEnd(undo: () => Promise<void>): () => void {
-      undos.push(undo);
-      return () => {
-        const at = undos.indexOf(undo);
-        if (at >= 0) undos.splice(at, 1);
-      };
-    },
+    onScopeEnd: (undo) => register(undos, undo),
+    onFailure: (undo) => register(rollbacks, undo),
   };
 
-  try {
-    return succeeded(await body(scope));
-  } catch (error: unknown) {
-    return failed<T>(
-      error instanceof ChainAbandoned ? error.failure : recogniseFailure(error),
-    );
-  } finally {
-    for (const undo of undos.reverse()) {
+  const unwind = async (list: Array<() => Promise<void>>): Promise<void> => {
+    for (const undo of list.reverse()) {
       try {
         await undo();
       } catch (cleanupError: unknown) {
@@ -84,5 +98,21 @@ export async function chain<T>(
         });
       }
     }
+  };
+
+  try {
+    const value = await body(scope);
+    await unwind(undos);
+    return succeeded(value);
+  } catch (error: unknown) {
+    // Cleanups first, rollbacks after — the order a single reverse-ordered list
+    // already produced, since a rollback is registered before the lock it must
+    // outlive. A delete issued while the chain still holds the object's lock is
+    // answered 403.
+    await unwind(undos);
+    await unwind(rollbacks);
+    return failed<T>(
+      error instanceof ChainAbandoned ? error.failure : recogniseFailure(error),
+    );
   }
 }

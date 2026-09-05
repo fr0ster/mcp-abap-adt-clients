@@ -34,6 +34,7 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
 import { ADT_NO_FAILURE, AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
+import { activationRefusal } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
 import { beginCriticalSection } from '../../utils/criticalSection';
 import { deletionRefusal } from '../../utils/deletionCheck';
@@ -217,14 +218,14 @@ export class AdtScalarFunctionImplementation<
       throw new Error('Description is required');
     }
 
-    return chain(this.logger, async ({ step, onScopeEnd }) => {
+    return chain(this.logger, async ({ step, onScopeEnd, onFailure }) => {
       onScopeEnd(async () => {
         this.connection.setSessionType('stateless');
       });
 
       let created = false;
       if (options?.deleteOnFailure) {
-        onScopeEnd(async () => {
+        onFailure(async () => {
           if (!created) return;
           this.logger?.warn?.(
             'Deleting scalar function implementation after failure',
@@ -474,7 +475,7 @@ export class AdtScalarFunctionImplementation<
             this.results.activation as IResultStrategy<
               ReturnType<R['activation']>
             >,
-            options?.analyse,
+            options?.analyse ?? activationRefusal,
           ),
         );
 
@@ -641,7 +642,7 @@ export class AdtScalarFunctionImplementation<
     return answering(
       () => activateScalarFunctionImplementation(this.connection, name),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
-      options?.analyse,
+      options?.analyse ?? activationRefusal,
     );
   }
 

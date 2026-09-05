@@ -15,6 +15,7 @@
 
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import { AdtMessageClassMessage } from '../../../../core/messageClass/AdtMessageClassMessage';
+import { expectFailure } from '../../../helpers/contract';
 
 const CLASS_XML = `<?xml version="1.0" encoding="utf-8"?><mc:messageClass xmlns:mc="http://www.sap.com/adt/messageclass" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZTEST_MSG" adtcore:description="d"><mc:messages><mc:message mc:msgno="001" mc:msgtext="existing"/></mc:messages></mc:messageClass>`;
 const LOCK_XML = `<?xml version="1.0" encoding="utf-8"?><asx:abap xmlns:asx="http://www.sap.com/abapxml"><asx:values><DATA><LOCK_HANDLE>LH1</LOCK_HANDLE></DATA></asx:values></asx:abap>`;
@@ -68,13 +69,16 @@ describe('message-class cleanup after a refused PUT', () => {
   it('sends every unlock on the lock session, not the one the PUT used', async () => {
     const { connection, sent } = createConnection();
 
-    await expect(
-      new AdtMessageClassMessage(connection, logger).update({
-        className: 'ZTEST_MSG',
-        msgno: '001',
-        msgtext: 'changed',
-      }),
-    ).rejects.toThrow(/save refused/);
+    expect(
+      expectFailure(
+        await new AdtMessageClassMessage(connection, logger).update({
+          className: 'ZTEST_MSG',
+          msgno: '001',
+          msgtext: 'changed',
+        }),
+        'update whose save the server refused',
+      ).message,
+    ).toMatch(/save refused/);
 
     const put = sent.find((r) => r.method === 'PUT');
     expect(put?.mode).toBe('stateless'); // the deliberate part
@@ -91,12 +95,15 @@ describe('message-class cleanup after a refused PUT', () => {
   it('does the same on the delete chain', async () => {
     const { connection, sent } = createConnection();
 
-    await expect(
-      new AdtMessageClassMessage(connection, logger).delete({
-        className: 'ZTEST_MSG',
-        msgno: '001',
-      }),
-    ).rejects.toThrow(/save refused/);
+    expect(
+      expectFailure(
+        await new AdtMessageClassMessage(connection, logger).delete({
+          className: 'ZTEST_MSG',
+          msgno: '001',
+        }),
+        'delete whose save the server refused',
+      ).message,
+    ).toMatch(/save refused/);
 
     const unlocks = unlocksOf(sent);
     expect(unlocks.length).toBeGreaterThan(0);

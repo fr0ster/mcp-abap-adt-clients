@@ -35,6 +35,7 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
 import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces';
+import { activationRefusal } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
 import { beginCriticalSection } from '../../utils/criticalSection';
 import { deletionRefusal } from '../../utils/deletionCheck';
@@ -189,14 +190,14 @@ export class AdtFunctionGroup<
     }
     const name = config.functionGroupName;
 
-    return chain(this.logger, async ({ step, onScopeEnd }) => {
+    return chain(this.logger, async ({ step, onScopeEnd, onFailure }) => {
       onScopeEnd(async () => {
         this.connection.setSessionType('stateless');
       });
 
       let created = false;
       if (options?.deleteOnFailure) {
-        onScopeEnd(async () => {
+        onFailure(async () => {
           if (!created) return;
           this.logger?.warn?.('Deleting function group after failure');
           // No stateful needed — the delete uses no lock.
@@ -524,7 +525,7 @@ export class AdtFunctionGroup<
           config.functionGroupName as string,
         ),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
-      options?.analyse,
+      options?.analyse ?? activationRefusal,
     );
   }
 

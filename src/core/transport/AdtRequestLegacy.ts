@@ -100,10 +100,12 @@ export class AdtRequestLegacy<
    * Not a saved-configuration search, so there is no configUri to pass — and
    * accepting one silently would report a filter that never applied.
    *
-   * The default reading is **not** used here: the legacy payload has never been
-   * captured, so `parseTransportTree` cannot honestly claim to read it. The
-   * document comes back as it arrived, and a consumer who has a legacy payload
-   * to work from injects a reading for it.
+   * The reading is the one the implementation was built with, like every other
+   * member. The legacy payload has never been captured, so the shipped
+   * `parseTransportTree` may well not read it — and if so it says which element
+   * it expected and what it found, which is a consumer's cue to inject a
+   * reading for their system. Handing the document back under a type that
+   * promises a tree would be this implementation lying about what it answered.
    */
   override async list(
     options?: IListTransportsOptions,
@@ -119,7 +121,7 @@ export class AdtRequestLegacy<
 
     return answering(
       () => listTransportsLegacy(this.conn),
-      (answer) => String(answer.data ?? '') as ReturnType<R['list']>,
+      this.results.list as IResultStrategy<ReturnType<R['list']>>,
     );
   }
 

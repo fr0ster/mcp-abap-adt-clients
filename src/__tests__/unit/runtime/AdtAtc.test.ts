@@ -579,7 +579,9 @@ describe('AdtAtc — the documents are read structurally', () => {
       'waiting run',
     );
 
-    expect(result.findingStats).toBe('4,5,6');
+    // The union discriminates on `waited`; `findingStats` is on the waiting
+    // arm alone, which is what a `wait: true` run answers.
+    expect(result).toMatchObject({ waited: true, findingStats: '4,5,6' });
   });
 
   // An all-digit id is a string, not a number: `String(12345)` would round-trip

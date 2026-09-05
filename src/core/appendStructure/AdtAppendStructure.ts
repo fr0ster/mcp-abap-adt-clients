@@ -29,6 +29,7 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
 import { ADT_NO_FAILURE, AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
+import { activationRefusal } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
 import { beginCriticalSection } from '../../utils/criticalSection';
 import { deletionRefusal } from '../../utils/deletionCheck';
@@ -300,7 +301,7 @@ export class AdtAppendStructure<
     // leaves the work half done.
     const endCriticalSection = beginCriticalSection(this.connection);
 
-    return chain(this.logger, async ({ step, onScopeEnd }) => {
+    return chain(this.logger, async ({ step, onScopeEnd, onFailure }) => {
       onScopeEnd(async () => {
         endCriticalSection();
       });
@@ -314,7 +315,7 @@ export class AdtAppendStructure<
 
       let created = false;
       if (options?.deleteOnFailure) {
-        onScopeEnd(async () => {
+        onFailure(async () => {
           if (!created) return;
           await deleteAppendStructure(this.connection, {
             append_structure_name: name,
@@ -433,7 +434,7 @@ export class AdtAppendStructure<
     return answering(
       () => activateAppendStructure(this.connection, name),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
-      options?.analyse,
+      options?.analyse ?? activationRefusal,
     );
   }
 

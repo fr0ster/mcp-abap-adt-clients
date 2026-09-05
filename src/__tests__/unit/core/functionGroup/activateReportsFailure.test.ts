@@ -11,7 +11,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
 import { AdtFunctionGroup } from '../../../../core/functionGroup/AdtFunctionGroup';
-import { expectResult } from '../../../helpers/contract';
+import { expectFailure, expectResult } from '../../../helpers/contract';
 
 const FAILED = `<?xml version="1.0" encoding="utf-8"?>
 <chkl:messages xmlns:chkl="http://www.sap.com/abapxml/checklist">
@@ -44,14 +44,21 @@ const connectionReturning = (body: string) => {
 };
 
 describe('function group activation reports what the server said', () => {
-  it('rejects when the response carries an error-severity message', async () => {
+  it('fails when the response carries an error-severity message', async () => {
     const { connection } = connectionReturning(FAILED);
 
-    await expect(
-      new AdtFunctionGroup(connection).activate({
+    // ADT answers a refused activation with 200, so nothing below the contract
+    // can tell. `activationRefusal` reads the messages and names it, and the
+    // caller sees the failure half rather than `errors: []`.
+    const failure = expectFailure(
+      await new AdtFunctionGroup(connection).activate({
         functionGroupName: 'ZFG_TEST',
       }),
-    ).rejects.toThrow(/could not be activated/);
+      'activate a function group the server refuses',
+    );
+
+    expect(failure.origin).toBe('refusal');
+    expect(failure.message).toMatch(/could not be activated/);
   });
 
   it('still POSTs to the activation resource', async () => {

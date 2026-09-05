@@ -160,16 +160,6 @@ export const activationRefusal = (
     : ADT_NO_FAILURE;
 };
 
-export function assertActivationSucceeded(
-  objectLabel: string,
-  responseData: unknown,
-): void {
-  const failure = detectActivationFailure(responseData);
-  if (failure) {
-    throw new Error(`${objectLabel} activation failed: ${failure}`);
-  }
-}
-
 /**
  * Build object URI from name and type
  * Used by both individual and group activation
@@ -345,13 +335,11 @@ export async function activateObjectInSession(
     headers,
   });
 
-  // ADT returns HTTP 200 even on failed activation (locked object, syntax
-  // errors). Surface an explicit failure signal as a thrown error instead of
-  // letting callers report a false success (issue #78).
-  const failure = detectActivationFailure(response.data);
-  if (failure) {
-    throw new Error(`Activation of ${objectName} failed: ${failure}`);
-  }
-
+  // The answer, as it arrived. ADT returns 200 even on a failed activation
+  // (locked object, syntax errors), and this used to throw a plain `Error` for
+  // it — which `recogniseFailure` then called `origin: 'connection'`, sending a
+  // caller to look at a network that had worked perfectly. The verdict is
+  // {@link activationRefusal}'s to give, and every `activate` member defaults
+  // to it (issue #78).
   return response;
 }

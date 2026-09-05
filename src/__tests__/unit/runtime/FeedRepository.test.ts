@@ -107,8 +107,12 @@ describe('FeedRepository', () => {
     });
     const repo = new FeedRepository(connection, createLogger());
 
-    const entries = await repo.byUrl('/sap/bc/adt/runtime/dumps');
+    const entries = expectResult(
+      await repo.byUrl('/sap/bc/adt/runtime/dumps'),
+      'an empty feed',
+    );
 
+    // An empty feed is an answer, not a failure.
     expect(entries).toEqual([]);
   });
 
