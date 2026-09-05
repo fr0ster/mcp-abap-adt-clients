@@ -84,6 +84,29 @@ implementation once rather than chosen at each call.
 - **`AdtFunctionInclude.readSource()` is gone.** `read()` is the source, as the
   contract says of an object that has one.
 
+- **`publishODataV2` and `unpublishODataV2` are gone.** They were two method
+  names for one endpoint with a `serviceType` parameter, and both issued a GET
+  to a `…jobs` URL that Eclipse POSTs to — so neither was the publish they were
+  named for. `update({ desiredPublicationState, serviceType })` covers odatav2
+  and odatav4 alike.
+
+- **`getODataV2ServiceBinding` and `getODataV4ServiceBinding` are one member:**
+  `getServiceGroup({ objectname, serviceType, … })`. Same defect, next door. Its
+  `Accept` now carries v1 as well as v2, as Eclipse sends it; v2 alone is a 406
+  on a system that serves only v1.
+
+- **Publishing no longer demands a service, version and protocol the binding
+  already states.** They are read from its own document — `srvb:services
+  srvb:name`, `srvb:content srvb:version`, `srvb:binding srvb:type` — and remain
+  accepted as an override. Requiring them let a caller publish under a version
+  that disagreed with the object.
+
+- **`AdtServiceBinding` no longer declares `implements IAdtServiceBinding`**, and
+  `IServiceBindingPublicationParams` / `IServiceGroupParams` are declared in this
+  package rather than in the contracts one. The contract still names the two
+  removed members; this shape is being settled against measured traffic and
+  moves to `@mcp-abap-adt/interfaces` before the release.
+
 - **`AdtRequest.create()` answers the created request**, not its document:
   `{ transportNumber, description, type, targetSystem, owner, uri, … }`. The
   low-level `createTransport` hands the document on and `parseCreatedTransport`
@@ -122,6 +145,13 @@ implementation once rather than chosen at each call.
 
 - **`AdtFunctionModuleLegacy.delete` passed `(module, group)`** to a lock taking
   `(group, module)`.
+
+- **A publish or unpublish job's own verdict was thrown away.** `POST
+  …/{serviceType}/publishjobs` answers `<SEVERITY>` and `<SHORT_TEXT>` in an
+  `asx:abap` envelope — measured: `OK` / `ZAC_SRVB01 published locally`. The
+  member answered the document and a caller checking `ok` learned only that the
+  request completed. `publicationRefusal` reads it, and is the default `analyse`
+  for the publication path.
 
 - **`LockCapability.lock` and `Profiler.read` classified caller errors as
   connection failures.** A missing name and a view the family does not have are
