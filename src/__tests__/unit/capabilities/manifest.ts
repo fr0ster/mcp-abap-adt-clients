@@ -754,6 +754,8 @@ export const HANDLERS = {
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
       readTransport: '/sap/bc/adt/cts/transportchecks',
+      lock: '/sap/bc/adt/businessservices/bindings/zguard_srvb',
+      unlock: '/sap/bc/adt/businessservices/bindings/zguard_srvb',
     },
     capabilities: [
       'creatable',
@@ -764,8 +766,13 @@ export const HANDLERS = {
       'checkable',
       'activatable',
       'transportAware',
+      'lockable',
     ],
-    why: 'getService() hands out a service binding, so it has the binding’s set: no versions resource, and ADT offers no lock for one. Caught by the guard 2026-08-14 — this entry claimed the full set.',
+    why:
+      'getService() hands out a service binding, so it has the binding’s set: ' +
+      'no versions resource, and the binding’s lock. Caught by the guard ' +
+      '2026-08-14 — this entry claimed the full set; and again 2026-09-05, ' +
+      'when the binding gained the lock Eclipse was measured taking.',
   },
 
   // ── Objects with no version history ──────────────────────────────────────
@@ -1080,6 +1087,8 @@ export const HANDLERS = {
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
       readTransport: '/sap/bc/adt/cts/transportchecks',
+      lock: '/sap/bc/adt/businessservices/bindings/zguard_srvb',
+      unlock: '/sap/bc/adt/businessservices/bindings/zguard_srvb',
     },
     capabilities: [
       'creatable',
@@ -1090,8 +1099,13 @@ export const HANDLERS = {
       'checkable',
       'activatable',
       'transportAware',
+      'lockable',
     ],
-    why: 'No versions resource, and ADT offers no lock for a service binding.',
+    why:
+      'No versions resource. It DOES lock: measured from Eclipse on the trial, ' +
+      '`_action=LOCK&accessMode=MODIFY` before a publish job and `_action=UNLOCK` ' +
+      'when the editor closes — publishing is what editing a binding is. ' +
+      'This entry used to say ADT offers no lock, which was never checked.',
   },
 
   // ── Parts of an object: no create ────────────────────────────────────────

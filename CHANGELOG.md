@@ -101,6 +101,17 @@ implementation once rather than chosen at each call.
   accepted as an override. Requiring them let a caller publish under a version
   that disagreed with the object.
 
+- **`AdtServiceBinding` gains `lock()` and `unlock()`**, and the manifest's
+  claim that "ADT offers no lock for a service binding" is retired — measured
+  from Eclipse, it takes one: `_action=LOCK&accessMode=MODIFY` before a publish
+  job, `_action=UNLOCK&lockHandle=…` when the editor closes. Publishing is what
+  editing a binding is.
+
+  **The library does not take it for you.** How long a lock is held is a policy
+  — an editor holds one across several publishes, a script for one call — and
+  the connection is shared. See "Service bindings: publishing is the editing" in
+  `docs/usage/CLIENT_API_REFERENCE.md` for the shape a consumer writes.
+
 - **`AdtServiceBinding` no longer declares `implements IAdtServiceBinding`**, and
   `IServiceBindingPublicationParams` / `IServiceGroupParams` are declared in this
   package rather than in the contracts one. The contract still names the two

@@ -6,6 +6,7 @@ import type {
   IAdtCreatable,
   IAdtDeletable,
   IAdtError,
+  IAdtLockable,
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
@@ -37,10 +38,12 @@ import {
   buildQueryString,
   encodeSapObjectName,
 } from '../../utils/internalUtils';
+import { nothing, rawDocument } from '../../utils/resultStrategy';
 import { getSystemInformation } from '../../utils/systemInfo';
 import { getTimeout } from '../../utils/timeouts';
 import { chain } from '../shared/chain';
 import type { ObjectVersion } from '../shared/results';
+import { lockServiceBinding, unlockServiceBinding } from './lock';
 import type {
   IActivateServiceBindingParams,
   ICheckServiceBindingParams,
@@ -119,7 +122,8 @@ export class AdtServiceBinding<
     IAdtValidatable<IServiceBindingConfig, ReturnType<R['validation']>>,
     IAdtCheckable<IServiceBindingConfig, ReturnType<R['check']>>,
     IAdtActivatable<IServiceBindingConfig, ReturnType<R['activation']>>,
-    IAdtTransportAware<IServiceBindingConfig, ReturnType<R['transport']>>
+    IAdtTransportAware<IServiceBindingConfig, ReturnType<R['transport']>>,
+    IAdtLockable<IServiceBindingConfig>
 {
   // `IAdtServiceBinding` from the contracts package is deliberately NOT in the
   // list above yet. It still declares `publishODataV2` and `unpublishODataV2` —
@@ -610,6 +614,62 @@ export class AdtServiceBinding<
       // refusal rather than a document nobody looked at.
       options?.analyse ?? publicationRefusal,
     );
+  }
+
+  /**
+   * Take the binding's lock.
+   *
+   * **Publishing is what editing a service binding is** — it is not edited any
+   * other way — so this is the lock a publication takes. Measured from Eclipse
+   * (ADT 3.60.3) on the trial, 2026-09-05: `_action=LOCK&accessMode=MODIFY` on a
+   * stateful session before the job, and `_action=UNLOCK&lockHandle=…` when the
+   * editor closes.
+   *
+   * **The caller takes it, and the caller gives it back.** This member does not
+   * lock inside `update` on the caller's behalf: how long a lock is held is a
+   * policy — Eclipse holds one for as long as an editor is open, a script holds
+   * one for a single call — and the connection is usually shared, so a library
+   * that locks and unlocks around its own operation decides that for everyone.
+   * See `docs/usage/CLIENT_API_REFERENCE.md` for the shape a consumer writes.
+   */
+  async lock(
+    config: Partial<IServiceBindingConfig>,
+  ): Promise<IAdtResponse<string>> {
+    const name = this.name(config);
+    // Stateful for the window: on older BASIS a handle is only valid inside a
+    // stateful request. The caller returns to stateless via `unlock`.
+    this.connection.setSessionType?.('stateful');
+    return answering(
+      async () => ({
+        data: await lockServiceBinding(this.connection, name),
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+      }),
+      rawDocument,
+    );
+  }
+
+  /**
+   * Give the lock back.
+   *
+   * Without it the binding stays "currently being edited": its own delete is
+   * refused with `You are already editing`, and a `_action=LOCK` from anywhere
+   * else — another session, another process, the same user — is answered
+   * `403 ExceptionResourceNoAccess`.
+   */
+  async unlock(
+    config: Partial<IServiceBindingConfig>,
+    lockHandle: string,
+  ): Promise<IAdtResponse<void>> {
+    const name = this.name(config);
+    return answering(async () => {
+      try {
+        return await unlockServiceBinding(this.connection, name, lockHandle);
+      } finally {
+        this.connection.setSessionType?.('stateless');
+      }
+    }, nothing);
   }
 
   /**

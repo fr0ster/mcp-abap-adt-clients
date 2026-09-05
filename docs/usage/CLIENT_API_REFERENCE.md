@@ -709,6 +709,83 @@ the contract can tell from a success. `activationRefusal` and `deletionRefusal`
 are exported, so your own `analyse` can defer to one instead of re-deriving what
 it already knows.
 
+### Service bindings: publishing is the editing
+
+A service binding is not edited the way a class is. It is created once, and
+after that it is **published** and **unpublished** — and that is what its ADT
+lock is for.
+
+Measured from Eclipse (ADT 3.60.3), publishing looks like this:
+
+```
+POST …/bindings/zac_srvb01?_action=LOCK&accessMode=MODIFY   200   stateful
+POST …/businessservices/odatav4/publishjobs                 200   stateless, ~133 s
+…
+POST …/bindings/zac_srvb01?_action=UNLOCK&lockHandle=6B35…  200   "Closing editor"
+```
+
+Unpublishing is the same, against `…/unpublishjobs`.
+
+**The lock is yours to take and yours to give back.** `update()` does not take
+it for you:
+
+```typescript
+const bindings = client.getServiceBinding();
+
+const locked = await bindings.lock({ bindingName: 'ZAC_SRVB01' });
+if (!locked.ok) throw new Error(locked.getError().message);
+const lockHandle = locked.getResult().value;
+
+try {
+  const answer = await bindings.update({
+    bindingName: 'ZAC_SRVB01',
+    desiredPublicationState: 'published',
+  });
+  if (!answer.ok) throw new Error(answer.getError().message);
+} finally {
+  await bindings.unlock({ bindingName: 'ZAC_SRVB01' }, lockHandle);
+}
+```
+
+Why the library does not do that for you: **how long a lock is held is a
+policy**, and it is not one policy. Eclipse holds a binding's lock for as long
+as an editor is open — across several publishes, if that is what the person
+does — and releases it when the editor closes. A script holds one for a single
+call. The connection is usually shared by everything a consumer is doing, so a
+library that locked and unlocked around its own operation would be choosing for
+every other user of that session.
+
+**What it costs to skip it.** A binding whose lock was never released refuses
+its own delete with `You are already editing ZAC_SRVB01`, and any later
+`_action=LOCK` — another session, another process, the same user — is answered
+`403 ExceptionResourceNoAccess: User … is currently editing`. A session recycle
+does not clear it; only the unlock does.
+
+**Which service, which version, which protocol.** You need name none of them.
+The binding states all three in its own document — `srvb:services srvb:name`,
+`srvb:content srvb:version`, `srvb:binding srvb:type` — and `update()` reads
+them from there. Pass them only to override, and note that a version that
+disagrees with the binding is a publish of something else.
+
+**Nothing here waits.** The job answers its own verdict — `<SEVERITY>OK` with a
+`<SHORT_TEXT>` — and `publicationRefusal` reads it, so a refused publish comes
+back as the failure half. It takes about two minutes of server time on the
+systems measured; that is the operation, not a timeout to tune. If you want to
+watch the result settle, read the service group yourself:
+
+```typescript
+const group = await bindings.getServiceGroup({
+  objectname: 'ZAC_SRVB01',
+  serviceType: 'odatav4',
+  servicename: 'ZAC_SRVD01',
+  serviceversion: '0001',
+});
+```
+
+That is a read of the OData service group — its URL prefix, its collections,
+its deployment state — which carries `published` among them. It is not a
+job-status endpoint, and polling it is the consumer's to write.
+
 ### Message class (MSAG) and its messages
 
 Message classes and their individual messages are two separate handlers.
