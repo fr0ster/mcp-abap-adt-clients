@@ -221,12 +221,9 @@ describe('Table (using AdtClient)', () => {
         }
 
         try {
-          const resultState = expectResult(
-            await tester.readTest({
-              tableName: standardTableName,
-            }),
-            'resultState',
-          );
+          const resultState = await tester.readTest({
+            tableName: standardTableName,
+          });
           expect(resultState).toBeDefined();
           const tableConfig = resultState;
           if (

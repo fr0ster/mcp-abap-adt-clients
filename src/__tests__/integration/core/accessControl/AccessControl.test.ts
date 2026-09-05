@@ -272,12 +272,9 @@ describe('AccessControl (using AdtClient)', () => {
         }
 
         try {
-          const resultState = expectResult(
-            await tester.readTest({
-              accessControlName: accessControlName,
-            }),
-            'resultState',
-          );
+          const resultState = await tester.readTest({
+            accessControlName: accessControlName,
+          });
           if (!resultState) {
             logTestSkip(
               testsLogger,

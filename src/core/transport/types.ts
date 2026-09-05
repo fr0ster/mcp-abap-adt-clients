@@ -9,6 +9,8 @@
 
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces';
 import { rawDocument } from '../../utils/resultStrategy';
+import type { ICreatedTransport } from './parseCreatedTransport';
+import { parseCreatedTransport } from './parseCreatedTransport';
 import { parseTransportTree } from './parseTransportTree';
 
 // Types defined in @mcp-abap-adt/interfaces
@@ -101,13 +103,19 @@ export interface ITransportTree {
 
 /** One strategy per member of a transport-request implementation. */
 export interface ITransportResults<
-  TCreated = string,
+  TCreated = ICreatedTransport,
   TRead = string,
   TList = ITransportTree,
   TUpdated = string,
   TDeleted = string,
 > {
-  /** What the create answers — the document carrying the new number. */
+  /**
+   * What the create answers.
+   *
+   * The new request by default: a create whose number a caller cannot reach is
+   * a create they cannot use, and the number is the only thing the document is
+   * there to deliver. `rawDocument` gives the document back untouched.
+   */
   readonly created: IResultStrategy<TCreated>;
   /** What a read of one request answers. */
   readonly read: IResultStrategy<TRead>;
@@ -132,7 +140,7 @@ export interface ITransportResults<
  * `satisfies`, never an annotation — see `classDocuments` for why.
  */
 export const transportDocuments = {
-  created: rawDocument,
+  created: (answer) => parseCreatedTransport(answer.data),
   read: rawDocument,
   list: (answer) => parseTransportTree(answer.data),
   updated: rawDocument,

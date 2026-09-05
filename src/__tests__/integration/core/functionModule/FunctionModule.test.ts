@@ -299,13 +299,10 @@ describe('FunctionModule (using AdtClient)', () => {
         }
 
         try {
-          const resultState = expectResult(
-            await tester.readTest({
-              functionModuleName: standardFunctionModuleName,
-              functionGroupName: standardFunctionGroupName,
-            }),
-            'resultState',
-          );
+          const resultState = await tester.readTest({
+            functionModuleName: standardFunctionModuleName,
+            functionGroupName: standardFunctionGroupName,
+          });
           expect(resultState).toBeDefined();
           const sourceCode =
             typeof resultState === 'string'

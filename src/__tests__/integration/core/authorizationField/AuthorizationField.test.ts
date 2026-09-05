@@ -295,10 +295,7 @@ describe('AuthorizationField (using AdtClient)', () => {
           // getAuthorizationField() is narrowed to Crud & Validatable &
           // Checkable & Activatable & Lockable (no readTransport/
           // getVersions/getVersionSource); cast through the full interface.
-          client.getAuthorizationField() as unknown as IAdtObject<
-            IAuthorizationFieldConfig,
-            IAuthorizationFieldState
-          >,
+          client.getAuthorizationField(),
           'AuthorizationField',
           'create_authorization_field',
           'adt_authorization_field',

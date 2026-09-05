@@ -60,7 +60,7 @@ describe('AdtUnitTest.validate()', () => {
     expect(calls).toHaveLength(0);
   });
 
-  it('confirms an existing container by reading it, and reports what came back', async () => {
+  it('confirms an existing container by reading it, and validates nothing more', async () => {
     const { conn, calls } = makeConn((r) => {
       expect(r.method).toBe('GET');
       expect(r.url).toBe('/sap/bc/adt/oo/classes/ZCL_CONTAINER/source/main');
@@ -68,14 +68,16 @@ describe('AdtUnitTest.validate()', () => {
     });
     const h = new AdtUnitTest(conn, createLibraryLogger());
 
-    const state = expectResult(
+    // One request, and it is the read. The class is there and no source was
+    // given, so there is nothing left to check — the answer succeeds carrying
+    // no verdict, which is different from a verdict that says "fine".
+    const verdict = expectResult(
       await h.validate({ className: 'ZCL_CONTAINER' }),
-      'state',
+      'validation',
     );
 
     expect(calls).toHaveLength(1);
-    expect(state.errors).toEqual([]);
-    expect(state.readResult?.data).toBe('CLASS zcl_container DEFINITION.');
+    expect(verdict).toBeUndefined();
   });
 
   it('checks the test source too, when there is source to check', async () => {
@@ -90,16 +92,16 @@ describe('AdtUnitTest.validate()', () => {
     });
     const h = new AdtUnitTest(conn, createLibraryLogger());
 
-    const state = expectResult(
+    const verdict = expectResult(
       await h.validate({
         className: 'ZCL_CONTAINER',
         testClassSource: 'CLASS ltcl_test DEFINITION FOR TESTING.',
       }),
-      'state',
+      'validation',
     );
 
     expect(calls).toHaveLength(2);
-    expect(state.checkResult?.data).toBe('<code-ok/>');
+    expect(verdict).toBe('<code-ok/>');
   });
 
   it('validates the NAME when the container does not exist yet — the create path', async () => {
@@ -116,17 +118,17 @@ describe('AdtUnitTest.validate()', () => {
     });
     const h = new AdtUnitTest(conn, createLibraryLogger());
 
-    const state = expectResult(
+    const verdict = expectResult(
       await h.validate({
         className: 'ZCL_NEW_TESTS',
         packageName: 'ZPKG',
         description: 'tests',
       }),
-      'state',
+      'validation',
     );
 
     expect(calls).toHaveLength(2);
-    expect(state.validationResponse?.data).toBe('<name-ok/>');
+    expect(verdict).toBe('<name-ok/>');
   });
   it('a read that fails for any other reason is reported, not treated as absence', async () => {
     // A 500 is a fact about the request, not about the class. Routing it into
@@ -168,20 +170,21 @@ describe('AdtCdsUnitTest.validate()', () => {
     });
     const h = new AdtCdsUnitTest(conn, createLibraryLogger());
 
-    const state = expectResult(
+    const verdict = expectResult(
       await h.validate({
         className: 'ZCL_CDS_DUMMY',
         packageName: 'ZPKG',
         classTemplate: '<template/>',
         testClassSource: 'CLASS ltcl_test DEFINITION FOR TESTING.',
       }),
-      'state',
+      'validation',
     );
 
+    // Both requests went out — the handler above asserts which is which — and
+    // the answer is the name check's document. The code check is not dropped:
+    // its failure would have come back instead of this.
     expect(calls).toHaveLength(2);
-    expect(state.errors).toEqual([]);
-    expect(state.validationResponse?.data).toBe('<name-ok/>');
-    expect(state.testClassState?.validationResponse?.data).toBe('<code-ok/>');
+    expect(verdict).toBe('<name-ok/>');
   });
 
   it('a name the server rejects produces an error, not an empty success (one request)', async () => {
@@ -241,12 +244,12 @@ describe('AdtCdsUnitTest.validate()', () => {
     });
     const h = new AdtCdsUnitTest(conn, createLibraryLogger());
 
-    const state = expectResult(
+    const verdict = expectResult(
       await h.validate({ className: 'ZCL_CONTAINER' }),
-      'state',
+      'validation',
     );
 
     expect(calls).toHaveLength(1);
-    expect(state.errors).toEqual([]);
+    expect(verdict).toBeUndefined();
   });
 });

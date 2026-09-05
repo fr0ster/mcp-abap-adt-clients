@@ -23,6 +23,7 @@ import {
 } from '../src/__tests__/helpers/sessionConfig';
 import { createConnectionLogger } from '../src/__tests__/helpers/testLogger';
 import { AdtRuntimeClient } from '../src/clients/AdtRuntimeClient';
+import { resultOf } from './resultOf';
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../.env');
 if (fs.existsSync(envPath)) {
@@ -60,10 +61,12 @@ async function main() {
       );
 
       const response = user
-        ? await dumps.listByUser(user, { top, inlinecount: 'allpages' })
-        : await dumps.list({ top, inlinecount: 'allpages' });
+        ? resultOf(
+            await dumps.listByUser(user, { top, inlinecount: 'allpages' }),
+          )
+        : resultOf(await dumps.list({ top, inlinecount: 'allpages' }));
 
-      const xml = String(response.data);
+      const xml = response;
       // Extract dump IDs from Atom feed
       const idRegex = /\/sap\/bc\/adt\/runtime\/dumps?\/([^"'<\s]+)/g;
       const ids = new Set<string>();
@@ -86,9 +89,11 @@ async function main() {
     }
 
     console.log(`\n=== Dump: ${dumpId} (view=${view || 'default'}) ===\n`);
-    const response = await dumps.getById(dumpId, view ? { view } : {});
-    console.log(String(response.data).slice(0, 3000));
-    if (String(response.data).length > 3000) {
+    const response = resultOf(
+      await dumps.getById(dumpId, view ? { view } : {}),
+    );
+    console.log(response.slice(0, 3000));
+    if (response.length > 3000) {
       console.log('\n... (truncated)');
     }
   } finally {

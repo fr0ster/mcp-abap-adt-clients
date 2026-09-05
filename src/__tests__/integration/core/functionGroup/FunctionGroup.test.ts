@@ -86,10 +86,7 @@ describe('FunctionGroup (using AdtClient)', () => {
       tester = new BaseTester(
         // getFunctionGroup() declares no IAdtVersionable (no
         // getVersions/getVersionSource); cast through the full interface.
-        client.getFunctionGroup() as unknown as IAdtObject<
-          IFunctionGroupConfig,
-          IFunctionGroupState
-        >,
+        client.getFunctionGroup(),
         'FunctionGroup',
         'create_function_group',
         'adt_function_group',
@@ -271,12 +268,9 @@ describe('FunctionGroup (using AdtClient)', () => {
         }
 
         try {
-          const resultState = expectResult(
-            await tester.readTest({
-              functionGroupName: standardFunctionGroupName,
-            }),
-            'resultState',
-          );
+          const resultState = await tester.readTest({
+            functionGroupName: standardFunctionGroupName,
+          });
           expect(resultState).toBeDefined();
           expect(resultState).toBeDefined();
           // FunctionGroup read returns function group config - check if functionGroupName is present

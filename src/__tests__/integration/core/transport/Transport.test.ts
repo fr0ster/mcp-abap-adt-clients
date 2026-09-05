@@ -175,16 +175,15 @@ describe('AdtRequest', () => {
 
         try {
           logTestStep('create', testsLogger);
-          const createState = expectResult(
+          const created = expectResult(
             await client.getRequest().create(buildConfig(testCase) as any),
-            'createState',
+            'create transport request',
           );
 
-          expect(createState).toBeDefined();
-          expect(createState.transportNumber).toBeDefined();
-          expect(createState.errors.length).toBe(0);
+          // A create that answers no number is a create nothing else can use.
+          expect(created.transportNumber).toMatch(/\S/);
 
-          transportNumber = createState.transportNumber || null;
+          transportNumber = created.transportNumber || null;
 
           logTestSuccess(testsLogger, 'AdtRequest - full workflow');
         } catch (error: any) {
@@ -303,18 +302,16 @@ describe('AdtRequest', () => {
           }
 
           logTestStep('list', testsLogger);
-          const listState = expectResult(
+          // The shipped reading of a listing is the parsed tree, so the
+          // assertions below are about requests rather than about a document.
+          const tree = expectResult(
             await client.getRequest().list(),
-            'listState',
+            'list transport requests',
           );
 
-          expect(listState.errors.length).toBe(0);
-          expect(listState).toBeDefined();
-
-          const body = String(listState ?? '');
-          expect(body).toContain('tm:root');
-
-          const requestCount = (body.match(/<tm:request /g) ?? []).length;
+          expect(Array.isArray(tree.requests)).toBe(true);
+          const numbers = tree.requests.map((r) => r.attributes['tm:number']);
+          const requestCount = tree.requests.length;
           logTestStep(`requests returned: ${requestCount}`, testsLogger);
 
           if (knownTransportNumber) {
@@ -324,21 +321,21 @@ describe('AdtRequest', () => {
               `known-request case: expecting ${knownTransportNumber} in the list body`,
               testsLogger,
             );
-            expect(body).toContain(knownTransportNumber);
+            expect(numbers).toContain(knownTransportNumber);
           } else {
             // Fallback case: no discriminator was available (no test case
             // configured/enabled, or creation itself failed on this system —
             // e.g. legacy systems without the configured user). This branch
-            // only confirms the response is a well-formed tm:root document;
-            // it does NOT treat zero requests as suspicious. A system that
-            // genuinely holds no transport requests must be able to report
-            // zero without being flagged as broken.
+            // only confirms the tree parsed; it does NOT treat zero requests
+            // as suspicious. A system that genuinely holds no transport
+            // requests must be able to report zero without being flagged as
+            // broken.
             logTestStep(
               'fallback case: no discriminator transport available, ' +
                 `asserting response shape only (requests returned: ${requestCount})`,
               testsLogger,
             );
-            expect(body).toMatch(/<tm:root[^>]*\/>|<\/tm:root>/);
+            expect(tree.attributes).toBeDefined();
           }
 
           logTestSuccess(testsLogger, 'AdtRequest - list transports');

@@ -78,10 +78,7 @@ describe('FunctionInclude (using AdtClient)', () => {
       tester = new BaseTester<IFunctionIncludeConfig>(
         // getFunctionInclude() is narrowed to its honest capability composite
         // (no readTransport); cast through the full interface.
-        client.getFunctionInclude() as unknown as IAdtObject<
-          IFunctionIncludeConfig,
-          IFunctionIncludeState
-        >,
+        client.getFunctionInclude(),
         'FunctionInclude',
         'create_function_include',
         'adt_function_include',

@@ -221,12 +221,9 @@ describe('Structure (using AdtClient)', () => {
         }
 
         try {
-          const resultState = expectResult(
-            await tester.readTest({
-              structureName: standardStructureName,
-            }),
-            'resultState',
-          );
+          const resultState = await tester.readTest({
+            structureName: standardStructureName,
+          });
           expect(resultState).toBeDefined();
           const structureConfig = resultState;
           if (

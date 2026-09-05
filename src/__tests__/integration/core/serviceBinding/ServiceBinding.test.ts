@@ -416,12 +416,9 @@ describe('ServiceBinding (using AdtClient)', () => {
         });
 
         try {
-          const resultState = expectResult(
-            await tester.readTest({
-              bindingName,
-            }),
-            'resultState',
-          );
+          const resultState = await tester.readTest({
+            bindingName,
+          });
           if (!resultState) {
             logTestSkip(
               testsLogger,

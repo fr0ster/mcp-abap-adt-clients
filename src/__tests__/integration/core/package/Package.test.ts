@@ -96,10 +96,7 @@ describe('Package (using AdtClient)', () => {
         // Lockable & TransportAware (no activate/getVersions); BaseTester's
         // flowTest still exercises activate, which the concrete handler
         // implements at runtime — cast through the full interface.
-        client.getPackage() as unknown as IAdtObject<
-          IPackageConfig,
-          IPackageState
-        >,
+        client.getPackage(),
         'Package',
         'create_package',
         'adt_package',
@@ -339,12 +336,9 @@ describe('Package (using AdtClient)', () => {
         }
 
         try {
-          const resultState = expectResult(
-            await tester.readTest({
-              packageName: standardPackageName,
-            }),
-            'resultState',
-          );
+          const resultState = await tester.readTest({
+            packageName: standardPackageName,
+          });
           expect(resultState).toBeDefined();
           const packageConfig = resultState;
           if (

@@ -86,10 +86,7 @@ describe('Domain (using AdtClient)', () => {
       tester = new BaseTester(
         // getDomain() declares no IAdtVersionable (no
         // getVersions/getVersionSource); cast through the full interface.
-        client.getDomain() as unknown as IAdtObject<
-          IDomainConfig,
-          IDomainState
-        >,
+        client.getDomain(),
         'Domain',
         'create_domain',
         'adt_domain',
@@ -230,12 +227,9 @@ describe('Domain (using AdtClient)', () => {
         }
 
         try {
-          const resultState = expectResult(
-            await tester.readTest({
-              domainName: standardDomainName,
-            }),
-            'resultState',
-          );
+          const resultState = await tester.readTest({
+            domainName: standardDomainName,
+          });
           expect(resultState).toBeDefined();
           const domainConfig = resultState;
           if (

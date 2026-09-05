@@ -154,7 +154,7 @@ function parseArgs(argv: string[]): Options {
 function getHandler(
   client: AdtClient,
   options: Options,
-): IAdtReadable<any, any> {
+): IAdtReadable<any, any, any> {
   switch (options.objectType) {
     case 'class':
       return client.getClass();

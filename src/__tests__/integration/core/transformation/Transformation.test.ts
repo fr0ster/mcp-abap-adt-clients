@@ -286,12 +286,9 @@ describe('Transformation - SimpleTransformation (using AdtClient)', () => {
         }
 
         try {
-          const resultState = expectResult(
-            await tester.readTest({
-              transformationName: transformationName,
-            }),
-            'resultState',
-          );
+          const resultState = await tester.readTest({
+            transformationName: transformationName,
+          });
           if (!resultState) {
             logTestSkip(
               testsLogger,

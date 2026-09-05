@@ -245,12 +245,9 @@ describe('Class (using AdtClient)', () => {
         }
 
         try {
-          const resultState = expectResult(
-            await tester.readTest({
-              className: standardClassName,
-            }),
-            'resultState',
-          );
+          const resultState = await tester.readTest({
+            className: standardClassName,
+          });
           expect(resultState).toBeDefined();
           // IClassState doesn't have className directly, check readResult
           expect(resultState).toBeDefined();
@@ -341,26 +338,24 @@ describe('Class (using AdtClient)', () => {
         }
 
         try {
+          // The shipped reading of a transport request is its document. The
+          // number is what identifies the request, so a document that does not
+          // name it is not the request that was asked for.
           const result = expectResult(
             await client
               .getRequest()
               .read({ transportNumber: transportRequest }),
-            'result',
+            'read transport request',
           );
-          expect(result).toBeDefined();
-          expect(result?.transportNumber || result?.transport_request).toBe(
-            transportRequest,
-          );
-          const metadataState = expectResult(
+          expect(result).toContain(transportRequest);
+
+          const metadata = expectResult(
             await client
               .getRequest()
               .readMetadata({ transportNumber: transportRequest }),
-            'metadataState',
+            'read transport request metadata',
           );
-          expect(metadataState).toBeDefined();
-          expect(
-            metadataState.transportNumber || metadataState?.transport_request,
-          ).toBe(transportRequest);
+          expect(metadata).toContain(transportRequest);
 
           logTestSuccess(testsLogger, 'Class - read transport request');
         } catch (error) {

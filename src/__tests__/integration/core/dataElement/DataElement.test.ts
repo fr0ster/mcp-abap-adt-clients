@@ -374,10 +374,7 @@ describe('DataElement (using AdtClient)', () => {
           // getDataElement() declares no IAdtVersionable (no
           // getVersions/getVersionSource); BaseTester's generic type still
           // requires the full interface — cast through it.
-          client.getDataElement() as unknown as IAdtObject<
-            IDataElementConfig,
-            IDataElementState
-          >,
+          client.getDataElement(),
           'DataElement',
           'create_data_element',
           'adt_data_element',
@@ -472,10 +469,7 @@ describe('DataElement (using AdtClient)', () => {
           const tester = new BaseTester(
             // getDataElement() declares no IAdtVersionable (no
             // getVersions/getVersionSource); cast through the full interface.
-            client.getDataElement() as unknown as IAdtObject<
-              IDataElementConfig,
-              IDataElementState
-            >,
+            client.getDataElement(),
             'DataElement',
             'create_data_element',
             'adt_data_element',
@@ -483,12 +477,9 @@ describe('DataElement (using AdtClient)', () => {
           );
 
           // Use BaseTester.readTest() for standardized read operation
-          const resultState = expectResult(
-            await tester.readTest({
-              dataElementName: standardDataElementName,
-            }),
-            'resultState',
-          );
+          const resultState = await tester.readTest({
+            dataElementName: standardDataElementName,
+          });
 
           expect(resultState).toBeDefined();
           expect(resultState).toBeDefined();

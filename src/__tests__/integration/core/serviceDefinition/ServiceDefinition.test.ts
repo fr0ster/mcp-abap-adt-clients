@@ -289,12 +289,9 @@ describe('ServiceDefinition (using AdtClient)', () => {
         }
 
         try {
-          const resultState = expectResult(
-            await tester.readTest({
-              serviceDefinitionName: serviceDefinitionName,
-            }),
-            'resultState',
-          );
+          const resultState = await tester.readTest({
+            serviceDefinitionName: serviceDefinitionName,
+          });
           if (!resultState) {
             logTestSkip(
               testsLogger,

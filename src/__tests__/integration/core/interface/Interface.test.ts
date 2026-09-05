@@ -217,12 +217,9 @@ describe('Interface (using AdtClient)', () => {
         }
 
         try {
-          const resultState = expectResult(
-            await tester.readTest({
-              interfaceName: standardInterfaceName,
-            }),
-            'resultState',
-          );
+          const resultState = await tester.readTest({
+            interfaceName: standardInterfaceName,
+          });
           expect(resultState).toBeDefined();
           const interfaceConfig = resultState;
           if (
