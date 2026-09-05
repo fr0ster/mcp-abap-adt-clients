@@ -125,7 +125,26 @@ implementation once rather than chosen at each call.
 
 - **`LockCapability.lock` and `Profiler.read` classified caller errors as
   connection failures.** A missing name and a view the family does not have are
-  the caller's mistake and throw before any request.
+  the caller's mistake and throw before any request. The first full run against
+  a system found the same shape across `AdtUtils`: an empty object name, a
+  missing SQL query, a type with no source resource — every low-level guard
+  threw inside the request `answering` runs, so it came back as
+  `origin: 'connection'`. They are raised in the contract members now.
+
+- **`rawDocument` answered `[object Object]` for every JSON endpoint.** The
+  transport parses `application/json` on the way in, so `answer.data` is an
+  object by the time a reading sees it; it is re-serialised rather than
+  stringified. The DSFI source read is the member this was visible on.
+
+- **Twenty-two low-level `delete` functions replaced the server's document**
+  with `{ success: true, …, message: 'X deleted successfully' }` — a sentence
+  this library wrote about a call it had not read. They hand the response on.
+
+- **Every successful package delete was reported as a refusal.** `AdtPackage`
+  used `deletionRefusal` for the delete step as well as the check, but a check
+  answers `del:isDeletable` and a deletion answers `del:isDeleted` — so the
+  check parser found no flag and defaulted to refusing. `packageDeletionRefusal`
+  reads the deletion result, and treats an empty body as nothing said.
 
 ### Added
 
