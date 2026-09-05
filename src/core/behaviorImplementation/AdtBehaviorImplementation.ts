@@ -200,11 +200,11 @@ export class AdtBehaviorImplementation<
   }
 
   /** Read the class's source. */
-  async read(
+  async read<E extends IAdtError = IAdtError>(
     config: Partial<IBehaviorImplementationConfig>,
     version?: 'active' | 'inactive',
-    options?: IReadOptions & IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['source']>>> {
+    options?: IReadOptions & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     const name = this.name(config);
 
     return answering(
@@ -222,10 +222,10 @@ export class AdtBehaviorImplementation<
   }
 
   /** Read the class's metadata document. */
-  async readMetadata(
+  async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IBehaviorImplementationConfig>,
-    options?: IReadOptions & IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['metadata']>>> {
+    options?: IReadOptions & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
     const name = this.name(config);
 
     return answering(
@@ -242,10 +242,10 @@ export class AdtBehaviorImplementation<
   }
 
   /** The transport request the class belongs to. */
-  async readTransport(
+  async readTransport<E extends IAdtError = IAdtError>(
     config: Partial<IBehaviorImplementationConfig>,
-    options?: { withLongPolling?: boolean } & IAdtOperationOptions,
-  ): Promise<IAdtResponse<string>> {
+    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+  ): Promise<IAdtResponse<string, E>> {
     const name = this.name(config);
 
     return answering(

@@ -108,11 +108,11 @@ export class AdtLocalMacros<
   }
 
   /** Read the include's source. */
-  async read(
+  async read<E extends IAdtError = IAdtError>(
     config: Partial<ILocalMacrosConfig>,
     version: 'active' | 'inactive' = 'active',
-    options?: IReadOptions & IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['source']>>> {
+    options?: IReadOptions & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     if (!config.className) {
       throw new Error('Class name is required');
     }

@@ -125,5 +125,55 @@ long a lock is held is a policy the consumer owns.
 The full account, with the Eclipse trace and a `try/finally` example, is in
 [CLIENT_API_REFERENCE.md](CLIENT_API_REFERENCE.md#service-bindings-publishing-is-the-editing).
 
-The other exception is the **transport request**, which is not a locked object at
+## Message classes: the messages are rows
+
+The other place the flow does not hold, and for a different reason. A message
+class is a container and its messages are rows in it — addressable, lockable,
+and with no write of their own. Measured from a full run, creating, updating and
+deleting message `001` are **indistinguishable on the wire**: all three are the
+same PUT of the whole class, differing only in the body.
+
+```
+GET  …/messageclass/zac_msg01                            read the class whole
+GET  …/messageclass/zac_msg01                            again, for read-modify-write
+POST …/messages/001?_action=LOCK_MSG&accessMode=MODIFY   lock the row
+POST …?_action=LOCK&accessMode=MODIFY&msgNo=001&onSave=X lock the container, naming the row
+PUT  …?lockHandle=…&corrNr=…                             write the class whole
+POST …?_action=UNLOCK&lockHandle=…                       release the container
+POST …/messages/001?_action=UNLOCK_ALL                   release the row
+```
+
+Two locks per write, taken in that order and released in reverse, and the
+container's lock is told which row is being saved. So a member that edits one
+message reads and rewrites the whole class, which is why a handful of message
+operations produce a great many class reads.
+
+The third exception is the **transport request**, which is not a locked object at
 all: it is changed and deleted directly.
+
+## A newly created object cannot be read until it is activated
+
+Not a delay — a refusal, and the same one however you ask. Measured against a
+live system by creating a class and reading it before activating:
+
+```
+200  POST oo/classes                                     the create succeeds
+400  GET  oo/classes/ZAC_PROBE_INACT
+400  GET  oo/classes/ZAC_PROBE_INACT?version=inactive
+400  GET  oo/classes/ZAC_PROBE_INACT?version=active
+400  GET  oo/classes/ZAC_PROBE_INACT/source/main?version=inactive
+200  POST activation?method=activate&preauditRequested=true
+200  GET  oo/classes/ZAC_PROBE_INACT                     8 KB, and correct
+```
+
+The refusal is `400 ExceptionResourceWrongData`, `SADT_RESOURCE/007` —
+*"Resource  ZAC_PROBE_INACT: wrong input data for processing"*, with the double
+space where the object type should be. It says nothing about activation, which
+is what makes it expensive: it reads as a malformed request, so the natural
+response is to retry, and retrying never works. This library's own test suite
+spent sixteen seconds a run on eight such retries before it was measured.
+
+**What to do instead:** activate, then read. If you want the object left
+inactive, do not expect to read it back — the write is what you have.
+
+Reproduce with `npx ts-node scripts/probe-inactive-metadata.ts`.

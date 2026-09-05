@@ -213,11 +213,11 @@ export class AdtInterface<
   }
 
   /** Read the interface's source. */
-  async read(
+  async read<E extends IAdtError = IAdtError>(
     config: Partial<IInterfaceConfig>,
     version?: 'active' | 'inactive',
-    options?: IReadOptions & IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['source']>>> {
+    options?: IReadOptions & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     if (!config.interfaceName) {
       throw new Error('Interface name is required');
     }
@@ -238,10 +238,10 @@ export class AdtInterface<
   }
 
   /** Read the interface's metadata. */
-  async readMetadata(
+  async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IInterfaceConfig>,
-    options?: IReadOptions & IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['metadata']>>> {
+    options?: IReadOptions & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
     if (!config.interfaceName) {
       throw new Error('Interface name is required');
     }
@@ -521,10 +521,10 @@ export class AdtInterface<
   }
 
   /** The transport request the interface belongs to. */
-  async readTransport(
+  async readTransport<E extends IAdtError = IAdtError>(
     config: Partial<IInterfaceConfig>,
-    options?: { withLongPolling?: boolean } & IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['transport']>>> {
+    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
     if (!config.interfaceName) {
       throw new Error('Interface name is required');
     }

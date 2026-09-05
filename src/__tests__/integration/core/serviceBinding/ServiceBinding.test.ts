@@ -306,7 +306,9 @@ describe('ServiceBinding (using AdtClient)', () => {
             'active',
             i > 0 ? { withLongPolling: true } : undefined,
           );
-        if (state) {
+        // `state.ok`, not `state`: an answer is an object either way, so this
+        // returned true on the first pass and waited for nothing.
+        if (state.ok) {
           return true;
         }
         await wait(1000);

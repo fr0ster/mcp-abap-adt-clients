@@ -25,7 +25,7 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
-import { answering, failed } from '../../utils/adtResponse';
+import { answering, failed, type IAdtOptions } from '../../utils/adtResponse';
 import { AdtRequest } from './AdtRequest';
 import { getTransportLegacy, listTransportsLegacy } from './readLegacy';
 import type { ITransportConfig, ITransportResults } from './types';
@@ -80,11 +80,11 @@ export class AdtRequestLegacy<
    * `/sap/bc/cts/transportrequests` answers the full list for the current user;
    * the one asked for is picked out of it here.
    */
-  override async read(
+  override async read<E extends IAdtError = IAdtError>(
     config: Partial<ITransportConfig>,
     _version?: 'active' | 'inactive',
-    options?: { withLongPolling?: boolean },
-  ): Promise<IAdtResponse<ReturnType<R['read']>>> {
+    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['read']>, E>> {
     if (!config.transportNumber) {
       throw new Error('Transport request number is required');
     }

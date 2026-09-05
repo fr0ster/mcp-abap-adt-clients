@@ -231,11 +231,11 @@ export class AdtFunctionModule<
   }
 
   /** Read the module's source. */
-  async read(
+  async read<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionModuleConfig>,
     version?: 'active' | 'inactive',
-    options?: IReadOptions & IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['source']>>> {
+    options?: IReadOptions & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     const { group, module } = this.names(config);
 
     // No 404 special case: whether an empty answer *is* absence is the caller's
@@ -248,10 +248,10 @@ export class AdtFunctionModule<
   }
 
   /** Read the module's metadata. */
-  async readMetadata(
+  async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionModuleConfig>,
-    options?: IReadOptions & IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['metadata']>>> {
+    options?: IReadOptions & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
     const { group, module } = this.names(config);
 
     return answering(
@@ -262,10 +262,10 @@ export class AdtFunctionModule<
   }
 
   /** The transport request the module belongs to. */
-  async readTransport(
+  async readTransport<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionModuleConfig>,
-    options?: { withLongPolling?: boolean } & IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['transport']>>> {
+    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
     const { group, module } = this.names(config);
 
     return answering(

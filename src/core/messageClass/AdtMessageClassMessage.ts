@@ -26,6 +26,7 @@
  */
 
 import type {
+  AdtNoFailure,
   IAbapConnection,
   IAdtCreatable,
   IAdtDeletable,
@@ -34,12 +35,18 @@ import type {
   IAdtReadable,
   IAdtResponse,
   IAdtUpdatable,
+  IAdtWireResponse,
   ILogger,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
 import { ADT_NO_FAILURE, AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
 import { MESSAGE_CLASS_UPDATE_CONTENT_TYPE } from '../../constants/contentTypes';
-import { answering, failed, type IAdtOptions } from '../../utils/adtResponse';
+import {
+  answering,
+  failed,
+  type IAdtOptions,
+  type IAnalyse,
+} from '../../utils/adtResponse';
 import { beginCriticalSection } from '../../utils/criticalSection';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { requestOf } from '../../utils/requestTrace';
@@ -111,18 +118,18 @@ export class AdtMessageClassMessage<
    * {@link AdtObjectErrorCodes.OBJECT_NOT_FOUND}, so a consumer branches on the
    * code rather than on a message.
    */
-  async read(
+  async read<E extends IAdtError = IAdtError>(
     config: Partial<IMessageClassMessageConfig>,
     _version?: 'active' | 'inactive',
-    options?: { withLongPolling?: boolean } & IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['read']>>> {
+    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['read']>, E>> {
     const { name, no } = this.names(config);
 
     return answering(
       () => getMessageClassSource(this.connection, name),
       this.results.read as IResultStrategy<ReturnType<R['read']>>,
-      options?.analyse ??
-        ((verdict, answer) => {
+      (options?.analyse ??
+        (((verdict: IAdtError | AdtNoFailure, answer?: IAdtWireResponse) => {
           if (verdict !== ADT_NO_FAILURE) return verdict;
           const cls = parseMessageClass(String(answer?.data ?? ''));
           return cls.messages.some((m) => m.msgno === no)
@@ -134,15 +141,15 @@ export class AdtMessageClassMessage<
                 response: answer,
                 request: requestOf(answer),
               };
-        }),
+        }) as IAnalyse<E>)) as IAnalyse<E>,
     );
   }
 
   /** The same class document `read` fetches. */
-  async readMetadata(
+  async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IMessageClassMessageConfig>,
-    options?: { withLongPolling?: boolean } & IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['read']>>> {
+    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['read']>, E>> {
     return this.read(config, undefined, options);
   }
 

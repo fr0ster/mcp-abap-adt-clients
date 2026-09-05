@@ -139,7 +139,10 @@ describe('MessageClass (using AdtClient)', () => {
             const state = await client
               .getMessageClass()
               .read({ name: msgClassName });
-            if (state) {
+            // `state.ok`, not `state`: the answer is an object either way, so
+            // the bare check was always true and this deleted a class that was
+            // not there on every run.
+            if (state.ok) {
               await client.getMessageClass().delete({
                 name: msgClassName,
                 transportRequest: resolvedTransport,
@@ -152,7 +155,7 @@ describe('MessageClass (using AdtClient)', () => {
                 const still = await client
                   .getMessageClass()
                   .read({ name: msgClassName });
-                if (!still) break;
+                if (!still.ok) break;
               }
             }
           } catch (error: any) {
@@ -360,10 +363,15 @@ describe('MessageClass (using AdtClient)', () => {
             // The deletion service is asynchronous — wait until the class is
             // actually gone so a back-to-back re-run does not race an in-flight
             // delete (create-then-read would otherwise 404 on the same name).
+            // `read` answers a contract, and a contract is always truthy. This
+            // read `if (!still) break`, so the loop never broke: twenty round
+            // trips and ten seconds of sleeping every run, all of them
+            // answering 404, measured in a wire log. The answer says whether
+            // the class is gone; the object it arrives in does not.
             for (let i = 0; i < 20; i++) {
               await new Promise((r) => setTimeout(r, 500));
               const still = await mcHandler.read({ name: msgClassName });
-              if (!still) break;
+              if (!still.ok) break;
             }
           } catch {
             // Swallow — class may already be absent or delete may fail after a

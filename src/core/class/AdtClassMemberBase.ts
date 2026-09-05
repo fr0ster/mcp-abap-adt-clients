@@ -201,10 +201,10 @@ export abstract class AdtClassMemberBase<
    * responsible are the class's. This reads the class, and says so rather than
    * implying the include carries any of it.
    */
-  async readMetadata(
+  async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig>,
-    options?: IReadOptions & IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['metadata']>>> {
+    options?: IReadOptions & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
@@ -231,10 +231,10 @@ export abstract class AdtClassMemberBase<
    * An include is never in a transport of its own — it travels inside its
    * class, so this reads the class's.
    */
-  async readTransport(
+  async readTransport<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig>,
-    options?: { withLongPolling?: boolean } & IAdtOperationOptions,
-  ): Promise<IAdtResponse<string>> {
+    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+  ): Promise<IAdtResponse<string, E>> {
     if (!config.className) {
       throw new Error('Class name is required');
     }

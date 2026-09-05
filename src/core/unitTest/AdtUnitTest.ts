@@ -257,29 +257,29 @@ export class AdtUnitTest<
   }
 
   /** Read the tests — the whole `testclasses` include of the container class. */
-  async read(
+  async read<E extends IAdtError = IAdtError>(
     config: Partial<IUnitTestConfig>,
     version: 'active' | 'inactive' = 'active',
-    options?: { withLongPolling?: boolean } & IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['source']>>> {
+    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     const name = this.name(config);
     return this.adtLocalTestClass.read(
       { className: name },
       version,
       options,
-    ) as Promise<IAdtResponse<ReturnType<R['source']>>>;
+    ) as Promise<IAdtResponse<ReturnType<R['source']>, E>>;
   }
 
   /** Metadata of the container class — an include carries none of its own. */
-  async readMetadata(
+  async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IUnitTestConfig>,
-    options?: { withLongPolling?: boolean } & IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['metadata']>>> {
+    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
     const name = this.name(config);
     return this.adtLocalTestClass.readMetadata(
       { className: name },
       options,
-    ) as Promise<IAdtResponse<ReturnType<R['metadata']>>>;
+    ) as Promise<IAdtResponse<ReturnType<R['metadata']>, E>>;
   }
 
   /**

@@ -184,11 +184,11 @@ export class AdtInclude<
   }
 
   /** Read the include's source. */
-  async read(
+  async read<E extends IAdtError = IAdtError>(
     config: Partial<IIncludeConfig>,
     version?: 'active' | 'inactive',
-    options?: { withLongPolling?: boolean } & IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['source']>>> {
+    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     const includeName = requireName(config);
     return answering(
       () => getIncludeSource(this.connection, includeName, version),
@@ -198,10 +198,10 @@ export class AdtInclude<
   }
 
   /** Read the include's metadata. */
-  async readMetadata(
+  async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IIncludeConfig>,
-    options?: { withLongPolling?: boolean } & IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['metadata']>>> {
+    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
     const includeName = requireName(config);
     return answering(
       () => getIncludeMetadata(this.connection, includeName),

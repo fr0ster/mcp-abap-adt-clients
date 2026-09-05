@@ -325,11 +325,11 @@ export class AdtFunctionInclude<
    * Historically it answered metadata, which disagreed with class, program and
    * function module.
    */
-  async read(
+  async read<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionIncludeConfig>,
     version?: 'active' | 'inactive',
-    options?: IReadOptions & IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['source']>>> {
+    options?: IReadOptions & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     const { group, include } = this.names(config);
 
     return answering(

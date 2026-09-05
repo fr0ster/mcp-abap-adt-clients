@@ -201,11 +201,11 @@ export class AdtAppendStructure<
   }
 
   /** Read the DDL source. */
-  async read(
+  async read<E extends IAdtError = IAdtError>(
     config: Partial<IAppendStructureConfig>,
     version?: 'active' | 'inactive',
-    options?: IReadOptions & IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['source']>>> {
+    options?: IReadOptions & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     const name = this.name(config);
 
     // No 404 special case: whether an empty answer *is* absence is the caller's
@@ -225,10 +225,10 @@ export class AdtAppendStructure<
   }
 
   /** Read the metadata document. */
-  async readMetadata(
+  async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IAppendStructureConfig>,
-    options?: IReadOptions & IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['metadata']>>> {
+    options?: IReadOptions & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
     const name = this.name(config);
 
     return answering(
@@ -246,10 +246,10 @@ export class AdtAppendStructure<
   }
 
   /** The transport request the object belongs to. */
-  async readTransport(
+  async readTransport<E extends IAdtError = IAdtError>(
     config: Partial<IAppendStructureConfig>,
-    options?: { withLongPolling?: boolean } & IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['transport']>>> {
+    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
     const name = this.name(config);
 
     return answering(

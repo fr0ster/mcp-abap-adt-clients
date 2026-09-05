@@ -210,11 +210,11 @@ export class AdtDomain<
    *
    * `version` is accepted and ignored: a domain is XML-based and has one
    * document, not an active/inactive source pair. */
-  async read(
+  async read<E extends IAdtError = IAdtError>(
     config: Partial<IDomainConfig>,
     _version?: 'active' | 'inactive',
-    options?: IReadOptions & IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['source']>>> {
+    options?: IReadOptions & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     const name = this.name(config);
 
     // No 404 special case: ADT answers a read for a missing object with 200 and
@@ -228,10 +228,10 @@ export class AdtDomain<
   }
 
   /** Read the object's metadata document. */
-  async readMetadata(
+  async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IDomainConfig>,
-    options?: IReadOptions & IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['metadata']>>> {
+    options?: IReadOptions & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
     const name = this.name(config);
 
     return answering(
@@ -242,10 +242,10 @@ export class AdtDomain<
   }
 
   /** The transport request the object belongs to. */
-  async readTransport(
+  async readTransport<E extends IAdtError = IAdtError>(
     config: Partial<IDomainConfig>,
-    options?: { withLongPolling?: boolean } & IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['transport']>>> {
+    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
     const name = this.name(config);
 
     return answering(

@@ -276,11 +276,11 @@ export class AdtFunctionGroup<
    * `version` is accepted and ignored: a group is a container, and the resource
    * this reads is its metadata document, which has no active/inactive pair.
    */
-  async read(
+  async read<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionGroupConfig>,
     _version?: 'active' | 'inactive',
-    options?: IReadOptions & IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['source']>>> {
+    options?: IReadOptions & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     if (!config.functionGroupName) {
       throw new Error('Function group name is required');
     }
@@ -305,10 +305,10 @@ export class AdtFunctionGroup<
    * The same resource `read` fetches — a group has no source to tell it apart
    * from — declared separately because the contract asks both of a readable.
    */
-  async readMetadata(
+  async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionGroupConfig>,
-    options?: IReadOptions & IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['metadata']>>> {
+    options?: IReadOptions & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
     if (!config.functionGroupName) {
       throw new Error('Function group name is required');
     }
@@ -326,10 +326,10 @@ export class AdtFunctionGroup<
   }
 
   /** The transport request the group belongs to. */
-  async readTransport(
+  async readTransport<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionGroupConfig>,
-    options?: { withLongPolling?: boolean } & IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['transport']>>> {
+    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
     if (!config.functionGroupName) {
       throw new Error('Function group name is required');
     }

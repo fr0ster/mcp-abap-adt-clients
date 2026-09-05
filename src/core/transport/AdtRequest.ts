@@ -149,11 +149,11 @@ export class AdtRequest<
   }
 
   /** Read one transport request. */
-  async read(
+  async read<E extends IAdtError = IAdtError>(
     config: Partial<ITransportConfig>,
     _version?: 'active' | 'inactive',
-    options?: { withLongPolling?: boolean } & IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['read']>>> {
+    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['read']>, E>> {
     const number = this.number(config);
 
     return answering(
@@ -169,10 +169,10 @@ export class AdtRequest<
    * A transport request has no separate metadata resource: what `read` answers
    * *is* the description, the owner and the tasks.
    */
-  async readMetadata(
+  async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<ITransportConfig>,
-    options?: { withLongPolling?: boolean } & IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['read']>>> {
+    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['read']>, E>> {
     return this.read(config, undefined, options);
   }
 

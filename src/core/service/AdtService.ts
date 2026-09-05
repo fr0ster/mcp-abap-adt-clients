@@ -545,11 +545,11 @@ export class AdtServiceBinding<
   }
 
   /** Read the binding document. */
-  async read(
+  async read<E extends IAdtError = IAdtError>(
     config: Partial<IServiceBindingConfig>,
     version?: 'active' | 'inactive',
-    options?: { withLongPolling?: boolean } & IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['source']>>> {
+    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     const name = this.name(config);
 
     // No 404 special case: whether an empty or missing answer *is* absence is
@@ -806,10 +806,10 @@ export class AdtServiceBinding<
    * A binding has no `objectstates` resource: what stands in for it is the CTS
    * transport check, which is why this needs the package as well as the name.
    */
-  async readTransport(
+  async readTransport<E extends IAdtError = IAdtError>(
     config: Partial<IServiceBindingConfig>,
-    options?: { withLongPolling?: boolean } & IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['transport']>>> {
+    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
     const name = this.name(config);
     if (!config.packageName) {
       throw new Error('packageName is required for transport check');

@@ -174,11 +174,11 @@ export class AdtMessageClass<
    * {@link parseMessageClass} in this module is the reading a consumer can
    * compose if they want the messages as a list rather than the document.
    */
-  async read(
+  async read<E extends IAdtError = IAdtError>(
     config: Partial<IMessageClassConfig>,
     _version?: 'active' | 'inactive',
-    options?: { withLongPolling?: boolean } & IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['source']>>> {
+    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     const name = this.name(config);
 
     // No 404 special case: whether an empty or missing answer *is* absence is

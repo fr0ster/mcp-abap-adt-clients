@@ -231,11 +231,11 @@ export class AdtProgram<
   }
 
   /** Read the program's source. */
-  async read(
+  async read<E extends IAdtError = IAdtError>(
     config: Partial<IProgramConfig>,
     version?: 'active' | 'inactive',
-    options?: IReadOptions & IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['source']>>> {
+    options?: IReadOptions & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     if (!config.programName) {
       throw new Error('Program name is required');
     }
@@ -258,10 +258,10 @@ export class AdtProgram<
   }
 
   /** Read the program's metadata: package, responsible, description. */
-  async readMetadata(
+  async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IProgramConfig>,
-    options?: IReadOptions & IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['metadata']>>> {
+    options?: IReadOptions & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
     if (!config.programName) {
       throw new Error('Program name is required');
     }
@@ -543,10 +543,10 @@ export class AdtProgram<
   }
 
   /** The transport request the program belongs to. */
-  async readTransport(
+  async readTransport<E extends IAdtError = IAdtError>(
     config: Partial<IProgramConfig>,
-    options?: { withLongPolling?: boolean } & IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['transport']>>> {
+    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
     if (!config.programName) {
       throw new Error('Program name is required');
     }

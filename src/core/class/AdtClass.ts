@@ -233,11 +233,11 @@ export class AdtClass<
   /**
    * Read class
    */
-  async read(
+  async read<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig>,
     version?: 'active' | 'inactive',
-    options?: IReadOptions & IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['source']>>> {
+    options?: IReadOptions & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     if (!config.className) {
       throw new Error('Class name is required');
     }

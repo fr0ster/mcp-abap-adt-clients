@@ -253,11 +253,11 @@ export class AdtPackage<
    * `version` is passed through, though a package has one document: the
    * endpoint accepts it and callers pass it.
    */
-  async read(
+  async read<E extends IAdtError = IAdtError>(
     config: Partial<IPackageConfig>,
     version?: 'active' | 'inactive',
-    options?: IReadOptions & IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['source']>>> {
+    options?: IReadOptions & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     const name = this.name(config);
 
     // No 404 special case: ADT answers a read for a package that is not there
@@ -271,10 +271,10 @@ export class AdtPackage<
   }
 
   /** The same document `read` fetches — a package has no second resource. */
-  async readMetadata(
+  async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IPackageConfig>,
-    options?: IReadOptions & IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['metadata']>>> {
+    options?: IReadOptions & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
     const name = this.name(config);
 
     return answering(
@@ -292,10 +292,10 @@ export class AdtPackage<
   }
 
   /** The transport request the package belongs to. */
-  async readTransport(
+  async readTransport<E extends IAdtError = IAdtError>(
     config: Partial<IPackageConfig>,
-    options?: { withLongPolling?: boolean } & IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['transport']>>> {
+    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
     const name = this.name(config);
 
     return answering(
