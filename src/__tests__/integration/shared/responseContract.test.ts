@@ -33,7 +33,6 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
-import { AdtParseError, AdtSAPError } from '../../../utils/adtErrors';
 import { expectResult } from '../../helpers/contract';
 import {
   createTestAdtClient,
@@ -117,8 +116,10 @@ describe('Response contract - 17.0.0', () => {
         throw new Error(`expected a result: ${answer.getError().message}`);
       }
       // The union's other guarantee, and the one a caller relies on when they
-      // branch: on the success side there is nothing to read as a failure.
-      expect(answer.getError()).toBeUndefined();
+      // branch: the success half declares no `getError` at all, so reaching for
+      // one does not compile. Asserted here as the runtime shape, since the
+      // compile-time half is what the narrowing above already proves.
+      expect('getError' in answer).toBe(false);
     }, 60000);
   });
 
@@ -181,13 +182,11 @@ describe('Response contract - 17.0.0', () => {
         );
       }
 
-      // Whatever it was, it is the server's word or ours — and `cause` says
-      // which, by type.
-      if (failure.origin === 'refusal') {
-        expect(failure.cause).toBeInstanceOf(AdtSAPError);
-      } else if (failure.origin === 'parse') {
-        expect(failure.cause).toBeInstanceOf(AdtParseError);
-      }
+      // Two origins, and no `cause`. interfaces 31.0.0 removed both the third
+      // origin and the thrown error behind the failure: `parse` described this
+      // library failing to read a document, which is not a verdict about the
+      // server, and `cause` published what it had thrown internally.
+      expect(['connection', 'refusal']).toContain(failure.origin);
     }, 60000);
 
     it('a package that does not exist is not an empty package', async () => {
@@ -228,12 +227,15 @@ describe('Response contract - 17.0.0', () => {
       // the request itself succeeded, which used to be stored as a result with
       // `errors: []`. That one is covered by unit tests against a stub, because
       // it needs a server that answers 200 with an exception document.
-      const state = expectResult(
-        await client.getClass().read({ className: NEVER_EXISTS }),
-        'state',
-      );
+      const answer = await client.getClass().read({ className: NEVER_EXISTS });
 
-      expect(state).toBeUndefined();
+      // ADT answers a read for an object that is not there with 200 and an
+      // empty body — never a 404 — so the shipped reading answers `''` and the
+      // call succeeds. Whether an empty body *is* absence is the caller's
+      // `analyse`, which is exactly why this library does not decide it here.
+      expect(answer.ok).toBe(true);
+      if (!answer.ok) throw new Error('expected a result');
+      expect(answer.getResult().value).toBe('');
     }, 60000);
 
     it('surfaces a refusal on a write rather than reporting success', async () => {
@@ -241,35 +243,24 @@ describe('Response contract - 17.0.0', () => {
       logTestStep(`activate ${NEVER_EXISTS}`, testsLogger);
 
       // A write is where reporting success on a refusal costs something: the
-      // caller believes an object exists, or was activated, and it was not.
-      const outcome = expectResult(
-        await client
-          .getClass()
-          .activate({ className: NEVER_EXISTS })
-          .then(
-            (state) => ({ threw: false as const, state }),
-            (error: unknown) => ({ threw: true as const, error }),
-          ),
-        'outcome',
-      );
+      // caller believes an object was activated, and it was not.
+      //
+      // No throw/no-throw dance any more. The refusal is in the answer — that
+      // is the whole change — so the test reads it there, and a library that
+      // went back to reporting success would fail on the first line.
+      const answer = await client
+        .getClass()
+        .activate({ className: NEVER_EXISTS });
 
-      if (outcome.threw) {
-        const error = outcome.error as Error;
-        testsLogger.info?.(`📛 ${error.name}: ${error.message.slice(0, 120)}`);
-        if (error instanceof AdtSAPError) {
-          expect(error.message.length).toBeGreaterThan(0);
-          expect(error.request?.url).toContain('/sap/bc/adt/');
-        }
-        return;
-      }
+      expect(answer.ok).toBe(false);
+      if (answer.ok) throw new Error('expected a failure');
 
-      // If it did not throw, the state must say so — an empty `errors` here is
-      // the library reporting success for something the server refused.
-      const errors = outcome.state?.errors ?? [];
+      const failure = answer.getError();
       testsLogger.info?.(
-        `state returned, errors=${errors.length}: ${JSON.stringify(errors).slice(0, 200)}`,
+        `📛 [${failure.origin}] ${failure.message.slice(0, 120)}`,
       );
-      expect(errors.length).toBeGreaterThan(0);
+      expect(failure.message.length).toBeGreaterThan(0);
+      expect(['connection', 'refusal']).toContain(failure.origin);
     }, 60000);
   });
 });

@@ -114,17 +114,15 @@ describe('Shared - readMetadata', () => {
         }),
       );
 
-      expect(activeResult.status).toBe(200);
-      expect(activeResult.data).toBeDefined();
+      expect(activeResult).toBeDefined();
       logTestStep(
-        `metadata active size: ${activeResult.data?.length || 0} bytes`,
+        `metadata active size: ${activeResult?.length || 0} bytes`,
         testsLogger,
       );
 
-      expect(inactiveResult.status).toBe(200);
-      expect(inactiveResult.data).toBeDefined();
+      expect(inactiveResult).toBeDefined();
       logTestStep(
-        `metadata inactive size: ${inactiveResult.data?.length || 0} bytes`,
+        `metadata inactive size: ${inactiveResult?.length || 0} bytes`,
         testsLogger,
       );
 
@@ -187,14 +185,10 @@ describe('Shared - readMetadata', () => {
         client.getUtils().readObjectMetadata('domain', domainName),
       );
 
-      expect(result.status).toBe(200);
-      expect(result.data).toBeDefined();
+      expect(result).toBeDefined();
 
       testsLogger.info?.('✅ Metadata retrieved');
-      logTestStep(
-        `metadata size: ${result.data?.length || 0} bytes`,
-        testsLogger,
-      );
+      logTestStep(`metadata size: ${result?.length || 0} bytes`, testsLogger);
     } catch (error: any) {
       if (error.response?.status === 406) {
         if (isHttpStatusAllowed(406, { params: {} })) {
@@ -249,8 +243,7 @@ describe('Shared - readMetadata', () => {
       const result = await orThrow(
         client.getUtils().readObjectMetadata('table', tableName),
       );
-      expect(result.status).toBe(200);
-      expect(result.data).toBeDefined();
+      expect(result).toBeDefined();
     } catch (error: any) {
       if (error.response?.status === 406) {
         if (isHttpStatusAllowed(406, { params: {} })) {
