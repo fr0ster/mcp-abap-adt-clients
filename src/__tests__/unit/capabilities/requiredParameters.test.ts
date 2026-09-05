@@ -1,5 +1,5 @@
 /**
- * No create leaves an object without a package.
+ * A create refuses a missing required parameter before it reaches the wire.
  *
  * An object created and never bound to a package is the one thing `delete()`
  * cannot remove: the deletion check resolves through the package, so it reports
@@ -13,6 +13,11 @@
  * builders make `<adtcore:packageRef>` conditional, so dropping the argument
  * check would not fail a compile, would not fail any other test, and would
  * start posting objects with no package.
+ *
+ * The object's **name** is checked the same way and for a plainer reason: a
+ * create without one addresses the wrong resource, and what it makes there is
+ * anybody's guess. Two parameters, both required, neither allowed past the
+ * argument list.
  *
  * The subject is the factory return type, like the rest of this folder: a
  * consumer never names the class.
@@ -80,6 +85,49 @@ describe('a create without a package', () => {
         answered = await handler.create(withoutPackage);
       } catch (error) {
         expect(String((error as Error).message)).toMatch(/package/i);
+        return;
+      }
+      expect(answered).toHaveProperty('ok', false);
+    });
+  }
+});
+
+describe('a create without the object\u2019s name', () => {
+  /**
+   * The name lives under a different key in every config — `className`,
+   * `ddlName`, `functionGroupName` — so it is found rather than listed: the
+   * manifest's `subject` ends in the object's name, and exactly one config
+   * value matches it.
+   */
+  const nameKeyOf = (entry: {
+    subject: string;
+    config: Record<string, unknown>;
+  }): string | undefined => {
+    const last = entry.subject.split('/').pop()?.toUpperCase();
+    if (!last) return undefined;
+    return Object.keys(entry.config).find(
+      (k) => String(entry.config[k]).toUpperCase() === last,
+    );
+  };
+
+  for (const [name, entry] of Object.entries(HANDLERS)) {
+    const key = nameKeyOf(entry as never);
+    if (!key) continue;
+
+    it(`is refused by ${name}, before any request`, async () => {
+      const client = new AdtClient(refusing());
+      // biome-ignore lint/suspicious/noExplicitAny: the manifest is untyped by design
+      const handler = (entry as any).factory(client) as any;
+      if (typeof handler.create !== 'function') return;
+
+      const withoutName = { ...(entry.config as Record<string, unknown>) };
+      delete withoutName[key];
+
+      let answered: unknown;
+      try {
+        answered = await handler.create(withoutName);
+      } catch (error) {
+        expect(String((error as Error).message)).toMatch(/name|required/i);
         return;
       }
       expect(answered).toHaveProperty('ok', false);
