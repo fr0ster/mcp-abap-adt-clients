@@ -9,15 +9,16 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type {
   IAbapConnection,
-  IAdtOperationOptions,
-  IAdtWireResponse,
+  IAdtResponse,
   IGetVirtualFoldersContentsParams,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
+import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
-import { orThrow } from '../../../utils/adtResponse';
+import { failed } from '../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
+import type { TestableObject } from '../../helpers/BaseTester';
 import { BaseTester } from '../../helpers/BaseTester';
 import {
   createTestAdtClient,
@@ -50,8 +51,16 @@ const connectionLogger: ILogger = createConnectionLogger();
 const libraryLogger: ILogger = createLibraryLogger();
 const testsLogger: ILogger = createTestsLogger();
 
+/**
+ * The state type is a document, not the envelope.
+ *
+ * `getUtils()` returns contracts as of this release, and
+ * `getVirtualFoldersContents` answers the body. A shim that still declared
+ * `IAdtWireResponse` would have to invent a status to satisfy itself — so it
+ * declares what it actually gets.
+ */
 class VirtualFoldersContentsObject
-  implements IAdtObject<IGetVirtualFoldersContentsParams, IAdtWireResponse>
+  implements TestableObject<IGetVirtualFoldersContentsParams>
 {
   private client: AdtClient;
 
@@ -59,96 +68,53 @@ class VirtualFoldersContentsObject
     this.client = client;
   }
 
-  private rejectUnsupported<T>(operation: string): Promise<T> {
-    return Promise.reject(
-      new Error(
-        `Virtual folders contents does not support ${operation} operation`,
-      ),
+  /**
+   * Every member this resource does not have.
+   *
+   * Answered, not thrown: the contract says a member answers `IAdtResponse`,
+   * and a shim that threw would make the harness treat "this resource has no
+   * create" differently from "the server refused the create".
+   */
+  private unsupported<T>(operation: string): Promise<IAdtResponse<T>> {
+    return Promise.resolve(
+      failed<T>({
+        origin: 'refusal',
+        code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION,
+        message: `Virtual folders contents does not support ${operation}`,
+      }),
     );
   }
 
-  getVersions() {
-    return this.rejectUnsupported<never>('getVersions');
+  validate() {
+    return this.unsupported<unknown>('validate');
   }
 
-  getVersionSource() {
-    return this.rejectUnsupported<never>('getVersionSource');
-  }
-
-  validate(
-    _config: Partial<IGetVirtualFoldersContentsParams>,
-  ): Promise<IAdtWireResponse> {
-    return this.rejectUnsupported('validate');
-  }
-
-  create(
-    _config: IGetVirtualFoldersContentsParams,
-    _options?: IAdtOperationOptions,
-  ): Promise<IAdtWireResponse> {
-    return this.rejectUnsupported('create');
+  create() {
+    return this.unsupported<unknown>('create');
   }
 
   read(
     config: Partial<IGetVirtualFoldersContentsParams>,
-    _version?: 'active' | 'inactive',
-    _options?: { withLongPolling?: boolean },
-  ): Promise<IAdtWireResponse | undefined> {
-    return orThrow(
-      this.client
-        .getUtils()
-        .getVirtualFoldersContents(config as IGetVirtualFoldersContentsParams),
-    );
+  ): Promise<IAdtResponse<string>> {
+    return this.client
+      .getUtils()
+      .getVirtualFoldersContents(config as IGetVirtualFoldersContentsParams);
   }
 
-  readMetadata(
-    _config: Partial<IGetVirtualFoldersContentsParams>,
-    _options?: { withLongPolling?: boolean },
-  ): Promise<IAdtWireResponse> {
-    return this.rejectUnsupported('readMetadata');
+  readMetadata() {
+    return this.unsupported<unknown>('readMetadata');
   }
 
-  update(
-    _config: Partial<IGetVirtualFoldersContentsParams>,
-    _options?: IAdtOperationOptions,
-  ): Promise<IAdtWireResponse> {
-    return this.rejectUnsupported('update');
+  update() {
+    return this.unsupported<unknown>('update');
   }
 
-  delete(
-    _config: Partial<IGetVirtualFoldersContentsParams>,
-  ): Promise<IAdtWireResponse> {
-    return this.rejectUnsupported('delete');
+  delete() {
+    return this.unsupported<unknown>('delete');
   }
 
-  activate(
-    _config: Partial<IGetVirtualFoldersContentsParams>,
-  ): Promise<IAdtWireResponse> {
-    return this.rejectUnsupported('activate');
-  }
-
-  check(
-    _config: Partial<IGetVirtualFoldersContentsParams>,
-    _status?: string,
-  ): Promise<IAdtWireResponse> {
-    return this.rejectUnsupported('check');
-  }
-
-  readTransport(
-    _config: Partial<IGetVirtualFoldersContentsParams>,
-    _options?: { withLongPolling?: boolean },
-  ): Promise<IAdtWireResponse> {
-    return this.rejectUnsupported('readTransport');
-  }
-
-  lock(_config: Partial<IGetVirtualFoldersContentsParams>): Promise<string> {
-    return this.rejectUnsupported('lock');
-  }
-
-  unlock(
-    _config: Partial<IGetVirtualFoldersContentsParams>,
-    _lockHandle: string,
-  ): Promise<IAdtWireResponse> {
-    return this.rejectUnsupported('unlock');
+  activate() {
+    return this.unsupported<unknown>('activate');
   }
 }
 
@@ -293,12 +259,12 @@ describe('Shared - getVirtualFoldersContents', () => {
       }
 
       try {
-        const result = await tester.readTest(config, {
+        // The document itself. A status check never saw the refusals ADT
+        // delivers inside a 200; what the document contains is the assertion.
+        const result = (await tester.readTest(config, {
           skipReadMetadata: true,
-        });
-        expect(result?.status).toBe(200);
-        expect(result?.data).toBeDefined();
-        expect(result?.data).toContain('virtualFoldersResult');
+        })) as string;
+        expect(result).toContain('virtualFoldersResult');
         logTestSuccess(testsLogger, testName);
       } catch (error) {
         logTestError(testsLogger, testName, error);

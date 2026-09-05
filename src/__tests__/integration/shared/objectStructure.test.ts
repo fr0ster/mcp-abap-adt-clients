@@ -7,13 +7,14 @@
 
 import type {
   IAbapConnection,
-  IAdtOperationOptions,
-  IAdtWireResponse,
+  IAdtResponse,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
+import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
 import type { AdtClient } from '../../../clients/AdtClient';
-import { orThrow } from '../../../utils/adtResponse';
+import { failed } from '../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
+import type { TestableObject } from '../../helpers/BaseTester';
 import { BaseTester } from '../../helpers/BaseTester';
 import {
   createTestAdtClient,
@@ -48,104 +49,68 @@ const connectionLogger: ILogger = createConnectionLogger();
 const libraryLogger: ILogger = createLibraryLogger();
 const testsLogger: ILogger = createTestsLogger();
 
-class ObjectStructureObject
-  implements IAdtObject<IObjectStructureParams, IAdtWireResponse>
-{
+/**
+ * The state type is a document, not the envelope.
+ *
+ * `getUtils()` returns contracts as of this release, and `getObjectStructure`
+ * answers the body. A shim that still declared `IAdtWireResponse` would have to
+ * invent a status to satisfy itself — so it declares what it actually gets.
+ */
+class ObjectStructureObject implements TestableObject<IObjectStructureParams> {
   private client: AdtClient;
 
   constructor(client: AdtClient) {
     this.client = client;
   }
 
-  private rejectUnsupported<T>(operation: string): Promise<T> {
-    return Promise.reject(
-      new Error(`Object structure does not support ${operation} operation`),
+  /**
+   * Every member this resource does not have.
+   *
+   * Answered, not thrown: the contract says a member answers `IAdtResponse`,
+   * and a shim that threw would make the harness treat "this resource has no
+   * create" differently from "the server refused the create".
+   */
+  private unsupported<T>(operation: string): Promise<IAdtResponse<T>> {
+    return Promise.resolve(
+      failed<T>({
+        origin: 'refusal',
+        code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION,
+        message: `Object structure does not support ${operation}`,
+      }),
     );
   }
 
-  getVersions() {
-    return this.rejectUnsupported<never>('getVersions');
+  validate() {
+    return this.unsupported<unknown>('validate');
   }
 
-  getVersionSource() {
-    return this.rejectUnsupported<never>('getVersionSource');
+  create() {
+    return this.unsupported<unknown>('create');
   }
 
-  validate(
-    _config: Partial<IObjectStructureParams>,
-  ): Promise<IAdtWireResponse> {
-    return this.rejectUnsupported('validate');
-  }
-
-  create(
-    _config: IObjectStructureParams,
-    _options?: IAdtOperationOptions,
-  ): Promise<IAdtWireResponse> {
-    return this.rejectUnsupported('create');
-  }
-
-  read(
-    config: Partial<IObjectStructureParams>,
-    _version?: 'active' | 'inactive',
-    _options?: { withLongPolling?: boolean },
-  ): Promise<IAdtWireResponse | undefined> {
+  read(config: Partial<IObjectStructureParams>): Promise<IAdtResponse<string>> {
     if (!config.object_type || !config.object_name) {
       return Promise.reject(new Error('object_type and object_name required'));
     }
-    return orThrow(
-      this.client
-        .getUtils()
-        .getObjectStructure(config.object_type, config.object_name),
-    );
+    return this.client
+      .getUtils()
+      .getObjectStructure(config.object_type, config.object_name);
   }
 
-  readMetadata(
-    _config: Partial<IObjectStructureParams>,
-    _options?: { withLongPolling?: boolean },
-  ): Promise<IAdtWireResponse> {
-    return this.rejectUnsupported('readMetadata');
+  readMetadata() {
+    return this.unsupported<unknown>('readMetadata');
   }
 
-  update(
-    _config: Partial<IObjectStructureParams>,
-    _options?: IAdtOperationOptions,
-  ): Promise<IAdtWireResponse> {
-    return this.rejectUnsupported('update');
+  update() {
+    return this.unsupported<unknown>('update');
   }
 
-  delete(_config: Partial<IObjectStructureParams>): Promise<IAdtWireResponse> {
-    return this.rejectUnsupported('delete');
+  delete() {
+    return this.unsupported<unknown>('delete');
   }
 
-  activate(
-    _config: Partial<IObjectStructureParams>,
-  ): Promise<IAdtWireResponse> {
-    return this.rejectUnsupported('activate');
-  }
-
-  check(
-    _config: Partial<IObjectStructureParams>,
-    _status?: string,
-  ): Promise<IAdtWireResponse> {
-    return this.rejectUnsupported('check');
-  }
-
-  readTransport(
-    _config: Partial<IObjectStructureParams>,
-    _options?: { withLongPolling?: boolean },
-  ): Promise<IAdtWireResponse> {
-    return this.rejectUnsupported('readTransport');
-  }
-
-  lock(_config: Partial<IObjectStructureParams>): Promise<string> {
-    return this.rejectUnsupported('lock');
-  }
-
-  unlock(
-    _config: Partial<IObjectStructureParams>,
-    _lockHandle: string,
-  ): Promise<IAdtWireResponse> {
-    return this.rejectUnsupported('unlock');
+  activate() {
+    return this.unsupported<unknown>('activate');
   }
 }
 
@@ -256,11 +221,14 @@ describe('Shared - getObjectStructure', () => {
       }
 
       try {
-        const result = await tester.readTest(config, {
+        // The document itself, not an envelope: a status check never saw the
+        // refusals ADT delivers inside a 200, and `readTest` already turns a
+        // failure into a failed test naming what SAP said.
+        const result = (await tester.readTest(config, {
           skipReadMetadata: true,
-        });
-        expect(result?.status).toBe(200);
-        expect(result?.data).toBeDefined();
+        })) as string;
+        expect(typeof result).toBe('string');
+        expect(result.length).toBeGreaterThan(0);
         logTestSuccess(testsLogger, testName);
       } catch (error: any) {
         if (error?.response?.status === 406) {

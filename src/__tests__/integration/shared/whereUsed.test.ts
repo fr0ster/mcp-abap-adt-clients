@@ -16,6 +16,7 @@ import type { AdtClient } from '../../../clients/AdtClient';
 import { AdtUtils } from '../../../core/shared/AdtUtils';
 import { orThrow } from '../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
+import { expectResult } from '../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -485,7 +486,7 @@ describe('Shared - getWhereUsed', () => {
     testsLogger.info?.('✅ Test complete: parsed results received');
   }, 30000);
 
-  it('should get where-used list with raw XML included', async () => {
+  it('hands back the document itself, for a caller that wants all of it', async () => {
     if (!hasConfig) {
       testsLogger.warn?.(
         '⚠️ Skipping test: No .env file or SAP configuration found',
@@ -518,28 +519,30 @@ describe('Shared - getWhereUsed', () => {
       return;
     }
 
-    logTestStep('get where-used list with raw XML', testsLogger);
+    logTestStep('get the where-used document', testsLogger);
 
-    // `AdtUtils` and not `client.getUtils()`: the two-step flow under test fetches
-    // a scope document and hands it back, and `getWhereUsed(scopeXml)` is a class
-    // member that `IAdtInformationSystem` does not carry. The contract's
-    // `getWhereUsedList` builds its own scope from flags instead, so it cannot
-    // stand in here — see the CHANGELOG entry for the gap and what closes it.
+    // `getWhereUsedList` carried an `includeRawXml` flag that put the whole
+    // document inside the parsed result — the same endpoint answering two
+    // shapes depending on a boolean. The document is its own member:
+    // `getWhereUsed` runs the search and answers the body, and a caller who
+    // wants everything asks that one.
+    //
+    // `AdtUtils` and not `client.getUtils()`: the two-step flow fetches a scope
+    // document and hands it back, and `getWhereUsed(scopeXml)` is a class
+    // member that `IAdtInformationSystem` does not carry.
     const utils = new AdtUtils(connection, testsLogger);
-    const result = await orThrow(
-      utils.getWhereUsedList({
+    const document = expectResult(
+      await utils.getWhereUsed({
         object_name: objectName,
         object_type: objectType,
-        includeRawXml: true,
       }),
+      'where-used document',
     );
 
-    expect(result).toBeDefined();
-    expect(result.rawXml).toBeDefined();
-    expect(result.rawXml).toContain('usageReferenceResult');
+    expect(document).toContain('usageReferenceResult');
 
-    testsLogger.info?.(`📊 Raw XML size: ${result.rawXml?.length} bytes`);
-    testsLogger.info?.('✅ Test complete: raw XML included');
+    testsLogger.info?.(`📊 Document size: ${document.length} bytes`);
+    testsLogger.info?.('✅ Test complete: the whole document came back');
   }, 30000);
 
   it('narrows results to selected object types (enableOnlyTypes vs enableAllTypes)', async () => {
@@ -643,9 +646,7 @@ describe('Shared - getWhereUsed', () => {
     );
     const scopeTypes = [
       ...new Set(
-        [...String(scopeResponse.data).matchAll(/name="([^"]+)"/g)].map(
-          (m) => m[1],
-        ),
+        [...String(scopeResponse).matchAll(/name="([^"]+)"/g)].map((m) => m[1]),
       ),
     ];
     const absentType = scopeTypes.find((t) => !allTypes.includes(t));
