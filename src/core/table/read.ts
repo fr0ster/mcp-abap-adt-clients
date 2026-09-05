@@ -26,13 +26,11 @@ export async function getTableMetadata(
   tableName: string,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  return orThrow(
-    getUtils(connection).readObjectMetadata(
-      'table',
-      tableName,
-      undefined,
-      options,
-    ),
+  return getUtils(connection).objectMetadataWire(
+    'table',
+    tableName,
+    undefined,
+    options,
   );
 }
 
@@ -45,14 +43,12 @@ export async function getTableSource(
   version?: 'active' | 'inactive',
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  return orThrow(
-    getUtils(connection).readObjectSource(
-      'table',
-      tableName,
-      undefined,
-      version,
-      options,
-    ),
+  return getUtils(connection).objectSourceWire(
+    'table',
+    tableName,
+    undefined,
+    version,
+    options,
   );
 }
 

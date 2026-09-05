@@ -1,6 +1,7 @@
-import type { IAbapConnection, IObjectVersion } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
+import type { ObjectVersion } from '../shared/results';
 import { parseVersionsFeed, throwVersionsError } from '../shared/versions';
 import type { IProgramConfig } from './types';
 
@@ -10,7 +11,7 @@ const ACCEPT_VERSION_FEED = 'application/atom+xml;type=feed';
 export async function getProgramVersions(
   connection: IAbapConnection,
   config: Partial<IProgramConfig>,
-): Promise<IObjectVersion[]> {
+): Promise<ObjectVersion[]> {
   if (!config.programName) throw new Error('programName is required');
   const encodedName = encodeSapObjectName(config.programName);
   const url = `/sap/bc/adt/programs/programs/${encodedName}/source/main/versions`;

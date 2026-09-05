@@ -20,6 +20,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { AdtCdsUnitTest } from '../../../../core/unitTest/AdtCdsUnitTest';
 import { AdtUnitTest } from '../../../../core/unitTest/AdtUnitTest';
+import { expectFailure, expectResult } from '../../../helpers/contract';
 import { createLibraryLogger } from '../../../helpers/testLogger';
 
 type Call = { url: string; method: string; data?: unknown };
@@ -59,7 +60,7 @@ describe('AdtUnitTest.validate()', () => {
     expect(calls).toHaveLength(0);
   });
 
-  it('confirms an existing container by reading it, and reports what came back', async () => {
+  it('confirms an existing container by reading it, and validates nothing more', async () => {
     const { conn, calls } = makeConn((r) => {
       expect(r.method).toBe('GET');
       expect(r.url).toBe('/sap/bc/adt/oo/classes/ZCL_CONTAINER/source/main');
@@ -67,11 +68,16 @@ describe('AdtUnitTest.validate()', () => {
     });
     const h = new AdtUnitTest(conn, createLibraryLogger());
 
-    const state = await h.validate({ className: 'ZCL_CONTAINER' });
+    // One request, and it is the read. The class is there and no source was
+    // given, so there is nothing left to check — the answer succeeds carrying
+    // no verdict, which is different from a verdict that says "fine".
+    const verdict = expectResult(
+      await h.validate({ className: 'ZCL_CONTAINER' }),
+      'validation',
+    );
 
     expect(calls).toHaveLength(1);
-    expect(state.errors).toEqual([]);
-    expect(state.readResult?.data).toBe('CLASS zcl_container DEFINITION.');
+    expect(verdict).toBeUndefined();
   });
 
   it('checks the test source too, when there is source to check', async () => {
@@ -86,13 +92,16 @@ describe('AdtUnitTest.validate()', () => {
     });
     const h = new AdtUnitTest(conn, createLibraryLogger());
 
-    const state = await h.validate({
-      className: 'ZCL_CONTAINER',
-      testClassSource: 'CLASS ltcl_test DEFINITION FOR TESTING.',
-    });
+    const verdict = expectResult(
+      await h.validate({
+        className: 'ZCL_CONTAINER',
+        testClassSource: 'CLASS ltcl_test DEFINITION FOR TESTING.',
+      }),
+      'validation',
+    );
 
     expect(calls).toHaveLength(2);
-    expect(state.checkResult?.data).toBe('<code-ok/>');
+    expect(verdict).toBe('<code-ok/>');
   });
 
   it('validates the NAME when the container does not exist yet — the create path', async () => {
@@ -109,14 +118,17 @@ describe('AdtUnitTest.validate()', () => {
     });
     const h = new AdtUnitTest(conn, createLibraryLogger());
 
-    const state = await h.validate({
-      className: 'ZCL_NEW_TESTS',
-      packageName: 'ZPKG',
-      description: 'tests',
-    });
+    const verdict = expectResult(
+      await h.validate({
+        className: 'ZCL_NEW_TESTS',
+        packageName: 'ZPKG',
+        description: 'tests',
+      }),
+      'validation',
+    );
 
     expect(calls).toHaveLength(2);
-    expect(state.validationResponse?.data).toBe('<name-ok/>');
+    expect(verdict).toBe('<name-ok/>');
   });
   it('a read that fails for any other reason is reported, not treated as absence', async () => {
     // A 500 is a fact about the request, not about the class. Routing it into
@@ -133,9 +145,13 @@ describe('AdtUnitTest.validate()', () => {
     );
     const h = new AdtUnitTest(conn, createLibraryLogger());
 
-    await expect(h.validate({ className: 'ZCL_CONTAINER' })).rejects.toThrow(
-      /server error/i,
+    // Reported, and it stops the chain: one request, and the failure is the
+    // 500 rather than a name check nobody asked for.
+    const failure = expectFailure(
+      await h.validate({ className: 'ZCL_CONTAINER' }),
+      'validate against a server that failed',
     );
+    expect(failure.message).toMatch(/server error/i);
     expect(calls).toHaveLength(1);
   });
 });
@@ -158,17 +174,21 @@ describe('AdtCdsUnitTest.validate()', () => {
     });
     const h = new AdtCdsUnitTest(conn, createLibraryLogger());
 
-    const state = await h.validate({
-      className: 'ZCL_CDS_DUMMY',
-      packageName: 'ZPKG',
-      classTemplate: '<template/>',
-      testClassSource: 'CLASS ltcl_test DEFINITION FOR TESTING.',
-    });
+    const verdict = expectResult(
+      await h.validate({
+        className: 'ZCL_CDS_DUMMY',
+        packageName: 'ZPKG',
+        classTemplate: '<template/>',
+        testClassSource: 'CLASS ltcl_test DEFINITION FOR TESTING.',
+      }),
+      'validation',
+    );
 
+    // Both requests went out — the handler above asserts which is which — and
+    // the answer is the name check's document. The code check is not dropped:
+    // its failure would have come back instead of this.
     expect(calls).toHaveLength(2);
-    expect(state.errors).toEqual([]);
-    expect(state.validationResponse?.data).toBe('<name-ok/>');
-    expect(state.testClassState?.validationResponse?.data).toBe('<code-ok/>');
+    expect(verdict).toBe('<name-ok/>');
   });
 
   it('a name the server rejects produces an error, not an empty success (one request)', async () => {
@@ -183,8 +203,8 @@ describe('AdtCdsUnitTest.validate()', () => {
     );
     const h = new AdtCdsUnitTest(conn, createLibraryLogger());
 
-    await expect(
-      h.validate({
+    const failure = expectFailure(
+      await h.validate({
         className: 'BOGUS NAME',
         // Required since the endpoint was measured to demand it. Without it the
         // handler's own guard throws first and this test would pass while
@@ -194,7 +214,15 @@ describe('AdtCdsUnitTest.validate()', () => {
         classTemplate: '<template/>',
         testClassSource: 'CLASS ltcl_test DEFINITION FOR TESTING.',
       }),
-    ).rejects.toMatchObject({ code: 'ADT_VALIDATION_FAILED', status: 400 });
+      'validate a name the server rejects',
+    );
+
+    // The status is on `response`, where the answer it came on is — not on
+    // invented fields beside the message.
+    expect(failure.response?.status).toBe(400);
+    expect(failure.message).toContain('invalid object name');
+    // And it stopped: the local-test-class check never went out over a name
+    // the server had already refused.
     expect(calls).toHaveLength(1);
   });
 
@@ -228,9 +256,12 @@ describe('AdtCdsUnitTest.validate()', () => {
     });
     const h = new AdtCdsUnitTest(conn, createLibraryLogger());
 
-    const state = await h.validate({ className: 'ZCL_CONTAINER' });
+    const verdict = expectResult(
+      await h.validate({ className: 'ZCL_CONTAINER' }),
+      'validation',
+    );
 
     expect(calls).toHaveLength(1);
-    expect(state.errors).toEqual([]);
+    expect(verdict).toBeUndefined();
   });
 });

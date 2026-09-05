@@ -15,13 +15,11 @@ import * as path from 'node:path';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type {
-  ITransformationConfig,
-  ITransformationState,
-} from '../../../../core/transformation';
+import type { ITransformationConfig } from '../../../../core/transformation';
 import { getTransformation } from '../../../../core/transformation/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -70,7 +68,7 @@ describe('Transformation - SimpleTransformation (using AdtClient)', () => {
   let hasConfig = false;
   let isCloudSystem = false;
   let isLegacy = false;
-  let tester: BaseTester<ITransformationConfig, ITransformationState>;
+  let tester: BaseTester<ITransformationConfig>;
 
   beforeAll(async () => {
     try {
@@ -299,7 +297,7 @@ describe('Transformation - SimpleTransformation (using AdtClient)', () => {
             );
             return;
           }
-          expect(resultState.readResult).toBeDefined();
+          expect(resultState).toBeDefined();
 
           logTestSuccess(testsLogger, 'Transformation - read standard object');
         } catch (error: any) {

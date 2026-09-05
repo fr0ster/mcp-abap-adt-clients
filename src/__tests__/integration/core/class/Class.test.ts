@@ -15,9 +15,11 @@ import * as path from 'node:path';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type { IClassConfig, IClassState } from '../../../../core/class';
+import type { IClassConfig } from '../../../../core/class';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { expectResult } from '../../../helpers/contract';
+import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -66,7 +68,7 @@ describe('Class (using AdtClient)', () => {
   let isCloudSystem = false;
   let isLegacy = false;
   let systemContext: Awaited<ReturnType<typeof resolveSystemContext>>;
-  let tester: BaseTester<IClassConfig, IClassState>;
+  let tester: BaseTester<IClassConfig>;
 
   beforeAll(async () => {
     try {
@@ -119,11 +121,14 @@ describe('Class (using AdtClient)', () => {
               libraryLogger,
               systemContext,
             );
-            const existingClass = await cleanupClient
-              .getClass()
-              .read({ className });
-            if (existingClass) {
-              await cleanupClient.getClass().readMetadata({ className });
+            // `if (existingClass)` was always true once a read stopped
+            // throwing: it is an answer object either way. The answer decides —
+            // see `presenceOf`.
+            const existing = presenceOf(
+              await cleanupClient.getClass().read({ className }),
+              `class ${className}`,
+            );
+            if (existing.present === true) {
               try {
                 // Use BaseTester's config resolver to get transport request (allows overriding global params)
                 const transportRequest = tester.getTransportRequest();
@@ -249,7 +254,7 @@ describe('Class (using AdtClient)', () => {
           });
           expect(resultState).toBeDefined();
           // IClassState doesn't have className directly, check readResult
-          expect(resultState?.readResult).toBeDefined();
+          expect(resultState).toBeDefined();
 
           logTestSuccess(testsLogger, 'Class - read standard object');
         } catch (error) {
@@ -337,22 +342,24 @@ describe('Class (using AdtClient)', () => {
         }
 
         try {
-          const result = await client
-            .getRequest()
-            .read({ transportNumber: transportRequest });
-          expect(result).toBeDefined();
-          expect(
-            result?.transportNumber ||
-              result?.readResult?.data?.transport_request,
-          ).toBe(transportRequest);
-          const metadataState = await client
-            .getRequest()
-            .readMetadata({ transportNumber: transportRequest });
-          expect(metadataState).toBeDefined();
-          expect(
-            metadataState.transportNumber ||
-              metadataState.readResult?.data?.transport_request,
-          ).toBe(transportRequest);
+          // The shipped reading of a transport request is its document. The
+          // number is what identifies the request, so a document that does not
+          // name it is not the request that was asked for.
+          const result = expectResult(
+            await client
+              .getRequest()
+              .read({ transportNumber: transportRequest }),
+            'read transport request',
+          );
+          expect(result).toContain(transportRequest);
+
+          const metadata = expectResult(
+            await client
+              .getRequest()
+              .readMetadata({ transportNumber: transportRequest }),
+            'read transport request metadata',
+          );
+          expect(metadata).toContain(transportRequest);
 
           logTestSuccess(testsLogger, 'Class - read transport request');
         } catch (error) {

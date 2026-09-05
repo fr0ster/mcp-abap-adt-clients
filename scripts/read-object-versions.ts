@@ -340,7 +340,7 @@ async function run(): Promise<void> {
             options.functionGroup,
           ),
         );
-        testsLogger.info?.(`Metadata status: ${metadata.status}`);
+        testsLogger.info?.(`Metadata: ${metadata.length} bytes`);
       } catch (error) {
         logHttpError(error, 'Read metadata');
       }

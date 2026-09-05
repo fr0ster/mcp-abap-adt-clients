@@ -1,44 +1,51 @@
-import { beginCriticalSection } from '../../utils/criticalSection';
-import { assertDeletable } from '../../utils/deletionCheck';
 /**
- * AdtFunctionGroup - High-level CRUD operations for Function Group objects
+ * AdtFunctionGroup - CRUD for `FUGR/F` function groups.
  *
- * Implements IAdtObject interface with automatic operation chains,
- * error handling, and resource cleanup.
+ * A function group is a **container**: it has no source of its own, so `read`
+ * answers its metadata document and `update` changes only its description.
  *
- * Uses low-level functions directly (not Builder classes).
- *
- * Session management:
- * - stateful: only when doing lock/update/unlock operations
- * - stateless: obligatory after unlock
- * - If no lock/unlock, no stateful needed
- * - activate uses same session/cookies (no stateful needed)
+ * Every member answers `IAdtResponse<T>`, where T is what the result set given
+ * at construction makes of that endpoint's answer.
  *
  * Operation chains:
- * - Create: validate → create → check → (no update - function groups are containers)
- * - Update: lock → update(metadata) → unlock → check → activate
+ * - Create: validate → create → check → activate (optional)
+ * - Update: lock → update → unlock → check → activate (optional)
  * - Delete: check(deletion) → delete
- *
- * Note: Function groups are containers for function modules and don't have source code.
- * Update only changes metadata (description).
  */
 
 import type {
-  HttpError,
+  AdtNoFailure,
   IAbapConnection,
   IAdtActivatable,
   IAdtCheckable,
   IAdtContentTypes,
-  IAdtCrud,
+  IAdtCreatable,
+  IAdtDeletable,
+  IAdtError,
   IAdtLockable,
   IAdtOperationOptions,
+  IAdtReadable,
+  IAdtResponse,
   IAdtSystemContext,
   IAdtTransportAware,
+  IAdtUpdatable,
   IAdtValidatable,
+  IAdtWireResponse,
   ILogger,
-  IObjectVersion,
+  IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
-import { safeErrorMessage } from '../../utils/internalUtils';
+import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces';
+import { activationRefusal } from '../../utils/activationUtils';
+import {
+  answering,
+  type IAdtOptions,
+  type IAnalyse,
+} from '../../utils/adtResponse';
+import { beginCriticalSection } from '../../utils/criticalSection';
+import { deletionRefusal } from '../../utils/deletionCheck';
+import { requestOf } from '../../utils/requestTrace';
+import { validationRefusal } from '../../utils/validationRefusal';
+import { chain } from '../shared/chain';
 import {
   createLockTracker,
   type LockRegistry,
@@ -49,19 +56,51 @@ import { activateFunctionGroup } from './activation';
 import { checkFunctionGroup } from './check';
 import { create as createFunctionGroup } from './create';
 import { checkDeletion, deleteFunctionGroup } from './delete';
-import { lockFunctionGroup, unlockFunctionGroup } from './lock';
+import { lockFunctionGroup } from './lock';
 import { getFunctionGroup, getFunctionGroupTransport } from './read';
-import type { IFunctionGroupConfig, IFunctionGroupState } from './types';
+import {
+  functionGroupDocuments,
+  type IFunctionGroupConfig,
+  type IFunctionGroupResults,
+} from './types';
+import { unlockFunctionGroup } from './unlock';
 import { updateFunctionGroup } from './update';
 import { validateFunctionGroupName } from './validation';
-export class AdtFunctionGroup
-  implements
-    IAdtCrud<IFunctionGroupConfig, IFunctionGroupState>,
-    IAdtValidatable<IFunctionGroupConfig, IFunctionGroupState>,
-    IAdtCheckable<IFunctionGroupConfig, IFunctionGroupState>,
-    IAdtActivatable<IFunctionGroupConfig, IFunctionGroupState>,
-    IAdtLockable<IFunctionGroupConfig, IFunctionGroupState>,
-    IAdtTransportAware<IFunctionGroupConfig, IFunctionGroupState>
+
+/**
+ * Kept as the name this module has always exported. The reading is no longer
+ * function-group-specific: a DDL source answers the same `200` with
+ * `<SEVERITY>ERROR</SEVERITY>` and was not being read at all, so it lives in
+ * {@link validationRefusal} and is the default for every type now.
+ */
+export const validationSeverity = validationRefusal;
+
+export class AdtFunctionGroup<
+  R extends IFunctionGroupResults<
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown
+  > = IFunctionGroupResults,
+> implements
+    IAdtCreatable<IFunctionGroupConfig, ReturnType<R['created']>>,
+    IAdtReadable<
+      IFunctionGroupConfig,
+      ReturnType<R['source']>,
+      ReturnType<R['metadata']>
+    >,
+    IAdtUpdatable<IFunctionGroupConfig, ReturnType<R['updated']>>,
+    IAdtDeletable<IFunctionGroupConfig, ReturnType<R['deletion']>>,
+    IAdtValidatable<IFunctionGroupConfig, ReturnType<R['validation']>>,
+    IAdtCheckable<IFunctionGroupConfig, ReturnType<R['check']>>,
+    IAdtActivatable<IFunctionGroupConfig, ReturnType<R['activation']>>,
+    IAdtLockable<IFunctionGroupConfig>,
+    IAdtTransportAware<IFunctionGroupConfig, ReturnType<R['transport']>>
 {
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
@@ -76,6 +115,8 @@ export class AdtFunctionGroup
     systemContext?: IAdtSystemContext,
     contentTypes?: IAdtContentTypes,
     lockRegistry?: LockRegistry,
+    // The one cast in this file, and it is on the default. See AdtClass.
+    protected readonly results: R = functionGroupDocuments as unknown as R,
   ) {
     this.connection = connection;
     this.logger = logger;
@@ -89,35 +130,33 @@ export class AdtFunctionGroup
     );
   }
 
-  /**
-   * Validate function group configuration before creation
-   */
-  async validate(
+  /** Validate a function group name before creating it. */
+  async validate<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionGroupConfig>,
-  ): Promise<IFunctionGroupState> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
     if (!config.functionGroupName) {
       throw new Error('Function group name is required for validation');
     }
 
-    return {
-      validationResponse: await validateFunctionGroupName(
-        this.connection,
-        config.functionGroupName,
-        config.packageName,
-        config.description,
-      ),
-      errors: [],
-    };
+    return answering(
+      () =>
+        validateFunctionGroupName(
+          this.connection,
+          config.functionGroupName as string,
+          config.packageName,
+          config.description,
+        ),
+      this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
+      (options?.analyse ?? validationRefusal) as IAnalyse<E>,
+    );
   }
 
-  /**
-   * Create function group with full operation chain
-   * Note: Function groups are containers, so no source code update after create
-   */
-  async create(
+  /** Create the function group. */
+  async create<E extends IAdtError = IAdtError>(
     config: IFunctionGroupConfig,
-    options?: IAdtOperationOptions,
-  ): Promise<IFunctionGroupState> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     if (!config.functionGroupName) {
       throw new Error('Function group name is required');
     }
@@ -127,671 +166,422 @@ export class AdtFunctionGroup
     if (!config.description) {
       throw new Error('Description is required');
     }
+    const name = config.functionGroupName;
 
-    let objectCreated = false;
-    const _sessionId = this.connection.getSessionId?.() || '';
+    return chain(this.logger, async ({ step, onScopeEnd, onFailure }) => {
+      onScopeEnd(async () => {
+        this.connection.setSessionType('stateless');
+      });
 
-    try {
-      // 1. Validate (no stateful needed)
-      this.logger?.info?.('Step 1: Validating function group configuration');
-      try {
-        const validationResponse = await validateFunctionGroupName(
-          this.connection,
-          config.functionGroupName,
-          config.packageName,
-          config.description,
-        );
-        // Check SEVERITY in response body (HTTP 200 can still contain validation errors)
-        const responseData =
-          typeof validationResponse.data === 'string'
-            ? validationResponse.data
-            : '';
-        const severityMatch = responseData.match(
-          /<SEVERITY>([^<]+)<\/SEVERITY>/,
-        );
-        if (severityMatch?.[1] === 'ERROR') {
-          const shortTextMatch = responseData.match(
-            /<SHORT_TEXT>([^<]+)<\/SHORT_TEXT>/,
-          );
-          throw new Error(
-            shortTextMatch?.[1] || 'Function group validation failed',
-          );
-        }
-        this.logger?.info?.('Validation passed');
-      } catch (error: unknown) {
-        const e = error as HttpError;
-        // Ignore "Kerberos library not loaded" error for FunctionGroup (test cloud issue)
-        const errorMessage = e.response?.data || e.message || String(error);
-        const errorText =
-          typeof errorMessage === 'string'
-            ? errorMessage
-            : JSON.stringify(errorMessage);
-        if (errorText.toLowerCase().includes('kerberos library not loaded')) {
-          this.logger?.warn?.(
-            'Validation returned Kerberos error (ignoring): Kerberos library not loaded',
-          );
-          // Continue - this is a known issue in test environments
-        } else {
-          throw error; // Re-throw other errors
-        }
-      }
-
-      // 2. Create (no stateful needed)
-      this.logger?.info?.('Step 2: Creating function group');
-      await createFunctionGroup(
-        this.connection,
-        {
-          functionGroupName: config.functionGroupName,
-          packageName: config.packageName,
-          transportRequest: config.transportRequest,
-          description: config.description,
-          masterSystem: config.masterSystem ?? this.systemContext.masterSystem,
-          responsible: config.responsible ?? this.systemContext.responsible,
-          masterLanguage:
-            config.masterLanguage ?? this.systemContext.masterLanguage,
-        },
-        this.logger,
-        this.contentTypes,
-      );
-      this.logger?.info?.('Function group created');
-
-      // 2.5. Read with long polling to ensure object is ready
-      // Read 'inactive' version since object is not yet activated
-      this.logger?.info?.('read (wait for object ready)');
-      try {
-        await this.read(
-          { functionGroupName: config.functionGroupName },
-          'inactive',
-          { withLongPolling: true },
-        );
-        this.logger?.info?.('object is ready after creation');
-      } catch (readError) {
-        this.logger?.warn?.(
-          'read with long polling failed (object may not be ready yet):',
-          safeErrorMessage(readError),
-        );
-        // Continue anyway - check might still work
-      }
-      objectCreated = true;
-
-      // 3. Check after create (no stateful needed)
-      this.logger?.info?.('Step 3: Checking created function group');
-      await checkFunctionGroup(
-        this.connection,
-        config.functionGroupName,
-        'inactive',
-      );
-      this.logger?.info?.('Check after create passed');
-
-      // Note: Function groups are containers - no source code to update after create
-
-      // 4. Activate (if requested, no stateful needed - uses same session/cookies)
-      if (options?.activateOnCreate) {
-        this.logger?.info?.('Step 4: Activating function group');
-        const activateResponse = await activateFunctionGroup(
-          this.connection,
-          config.functionGroupName,
-        );
-        this.logger?.info?.(
-          'Function group activated, status:',
-          activateResponse.status,
-        );
-
-        // 4.5. Read with long polling to ensure object is ready after activation
-        this.logger?.info?.('read (wait for object ready after activation)');
-        try {
-          const readState = await this.read(
-            { functionGroupName: config.functionGroupName },
-            'active',
-            { withLongPolling: true },
-          );
-          if (readState) {
-            return {
-              createResult: activateResponse,
-              readResult: readState.readResult,
-              errors: [],
-            };
-          }
-          this.logger?.info?.('object is ready after activation');
-        } catch (readError) {
-          this.logger?.warn?.(
-            'read with long polling failed after activation:',
-            safeErrorMessage(readError),
-          );
-          // Continue anyway - activation was successful
-        }
-        return {
-          createResult: activateResponse,
-          errors: [],
-        };
-      }
-
-      // Read and return result (no stateful needed)
-      // Wrap in try-catch: on cloud systems the object may not be immediately
-      // readable after creation due to eventual consistency (HTTP 404).
-      try {
-        const readResponse = await getFunctionGroup(
-          this.connection,
-          config.functionGroupName,
-        );
-        return {
-          createResult: readResponse,
-          errors: [],
-        };
-      } catch (readError) {
-        const status = (readError as HttpError)?.response?.status;
-        if (status === 404) {
-          this.logger?.warn?.(
-            'Post-create read returned 404 (cloud eventual consistency), retrying after delay',
-          );
-          await new Promise((r) => setTimeout(r, 5000));
-          try {
-            const retryResponse = await getFunctionGroup(
-              this.connection,
-              config.functionGroupName,
-            );
-            return {
-              createResult: retryResponse,
-              errors: [],
-            };
-          } catch (retryError) {
-            this.logger?.warn?.(
-              'Post-create read retry also failed, returning without read result',
-              retryError,
-            );
-            return { errors: [] };
-          }
-        }
-        throw readError;
-      }
-    } catch (error: unknown) {
-      // Ensure stateless if needed
-      this.connection.setSessionType('stateless');
-
-      if (objectCreated && options?.deleteOnFailure) {
-        try {
+      let created = false;
+      if (options?.deleteOnFailure ?? true) {
+        onFailure(async () => {
+          if (!created) return;
           this.logger?.warn?.('Deleting function group after failure');
-          // No stateful needed - delete doesn't use lock/unlock
+          // No stateful needed — the delete uses no lock.
           await deleteFunctionGroup(this.connection, {
-            function_group_name: config.functionGroupName,
+            function_group_name: name,
             transport_request: config.transportRequest,
           });
-        } catch (deleteError) {
-          this.logger?.warn?.(
-            'Failed to delete function group after failure:',
-            safeErrorMessage(deleteError),
-          );
-        }
+        });
       }
 
-      this.logger?.error('Create failed:', safeErrorMessage(error));
-      throw error;
-    }
+      this.logger?.info?.('Step 1: Validating function group configuration');
+      await step(this.validate(config, options));
+
+      this.logger?.info?.('Step 2: Creating function group');
+      const value = await step(
+        answering(
+          () =>
+            createFunctionGroup(
+              this.connection,
+              {
+                functionGroupName: name,
+                packageName: config.packageName as string,
+                transportRequest: config.transportRequest,
+                description: config.description as string,
+                masterSystem:
+                  config.masterSystem ?? this.systemContext.masterSystem,
+                responsible:
+                  config.responsible ?? this.systemContext.responsible,
+                masterLanguage:
+                  config.masterLanguage ?? this.systemContext.masterLanguage,
+              },
+              this.logger,
+              this.contentTypes,
+            ),
+          this.results.created as IResultStrategy<ReturnType<R['created']>>,
+          options?.analyse,
+        ),
+      );
+      created = true;
+      this.logger?.info?.('Function group created');
+
+      // A readiness poll, not part of the answer: on cloud the object is not
+      // always readable the instant the create returns. Its failure is logged
+      // and the chain continues, because the create succeeded either way.
+      const ready = await this.read({ functionGroupName: name }, 'inactive', {
+        withLongPolling: true,
+      });
+      if (!ready.ok) {
+        this.logger?.warn?.(
+          'read with long polling failed after create:',
+          ready.getError().message,
+        );
+      }
+
+      this.logger?.info?.('Step 3: Checking created function group');
+      await step(this.check({ functionGroupName: name }, 'inactive', options));
+
+      if (options?.activateOnCreate) {
+        this.logger?.info?.('Step 4: Activating function group');
+        await step(this.activate({ functionGroupName: name }, options));
+      }
+
+      return value;
+    });
   }
 
   /**
-   * Read function group
+   * Read the function group.
+   *
+   * `version` is accepted and ignored: a group is a container, and the resource
+   * this reads is its metadata document, which has no active/inactive pair.
    */
-  async read(
+  async read<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionGroupConfig>,
     _version?: 'active' | 'inactive',
-    options?: IReadOptions,
-  ): Promise<IFunctionGroupState | undefined> {
+    options?: IReadOptions & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     if (!config.functionGroupName) {
       throw new Error('Function group name is required');
     }
 
-    try {
-      const response = await getFunctionGroup(
-        this.connection,
-        config.functionGroupName,
-        options,
-      );
-      return {
-        readResult: response,
-        errors: [],
-      };
-    } catch (error: unknown) {
-      const e = error as HttpError;
-      if (e.response?.status === 404) {
-        return undefined;
-      }
-      throw error;
-    }
+    // No 404 special case: whether an empty or missing answer *is* absence is
+    // the caller's reading, supplied through `analyse`.
+    return answering(
+      () =>
+        getFunctionGroup(
+          this.connection,
+          config.functionGroupName as string,
+          options,
+        ),
+      this.results.source as IResultStrategy<ReturnType<R['source']>>,
+      options?.analyse,
+    );
   }
 
   /**
-   * Read function group metadata (object characteristics: package, responsible, description, etc.)
-   * For function groups, read() already returns metadata since there's no source code.
+   * Read the group's metadata.
+   *
+   * The same resource `read` fetches — a group has no source to tell it apart
+   * from — declared separately because the contract asks both of a readable.
    */
-  async readMetadata(
+  async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionGroupConfig>,
-    options?: IReadOptions,
-  ): Promise<IFunctionGroupState> {
-    const state: IFunctionGroupState = { errors: [] };
+    options?: IReadOptions & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
     if (!config.functionGroupName) {
-      const error = new Error('Function group name is required');
-      state.errors.push({
-        method: 'readMetadata',
-        error,
-        timestamp: new Date(),
-      });
-      throw error;
+      throw new Error('Function group name is required');
     }
-    try {
-      // For objects without source code, read() already returns metadata
-      const readState = await this.read(
-        config,
-        options?.version ?? 'active',
-        options,
-      );
-      if (readState) {
-        state.metadataResult = readState.readResult;
-        state.readResult = readState.readResult;
-      } else {
-        const error = new Error(
-          `Function group '${config.functionGroupName}' not found`,
-        );
-        state.errors.push({
-          method: 'readMetadata',
-          error,
-          timestamp: new Date(),
-        });
-        throw error;
-      }
-      this.logger?.info?.('Function group metadata read successfully');
-      return state;
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({
-        method: 'readMetadata',
-        error: err,
-        timestamp: new Date(),
-      });
-      this.logger?.error('readMetadata', safeErrorMessage(err));
-      throw err;
-    }
+
+    return answering(
+      () =>
+        getFunctionGroup(
+          this.connection,
+          config.functionGroupName as string,
+          options,
+        ),
+      this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
+      options?.analyse,
+    );
   }
 
-  /**
-   * Read transport request information for the function group
-   */
-  async readTransport(
+  /** The transport request the group belongs to. */
+  async readTransport<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionGroupConfig>,
-    options?: { withLongPolling?: boolean },
-  ): Promise<IFunctionGroupState> {
-    const state: IFunctionGroupState = { errors: [] };
+    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
     if (!config.functionGroupName) {
-      const error = new Error('Function group name is required');
-      state.errors.push({
-        method: 'readTransport',
-        error,
-        timestamp: new Date(),
-      });
-      throw error;
+      throw new Error('Function group name is required');
     }
-    try {
-      const response = await getFunctionGroupTransport(
-        this.connection,
-        config.functionGroupName,
-        options?.withLongPolling !== undefined
-          ? { withLongPolling: options.withLongPolling }
-          : undefined,
-      );
-      state.transportResult = response;
-      this.logger?.info?.('Function group transport request read successfully');
-      return state;
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({
-        method: 'readTransport',
-        error: err,
-        timestamp: new Date(),
-      });
-      this.logger?.error('readTransport', safeErrorMessage(err));
-      throw err;
-    }
+
+    return answering(
+      () =>
+        getFunctionGroupTransport(
+          this.connection,
+          config.functionGroupName as string,
+          options?.withLongPolling !== undefined
+            ? { withLongPolling: options.withLongPolling }
+            : undefined,
+        ),
+      this.results.transport as IResultStrategy<ReturnType<R['transport']>>,
+      options?.analyse,
+    );
   }
 
   /**
-   * Update function group with full operation chain
-   * Always starts with lock
-   * Note: Function groups only support metadata updates (description)
-   * If options.lockHandle is provided, performs only low-level update without lock/check/unlock chain
+   * Update the group's description — the only thing a container has to change.
+   *
+   * With `options.lockHandle` the caller holds the lock and owns the chain, so
+   * this is one request.
    */
-  async update(
+  async update<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionGroupConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IFunctionGroupState> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     if (!config.functionGroupName) {
       throw new Error('Function group name is required');
     }
     if (!config.description) {
       throw new Error('Description is required for update');
     }
+    const name = config.functionGroupName;
+    const description = config.description;
+    const sessionId = this.connection.getSessionId?.() || '';
 
-    // Low-level mode: if lockHandle is provided, perform only update operation
     if (options?.lockHandle) {
       this.logger?.info?.(
         'Low-level update: performing update only (lockHandle provided)',
       );
-      const updateResponse = await updateFunctionGroup(
-        this.connection,
-        {
-          function_group_name: config.functionGroupName,
-          description: config.description,
-          lock_handle: options.lockHandle,
-          transport_request: config.transportRequest,
-        },
-        this.contentTypes,
+      return answering(
+        () =>
+          updateFunctionGroup(
+            this.connection,
+            {
+              function_group_name: name,
+              description,
+              lock_handle: options.lockHandle as string,
+              transport_request: config.transportRequest,
+            },
+            this.contentTypes,
+          ),
+        this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+        options?.analyse,
       );
-      this.logger?.info?.('Function group updated (low-level)');
-      return {
-        updateResult: updateResponse,
-        errors: [],
-      };
     }
 
-    let lockHandle: string | undefined;
-    const sessionId = this.connection.getSessionId?.() || '';
-
-    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
-
-    // the lock but leaves the work half-done.
-
+    // A LOCK…UNLOCK window: a timeout in the middle releases the lock and
+    // leaves the work half done.
     const endCriticalSection = beginCriticalSection(this.connection);
 
-    try {
-      // 1. Lock (update always starts with lock, stateful ONLY before lock)
+    return chain(this.logger, async ({ step, onScopeEnd }) => {
+      onScopeEnd(async () => {
+        endCriticalSection();
+      });
+
       this.logger?.info?.('Step 1: Locking function group');
       this.connection.setSessionType('stateful');
-      lockHandle = await lockFunctionGroup(
+      // Registered FIRST so it unwinds LAST: a handle is only valid inside a
+      // stateful request on older BASIS (#106).
+      onScopeEnd(async () => {
+        this.connection.setSessionType('stateless');
+      });
+
+      const lockHandle = await lockFunctionGroup(
         this.connection,
-        config.functionGroupName,
+        name,
         sessionId,
       );
-      this.lockTracker.track(config.functionGroupName, lockHandle);
+      this.lockTracker.track(name, lockHandle);
+      const releaseLock = onScopeEnd(async () => {
+        await unlockFunctionGroup(this.connection, name, lockHandle, sessionId);
+        this.lockTracker.untrack(name);
+      });
       this.logger?.info?.('Function group locked, handle:', lockHandle);
 
-      // 2. Update metadata (description)
       this.logger?.info?.('Step 2: Updating function group metadata');
-      await updateFunctionGroup(
-        this.connection,
-        {
-          function_group_name: config.functionGroupName,
-          description: config.description,
-          transport_request: config.transportRequest,
-          lock_handle: lockHandle,
-        },
-        this.contentTypes,
+      const updated = await step(
+        answering(
+          () =>
+            updateFunctionGroup(
+              this.connection,
+              {
+                function_group_name: name,
+                description,
+                transport_request: config.transportRequest,
+                lock_handle: lockHandle,
+              },
+              this.contentTypes,
+            ),
+          this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+          options?.analyse,
+        ),
       );
       this.logger?.info?.('Function group updated');
 
-      // 2.5. Read with long polling to ensure object is ready after update
-      this.logger?.info?.('read (wait for object ready after update)');
-      try {
-        await this.read(
-          { functionGroupName: config.functionGroupName },
-          'active',
-          { withLongPolling: true },
-        );
-        this.logger?.info?.('object is ready after update');
-      } catch (readError) {
+      const ready = await this.read({ functionGroupName: name }, 'active', {
+        withLongPolling: true,
+      });
+      if (!ready.ok) {
         this.logger?.warn?.(
           'read with long polling failed after update:',
-          safeErrorMessage(readError),
+          ready.getError().message,
         );
-        // Continue anyway - unlock might still work
       }
 
-      // 3. Unlock (obligatory stateless after unlock)
-      if (lockHandle) {
-        this.logger?.info?.('Step 3: Unlocking function group');
-        this.connection.setSessionType('stateful');
-        await unlockFunctionGroup(
-          this.connection,
-          config.functionGroupName,
-          lockHandle,
-          sessionId,
-        );
-        this.connection.setSessionType('stateless');
-        this.lockTracker.untrack(config.functionGroupName);
-        lockHandle = undefined;
-        this.logger?.info?.('Function group unlocked');
-      }
+      this.logger?.info?.('Step 3: Unlocking function group');
+      this.connection.setSessionType('stateful');
+      await unlockFunctionGroup(this.connection, name, lockHandle, sessionId);
+      this.connection.setSessionType('stateless');
+      this.lockTracker.untrack(name);
+      releaseLock();
+      this.logger?.info?.('Function group unlocked');
 
-      // 4. Final check (no stateful needed)
       this.logger?.info?.('Step 4: Final check');
-      await checkFunctionGroup(
-        this.connection,
-        config.functionGroupName,
-        'inactive',
-      );
-      this.logger?.info?.('Final check passed');
+      await step(this.check({ functionGroupName: name }, 'inactive', options));
 
-      // 5. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnUpdate) {
         this.logger?.info?.('Step 5: Activating function group');
-        const activateResponse = await activateFunctionGroup(
-          this.connection,
-          config.functionGroupName,
-        );
-        this.logger?.info?.(
-          'Function group activated, status:',
-          activateResponse.status,
-        );
-
-        // 5.5. Read with long polling to ensure object is ready after activation
-        this.logger?.info?.('read (wait for object ready after activation)');
-        try {
-          const readState = await this.read(
-            { functionGroupName: config.functionGroupName },
-            'active',
-            { withLongPolling: true },
-          );
-          if (readState) {
-            return {
-              updateResult: activateResponse,
-              readResult: readState.readResult,
-              errors: [],
-            };
-          }
-          this.logger?.info?.('object is ready after activation');
-        } catch (readError) {
-          this.logger?.warn?.(
-            'read with long polling failed after activation:',
-            safeErrorMessage(readError),
-          );
-          // Continue anyway - activation was successful
-        }
-        return {
-          updateResult: activateResponse,
-          errors: [],
-        };
+        await step(this.activate({ functionGroupName: name }, options));
       }
 
-      // Read and return result (no stateful needed)
-      const readResponse = await getFunctionGroup(
-        this.connection,
-        config.functionGroupName,
-      );
-      return {
-        updateResult: readResponse,
-        errors: [],
-      };
-    } catch (error: unknown) {
-      // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
-      if (lockHandle) {
-        try {
-          this.logger?.warn?.('Unlocking function group during error cleanup');
-          this.connection.setSessionType('stateful');
-          await unlockFunctionGroup(
-            this.connection,
-            config.functionGroupName,
-            lockHandle,
-            sessionId,
-          );
-          this.connection.setSessionType('stateless');
-          this.lockTracker.untrack(config.functionGroupName);
-        } catch (unlockError) {
-          this.logger?.warn?.(
-            'Failed to unlock during cleanup:',
-            safeErrorMessage(unlockError),
-          );
-        }
-      } else {
-        // Ensure stateless if lock failed
-        this.connection.setSessionType('stateless');
-      }
-
-      if (options?.deleteOnFailure) {
-        try {
-          this.logger?.warn?.('Deleting function group after failure');
-          // No stateful needed - delete doesn't use lock/unlock
-          await deleteFunctionGroup(this.connection, {
-            function_group_name: config.functionGroupName,
-            transport_request: config.transportRequest,
-          });
-        } catch (deleteError) {
-          this.logger?.warn?.(
-            'Failed to delete function group after failure:',
-            safeErrorMessage(deleteError),
-          );
-        }
-      }
-
-      this.logger?.error('Update failed:', safeErrorMessage(error));
-      throw error;
-    } finally {
-      endCriticalSection();
-    }
+      return updated;
+    });
   }
 
   /**
-   * Delete function group
+   * Delete the function group.
+   *
+   * The deletion check is read, not merely performed — see AdtProgram.delete.
    */
-  async delete(
+  async delete<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionGroupConfig>,
-  ): Promise<IFunctionGroupState> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     if (!config.functionGroupName) {
       throw new Error('Function group name is required');
     }
+    const name = config.functionGroupName;
 
-    try {
-      // Check for deletion (no stateful needed)
+    return chain(this.logger, async ({ step }) => {
       this.logger?.info?.('Checking function group for deletion');
-      const deletionCheck = await checkDeletion(this.connection, {
-        function_group_name: config.functionGroupName,
-        transport_request: config.transportRequest,
-      });
-      // ADT already said whether this may be deleted; refusing to read that
-      // answer is how a delete came to report success while the object
-      // stayed. Throws on isDeletable=false or a message of type E; a W
-      // is a warning and passes.
-      assertDeletable(deletionCheck.data);
+      await step(
+        answering(
+          () =>
+            checkDeletion(this.connection, {
+              function_group_name: name,
+              transport_request: config.transportRequest,
+            }),
+          this.results.check as IResultStrategy<ReturnType<R['check']>>,
+          (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
+        ),
+      );
       this.logger?.info?.('Deletion check passed');
 
-      // Delete (no stateful needed - no lock/unlock)
+      // No stateful session: this delete uses no lock.
       this.logger?.info?.('Deleting function group');
-      const result = await deleteFunctionGroup(this.connection, {
-        function_group_name: config.functionGroupName,
-        transport_request: config.transportRequest,
-      });
+      const value = await step(
+        answering(
+          () =>
+            deleteFunctionGroup(this.connection, {
+              function_group_name: name,
+              transport_request: config.transportRequest,
+            }),
+          this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+          options?.analyse,
+        ),
+      );
       this.logger?.info?.('Function group deleted');
-
-      return { deleteResult: result, errors: [] };
-    } catch (error: unknown) {
-      this.logger?.error('Delete failed:', safeErrorMessage(error));
-      throw error;
-    }
+      return value;
+    });
   }
 
-  /**
-   * Activate function group
-   * No stateful needed - uses same session/cookies
-   */
-  async activate(
+  /** Activate the function group. Needs no stateful session. */
+  async activate<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionGroupConfig>,
-  ): Promise<IFunctionGroupState> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     if (!config.functionGroupName) {
       throw new Error('Function group name is required');
     }
 
-    try {
-      const result = await activateFunctionGroup(
-        this.connection,
-        config.functionGroupName,
-      );
-      return { activateResult: result, errors: [] };
-    } catch (error: unknown) {
-      this.logger?.error('Activate failed:', safeErrorMessage(error));
-      throw error;
-    }
+    return answering(
+      () =>
+        activateFunctionGroup(
+          this.connection,
+          config.functionGroupName as string,
+        ),
+      this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
+      (options?.analyse ?? activationRefusal) as IAnalyse<E>,
+    );
   }
 
-  /**
-   * Check function group
-   */
-  async check(
+  /** Check the function group. */
+  async check<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionGroupConfig>,
     status?: string,
-  ): Promise<IFunctionGroupState> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     if (!config.functionGroupName) {
       throw new Error('Function group name is required');
     }
-
-    // Map status to version
     const version: 'active' | 'inactive' =
       status === 'active' ? 'active' : 'inactive';
-    return {
-      checkResult: await checkFunctionGroup(
-        this.connection,
-        config.functionGroupName,
-        version,
-      ),
-      errors: [],
-    };
+
+    return answering(
+      () =>
+        checkFunctionGroup(
+          this.connection,
+          config.functionGroupName as string,
+          version,
+        ),
+      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      options?.analyse,
+    );
   }
 
-  /**
-   * Lock function group for modification
-   */
-  async lock(config: Partial<IFunctionGroupConfig>): Promise<string> {
+  /** Lock the function group for modification. */
+  async lock(
+    config: Partial<IFunctionGroupConfig>,
+  ): Promise<IAdtResponse<string>> {
     if (!config.functionGroupName) {
       throw new Error('Function group name is required');
     }
+    const name = config.functionGroupName;
 
-    this.connection.setSessionType('stateful');
-    const lockHandle = await lockFunctionGroup(
-      this.connection,
-      config.functionGroupName,
+    return answering(
+      async () => {
+        this.connection.setSessionType('stateful');
+        const lockHandle = await lockFunctionGroup(this.connection, name);
+        this.lockTracker.track(name, lockHandle);
+        // The handle is the value, and the request does not keep the wire it
+        // came on — so the answer is built around what the request produced.
+        return {
+          data: lockHandle,
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+        };
+      },
+      (answer) => String(answer.data),
     );
-    this.lockTracker.track(config.functionGroupName, lockHandle);
-    return lockHandle;
   }
 
-  /**
-   * Unlock function group
-   */
+  /** Unlock the function group. */
   async unlock(
     config: Partial<IFunctionGroupConfig>,
     lockHandle: string,
-  ): Promise<IFunctionGroupState> {
+  ): Promise<IAdtResponse<void>> {
     if (!config.functionGroupName) {
       throw new Error('Function group name is required');
     }
+    const name = config.functionGroupName;
 
-    this.connection.setSessionType('stateful');
-    const result = await unlockFunctionGroup(
-      this.connection,
-      config.functionGroupName,
-      lockHandle,
+    return answering(
+      async () => {
+        // UNLOCK must run stateful (older BASIS #106); stateless after.
+        this.connection.setSessionType('stateful');
+        const result = await unlockFunctionGroup(
+          this.connection,
+          name,
+          lockHandle,
+        );
+        this.connection.setSessionType('stateless');
+        this.lockTracker.untrack(name);
+        return result;
+      },
+      () => undefined,
     );
-    this.connection.setSessionType('stateless');
-    this.lockTracker.untrack(config.functionGroupName);
-    return {
-      unlockResult: result,
-      errors: [],
-    };
   }
 }

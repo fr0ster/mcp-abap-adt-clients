@@ -9,7 +9,6 @@ Primary public entry points:
 - `AdtClientLegacy` - extends `AdtClient` for legacy systems (BASIS < 7.50): blocks unsupported types, uses legacy deletion and versionless content types.
 - `createAdtClient()` - factory that auto-detects system version and returns `AdtClient` or `AdtClientLegacy`.
 - `AdtRuntimeClient` - stable runtime operations (debugger, traces, dumps, logs, feeds, ATC check runs, DDIC runtime helpers).
-- `AdtRuntimeClientExperimental` - runtime APIs in progress (currently AMDP debugger/data preview).
 - `AdtClientsWS` - WebSocket request/event facade.
 - `AdtExecutor` - execution-oriented facade (currently class execution with optional profiling helpers).
 - `AdtAbapGitClient` - standalone client (not a factory on `AdtClient`) wrapping the SAP-official ADT-integrated abapGit (`/sap/bc/adt/abapgit/*`); available on cloud and modern on-prem (ABAP Platform 2022+).
@@ -47,7 +46,6 @@ src/
     AdtClientLegacy.ts
     createAdtClient.ts
     AdtRuntimeClient.ts
-    AdtRuntimeClientExperimental.ts
     AdtClientsWS.ts
     DebuggerSessionClient.ts
     AdtExecutor.ts
@@ -111,11 +109,10 @@ Each object module encapsulates its ADT endpoint specifics in `core/<object>/*.t
 - `delete` uses ADT deletion API (`POST /sap/bc/adt/deletion/delete`)
 : if binding is published, delete flow executes unpublish pre-step before deletion
 
-### 2) `AdtRuntimeClient` / `AdtRuntimeClientExperimental`
+### 2) `AdtRuntimeClient`
 
 Runtime clients are facades over pure runtime functions in `src/runtime/*`.
 - `AdtRuntimeClient`: stable APIs.
-- `AdtRuntimeClientExperimental`: extends stable runtime client and adds AMDP-in-progress APIs.
 
 Runtime accessors return handlers narrowed to what the subject actually
 supports, rather than a uniform object interface. `getAtc()` is the clearest
@@ -185,23 +182,50 @@ Notably, where-used supports:
 
 ## Error and Response Handling
 
+Every member answers `IAdtResponse<T>` — a result or a failure, never both and
+never neither. Two strategies decide what that is, and the order is fixed:
+
+1. **The error strategy** (`analyse`, per call) decides whether the answer is a
+   failure at all. It is asked first, so a reading is never handed a refusal to
+   make a value out of. The shipped defaults read what ADT delivers inside a 200
+   — `deletionRefusal`, `activationRefusal`, `validationUnsupported`,
+   `validationRefusal`, `testDoublesVerdict`, `startedRun` — because nothing
+   below the contract can tell those from a success.
+2. **The result strategy** (injected into the implementation once, at
+   construction) decides what a non-failure becomes. Defaults ship per object
+   type as `<type>Documents`.
+
+`IAdtError.origin` has two values and both describe the server: `'refusal'` (SAP
+answered no) and `'connection'` (no answer arrived). A document *this library*
+cannot read is neither — it throws `AdtParseError` as itself, because calling it
+a verdict about SAP points a caller at a system that answered correctly. A
+consumer's own reading throwing is the same case and is left untouched.
+
 Common behaviors in implementations:
-- Preserve raw ADT responses for caller inspection.
+- Preserve raw ADT responses for caller inspection — the failure half carries
+  `response` whole, and the shipped readings default to the document.
 - Parse XML responses where lock handles/run states are needed.
-- Enrich thrown errors with operation context/status in many modules.
-- Some `read` methods return `undefined` for `404` (object-not-found semantics).
+- A caller error — a missing required name, a view a family does not have —
+  throws before any request. It is not a verdict about a server that was never
+  asked anything.
+- `chain()` is the resource scope for multi-step operations: `onScopeEnd` runs
+  cleanup on every path (success included), `onFailure` runs a rollback only
+  when the chain fails, and both unwind in reverse order of registration.
 
 ## Type System and Exports
 
 **Types are defined once, in `@mcp-abap-adt/interfaces` (`^17.1.0`).** As of 7.5.0 this package declares no type it shares with the contract package. Each `src/core/<object>/types.ts` is a re-export surface:
 
 ```ts
-export type {
-  ICreateClassParams,
-  IClassConfig,
-  IClassState,
-} from '@mcp-abap-adt/interfaces';
+export type { ICreateClassParams, IClassConfig } from '@mcp-abap-adt/interfaces';
 ```
+
+The `IXxxState` half of every pair is gone: a member answers one value and a
+failure, and neither is a state bag. Each `types.ts` now also declares what the
+contract does **not** carry — the module's `IXxxResults` strategy set and the
+`<type>Documents` default that satisfies it, next to the shapes those readings
+build. A contract carries what is needed to use or replace it; a shape a
+replacement reading would not produce is neither.
 
 Rationale: the two packages previously held independent copies of the same interfaces, and they drifted silently — a field required on one side and optional on the other produced no error anywhere. A single definition site makes that class of bug impossible.
 
@@ -214,7 +238,10 @@ A guard under `src/__tests__/unit/capabilities/` holds the line: a manifest auth
 Package root (`src/index.ts`) exports:
 - client classes (`AdtClient`, runtime/ws/executor clients),
 - selected runtime/debugger types,
-- object config/state/type definitions (re-exported from interfaces),
+- object config/type definitions (re-exported from interfaces),
+- the injection surface (`src/index.readings.ts`): the strategy implementations,
+  one `IXxxResults` + `<type>Documents` pair per object type, and the shapes the
+  shipped readings build,
 - shared utility type unions (`AdtObjectType`, `AdtSourceObjectType`, ...) — likewise re-exported,
 - core interfaces re-exported from `@mcp-abap-adt/interfaces`.
 
@@ -261,5 +288,5 @@ When adding a new ADT object type:
 
 When adding runtime APIs:
 1. Add pure functions in `src/runtime/<domain>/`.
-2. Expose via `AdtRuntimeClient` (stable) or `AdtRuntimeClientExperimental` (in-progress).
+2. Expose via `AdtRuntimeClient`.
 3. Add unit/integration tests depending on endpoint safety and availability.

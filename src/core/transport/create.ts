@@ -7,7 +7,6 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
-import { XMLParser } from 'fast-xml-parser';
 import { ACCEPT_TRANSPORT } from '../../constants/contentTypes';
 import { safeStringify } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -33,42 +32,6 @@ function buildCreateTransportXml(
     <tm:task tm:owner="${owner}"/>
   </tm:request>
 </tm:root>`;
-}
-
-/**
- * Parse transport creation response
- */
-function parseTransportResponse(xmlData: string): Record<string, unknown> {
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: '',
-    parseAttributeValue: true,
-  });
-
-  const result = parser.parse(xmlData);
-  const root = result['tm:root'] || result.root;
-
-  if (!root) {
-    throw new Error(
-      'Invalid transport response XML structure - no tm:root found',
-    );
-  }
-
-  const request = root['tm:request'] || {};
-  const task = request['tm:task'] || {};
-
-  return {
-    transport_number: request['tm:number'],
-    description: request['tm:desc'] || request['tm:description'],
-    type: request['tm:type'],
-    target_system: request['tm:target'],
-    target_desc: request['tm:target_desc'],
-    cts_project: request['tm:cts_project'],
-    cts_project_desc: request['tm:cts_project_desc'],
-    uri: request['tm:uri'],
-    parent: request['tm:parent'],
-    owner: task['tm:owner'] || request['tm:owner'],
-  };
 }
 
 /**
@@ -107,27 +70,9 @@ export async function createTransport(
       headers,
     });
 
-    const transportInfo = parseTransportResponse(response.data);
-    const requestOwner = params.owner || username;
-
-    return {
-      data: {
-        success: true,
-        transport_request: transportInfo.transport_number,
-        description: transportInfo.description,
-        type: transportInfo.type,
-        target_system: transportInfo.target_system,
-        target_desc: transportInfo.target_desc,
-        cts_project: transportInfo.cts_project,
-        owner: requestOwner,
-        uri: transportInfo.uri,
-        message: `Transport request ${transportInfo.transport_number} created successfully`,
-      },
-      status: response.status,
-      statusText: response.statusText,
-      headers: response.headers,
-      config: response.config,
-    } as IAdtWireResponse;
+    // The document, as it arrived. What a caller wants out of it is the
+    // reading's question — `parseCreatedTransport` is the shipped answer.
+    return response;
   } catch (error: unknown) {
     const e = error as HttpError;
     const errorMessage = e.response?.data

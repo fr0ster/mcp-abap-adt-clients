@@ -11,6 +11,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
 import { AdtRequestLegacy } from '../../../../core/transport/AdtRequestLegacy';
+import { expectFailure, expectResult } from '../../../helpers/contract';
 
 const recordingConnection = () => {
   const calls: IAbapRequestOptions[] = [];
@@ -36,45 +37,52 @@ describe('legacy transport list', () => {
   it('calls the legacy CTS path, not the ADT one', async () => {
     const { connection, calls } = recordingConnection();
 
-    const state = await new AdtRequestLegacy(connection).list();
+    const tree = expectResult(
+      await new AdtRequestLegacy(connection).list(),
+      'legacy list',
+    );
 
     expect(calls).toHaveLength(1);
     expect(calls[0].url).toBe('/sap/bc/cts/transportrequests');
-    expect(state.listResult).toBeDefined();
-    expect(state.errors).toEqual([]);
+    // `<tm:root/>` is an empty list, and an empty list is an answer.
+    expect(tree.requests).toEqual([]);
   });
 
-  it('rejects configUri instead of silently ignoring it', async () => {
+  it('refuses configUri instead of silently ignoring it', async () => {
     const { connection, calls } = recordingConnection();
 
-    await expect(
-      new AdtRequestLegacy(connection).list({ configUri: '/x' }),
-    ).rejects.toThrow(/not supported on legacy/);
+    const failure = expectFailure(
+      await new AdtRequestLegacy(connection).list({ configUri: '/x' }),
+      'legacy list with configUri',
+    );
+
+    expect(failure.message).toMatch(/not supported on legacy/);
     expect(calls).toHaveLength(0);
   });
 });
 
 describe('legacy transport update/delete', () => {
-  it('rejects update() instead of inheriting the modern endpoint (zero requests)', async () => {
+  it('refuses update() instead of inheriting the modern endpoint (zero requests)', async () => {
     const { connection, calls } = recordingConnection();
 
-    await expect(
-      new AdtRequestLegacy(connection).update({
-        transportNumber: 'DEVK900001',
-        description: 'new description',
-      }),
-    ).rejects.toThrow(/not supported on legacy/);
+    const failure = expectFailure(
+      await new AdtRequestLegacy(connection).update(),
+      'legacy update',
+    );
+
+    expect(failure.message).toMatch(/not supported on legacy/);
     expect(calls).toHaveLength(0);
   });
 
-  it('rejects delete() instead of inheriting the modern endpoint (zero requests)', async () => {
+  it('refuses delete() instead of inheriting the modern endpoint (zero requests)', async () => {
     const { connection, calls } = recordingConnection();
 
-    await expect(
-      new AdtRequestLegacy(connection).delete({
-        transportNumber: 'DEVK900001',
-      }),
-    ).rejects.toThrow(/not supported on legacy/);
+    const failure = expectFailure(
+      await new AdtRequestLegacy(connection).delete(),
+      'legacy delete',
+    );
+
+    expect(failure.message).toMatch(/not supported on legacy/);
     expect(calls).toHaveLength(0);
   });
 });

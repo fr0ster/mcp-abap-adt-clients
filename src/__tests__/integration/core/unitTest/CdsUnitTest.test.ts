@@ -25,6 +25,7 @@ import type {
 } from '../../../../core/unitTest';
 import { checkCdsTestDoublesAvailability } from '../../../../core/unitTest/checkCdsTestDoublesAvailability';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -281,11 +282,11 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
             transportRequest,
           };
 
-          const createState = await client
-            .getCdsUnitTest()
-            .create(cdsUnitTestConfigForCreate);
+          const createState = expectResult(
+            await client.getCdsUnitTest().create(cdsUnitTestConfigForCreate),
+            'createState',
+          );
           expect(createState).toBeDefined();
-          expect(createState.testClassState).toBeDefined();
           testsLogger.info?.('CDS unit test class created successfully');
 
           // Step 3: Activate class
@@ -299,47 +300,56 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
 
           // Step 4: Read the created test class
           logTestStep('read', testsLogger);
-          const readState = await client.getClass().read({ className });
+          const readState = expectResult(
+            await client.getClass().read({ className }),
+            'readState',
+          );
           expect(readState).toBeDefined();
-          expect(readState?.readResult).toBeDefined();
           testsLogger.info?.('CDS unit test class read successfully');
-          const metadataState = await client
-            .getClass()
-            .readMetadata({ className });
+          const metadataState = expectResult(
+            await client.getClass().readMetadata({ className }),
+            'metadataState',
+          );
           expect(metadataState).toBeDefined();
-          expect(metadataState.metadataResult).toBeDefined();
           testsLogger.info?.('CDS unit test class metadata read successfully');
 
           // Step 5: Run the tests the generated class holds. No create and no
           // update first — running is its own capability.
           logTestStep('run (unit test)', testsLogger);
           const unitTest = client.getUnitTest();
-          const runId = await unitTest.run(
-            [{ containerClass: className, testClass: testClassName }],
-            testCase.params.unit_test_options || {},
+          const runId = expectResult(
+            await unitTest.run(
+              [{ containerClass: className, testClass: testClassName }],
+              testCase.params.unit_test_options || {},
+            ),
+            'start CDS unit test run',
           );
           expect(runId).toBeDefined();
           testsLogger.info?.('CDS unit test run started, run ID:', runId);
 
           // Step 6: Ask about the run — its own interface since 16.0.0
           logTestStep('getStatus (run)', testsLogger);
-          const statusResponse = await unitTest.getStatus(
-            runId,
-            testCase.params.unit_test_status?.with_long_polling ?? true,
+          const statusResponse = expectResult(
+            await unitTest.getStatus(
+              runId,
+              testCase.params.unit_test_status?.with_long_polling ?? true,
+            ),
+            'statusResponse',
           );
           expect(statusResponse).toBeDefined();
-          expect(statusResponse.data).toBeDefined();
           testsLogger.info?.('CDS unit test status retrieved');
 
           // Step 7: Fetch the result document
           logTestStep('getResult (run)', testsLogger);
-          const resultResponse = await unitTest.getResult(runId, {
-            withNavigationUris:
-              testCase.params.unit_test_result?.with_navigation_uris || false,
-            format: testCase.params.unit_test_result?.format || 'abapunit',
-          });
+          const resultResponse = expectResult(
+            await unitTest.getResult(runId, {
+              withNavigationUris:
+                testCase.params.unit_test_result?.with_navigation_uris || false,
+              format: testCase.params.unit_test_result?.format || 'abapunit',
+            }),
+            'resultResponse',
+          );
           expect(resultResponse).toBeDefined();
-          expect(resultResponse.data).toBeDefined();
           testsLogger.info?.('CDS unit test result retrieved successfully');
 
           // Step 10: Cleanup

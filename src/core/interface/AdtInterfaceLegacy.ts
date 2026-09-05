@@ -1,78 +1,87 @@
-import { beginCriticalSection } from '../../utils/criticalSection';
 /**
  * AdtInterfaceLegacy - Interface handler for legacy SAP systems (BASIS < 7.50)
  *
  * Overrides delete() to use direct DELETE instead of /sap/bc/adt/deletion/ API.
  */
 
-import {
-  encodeSapObjectName,
-  safeErrorMessage,
-} from '../../utils/internalUtils';
+import type {
+  IAdtError,
+  IAdtOperationOptions,
+  IAdtResponse,
+  IResultStrategy,
+} from '@mcp-abap-adt/interfaces';
+import { answering, type IAdtOptions } from '../../utils/adtResponse';
+import { beginCriticalSection } from '../../utils/criticalSection';
+import { encodeSapObjectName } from '../../utils/internalUtils';
+import { chain } from '../shared/chain';
 import { deleteObjectDirect } from '../shared/deleteLegacy';
 import { AdtInterface } from './AdtInterface';
 import { lockInterface } from './lock';
-import type { IInterfaceConfig, IInterfaceState } from './types';
+import type { IInterfaceConfig, IInterfaceResults } from './types';
 import { unlockInterface } from './unlock';
 
-export class AdtInterfaceLegacy extends AdtInterface {
-  override async delete(
+export class AdtInterfaceLegacy<
+  R extends IInterfaceResults<
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown
+  > = IInterfaceResults,
+> extends AdtInterface<R> {
+  override async delete<E extends IAdtError = IAdtError>(
     config: Partial<IInterfaceConfig>,
-  ): Promise<IInterfaceState> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     if (!config.interfaceName) {
       throw new Error('Interface name is required');
     }
-
-    const state: IInterfaceState = { errors: [] };
-    let lockHandle: string | undefined;
-
-    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
-
-    // the lock but leaves the work half-done.
+    const name = config.interfaceName;
 
     const endCriticalSection = beginCriticalSection(this.connection);
 
-    try {
+    return chain(this.logger, async ({ step, onScopeEnd }) => {
+      onScopeEnd(async () => {
+        endCriticalSection();
+      });
+
       this.logger?.info?.('Locking interface for deletion');
       this.connection.setSessionType('stateful');
-      const lockResult = await lockInterface(
-        this.connection,
-        config.interfaceName,
-      );
-      lockHandle = lockResult.lockHandle;
+      onScopeEnd(async () => {
+        this.connection.setSessionType('stateless');
+      });
+
+      const { lockHandle } = await lockInterface(this.connection, name);
+      // Released on the way out only if the delete did not happen: a deleted
+      // object has nothing left to unlock.
+      let deleted = false;
+      onScopeEnd(async () => {
+        if (deleted) return;
+        await unlockInterface(this.connection, name, lockHandle);
+      });
 
       this.logger?.info?.('Deleting interface (direct DELETE)');
-      const objectUrl = `/sap/bc/adt/oo/interfaces/${encodeSapObjectName(config.interfaceName).toLowerCase()}`;
-      state.deleteResult = await deleteObjectDirect(
-        this.connection,
-        objectUrl,
-        lockHandle as string,
-        config.transportRequest,
+      const objectUrl = `/sap/bc/adt/oo/interfaces/${encodeSapObjectName(name).toLowerCase()}`;
+      const value = await step(
+        answering(
+          () =>
+            deleteObjectDirect(
+              this.connection,
+              objectUrl,
+              lockHandle,
+              config.transportRequest,
+            ),
+          this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+          options?.analyse,
+        ),
       );
+      deleted = true;
       this.logger?.info?.('Interface deleted');
-
-      return state;
-    } catch (error: unknown) {
-      this.logger?.error?.('Delete failed:', safeErrorMessage(error));
-      if (lockHandle) {
-        try {
-          await unlockInterface(
-            this.connection,
-            config.interfaceName,
-            lockHandle,
-          );
-        } catch (unlockError: unknown) {
-          this.logger?.error?.(
-            'Unlock after delete failure also failed:',
-            safeErrorMessage(unlockError),
-          );
-        }
-      }
-      throw error;
-    } finally {
-      this.connection.setSessionType('stateless');
-
-      endCriticalSection();
-    }
+      return value;
+    });
   }
 }

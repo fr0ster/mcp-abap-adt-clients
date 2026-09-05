@@ -1,11 +1,24 @@
 import type {
+  AdtNoFailure,
   IAbapConnection,
+  IAdtActivatable,
+  IAdtCheckable,
+  IAdtCreatable,
+  IAdtDeletable,
+  IAdtError,
+  IAdtLockable,
   IAdtOperationOptions,
+  IAdtReadable,
+  IAdtResponse,
   IAdtSystemContext,
+  IAdtTransportAware,
+  IAdtUpdatable,
+  IAdtValidatable,
   IAdtWireResponse,
   ILogger,
-  IObjectVersion,
+  IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
+import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
 import {
   ACCEPT_CHECK_MESSAGES,
@@ -18,35 +31,114 @@ import {
   CT_DELETION_CHECK,
   CT_TRANSPORT_CHECK,
 } from '../../constants/contentTypes';
-import { assertActivationSucceeded } from '../../utils/activationUtils';
-import { assertDeletable } from '../../utils/deletionCheck';
+import { activationRefusal } from '../../utils/activationUtils';
+import {
+  answering,
+  type IAdtOptions,
+  type IAnalyse,
+} from '../../utils/adtResponse';
+import { deletionRefusal } from '../../utils/deletionCheck';
 import {
   buildQueryString,
   encodeSapObjectName,
 } from '../../utils/internalUtils';
+import { requestOf } from '../../utils/requestTrace';
+import { nothing, rawDocument } from '../../utils/resultStrategy';
 import { getSystemInformation } from '../../utils/systemInfo';
 import { getTimeout } from '../../utils/timeouts';
+import { validationRefusal } from '../../utils/validationRefusal';
+import { chain } from '../shared/chain';
+import type { ObjectVersion } from '../shared/results';
+import { lockServiceBinding, unlockServiceBinding } from './lock';
 import type {
   IActivateServiceBindingParams,
-  IAdtServiceBinding,
   ICheckServiceBindingParams,
   IClassifyServiceBindingParams,
   ICreateAndGenerateServiceBindingParams,
   ICreateServiceBindingParams,
   IDeleteServiceBindingParams,
   IGenerateServiceBindingParams,
-  IGetServiceBindingODataParams,
   IPublishODataV2Params,
   IReadServiceBindingParams,
   IServiceBindingConfig,
-  IServiceBindingState,
+  IServiceBindingPublicationParams,
+  IServiceGroupParams,
+  IServiceResults,
   ITransportCheckServiceBindingParams,
   IUnpublishODataV2Params,
   IUpdateServiceBindingParams,
   IValidateServiceBindingParams,
+  ServiceBindingVariant,
 } from './types';
-import { resolveBindingVariant } from './types';
-export class AdtServiceBinding implements IAdtServiceBinding {
+import { resolveBindingVariant, serviceDocuments } from './types';
+/**
+ * The verdict a publish or unpublish job answers with.
+ *
+ * `POST …/{serviceType}/publishjobs` (and `unpublishjobs`) does not just accept
+ * the work — it reports the outcome, in ADT's own `asx:abap` envelope:
+ *
+ * ```xml
+ * <asx:values><DATA>
+ *   <SEVERITY>OK</SEVERITY>
+ *   <SHORT_TEXT>ZAC_SRVB01 published locally</SHORT_TEXT>
+ * </DATA></asx:values>
+ * ```
+ *
+ * Nobody read it. The member answered the document and a caller who checked
+ * only `ok` learned that the request completed, never what it did — which is
+ * the shape this release removes everywhere else. Measured on the trial
+ * 2026-09-05: the POST takes ~130s of server time and then says exactly this.
+ *
+ * Conservative in the same way as its neighbours: a body with no `SEVERITY` is
+ * not a refusal, because inventing a "no" from silence is how an empty answer
+ * came to mean failure elsewhere. Only a severity that is not OK is one.
+ */
+export const publicationRefusal = (
+  verdict: IAdtError | AdtNoFailure,
+  answer?: IAdtWireResponse,
+): IAdtError | AdtNoFailure => {
+  if (verdict !== ADT_NO_FAILURE) return verdict;
+
+  const xml = typeof answer?.data === 'string' ? answer.data : '';
+  const severity = /<SEVERITY>([^<]*)<\/SEVERITY>/i.exec(xml)?.[1]?.trim();
+  if (!severity || severity.toUpperCase() === 'OK') return ADT_NO_FAILURE;
+
+  const shortText = /<SHORT_TEXT>([^<]*)<\/SHORT_TEXT>/i.exec(xml)?.[1]?.trim();
+  const longText = /<LONG_TEXT>([^<]*)<\/LONG_TEXT>/i.exec(xml)?.[1]?.trim();
+  return {
+    origin: 'refusal',
+    message:
+      `Publication ${severity}: ${shortText || 'the server gave no short text'}` +
+      (longText ? ` — ${longText}` : ''),
+    response: answer,
+    request: requestOf(answer),
+  };
+};
+
+export class AdtServiceBinding<
+  R extends IServiceResults = typeof serviceDocuments,
+> implements
+    IAdtCreatable<IServiceBindingConfig, ReturnType<R['created']>>,
+    IAdtReadable<
+      IServiceBindingConfig,
+      ReturnType<R['source']>,
+      ReturnType<R['metadata']>
+    >,
+    IAdtUpdatable<IServiceBindingConfig, ReturnType<R['updated']>>,
+    IAdtDeletable<IServiceBindingConfig, ReturnType<R['deletion']>>,
+    IAdtValidatable<IServiceBindingConfig, ReturnType<R['validation']>>,
+    IAdtCheckable<IServiceBindingConfig, ReturnType<R['check']>>,
+    IAdtActivatable<IServiceBindingConfig, ReturnType<R['activation']>>,
+    IAdtTransportAware<IServiceBindingConfig, ReturnType<R['transport']>>,
+    IAdtLockable<IServiceBindingConfig>
+{
+  // `IAdtServiceBinding` from the contracts package is deliberately NOT in the
+  // list above yet. It still declares `publishODataV2` and `unpublishODataV2` —
+  // two method names for what is one endpoint with a `serviceType` parameter,
+  // and both of them GET a `…jobs` URL that Eclipse POSTs to. The shape here is
+  // being settled against measured traffic first; it moves to
+  // `@mcp-abap-adt/interfaces` when it does what it needs to, not before.
+
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
   private readonly systemContext: IAdtSystemContext;
@@ -57,6 +149,7 @@ export class AdtServiceBinding implements IAdtServiceBinding {
     connection: IAbapConnection,
     logger?: ILogger,
     systemContext?: IAdtSystemContext,
+    private readonly results: R = serviceDocuments as unknown as R,
   ) {
     this.connection = connection;
     this.logger = logger;
@@ -69,6 +162,50 @@ export class AdtServiceBinding implements IAdtServiceBinding {
   });
   private asRecord(value: unknown): Record<string, unknown> {
     return (value ?? {}) as Record<string, unknown>;
+  }
+
+  /** The binding name, or the caller's mistake. */
+  private name(config: Partial<IServiceBindingConfig>): string {
+    if (!config.bindingName) {
+      throw new Error('bindingName is required');
+    }
+    return config.bindingName;
+  }
+
+  /**
+   * Read the system's binding-type catalogue and answer a failure if the
+   * variant asked for is not in it.
+   *
+   * Not a judgement of a document: posting a variant the system does not offer
+   * produces an answer a caller cannot act on, and the catalogue is the
+   * system's own statement of what it has.
+   */
+  private async assertVariantAvailable(
+    variant: ServiceBindingVariant,
+  ): Promise<IAdtResponse<ReturnType<R['bindingTypes']>>> {
+    const { bindingType, bindingVersion } = resolveBindingVariant(variant);
+    const key = this.getBindingTypeAvailabilityKey(bindingType, bindingVersion);
+
+    return answering(
+      () => this.bindingTypesRequest(),
+      this.results.bindingTypes as IResultStrategy<
+        ReturnType<R['bindingTypes']>
+      >,
+      (verdict, answer) => {
+        if (verdict !== ADT_NO_FAILURE) return verdict;
+        const available = this.extractAvailableBindingTypes(
+          answer as IAdtWireResponse,
+        );
+        return available.has(key)
+          ? ADT_NO_FAILURE
+          : {
+              origin: 'refusal' as const,
+              message: `Binding variant ${variant} (${bindingType}/${bindingVersion}) is not available on current ADT system`,
+              response: answer,
+              request: requestOf(answer),
+            };
+      },
+    );
   }
 
   private static encodeName(name: string): string {
@@ -258,12 +395,19 @@ export class AdtServiceBinding implements IAdtServiceBinding {
     });
   }
 
-  async validate(
+  /**
+   * Validate before creating: the variant must exist on this system, and the
+   * transport check must accept the object.
+   *
+   * The variant check is not this library judging a document — it is a read of
+   * the system's own catalogue, and posting a variant the system does not offer
+   * produces a failure the caller cannot interpret.
+   */
+  async validate<E extends IAdtError = IAdtError>(
     config: Partial<IServiceBindingConfig>,
-  ): Promise<IServiceBindingState> {
-    if (!config.bindingName) {
-      throw new Error('bindingName is required for validation');
-    }
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+    const name = this.name(config);
     if (!config.serviceDefinitionName) {
       throw new Error('serviceDefinitionName is required for validation');
     }
@@ -273,272 +417,464 @@ export class AdtServiceBinding implements IAdtServiceBinding {
     if (!config.bindingVariant) {
       throw new Error('bindingVariant is required for validation');
     }
-    const { bindingType, bindingVersion } = resolveBindingVariant(
-      config.bindingVariant,
-    );
+    const packageName = config.packageName;
+    const variant = config.bindingVariant;
 
-    // Validation flow:
-    // 1) Read available binding types (GET discovery endpoint)
-    // 2) Run transport check (POST), as pre-create server-side validation
-    const serviceTypesResult = await this.getServiceBindingTypes();
-    const availableBindingTypes =
-      this.extractAvailableBindingTypes(serviceTypesResult);
-    const availabilityKey = this.getBindingTypeAvailabilityKey(
-      bindingType,
-      bindingVersion,
-    );
-    if (!availableBindingTypes.has(availabilityKey)) {
-      throw new Error(
-        `Binding variant ${config.bindingVariant} (${bindingType}/${bindingVersion}) is not available on current ADT system`,
+    return chain(this.logger, async ({ step }) => {
+      await step(this.assertVariantAvailable(variant));
+
+      return step(
+        answering(
+          () =>
+            this.transportCheckRequest({
+              objectName: name,
+              packageName,
+              description: config.description,
+              operation: 'I',
+            }),
+          this.results.validation as IResultStrategy<
+            ReturnType<R['validation']>
+          >,
+          (options?.analyse ?? validationRefusal) as IAnalyse<E>,
+        ),
       );
-    }
-
-    const validationResponse = await this.transportCheckServiceBinding({
-      objectName: config.bindingName,
-      packageName: config.packageName,
-      description: config.description,
-      operation: 'I',
     });
-
-    return {
-      errors: [],
-      validationResponse,
-      serviceTypesResult,
-      transportResult: validationResponse,
-    };
   }
 
-  async create(
+  /**
+   * Create the binding, and activate and generate its service.
+   *
+   * The answer is the create's own. What the chain does after it — the check,
+   * the activation, the generation — is this implementation's business and
+   * reaches a caller only if it fails.
+   */
+  async create<E extends IAdtError = IAdtError>(
     config: IServiceBindingConfig,
-    options?: IAdtOperationOptions,
-  ): Promise<IServiceBindingState> {
-    if (!config.bindingName) {
-      throw new Error('bindingName is required');
-    }
-    if (!config.packageName) {
-      throw new Error('packageName is required');
-    }
-    if (!config.description) {
-      throw new Error('description is required');
-    }
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    const name = this.name(config);
+    if (!config.packageName) throw new Error('packageName is required');
+    if (!config.description) throw new Error('description is required');
     if (!config.serviceDefinitionName) {
       throw new Error('serviceDefinitionName is required');
     }
-    if (!config.serviceName) {
-      throw new Error('serviceName is required');
-    }
-    if (!config.serviceVersion) {
-      throw new Error('serviceVersion is required');
-    }
-    if (!config.bindingVariant) {
-      throw new Error('bindingVariant is required');
-    }
-    const {
-      bindingType,
-      bindingVersion,
-      serviceType: generatedServiceType,
-    } = resolveBindingVariant(config.bindingVariant);
-
-    const state: IServiceBindingState = { errors: [] };
-
-    const serviceTypesResult = await this.getServiceBindingTypes();
-    state.serviceTypesResult = serviceTypesResult;
-    const availableBindingTypes =
-      this.extractAvailableBindingTypes(serviceTypesResult);
-    const availabilityKey = this.getBindingTypeAvailabilityKey(
-      bindingType,
-      bindingVersion,
+    if (!config.serviceName) throw new Error('serviceName is required');
+    if (!config.serviceVersion) throw new Error('serviceVersion is required');
+    if (!config.bindingVariant) throw new Error('bindingVariant is required');
+    const { serviceType: generatedServiceType } = resolveBindingVariant(
+      config.bindingVariant,
     );
-    if (!availableBindingTypes.has(availabilityKey)) {
-      throw new Error(
-        `Binding variant ${config.bindingVariant} (${bindingType}/${bindingVersion}) is not available on current ADT system`,
+    const packageName = config.packageName;
+    const description = config.description;
+    const serviceName = config.serviceName;
+    const serviceVersion = config.serviceVersion;
+    const serviceDefinitionName = config.serviceDefinitionName;
+    const bindingVariant = config.bindingVariant;
+
+    return chain(this.logger, async ({ step, onFailure }) => {
+      // A binding's create is the longest chain here — check, activate, a read
+      // of the service group, another check — and every one of those runs after
+      // the binding exists. Without this, a failure at any of them left a
+      // binding behind holding its name, which is the one thing a later create
+      // cannot work around.
+      let created = false;
+      if (options?.deleteOnFailure ?? true) {
+        onFailure(async () => {
+          if (!created) return;
+          this.logger?.warn?.('Deleting service binding after failure');
+          await this.delete({ bindingName: name }, options);
+        });
+      }
+
+      await step(this.assertVariantAvailable(bindingVariant));
+
+      if (config.runTransportCheck ?? true) {
+        await step(
+          answering(
+            () =>
+              this.transportCheckRequest({
+                objectName: name,
+                packageName,
+                description,
+                operation: 'I',
+              }),
+            this.results.transport as IResultStrategy<
+              ReturnType<R['transport']>
+            >,
+            options?.analyse,
+          ),
+        );
+      }
+
+      const value = await step(
+        answering(
+          () =>
+            this.createRequest({
+              bindingName: name,
+              packageName,
+              description,
+              serviceDefinitionName,
+              serviceName,
+              serviceVersion,
+              bindingVariant,
+              masterLanguage: config.masterLanguage,
+              masterSystem: config.masterSystem,
+              responsible: config.responsible,
+              transportRequest: config.transportRequest,
+            }),
+          this.results.created as IResultStrategy<ReturnType<R['created']>>,
+          options?.analyse,
+        ),
       );
-    }
 
-    if (config.runTransportCheck ?? true) {
-      state.transportResult = await this.transportCheckServiceBinding({
-        objectName: config.bindingName,
-        packageName: config.packageName,
-        description: config.description,
-        operation: 'I',
-      });
-    }
+      // Past the create: a refused create leaves nothing to remove, and the
+      // rollback above must not delete a binding this call did not make.
+      created = true;
 
-    state.createResult = await this.createServiceBinding({
-      bindingName: config.bindingName,
-      packageName: config.packageName,
-      description: config.description,
-      serviceDefinitionName: config.serviceDefinitionName,
-      serviceName: config.serviceName,
-      serviceVersion: config.serviceVersion,
-      bindingVariant: config.bindingVariant,
-      masterLanguage: config.masterLanguage,
-      masterSystem: config.masterSystem,
-      responsible: config.responsible,
-      transportRequest: config.transportRequest,
+      await step(this.check({ bindingName: name }, 'inactive', options));
+
+      const activateAfterCreate = options?.activateOnCreate !== false;
+      if (activateAfterCreate) {
+        await step(this.activate({ bindingName: name }, options));
+      }
+
+      await step(
+        answering(
+          () =>
+            this.generateRequest({
+              serviceType: generatedServiceType,
+              bindingName: name,
+              serviceName,
+              serviceVersion,
+              serviceDefinitionName,
+            }),
+          this.results.generation as IResultStrategy<
+            ReturnType<R['generation']>
+          >,
+          options?.analyse,
+        ),
+      );
+
+      if (activateAfterCreate) {
+        await step(this.check({ bindingName: name }, 'active', options));
+      }
+
+      return value;
     });
-
-    state.inactiveCheckResult = await this.checkServiceBinding({
-      bindingName: config.bindingName,
-      version: 'inactive',
-    });
-
-    const activateAfterCreate =
-      options?.activateOnCreate === undefined ? true : options.activateOnCreate;
-
-    if (activateAfterCreate) {
-      state.activateResult = await this.activateServiceBinding({
-        bindingName: config.bindingName,
-        preauditRequested: true,
-      });
-    }
-
-    state.readResult = await this.readServiceBinding({
-      bindingName: config.bindingName,
-      version: activateAfterCreate ? 'active' : 'inactive',
-    });
-
-    state.generatedInfoResult = await this.generateServiceBinding({
-      serviceType: generatedServiceType,
-      bindingName: config.bindingName,
-      serviceName: config.serviceName,
-      serviceVersion: config.serviceVersion,
-      serviceDefinitionName: config.serviceDefinitionName,
-    });
-
-    if (activateAfterCreate) {
-      state.activeCheckResult = await this.checkServiceBinding({
-        bindingName: config.bindingName,
-        version: 'active',
-      });
-      state.checkResult = state.activeCheckResult;
-    } else {
-      state.checkResult = state.inactiveCheckResult;
-    }
-
-    return state;
   }
 
-  async read(
+  /** Read the binding document. */
+  async read<E extends IAdtError = IAdtError>(
     config: Partial<IServiceBindingConfig>,
     version?: 'active' | 'inactive',
-  ): Promise<IServiceBindingState | undefined> {
-    if (!config.bindingName) {
-      throw new Error('bindingName is required');
-    }
+    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
+    const name = this.name(config);
 
-    try {
-      const readResult = await this.readServiceBinding({
-        bindingName: config.bindingName,
-        version,
-      });
-
-      return {
-        errors: [],
-        readResult,
-      };
-    } catch (error: unknown) {
-      const err = error as { response?: { status?: number } };
-      if (err.response?.status === 404) {
-        return undefined;
-      }
-      throw error;
-    }
+    // No 404 special case: whether an empty or missing answer *is* absence is
+    // the caller's reading, supplied through `analyse`.
+    return answering(
+      () => this.readRequest({ bindingName: name, version }),
+      this.results.source as IResultStrategy<ReturnType<R['source']>>,
+      options?.analyse,
+    );
   }
 
+  /**
+   * Read the binding as metadata.
+   *
+   * The same resource `read` fetches — a binding has one document — declared
+   * separately because the contract asks both of a readable.
+   */
   async readMetadata(
     config: Partial<IServiceBindingConfig>,
-    options?: { withLongPolling?: boolean; version?: 'active' | 'inactive' },
-  ): Promise<IServiceBindingState> {
-    const state = await this.read(config, options?.version);
-    return {
-      ...(state ?? { errors: [] }),
-      metadataResult: state?.readResult,
-    };
+    options?: {
+      withLongPolling?: boolean;
+      version?: 'active' | 'inactive';
+    } & IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['metadata']>>> {
+    const name = this.name(config);
+
+    return answering(
+      () => this.readRequest({ bindingName: name, version: options?.version }),
+      this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
+      options?.analyse,
+    );
   }
 
-  async update(
+  /**
+   * Change the binding's publication state.
+   *
+   * That is the only thing an update does to a binding: publish it, withdraw
+   * it, or leave it as it is.
+   */
+  async update<E extends IAdtError = IAdtError>(
     config: Partial<IServiceBindingConfig>,
-  ): Promise<IServiceBindingState> {
-    if (!config.bindingName) {
-      throw new Error('bindingName is required');
-    }
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+    const name = this.name(config);
     if (!config.desiredPublicationState) {
       throw new Error('desiredPublicationState is required');
     }
-    if (!config.serviceType) {
-      throw new Error('serviceType is required for update');
-    }
-    if (!config.serviceName) {
-      throw new Error('serviceName is required for update');
-    }
+    // Which service, which version and which protocol are **properties of the
+    // binding**, and it states all three in its own document:
+    // `srvb:services srvb:name`, `srvb:content srvb:version` and
+    // `srvb:binding srvb:type`. Requiring them from the caller asked them to
+    // repeat what the object already says, and let them pass a version that
+    // disagrees with it. They stay accepted as an override.
+    const desiredPublicationState = config.desiredPublicationState;
 
-    const updateResult = await this.updateServiceBinding({
-      bindingName: config.bindingName,
-      desiredPublicationState: config.desiredPublicationState,
-      serviceType: config.serviceType,
-      serviceName: config.serviceName,
-      serviceVersion: config.serviceVersion,
-    });
-
-    const readResult = await this.readServiceBinding({
-      bindingName: config.bindingName,
-      version: 'active',
-    });
-
-    return {
-      errors: [],
-      updateResult,
-      readResult,
-    };
+    return answering(
+      () =>
+        this.updateRequest({
+          bindingName: name,
+          desiredPublicationState,
+          serviceType: config.serviceType,
+          serviceName: config.serviceName,
+          serviceVersion: config.serviceVersion,
+        }),
+      this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      // A publication change IS this member's write: `update` on a binding
+      // changes nothing else. The job reports `SEVERITY` and `SHORT_TEXT` in
+      // its answer, and reading them here is what makes a refused publish a
+      // refusal rather than a document nobody looked at.
+      (options?.analyse ?? publicationRefusal) as IAnalyse<E>,
+    );
   }
 
-  async delete(
+  /**
+   * Take the binding's lock.
+   *
+   * **Publishing is what editing a service binding is** — it is not edited any
+   * other way — so this is the lock a publication takes. Measured from Eclipse
+   * (ADT 3.60.3) on the trial, 2026-09-05: `_action=LOCK&accessMode=MODIFY` on a
+   * stateful session before the job, and `_action=UNLOCK&lockHandle=…` when the
+   * editor closes.
+   *
+   * **The caller takes it, and the caller gives it back.** This member does not
+   * lock inside `update` on the caller's behalf: how long a lock is held is a
+   * policy — Eclipse holds one for as long as an editor is open, a script holds
+   * one for a single call — and the connection is usually shared, so a library
+   * that locks and unlocks around its own operation decides that for everyone.
+   * See `docs/usage/CLIENT_API_REFERENCE.md` for the shape a consumer writes.
+   */
+  async lock(
     config: Partial<IServiceBindingConfig>,
-  ): Promise<IServiceBindingState> {
-    if (!config.bindingName) {
-      throw new Error('bindingName is required');
-    }
+  ): Promise<IAdtResponse<string>> {
+    const name = this.name(config);
+    // Stateful for the window: on older BASIS a handle is only valid inside a
+    // stateful request. The caller returns to stateless via `unlock`.
+    this.connection.setSessionType?.('stateful');
+    return answering(
+      async () => ({
+        data: await lockServiceBinding(this.connection, name),
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+      }),
+      rawDocument,
+    );
+  }
 
+  /**
+   * Give the lock back.
+   *
+   * Without it the binding stays "currently being edited": its own delete is
+   * refused with `You are already editing`, and a `_action=LOCK` from anywhere
+   * else — another session, another process, the same user — is answered
+   * `403 ExceptionResourceNoAccess`.
+   */
+  async unlock(
+    config: Partial<IServiceBindingConfig>,
+    lockHandle: string,
+  ): Promise<IAdtResponse<void>> {
+    const name = this.name(config);
+    return answering(async () => {
+      try {
+        return await unlockServiceBinding(this.connection, name, lockHandle);
+      } finally {
+        this.connection.setSessionType?.('stateless');
+      }
+    }, nothing);
+  }
+
+  /**
+   * Delete the binding.
+   *
+   * A published binding is withdrawn first, because ADT refuses to delete one
+   * that is still published; that pre-step is best-effort, since a binding that
+   * cannot be read is one the delete will refuse for its own reasons.
+   *
+   * The deletion check is read, not merely performed. Until 12.0.0 this handler
+   * alone deleted without asking, and a delete the server never approved is one
+   * a caller has no reason to believe happened.
+   */
+  async delete<E extends IAdtError = IAdtError>(
+    config: Partial<IServiceBindingConfig>,
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+    const name = this.name(config);
+
+    return chain(this.logger, async ({ step }) => {
+      await this.unpublishBeforeDelete(config, name);
+
+      await step(
+        answering(
+          () => this.deletionCheckRequest(name),
+          this.results.check as IResultStrategy<ReturnType<R['check']>>,
+          (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
+        ),
+      );
+
+      return step(
+        answering(
+          () =>
+            this.deleteRequest({
+              bindingName: name,
+              transportRequest: config.transportRequest,
+            }),
+          this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+          options?.analyse,
+        ),
+      );
+    });
+  }
+
+  /**
+   * Withdraw a published binding so the delete is not refused.
+   *
+   * Best-effort by design: if the read or the withdrawal fails, the delete is
+   * attempted anyway and answers for itself.
+   */
+  private async unpublishBeforeDelete(
+    config: Partial<IServiceBindingConfig>,
+    name: string,
+  ): Promise<void> {
     try {
-      const activeState = await this.readServiceBinding({
-        bindingName: config.bindingName,
+      const active = await this.readRequest({
+        bindingName: name,
         version: 'active',
       });
-      const current = this.parseServiceBindingState(activeState);
-      if (current.published && current.allowedAction === 'UNPUBLISH') {
-        const serviceType = config.serviceType ?? current.serviceType;
-        const serviceName = config.serviceName ?? current.serviceName;
-        const serviceVersion = config.serviceVersion ?? current.serviceVersion;
-        if (serviceType && serviceName) {
-          this.logger?.info?.(
-            `ServiceBinding delete pre-step: unpublish ${config.bindingName}`,
-            {
-              serviceType,
-              serviceName,
-              serviceVersion,
-            },
-          );
-          await this.updateServiceBinding({
-            bindingName: config.bindingName,
-            desiredPublicationState: 'unpublished',
-            serviceType,
-            serviceName,
-            serviceVersion,
-          });
-        }
-      }
-    } catch {
-      // best-effort: if read/unpublish fails, try delete directly
-    }
+      const current = this.parseServiceBindingState(active);
+      if (!current.published || current.allowedAction !== 'UNPUBLISH') return;
 
-    // Ask ADT whether the binding may go, as every other object type does.
-    // Until 12.0.0 this handler alone deleted without asking — the capability
-    // guard found it. A delete the server never approved is one a caller has no
-    // reason to believe happened, and the check is the same generic service for
-    // a binding as for a class: it takes the object's URI and nothing else.
-    const encoded = encodeSapObjectName(config.bindingName).toLowerCase();
-    const checkResponse = await this.connection.makeAdtRequest({
+      const serviceType = config.serviceType ?? current.serviceType;
+      const serviceName = config.serviceName ?? current.serviceName;
+      const serviceVersion = config.serviceVersion ?? current.serviceVersion;
+      if (!serviceType || !serviceName) return;
+
+      this.logger?.info?.(`ServiceBinding delete pre-step: unpublish ${name}`, {
+        serviceType,
+        serviceName,
+        serviceVersion,
+      });
+      await this.updateRequest({
+        bindingName: name,
+        desiredPublicationState: 'unpublished',
+        serviceType,
+        serviceName,
+        serviceVersion,
+      });
+    } catch (error: unknown) {
+      this.logger?.warn?.(
+        'unpublish before delete did not complete; deleting anyway',
+        { error: String(error) },
+      );
+    }
+  }
+
+  /**
+   * Activate the binding.
+   *
+   * Judged by the messages, never by the status: ADT answers 200 with a
+   * `<msg type="E">` when it refuses.
+   */
+  async activate<E extends IAdtError = IAdtError>(
+    config: Partial<IServiceBindingConfig>,
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+    const name = this.name(config);
+
+    return answering(
+      () =>
+        this.activateRequest({ bindingName: name, preauditRequested: true }),
+      this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
+      (options?.analyse ?? activationRefusal) as IAnalyse<E>,
+    );
+  }
+
+  /** Check the binding. */
+  async check<E extends IAdtError = IAdtError>(
+    config: Partial<IServiceBindingConfig>,
+    status?: string,
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+    const name = this.name(config);
+    const version = status === 'active' ? 'active' : 'inactive';
+
+    return answering(
+      () => this.checkRequest({ bindingName: name, version }),
+      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * The transport check for the binding.
+   *
+   * A binding has no `objectstates` resource: what stands in for it is the CTS
+   * transport check, which is why this needs the package as well as the name.
+   */
+  async readTransport<E extends IAdtError = IAdtError>(
+    config: Partial<IServiceBindingConfig>,
+    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
+    const name = this.name(config);
+    if (!config.packageName) {
+      throw new Error('packageName is required for transport check');
+    }
+    const packageName = config.packageName;
+
+    return answering(
+      () =>
+        this.transportCheckRequest({
+          objectName: name,
+          packageName,
+          description: config.description,
+          operation: 'U',
+        }),
+      this.results.transport as IResultStrategy<ReturnType<R['transport']>>,
+      options?.analyse,
+    );
+  }
+
+  /** The binding types this system offers. */
+  async getServiceBindingTypes(): Promise<
+    IAdtResponse<ReturnType<R['bindingTypes']>>
+  > {
+    return answering(
+      () => this.bindingTypesRequest(),
+      this.results.bindingTypes as IResultStrategy<
+        ReturnType<R['bindingTypes']>
+      >,
+    );
+  }
+
+  private async bindingTypesRequest(): Promise<IAdtWireResponse> {
+    return this.connection.makeAdtRequest({
+      url: '/sap/bc/adt/businessservices/bindings/bindingtypes',
+      method: 'GET',
+      timeout: getTimeout('default'),
+      headers: {
+        Accept: 'application/vnd.sap.adt.nameditems.v1+xml, application/xml',
+      },
+    });
+  }
+
+  /** ADT's generic deletion check, over this binding's URI. */
+  private async deletionCheckRequest(name: string): Promise<IAdtWireResponse> {
+    const encoded = encodeSapObjectName(name).toLowerCase();
+    return this.connection.makeAdtRequest({
       url: '/sap/bc/adt/deletion/check',
       method: 'POST',
       timeout: getTimeout('default'),
@@ -551,97 +887,9 @@ export class AdtServiceBinding implements IAdtServiceBinding {
         'Content-Type': CT_DELETION_CHECK,
       },
     });
-    assertDeletable(checkResponse.data);
-
-    const deleteResult = await this.deleteServiceBinding({
-      bindingName: config.bindingName,
-      transportRequest: config.transportRequest,
-    });
-
-    return {
-      errors: [],
-      deleteResult,
-    };
   }
 
-  async activate(
-    config: Partial<IServiceBindingConfig>,
-  ): Promise<IServiceBindingState> {
-    if (!config.bindingName) {
-      throw new Error('bindingName is required');
-    }
-
-    const activateResult = await this.activateServiceBinding({
-      bindingName: config.bindingName,
-      preauditRequested: true,
-    });
-
-    // Activation is judged by the messages, never by the status code: ADT
-    // answers 200 with a <msg type="E"> when it refuses. Ten other handlers
-    // call this; this one returned errors: [] whatever came back.
-    assertActivationSucceeded('Service binding', activateResult.data);
-
-    return {
-      errors: [],
-      activateResult,
-    };
-  }
-
-  async check(
-    config: Partial<IServiceBindingConfig>,
-    status?: string,
-  ): Promise<IServiceBindingState> {
-    if (!config.bindingName) {
-      throw new Error('bindingName is required');
-    }
-
-    const version = status === 'active' ? 'active' : 'inactive';
-    const checkResult = await this.checkServiceBinding({
-      bindingName: config.bindingName,
-      version,
-    });
-
-    return {
-      errors: [],
-      checkResult,
-    };
-  }
-
-  async readTransport(
-    config: Partial<IServiceBindingConfig>,
-  ): Promise<IServiceBindingState> {
-    if (!config.bindingName) {
-      throw new Error('bindingName is required');
-    }
-    if (!config.packageName) {
-      throw new Error('packageName is required for transport check');
-    }
-
-    const transportResult = await this.transportCheckServiceBinding({
-      objectName: config.bindingName,
-      packageName: config.packageName,
-      description: config.description,
-      operation: 'U',
-    });
-
-    return {
-      errors: [],
-      transportResult,
-    };
-  }
-
-  async getServiceBindingTypes(): Promise<IAdtWireResponse> {
-    return this.connection.makeAdtRequest({
-      url: '/sap/bc/adt/businessservices/bindings/bindingtypes',
-      method: 'GET',
-      timeout: getTimeout('default'),
-      headers: {
-        Accept: 'application/vnd.sap.adt.nameditems.v1+xml, application/xml',
-      },
-    });
-  }
-
-  async validateServiceBinding(
+  private async validateRequest(
     params: IValidateServiceBindingParams,
   ): Promise<IAdtWireResponse> {
     if (!params.objname) {
@@ -663,7 +911,7 @@ export class AdtServiceBinding implements IAdtServiceBinding {
     });
   }
 
-  async transportCheckServiceBinding(
+  private async transportCheckRequest(
     params: ITransportCheckServiceBindingParams,
   ): Promise<IAdtWireResponse> {
     if (!params.objectName) {
@@ -685,7 +933,7 @@ export class AdtServiceBinding implements IAdtServiceBinding {
     });
   }
 
-  async createServiceBinding(
+  private async createRequest(
     params: ICreateServiceBindingParams,
   ): Promise<IAdtWireResponse> {
     if (!params.bindingName) {
@@ -747,7 +995,7 @@ export class AdtServiceBinding implements IAdtServiceBinding {
     });
   }
 
-  async readServiceBinding(
+  private async readRequest(
     params: IReadServiceBindingParams,
   ): Promise<IAdtWireResponse> {
     if (!params.bindingName) {
@@ -766,8 +1014,8 @@ export class AdtServiceBinding implements IAdtServiceBinding {
     });
   }
 
-  async updateServiceBinding(
-    params: IUpdateServiceBindingParams,
+  private async updateRequest(
+    params: IServiceBindingPublicationParams,
   ): Promise<IAdtWireResponse> {
     if (!params.bindingName) {
       throw new Error('bindingName is required');
@@ -775,18 +1023,17 @@ export class AdtServiceBinding implements IAdtServiceBinding {
     if (!params.desiredPublicationState) {
       throw new Error('desiredPublicationState is required');
     }
-    if (!params.serviceType) {
-      throw new Error('serviceType is required');
-    }
-    if (!params.serviceName) {
-      throw new Error('serviceName is required');
-    }
-
-    const readResponse = await this.readServiceBinding({
+    const readResponse = await this.readRequest({
       bindingName: params.bindingName,
       version: 'active',
     });
     const current = this.parseServiceBindingState(readResponse);
+    // The binding's own answer fills in what the caller did not say. This read
+    // already happens for the state check, so knowing which service is being
+    // published costs the server nothing extra.
+    const serviceType = params.serviceType ?? current.serviceType;
+    const serviceName = params.serviceName ?? current.serviceName;
+    const serviceVersion = params.serviceVersion ?? current.serviceVersion;
     this.logger?.info?.(
       `ServiceBinding update: ${params.bindingName} -> ${params.desiredPublicationState}`,
       {
@@ -812,11 +1059,17 @@ export class AdtServiceBinding implements IAdtServiceBinding {
           `Invalid state transition: cannot publish service binding ${params.bindingName}. allowedAction=${current.allowedAction ?? 'UNKNOWN'}`,
         );
       }
+      if (!(serviceType && serviceName)) {
+        throw new Error(
+          `Cannot publish ${params.bindingName}: neither the caller nor the ` +
+            'binding names a service type and a service name.',
+        );
+      }
       return this.publishByServiceType(
-        params.serviceType,
+        serviceType,
         params.bindingName,
-        params.serviceName,
-        params.serviceVersion,
+        serviceName,
+        serviceVersion,
       );
     }
 
@@ -825,15 +1078,21 @@ export class AdtServiceBinding implements IAdtServiceBinding {
         `Invalid state transition: cannot unpublish service binding ${params.bindingName}. allowedAction=${current.allowedAction ?? 'UNKNOWN'}`,
       );
     }
+    if (!(serviceType && serviceName)) {
+      throw new Error(
+        `Cannot unpublish ${params.bindingName}: neither the caller nor the ` +
+          'binding names a service type and a service name.',
+      );
+    }
     return this.unpublishByServiceType(
-      params.serviceType,
+      serviceType,
       params.bindingName,
-      params.serviceName,
-      params.serviceVersion,
+      serviceName,
+      serviceVersion,
     );
   }
 
-  async deleteServiceBinding(
+  private async deleteRequest(
     params: IDeleteServiceBindingParams,
   ): Promise<IAdtWireResponse> {
     if (!params.bindingName) {
@@ -852,7 +1111,7 @@ export class AdtServiceBinding implements IAdtServiceBinding {
     });
   }
 
-  async checkServiceBinding(
+  private async checkRequest(
     params: ICheckServiceBindingParams,
   ): Promise<IAdtWireResponse> {
     if (!params.bindingName) {
@@ -875,7 +1134,7 @@ export class AdtServiceBinding implements IAdtServiceBinding {
     });
   }
 
-  async activateServiceBinding(
+  private async activateRequest(
     params: IActivateServiceBindingParams,
   ): Promise<IAdtWireResponse> {
     if (!params.bindingName) {
@@ -899,7 +1158,17 @@ export class AdtServiceBinding implements IAdtServiceBinding {
     });
   }
 
+  /** Generate the service the binding exposes. */
   async generateServiceBinding(
+    params: IGenerateServiceBindingParams,
+  ): Promise<IAdtResponse<ReturnType<R['generation']>>> {
+    return answering(
+      () => this.generateRequest(params),
+      this.results.generation as IResultStrategy<ReturnType<R['generation']>>,
+    );
+  }
+
+  private async generateRequest(
     params: IGenerateServiceBindingParams,
   ): Promise<IAdtWireResponse> {
     if (!params.bindingName) {
@@ -936,145 +1205,112 @@ export class AdtServiceBinding implements IAdtServiceBinding {
     });
   }
 
+  /**
+   * Create the binding and generate its service.
+   *
+   * One value, not six envelopes. Until 30.0.0 this handed back the answer of
+   * every request it made along the way; what an implementation does on the way
+   * to an answer is its own business, and reaches a caller only if it fails.
+   */
   async createAndGenerateServiceBinding(
     params: ICreateAndGenerateServiceBindingParams,
-  ): Promise<{
-    createResult: IAdtWireResponse;
-    inactiveCheckResult: IAdtWireResponse;
-    activationResult?: IAdtWireResponse;
-    readResult: IAdtWireResponse;
-    generatedInfoResult: IAdtWireResponse;
-    activeCheckResult?: IAdtWireResponse;
-  }> {
-    const state = await this.create(
-      {
-        bindingName: params.bindingName,
-        packageName: params.packageName,
-        description: params.description,
-        serviceDefinitionName: params.serviceDefinitionName,
-        serviceName: params.serviceName,
-        serviceVersion: params.serviceVersion,
-        bindingVariant: params.bindingVariant,
-        masterLanguage: params.masterLanguage,
-        masterSystem: params.masterSystem,
-        responsible: params.responsible,
-        runTransportCheck: params.runTransportCheck,
-      },
-      { activateOnCreate: true },
-    );
+  ): Promise<IAdtResponse<ReturnType<R['generation']>>> {
+    const { serviceType } = resolveBindingVariant(params.bindingVariant);
 
-    if (
-      !state.createResult ||
-      !state.inactiveCheckResult ||
-      !state.readResult ||
-      !state.generatedInfoResult
-    ) {
-      throw new Error(
-        'Create and generate flow did not produce required results',
+    return chain(this.logger, async ({ step }) => {
+      await step(
+        this.create(
+          {
+            bindingName: params.bindingName,
+            packageName: params.packageName,
+            description: params.description,
+            serviceDefinitionName: params.serviceDefinitionName,
+            serviceName: params.serviceName,
+            serviceVersion: params.serviceVersion,
+            bindingVariant: params.bindingVariant,
+            masterLanguage: params.masterLanguage,
+            masterSystem: params.masterSystem,
+            responsible: params.responsible,
+            runTransportCheck: params.runTransportCheck,
+          },
+          { activateOnCreate: true },
+        ),
       );
-    }
 
-    return {
-      createResult: state.createResult,
-      inactiveCheckResult: state.inactiveCheckResult,
-      activationResult: state.activateResult,
-      readResult: state.readResult,
-      generatedInfoResult: state.generatedInfoResult,
-      activeCheckResult: state.activeCheckResult,
-    };
+      return step(
+        this.generateServiceBinding({
+          serviceType,
+          bindingName: params.bindingName,
+          serviceName: params.serviceName,
+          serviceVersion: params.serviceVersion,
+          serviceDefinitionName: params.serviceDefinitionName,
+        }),
+      );
+    });
   }
 
-  async getODataV2ServiceBinding(
-    params: IGetServiceBindingODataParams,
+  /**
+   * The OData service group this binding publishes.
+   *
+   * `GET …/{serviceType}/{binding}?servicename=…&serviceversion=…&srvdname=…`,
+   * measured from Eclipse. It is a **read of another object** — the service
+   * group, with its URL prefix, its collections and its deployment state —
+   * which happens to carry `published`, which is why Eclipse reads it after a
+   * publish job. It is not a job-status endpoint.
+   *
+   * One member, not `getODataV2ServiceBinding` and `getODataV4ServiceBinding`:
+   * the protocol is a parameter. Accept carries v1 as well as v2, as Eclipse
+   * sends it — a system that only serves v1 answered 406 to the v2-only header
+   * this used to send.
+   */
+  async getServiceGroup(
+    params: IServiceGroupParams,
+  ): Promise<IAdtResponse<ReturnType<R['odata']>>> {
+    return answering(
+      () => this.serviceGroupRequest(params),
+      this.results.odata as IResultStrategy<ReturnType<R['odata']>>,
+    );
+  }
+
+  private async serviceGroupRequest(
+    params: IServiceGroupParams,
   ): Promise<IAdtWireResponse> {
     if (!params.objectname) {
       throw new Error('objectname is required');
     }
+    if (!params.serviceType) {
+      throw new Error('serviceType is required');
+    }
 
-    const v2Qs = buildQueryString({
+    const query = buildQueryString({
       servicename: params.servicename,
       serviceversion: params.serviceversion,
       srvdname: params.srvdname,
     });
     return this.connection.makeAdtRequest({
-      url: `/sap/bc/adt/businessservices/odatav2/${encodeURIComponent(params.objectname)}?${v2Qs}`,
-      method: 'GET',
-      timeout: getTimeout('default'),
-      headers: {
-        Accept: 'application/vnd.sap.adt.businessservices.odatav2.v3+xml',
-      },
-    });
-  }
-
-  async getODataV4ServiceBinding(
-    params: IGetServiceBindingODataParams,
-  ): Promise<IAdtWireResponse> {
-    if (!params.objectname) {
-      throw new Error('objectname is required');
-    }
-
-    const v4Qs = buildQueryString({
-      servicename: params.servicename,
-      serviceversion: params.serviceversion,
-      srvdname: params.srvdname,
-    });
-    return this.connection.makeAdtRequest({
-      url: `/sap/bc/adt/businessservices/odatav4/${encodeURIComponent(params.objectname)}?${v4Qs}`,
-      method: 'GET',
-      timeout: getTimeout('default'),
-      headers: {
-        Accept: 'application/vnd.sap.adt.businessservices.odatav4.v2+xml',
-      },
-    });
-  }
-
-  async publishODataV2(
-    params: IPublishODataV2Params,
-  ): Promise<IAdtWireResponse> {
-    if (!params.servicename) {
-      throw new Error('servicename is required');
-    }
-
-    this.logger?.info?.('Publishing OData V2 service', params);
-    const pubV2Qs = buildQueryString({
-      servicename: params.servicename,
-      serviceversion: params.serviceversion,
-    });
-    return this.connection.makeAdtRequest({
-      url: `/sap/bc/adt/businessservices/odatav2/publishjobs?${pubV2Qs}`,
+      url: `/sap/bc/adt/businessservices/${params.serviceType}/${encodeURIComponent(params.objectname)}?${query}`,
       method: 'GET',
       timeout: getTimeout('default'),
       headers: {
         Accept:
-          'application/vnd.sap.adt.businessservices.odatav2.v3+xml, application/json, text/plain',
-      },
-    });
-  }
-
-  async unpublishODataV2(
-    params: IUnpublishODataV2Params,
-  ): Promise<IAdtWireResponse> {
-    if (!params.servicename) {
-      throw new Error('servicename is required');
-    }
-
-    this.logger?.info?.('Unpublishing OData V2 service', params);
-    const unpubV2Qs = buildQueryString({
-      servicename: params.servicename,
-      serviceversion: params.serviceversion,
-    });
-    return this.connection.makeAdtRequest({
-      url: `/sap/bc/adt/businessservices/odatav2/unpublishjobs?${unpubV2Qs}`,
-      method: 'GET',
-      timeout: getTimeout('default'),
-      headers: {
-        Accept:
-          'application/vnd.sap.adt.businessservices.odatav2.v3+xml, application/json, text/plain',
+          `application/vnd.sap.adt.businessservices.${params.serviceType}.v1+xml, ` +
+          `application/vnd.sap.adt.businessservices.${params.serviceType}.v2+xml`,
       },
     });
   }
 
   async classifyServiceBinding(
+    params: IClassifyServiceBindingParams,
+  ): Promise<IAdtResponse<ReturnType<R['classification']>>> {
+    return answering(
+      () => this.classifyRequest(params),
+      this.results.classification as IResultStrategy<
+        ReturnType<R['classification']>
+      >,
+    );
+  }
+
+  private async classifyRequest(
     params: IClassifyServiceBindingParams,
   ): Promise<IAdtWireResponse> {
     if (!params.objectname) {

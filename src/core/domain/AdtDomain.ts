@@ -1,44 +1,40 @@
-import { beginCriticalSection } from '../../utils/criticalSection';
-import { assertDeletable } from '../../utils/deletionCheck';
 /**
- * AdtDomain - High-level CRUD operations for Domain objects
+ * AdtDomain - CRUD for `DOMA/DD` domains.
  *
- * Implements IAdtObject interface with automatic operation chains,
- * error handling, and resource cleanup.
+ * A domain is an XML-based entity: it has no source, `read` and `readMetadata`
+ * fetch the same document, and `update` is a read-modify-write of that XML.
  *
- * Uses low-level functions directly (not Builder classes).
- *
- * Session management:
- * - stateful: only when doing lock/update/unlock operations
- * - stateless: obligatory after unlock
- * - If no lock/unlock, no stateful needed
- * - activate uses same session/cookies (no stateful needed)
- *
- * Operation chains:
- * - Create: validate → create → check → lock → check(inactive) → update → unlock → check → activate
- * - Update: lock → check(inactive) → update → unlock → check → activate
- * - Delete: check(deletion) → delete
+ * Every member answers `IAdtResponse<T>`, where T is what the result set given
+ * at construction makes of that endpoint's answer.
  */
-
 import type {
-  HttpError,
   IAbapConnection,
   IAdtActivatable,
   IAdtCheckable,
-  IAdtCrud,
+  IAdtCreatable,
+  IAdtDeletable,
+  IAdtError,
   IAdtLockable,
   IAdtOperationOptions,
+  IAdtReadable,
+  IAdtResponse,
   IAdtSystemContext,
   IAdtTransportAware,
+  IAdtUpdatable,
   IAdtValidatable,
   ILogger,
-  IObjectVersion,
+  IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
-import { safeErrorMessage } from '../../utils/internalUtils';
+import { activationRefusal } from '../../utils/activationUtils';
 import {
-  type ICapabilityContext,
-  LockCapability,
-} from '../shared/capabilities';
+  answering,
+  type IAdtOptions,
+  type IAnalyse,
+} from '../../utils/adtResponse';
+import { beginCriticalSection } from '../../utils/criticalSection';
+import { deletionRefusal } from '../../utils/deletionCheck';
+import { validationRefusal } from '../../utils/validationRefusal';
+import { chain } from '../shared/chain';
 import {
   createLockTracker,
   type LockRegistry,
@@ -51,55 +47,58 @@ import { create as createDomain } from './create';
 import { checkDeletion, deleteDomain } from './delete';
 import { lockDomain } from './lock';
 import { getDomain, getDomainTransport } from './read';
-import type { IDomainConfig, IDomainState } from './types';
+import {
+  domainDocuments,
+  type IDomainConfig,
+  type IDomainResults,
+} from './types';
 import { unlockDomain } from './unlock';
 import { updateDomain } from './update';
 import { validateDomainName } from './validation';
-export class AdtDomain
-  implements
-    IAdtCrud<IDomainConfig, IDomainState>,
-    IAdtValidatable<IDomainConfig, IDomainState>,
-    IAdtCheckable<IDomainConfig, IDomainState>,
-    IAdtActivatable<IDomainConfig, IDomainState>,
-    IAdtLockable<IDomainConfig, IDomainState>,
-    IAdtTransportAware<IDomainConfig, IDomainState>
+
+export class AdtDomain<
+  R extends IDomainResults<
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown
+  > = IDomainResults,
+> implements
+    IAdtCreatable<IDomainConfig, ReturnType<R['created']>>,
+    IAdtReadable<
+      IDomainConfig,
+      ReturnType<R['source']>,
+      ReturnType<R['metadata']>
+    >,
+    IAdtUpdatable<IDomainConfig, ReturnType<R['updated']>>,
+    IAdtDeletable<IDomainConfig, ReturnType<R['deletion']>>,
+    IAdtValidatable<IDomainConfig, ReturnType<R['validation']>>,
+    IAdtCheckable<IDomainConfig, ReturnType<R['check']>>,
+    IAdtActivatable<IDomainConfig, ReturnType<R['activation']>>,
+    IAdtLockable<IDomainConfig>,
+    IAdtTransportAware<IDomainConfig, ReturnType<R['transport']>>
 {
-  private readonly connection: IAbapConnection;
-  private readonly logger?: ILogger;
-  private readonly systemContext: IAdtSystemContext;
+  protected readonly connection: IAbapConnection;
+  protected readonly logger?: ILogger;
+  protected readonly systemContext: IAdtSystemContext;
   private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'Domain';
-
-  // LAZY thunk (not a getter that snapshots): captures `this` but reads
-  // this.connection/this.logger only when invoked, after the constructor has
-  // run — so building the capability below as a class field is safe.
-  private readonly capCtx = (): ICapabilityContext => ({
-    connection: this.connection,
-    logger: this.logger,
-  });
-
-  private readonly lockCap = new LockCapability<IDomainConfig, IDomainState>(
-    this.capCtx,
-    {
-      nameOf: (c) => {
-        if (!c.domainName) throw new Error('Domain name is required');
-        return c.domainName;
-      },
-      acquire: async (ctx, name) => ({
-        lockHandle: await lockDomain(ctx.connection, name),
-      }),
-      release: async (ctx, name, handle) => {
-        const result = await unlockDomain(ctx.connection, name, handle);
-        return { unlockResult: result, errors: [] };
-      },
-    },
-  );
 
   constructor(
     connection: IAbapConnection,
     logger?: ILogger,
     systemContext?: IAdtSystemContext,
     lockRegistry?: LockRegistry,
+    // The one cast in this file, and it is on the default: the shipped set
+    // satisfies the erased bound, which the compiler cannot see through the
+    // `unknown`s. A cast on a member would be the factory lying about what it
+    // answers.
+    protected readonly results: R = domainDocuments as unknown as R,
   ) {
     this.connection = connection;
     this.logger = logger;
@@ -107,47 +106,49 @@ export class AdtDomain
     this.lockTracker = createLockTracker(
       lockRegistry,
       this.objectType,
-      (domainName, lockHandle) =>
-        unlockDomain(this.connection, domainName, lockHandle),
+      (name, lockHandle) => unlockDomain(this.connection, name, lockHandle),
     );
   }
 
-  /**
-   * Validate domain configuration before creation
-   */
-  async validate(config: Partial<IDomainConfig>): Promise<IDomainState> {
+  /** The name, or the caller's mistake — nothing was asked of the server yet. */
+  private name(config: Partial<IDomainConfig>): string {
     if (!config.domainName) {
-      throw new Error('Domain name is required for validation');
+      throw new Error('Domain name is required');
     }
-    // The endpoint refuses an empty one, so this is a caller error rather
-    // than a 400 to decode later.
+    return config.domainName;
+  }
+
+  /** Validate the name before creating the object. */
+  async validate<E extends IAdtError = IAdtError>(
+    config: Partial<IDomainConfig>,
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+    const name = this.name(config);
+    // The endpoint refuses an empty one, so this is a caller error rather than a
+    // 400 to decode later.
     if (!config.description) {
       throw new Error('Description is required for validation');
     }
 
-    const validationResponse = await validateDomainName(
-      this.connection,
-      config.domainName,
-      config.description,
-      config.packageName,
+    return answering(
+      () =>
+        validateDomainName(
+          this.connection,
+          name,
+          config.description as string,
+          config.packageName,
+        ),
+      this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
+      (options?.analyse ?? validationRefusal) as IAnalyse<E>,
     );
-
-    return {
-      validationResponse: validationResponse,
-      errors: [],
-    };
   }
 
-  /**
-   * Create domain with full operation chain
-   */
-  async create(
+  /** Create the object. */
+  async create<E extends IAdtError = IAdtError>(
     config: IDomainConfig,
-    options?: IAdtOperationOptions,
-  ): Promise<IDomainState> {
-    if (!config.domainName) {
-      throw new Error('Domain name is required');
-    }
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    const name = this.name(config);
     if (!config.packageName) {
       throw new Error('Package name is required');
     }
@@ -155,540 +156,428 @@ export class AdtDomain
       throw new Error('Description is required');
     }
 
-    let objectCreated = false;
-    const state: IDomainState = {
-      errors: [],
-    };
-
-    try {
-      // Create domain
-      this.logger?.info?.('Creating domain');
-      const createResponse = await createDomain(this.connection, {
-        domain_name: config.domainName,
-        package_name: config.packageName,
-        transport_request: config.transportRequest,
-        description: config.description,
-        datatype: config.datatype,
-        length: config.length,
-        decimals: config.decimals,
-        conversion_exit: config.conversion_exit,
-        lowercase: config.lowercase,
-        sign_exists: config.sign_exists,
-        value_table: config.value_table,
-        fixed_values: config.fixed_values,
-        masterSystem: this.systemContext.masterSystem,
-        responsible: this.systemContext.responsible,
-        masterLanguage:
-          config.masterLanguage ?? this.systemContext.masterLanguage,
+    return chain(this.logger, async ({ step, onScopeEnd, onFailure }) => {
+      onScopeEnd(async () => {
+        this.connection.setSessionType('stateless');
       });
-      state.createResult = createResponse;
-      objectCreated = true;
-      this.logger?.info?.('Domain created');
 
-      return state;
-    } catch (error: unknown) {
-      // Cleanup on error - ensure stateless
-      this.connection.setSessionType('stateless');
-
-      if (objectCreated && options?.deleteOnFailure) {
-        try {
+      let created = false;
+      if (options?.deleteOnFailure ?? true) {
+        onFailure(async () => {
+          if (!created) return;
           this.logger?.warn?.('Deleting domain after failure');
-          // No stateful needed - delete doesn't use lock/unlock
           await deleteDomain(this.connection, {
-            domain_name: config.domainName,
+            domain_name: name,
             transport_request: config.transportRequest,
           });
-        } catch (deleteError) {
-          this.logger?.warn?.(
-            'Failed to delete domain after failure:',
-            safeErrorMessage(deleteError),
-          );
-        }
+        });
       }
 
-      this.logger?.error('Create failed:', safeErrorMessage(error));
-      throw error;
-    }
+      this.logger?.info?.('Creating domain');
+      const value = await step(
+        answering(
+          () =>
+            createDomain(this.connection, {
+              domain_name: name,
+              package_name: config.packageName as string,
+              transport_request: config.transportRequest,
+              description: config.description as string,
+              datatype: config.datatype,
+              length: config.length,
+              decimals: config.decimals,
+              conversion_exit: config.conversion_exit,
+              lowercase: config.lowercase,
+              sign_exists: config.sign_exists,
+              value_table: config.value_table,
+              fixed_values: config.fixed_values,
+              masterSystem: this.systemContext.masterSystem,
+              responsible: this.systemContext.responsible,
+              masterLanguage:
+                config.masterLanguage ?? this.systemContext.masterLanguage,
+            }),
+          this.results.created as IResultStrategy<ReturnType<R['created']>>,
+          options?.analyse,
+        ),
+      );
+      // Only past the step: a refused create leaves nothing to delete, and the
+      // cleanup above must not remove an object this call did not make.
+      created = true;
+      this.logger?.info?.('Domain created');
+      return value;
+    });
   }
 
-  /**
-   * Read domain
-   */
-  async read(
+  /** Read the object.
+   *
+   * `version` is accepted and ignored: a domain is XML-based and has one
+   * document, not an active/inactive source pair. */
+  async read<E extends IAdtError = IAdtError>(
     config: Partial<IDomainConfig>,
     _version?: 'active' | 'inactive',
-    options?: IReadOptions,
-  ): Promise<IDomainState | undefined> {
-    if (!config.domainName) {
-      throw new Error('Domain name is required');
-    }
+    options?: IReadOptions & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
+    const name = this.name(config);
 
-    try {
-      const response = await getDomain(
-        this.connection,
-        config.domainName,
-        options,
-      );
-      return {
-        readResult: response,
-        errors: [],
-      };
-    } catch (error: unknown) {
-      const e = error as HttpError;
-      if (e.response?.status === 404) {
-        return undefined;
-      }
-      this.logger?.error('Read failed:', safeErrorMessage(error));
-      throw error;
-    }
+    // No 404 special case: ADT answers a read for a missing object with 200 and
+    // an empty body, so absence was never a status to branch on — and whether
+    // an empty body *is* absence is the caller's reading, through `analyse`.
+    return answering(
+      () => getDomain(this.connection, name, options),
+      this.results.source as IResultStrategy<ReturnType<R['source']>>,
+      options?.analyse,
+    );
+  }
+
+  /** Read the object's metadata document. */
+  async readMetadata<E extends IAdtError = IAdtError>(
+    config: Partial<IDomainConfig>,
+    options?: IReadOptions & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+    const name = this.name(config);
+
+    return answering(
+      () => getDomain(this.connection, name, options),
+      this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
+      options?.analyse,
+    );
+  }
+
+  /** The transport request the object belongs to. */
+  async readTransport<E extends IAdtError = IAdtError>(
+    config: Partial<IDomainConfig>,
+    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
+    const name = this.name(config);
+
+    return answering(
+      () => getDomainTransport(this.connection, name, options),
+      this.results.transport as IResultStrategy<ReturnType<R['transport']>>,
+      options?.analyse,
+    );
   }
 
   /**
-   * Read domain metadata (object characteristics: package, responsible, description, etc.)
-   * For domains, read() already returns metadata since there's no source code.
+   * Write the object.
+   *
+   * With `options.lockHandle` the caller holds the lock and owns the chain, so
+   * this is one request. Without it, this locks, checks, writes and unlocks —
+   * and the unlock happens on every path out.
    */
-  async readMetadata(
+  async update<E extends IAdtError = IAdtError>(
     config: Partial<IDomainConfig>,
-    options?: IReadOptions,
-  ): Promise<IDomainState> {
-    const state: IDomainState = { errors: [] };
-    if (!config.domainName) {
-      const error = new Error('Domain name is required');
-      state.errors.push({
-        method: 'readMetadata',
-        error,
-        timestamp: new Date(),
-      });
-      throw error;
-    }
-    try {
-      // For objects without source code, read() already returns metadata
-      const readState = await this.read(
-        config,
-        options?.version ?? 'active',
-        options,
-      );
-      if (readState) {
-        state.metadataResult = readState.readResult;
-        state.readResult = readState.readResult;
-      } else {
-        const error = new Error(`Domain '${config.domainName}' not found`);
-        state.errors.push({
-          method: 'readMetadata',
-          error,
-          timestamp: new Date(),
-        });
-        throw error;
-      }
-      this.logger?.info?.('Domain metadata read successfully');
-      return state;
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({
-        method: 'readMetadata',
-        error: err,
-        timestamp: new Date(),
-      });
-      this.logger?.error('readMetadata', safeErrorMessage(err));
-      throw err;
-    }
-  }
-
-  /**
-   * Update domain with full operation chain
-   * Always starts with lock
-   */
-  async update(
-    config: Partial<IDomainConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IDomainState> {
-    if (!config.domainName) {
-      throw new Error('Domain name is required');
-    }
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+    const name = this.name(config);
     if (!config.packageName) {
       throw new Error('Package name is required for update');
     }
+    const source = options?.xmlContent;
 
-    // Low-level mode: if lockHandle is provided, perform only update operation
     if (options?.lockHandle) {
+      const lockHandle = options.lockHandle;
       this.logger?.info?.(
         'Low-level update: performing update only (lockHandle provided)',
       );
-
-      const updateResponse = await updateDomain(
-        this.connection,
-        {
-          domain_name: config.domainName,
-          package_name: config.packageName,
-          transport_request: config.transportRequest,
-          description: config.description,
-          datatype: config.datatype,
-          length: config.length,
-          decimals: config.decimals,
-          conversion_exit: config.conversion_exit,
-          lowercase: config.lowercase,
-          sign_exists: config.sign_exists,
-          value_table: config.value_table,
-          fixed_values: config.fixed_values,
-          masterSystem: this.systemContext.masterSystem,
-          responsible: this.systemContext.responsible,
-        },
-        options.lockHandle,
+      return answering(
+        () =>
+          updateDomain(
+            this.connection,
+            {
+              domain_name: name,
+              package_name: config.packageName as string,
+              transport_request: config.transportRequest,
+              description: config.description,
+              datatype: config.datatype,
+              length: config.length,
+              decimals: config.decimals,
+              conversion_exit: config.conversion_exit,
+              lowercase: config.lowercase,
+              sign_exists: config.sign_exists,
+              value_table: config.value_table,
+              fixed_values: config.fixed_values,
+              masterSystem: this.systemContext.masterSystem,
+              responsible: this.systemContext.responsible,
+            },
+            lockHandle,
+          ),
+        this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+        options?.analyse,
       );
-      this.logger?.info?.('Domain updated (low-level)');
-      return {
-        updateResult: updateResponse,
-        errors: [],
-      };
     }
 
-    let lockHandle: string | undefined;
-    const state: IDomainState = {
-      errors: [],
-    };
-
-    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
-
-    // the lock but leaves the work half-done.
-
+    // A LOCK…UNLOCK window: a timeout in the middle releases the lock and
+    // leaves the work half done, so the connection is told this is critical.
     const endCriticalSection = beginCriticalSection(this.connection);
 
-    try {
-      // 1. Lock (update always starts with lock, stateful ONLY before lock)
-      this.logger?.info?.('lock');
+    return chain(this.logger, async ({ step, onScopeEnd }) => {
+      onScopeEnd(async () => {
+        endCriticalSection();
+      });
+
+      this.logger?.info?.('Step 1: Locking domain');
       this.connection.setSessionType('stateful');
-      lockHandle = await lockDomain(this.connection, config.domainName);
-      state.lockHandle = lockHandle;
-      this.lockTracker.track(config.domainName, lockHandle);
-      this.logger?.info?.('locked');
-
-      // 2. Check inactive with XML for update (if provided)
-      const xmlToCheck = options?.xmlContent;
-      if (xmlToCheck) {
-        this.logger?.info?.('check(inactive)');
-        const deletionCheck = await checkDomainSyntax(
-          this.connection,
-          config.domainName,
-          'inactive',
-          xmlToCheck,
-          this.logger,
-        );
-        state.checkResult = deletionCheck;
-        this.logger?.info?.('checked(inactive)');
-      }
-
-      // 3. Update
-      if (lockHandle) {
-        this.logger?.info?.('update');
-        await updateDomain(
-          this.connection,
-          {
-            domain_name: config.domainName,
-            package_name: config.packageName,
-            transport_request: config.transportRequest,
-            description: config.description,
-            datatype: config.datatype,
-            length: config.length,
-            decimals: config.decimals,
-            conversion_exit: config.conversion_exit,
-            lowercase: config.lowercase,
-            sign_exists: config.sign_exists,
-            value_table: config.value_table,
-            fixed_values: config.fixed_values,
-            masterSystem: this.systemContext.masterSystem,
-            responsible: this.systemContext.responsible,
-          },
-          lockHandle,
-        );
-        // updateDomain returns void, so we don't store it in state
-        this.logger?.info?.('updated');
-
-        // 3.5. Read with long polling to ensure object is ready after update
-        this.logger?.info?.('read (wait for object ready after update)');
-        try {
-          await this.read({ domainName: config.domainName }, 'active', {
-            withLongPolling: true,
-          });
-          this.logger?.info?.('object is ready after update');
-        } catch (readError) {
-          this.logger?.warn?.(
-            'read with long polling failed after update:',
-            safeErrorMessage(readError),
-          );
-          // Continue anyway - unlock might still work
-        }
-      }
-
-      // 4. Unlock (obligatory stateless after unlock)
-      if (lockHandle) {
-        this.logger?.info?.('unlock');
-        this.connection.setSessionType('stateful');
-        const unlockResponse = await unlockDomain(
-          this.connection,
-          config.domainName,
-          lockHandle,
-        );
-        state.unlockResult = unlockResponse;
+      // Registered FIRST so it unwinds LAST: on older BASIS a lock handle is
+      // only valid inside a stateful request, so going stateless before the
+      // unlock would break the unlock (#106); and if the lock itself throws,
+      // the session is still restored.
+      onScopeEnd(async () => {
         this.connection.setSessionType('stateless');
-        this.lockTracker.untrack(config.domainName);
-        lockHandle = undefined;
-        this.logger?.info?.('unlocked');
+      });
+
+      const lockHandle = await lockDomain(this.connection, name);
+      this.lockTracker.track(name, lockHandle);
+      const releaseLock = onScopeEnd(async () => {
+        await unlockDomain(this.connection, name, lockHandle);
+        this.lockTracker.untrack(name);
+      });
+      this.logger?.info?.('Domain locked, handle:', lockHandle);
+
+      if (source) {
+        this.logger?.info?.(
+          'Step 2: Checking inactive version with update content',
+        );
+        await step(
+          answering(
+            () =>
+              checkDomainSyntax(
+                this.connection,
+                name,
+                'inactive',
+                source,
+                this.logger,
+              ),
+            this.results.check as IResultStrategy<ReturnType<R['check']>>,
+            options?.analyse,
+          ),
+        );
       }
 
-      // 5. Final check (no stateful needed)
-      this.logger?.info?.('check(inactive)');
-      const checkResponse2 = await checkDomainSyntax(
-        this.connection,
-        config.domainName,
-        'inactive',
-        undefined,
-        this.logger,
+      // Always written: the fields come from the config, not from a
+      // source string a caller may or may not have passed, so there is
+      // nothing to skip and nothing to leave undefined.
+      this.logger?.info?.('Step 3: Updating domain');
+      const updated = await step(
+        answering(
+          () =>
+            updateDomain(
+              this.connection,
+              {
+                domain_name: name,
+                package_name: config.packageName as string,
+                transport_request: config.transportRequest,
+                description: config.description,
+                datatype: config.datatype,
+                length: config.length,
+                decimals: config.decimals,
+                conversion_exit: config.conversion_exit,
+                lowercase: config.lowercase,
+                sign_exists: config.sign_exists,
+                value_table: config.value_table,
+                fixed_values: config.fixed_values,
+                masterSystem: this.systemContext.masterSystem,
+                responsible: this.systemContext.responsible,
+              },
+              lockHandle,
+            ),
+          this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+          options?.analyse,
+        ),
       );
-      state.checkResult = checkResponse2;
-      this.logger?.info?.('checked(inactive)');
+      this.logger?.info?.('Domain updated');
 
-      // 6. Activate (if requested, no stateful needed - uses same session/cookies)
-      if (options?.activateOnUpdate) {
-        this.logger?.info?.('activate');
-        const activateResponse = await activateDomain(
-          this.connection,
-          config.domainName,
+      // The write produced the inactive version; the active one may not exist
+      // yet. A failure here is not the update's failure, so it is logged and
+      // the chain continues — the unlock still has to happen.
+      const ready = await this.read(config, 'active', {
+        withLongPolling: true,
+      });
+      if (!ready.ok) {
+        this.logger?.warn?.(
+          'read with long polling failed after update:',
+          ready.getError().message,
         );
-        state.activateResult = activateResponse;
-        this.logger?.info?.('activated');
+      }
 
-        // 6.5. Read with long polling to ensure object is ready after activation
-        this.logger?.info?.('read (wait for object ready after activation)');
-        try {
-          const readState = await this.read(
-            { domainName: config.domainName },
-            'active',
-            { withLongPolling: true },
-          );
-          if (readState) {
-            state.readResult = readState.readResult;
-          }
-          this.logger?.info?.('object is ready after activation');
-        } catch (readError) {
+      this.logger?.info?.('Step 4: Unlocking domain');
+      this.connection.setSessionType('stateful');
+      await unlockDomain(this.connection, name, lockHandle);
+      this.connection.setSessionType('stateless');
+      this.lockTracker.untrack(name);
+      // Unlocked as its own step, so the registration is discharged rather than
+      // run a second time when the scope unwinds.
+      releaseLock();
+      this.logger?.info?.('Domain unlocked');
+
+      this.logger?.info?.('Step 5: Final check');
+      await step(
+        answering(
+          () =>
+            checkDomainSyntax(
+              this.connection,
+              name,
+              'inactive',
+              undefined,
+              this.logger,
+            ),
+          this.results.check as IResultStrategy<ReturnType<R['check']>>,
+          options?.analyse,
+        ),
+      );
+
+      if (options?.activateOnUpdate) {
+        this.logger?.info?.('Step 6: Activating domain');
+        await step(
+          answering(
+            () => activateDomain(this.connection, name),
+            this.results.activation as IResultStrategy<
+              ReturnType<R['activation']>
+            >,
+            (options?.analyse ?? activationRefusal) as IAnalyse<E>,
+          ),
+        );
+
+        const ready = await this.read(config, 'active', {
+          withLongPolling: true,
+        });
+        if (!ready.ok) {
           this.logger?.warn?.(
             'read with long polling failed after activation:',
-            safeErrorMessage(readError),
-          );
-          // Continue anyway - activation was successful
-        }
-      } else {
-        // Read inactive version if not activated (metadata endpoint may return inactive version if active doesn't exist)
-        const readResponse = await getDomain(
-          this.connection,
-          config.domainName,
-        );
-        state.readResult = readResponse;
-      }
-
-      return state;
-    } catch (error: unknown) {
-      // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
-      if (lockHandle) {
-        try {
-          this.logger?.warn?.('Unlocking domain during error cleanup');
-          this.connection.setSessionType('stateful');
-          await unlockDomain(this.connection, config.domainName, lockHandle);
-          this.connection.setSessionType('stateless');
-          this.lockTracker.untrack(config.domainName);
-        } catch (unlockError) {
-          // Cleanup unlock failed — the lock stays tracked so unlockAll() (or
-          // session-drop) remains the last resort.
-          this.logger?.warn?.(
-            'Failed to unlock during cleanup:',
-            safeErrorMessage(unlockError),
-          );
-        }
-      } else {
-        // Ensure stateless if lock failed
-        this.connection.setSessionType('stateless');
-      }
-
-      if (options?.deleteOnFailure) {
-        try {
-          this.logger?.warn?.('Deleting domain after failure');
-          // No stateful needed - delete doesn't use lock/unlock
-          await deleteDomain(this.connection, {
-            domain_name: config.domainName,
-            transport_request: config.transportRequest,
-          });
-        } catch (deleteError) {
-          this.logger?.warn?.(
-            'Failed to delete domain after failure:',
-            safeErrorMessage(deleteError),
+            ready.getError().message,
           );
         }
       }
 
-      this.logger?.error('Update failed:', safeErrorMessage(error));
-      throw error;
-    } finally {
-      endCriticalSection();
-    }
+      return updated;
+    });
   }
 
   /**
-   * Delete domain
+   * Delete the object.
+   *
+   * The deletion check is read, not merely performed: ADT answers a refusal
+   * with `del:isDeletable="false"` inside a 200, and a delete that ignored it
+   * reported success while the object stayed. {@link deletionRefusal} is the
+   * shipped reading of that answer; a caller who wants another passes their own
+   * `analyse`.
    */
-  async delete(config: Partial<IDomainConfig>): Promise<IDomainState> {
-    if (!config.domainName) {
-      throw new Error('Domain name is required');
-    }
+  async delete<E extends IAdtError = IAdtError>(
+    config: Partial<IDomainConfig>,
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+    const name = this.name(config);
 
-    const state: IDomainState = {
-      errors: [],
-    };
-
-    try {
-      // Check for deletion (no stateful needed)
+    return chain(this.logger, async ({ step }) => {
       this.logger?.info?.('Checking domain for deletion');
-      const deletionCheck = await checkDeletion(this.connection, {
-        domain_name: config.domainName,
-        transport_request: config.transportRequest,
-      });
-      // ADT already said whether this may be deleted; refusing to read that
-      // answer is how a delete came to report success while the object
-      // stayed. Throws on isDeletable=false or a message of type E; a W
-      // is a warning and passes.
-      assertDeletable(deletionCheck.data);
-      state.checkResult = deletionCheck;
+      await step(
+        answering(
+          () =>
+            checkDeletion(this.connection, {
+              domain_name: name,
+              transport_request: config.transportRequest,
+            }),
+          this.results.check as IResultStrategy<ReturnType<R['check']>>,
+          (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
+        ),
+      );
       this.logger?.info?.('Deletion check passed');
 
-      // Delete (no stateful needed - no lock/unlock)
+      // No stateful session: this delete uses no lock.
       this.logger?.info?.('Deleting domain');
-      const deleteResponse = await deleteDomain(this.connection, {
-        domain_name: config.domainName,
-        transport_request: config.transportRequest,
-      });
-      state.deleteResult = deleteResponse;
-      this.logger?.info?.('Domain deleted');
-
-      return state;
-    } catch (error: unknown) {
-      this.logger?.error('Delete failed:', safeErrorMessage(error));
-      throw error;
-    }
-  }
-
-  /**
-   * Activate domain
-   * No stateful needed - uses same session/cookies
-   */
-  async activate(config: Partial<IDomainConfig>): Promise<IDomainState> {
-    if (!config.domainName) {
-      throw new Error('Domain name is required');
-    }
-
-    const state: IDomainState = {
-      errors: [],
-    };
-
-    try {
-      const activateResponse = await activateDomain(
-        this.connection,
-        config.domainName,
+      const value = await step(
+        answering(
+          () =>
+            deleteDomain(this.connection, {
+              domain_name: name,
+              transport_request: config.transportRequest,
+            }),
+          this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+          options?.analyse,
+        ),
       );
-      state.activateResult = activateResponse;
-      return state;
-    } catch (error: unknown) {
-      this.logger?.error('Activate failed:', safeErrorMessage(error));
-      throw error;
-    }
+      this.logger?.info?.('Domain deleted');
+      return value;
+    });
   }
 
-  /**
-   * Check domain
-   */
-  async check(
+  /** Activate the object. Needs no stateful session. */
+  async activate<E extends IAdtError = IAdtError>(
+    config: Partial<IDomainConfig>,
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+    const name = this.name(config);
+
+    return answering(
+      () => activateDomain(this.connection, name),
+      this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
+      (options?.analyse ?? activationRefusal) as IAnalyse<E>,
+    );
+  }
+
+  /** Check the object. */
+  async check<E extends IAdtError = IAdtError>(
     config: Partial<IDomainConfig>,
     status?: string,
-  ): Promise<IDomainState> {
-    if (!config.domainName) {
-      throw new Error('Domain name is required');
-    }
-
-    const state: IDomainState = {
-      errors: [],
-    };
-
-    // Map status to version
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+    const name = this.name(config);
     const version: 'active' | 'inactive' =
       status === 'active' ? 'active' : 'inactive';
-    const deletionCheck = await checkDomainSyntax(
-      this.connection,
-      config.domainName,
-      version,
-      undefined,
-      this.logger,
+
+    return answering(
+      () =>
+        checkDomainSyntax(
+          this.connection,
+          name,
+          version,
+          undefined,
+          this.logger,
+        ),
+      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      options?.analyse,
     );
-    state.checkResult = deletionCheck;
-    return state;
   }
 
-  /**
-   * Read transport request information for the domain
-   */
-  async readTransport(
-    config: Partial<IDomainConfig>,
-    options?: { withLongPolling?: boolean },
-  ): Promise<IDomainState> {
-    const state: IDomainState = {
-      errors: [],
-    };
+  /** Lock the object for modification. */
+  async lock(config: Partial<IDomainConfig>): Promise<IAdtResponse<string>> {
+    const name = this.name(config);
 
-    if (!config.domainName) {
-      const error = new Error('Domain name is required');
-      state.errors.push({
-        method: 'readTransport',
-        error,
-        timestamp: new Date(),
-      });
-      throw error;
-    }
-
-    try {
-      const response = await getDomainTransport(
-        this.connection,
-        config.domainName,
-        options,
-      );
-      state.transportResult = response;
-      this.logger?.info?.('Transport request read successfully');
-      return state;
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({
-        method: 'readTransport',
-        error: err,
-        timestamp: new Date(),
-      });
-      this.logger?.error('readTransport', safeErrorMessage(err));
-      throw err;
-    }
+    return answering(
+      async () => {
+        this.connection.setSessionType('stateful');
+        const lockHandle = await lockDomain(this.connection, name);
+        this.lockTracker.track(name, lockHandle);
+        // The handle is the value, and the request does not keep the wire it
+        // came on — so the answer is built around what the request produced.
+        return {
+          data: lockHandle,
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+        };
+      },
+      (answer) => String(answer.data),
+    );
   }
 
-  /**
-   * Lock domain for modification
-   */
-  async lock(config: Partial<IDomainConfig>): Promise<string> {
-    const handle = await this.lockCap.lock(config);
-    this.lockTracker.track(config.domainName as string, handle);
-    return handle;
-  }
-
-  /**
-   * Unlock domain
-   */
+  /** Unlock the object. */
   async unlock(
     config: Partial<IDomainConfig>,
     lockHandle: string,
-  ): Promise<IDomainState> {
-    const state = await this.lockCap.unlock(config, lockHandle);
-    this.lockTracker.untrack(config.domainName as string);
-    return state;
+  ): Promise<IAdtResponse<void>> {
+    const name = this.name(config);
+
+    return answering(
+      async () => {
+        // UNLOCK must run stateful (older BASIS #106); stateless after.
+        this.connection.setSessionType('stateful');
+        try {
+          return await unlockDomain(this.connection, name, lockHandle);
+        } finally {
+          this.connection.setSessionType('stateless');
+          this.lockTracker.untrack(name);
+        }
+      },
+      () => undefined,
+    );
   }
 }

@@ -7,13 +7,13 @@
  * Phase Z live-probe findings.
  */
 
+import { XMLParser } from 'fast-xml-parser';
 import type {
   IAbapGitErrorLogEntry,
   IAbapGitExternalRepoBranch,
   IAbapGitExternalRepoInfo,
   IAbapGitRepoStatus,
-} from '@mcp-abap-adt/interfaces';
-import { XMLParser } from 'fast-xml-parser';
+} from './types';
 
 const parser = new XMLParser({
   ignoreAttributes: false,

@@ -20,6 +20,7 @@ import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -201,24 +202,29 @@ describe('ScalarFunction (DSFD/SCF) integration', () => {
             );
 
             // ── 4a) Read active ──
-            const readState = await sf.read({ scalarFunctionName }, 'active');
-            expect(readState).toBeDefined();
-            expect(readState?.readResult).toBeDefined();
-            expect((readState?.readResult as any)?.status).toBe(200);
+            const readState = expectResult(
+              await sf.read({ scalarFunctionName }, 'active'),
+              'readState',
+            );
+            expect(typeof readState).toBe('string');
           } else {
             // ── 3b) Metadata-only validation: read the inactive object back ──
-            const readState = await sf.read({ scalarFunctionName }, 'inactive');
-            expect(readState).toBeDefined();
-            expect(readState?.readResult).toBeDefined();
-            expect((readState?.readResult as any)?.status).toBe(200);
+            const readState = expectResult(
+              await sf.read({ scalarFunctionName }, 'inactive'),
+              'readState',
+            );
+            expect(typeof readState).toBe('string');
           }
 
           // ── 5) Delete ──
-          const deleteState = await sf.delete({
-            scalarFunctionName,
-            transportRequest,
-          });
-          expect(deleteState.deleteResult).toBeDefined();
+          const deleteState = expectResult(
+            await sf.delete({
+              scalarFunctionName,
+              transportRequest,
+            }),
+            'deleteState',
+          );
+          expect(deleteState).toBeDefined();
 
           logTestSuccess(testsLogger, TEST_LABEL);
         } catch (error) {
@@ -293,7 +299,10 @@ describe('ScalarFunction (DSFD/SCF) integration', () => {
 
         try {
           const sf = client.getScalarFunction();
-          const resultState = await sf.read({ scalarFunctionName }, 'active');
+          const resultState = expectResult(
+            await sf.read({ scalarFunctionName }, 'active'),
+            'resultState',
+          );
           if (!resultState) {
             logTestSkip(
               testsLogger,
@@ -302,7 +311,7 @@ describe('ScalarFunction (DSFD/SCF) integration', () => {
             );
             return;
           }
-          expect(resultState.readResult).toBeDefined();
+          expect(resultState).toBeDefined();
           logTestSuccess(testsLogger, TEST_LABEL);
         } catch (error) {
           logTestError(testsLogger, TEST_LABEL, error);

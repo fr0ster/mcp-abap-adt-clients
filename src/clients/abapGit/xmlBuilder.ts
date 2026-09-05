@@ -12,6 +12,7 @@ import type {
   IAbapGitLinkArgs,
   IAbapGitPullArgs,
 } from '@mcp-abap-adt/interfaces';
+import type { IAbapGitRepoStatus } from './types';
 
 const NS_ABAPGITREPO = 'http://www.sap.com/adt/abapgit/repositories';
 const NS_ABAPGIT_EXTERNAL_REPO = 'http://www.sap.com/adt/abapgit/externalRepo';
@@ -49,7 +50,7 @@ export function buildLinkBody(args: IAbapGitLinkArgs): string {
 }
 
 export function buildPullBody(
-  args: IAbapGitPullArgs,
+  args: IAbapGitPullArgs<IAbapGitRepoStatus>,
   resolvedBranch: string,
 ): string {
   return (

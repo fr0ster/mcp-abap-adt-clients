@@ -7,12 +7,16 @@
  */
 
 import type {
+  AdtNoFailure,
   IAbapConnection,
+  IAdtError,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
+import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
 import { CT_ACTIVATION } from '../constants/contentTypes';
 import { encodeSapObjectName } from './internalUtils';
+import { requestOf } from './requestTrace';
 import { getTimeout } from './timeouts';
 
 /**
@@ -133,15 +137,30 @@ function detectActivationFailure(responseData: unknown): string | null {
  * @param objectLabel prefix for the thrown message, e.g. `'Scalar function'`
  * @throws when the response carries at least one error-severity message
  */
-export function assertActivationSucceeded(
-  objectLabel: string,
-  responseData: unknown,
-): void {
-  const failure = detectActivationFailure(responseData);
-  if (failure) {
-    throw new Error(`${objectLabel} activation failed: ${failure}`);
-  }
-}
+/**
+ * ADT's own activation verdict, as a failure rather than an exception.
+ *
+ * The shipped `analyse` for an activation step. Same rule as
+ * {@link assertActivationSucceeded} — an `<msg type="E">` is the verdict and
+ * `activationExecuted="false"` is not — but returned, because a chain's
+ * failures are answered. A consumer who reads activation messages some other
+ * way passes their own `analyse` instead.
+ */
+export const activationRefusal = (
+  verdict: IAdtError | AdtNoFailure,
+  answer?: IAdtWireResponse,
+): IAdtError | AdtNoFailure => {
+  if (verdict !== ADT_NO_FAILURE) return verdict;
+  const failure = detectActivationFailure(answer?.data);
+  return failure
+    ? {
+        origin: 'refusal',
+        message: `Activation failed: ${failure}`,
+        response: answer,
+        request: requestOf(answer),
+      }
+    : ADT_NO_FAILURE;
+};
 
 /**
  * Build object URI from name and type
@@ -318,13 +337,11 @@ export async function activateObjectInSession(
     headers,
   });
 
-  // ADT returns HTTP 200 even on failed activation (locked object, syntax
-  // errors). Surface an explicit failure signal as a thrown error instead of
-  // letting callers report a false success (issue #78).
-  const failure = detectActivationFailure(response.data);
-  if (failure) {
-    throw new Error(`Activation of ${objectName} failed: ${failure}`);
-  }
-
+  // The answer, as it arrived. ADT returns 200 even on a failed activation
+  // (locked object, syntax errors), and this used to throw a plain `Error` for
+  // it — which `recogniseFailure` then called `origin: 'connection'`, sending a
+  // caller to look at a network that had worked perfectly. The verdict is
+  // {@link activationRefusal}'s to give, and every `activate` member defaults
+  // to it (issue #78).
   return response;
 }

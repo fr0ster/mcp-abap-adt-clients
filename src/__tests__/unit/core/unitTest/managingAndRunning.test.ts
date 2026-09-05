@@ -13,6 +13,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
 import { AdtUnitTest } from '../../../../core/unitTest/AdtUnitTest';
+import { expectResult } from '../../../helpers/contract';
 import { createLibraryLogger } from '../../../helpers/testLogger';
 
 type Call = { url: string; method: string; data?: unknown };
@@ -149,7 +150,10 @@ describe('AdtUnitTest — managing the tests', () => {
     const { conn, calls } = makeConn();
     const h = new AdtUnitTest(conn, createLibraryLogger());
 
-    const handle = await h.lock({ className: 'ZCL_TESTS' });
+    const handle = expectResult(
+      await h.lock({ className: 'ZCL_TESTS' }),
+      'lock the container class',
+    );
 
     expect(handle).toBe('LH');
     expect(calls).toHaveLength(1);
@@ -199,9 +203,10 @@ describe('AdtUnitTest — running', () => {
     const { conn, calls } = makeConn(() => RUN_STARTED);
     const h = new AdtUnitTest(conn, createLibraryLogger());
 
-    const runId = await h.run([
-      { containerClass: 'ZCL_TESTS', testClass: 'LTCL' },
-    ]);
+    const runId = expectResult(
+      await h.run([{ containerClass: 'ZCL_TESTS', testClass: 'LTCL' }]),
+      'start a run',
+    );
 
     expect(calls).toHaveLength(1);
     expect(calls[0].method).toBe('POST');

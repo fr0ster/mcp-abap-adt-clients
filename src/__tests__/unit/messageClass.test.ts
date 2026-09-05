@@ -2,8 +2,10 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
+import { parseMessageClass } from '../../core/messageClass';
 import { AdtMessageClass } from '../../core/messageClass/AdtMessageClass';
 import { noopLogger } from '../../utils/noopLogger';
+import { expectFailure, expectResult } from '../helpers/contract';
 
 const CLASS_XML = `<?xml version="1.0"?><mc:messageClass xmlns:mc="http://www.sap.com/adt/MessageClass" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZT" adtcore:type="MSAG/N" adtcore:description="D"><adtcore:packageRef adtcore:name="ZP"/></mc:messageClass>`;
 const CLASS_XML_WITH_MSG = `<?xml version="1.0"?><mc:messageClass xmlns:mc="http://www.sap.com/adt/MessageClass" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZT" adtcore:type="MSAG/N" adtcore:description="OLD"><adtcore:packageRef adtcore:name="ZP"/><mc:messages mc:msgno="001" mc:msgtext="Hello"/></mc:messageClass>`;
@@ -211,8 +213,10 @@ describe('AdtMessageClass', () => {
       ),
       noopLogger,
     );
-    const st = await mc.read({ name: 'ZT' });
-    expect(st?.messageClass?.name).toBe('ZT');
+    // The document, as it arrived. `parseMessageClass` is the reading beside
+    // it — the member answers the class, not a shape chosen for the caller.
+    const document = expectResult(await mc.read({ name: 'ZT' }), 'read');
+    expect(parseMessageClass(String(document)).name).toBe('ZT');
   });
 
   it('carries no method for what a message class cannot do', () => {
@@ -346,9 +350,12 @@ describe('AdtMessageClass', () => {
     });
 
     const mc = new AdtMessageClass(c, noopLogger);
-    await expect(mc.update({ name: 'ZT', description: 'NEW' })).rejects.toThrow(
-      'PUT failed',
-    );
+    expect(
+      expectFailure(
+        await mc.update({ name: 'ZT', description: 'NEW' }),
+        'update whose PUT the server refused',
+      ).message,
+    ).toContain('PUT failed');
 
     // UNLOCK must still have been called (call index 3)
     expect(calls).toHaveLength(4);

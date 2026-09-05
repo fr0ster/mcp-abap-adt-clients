@@ -95,7 +95,7 @@ These types throw an error with the exact missing endpoint when the getter is ca
 |-------------|--------|------|
 | CDS Unit Test | `getCdsUnitTest()` | `/sap/bc/adt/abapunit/testruns` IS present on legacy — not blocked |
 | Unit Test | `getUnitTest()` | Same endpoint — works |
-| Transport Request | `getRequest()` | Uses `/sap/bc/cts/` — `create()`/`read()`/`list()` work; `listNodes()` throws (the `/sap/bc/cts/transportrequests` payload has never been captured) |
+| Transport Request | `getRequest()` | Uses `/sap/bc/cts/` — `read()`/`list()` work, `create()`/`update()`/`delete()` answer a refusal; `list()`'s payload has never been captured, so the shipped reading may not recognise it and will say so — inject your own |
 
 ## Shared Utilities (AdtUtils) Support
 
@@ -103,7 +103,7 @@ These types throw an error with the exact missing endpoint when the getter is ca
 
 | Utility | Method | Endpoint |
 |---------|--------|----------|
-| Search objects | `searchObjects()` | `/sap/bc/adt/repository/informationsystem/search` |
+| Search objects | `search()` | `/sap/bc/adt/repository/informationsystem/search` |
 | Node structure | `fetchNodeStructure()` | `/sap/bc/adt/repository/nodestructure` |
 | Package hierarchy | `getPackageHierarchy()` | (uses nodeStructure) |
 | Package contents | `getPackageContentsList()` | (uses nodeStructure) |

@@ -19,9 +19,9 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type { IFeatureToggleObject } from '../../../../core/featureToggle';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -429,13 +429,13 @@ describe('FeatureToggle (using AdtClient)', () => {
           );
           return;
         }
-        const handler: IFeatureToggleObject = client.getFeatureToggle();
-        const state = await handler.getRuntimeState({ featureToggleName });
-        expect(state.runtimeState).toBeDefined();
-        expect(state.runtimeState?.name).toBe(featureToggleName.toUpperCase());
-        expect(['on', 'off', 'undefined']).toContain(
-          state.runtimeState?.clientState,
+        const handler = client.getFeatureToggle();
+        const state = expectResult(
+          await handler.getRuntimeState({ featureToggleName }),
+          'getRuntimeState',
         );
+        expect(state.name).toBe(featureToggleName.toUpperCase());
+        expect(['on', 'off', 'undefined']).toContain(state.clientState);
       },
       getTimeout('test'),
     );
@@ -451,12 +451,12 @@ describe('FeatureToggle (using AdtClient)', () => {
           );
           return;
         }
-        const handler: IFeatureToggleObject = client.getFeatureToggle();
-        const state = await handler.checkState({ featureToggleName });
-        expect(state.checkStateResult).toBeDefined();
-        expect(typeof state.checkStateResult?.customizingTransportAllowed).toBe(
-          'boolean',
+        const handler = client.getFeatureToggle();
+        const state = expectResult(
+          await handler.checkState({ featureToggleName }),
+          'checkState',
         );
+        expect(typeof state.customizingTransportAllowed).toBe('boolean');
       },
       getTimeout('test'),
     );
@@ -472,10 +472,15 @@ describe('FeatureToggle (using AdtClient)', () => {
           );
           return;
         }
-        const handler: IFeatureToggleObject = client.getFeatureToggle();
-        const state = await handler.readSource({ featureToggleName });
-        expect(state.readResult).toBeDefined();
-        expect(state.sourceResult).toBeDefined();
+        const handler = client.getFeatureToggle();
+        // The source document, as it arrived. A caller who wants
+        // `IFeatureToggleSource` parsed out of it supplies a strategy that does
+        // it — this member does not decide that for everyone.
+        const source = expectResult(
+          await handler.readSource({ featureToggleName }),
+          'readSource',
+        );
+        expect(typeof source).toBe('string');
       },
       getTimeout('test'),
     );
@@ -498,23 +503,22 @@ describe('FeatureToggle (using AdtClient)', () => {
         const transportRequest = resolveTransportRequest(
           testCase?.params?.transport_request,
         );
-        const handler: IFeatureToggleObject = client.getFeatureToggle();
-        const onState = await handler.switchOn(
-          { featureToggleName },
-          { transportRequest },
+        const handler = client.getFeatureToggle();
+        const onState = expectResult(
+          await handler.switchOn({ featureToggleName }, { transportRequest }),
+          'onState',
         );
         expect(
-          onState.runtimeState?.clientState === 'on' ||
-            onState.runtimeState?.clientState === 'undefined',
+          onState?.clientState === 'on' || onState?.clientState === 'undefined',
         ).toBe(true);
 
-        const offState = await handler.switchOff(
-          { featureToggleName },
-          { transportRequest },
+        const offState = expectResult(
+          await handler.switchOff({ featureToggleName }, { transportRequest }),
+          'offState',
         );
         expect(
-          offState.runtimeState?.clientState === 'off' ||
-            offState.runtimeState?.clientState === 'undefined',
+          offState?.clientState === 'off' ||
+            offState?.clientState === 'undefined',
         ).toBe(true);
       },
       getTimeout('test'),

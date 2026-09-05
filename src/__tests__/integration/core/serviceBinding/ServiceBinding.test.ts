@@ -16,12 +16,11 @@ import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import { XMLParser } from 'fast-xml-parser';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type {
-  IServiceBindingConfig,
-  IServiceBindingState,
-} from '../../../../core/service';
+import type { IServiceBindingConfig } from '../../../../core/service';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { expectResult } from '../../../helpers/contract';
+import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -70,7 +69,7 @@ describe('ServiceBinding (using AdtClient)', () => {
   let hasConfig = false;
   let isCloudSystem = false;
   let isLegacy = false;
-  let tester: BaseTester<IServiceBindingConfig, IServiceBindingState>;
+  let tester: BaseTester<IServiceBindingConfig>;
 
   beforeAll(async () => {
     try {
@@ -139,15 +138,27 @@ describe('ServiceBinding (using AdtClient)', () => {
           }
 
           try {
-            const existingActive = await client
-              .getServiceBinding()
-              .read({ bindingName }, 'active');
-            const existingInactive = await client
-              .getServiceBinding()
-              .read({ bindingName }, 'inactive');
-            const hasExisting =
-              !!existingActive?.readResult || !!existingInactive?.readResult;
-            if (!hasExisting) {
+            // `!!value` on an unwrapped answer was always true, and
+            // `expectResult` failed the whole setup for a binding that simply
+            // is not there — which is the state this flow wants. The answer
+            // decides, on either version.
+            const active = presenceOf(
+              await client.getServiceBinding().read({ bindingName }, 'active'),
+              `service binding ${bindingName} (active)`,
+            );
+            const inactive = presenceOf(
+              await client
+                .getServiceBinding()
+                .read({ bindingName }, 'inactive'),
+              `service binding ${bindingName} (inactive)`,
+            );
+            if (active.present === 'unknown') {
+              return { success: false, reason: `⚠️ ${active.reason}` };
+            }
+            if (inactive.present === 'unknown') {
+              return { success: false, reason: `⚠️ ${inactive.reason}` };
+            }
+            if (!(active.present || inactive.present)) {
               return { success: true };
             }
 
@@ -160,7 +171,7 @@ describe('ServiceBinding (using AdtClient)', () => {
               params.service_name || params.service_definition_name;
             const serviceVersion = params.service_version || '0001';
 
-            if (existingActive?.readResult) {
+            if (active.present === true) {
               try {
                 await client.getServiceBinding().update({
                   bindingName,
@@ -225,10 +236,11 @@ describe('ServiceBinding (using AdtClient)', () => {
     let parentResponsible = params.responsible;
 
     try {
-      const parentState = await client
-        .getPackage()
-        .readMetadata({ packageName: parentPackage });
-      const raw = parentState?.metadataResult?.data;
+      const parentState = expectResult(
+        await client.getPackage().readMetadata({ packageName: parentPackage }),
+        'parentState',
+      );
+      const raw = parentState;
       if (typeof raw === 'string') {
         const parsed = xmlParser.parse(raw) as Record<string, any>;
         const pkg = parsed?.['pak:package'] ?? parsed?.package ?? {};
@@ -275,10 +287,11 @@ describe('ServiceBinding (using AdtClient)', () => {
       );
     }
 
-    const existing = await client
-      .getPackage()
-      .read({ packageName: testSubpackage });
-    if (existing) {
+    const existing = presenceOf(
+      await client.getPackage().read({ packageName: testSubpackage }),
+      `package ${testSubpackage}`,
+    );
+    if (existing.present === true) {
       return testSubpackage;
     }
 
@@ -293,7 +306,9 @@ describe('ServiceBinding (using AdtClient)', () => {
             'active',
             i > 0 ? { withLongPolling: true } : undefined,
           );
-        if (state) {
+        // `state.ok`, not `state`: an answer is an object either way, so this
+        // returned true on the first pass and waited for nothing.
+        if (state.ok) {
           return true;
         }
         await wait(1000);
@@ -357,7 +372,13 @@ describe('ServiceBinding (using AdtClient)', () => {
         const testCase = tester.getTestCaseDefinition();
         const params = testCase?.params || {};
         const testSubpackage = await ensureTestSubpackage(params);
-        const updatePublicationState = 'published';
+        // From the config, not a constant. This read `'published'` outright,
+        // so `desired_publication_state` in test-config.yaml was decoration:
+        // the flow published every run whatever the file said, and then could
+        // not delete what it had published. Publishing is ~130s of server time
+        // and belongs in a case somebody turns on deliberately.
+        const updatePublicationState =
+          params.desired_publication_state || 'unchanged';
         const updateDetails = `serviceType=${config.serviceType}, serviceName=${config.serviceName}, serviceVersion=${config.serviceVersion}`;
         logTestStep(
           `update publication state: ${updatePublicationState} :: ${updateDetails}`,
@@ -425,7 +446,7 @@ describe('ServiceBinding (using AdtClient)', () => {
             );
             return;
           }
-          expect(resultState?.readResult).toBeDefined();
+          expect(resultState).toBeDefined();
 
           logTestSuccess(testsLogger, 'ServiceBinding - read standard object');
         } catch (error) {

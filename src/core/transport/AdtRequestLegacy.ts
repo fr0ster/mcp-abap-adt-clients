@@ -1,172 +1,153 @@
 /**
- * AdtRequestLegacy - Transport request handler for legacy SAP systems (BASIS < 7.50)
+ * AdtRequestLegacy - Transport request handler for legacy SAP systems
+ * (BASIS < 7.50).
  *
- * Legacy systems use /sap/bc/cts/ instead of /sap/bc/adt/cts/ for transport endpoints.
+ * Legacy systems use `/sap/bc/cts/` instead of `/sap/bc/adt/cts/`.
  *
- * Supported operations:
- * - read: GET /sap/bc/cts/transportrequests (returns full list, filtered client-side)
- * - list: GET /sap/bc/cts/transportrequests (no saved-configuration search; configUri rejected)
+ * Supported:
+ * - `read`: GET /sap/bc/cts/transportrequests (the full list, filtered here)
+ * - `list`: the same resource; not a saved-configuration search, so no configUri
  *
- * Unsupported operations:
- * - create: Legacy CTS REST API does not support creating transport requests.
- *   The endpoint rejects all POST payloads — no useraction value is accepted.
- *   Use SE01/SE09/SE10 transaction to create transports on legacy systems.
- * - update, delete: Whether the legacy endpoint supports changing a description
- *   or deleting a request has never been captured. Both are refused rather than
- *   guessed against the modern `/sap/bc/adt/cts/transportrequests/<NR>` shape.
+ * Refused, each with the same reason: the legacy endpoint's shape for that
+ * operation has never been captured, and inventing a payload for an uncaptured
+ * endpoint is exactly the guessing this design exists to stop. They answer the
+ * refusal rather than throwing it — a consumer that supports both kinds of
+ * system will call them, and that is a normal case, not an exception.
  */
 
 import type {
-  HttpError,
   IAbapConnection,
-  IAdtOperationOptions,
+  IAdtError,
+  IAdtResponse,
   IAdtSystemContext,
   IListTransportsOptions,
   ILogger,
+  IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
+import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
+import { answering, failed, type IAdtOptions } from '../../utils/adtResponse';
 import { AdtRequest } from './AdtRequest';
 import { getTransportLegacy, listTransportsLegacy } from './readLegacy';
-import type { ITransportConfig, ITransportState } from './types';
+import type { ITransportConfig, ITransportResults } from './types';
 
-export class AdtRequestLegacy extends AdtRequest {
+const unsupported = (what: string, why: string): IAdtError => ({
+  origin: 'refusal',
+  code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION,
+  message:
+    `${what} is not supported on legacy SAP systems (BASIS < 7.50). ${why} ` +
+    'Use SE01/SE09/SE10 to manage transports there.',
+});
+
+export class AdtRequestLegacy<
+  R extends ITransportResults<
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown
+  > = ITransportResults,
+> extends AdtRequest<R> {
   private readonly conn: IAbapConnection;
 
   constructor(
     connection: IAbapConnection,
     logger?: ILogger,
     systemContext?: IAdtSystemContext,
+    results?: R,
   ) {
-    super(connection, logger, systemContext);
+    super(connection, logger, systemContext, results);
     this.conn = connection;
   }
 
   /**
-   * Create transport request — NOT supported on legacy systems.
-   *
-   * Legacy CTS endpoint (/sap/bc/cts/transportrequests) does not support
-   * creating transport requests via REST API. The endpoint rejects all
-   * POST payloads with "user action is not supported".
+   * Refused: the legacy CTS endpoint rejects every POST payload with "user
+   * action is not supported" — no useraction value is accepted.
    */
-  override async create(
-    _config: ITransportConfig,
-    _options?: IAdtOperationOptions,
-  ): Promise<ITransportState> {
-    throw new Error(
-      'Creating transport requests is not supported on legacy SAP systems (BASIS < 7.50). ' +
-        'The /sap/bc/cts/transportrequests endpoint does not support create operations. ' +
-        'Use SE01/SE09/SE10 transaction to create transports.',
+  override async create<E extends IAdtError = IAdtError>(): Promise<
+    IAdtResponse<ReturnType<R['created']>, E>
+  > {
+    return failed<ReturnType<R['created']>, E>(
+      unsupported(
+        'Creating transport requests',
+        'The /sap/bc/cts/transportrequests endpoint rejects every create payload.',
+      ) as E,
     );
   }
 
   /**
-   * Read transport request (legacy path).
+   * Read one request from the legacy list.
    *
-   * GET /sap/bc/cts/transportrequests returns the full transport list
-   * for the current user. The response is filtered client-side.
+   * `/sap/bc/cts/transportrequests` answers the full list for the current user;
+   * the one asked for is picked out of it here.
    */
-  override async read(
+  override async read<E extends IAdtError = IAdtError>(
     config: Partial<ITransportConfig>,
     _version?: 'active' | 'inactive',
-  ): Promise<ITransportState | undefined> {
+    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['read']>, E>> {
     if (!config.transportNumber) {
       throw new Error('Transport request number is required');
     }
+    const number = config.transportNumber;
 
-    try {
-      const response = await getTransportLegacy(
-        this.conn,
-        config.transportNumber,
-      );
-
-      return {
-        transportNumber: config.transportNumber,
-        readResult: response,
-        errors: [],
-      };
-    } catch (error: unknown) {
-      const e = error as HttpError;
-      if (e.response?.status === 404) {
-        return undefined;
-      }
-      throw error;
-    }
+    return answering(
+      () => getTransportLegacy(this.conn, number),
+      this.results.read as IResultStrategy<ReturnType<R['read']>>,
+    );
   }
 
   /**
-   * List transport requests (legacy path).
+   * List the current user's requests.
    *
-   * `/sap/bc/cts/transportrequests` returns the full list for the current user.
-   * It is not a saved-configuration search, so there is no configUri to pass —
-   * and accepting one silently would report a filter that never applied.
+   * Not a saved-configuration search, so there is no configUri to pass — and
+   * accepting one silently would report a filter that never applied.
+   *
+   * The reading is the one the implementation was built with, like every other
+   * member. The legacy payload has never been captured, so the shipped
+   * `parseTransportTree` may well not read it — and if so it says which element
+   * it expected and what it found, which is a consumer's cue to inject a
+   * reading for their system. Handing the document back under a type that
+   * promises a tree would be this implementation lying about what it answered.
    */
   override async list(
     options?: IListTransportsOptions,
-  ): Promise<ITransportState> {
+  ): Promise<IAdtResponse<ReturnType<R['list']>>> {
     if (options?.configUri) {
-      throw new Error(
-        'configUri is not supported on legacy SAP systems: ' +
-          '/sap/bc/cts/transportrequests is not a saved-configuration search and ' +
-          'always returns the full list for the current user.',
+      return failed(
+        unsupported(
+          'configUri',
+          '/sap/bc/cts/transportrequests is not a saved-configuration search and always returns the full list for the current user.',
+        ),
       );
     }
 
-    const response = await listTransportsLegacy(this.conn);
-    return { listResult: response, errors: [] };
-  }
-
-  /**
-   * Not supported on legacy systems.
-   *
-   * `/sap/bc/cts/transportrequests` has never been captured, and assuming the
-   * modern parser fits it would be exactly the guess this design exists to
-   * stop. Supported once someone captures a legacy payload.
-   */
-  override async listNodes(): Promise<never> {
-    throw new Error(
-      'listNodes() is not supported on legacy SAP systems: the payload of ' +
-        '/sap/bc/cts/transportrequests has never been captured, so no parser can ' +
-        'honestly claim to read it. Use list() and parse the response yourself.',
+    return answering(
+      () => listTransportsLegacy(this.conn),
+      this.results.list as IResultStrategy<ReturnType<R['list']>>,
     );
   }
 
-  /**
-   * Update transport request description — NOT supported on legacy systems.
-   *
-   * `AdtRequest.update()` targets the modern `/sap/bc/adt/cts/transportrequests/<NR>`
-   * endpoint, which legacy systems (BASIS < 7.50) do not have. Whether the legacy
-   * `/sap/bc/cts/transportrequests` resource supports changing a description at all
-   * — and if so, in what shape — has never been captured. Inventing a payload for
-   * an uncaptured endpoint is exactly the guessing this design exists to stop.
-   */
-  override async update(
-    _config: Partial<ITransportConfig>,
-    _options?: IAdtOperationOptions,
-  ): Promise<ITransportState> {
-    throw new Error(
-      'Updating transport requests is not supported on legacy SAP systems (BASIS < 7.50). ' +
-        'The legacy /sap/bc/cts/transportrequests endpoint has never been captured, so ' +
-        'whether or how it supports changing a description is unknown. ' +
-        'Use SE01/SE09/SE10 transaction to update transports.',
+  /** Refused: the legacy endpoint's update shape has never been captured. */
+  override async update<E extends IAdtError = IAdtError>(): Promise<
+    IAdtResponse<ReturnType<R['updated']>, E>
+  > {
+    return failed<ReturnType<R['updated']>, E>(
+      unsupported(
+        'Updating transport requests',
+        'The legacy /sap/bc/cts/transportrequests endpoint has never been captured, so whether or how it supports changing a description is unknown.',
+      ) as E,
     );
   }
 
-  /**
-   * Delete transport request — NOT supported on legacy systems.
-   *
-   * `AdtRequest.delete()` targets the modern `/sap/bc/adt/cts/transportrequests/<NR>`
-   * endpoint, which legacy systems (BASIS < 7.50) do not have. Whether the legacy
-   * `/sap/bc/cts/transportrequests` resource supports deleting a request at all has
-   * never been captured. Inventing a payload for an uncaptured endpoint is exactly
-   * the guessing this design exists to stop.
-   */
-  override async delete(
-    _config: Partial<ITransportConfig>,
-  ): Promise<ITransportState> {
-    throw new Error(
-      'Deleting transport requests is not supported on legacy SAP systems (BASIS < 7.50). ' +
-        'The legacy /sap/bc/cts/transportrequests endpoint has never been captured, so ' +
-        'whether it supports deleting a request is unknown. ' +
-        'Use SE01/SE09/SE10 transaction to delete transports.',
+  /** Refused: the legacy endpoint's delete shape has never been captured. */
+  override async delete<E extends IAdtError = IAdtError>(): Promise<
+    IAdtResponse<ReturnType<R['deleted']>, E>
+  > {
+    return failed<ReturnType<R['deleted']>, E>(
+      unsupported(
+        'Deleting transport requests',
+        'The legacy /sap/bc/cts/transportrequests endpoint has never been captured, so whether it supports deleting a request is unknown.',
+      ) as E,
     );
   }
 }

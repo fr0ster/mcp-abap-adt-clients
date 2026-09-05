@@ -5,7 +5,6 @@
  * - getProfiler() — Profiler traces
  * - getCrossTrace() — Cross trace analysis
  * - getSt05Trace() — ST05 performance traces
- * - getDebugger() — Composite debugger (ABAP, AMDP, memory snapshots)
  * - getApplicationLog() — Application log analysis
  * - getAtc() — ATC check runs: start one, poll it, read the worklist
  * - getAtcLog() — ATC check failure and execution logs
@@ -26,8 +25,6 @@
  * const traceParams = await client.getProfiler().getParameters();
  *
  * // Debugging
- * await client.getDebugger().getAbap().launch({ debuggingMode: 'external' });
- * const callStack = await client.getDebugger().getAbap().getCallStack();
  *
  * // Logs
  * const appLog = await client.getApplicationLog().getObject('Z_MY_LOG');
@@ -38,32 +35,11 @@
  * ```
  */
 
-import type {
-  IAbapConnection,
-  IAdtRunnable,
-  IApplicationLog,
-  IAtcFindings,
-  IAtcLog,
-  IAtcRunOptions,
-  IAtcRunResult,
-  IAtcRunStatusReadable,
-  IAtcRunTarget,
-  ICrossTrace,
-  IDdicActivation,
-  IDebugger,
-  IFeedRepository,
-  IGatewayErrorLog,
-  ILogger,
-  IProfiler,
-  IRuntimeDumps,
-  ISt05Trace,
-  ISystemMessages,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import { ApplicationLog } from '../runtime/applicationLog/ApplicationLog';
 import { AdtAtc } from '../runtime/atc/AdtAtc';
 import { AtcLog } from '../runtime/atc/AtcLog';
 import { DdicActivation } from '../runtime/ddic/DdicActivation';
-import { Debugger } from '../runtime/debugger/Debugger';
 import { RuntimeDumps } from '../runtime/dumps/RuntimeDumps';
 import { FeedRepository } from '../runtime/feeds/FeedRepository';
 import { GatewayErrorLog } from '../runtime/gatewayErrorLog/GatewayErrorLog';
@@ -80,7 +56,6 @@ export class AdtRuntimeClient {
   private _profiler?: Profiler;
   private _crossTrace?: CrossTrace;
   private _st05Trace?: St05Trace;
-  private _debugger?: Debugger;
   private _applicationLog?: ApplicationLog;
   private _atc?: AdtAtc;
   private _atcLog?: AtcLog;
@@ -132,35 +107,28 @@ export class AdtRuntimeClient {
   // Domain Object Factories
   // ============================================================================
 
-  getProfiler(): IProfiler {
+  getProfiler(): Profiler {
     if (!this._profiler) {
       this._profiler = new Profiler(this.connection, this.logger);
     }
     return this._profiler;
   }
 
-  getCrossTrace(): ICrossTrace {
+  getCrossTrace(): CrossTrace {
     if (!this._crossTrace) {
       this._crossTrace = new CrossTrace(this.connection, this.logger);
     }
     return this._crossTrace;
   }
 
-  getSt05Trace(): ISt05Trace {
+  getSt05Trace(): St05Trace {
     if (!this._st05Trace) {
       this._st05Trace = new St05Trace(this.connection, this.logger);
     }
     return this._st05Trace;
   }
 
-  getDebugger(): IDebugger {
-    if (!this._debugger) {
-      this._debugger = new Debugger(this.connection, this.logger);
-    }
-    return this._debugger;
-  }
-
-  getApplicationLog(): IApplicationLog {
+  getApplicationLog(): ApplicationLog {
     if (!this._applicationLog) {
       this._applicationLog = new ApplicationLog(this.connection, this.logger);
     }
@@ -173,30 +141,28 @@ export class AdtRuntimeClient {
    * The intersection is spelled here rather than given a name: one getter has
    * this set, and a composite earns a name when more than one handler does.
    */
-  getAtc(): IAdtRunnable<IAtcRunTarget, IAtcRunResult, IAtcRunOptions> &
-    IAtcRunStatusReadable &
-    IAtcFindings {
+  getAtc(): AdtAtc {
     if (!this._atc) {
       this._atc = new AdtAtc(this.connection, this.logger);
     }
     return this._atc;
   }
 
-  getAtcLog(): IAtcLog {
+  getAtcLog(): AtcLog {
     if (!this._atcLog) {
       this._atcLog = new AtcLog(this.connection, this.logger);
     }
     return this._atcLog;
   }
 
-  getDdicActivation(): IDdicActivation {
+  getDdicActivation(): DdicActivation {
     if (!this._ddicActivation) {
       this._ddicActivation = new DdicActivation(this.connection, this.logger);
     }
     return this._ddicActivation;
   }
 
-  getDumps(): IRuntimeDumps {
+  getDumps(): RuntimeDumps {
     if (!this._dumps) {
       this._dumps = new RuntimeDumps(this.connection, this.logger);
     }
@@ -207,21 +173,21 @@ export class AdtRuntimeClient {
   // Feed, SystemMessages, GatewayErrorLog Factories
   // ============================================================================
 
-  getFeeds(): IFeedRepository {
+  getFeeds(): FeedRepository {
     if (!this._feeds) {
       this._feeds = new FeedRepository(this.connection, this.logger);
     }
     return this._feeds;
   }
 
-  getSystemMessages(): ISystemMessages {
+  getSystemMessages(): SystemMessages {
     if (!this._systemMessages) {
       this._systemMessages = new SystemMessages(this.connection, this.logger);
     }
     return this._systemMessages;
   }
 
-  getGatewayErrorLog(): IGatewayErrorLog {
+  getGatewayErrorLog(): GatewayErrorLog {
     if (!this._gatewayErrorLog) {
       this._gatewayErrorLog = new GatewayErrorLog(this.connection, this.logger);
     }

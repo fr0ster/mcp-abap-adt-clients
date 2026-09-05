@@ -5,6 +5,7 @@ import type {
 import { AdtClass } from '../../core/class/AdtClass';
 import { AdtLocalTypes } from '../../core/class/AdtLocalTypes';
 import { getClassIncludeVersions } from '../../core/class/versions';
+import { expectResult } from '../helpers/contract';
 
 const FEED = `<?xml version="1.0"?><atom:feed xmlns:atom="http://www.w3.org/2005/Atom"><atom:title>Version List of ZCL (CLAS)</atom:title><atom:entry><atom:content type="text/plain" src="/sap/bc/adt/oo/classes/zcl/includes/main/versions/1/00000/content"/><atom:id>00000</atom:id></atom:entry></atom:feed>`;
 
@@ -23,7 +24,10 @@ describe('getClassIncludeVersions', () => {
       return { data: FEED, status: 200, headers: {} } as IAdtWireResponse;
     });
     const cls = new AdtClass(c);
-    const list = await cls.getVersions({ className: 'ZCL' });
+    const list = expectResult(
+      await cls.getVersions({ className: 'ZCL' }),
+      'versions',
+    );
     expect(seen.url).toBe('/sap/bc/adt/oo/classes/ZCL/includes/main/versions');
     expect(seen.headers.Accept).toContain('application/atom+xml;type=feed');
     expect(list).toHaveLength(1);

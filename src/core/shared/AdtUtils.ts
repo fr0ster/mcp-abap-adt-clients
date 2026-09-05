@@ -76,27 +76,29 @@ import type {
   IAbapConnection,
   IAdtDataPreview,
   IAdtDiscovery,
+  IAdtError,
   IAdtGroupLifecycle,
   IAdtInformationSystem,
   IAdtObjectAccess,
+  IAdtOperationOptions,
   IAdtPackageBrowsing,
   IAdtRepositoryStructure,
   IAdtResponse,
-  IAdtResult,
-  IAdtSearchable,
   IAdtWireResponse,
   ILogger,
-  INamedItem,
-  IRepositoryNodeContents,
-  ISearchResult,
+  IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
-import { throwIfSapError } from '../../utils/adtErrors';
-import { answering, answeringWith } from '../../utils/adtResponse';
+import {
+  answering,
+  answeringValue,
+  type IAdtOptions,
+} from '../../utils/adtResponse';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { withRefusalDetection } from '../../utils/refusalAware';
+import { rawDocument } from '../../utils/resultStrategy';
 import { getTimeout } from '../../utils/timeouts';
-import { getAllTypes as getAllTypesUtil, parseNamedItems } from './allTypes';
+import { getAllTypes as getAllTypesUtil } from './allTypes';
 import { getDiscovery as getDiscoveryUtil } from './discovery';
 import { listFunctionGroupIncludes } from './functionGroupIncludesList';
 import { listFunctionModules } from './functionModulesList';
@@ -105,19 +107,17 @@ import { activateObjectsGroup } from './groupActivation';
 import { checkDeletionGroup, deleteObjectsGroup } from './groupDeletion';
 import { getInclude as getIncludeUtil } from './include';
 import { getIncludesList } from './includesList';
-import {
-  fetchNodeStructure as fetchNodeStructureUtil,
-  toNodeContents,
-} from './nodeStructure';
+import { fetchNodeStructure as fetchNodeStructureUtil } from './nodeStructure';
 import { getObjectStructure as getObjectStructureUtil } from './objectStructure';
 import { getPackageContentsList } from './packageContentsList';
 import { getPackageHierarchy } from './packageHierarchy';
 // Import utility functions
-import { searchObjects, searchObjectsTyped } from './search';
+import { searchObjects } from './search';
 import { getSqlQuery } from './sqlQuery';
 import { getTableContents } from './tableContents';
 import { getVirtualFoldersContents } from './virtualFolders';
 import {
+  assertWhereUsedTarget,
   getWhereUsed,
   getWhereUsedList,
   getWhereUsedScope,
@@ -144,12 +144,13 @@ import {
   ACCEPT_TABLE_TYPE,
   CT_VIEW,
 } from '../../constants/contentTypes';
-// Import types
 import type {
   AdtObjectType,
   AdtSourceObjectType,
   IGetDiscoveryParams,
+  IGetNodeContentsOptions,
   IGetPackageContentsListOptions,
+  IGetPackageContentsOptions,
   IGetPackageHierarchyOptions,
   IGetSqlQueryParams,
   IGetTableContentsParams,
@@ -165,6 +166,8 @@ import type {
   ISearchObjectsParams,
   IWhereUsedListResult,
 } from './types';
+// Import types
+import { type IUtilResults, utilDocuments } from './utilResultSet';
 
 /**
  * Declared against every atom, not only `IAdtSearchable`.
@@ -190,12 +193,17 @@ import type {
  * decision 16: one endpoint is one member, and a caller who needs the raw
  * document passes a parser to the one that has a contract.
  */
-export class AdtUtils
-  implements
-    IAdtInformationSystem,
-    IAdtRepositoryStructure,
-    IAdtPackageBrowsing,
-    IAdtGroupLifecycle,
+export class AdtUtils<
+  R extends IUtilResults<unknown, unknown, unknown> = IUtilResults,
+> implements
+    IAdtInformationSystem<
+      ReturnType<R['search']>,
+      IWhereUsedListResult,
+      ReturnType<R['types']>
+    >,
+    IAdtRepositoryStructure<ReturnType<R['node']>>,
+    IAdtPackageBrowsing<IPackageContentItem[]>,
+    IAdtGroupLifecycle<IInactiveObjectsResponse>,
     IAdtDataPreview,
     IAdtDiscovery,
     IAdtObjectAccess
@@ -203,7 +211,12 @@ export class AdtUtils
   protected connection: IAbapConnection;
   private logger: ILogger;
 
-  constructor(connection: IAbapConnection, logger: ILogger) {
+  constructor(
+    connection: IAbapConnection,
+    logger: ILogger,
+    // The one cast in this file, and it is on the default. See AdtClass.
+    private readonly results: R = utilDocuments as unknown as R,
+  ) {
     // Wrapped once, here, where a connection enters the library. A refusal SAP
     // sends with a 2xx would otherwise be stored as a result and reported as
     // success — see src/utils/refusalAware.ts for what that measured.
@@ -212,65 +225,26 @@ export class AdtUtils
   }
 
   /**
-   * Search for ABAP objects by name pattern
+   * Objects matching a query.
    *
-   * @param params - Search parameters
-   * @returns Search results
+   * One member over one endpoint. `searchObjects` sat beside it until 31.0.0
+   * issuing the identical request and handing back the envelope, and `search`
+   * itself took a `parse` argument — so "how far the answer was parsed" was a
+   * property of which method you called and what you passed it, rather than of
+   * the implementation you were given.
+   *
+   * The hits are the default because they are what a caller does something
+   * with: a recorded hit list runs to 473 rows and 1.3MB. A consumer who wants
+   * the document passes `rawDocument` for `search` when constructing this.
    */
-  async searchObjects(
-    params: ISearchObjectsParams,
-  ): Promise<IAdtResponse<IAdtResult<IAdtWireResponse>>> {
-    return answering(() => searchObjects(this.connection, params));
-  }
-
-  /**
-   * Locate objects by name pattern — the IAdtSearchable capability.
-   *
-   * One endpoint, one member. `searchObjects` above issues the same request and
-   * hands back the envelope; it survives here for callers on the old signature
-   * and is not in `IAdtInformationSystem`, because a second member over one
-   * resource makes "how far the answer was parsed" a property of which method
-   * was called rather than of the contract.
-   *
-   * A caller who needs the document rather than the hits passes a parser. That
-   * is the same request and the same work — only the reading is theirs, which is
-   * what a strategy is for.
-   */
-  async search(
+  async search<E extends IAdtError = IAdtError>(
     criteria: ISearchObjectsParams,
-  ): Promise<IAdtResponse<IAdtResult<ISearchResult[]>>>;
-  async search<T>(
-    criteria: ISearchObjectsParams,
-    parse: (data: unknown) => T,
-  ): Promise<IAdtResponse<IAdtResult<T>>>;
-  async search<T>(
-    criteria: ISearchObjectsParams,
-    parse?: (data: unknown) => T,
-  ): Promise<IAdtResponse<IAdtResult<ISearchResult[] | T>>> {
-    if (!parse) {
-      return answering<ISearchResult[] | T>(() =>
-        searchObjectsTyped(this.connection, criteria),
-      );
-    }
-
-    return answeringWith<unknown, ISearchResult[] | T>(
-      async () => {
-        const response = await searchObjects(this.connection, criteria);
-
-        // A strategy exists so the caller can control how much of a large answer
-        // they take. It is not a place a refusal can hide: a parser looking for
-        // hits in an exception document finds none and reports emptiness. So the
-        // refusal is recognised before the parser runs, and comes back as the
-        // failure half rather than flying past.
-        throwIfSapError(String(response.data ?? ''));
-
-        // Nothing here forms a second opinion about the document — the raw body
-        // goes over untouched rather than parsed and re-emitted.
-        return response.data;
-      },
-      // Theirs, and outside the classification: a bug in this parser is not a
-      // connection failure, and must not be reported as one.
-      (data) => parse(data),
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['search']>, E>> {
+    return answering(
+      () => searchObjects(this.connection, criteria),
+      this.results.search as IResultStrategy<ReturnType<R['search']>>,
+      options?.analyse,
     );
   }
 
@@ -282,8 +256,11 @@ export class AdtUtils
    */
   async getVirtualFoldersContents(
     params: IGetVirtualFoldersContentsParams,
-  ): Promise<IAdtResponse<IAdtResult<IAdtWireResponse>>> {
-    return answering(() => getVirtualFoldersContents(this.connection, params));
+  ): Promise<IAdtResponse<string>> {
+    return answering(
+      () => getVirtualFoldersContents(this.connection, params),
+      rawDocument,
+    );
   }
 
   /**
@@ -320,8 +297,16 @@ export class AdtUtils
    */
   async getWhereUsedScope(
     params: IGetWhereUsedScopeParams,
-  ): Promise<IAdtResponse<IAdtResult<IAdtWireResponse>>> {
-    return answering(() => getWhereUsedScope(this.connection, params));
+  ): Promise<IAdtResponse<string>> {
+    // Before `answering`, not inside the request: a missing name is the
+    // caller's mistake, and classified inside it comes back as
+    // `origin: 'connection'` — advice to check a network nothing reached.
+    assertWhereUsedTarget(params);
+
+    return answering(
+      () => getWhereUsedScope(this.connection, params),
+      rawDocument,
+    );
   }
 
   /**
@@ -401,8 +386,10 @@ export class AdtUtils
    */
   async getWhereUsed(
     params: IGetWhereUsedParams,
-  ): Promise<IAdtResponse<IAdtResult<IAdtWireResponse>>> {
-    return answering(() => getWhereUsed(this.connection, params));
+  ): Promise<IAdtResponse<string>> {
+    assertWhereUsedTarget(params);
+
+    return answering(() => getWhereUsed(this.connection, params), rawDocument);
   }
 
   /**
@@ -430,8 +417,10 @@ export class AdtUtils
    */
   async getWhereUsedList(
     params: IGetWhereUsedListParams,
-  ): Promise<IAdtResponse<IAdtResult<IWhereUsedListResult>>> {
-    return answering(() => getWhereUsedList(this.connection, params));
+  ): Promise<IAdtResponse<IWhereUsedListResult>> {
+    assertWhereUsedTarget(params);
+
+    return answeringValue(() => getWhereUsedList(this.connection, params));
   }
 
   /**
@@ -442,8 +431,8 @@ export class AdtUtils
    */
   async getInactiveObjects(options?: {
     includeRawXml?: boolean;
-  }): Promise<IAdtResponse<IAdtResult<IInactiveObjectsResponse>>> {
-    return answering(() => getInactiveObjects(this.connection, options));
+  }): Promise<IAdtResponse<IInactiveObjectsResponse>> {
+    return answeringValue(() => getInactiveObjects(this.connection, options));
   }
 
   /**
@@ -456,9 +445,10 @@ export class AdtUtils
   async activateObjectsGroup(
     objects: IObjectReference[],
     preauditRequested: boolean = false,
-  ): Promise<IAdtResponse<IAdtResult<IAdtWireResponse>>> {
-    return answering(() =>
-      activateObjectsGroup(this.connection, objects, preauditRequested),
+  ): Promise<IAdtResponse<string>> {
+    return answering(
+      () => activateObjectsGroup(this.connection, objects, preauditRequested),
+      rawDocument,
     );
   }
 
@@ -470,8 +460,11 @@ export class AdtUtils
    */
   async checkDeletionGroup(
     objects: IObjectReference[],
-  ): Promise<IAdtResponse<IAdtResult<IAdtWireResponse>>> {
-    return answering(() => checkDeletionGroup(this.connection, objects));
+  ): Promise<IAdtResponse<string>> {
+    return answering(
+      () => checkDeletionGroup(this.connection, objects),
+      rawDocument,
+    );
   }
 
   /**
@@ -484,9 +477,10 @@ export class AdtUtils
   async deleteObjectsGroup(
     objects: IObjectReference[],
     transportRequest?: string,
-  ): Promise<IAdtResponse<IAdtResult<IAdtWireResponse>>> {
-    return answering(() =>
-      deleteObjectsGroup(this.connection, objects, transportRequest),
+  ): Promise<IAdtResponse<string>> {
+    return answering(
+      () => deleteObjectsGroup(this.connection, objects, transportRequest),
+      rawDocument,
     );
   }
 
@@ -506,36 +500,61 @@ export class AdtUtils
     objectName: string,
     functionGroup?: string,
     options?: IReadOptions,
-  ): Promise<IAdtResponse<IAdtResult<IAdtWireResponse>>> {
-    return answering(async () => {
-      let uri = getObjectMetadataUri(objectType, objectName, functionGroup);
-      const params = [];
-      if (options?.version) {
-        params.push(`version=${options.version}`);
-      }
-      if (options?.withLongPolling) {
-        params.push('withLongPolling=true');
-      }
-      if (params.length > 0) {
-        uri += `?${params.join('&')}`;
-      }
-      const acceptHeader =
-        options?.accept ?? getMetadataAcceptHeader(objectType);
-      return makeAdtRequestWithAcceptNegotiation(
-        this.connection,
-        {
-          url: uri,
-          method: 'GET',
-          timeout: getTimeout('default'),
-          headers: {
-            Accept: acceptHeader,
-          },
+  ): Promise<IAdtResponse<string>> {
+    // Built here, not inside the request: `getObjectMetadataUri` refuses a type
+    // it has no resource for, and that is the caller's mistake. Classified
+    // inside `answering` it would come back as `origin: 'connection'`, pointing
+    // at a network nothing reached.
+    getObjectMetadataUri(objectType, objectName, functionGroup);
+
+    return answering(
+      () =>
+        this.objectMetadataWire(objectType, objectName, functionGroup, options),
+      rawDocument,
+    );
+  }
+
+  /**
+   * The metadata answer itself, for callers inside this package.
+   *
+   * The contract member above answers a document, because that is what a
+   * consumer of {@link IAdtObjectAccess} reads. The per-type request functions
+   * need the answer whole — status and headers included — so that the handler
+   * can apply *its* consumer's strategy to it, and reading it here would throw
+   * that away and make them read it back out of a string.
+   */
+  async objectMetadataWire(
+    objectType: AdtObjectType,
+    objectName: string,
+    functionGroup?: string,
+    options?: IReadOptions,
+  ): Promise<IAdtWireResponse> {
+    let uri = getObjectMetadataUri(objectType, objectName, functionGroup);
+    const params = [];
+    if (options?.version) {
+      params.push(`version=${options.version}`);
+    }
+    if (options?.withLongPolling) {
+      params.push('withLongPolling=true');
+    }
+    if (params.length > 0) {
+      uri += `?${params.join('&')}`;
+    }
+    const acceptHeader = options?.accept ?? getMetadataAcceptHeader(objectType);
+    return makeAdtRequestWithAcceptNegotiation(
+      this.connection,
+      {
+        url: uri,
+        method: 'GET',
+        timeout: getTimeout('default'),
+        headers: {
+          Accept: acceptHeader,
         },
-        {
-          logger: this.logger,
-        },
-      );
-    });
+      },
+      {
+        logger: this.logger,
+      },
+    );
   }
 
   /**
@@ -557,41 +576,73 @@ export class AdtUtils
     functionGroup?: string,
     version?: 'active' | 'inactive',
     options?: IReadOptions,
-  ): Promise<IAdtResponse<IAdtResult<IAdtWireResponse>>> {
-    return answering(async () => {
-      if (!supportsSourceCode(objectType)) {
-        throw new Error(
-          `Object type ${objectType} does not support source code reading`,
-        );
-      }
-
-      let uri = getObjectSourceUri(
-        objectType,
-        objectName,
-        functionGroup,
-        version,
+  ): Promise<IAdtResponse<string>> {
+    // Raised before anything is asked, rather than dressed as a verdict about
+    // the server: a type with no source resource, and a function module with no
+    // function group, are both the caller's mistake. `getObjectSourceUri` is
+    // pure, so building the URI here is how its own guards surface as
+    // themselves — inside `answering` they came back as
+    // `origin: 'connection'`, advice to check a network nothing reached.
+    if (!supportsSourceCode(objectType)) {
+      throw new Error(
+        `Object type ${objectType} does not support source code reading`,
       );
-      if (options?.withLongPolling) {
-        const separator = uri.includes('?') ? '&' : '?';
-        uri += `${separator}withLongPolling=true`;
-      }
+    }
+    getObjectSourceUri(objectType, objectName, functionGroup, version);
 
-      const acceptHeader = options?.accept ?? 'text/plain';
-      return makeAdtRequestWithAcceptNegotiation(
-        this.connection,
-        {
-          url: uri,
-          method: 'GET',
-          timeout: getTimeout('default'),
-          headers: {
-            Accept: acceptHeader,
-          },
-        },
-        {
-          logger: this.logger,
-        },
+    return answering(
+      () =>
+        this.objectSourceWire(
+          objectType,
+          objectName,
+          functionGroup,
+          version,
+          options,
+        ),
+      rawDocument,
+    );
+  }
+
+  /** The source answer itself — see {@link objectMetadataWire}. */
+  async objectSourceWire(
+    objectType: AdtSourceObjectType,
+    objectName: string,
+    functionGroup?: string,
+    version?: 'active' | 'inactive',
+    options?: IReadOptions,
+  ): Promise<IAdtWireResponse> {
+    if (!supportsSourceCode(objectType)) {
+      throw new Error(
+        `Object type ${objectType} does not support source code reading`,
       );
-    });
+    }
+
+    let uri = getObjectSourceUri(
+      objectType,
+      objectName,
+      functionGroup,
+      version,
+    );
+    if (options?.withLongPolling) {
+      const separator = uri.includes('?') ? '&' : '?';
+      uri += `${separator}withLongPolling=true`;
+    }
+
+    const acceptHeader = options?.accept ?? 'text/plain';
+    return makeAdtRequestWithAcceptNegotiation(
+      this.connection,
+      {
+        url: uri,
+        method: 'GET',
+        timeout: getTimeout('default'),
+        headers: {
+          Accept: acceptHeader,
+        },
+      },
+      {
+        logger: this.logger,
+      },
+    );
   }
 
   /**
@@ -629,10 +680,12 @@ export class AdtUtils
    * @param params - SQL query parameters
    * @returns Query result
    */
-  async getSqlQuery(
-    params: IGetSqlQueryParams,
-  ): Promise<IAdtResponse<IAdtResult<IAdtWireResponse>>> {
-    return answering(() => getSqlQuery(this.connection, params));
+  async getSqlQuery(params: IGetSqlQueryParams): Promise<IAdtResponse<string>> {
+    if (!params.sql_query) {
+      throw new Error('SQL query is required');
+    }
+
+    return answering(() => getSqlQuery(this.connection, params), rawDocument);
   }
 
   /**
@@ -644,8 +697,15 @@ export class AdtUtils
    */
   async getTableContents(
     params: IGetTableContentsParams,
-  ): Promise<IAdtResponse<IAdtResult<IAdtWireResponse>>> {
-    return answering(() => getTableContents(this.connection, params));
+  ): Promise<IAdtResponse<string>> {
+    if (!params.table_name) {
+      throw new Error('Table name is required');
+    }
+
+    return answering(
+      () => getTableContents(this.connection, params),
+      rawDocument,
+    );
   }
 
   /**
@@ -656,8 +716,11 @@ export class AdtUtils
    */
   async discovery(
     params: IGetDiscoveryParams = {},
-  ): Promise<IAdtResponse<IAdtResult<IAdtWireResponse>>> {
-    return answering(() => getDiscoveryUtil(this.connection, params));
+  ): Promise<IAdtResponse<string>> {
+    return answering(
+      () => getDiscoveryUtil(this.connection, params),
+      rawDocument,
+    );
   }
 
   /**
@@ -679,19 +742,19 @@ export class AdtUtils
   async fetchNodeStructure(
     parentType: string,
     parentName: string,
-    nodeId?: string,
-    withShortDescriptions: boolean = true,
-  ): Promise<IAdtResponse<IAdtResult<IRepositoryNodeContents>>> {
-    return answering(async () => {
-      const response = await fetchNodeStructureUtil(
-        this.connection,
-        parentType,
-        parentName,
-        nodeId,
-        withShortDescriptions,
-      );
-      return toNodeContents(String(response.data ?? ''), this.logger);
-    });
+    options?: IGetNodeContentsOptions,
+  ): Promise<IAdtResponse<ReturnType<R['node']>>> {
+    return answering(
+      () =>
+        fetchNodeStructureUtil(
+          this.connection,
+          parentType,
+          parentName,
+          options?.nodeId,
+          options?.withShortDescriptions ?? true,
+        ),
+      this.results.node as IResultStrategy<ReturnType<R['node']>>,
+    );
   }
 
   /**
@@ -714,8 +777,12 @@ export class AdtUtils
     objectName: string,
     objectType: 'PROG/P' | 'PROG/I' | 'FUGR' | 'CLAS/OC',
     timeout: number = 30000,
-  ): Promise<IAdtResponse<IAdtResult<string[]>>> {
-    return answering(() =>
+  ): Promise<IAdtResponse<string[]>> {
+    if (!objectName) {
+      throw new Error('Object name is required');
+    }
+
+    return answeringValue(() =>
       getIncludesList(this.connection, objectName, objectType, timeout),
     );
   }
@@ -729,8 +796,12 @@ export class AdtUtils
    */
   async listFunctionModules(
     functionGroupName: string,
-  ): Promise<IAdtResponse<IAdtResult<string[]>>> {
-    return answering(() =>
+  ): Promise<IAdtResponse<string[]>> {
+    if (!functionGroupName) {
+      throw new Error('Function group name is required');
+    }
+
+    return answeringValue(() =>
       listFunctionModules(this.connection, functionGroupName),
     );
   }
@@ -748,8 +819,12 @@ export class AdtUtils
    */
   async listFunctionGroupIncludes(
     functionGroupName: string,
-  ): Promise<IAdtResponse<IAdtResult<string[]>>> {
-    return answering(() =>
+  ): Promise<IAdtResponse<string[]>> {
+    if (!functionGroupName) {
+      throw new Error('Function group name is required');
+    }
+
+    return answeringValue(() =>
       listFunctionGroupIncludes(this.connection, functionGroupName),
     );
   }
@@ -771,14 +846,20 @@ export class AdtUtils
    */
   async getPackageContents(
     packageName: string,
-  ): Promise<IAdtResponse<IAdtResult<IAdtWireResponse>>> {
-    return answering(async () => {
-      return fetchNodeStructureUtil(
+    options?: IGetPackageContentsOptions,
+  ): Promise<IAdtResponse<IPackageContentItem[]>> {
+    // The contract asks what a package holds, not which requests were made to
+    // find out — so this is the flat listing, which is the answer to that
+    // question. The single node-structure request that used to stand in for it
+    // answered one level of a tree and left the caller to walk the rest.
+    return answeringValue(() =>
+      getPackageContentsList(
         this.connection,
-        'DEVC/K',
-        packageName.toUpperCase(),
-      );
-    });
+        packageName,
+        { includeDescriptions: options?.withShortDescriptions },
+        this.logger,
+      ),
+    );
   }
 
   /**
@@ -805,15 +886,15 @@ export class AdtUtils
   async getPackageContentsList(
     packageName: string,
     options?: IGetPackageContentsListOptions,
-  ): Promise<IAdtResponse<IAdtResult<IPackageContentItem[]>>> {
-    return answering(async () => {
-      return getPackageContentsList(
+  ): Promise<IAdtResponse<IPackageContentItem[]>> {
+    return answeringValue(() =>
+      getPackageContentsList(
         this.connection,
         packageName,
         options,
         this.logger,
-      );
-    });
+      ),
+    );
   }
 
   /**
@@ -838,15 +919,10 @@ export class AdtUtils
   async getPackageHierarchy(
     packageName: string,
     options?: IGetPackageHierarchyOptions,
-  ): Promise<IAdtResponse<IAdtResult<IPackageHierarchyNode>>> {
-    return answering(async () => {
-      return getPackageHierarchy(
-        this.connection,
-        packageName,
-        options,
-        this.logger,
-      );
-    });
+  ): Promise<IAdtResponse<IPackageHierarchyNode>> {
+    return answeringValue(() =>
+      getPackageHierarchy(this.connection, packageName, options, this.logger),
+    );
   }
 
   /**
@@ -866,9 +942,17 @@ export class AdtUtils
   async getObjectStructure(
     objectType: string,
     objectName: string,
-  ): Promise<IAdtResponse<IAdtResult<IAdtWireResponse>>> {
-    return answering(() =>
-      getObjectStructureUtil(this.connection, objectType, objectName),
+  ): Promise<IAdtResponse<string>> {
+    if (!objectType) {
+      throw new Error('Object type is required');
+    }
+    if (!objectName) {
+      throw new Error('Object name is required');
+    }
+
+    return answering(
+      () => getObjectStructureUtil(this.connection, objectType, objectName),
+      rawDocument,
     );
   }
 
@@ -886,10 +970,15 @@ export class AdtUtils
    * const sourceCode = response.data; // Include source code
    * ```
    */
-  async getInclude(
-    includeName: string,
-  ): Promise<IAdtResponse<IAdtResult<IAdtWireResponse>>> {
-    return answering(() => getIncludeUtil(this.connection, includeName));
+  async getInclude(includeName: string): Promise<IAdtResponse<string>> {
+    if (!includeName) {
+      throw new Error('Include name is required');
+    }
+
+    return answering(
+      () => getIncludeUtil(this.connection, includeName),
+      rawDocument,
+    );
   }
 
   /**
@@ -912,16 +1001,11 @@ export class AdtUtils
     maxItemCount: number = 999,
     name: string = '*',
     data: string = 'usedByProvider',
-  ): Promise<IAdtResponse<IAdtResult<INamedItem[]>>> {
-    return answering(async () => {
-      const response = await getAllTypesUtil(
-        this.connection,
-        maxItemCount,
-        name,
-        data,
-      );
-      return parseNamedItems(String(response.data ?? ''), this.logger);
-    });
+  ): Promise<IAdtResponse<ReturnType<R['types']>>> {
+    return answering(
+      () => getAllTypesUtil(this.connection, maxItemCount, name, data),
+      this.results.types as IResultStrategy<ReturnType<R['types']>>,
+    );
   }
 }
 

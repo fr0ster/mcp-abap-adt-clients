@@ -21,6 +21,8 @@ import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IUnitTestConfig } from '../../../../core/unitTest';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { expectResult } from '../../../helpers/contract';
+import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -190,10 +192,14 @@ describe('AdtUnitTest (using AdtClient)', () => {
           // Step 0: Check if class already exists
           let classExists = false;
           try {
-            const existingClass = await client
-              .getClass()
-              .read({ className: containerClass });
-            if (existingClass?.readResult) {
+            // `expectResult` failed the setup for a container class that is
+            // simply not there — which is the state this flow wants — and
+            // `if (existingClass)` was true either way. The answer decides.
+            const existingClass = presenceOf(
+              await client.getClass().read({ className: containerClass }),
+              `class ${containerClass}`,
+            );
+            if (existingClass.present === true) {
               classExists = true;
               testsLogger.info?.(
                 `Class ${containerClass} already exists, will reuse`,
@@ -261,26 +267,30 @@ describe('AdtUnitTest (using AdtClient)', () => {
           // Step 5: Read back the tests that were written into the class
           logTestStep('read (unit test)', testsLogger);
           const unitTest = client.getUnitTest();
-          const readState = await unitTest.read(
-            { className: containerClass },
-            'active',
+          const readState = expectResult(
+            await unitTest.read({ className: containerClass }, 'active'),
+            'readState',
           );
           expect(readState).toBeDefined();
-          expect(readState?.readResult).toBeDefined();
           testsLogger.info?.('Tests read back from the container class');
 
-          const metadataState = await unitTest.readMetadata({
-            className: containerClass,
-          });
+          const metadataState = expectResult(
+            await unitTest.readMetadata({
+              className: containerClass,
+            }),
+            'metadataState',
+          );
           expect(metadataState).toBeDefined();
-          expect(metadataState.metadataResult).toBeDefined();
 
           // Step 6: Run the tests. Needs no create and no update — they are in
           // the class already, which is the whole point of the two being apart.
           logTestStep('run (unit test)', testsLogger);
-          const runId = await unitTest.run(
-            [{ containerClass, testClass: testClassName }],
-            unitTestOptions,
+          const runId = expectResult(
+            await unitTest.run(
+              [{ containerClass, testClass: testClassName }],
+              unitTestOptions,
+            ),
+            'start unit test run',
           );
           expect(runId).toBeDefined();
           testsLogger.info?.('Unit test run started, run ID:', runId);
@@ -288,16 +298,18 @@ describe('AdtUnitTest (using AdtClient)', () => {
           // Step 7: Ask about the run — a different concern from running it,
           // and since interfaces 16.0.0 a different interface as well.
           logTestStep('getStatus (run)', testsLogger);
-          const statusResponse = await unitTest.getStatus(
-            runId,
-            unitTestStatus.with_long_polling ?? true,
+          const statusResponse = expectResult(
+            await unitTest.getStatus(
+              runId,
+              unitTestStatus.with_long_polling ?? true,
+            ),
+            'statusResponse',
           );
           expect(statusResponse).toBeDefined();
-          expect(statusResponse.data).toBeDefined();
 
           // Log detailed status information
-          if (statusResponse.data) {
-            const status = statusResponse.data;
+          if (statusResponse) {
+            const status = statusResponse;
             if (typeof status === 'string') {
               // Try to parse XML if it's a string
               try {
@@ -333,16 +345,18 @@ describe('AdtUnitTest (using AdtClient)', () => {
 
           // Step 8: Fetch the result document
           logTestStep('getResult (run)', testsLogger);
-          const resultResponse = await unitTest.getResult(runId, {
-            withNavigationUris: unitTestResult.with_navigation_uris || false,
-            format: unitTestResult.format || 'abapunit',
-          });
+          const resultResponse = expectResult(
+            await unitTest.getResult(runId, {
+              withNavigationUris: unitTestResult.with_navigation_uris || false,
+              format: unitTestResult.format || 'abapunit',
+            }),
+            'resultResponse',
+          );
           expect(resultResponse).toBeDefined();
-          expect(resultResponse.data).toBeDefined();
 
           // Log detailed result information
-          if (resultResponse.data) {
-            const result = resultResponse.data;
+          if (resultResponse) {
+            const result = resultResponse;
             if (typeof result === 'string') {
               // Try to parse XML if it's a string
               try {

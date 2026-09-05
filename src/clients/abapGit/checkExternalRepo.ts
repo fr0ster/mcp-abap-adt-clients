@@ -1,13 +1,13 @@
 import type {
   IAbapConnection,
   IAbapGitExternalRepoCredentials,
-  IAbapGitExternalRepoInfo,
 } from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_ABAPGIT_EXTERNAL_REPO_INFO_RESPONSE_V2,
   CT_ABAPGIT_EXTERNAL_REPO_INFO_REQUEST_V2,
 } from '../../constants/contentTypes';
 import { getTimeout } from '../../utils/timeouts';
+import type { IAbapGitExternalRepoInfo } from './types';
 import { buildExternalRepoInfoBody } from './xmlBuilder';
 import { parseExternalRepoInfo } from './xmlParser';
 

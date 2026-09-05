@@ -9,6 +9,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type {
   IAbapConnection,
+  IAdtResponse,
   ILogger,
   ISessionLifecycleAware,
 } from '@mcp-abap-adt/interfaces';
@@ -47,8 +48,33 @@ const connectionLogger: ILogger = createConnectionLogger();
 const libraryLogger: ILogger = createLibraryLogger();
 const testsLogger: ILogger = createTestsLogger();
 
-const isStatusOk = (status?: number): boolean =>
-  status === 200 || status === 204;
+/**
+ * The answer, or a failure naming what SAP said.
+ *
+ * Not a status. ADT answers a refusal inside a 200, so `status === 200` passed
+ * whether or not the read worked; and these read the state bag's `readResult`,
+ * which no longer exists — every one of them threw "no response for …" on the
+ * first run after the migration. The contract is the verdict now, and the
+ * document is what a read is for.
+ */
+function assertAnswered(answer: unknown, label: string, name: string): void {
+  const contract = answer as IAdtResponse<unknown> | undefined;
+  if (!contract || typeof contract.ok !== 'boolean') {
+    throw new Error(`Read ${label} failed: no answer for ${name}`);
+  }
+  if (!contract.ok) {
+    throw new Error(
+      `Read ${label} failed for ${name} [${contract.getError().origin}]: ` +
+        contract.getError().message,
+    );
+  }
+  const value = contract.getResult().value;
+  if (typeof value !== 'string') {
+    throw new Error(
+      `Read ${label} for ${name} answered ${typeof value}, not a document`,
+    );
+  }
+}
 
 async function runReadWithAcceptLogging<T>(
   label: string,
@@ -67,26 +93,8 @@ async function runReadWithAcceptLogging<T>(
   }
 }
 
-function assertReadResult(state: any, label: string, name: string): void {
-  if (!state || !state.readResult) {
-    throw new Error(`Read ${label} failed: no response for ${name}`);
-  }
-  const status = state.readResult.status;
-  if (!isStatusOk(status)) {
-    throw new Error(`Read ${label} failed: HTTP ${status} for ${name}`);
-  }
-}
-
-function assertMetadataResult(state: any, label: string, name: string): void {
-  const result = state?.metadataResult || state?.readResult;
-  if (!result) {
-    throw new Error(`Read ${label} failed: no metadata response for ${name}`);
-  }
-  const status = result.status;
-  if (!isStatusOk(status)) {
-    throw new Error(`Read ${label} failed: HTTP ${status} for ${name}`);
-  }
-}
+const assertReadResult = assertAnswered;
+const assertMetadataResult = assertAnswered;
 
 async function runReadMetadataWithAcceptLogging<T>(
   label: string,

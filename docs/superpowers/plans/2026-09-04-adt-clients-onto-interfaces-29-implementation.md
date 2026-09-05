@@ -105,6 +105,26 @@
   `src/utils/resultStrategy.ts` before Task 2 creates it; they clear when it does.
 - **One SAP-touching run at a time**, and no edits under `src/` while one is in flight.
 - Test output: `npm test 2>&1 | tee test-run.log`, then read the file. Never pipe through `grep`/`head`/`tail`.
+- **A unit test cannot run through `npm test` until Task 14.** Jest's
+  `globalSetup` type-checks the whole project, so while the package is red every
+  suite dies in setup — including the one you just wrote. Run a single file
+  against a scratch config until then, and say so in the commit:
+
+  ```bash
+  cat > /tmp/jest.unit.js <<'CFG'
+  module.exports = {
+    preset: 'ts-jest',
+    testEnvironment: 'node',
+    rootDir: '<the repository root>',
+    transform: { '^.+\\.tsx?$': ['ts-jest', { isolatedModules: true, diagnostics: false }] },
+  };
+  CFG
+  npx jest -c /tmp/jest.unit.js <the one file> 2>&1 | tee unit-run.log
+  ```
+
+  `MCP_ENV_PATH=/tmp/nonexistent-env npx jest …` is **not** enough: it skips the
+  SAP preflight, not the type-check. Every `npx jest` line in Tasks 2, 3, 6 and
+  12 means this until the package compiles.
 - Deleting or renaming a symbol: enumerate first, edit, then grep the repository for it **including comments, README and docs**, and compare counts before and after. Three regex sweeps in the contracts package silently deleted six types and the first field of three others while every check stayed green.
 
 ---
@@ -157,6 +177,16 @@ git rm src/__tests__/unit/runtime/debugger/abap.batch.test.ts
 
 In `package.json`, remove the whole `"./batch"` key from `exports`.
 
+- [ ] **Step 3a: Move the debugger's batch helpers before deleting the module**
+
+`src/runtime/debugger/abap.ts` imports `createBatchBoundary` and
+`createRequestId` from `src/batch/buildBatchPayload.ts`. The debugger's
+`POST /sap/bc/adt/debugger/batch` is a **real ADT resource** — a step and a stack
+read in one round-trip, which the server answers — and has nothing to do with the
+batch clients this task removes. Copy those two functions into
+`src/runtime/debugger/batchPayload.ts`, with a header saying why they are there,
+and point `abap.ts` at it.
+
 - [ ] **Step 4: Sweep for leftovers**
 
 ```bash
@@ -196,6 +226,47 @@ can use."
 
 ---
 
+### Task 1a: The debugger, memory snapshots and batch move to a research branch
+
+Decided by the maintainer, 2026-09-04, and it is the other half of what
+`interfaces@30.0.0` did: what left the contract for research leaves the working
+branch here too, and its **implementation** goes to a research branch rather than
+being migrated onto contracts it no longer has.
+
+**Branch:** `research/debugger-memory-batch`, cut from the working branch before
+the deletions, so the code and its history survive with nothing to reconstruct.
+
+**Files (working branch):**
+- Delete: `src/runtime/debugger/` (8 files), `src/runtime/memory/` (3),
+  `src/clients/DebuggerSessionClient.ts`
+- Delete: the unit and integration tests for all three
+- Modify: `src/index.runtime.ts`, `src/index.ws.ts`, `src/runtime/index.ts`,
+  `src/clients/AdtRuntimeClient.ts` (`getDebugger`, its cache field and its
+  import), `src/clients/AdtClientsWS.ts` (`getDebuggerSessionClient`),
+  `src/clients/AdtRuntimeClientExperimental.ts` (its header)
+- Modify: `src/__tests__/unit/publicApiSurface.test.ts` (five names),
+  `AdtRuntimeClient.factory.test.ts`, `AdtClientsWS.test.ts`
+- Modify: `README.md`, `docs/README.md`, `docs/usage/CLIENT_API_REFERENCE.md`
+
+**Interfaces:** consumes nothing, produces nothing. This task only removes — and
+it removes 22 of the errors the migration would otherwise have to answer for.
+
+- [ ] **Step 1:** `git branch research/debugger-memory-batch` **before** deleting
+  anything. A branch cut afterwards preserves nothing.
+- [ ] **Step 2:** Delete the three implementations and their tests.
+- [ ] **Step 3:** Remove every usage — factories, barrels, the WS accessor, the
+  public-API surface list and the factory tests that name them.
+- [ ] **Step 4:** `grep -rn "Debugger\|MemorySnapshot" src README.md docs/` —
+  expected: nothing outside a changelog entry.
+- [ ] **Step 5:** Commit with `--no-verify`; the build is still red on the
+  migration itself.
+
+**When they come back**, they come back measured: one member per endpoint, and
+results named rather than framed — which is what `IDebugger`'s 39
+envelope-answering members could not do, and why they left in the first place.
+
+---
+
 ### Task 2: `answering()` composes the two strategies
 
 The mechanism the whole migration rests on. The current `answering(produce)` sees a finished value or an exception and never the wire response of a **successful** call, so `analyse` could never be consulted on the 200-with-empty-body it exists for.
@@ -210,7 +281,8 @@ The mechanism the whole migration rests on. The current `answering(produce)` see
 - Produces:
   - `const rawDocument: IResultStrategy<string>`
   - `const nothing: IResultStrategy<void>`
-  - `type IAnalyse = (verdict: IAdtError | undefined, answer?: IAdtWireResponse) => IAdtError | undefined`
+  - `type IAnalyse = (verdict: IAdtError | AdtNoFailure, answer?: IAdtWireResponse) => IAdtError | AdtNoFailure` — `ADT_NO_FAILURE`, never `undefined`, since `interfaces@31.0.0`
+  - **`answeringWith` is deleted.** Its whole purpose was to keep a consumer's parse outside the classification, and the new `answering` does that by construction: the reading runs after the verdict, outside any `catch`. `AdtUtils` is its only caller and migrates in Task 14.
   - `answering<T>(run: () => Promise<IAdtWireResponse>, read: IResultStrategy<T>, analyse?: IAnalyse): Promise<IAdtResponse<T>>`
 
 - [ ] **Step 1: Write the failing test**
@@ -226,7 +298,8 @@ Create `src/__tests__/unit/shared/answeringComposition.test.ts`:
  */
 import type { IAdtError, IAdtWireResponse } from '@mcp-abap-adt/interfaces';
 import { AdtSAPError } from '../../../utils/adtErrors';
-import { answering, rawDocument } from '../../../utils/adtResponse';
+import { answering } from '../../../utils/adtResponse';
+import { rawDocument } from '../../../utils/resultStrategy';
 
 const wire = (data: string, status = 200): IAdtWireResponse => ({
   data,
@@ -254,9 +327,18 @@ describe('answering', () => {
 
   it("carries SAP's own sentence, whole, when the request threw a refusal", async () => {
     const answer = await answering(async () => {
-      throw new AdtSAPError('SAP refused the request: ' +
-        'You are not authorized to make changes (authorization object S_ABPLNGVS)',
-        { response: wire(REFUSAL, 403) });
+      // Positional, and this is what the constructor actually takes:
+      // (message, document, adtType?, namespace?, response?, request?). An
+      // earlier draft of this plan invented an options object, which does not
+      // compile — read `src/utils/adtErrors.ts` before copying any of it.
+      throw new AdtSAPError(
+        'SAP refused the request: You are not authorized to make changes ' +
+          '(authorization object S_ABPLNGVS)',
+        REFUSAL,
+        'ExceptionResourceNoAccess',
+        'com.sap.adt',
+        wire(REFUSAL, 403),
+      );
     }, rawDocument);
 
     expect(answer.ok).toBe(false);
@@ -269,11 +351,15 @@ describe('answering', () => {
   });
 
   it('consults analyse on a success, so an empty body can be called a failure', async () => {
-    const analyse = (verdict: IAdtError | undefined, wireIn?: IAdtWireResponse) =>
-      verdict ??
-      (String(wireIn?.data ?? '') === ''
-        ? { origin: 'refusal' as const, message: 'the object is not there' }
-        : undefined);
+    const analyse = (
+      verdict: IAdtError | typeof ADT_NO_FAILURE,
+      wireIn?: IAdtWireResponse,
+    ): IAdtError | typeof ADT_NO_FAILURE =>
+      verdict !== ADT_NO_FAILURE
+        ? verdict
+        : String(wireIn?.data ?? '') === ''
+          ? { origin: 'refusal' as const, message: 'the object is not there' }
+          : ADT_NO_FAILURE;
 
     const answer = await answering(async () => wire(''), rawDocument, analyse);
 
@@ -285,10 +371,16 @@ describe('answering', () => {
   it('lets analyse clear a refusal, and the value comes from the same answer', async () => {
     const answer = await answering(
       async () => {
-        throw new AdtSAPError('refused', { response: wire('<probe/>', 404) });
+        throw new AdtSAPError(
+          'refused',
+          '<probe/>',
+          undefined,
+          undefined,
+          wire('<probe/>', 404),
+        );
       },
       rawDocument,
-      () => undefined,
+      () => ADT_NO_FAILURE,
     );
 
     expect(answer.ok).toBe(true);
@@ -304,7 +396,7 @@ describe('answering', () => {
         throw new Error('connect ECONNREFUSED');
       },
       rawDocument,
-      () => undefined,
+      () => ADT_NO_FAILURE,
     );
 
     expect(answer.ok).toBe(false);
@@ -329,7 +421,7 @@ describe('answering', () => {
 - [ ] **Step 2: Run it to verify it fails**
 
 ```bash
-MCP_ENV_PATH=/tmp/nonexistent-env npx jest src/__tests__/unit/shared/answeringComposition.test.ts 2>&1 | tee unit-run.log
+npx jest -c /tmp/jest.unit.js src/__tests__/unit/shared/answeringComposition.test.ts 2>&1 | tee unit-run.log
 ```
 
 Expected: FAIL — `rawDocument` is not exported and `answering` takes one argument.
@@ -390,7 +482,6 @@ export function succeeded<T>(value: T): IAdtResponse<T> {
   return {
     ok: true,
     getResult: () => ({ value }),
-    getError: () => undefined,
   };
 }
 
@@ -398,11 +489,16 @@ export function succeeded<T>(value: T): IAdtResponse<T> {
 export function failed<T>(error: IAdtError): IAdtResponse<T> {
   return {
     ok: false,
-    getResult: () => undefined,
     getError: () => error,
   };
 }
 ```
+
+**One method each, since `interfaces@31.0.0`.** A success declares no `getError`
+and a failure no `getResult`, so both halves stopped answering `undefined` and
+reaching either one requires narrowing on `ok` first. A caller who skipped the
+check used to get `undefined` and compile; now it is a type error, which is a
+free audit of every call site in this package that skipped it.
 
 `getResult()` still answers `IAdtResult<T>` — that is what the contract says. What
 changed is that `IAdtResult` is no longer written in the *response's* type
@@ -487,7 +583,7 @@ export async function answering<T>(
 Add to the imports at the top of the file:
 
 ```typescript
-import type { IResultStrategy } from './resultStrategy';
+import type { IResultStrategy } from '@mcp-abap-adt/interfaces';
 ```
 
 And re-export the defaults so callers have one import site:
@@ -503,7 +599,7 @@ exists.
 - [ ] **Step 8: Run the tests to verify they pass**
 
 ```bash
-MCP_ENV_PATH=/tmp/nonexistent-env npx jest src/__tests__/unit/shared/answeringComposition.test.ts 2>&1 | tee unit-run.log
+npx jest -c /tmp/jest.unit.js src/__tests__/unit/shared/answeringComposition.test.ts 2>&1 | tee unit-run.log
 ```
 
 Expected: 6 passed.
@@ -597,7 +693,7 @@ describe('the class default result strategies', () => {
 - [ ] **Step 2: Run it to verify it fails**
 
 ```bash
-MCP_ENV_PATH=/tmp/nonexistent-env npx jest src/__tests__/unit/core/classResultStrategy.test.ts 2>&1 | tee unit-run.log
+npx jest -c /tmp/jest.unit.js src/__tests__/unit/core/classResultStrategy.test.ts 2>&1 | tee unit-run.log
 ```
 
 Expected: FAIL — `classDocuments` is not exported.
@@ -607,7 +703,7 @@ Expected: FAIL — `classDocuments` is not exported.
 Append to `src/core/class/types.ts`:
 
 ```typescript
-import type { IResultStrategy } from '../../utils/resultStrategy';
+import type { IResultStrategy } from '@mcp-abap-adt/interfaces';
 import { nothing, rawDocument } from '../../utils/resultStrategy';
 
 /**
@@ -652,7 +748,7 @@ export const classDocuments: IClassResults = {  // all defaults
 - [ ] **Step 4: Run the tests to verify they pass**
 
 ```bash
-MCP_ENV_PATH=/tmp/nonexistent-env npx jest src/__tests__/unit/core/classResultStrategy.test.ts 2>&1 | tee unit-run.log
+npx jest -c /tmp/jest.unit.js src/__tests__/unit/core/classResultStrategy.test.ts 2>&1 | tee unit-run.log
 ```
 
 Expected: 3 passed.

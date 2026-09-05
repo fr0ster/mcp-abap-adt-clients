@@ -23,36 +23,74 @@
  */
 
 import type {
+  IAbapConnection,
+  IAdtCreatable,
+  IAdtDeletable,
+  IAdtError,
+  IAdtOperationOptions,
+  IAdtReadable,
+  IAdtRequest,
+  IAdtResponse,
   IAdtSystemContext,
-  ITransportTree,
+  IAdtUpdatable,
+  IDeferredResponseConnection,
+  IListTransportsOptions,
+  ILogger,
+  IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
-import {
-  type HttpError,
-  hasDeferredResponses,
-  type IAbapConnection,
-  type IAdtCreatable,
-  type IAdtModifiable,
-  type IAdtOperationOptions,
-  type IAdtReadable,
-  type IListTransportsOptions,
-  type ILogger,
-  type IObjectVersion,
-  TRANSPORT_SEARCH_CONFIGURATIONS_URL,
-} from '@mcp-abap-adt/interfaces';
+import { TRANSPORT_SEARCH_CONFIGURATIONS_URL } from '@mcp-abap-adt/interfaces';
 import { TransportSearchConfigurationMissing } from '../../utils/adtErrors';
-import { safeErrorMessage } from '../../utils/internalUtils';
+import { answering, type IAdtOptions } from '../../utils/adtResponse';
 import { createTransport } from './create';
 import { deleteTransport } from './delete';
 import { getTransportSearchConfigurations, listTransports } from './list';
 import { parseTransportTree } from './parseTransportTree';
 import { getTransport } from './read';
-import type { ITransportConfig, ITransportState } from './types';
+import {
+  type ITransportConfig,
+  type ITransportResults,
+  type ITransportTree,
+  transportDocuments,
+} from './types';
 import { updateTransport } from './update';
-export class AdtRequest
-  implements
-    IAdtCreatable<ITransportConfig, ITransportState>,
-    IAdtReadable<ITransportConfig, ITransportState>,
-    IAdtModifiable<ITransportConfig, ITransportState>
+
+/**
+ * Whether awaiting this connection's answers is safe right now.
+ *
+ * It left `@mcp-abap-adt/interfaces` in 29.0.0 with everything else that
+ * emitted code: the contract declares `IDeferredResponseConnection`, and the
+ * narrowing over it is an implementation.
+ *
+ * Not a proof of absence — a third-party connection that defers answers without
+ * declaring it will still deadlock. It makes the known case honest.
+ */
+export function hasDeferredResponses<T extends object>(
+  connection: T,
+): connection is T & IDeferredResponseConnection {
+  return (
+    (connection as Partial<IDeferredResponseConnection>)
+      .responsesAreDeferred === true
+  );
+}
+
+export class AdtRequest<
+  R extends ITransportResults<
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown
+  > = ITransportResults,
+> implements
+    IAdtCreatable<ITransportConfig, ReturnType<R['created']>>,
+    IAdtReadable<
+      ITransportConfig,
+      ReturnType<R['read']>,
+      ReturnType<R['read']>
+    >,
+    IAdtUpdatable<ITransportConfig, ReturnType<R['updated']>>,
+    IAdtDeletable<ITransportConfig, ReturnType<R['deleted']>>,
+    IAdtRequest<ReturnType<R['list']>>
 {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
@@ -63,139 +101,106 @@ export class AdtRequest
     connection: IAbapConnection,
     logger?: ILogger,
     systemContext?: IAdtSystemContext,
+    // The one cast in this file, and it is on the default. See AdtClass.
+    protected readonly results: R = transportDocuments as unknown as R,
   ) {
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};
   }
 
+  /** The request number, or the caller's mistake. */
+  private number(config: Partial<ITransportConfig>): string {
+    if (!config.transportNumber) {
+      throw new Error('Transport request number is required');
+    }
+    return config.transportNumber;
+  }
+
   /**
-   * Create transport request
+   * Create a transport request.
+   *
+   * The number is the system's to generate, so there is nothing to validate
+   * before the POST — which is why this module has no `validate`.
    */
-  async create(
+  async create<E extends IAdtError = IAdtError>(
     config: ITransportConfig,
-    _options?: IAdtOperationOptions,
-  ): Promise<ITransportState> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     if (!config.description) {
       throw new Error('Transport request description is required');
     }
 
-    try {
-      this.logger?.info?.('Creating transport request');
-      const response = await createTransport(this.connection, {
-        transport_type:
-          config.transportType === 'customizing' ? 'customizing' : 'workbench',
-        description: config.description,
-        target_system: config.targetSystem,
-        owner: config.owner ?? this.systemContext.responsible,
-      });
-
-      const transportNumber = response.data?.transport_request;
-
-      if (!transportNumber) {
-        throw new Error(
-          'Failed to create transport request: transport number not returned',
-        );
-      }
-
-      this.logger?.info?.('Transport request created:', transportNumber);
-
-      return {
-        createResult: response,
-        transportNumber,
-        errors: [],
-      };
-    } catch (error: unknown) {
-      this.logger?.error('Create failed:', safeErrorMessage(error));
-      throw error;
-    }
+    this.logger?.info?.('Creating transport request');
+    return answering(
+      () =>
+        createTransport(this.connection, {
+          transport_type:
+            config.transportType === 'customizing'
+              ? 'customizing'
+              : 'workbench',
+          description: config.description,
+          target_system: config.targetSystem,
+          owner: config.owner ?? this.systemContext.responsible,
+        }),
+      this.results.created as IResultStrategy<ReturnType<R['created']>>,
+      options?.analyse,
+    );
   }
 
-  /**
-   * Read transport request
-   */
-  async read(
+  /** Read one transport request. */
+  async read<E extends IAdtError = IAdtError>(
     config: Partial<ITransportConfig>,
     _version?: 'active' | 'inactive',
-  ): Promise<ITransportState | undefined> {
-    if (!config.transportNumber) {
-      throw new Error('Transport request number is required');
-    }
+    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['read']>, E>> {
+    const number = this.number(config);
 
-    try {
-      const response = await getTransport(
-        this.connection,
-        config.transportNumber,
-      );
-
-      // Parse response data to extract transport request details
-      // Response format depends on ADT API
-      const _data = response.data;
-
-      return {
-        transportNumber: config.transportNumber,
-        readResult: response,
-        errors: [],
-      };
-    } catch (error: unknown) {
-      const e = error as HttpError;
-      if (e.response?.status === 404) {
-        return undefined;
-      }
-      throw error;
-    }
+    return answering(
+      () => getTransport(this.connection, number),
+      this.results.read as IResultStrategy<ReturnType<R['read']>>,
+      options?.analyse,
+    );
   }
 
   /**
-   * List transport requests.
+   * The same document `read` fetches.
+   *
+   * A transport request has no separate metadata resource: what `read` answers
+   * *is* the description, the owner and the tasks.
+   */
+  async readMetadata<E extends IAdtError = IAdtError>(
+    config: Partial<ITransportConfig>,
+    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['read']>, E>> {
+    return this.read(config, undefined, options);
+  }
+
+  /**
+   * The transport requests the server lists.
+   *
+   * Until 30.0.0 this resource had three members — `list`, `listNodes`, and a
+   * `listNodes<T>(parse, …)` overload — which answered the identical document
+   * read to three different depths. One request, one member: the reading is
+   * chosen when this implementation is constructed, and the tree is the
+   * default because it is the only one that carries the containers, the
+   * description and the language a request holds.
    *
    * With `configUri`: one request. Without: two — the configurations, then the
    * list. The five filter parameters this used to take were never read by the
    * server; filtering is a property of the saved configuration.
    */
-  async list(options?: IListTransportsOptions): Promise<ITransportState> {
+  async list(
+    options?: IListTransportsOptions,
+  ): Promise<IAdtResponse<ReturnType<R['list']>>> {
     const configUri =
       options?.configUri ?? (await this.resolveSearchConfiguration());
 
     this.logger?.info?.('Listing transport requests', { configUri });
-    const response = await listTransports(this.connection, { configUri });
-
-    return { listResult: response, errors: [] };
-  }
-
-  /**
-   * The transport tree, parsed.
-   *
-   * Adds no request to `list()` — with a `configUri` that is one call, without
-   * one it is two, exactly as `list()` alone.
-   *
-   * Rejects on a body the parser does not recognise: the signature promises
-   * `ITransportTree`, and a reader takes a signature for a guarantee, so the
-   * guarantee here is "this shape or an error" — never a silently empty tree.
-   * An empty `tm:root` is not that failure: it resolves with `requests: []`,
-   * the permanent correct answer on a system holding no transport requests.
-   *
-   * A consumer whose system answers in a shape the default parser does not fit
-   * passes its own and keeps a type; telling it to fall back on the raw
-   * response would be telling it to go untyped, which is the defect this
-   * exists to remove.
-   */
-  async listNodes(options?: IListTransportsOptions): Promise<ITransportTree>;
-  async listNodes<T>(
-    parse: (data: unknown) => T,
-    options?: IListTransportsOptions,
-  ): Promise<T>;
-  async listNodes<T>(
-    first?: IListTransportsOptions | ((data: unknown) => T),
-    second?: IListTransportsOptions,
-  ): Promise<ITransportTree | T> {
-    const parse = typeof first === 'function' ? first : undefined;
-    const options = typeof first === 'function' ? second : first;
-
-    const state = await this.list(options);
-    const data = state.listResult?.data;
-
-    return parse ? parse(data) : parseTransportTree(data);
+    return answering(
+      () => listTransports(this.connection, { configUri }),
+      this.results.list as IResultStrategy<ReturnType<R['list']>>,
+    );
   }
 
   /**
@@ -244,90 +249,47 @@ export class AdtRequest
   }
 
   /**
-   * Read transport request metadata
-   * For transport requests, read() already returns all metadata (description, owner, etc.)
-   */
-  async readMetadata(
-    config: Partial<ITransportConfig>,
-  ): Promise<ITransportState> {
-    // For transport requests, metadata is the same as read() result
-    const readResult = await this.read(config);
-    if (!readResult) {
-      throw new Error('Transport request not found');
-    }
-    return readResult;
-  }
-
-  /**
-   * Update transport request description
+   * Update the request's description.
    *
-   * ADT's only mutable field on a request is its description. Read-modify-write:
-   * GET the current XML, patch the description into it, PUT it back — building
-   * the body from scratch would drop every server-managed field the client does
-   * not model.
+   * ADT's only mutable field on a request. Read-modify-write: GET the current
+   * XML, patch the description into it, PUT it back — building the body from
+   * scratch would drop every server-managed field the client does not model.
    */
-  async update(
+  async update<E extends IAdtError = IAdtError>(
     config: Partial<ITransportConfig>,
-    _options?: IAdtOperationOptions,
-  ): Promise<ITransportState> {
-    if (!config.transportNumber) {
-      throw new Error('Transport request number is required');
-    }
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+    const number = this.number(config);
     if (!config.description) {
       throw new Error('Transport request description is required for update');
     }
+    const description = config.description;
 
-    try {
-      this.logger?.info?.(
-        'Updating transport request description:',
-        config.transportNumber,
-      );
-      const response = await updateTransport(
-        this.connection,
-        config.transportNumber,
-        config.description,
-      );
-
-      return {
-        transportNumber: config.transportNumber,
-        updateResult: response,
-        errors: [],
-      };
-    } catch (error: unknown) {
-      this.logger?.error('Update failed:', safeErrorMessage(error));
-      throw error;
-    }
+    this.logger?.info?.('Updating transport request description:', number);
+    return answering(
+      () => updateTransport(this.connection, number, description),
+      this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      options?.analyse,
+    );
   }
 
   /**
-   * Delete transport request
+   * Delete the request.
    *
    * ADT accepts this only for a request that holds no objects; a non-empty
    * request is rejected by the server, not by this client.
    */
-  async delete(config: Partial<ITransportConfig>): Promise<ITransportState> {
-    if (!config.transportNumber) {
-      throw new Error('Transport request number is required');
-    }
+  async delete<E extends IAdtError = IAdtError>(
+    config: Partial<ITransportConfig>,
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deleted']>, E>> {
+    const number = this.number(config);
 
-    try {
-      this.logger?.info?.(
-        'Deleting transport request:',
-        config.transportNumber,
-      );
-      const response = await deleteTransport(
-        this.connection,
-        config.transportNumber,
-      );
-
-      return {
-        transportNumber: config.transportNumber,
-        deleteResult: response,
-        errors: [],
-      };
-    } catch (error: unknown) {
-      this.logger?.error('Delete failed:', safeErrorMessage(error));
-      throw error;
-    }
+    this.logger?.info?.('Deleting transport request:', number);
+    return answering(
+      () => deleteTransport(this.connection, number),
+      this.results.deleted as IResultStrategy<ReturnType<R['deleted']>>,
+      options?.analyse,
+    );
   }
 }

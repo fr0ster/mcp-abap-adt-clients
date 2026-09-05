@@ -15,12 +15,11 @@ import * as path from 'node:path';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type {
-  IFunctionModuleConfig,
-  IFunctionModuleState,
-} from '../../../../core/functionModule';
+import type { IFunctionModuleConfig } from '../../../../core/functionModule';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { expectResult } from '../../../helpers/contract';
+import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -72,7 +71,7 @@ describe('FunctionModule (using AdtClient)', () => {
   let isCloudSystem = false;
   let isLegacy = false;
   let systemContext: Awaited<ReturnType<typeof resolveSystemContext>>;
-  let tester: BaseTester<IFunctionModuleConfig, IFunctionModuleState>;
+  let tester: BaseTester<IFunctionModuleConfig>;
 
   beforeAll(async () => {
     try {
@@ -125,30 +124,30 @@ describe('FunctionModule (using AdtClient)', () => {
           const functionGroupName = testCase?.params?.function_group_name;
           if (!functionGroupName) return { success: true };
 
-          // Check if function module already exists via metadata
-          try {
+          // The answer decides, not the absence of a throw: a read does not
+          // throw for a missing object any more, so the old `try` fell through
+          // to "it exists" every time and this flow refused to run against a
+          // system that was in exactly the state it wanted.
+          const presence = presenceOf(
             await client.getFunctionModule().readMetadata({
               functionGroupName,
               functionModuleName,
-            });
-            // FM exists — skip test, post-test cleanup will handle deletion
+            }),
+            `FM ${functionGroupName}/${functionModuleName}`,
+          );
+          if (presence.present === 'unknown') {
+            // Not "missing": we did not find out, and creating over an object
+            // that may be there is the irreversible half of that guess.
+            return { success: false, reason: `⚠️ ${presence.reason}` };
+          }
+          if (presence.present) {
             return {
               success: false,
               objectExists: true,
               reason: `⚠️ Function Module ${functionGroupName}/${functionModuleName} already exists. Post-test cleanup will delete it.`,
             };
-          } catch (readErr: any) {
-            const status = readErr?.response?.status ?? readErr?.status;
-            if (status === 404) {
-              // FM doesn't exist — safe to proceed
-              return { success: true };
-            }
-            // Other error (406, 500, etc.) — cannot determine existence, skip for safety
-            return {
-              success: false,
-              reason: `⚠️ Cannot verify FM ${functionGroupName}/${functionModuleName} (HTTP ${status}): ${readErr.message}`,
-            };
           }
+          return { success: true };
         },
       });
     } catch (error) {
@@ -305,12 +304,10 @@ describe('FunctionModule (using AdtClient)', () => {
             functionModuleName: standardFunctionModuleName,
             functionGroupName: standardFunctionGroupName,
           });
-          expect(resultState?.readResult).toBeDefined();
-          const sourceCode =
-            typeof resultState?.readResult === 'string'
-              ? resultState.readResult
-              : (resultState?.readResult as any)?.data || '';
-          expect(typeof sourceCode).toBe('string');
+          // `readTest` unwraps the contract, so this is the document itself —
+          // the `.data` fallback beside it was reaching into an envelope that
+          // no longer arrives.
+          expect(typeof resultState).toBe('string');
 
           logTestSuccess(testsLogger, 'FunctionModule - read standard object');
         } catch (error: any) {

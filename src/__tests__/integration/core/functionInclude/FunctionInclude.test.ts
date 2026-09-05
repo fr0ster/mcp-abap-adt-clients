@@ -12,19 +12,14 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type {
-  IAbapConnection,
-  IAdtObject,
-  ILogger,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type {
-  IFunctionIncludeConfig,
-  IFunctionIncludeState,
-} from '../../../../core/functionInclude';
+import type { IFunctionIncludeConfig } from '../../../../core/functionInclude';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { expectResult } from '../../../helpers/contract';
+import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -36,6 +31,7 @@ import {
   createLibraryLogger,
   createTestsLogger,
 } from '../../../helpers/testLogger';
+import { logTestSkip } from '../../../helpers/testProgressLogger';
 
 const {
   resolvePackageName,
@@ -68,7 +64,7 @@ describe('FunctionInclude (using AdtClient)', () => {
   let isCloudSystem = false;
   let isLegacy = false;
   let systemContext: Awaited<ReturnType<typeof resolveSystemContext>>;
-  let tester: BaseTester<IFunctionIncludeConfig, IFunctionIncludeState>;
+  let tester: BaseTester<IFunctionIncludeConfig>;
 
   beforeAll(async () => {
     try {
@@ -81,13 +77,10 @@ describe('FunctionInclude (using AdtClient)', () => {
       isLegacy = legacy;
       hasConfig = true;
 
-      tester = new BaseTester<IFunctionIncludeConfig, IFunctionIncludeState>(
+      tester = new BaseTester<IFunctionIncludeConfig>(
         // getFunctionInclude() is narrowed to its honest capability composite
         // (no readTransport); cast through the full interface.
-        client.getFunctionInclude() as unknown as IAdtObject<
-          IFunctionIncludeConfig,
-          IFunctionIncludeState
-        >,
+        client.getFunctionInclude(),
         'FunctionInclude',
         'create_function_include',
         'adt_function_include',
@@ -131,29 +124,27 @@ describe('FunctionInclude (using AdtClient)', () => {
           const includeName = testCase?.params?.include_name;
           if (!functionGroupName || !includeName) return { success: true };
 
-          // Probe existence of the include. readMetadata throws on 404, so we
-          // catch and map status codes the same way FunctionModule does.
-          try {
+          // The answer decides, not the absence of a throw — see
+          // `presenceOf` for what that mistake cost.
+          const presence = presenceOf(
             await client.getFunctionInclude().readMetadata({
               functionGroupName,
               includeName,
-            });
+            }),
+            `Function Include ${functionGroupName}/${includeName}`,
+          );
+          if (presence.present === 'unknown') {
+            return { success: false, reason: `⚠️ ${presence.reason}` };
+          }
+          if (presence.present) {
             // Include exists — let post-test cleanup handle it.
             return {
               success: false,
               objectExists: true,
               reason: `⚠️ Function Include ${functionGroupName}/${includeName} already exists. Post-test cleanup will delete it.`,
             };
-          } catch (readErr: any) {
-            const status = readErr?.response?.status ?? readErr?.status;
-            if (status === 404) {
-              return { success: true };
-            }
-            return {
-              success: false,
-              reason: `⚠️ Cannot verify Function Include ${functionGroupName}/${includeName} (HTTP ${status}): ${readErr.message}`,
-            };
           }
+          return { success: true };
         },
       });
     } catch (error) {
@@ -264,42 +255,49 @@ describe('FunctionInclude (using AdtClient)', () => {
     );
 
     it(
-      'should read source via readSource()',
+      'should read source via read()',
       async () => {
-        if (!tester || !hasConfig || !client) return;
+        if (!tester || !hasConfig || !client) {
+          logTestSkip(
+            testsLogger,
+            'FunctionInclude - read source',
+            'No SAP configuration',
+          );
+          return;
+        }
         const testCase = tester.getTestCaseDefinition();
         const functionGroupName = testCase?.params?.function_group_name;
         const includeName = testCase?.params?.include_name;
-        if (!functionGroupName || !includeName) return;
-
-        try {
-          // readSource() is a method on the concrete AdtFunctionInclude handler
-          // (not part of the generic IAdtObject interface), so we cast.
-          const handler = client.getFunctionInclude() as unknown as {
-            readSource: (
-              config: Partial<IFunctionIncludeConfig>,
-            ) => Promise<IFunctionIncludeState | undefined>;
-          };
-          const result = await handler.readSource({
-            functionGroupName,
-            includeName,
-          });
-          if (result === undefined) {
-            // Include not present (e.g. previous flow test was skipped). That's
-            // acceptable — the readSource path is what we're smoke-testing.
-            return;
-          }
-          expect(result).toBeDefined();
-          expect(result.errors).toEqual([]);
-          const payload = result.readResult;
-          const body =
-            typeof payload === 'string' ? payload : (payload as any)?.data;
-          expect(typeof body).toBe('string');
-        } catch (error: any) {
-          const status = error?.response?.status;
-          if (status === 404) return; // include gone - nothing to read
-          throw error;
+        if (!functionGroupName || !includeName) {
+          logTestSkip(
+            testsLogger,
+            'FunctionInclude - read source',
+            'function_group_name / include_name not configured',
+          );
+          return;
         }
+
+        // There is no `readSource()` any more: `read()` is the source, as the
+        // contract says of an object that has one. The cast this used to need
+        // went with it.
+        const answer = await client
+          .getFunctionInclude()
+          .read({ functionGroupName, includeName });
+
+        // The flow test above creates this include and deletes it again, so by
+        // the time this runs it is usually gone — and ADT says so with an
+        // exception document, which is a refusal. That is the answer, not a
+        // reason to fail; what would be a defect is a *populated* source for an
+        // include nobody has.
+        if (!answer.ok) {
+          logTestSkip(
+            testsLogger,
+            'FunctionInclude - read source',
+            `include is not there: ${answer.getError().message}`,
+          );
+          return;
+        }
+        expect(typeof answer.getResult().value).toBe('string');
       },
       getTimeout('test'),
     );

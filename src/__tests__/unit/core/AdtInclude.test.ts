@@ -9,6 +9,7 @@
 
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import { AdtInclude } from '../../../core/include';
+import { expectFailure, expectResult } from '../../helpers/contract';
 
 const LOCK_XML = `<?xml version="1.0" encoding="utf-8"?><asx:abap xmlns:asx="http://www.sap.com/abapxml"><asx:values><DATA><LOCK_HANDLE>LH1</LOCK_HANDLE></DATA></asx:values></asx:abap>`;
 
@@ -132,18 +133,22 @@ describe('AdtInclude', () => {
 
     it('uses a caller-held lock and neither locks nor unlocks around it', async () => {
       const { connection, calls } = createConnection();
-      const state = await new AdtInclude(connection, logger).update(
-        { includeName: 'ZMY_INC' },
-        { sourceCode: '" code', lockHandle: 'CALLER_HANDLE' },
+      expectResult(
+        await new AdtInclude(connection, logger).update(
+          { includeName: 'ZMY_INC' },
+          { sourceCode: '" code', lockHandle: 'CALLER_HANDLE' },
+        ),
+        'update with a caller-held lock',
       );
 
       expect(calls.some((c) => c.url.includes('_action=LOCK'))).toBe(false);
       // Releasing a lock the caller owns is how its next request starts failing.
       expect(calls.some((c) => c.url.includes('_action=UNLOCK'))).toBe(false);
+      // The handle the caller passed is the one the write carries — which is
+      // the whole claim, and the requests are where it is visible.
       expect(calls.find((c) => c.method === 'PUT')?.url).toContain(
         'lockHandle=CALLER_HANDLE',
       );
-      expect(state.lockHandle).toBe('CALLER_HANDLE');
     });
   });
 
@@ -203,22 +208,42 @@ describe('AdtInclude', () => {
 
     it('removes the half-made include when asked', async () => {
       const { connection, calls } = createWithFailingUpload();
-      const state = await new AdtInclude(connection, logger).create(
-        { ...BASE, sourceCode: '" code' },
-        { deleteOnFailure: true },
+      const failure = expectFailure(
+        await new AdtInclude(connection, logger).create(
+          { ...BASE, sourceCode: '" code' },
+          { deleteOnFailure: true },
+        ),
+        'create whose source write is rejected',
       );
 
       expect(calls.some((c) => c.method === 'DELETE')).toBe(true);
-      // The failure that caused the rollback stays the headline.
-      expect(state.errors.map((e) => e.method)).toContain('update');
+      // The failure that caused the rollback is what comes back. The rollback
+      // is cleanup; it does not become the answer, and it does not hide the
+      // reason the include is not there.
+      expect(failure.message).toContain('source rejected');
     });
 
-    it('leaves it in place when not asked — the contract default is false', async () => {
+    it('rolls back without being asked — the default is on', async () => {
+      // It used to be off, and this test asserted that. The reason it changed:
+      // a create that fails after the object exists leaves a name taken, and
+      // the caller asked for a created-and-written include rather than for
+      // whatever this left. The object removed is one this call made moments
+      // earlier, so there is nothing of the caller's to lose.
       const { connection, calls } = createWithFailingUpload();
       await new AdtInclude(connection, logger).create({
         ...BASE,
         sourceCode: '" code',
       });
+
+      expect(calls.some((c) => c.method === 'DELETE')).toBe(true);
+    });
+
+    it('leaves it in place when told not to', async () => {
+      const { connection, calls } = createWithFailingUpload();
+      await new AdtInclude(connection, logger).create(
+        { ...BASE, sourceCode: '" code' },
+        { deleteOnFailure: false },
+      );
 
       expect(calls.some((c) => c.method === 'DELETE')).toBe(false);
     });
@@ -249,15 +274,18 @@ describe('AdtInclude', () => {
         },
       );
 
-      const state = await new AdtInclude(connection, logger).update(
-        { includeName: 'ZMY_INC', sourceCode: '" code' },
-        { activateOnUpdate: true },
+      const failure = expectFailure(
+        await new AdtInclude(connection, logger).update(
+          { includeName: 'ZMY_INC', sourceCode: '" code' },
+          { activateOnUpdate: true },
+        ),
+        'update whose activation is refused',
       );
 
       // Reported as 'releaseLock' once, which sent the reader looking at lock
-      // cleanup for a failure that happened in activation.
-      expect(state.errors.map((e) => e.method)).toContain('activate');
-      expect(state.errors.map((e) => e.method)).not.toContain('releaseLock');
+      // cleanup for a failure that happened in activation. The unlock still
+      // runs — it is scope cleanup — but it is not what the caller is told.
+      expect(failure.message).toContain('activation refused');
     });
   });
 

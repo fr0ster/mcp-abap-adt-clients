@@ -137,7 +137,17 @@ export function withRefusalDetection(
       }
     }
 
-    return response;
+    // Not a refusal this recognises — but the request is still worth keeping.
+    // A verdict in a document nobody classifies as an exception is read by a
+    // shipped `analyse` further up (an activation checklist, a deletion check,
+    // a publication's severity), and by then this is the last place the URL
+    // existed: the connection answers a 200 as `status`, `statusText`,
+    // `headers` and `data`, with `config` and `request` dropped.
+    //
+    // A new object rather than a field written onto the connection's own: the
+    // method is wrapped carefully above, and writing into the value it returns
+    // would give that care away.
+    return { ...response, request: asked };
   };
 
   return connection;

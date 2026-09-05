@@ -1,40 +1,44 @@
-import type { CheckRunVersion } from '../../utils/checkRun';
-import { beginCriticalSection } from '../../utils/criticalSection';
-import { assertDeletable } from '../../utils/deletionCheck';
 /**
- * AdtAccessControl - High-level CRUD operations for Access Control (DCLS) objects
+ * AdtAccessControl - CRUD for `DCLS/DL` access controls (DCL sources).
  *
- * Implements IAdtObject interface with automatic operation chains,
- * error handling, and resource cleanup.
- *
- * Uses low-level functions directly (not Builder classes).
- *
- * Session management:
- * - stateful: only when doing lock/update/unlock operations
- * - stateless: obligatory after unlock
- * - If no lock/unlock, no stateful needed
- * - activate uses same session/cookies (no stateful needed)
- *
- * Operation chains:
- * - Create: validate → create → check → lock → check(inactive) → update → unlock → check → activate
- * - Update: lock → check(inactive) → update → unlock → check → activate
- * - Delete: check(deletion) → delete
+ * Every member answers `IAdtResponse<T>`, where T is what the result set given
+ * at construction makes of that endpoint's answer.
  */
-
 import type {
-  HttpError,
   IAbapConnection,
+  IAdtActivatable,
+  IAdtCheckable,
+  IAdtCreatable,
+  IAdtDeletable,
+  IAdtError,
+  IAdtLockable,
   IAdtOperationOptions,
-  IAdtSourceObject,
+  IAdtReadable,
+  IAdtResponse,
   IAdtSystemContext,
+  IAdtTransportAware,
+  IAdtUpdatable,
+  IAdtValidatable,
+  IAdtVersionable,
   ILogger,
+  IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
-import { safeErrorMessage } from '../../utils/internalUtils';
+import { activationRefusal } from '../../utils/activationUtils';
+import {
+  answering,
+  type IAdtOptions,
+  type IAnalyse,
+} from '../../utils/adtResponse';
+import { beginCriticalSection } from '../../utils/criticalSection';
+import { deletionRefusal } from '../../utils/deletionCheck';
+import { validationRefusal } from '../../utils/validationRefusal';
+import { chain } from '../shared/chain';
 import {
   createLockTracker,
   type LockRegistry,
   type LockTracker,
 } from '../shared/LockRegistry';
+import type { ObjectVersion } from '../shared/results';
 import type { IReadOptions } from '../shared/types';
 import { activateAccessControl } from './activation';
 import { checkAccessControl } from './check';
@@ -46,21 +50,50 @@ import {
   getAccessControlSource,
   getAccessControlTransport,
 } from './read';
-import type { IAccessControlConfig, IAccessControlState } from './types';
+import {
+  accessControlDocuments,
+  type IAccessControlConfig,
+  type IAccessControlResults,
+} from './types';
 import { unlockAccessControl } from './unlock';
 import { updateAccessControl } from './update';
 import { validateAccessControlName } from './validation';
-
 import {
   getAccessControlVersionSource,
   getAccessControlVersions,
 } from './versions';
-export class AdtAccessControl
-  implements IAdtSourceObject<IAccessControlConfig, IAccessControlState>
+
+export class AdtAccessControl<
+  R extends IAccessControlResults<
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown
+  > = IAccessControlResults,
+> implements
+    IAdtCreatable<IAccessControlConfig, ReturnType<R['created']>>,
+    IAdtReadable<
+      IAccessControlConfig,
+      ReturnType<R['source']>,
+      ReturnType<R['metadata']>
+    >,
+    IAdtUpdatable<IAccessControlConfig, ReturnType<R['updated']>>,
+    IAdtDeletable<IAccessControlConfig, ReturnType<R['deletion']>>,
+    IAdtValidatable<IAccessControlConfig, ReturnType<R['validation']>>,
+    IAdtCheckable<IAccessControlConfig, ReturnType<R['check']>>,
+    IAdtActivatable<IAccessControlConfig, ReturnType<R['activation']>>,
+    IAdtLockable<IAccessControlConfig>,
+    IAdtTransportAware<IAccessControlConfig, ReturnType<R['transport']>>,
+    IAdtVersionable<IAccessControlConfig, ObjectVersion[], string>
 {
-  private readonly connection: IAbapConnection;
-  private readonly logger?: ILogger;
-  private readonly systemContext: IAdtSystemContext;
+  protected readonly connection: IAbapConnection;
+  protected readonly logger?: ILogger;
+  protected readonly systemContext: IAdtSystemContext;
   private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'AccessControl';
 
@@ -69,6 +102,11 @@ export class AdtAccessControl
     logger?: ILogger,
     systemContext?: IAdtSystemContext,
     lockRegistry?: LockRegistry,
+    // The one cast in this file, and it is on the default: the shipped set
+    // satisfies the erased bound, which the compiler cannot see through the
+    // `unknown`s. A cast on a member would be the factory lying about what it
+    // answers.
+    protected readonly results: R = accessControlDocuments as unknown as R,
   ) {
     this.connection = connection;
     this.logger = logger;
@@ -81,576 +119,458 @@ export class AdtAccessControl
     );
   }
 
-  /**
-   * Validate access control configuration before creation
-   */
-  async validate(
-    config: Partial<IAccessControlConfig>,
-  ): Promise<IAccessControlState> {
-    const state: IAccessControlState = { errors: [] };
+  /** The name, or the caller's mistake — nothing was asked of the server yet. */
+  private name(config: Partial<IAccessControlConfig>): string {
     if (!config.accessControlName) {
-      const error = new Error('Access control name is required for validation');
-      state.errors.push({ method: 'validate', error, timestamp: new Date() });
-      throw error;
+      throw new Error('Access control name is required');
     }
-    if (!config.packageName) {
-      const error = new Error('Package name is required for validation');
-      state.errors.push({ method: 'validate', error, timestamp: new Date() });
-      throw error;
-    }
-
-    try {
-      const response = await validateAccessControlName(
-        this.connection,
-        config.accessControlName,
-        config.packageName,
-        config.description,
-      );
-      state.validationResponse = response;
-      return state;
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({
-        method: 'validate',
-        error: err,
-        timestamp: new Date(),
-      });
-      this.logger?.error('validate', safeErrorMessage(err));
-      throw err;
-    }
+    return config.accessControlName;
   }
 
-  /**
-   * Create access control with full operation chain
-   */
-  async create(
-    config: IAccessControlConfig,
-    _options?: IAdtOperationOptions,
-  ): Promise<IAccessControlState> {
-    const state: IAccessControlState = { errors: [] };
-    if (!config.accessControlName) {
-      const error = new Error('Access control name is required');
-      state.errors.push({ method: 'create', error, timestamp: new Date() });
-      throw error;
+  /** Validate the name before creating the object. */
+  async validate<E extends IAdtError = IAdtError>(
+    config: Partial<IAccessControlConfig>,
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+    const name = this.name(config);
+    if (!config.packageName) {
+      throw new Error('Package name is required for validation');
     }
+
+    return answering(
+      () =>
+        validateAccessControlName(
+          this.connection,
+          name,
+          config.packageName as string,
+          config.description,
+        ),
+      this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
+      (options?.analyse ?? validationRefusal) as IAnalyse<E>,
+    );
+  }
+
+  /** Create the object. */
+  async create<E extends IAdtError = IAdtError>(
+    config: IAccessControlConfig,
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    const name = this.name(config);
     if (!config.packageName) {
       throw new Error('Package name is required');
     }
-    if (!config.description) {
-      throw new Error('Description is required');
-    }
 
-    try {
-      // Create access control
-      this.logger?.info?.('Creating access control');
-      const createResponse = await createAccessControl(this.connection, {
-        access_control_name: config.accessControlName,
-        package_name: config.packageName,
-        transport_request: config.transportRequest,
-        description: config.description,
-        masterSystem: this.systemContext.masterSystem,
-        responsible: this.systemContext.responsible,
-        masterLanguage:
-          config.masterLanguage ?? this.systemContext.masterLanguage,
+    return chain(this.logger, async ({ step, onScopeEnd, onFailure }) => {
+      onScopeEnd(async () => {
+        this.connection.setSessionType('stateless');
       });
-      state.createResult = createResponse;
-      this.logger?.info?.('Access control created');
 
-      return state;
-    } catch (error: unknown) {
-      this.logger?.error('Create failed:', safeErrorMessage(error));
-      throw error;
-    }
+      let created = false;
+      if (options?.deleteOnFailure ?? true) {
+        onFailure(async () => {
+          if (!created) return;
+          this.logger?.warn?.('Deleting access control after failure');
+          await deleteAccessControl(this.connection, {
+            access_control_name: name,
+            transport_request: config.transportRequest,
+          });
+        });
+      }
+
+      this.logger?.info?.('Creating access control');
+      const value = await step(
+        answering(
+          () =>
+            createAccessControl(this.connection, {
+              access_control_name: name,
+              description: config.description,
+              package_name: config.packageName as string,
+              transport_request: config.transportRequest,
+              masterSystem: this.systemContext.masterSystem,
+              responsible: this.systemContext.responsible,
+              masterLanguage:
+                config.masterLanguage ?? this.systemContext.masterLanguage,
+            }),
+          this.results.created as IResultStrategy<ReturnType<R['created']>>,
+          options?.analyse,
+        ),
+      );
+      // Only past the step: a refused create leaves nothing to delete, and the
+      // cleanup above must not remove an object this call did not make.
+      created = true;
+      this.logger?.info?.('Access control created');
+      return value;
+    });
   }
 
-  /**
-   * Read access control
-   */
-  async read(
+  /** Read the object. */
+  async read<E extends IAdtError = IAdtError>(
     config: Partial<IAccessControlConfig>,
     version?: 'active' | 'inactive',
-    options?: IReadOptions,
-  ): Promise<IAccessControlState | undefined> {
-    const state: IAccessControlState = { errors: [] };
-    if (!config.accessControlName) {
-      const error = new Error('Access control name is required');
-      state.errors.push({ method: 'read', error, timestamp: new Date() });
-      throw error;
-    }
+    options?: IReadOptions & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
+    const name = this.name(config);
 
-    try {
-      const response = await getAccessControlSource(
-        this.connection,
-        config.accessControlName,
-        version,
-        options,
-        this.logger,
-      );
-      state.readResult = response;
-      return state;
-    } catch (error: unknown) {
-      const e = error as HttpError;
-      if (e.response?.status === 404) {
-        return undefined;
-      }
-      throw error;
-    }
+    // No 404 special case: ADT answers a read for a missing object with 200 and
+    // an empty body, so absence was never a status to branch on — and whether
+    // an empty body *is* absence is the caller's reading, through `analyse`.
+    return answering(
+      () =>
+        getAccessControlSource(
+          this.connection,
+          name,
+          version ?? 'active',
+          options,
+        ),
+      this.results.source as IResultStrategy<ReturnType<R['source']>>,
+      options?.analyse,
+    );
+  }
+
+  /** Read the object's metadata document. */
+  async readMetadata<E extends IAdtError = IAdtError>(
+    config: Partial<IAccessControlConfig>,
+    options?: IReadOptions & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+    const name = this.name(config);
+
+    return answering(
+      () =>
+        getAccessControl(
+          this.connection,
+          name,
+          options?.version ?? 'active',
+          options,
+        ),
+      this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
+      options?.analyse,
+    );
+  }
+
+  /** The transport request the object belongs to. */
+  async readTransport<E extends IAdtError = IAdtError>(
+    config: Partial<IAccessControlConfig>,
+    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
+    const name = this.name(config);
+
+    return answering(
+      () => getAccessControlTransport(this.connection, name, options),
+      this.results.transport as IResultStrategy<ReturnType<R['transport']>>,
+      options?.analyse,
+    );
   }
 
   /**
-   * Read access control metadata (object characteristics: package, responsible, description, etc.)
+   * Write the object.
+   *
+   * With `options.lockHandle` the caller holds the lock and owns the chain, so
+   * this is one request. Without it, this locks, checks, writes and unlocks —
+   * and the unlock happens on every path out.
    */
-  async readMetadata(
+  async update<E extends IAdtError = IAdtError>(
     config: Partial<IAccessControlConfig>,
-    options?: IReadOptions,
-  ): Promise<IAccessControlState> {
-    const state: IAccessControlState = { errors: [] };
-    if (!config.accessControlName) {
-      const error = new Error('Access control name is required');
-      state.errors.push({
-        method: 'readMetadata',
-        error,
-        timestamp: new Date(),
-      });
-      throw error;
-    }
-    try {
-      const response = await getAccessControl(
-        this.connection,
-        config.accessControlName,
-        'inactive',
-        options,
-        this.logger,
-      );
-      state.metadataResult = response;
-      this.logger?.info?.('Access control metadata read successfully');
-      return state;
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({
-        method: 'readMetadata',
-        error: err,
-        timestamp: new Date(),
-      });
-      this.logger?.error('readMetadata', safeErrorMessage(err));
-      throw err;
-    }
-  }
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+    const name = this.name(config);
+    const source = options?.sourceCode || config.sourceCode;
 
-  /**
-   * Read transport request information for the access control
-   */
-  async readTransport(
-    config: Partial<IAccessControlConfig>,
-    options?: { withLongPolling?: boolean },
-  ): Promise<IAccessControlState> {
-    const state: IAccessControlState = { errors: [] };
-    if (!config.accessControlName) {
-      const error = new Error('Access control name is required');
-      state.errors.push({
-        method: 'readTransport',
-        error,
-        timestamp: new Date(),
-      });
-      throw error;
-    }
-    try {
-      const response = await getAccessControlTransport(
-        this.connection,
-        config.accessControlName,
-        options?.withLongPolling !== undefined
-          ? { withLongPolling: options.withLongPolling }
-          : undefined,
-      );
-      state.transportResult = response;
-      this.logger?.info?.('Access control transport request read successfully');
-      return state;
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({
-        method: 'readTransport',
-        error: err,
-        timestamp: new Date(),
-      });
-      this.logger?.error('readTransport', safeErrorMessage(err));
-      throw err;
-    }
-  }
-
-  /**
-   * Update access control with full operation chain
-   * Always starts with lock
-   * If options.lockHandle is provided, performs only low-level update without lock/check/unlock chain
-   */
-  async update(
-    config: Partial<IAccessControlConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAccessControlState> {
-    const state: IAccessControlState = { errors: [] };
-    if (!config.accessControlName) {
-      const error = new Error('Access control name is required');
-      state.errors.push({ method: 'update', error, timestamp: new Date() });
-      throw error;
-    }
-
-    // Low-level mode: if lockHandle is provided, perform only update operation
     if (options?.lockHandle) {
-      const codeToUpdate = options?.sourceCode || config.sourceCode;
-      if (!codeToUpdate) {
+      const lockHandle = options.lockHandle;
+      if (!source) {
         throw new Error('Source code is required for update');
       }
-
       this.logger?.info?.(
         'Low-level update: performing update only (lockHandle provided)',
       );
-      const updateResponse = await updateAccessControl(
-        this.connection,
-        {
-          access_control_name: config.accessControlName,
-          source_code: codeToUpdate,
-          transport_request: config.transportRequest,
-        },
-        options.lockHandle,
+      return answering(
+        () =>
+          updateAccessControl(
+            this.connection,
+            {
+              access_control_name: name,
+              source_code: source as string,
+              transport_request: config.transportRequest,
+            },
+            lockHandle,
+          ),
+        this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+        options?.analyse,
       );
-      this.logger?.info?.('Access control updated (low-level)');
-      return {
-        updateResult: updateResponse,
-        errors: [],
-      };
     }
 
-    let lockHandle: string | undefined;
-
-    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
-
-    // the lock but leaves the work half-done.
-
+    // A LOCK…UNLOCK window: a timeout in the middle releases the lock and
+    // leaves the work half done, so the connection is told this is critical.
     const endCriticalSection = beginCriticalSection(this.connection);
 
-    try {
-      // 1. Lock (update always starts with lock, stateful ONLY before lock)
+    return chain(this.logger, async ({ step, onScopeEnd }) => {
+      onScopeEnd(async () => {
+        endCriticalSection();
+      });
+
       this.logger?.info?.('Step 1: Locking access control');
       this.connection.setSessionType('stateful');
-      lockHandle = await lockAccessControl(
-        this.connection,
-        config.accessControlName,
-      );
-      this.lockTracker.track(config.accessControlName, lockHandle);
+      // Registered FIRST so it unwinds LAST: on older BASIS a lock handle is
+      // only valid inside a stateful request, so going stateless before the
+      // unlock would break the unlock (#106); and if the lock itself throws,
+      // the session is still restored.
+      onScopeEnd(async () => {
+        this.connection.setSessionType('stateless');
+      });
+
+      const lockHandle = await lockAccessControl(this.connection, name);
+      this.lockTracker.track(name, lockHandle);
+      const releaseLock = onScopeEnd(async () => {
+        await unlockAccessControl(this.connection, name, lockHandle);
+        this.lockTracker.untrack(name);
+      });
       this.logger?.info?.('Access control locked, handle:', lockHandle);
 
-      // 2. Check inactive with code for update (from options or config)
-      const codeToCheck = options?.sourceCode || config.sourceCode;
-      if (codeToCheck) {
+      if (source) {
         this.logger?.info?.(
           'Step 2: Checking inactive version with update content',
         );
-        await checkAccessControl(
-          this.connection,
-          config.accessControlName,
-          'inactive',
-          codeToCheck,
-          this.logger,
+        await step(
+          answering(
+            () => checkAccessControl(this.connection, name, 'inactive', source),
+            this.results.check as IResultStrategy<ReturnType<R['check']>>,
+            options?.analyse,
+          ),
         );
-        this.logger?.info?.('Check inactive with update content passed');
       }
 
-      // 3. Update
-      if (codeToCheck && lockHandle) {
+      let updated = undefined as ReturnType<R['updated']>;
+      if (source) {
         this.logger?.info?.('Step 3: Updating access control');
-        await updateAccessControl(
-          this.connection,
-          {
-            access_control_name: config.accessControlName,
-            source_code: codeToCheck,
-            transport_request: config.transportRequest,
-          },
-          lockHandle,
+        updated = await step(
+          answering(
+            () =>
+              updateAccessControl(
+                this.connection,
+                {
+                  access_control_name: name,
+                  source_code: source as string,
+                  transport_request: config.transportRequest,
+                },
+                lockHandle,
+              ),
+            this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+            options?.analyse,
+          ),
         );
         this.logger?.info?.('Access control updated');
 
-        // Poll the inactive version: the write above produced it; the active version may not exist yet.
-        // 3.5. Read with long polling (wait for object to be ready after update)
-        this.logger?.info?.('read (wait for object ready after update)');
-        try {
-          await this.read(
-            { accessControlName: config.accessControlName },
-            'inactive',
-            { withLongPolling: true },
-          );
-          this.logger?.info?.('object is ready after update');
-        } catch (readError) {
+        // The write produced the inactive version; the active one may not exist
+        // yet. A failure here is not the update's failure, so it is logged and
+        // the chain continues — the unlock still has to happen.
+        const ready = await this.read(config, 'inactive', {
+          withLongPolling: true,
+        });
+        if (!ready.ok) {
           this.logger?.warn?.(
-            'read with long polling failed (object may not be ready yet):',
-            safeErrorMessage(readError),
+            'read with long polling failed after update:',
+            ready.getError().message,
           );
-          // Continue anyway - unlock might still work
         }
       }
 
-      // 4. Unlock (obligatory stateless after unlock)
-      if (lockHandle) {
-        this.logger?.info?.('Step 4: Unlocking access control');
-        this.connection.setSessionType('stateful');
-        await unlockAccessControl(
-          this.connection,
-          config.accessControlName,
-          lockHandle,
-        );
-        this.connection.setSessionType('stateless');
-        this.lockTracker.untrack(config.accessControlName);
-        lockHandle = undefined;
-        this.logger?.info?.('Access control unlocked');
-      }
+      this.logger?.info?.('Step 4: Unlocking access control');
+      this.connection.setSessionType('stateful');
+      await unlockAccessControl(this.connection, name, lockHandle);
+      this.connection.setSessionType('stateless');
+      this.lockTracker.untrack(name);
+      // Unlocked as its own step, so the registration is discharged rather than
+      // run a second time when the scope unwinds.
+      releaseLock();
+      this.logger?.info?.('Access control unlocked');
 
-      // 5. Final check (no stateful needed)
       this.logger?.info?.('Step 5: Final check');
-      await checkAccessControl(
-        this.connection,
-        config.accessControlName,
-        'inactive',
-        undefined,
-        this.logger,
+      await step(
+        answering(
+          () => checkAccessControl(this.connection, name, 'inactive'),
+          this.results.check as IResultStrategy<ReturnType<R['check']>>,
+          options?.analyse,
+        ),
       );
-      this.logger?.info?.('Final check passed');
 
-      // 6. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnUpdate) {
         this.logger?.info?.('Step 6: Activating access control');
-        const activateResponse = await activateAccessControl(
-          this.connection,
-          config.accessControlName,
+        await step(
+          answering(
+            () => activateAccessControl(this.connection, name),
+            this.results.activation as IResultStrategy<
+              ReturnType<R['activation']>
+            >,
+            (options?.analyse ?? activationRefusal) as IAnalyse<E>,
+          ),
         );
-        this.logger?.info?.(
-          'Access control activated, status:',
-          activateResponse.status,
-        );
 
-        // 6.5. Read with long polling (wait for object to be ready after activation)
-        this.logger?.info?.('read (wait for object ready after activation)');
-        try {
-          await this.read(
-            { accessControlName: config.accessControlName },
-            'active',
-            { withLongPolling: true },
-          );
-          this.logger?.info?.('object is ready after activation');
-        } catch (readError) {
+        const ready = await this.read(config, 'active', {
+          withLongPolling: true,
+        });
+        if (!ready.ok) {
           this.logger?.warn?.(
-            'read with long polling failed (object may not be ready yet):',
-            safeErrorMessage(readError),
-          );
-          // Continue anyway - return activation response
-        }
-
-        return {
-          activateResult: activateResponse,
-          errors: [],
-        };
-      }
-
-      // Read and return result (no stateful needed)
-      const readResponse = await getAccessControlSource(
-        this.connection,
-        config.accessControlName,
-      );
-
-      return {
-        readResult: readResponse,
-        errors: [],
-      };
-    } catch (error: unknown) {
-      // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
-      if (lockHandle) {
-        try {
-          this.logger?.warn?.('Unlocking access control during error cleanup');
-          this.connection.setSessionType('stateful');
-          await unlockAccessControl(
-            this.connection,
-            config.accessControlName,
-            lockHandle,
-          );
-          this.connection.setSessionType('stateless');
-          this.lockTracker.untrack(config.accessControlName);
-        } catch (unlockError) {
-          this.logger?.warn?.(
-            'Failed to unlock during cleanup:',
-            safeErrorMessage(unlockError),
-          );
-        }
-      } else {
-        // Ensure stateless if lock failed
-        this.connection.setSessionType('stateless');
-      }
-
-      if (options?.deleteOnFailure) {
-        try {
-          this.logger?.warn?.('Deleting access control after failure');
-          // No stateful needed - delete doesn't use lock/unlock
-          await deleteAccessControl(this.connection, {
-            access_control_name: config.accessControlName,
-            transport_request: config.transportRequest,
-          });
-        } catch (deleteError) {
-          this.logger?.warn?.(
-            'Failed to delete access control after failure:',
-            safeErrorMessage(deleteError),
+            'read with long polling failed after activation:',
+            ready.getError().message,
           );
         }
       }
 
-      this.logger?.error('Update failed:', safeErrorMessage(error));
-      throw error;
-    } finally {
-      endCriticalSection();
-    }
+      return updated;
+    });
   }
 
   /**
-   * Delete access control
+   * Delete the object.
+   *
+   * The deletion check is read, not merely performed: ADT answers a refusal
+   * with `del:isDeletable="false"` inside a 200, and a delete that ignored it
+   * reported success while the object stayed. {@link deletionRefusal} is the
+   * shipped reading of that answer; a caller who wants another passes their own
+   * `analyse`.
    */
-  async delete(
+  async delete<E extends IAdtError = IAdtError>(
     config: Partial<IAccessControlConfig>,
-  ): Promise<IAccessControlState> {
-    const state: IAccessControlState = { errors: [] };
-    if (!config.accessControlName) {
-      const error = new Error('Access control name is required');
-      state.errors.push({ method: 'delete', error, timestamp: new Date() });
-      throw error;
-    }
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+    const name = this.name(config);
 
-    try {
-      // Check for deletion (no stateful needed)
+    return chain(this.logger, async ({ step }) => {
       this.logger?.info?.('Checking access control for deletion');
-      const deletionCheck = await checkDeletion(this.connection, {
-        access_control_name: config.accessControlName,
-        transport_request: config.transportRequest,
-      });
-      // ADT already said whether this may be deleted; refusing to read that
-      // answer is how a delete came to report success while the object
-      // stayed. Throws on isDeletable=false or a message of type E; a W
-      // is a warning and passes.
-      assertDeletable(deletionCheck.data);
+      await step(
+        answering(
+          () =>
+            checkDeletion(this.connection, {
+              access_control_name: name,
+              transport_request: config.transportRequest,
+            }),
+          this.results.check as IResultStrategy<ReturnType<R['check']>>,
+          (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
+        ),
+      );
       this.logger?.info?.('Deletion check passed');
 
-      // Delete (no stateful needed - no lock/unlock)
+      // No stateful session: this delete uses no lock.
       this.logger?.info?.('Deleting access control');
-      const result = await deleteAccessControl(this.connection, {
-        access_control_name: config.accessControlName,
-        transport_request: config.transportRequest,
-      });
-      this.logger?.info?.('Access control deleted');
-
-      return {
-        deleteResult: result,
-        errors: [],
-      };
-    } catch (error: unknown) {
-      this.logger?.error('Delete failed:', safeErrorMessage(error));
-      throw error;
-    }
-  }
-
-  /**
-   * Activate access control
-   * No stateful needed - uses same session/cookies
-   */
-  async activate(
-    config: Partial<IAccessControlConfig>,
-  ): Promise<IAccessControlState> {
-    const state: IAccessControlState = { errors: [] };
-    if (!config.accessControlName) {
-      const error = new Error('Access control name is required');
-      state.errors.push({ method: 'activate', error, timestamp: new Date() });
-      throw error;
-    }
-
-    try {
-      const result = await activateAccessControl(
-        this.connection,
-        config.accessControlName,
+      const value = await step(
+        answering(
+          () =>
+            deleteAccessControl(this.connection, {
+              access_control_name: name,
+              transport_request: config.transportRequest,
+            }),
+          this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+          options?.analyse,
+        ),
       );
-      state.activateResult = result;
-      return state;
-    } catch (error: unknown) {
-      this.logger?.error('Activate failed:', safeErrorMessage(error));
-      throw error;
-    }
+      this.logger?.info?.('Access control deleted');
+      return value;
+    });
   }
 
-  /**
-   * Check access control
-   */
-  async check(
+  /** Activate the object. Needs no stateful session. */
+  async activate<E extends IAdtError = IAdtError>(
+    config: Partial<IAccessControlConfig>,
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+    const name = this.name(config);
+
+    return answering(
+      () => activateAccessControl(this.connection, name),
+      this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
+      (options?.analyse ?? activationRefusal) as IAnalyse<E>,
+    );
+  }
+
+  /** Check the object. */
+  async check<E extends IAdtError = IAdtError>(
     config: Partial<IAccessControlConfig>,
     status?: string,
-  ): Promise<IAccessControlState> {
-    const state: IAccessControlState = { errors: [] };
-    if (!config.accessControlName) {
-      const error = new Error('Access control name is required');
-      state.errors.push({ method: 'check', error, timestamp: new Date() });
-      throw error;
-    }
-
-    // Map status to version
-    const version: CheckRunVersion =
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+    const name = this.name(config);
+    const version: 'active' | 'inactive' =
       status === 'active' ? 'active' : 'inactive';
-    state.checkResult = await checkAccessControl(
-      this.connection,
-      config.accessControlName,
-      version,
-      undefined,
-      this.logger,
+
+    return answering(
+      () =>
+        checkAccessControl(this.connection, name, version, config.sourceCode),
+      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      options?.analyse,
     );
-    return state;
   }
 
-  /**
-   * Lock access control for modification
-   */
-  async lock(config: Partial<IAccessControlConfig>): Promise<string> {
-    if (!config.accessControlName) {
-      throw new Error('Access control name is required');
-    }
+  /** Lock the object for modification. */
+  async lock(
+    config: Partial<IAccessControlConfig>,
+  ): Promise<IAdtResponse<string>> {
+    const name = this.name(config);
 
-    this.connection.setSessionType('stateful');
-    const lockHandle = await lockAccessControl(
-      this.connection,
-      config.accessControlName,
+    return answering(
+      async () => {
+        this.connection.setSessionType('stateful');
+        const lockHandle = await lockAccessControl(this.connection, name);
+        this.lockTracker.track(name, lockHandle);
+        // The handle is the value, and the request does not keep the wire it
+        // came on — so the answer is built around what the request produced.
+        return {
+          data: lockHandle,
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+        };
+      },
+      (answer) => String(answer.data),
     );
-    this.lockTracker.track(config.accessControlName, lockHandle);
-    return lockHandle;
   }
 
-  /**
-   * Unlock access control
-   */
+  /** Unlock the object. */
   async unlock(
     config: Partial<IAccessControlConfig>,
     lockHandle: string,
-  ): Promise<IAccessControlState> {
-    if (!config.accessControlName) {
-      throw new Error('Access control name is required');
-    }
+  ): Promise<IAdtResponse<void>> {
+    const name = this.name(config);
 
-    this.connection.setSessionType('stateful');
-    const result = await unlockAccessControl(
-      this.connection,
-      config.accessControlName,
-      lockHandle,
+    return answering(
+      async () => {
+        // UNLOCK must run stateful (older BASIS #106); stateless after.
+        this.connection.setSessionType('stateful');
+        try {
+          return await unlockAccessControl(this.connection, name, lockHandle);
+        } finally {
+          this.connection.setSessionType('stateless');
+          this.lockTracker.untrack(name);
+        }
+      },
+      () => undefined,
     );
-    this.connection.setSessionType('stateless');
-    this.lockTracker.untrack(config.accessControlName);
-    return {
-      unlockResult: result,
-      errors: [],
-    };
   }
 
-  getVersions(config: Partial<IAccessControlConfig>) {
-    return getAccessControlVersions(this.connection, config);
+  /** Version history of the object's source. */
+  async getVersions(
+    config: Partial<IAccessControlConfig>,
+  ): Promise<IAdtResponse<ObjectVersion[]>> {
+    return answering(
+      async () => ({
+        data: await getAccessControlVersions(this.connection, config),
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+      }),
+      (answer) => answer.data as ObjectVersion[],
+    );
   }
 
-  getVersionSource(contentUri: string) {
-    return getAccessControlVersionSource(this.connection, contentUri);
+  /** The source of one version, by the `contentUri` an entry carries. */
+  async getVersionSource(contentUri: string): Promise<IAdtResponse<string>> {
+    return answering(
+      async () => ({
+        data: await getAccessControlVersionSource(this.connection, contentUri),
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+      }),
+      (answer) => String(answer.data),
+    );
   }
 }

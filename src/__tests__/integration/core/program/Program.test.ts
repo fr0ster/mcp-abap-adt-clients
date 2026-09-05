@@ -15,10 +15,11 @@ import * as path from 'node:path';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type { IProgramConfig, IProgramState } from '../../../../core/program';
+import type { IProgramConfig } from '../../../../core/program';
 import { getProgramSource } from '../../../../core/program/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -66,7 +67,7 @@ describe('Program (using AdtClient)', () => {
   let hasConfig = false;
   let isCloudSystem = false;
   let systemContext: Awaited<ReturnType<typeof resolveSystemContext>>;
-  let tester: BaseTester<IProgramConfig, IProgramState>;
+  let tester: BaseTester<IProgramConfig>;
 
   beforeAll(async () => {
     try {
@@ -260,12 +261,10 @@ describe('Program (using AdtClient)', () => {
           const resultState = await tester.readTest({
             programName: standardProgramName,
           });
-          expect(resultState?.readResult).toBeDefined();
-          const sourceCode =
-            typeof resultState?.readResult === 'string'
-              ? resultState.readResult
-              : (resultState?.readResult as any)?.data || '';
-          expect(typeof sourceCode).toBe('string');
+          // `readTest` unwraps the contract, so this is the document itself —
+          // the `.data` fallback beside it was reaching into an envelope that
+          // no longer arrives.
+          expect(typeof resultState).toBe('string');
 
           logTestSuccess(testsLogger, 'Program - read standard object');
         } catch (error) {
@@ -331,22 +330,24 @@ describe('Program (using AdtClient)', () => {
         });
 
         try {
-          const result = await client
-            .getRequest()
-            .read({ transportNumber: transportRequest });
-          expect(result).toBeDefined();
-          expect(
-            result?.transportNumber ||
-              result?.readResult?.data?.transport_request,
-          ).toBe(transportRequest);
-          const metadataState = await client
-            .getRequest()
-            .readMetadata({ transportNumber: transportRequest });
-          expect(metadataState).toBeDefined();
-          expect(
-            metadataState.transportNumber ||
-              metadataState.readResult?.data?.transport_request,
-          ).toBe(transportRequest);
+          // The shipped reading of a transport request is its document. The
+          // number is what identifies the request, so a document that does not
+          // name it is not the request that was asked for.
+          const result = expectResult(
+            await client
+              .getRequest()
+              .read({ transportNumber: transportRequest }),
+            'read transport request',
+          );
+          expect(result).toContain(transportRequest);
+
+          const metadata = expectResult(
+            await client
+              .getRequest()
+              .readMetadata({ transportNumber: transportRequest }),
+            'read transport request metadata',
+          );
+          expect(metadata).toContain(transportRequest);
 
           logTestSuccess(testsLogger, 'Program - read transport request');
         } catch (error) {

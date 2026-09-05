@@ -26,13 +26,11 @@ export async function getDdlMetadata(
   ddlName: string,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  return orThrow(
-    getUtils(connection).readObjectMetadata(
-      'view',
-      ddlName,
-      undefined,
-      options,
-    ),
+  return getUtils(connection).objectMetadataWire(
+    'view',
+    ddlName,
+    undefined,
+    options,
   );
 }
 
@@ -45,14 +43,12 @@ export async function getDdlSource(
   version?: 'active' | 'inactive',
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  return orThrow(
-    getUtils(connection).readObjectSource(
-      'view',
-      ddlName,
-      undefined,
-      version,
-      options,
-    ),
+  return getUtils(connection).objectSourceWire(
+    'view',
+    ddlName,
+    undefined,
+    version,
+    options,
   );
 }
 

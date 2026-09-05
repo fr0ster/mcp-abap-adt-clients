@@ -6,7 +6,11 @@
  * with ?lockHandle=...).
  */
 
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+  ILogger,
+} from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_FUNCTION_INCLUDE,
   CT_FUNCTION_INCLUDE,
@@ -26,7 +30,7 @@ export async function updateFunctionInclude(
   params: ICreateFunctionIncludeParams,
   lockHandle: string,
   logger?: ILogger,
-): Promise<void> {
+): Promise<IAdtWireResponse> {
   if (!params.function_group_name) {
     throw new Error('function_group_name is required');
   }
@@ -53,7 +57,10 @@ export async function updateFunctionInclude(
     logger?.debug?.(xmlBody);
   }
 
-  await connection.makeAdtRequest({
+  // The answer is returned rather than discarded: what a write becomes is the
+  // consumer's result strategy to decide, and a function that swallowed it left
+  // that strategy nothing to read.
+  return connection.makeAdtRequest({
     url,
     method: 'PUT',
     timeout: getTimeout('default'),

@@ -16,6 +16,7 @@ import type { AdtClient } from '../../../clients/AdtClient';
 import { AdtUtils } from '../../../core/shared/AdtUtils';
 import { orThrow } from '../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
+import { expectResult } from '../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -108,32 +109,34 @@ describe('Shared - getWhereUsed', () => {
     // `getWhereUsedList` builds its own scope from flags instead, so it cannot
     // stand in here — see the CHANGELOG entry for the gap and what closes it.
     const utils = new AdtUtils(connection, testsLogger);
-    const scopeResponse = await withAcceptHandling(
-      utils.getWhereUsedScope({
-        object_name: objectName,
-        object_type: objectType,
-      }),
-    );
+    const scopeXml = expectResult(
+      await withAcceptHandling(
+        utils.getWhereUsedScope({
+          object_name: objectName,
+          object_type: objectType,
+        }),
+      ),
+      'where-used scope',
+    ) as string;
 
-    expect(scopeResponse.status).toBe(200);
-    expect(scopeResponse.data).toBeDefined();
+    expect(scopeXml.length).toBeGreaterThan(0);
 
     // Step 2: Use scope WITHOUT modifications (exactly as SAP returned it)
     testsLogger.info?.(
       '🔍 Step 2: Executing where-used search with UNMODIFIED scope...',
     );
-    const result = await withAcceptHandling(
-      utils.getWhereUsed({
-        object_name: objectName,
-        object_type: objectType,
-        scopeXml: scopeResponse.data, // Pass scope as-is, no modifications
-      }),
-    );
+    const document = expectResult(
+      await withAcceptHandling(
+        utils.getWhereUsed({
+          object_name: objectName,
+          object_type: objectType,
+          scopeXml: scopeXml,
+        }),
+      ),
+      'where-used search',
+    ) as string;
 
-    expect(result.status).toBe(200);
-    expect(result.data).toBeDefined();
-
-    const match = result.data?.match(/numberOfResults="(\d+)"/);
+    const match = document.match(/numberOfResults="(\d+)"/);
     if (match) {
       testsLogger.info?.(
         `🎯 Found ${match[1]} usage references with default scope`,
@@ -186,21 +189,19 @@ describe('Shared - getWhereUsed', () => {
     // `getWhereUsedList` builds its own scope from flags instead, so it cannot
     // stand in here — see the CHANGELOG entry for the gap and what closes it.
     const utils = new AdtUtils(connection, testsLogger);
-    const scopeResponse = await withAcceptHandling(
-      utils.getWhereUsedScope({
-        object_name: objectName,
-        object_type: objectType,
-      }),
-    );
-
-    expect(scopeResponse.status).toBe(200);
+    const scopeXml = expectResult(
+      await withAcceptHandling(
+        utils.getWhereUsedScope({
+          object_name: objectName,
+          object_type: objectType,
+        }),
+      ),
+      'where-used scope',
+    ) as string;
 
     // Parse initial state
-    const allTypes = (scopeResponse.data.match(/<usagereferences:type/g) || [])
-      .length;
-    const initialSelected = (
-      scopeResponse.data.match(/isSelected="true"/g) || []
-    ).length;
+    const allTypes = (scopeXml.match(/<usagereferences:type/g) || []).length;
+    const initialSelected = (scopeXml.match(/isSelected="true"/g) || []).length;
 
     testsLogger.info?.(
       `📊 Initial scope: ${initialSelected}/${allTypes} types selected`,
@@ -208,7 +209,7 @@ describe('Shared - getWhereUsed', () => {
 
     // Step 2: Enable ALL types (like Eclipse "Select All" checkbox)
     testsLogger.info?.('🔧 Modifying scope - enabling ALL types...');
-    const modifiedScope = utils.modifyWhereUsedScope(scopeResponse.data, {
+    const modifiedScope = utils.modifyWhereUsedScope(scopeXml, {
       enableAll: true,
     });
 
@@ -224,18 +225,18 @@ describe('Shared - getWhereUsed', () => {
     testsLogger.info?.(
       '🔍 Step 3: Executing where-used search with ALL types...',
     );
-    const result = await withAcceptHandling(
-      utils.getWhereUsed({
-        object_name: objectName,
-        object_type: objectType,
-        scopeXml: modifiedScope,
-      }),
-    );
+    const document = expectResult(
+      await withAcceptHandling(
+        utils.getWhereUsed({
+          object_name: objectName,
+          object_type: objectType,
+          scopeXml: modifiedScope,
+        }),
+      ),
+      'where-used search',
+    ) as string;
 
-    expect(result.status).toBe(200);
-    expect(result.data).toBeDefined();
-
-    const match = result.data?.match(/numberOfResults="(\d+)"/);
+    const match = document.match(/numberOfResults="(\d+)"/);
     if (match) {
       testsLogger.info?.(
         `🎯 Found ${match[1]} usage references with ALL types enabled`,
@@ -283,26 +284,26 @@ describe('Shared - getWhereUsed', () => {
       testsLogger.info?.(`📋 Object: ${objectName} (${objectType})`);
       testsLogger.info?.('🔍 Step 1: Fetching scope configuration...');
 
-      const result = await withAcceptHandling(
-        new AdtUtils(connection, testsLogger).getWhereUsed({
-          object_name: objectName,
-          object_type: objectType,
-        }),
-      );
-
-      expect(result.status).toBe(200);
-      expect(result.data).toBeDefined();
+      const document = expectResult(
+        await withAcceptHandling(
+          new AdtUtils(connection, testsLogger).getWhereUsed({
+            object_name: objectName,
+            object_type: objectType,
+          }),
+        ),
+        'where-used for a table',
+      ) as string;
 
       testsLogger.info?.('✅ Where-used query completed (default types)');
-      testsLogger.info?.(`📊 Response size: ${result.data?.length || 0} bytes`);
+      testsLogger.info?.(`📊 Response size: ${document.length} bytes`);
 
       // Parse and log number of results
-      const match = result.data?.match(/numberOfResults="(\d+)"/);
+      const match = document.match(/numberOfResults="(\d+)"/);
       if (match) {
         testsLogger.info?.(`🎯 Found ${match[1]} usage references`);
 
         // Parse objectTypes to see which types were searched
-        const typeMatches = result.data?.matchAll(
+        const typeMatches = document.matchAll(
           /<usagereferences:type name="([^"]+)" isSelected="true"/g,
         );
         const searchedTypes: string[] = [];
@@ -316,7 +317,7 @@ describe('Shared - getWhereUsed', () => {
         }
 
         // Log result description if available
-        const descMatch = result.data?.match(/resultDescription="([^"]+)"/);
+        const descMatch = document.match(/resultDescription="([^"]+)"/);
         if (descMatch) {
           testsLogger.info?.(`📝 Result: ${descMatch[1]}`);
         }
@@ -485,7 +486,7 @@ describe('Shared - getWhereUsed', () => {
     testsLogger.info?.('✅ Test complete: parsed results received');
   }, 30000);
 
-  it('should get where-used list with raw XML included', async () => {
+  it('hands back the document itself, for a caller that wants all of it', async () => {
     if (!hasConfig) {
       testsLogger.warn?.(
         '⚠️ Skipping test: No .env file or SAP configuration found',
@@ -518,28 +519,30 @@ describe('Shared - getWhereUsed', () => {
       return;
     }
 
-    logTestStep('get where-used list with raw XML', testsLogger);
+    logTestStep('get the where-used document', testsLogger);
 
-    // `AdtUtils` and not `client.getUtils()`: the two-step flow under test fetches
-    // a scope document and hands it back, and `getWhereUsed(scopeXml)` is a class
-    // member that `IAdtInformationSystem` does not carry. The contract's
-    // `getWhereUsedList` builds its own scope from flags instead, so it cannot
-    // stand in here — see the CHANGELOG entry for the gap and what closes it.
+    // `getWhereUsedList` carried an `includeRawXml` flag that put the whole
+    // document inside the parsed result — the same endpoint answering two
+    // shapes depending on a boolean. The document is its own member:
+    // `getWhereUsed` runs the search and answers the body, and a caller who
+    // wants everything asks that one.
+    //
+    // `AdtUtils` and not `client.getUtils()`: the two-step flow fetches a scope
+    // document and hands it back, and `getWhereUsed(scopeXml)` is a class
+    // member that `IAdtInformationSystem` does not carry.
     const utils = new AdtUtils(connection, testsLogger);
-    const result = await orThrow(
-      utils.getWhereUsedList({
+    const document = expectResult(
+      await utils.getWhereUsed({
         object_name: objectName,
         object_type: objectType,
-        includeRawXml: true,
       }),
+      'where-used document',
     );
 
-    expect(result).toBeDefined();
-    expect(result.rawXml).toBeDefined();
-    expect(result.rawXml).toContain('usageReferenceResult');
+    expect(document).toContain('usageReferenceResult');
 
-    testsLogger.info?.(`📊 Raw XML size: ${result.rawXml?.length} bytes`);
-    testsLogger.info?.('✅ Test complete: raw XML included');
+    testsLogger.info?.(`📊 Document size: ${document.length} bytes`);
+    testsLogger.info?.('✅ Test complete: the whole document came back');
   }, 30000);
 
   it('narrows results to selected object types (enableOnlyTypes vs enableAllTypes)', async () => {
@@ -643,9 +646,7 @@ describe('Shared - getWhereUsed', () => {
     );
     const scopeTypes = [
       ...new Set(
-        [...String(scopeResponse.data).matchAll(/name="([^"]+)"/g)].map(
-          (m) => m[1],
-        ),
+        [...String(scopeResponse).matchAll(/name="([^"]+)"/g)].map((m) => m[1]),
       ),
     ];
     const absentType = scopeTypes.find((t) => !allTypes.includes(t));

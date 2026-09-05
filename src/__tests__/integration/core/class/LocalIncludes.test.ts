@@ -26,6 +26,7 @@ import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -91,11 +92,14 @@ describe('Class local includes (using BaseTester)', () => {
     config: ParentClassConfig,
   ): Promise<{ success: boolean; reason?: string; created?: boolean }> {
     try {
-      const existing = await client
-        .getClass()
-        .read({ className: config.className });
-      if (existing) {
-        await client.getClass().readMetadata({ className: config.className });
+      // The answer decides: `if (existing)` was true for an answer object
+      // either way, so this reported "the class is already there" for a class
+      // that was not, and never created it.
+      const existing = presenceOf(
+        await client.getClass().read({ className: config.className }),
+        `class ${config.className}`,
+      );
+      if (existing.present === true) {
         return { success: true, created: false };
       }
 
@@ -116,12 +120,12 @@ describe('Class local includes (using BaseTester)', () => {
     }
   }
 
-  let definitionsTester: BaseTester<any, any>;
-  let localTypesTester: BaseTester<any, any>;
-  let localTestClassTester: BaseTester<any, any>;
-  let localMacrosTester: BaseTester<any, any>;
+  let definitionsTester: BaseTester<any>;
+  let localTypesTester: BaseTester<any>;
+  let localTestClassTester: BaseTester<any>;
+  let localMacrosTester: BaseTester<any>;
   const parentClassCreatedMap = new Map<
-    BaseTester<any, any>,
+    BaseTester<any>,
     { created: boolean; className: string | null }
   >();
 
@@ -169,7 +173,7 @@ describe('Class local includes (using BaseTester)', () => {
       );
 
       const setupCommon = (
-        tester: BaseTester<any, any>,
+        tester: BaseTester<any>,
         testDescription: string,
         codeField: string,
         options?: { skipEnsureParentClass?: () => boolean },

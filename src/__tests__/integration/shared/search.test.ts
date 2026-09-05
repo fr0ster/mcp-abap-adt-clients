@@ -15,7 +15,8 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
-import { parseSearchResults } from '../../../core/shared/search';
+import type { ISearchResult } from '../../../core/shared/utilResults';
+import { expectResult } from '../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -75,29 +76,18 @@ describe('Shared - searchObjects', () => {
     logTestStep('search objects by name pattern', testsLogger);
     testsLogger.info?.('🔍 Query: CL_ABAP*, maxResults: 10');
 
-    const result = await withAcceptHandling(
-      client.getUtils().search(
-        {
-          query: 'CL_ABAP*',
-          maxResults: 10,
-        },
-        (data) => String(data ?? ''),
+    // The shipped reading answers the hits, so there is no document to parse
+    // here any more — the regex this used to run was /<objectReference/, which
+    // never matches, because SAP prefixes the element. It was only logged,
+    // never asserted, so it found nothing for as long as it existed.
+    const hits = expectResult(
+      await withAcceptHandling(
+        client.getUtils().search({ query: 'CL_ABAP*', maxResults: 10 }),
       ),
-    );
-
-    // Reaching this line is the status assertion: the transport throws for a
-    // status it does not admit, so `result.status === 200` could only ever pass.
-    expect(result).toBeDefined();
+      'search CL_ABAP*',
+    ) as ISearchResult[];
 
     testsLogger.info?.('✅ Search completed');
-    testsLogger.info?.(`📊 Response size: ${result.length} bytes`);
-
-    // Parse with the shipped parser rather than a regex. The regex here used to
-    // be /<objectReference/, which never matches: SAP prefixes the element,
-    // `<adtcore:objectReference`. The count was only logged, never asserted, so
-    // it silently found nothing for as long as it existed — and read as
-    // evidence that the payload was unprefixed, which it is not.
-    const hits = parseSearchResults(result);
     testsLogger.info?.(`🎯 Found ${hits.length} objects`);
     // Assert the count FIRST. Asserting only inside the loop is how the old
     // regex failed: on an empty result no assertion runs and the test passes,
@@ -120,30 +110,16 @@ describe('Shared - searchObjects', () => {
     logTestStep('search objects with object type filter', testsLogger);
     testsLogger.info?.('🔍 Query: T*, objectType: TABL, maxResults: 10');
 
-    const result = await withAcceptHandling(
-      client.getUtils().search(
-        {
-          query: 'T*',
-          objectType: 'TABL',
-          maxResults: 10,
-        },
-        (data) => String(data ?? ''),
+    const hits = expectResult(
+      await withAcceptHandling(
+        client
+          .getUtils()
+          .search({ query: 'T*', objectType: 'TABL', maxResults: 10 }),
       ),
-    );
-
-    // Reaching this line is the status assertion: the transport throws for a
-    // status it does not admit, so `result.status === 200` could only ever pass.
-    expect(result).toBeDefined();
+      'search tables',
+    ) as ISearchResult[];
 
     testsLogger.info?.('✅ Search completed');
-    testsLogger.info?.(`📊 Response size: ${result.length} bytes`);
-
-    // Parse with the shipped parser rather than a regex. The regex here used to
-    // be /<objectReference/, which never matches: SAP prefixes the element,
-    // `<adtcore:objectReference`. The count was only logged, never asserted, so
-    // it silently found nothing for as long as it existed — and read as
-    // evidence that the payload was unprefixed, which it is not.
-    const hits = parseSearchResults(result);
     testsLogger.info?.(`🎯 Found ${hits.length} tables`);
     // Assert the count FIRST. Asserting only inside the loop is how the old
     // regex failed: on an empty result no assertion runs and the test passes,
@@ -164,16 +140,12 @@ describe('Shared - searchObjects', () => {
     }
 
     logTestStep('search objects with default maxResults', testsLogger);
-    const result = await withAcceptHandling(
-      client.getUtils().search(
-        {
-          query: 'CL_ABAP*',
-        },
-        (data) => String(data ?? ''),
-      ),
-    );
-    // Reaching this line is the status assertion: the transport throws for a
-    // status it does not admit, so `result.status === 200` could only ever pass.
-    expect(result).toBeDefined();
+    const hits = expectResult(
+      await withAcceptHandling(client.getUtils().search({ query: 'CL_ABAP*' })),
+      'search without maxResults',
+    ) as ISearchResult[];
+
+    // No `maxResults` is still a search, and the answer is still the hits.
+    expect(Array.isArray(hits)).toBe(true);
   }, 15000);
 });

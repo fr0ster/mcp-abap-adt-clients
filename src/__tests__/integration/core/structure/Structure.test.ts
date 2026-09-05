@@ -15,13 +15,11 @@ import * as path from 'node:path';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type {
-  IStructureConfig,
-  IStructureState,
-} from '../../../../core/structure';
+import type { IStructureConfig } from '../../../../core/structure';
 import { getStructure } from '../../../../core/structure/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -69,7 +67,7 @@ describe('Structure (using AdtClient)', () => {
   let hasConfig = false;
   let isLegacy = false;
   let isCloudSystem = false;
-  let tester: BaseTester<IStructureConfig, IStructureState>;
+  let tester: BaseTester<IStructureConfig>;
 
   beforeAll(async () => {
     try {
@@ -226,8 +224,8 @@ describe('Structure (using AdtClient)', () => {
           const resultState = await tester.readTest({
             structureName: standardStructureName,
           });
-          expect(resultState?.readResult).toBeDefined();
-          const structureConfig = resultState?.readResult;
+          expect(resultState).toBeDefined();
+          const structureConfig = resultState;
           if (
             structureConfig &&
             typeof structureConfig === 'object' &&

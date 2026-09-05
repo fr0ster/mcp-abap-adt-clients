@@ -20,8 +20,10 @@
 
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import { AdtUtils } from '../../../core/shared/AdtUtils';
+import { utilDocuments } from '../../../core/shared/utilResultSet';
 import { AdtSAPError } from '../../../utils/adtErrors';
 import { orThrow } from '../../../utils/adtResponse';
+import { expectFailure } from '../../helpers/contract';
 
 const MESSAGE = 'Resource ZNOPE does not exist';
 const HOLDER_MESSAGE = 'ZNOPE';
@@ -130,57 +132,41 @@ describe('a failing status reaches the caller, in the failure half', () => {
 });
 
 describe('200 carrying an exception document is a refusal, not an empty result', () => {
-  it('fetchNodeStructure throws with the message and the whole document', async () => {
+  it('fetchNodeStructure answers the failure, with the message and the whole document', async () => {
     const utils = new AdtUtils(connectionAnswering(200, EXCEPTION_XML), logger);
 
-    const error = await orThrow(
-      utils.fetchNodeStructure('PROG/P', 'ZNOPE'),
-    ).then(
-      () => {
-        throw new Error('expected a rejection');
-      },
-      (e: unknown) => e,
+    const refusal = expectFailure(
+      await utils.fetchNodeStructure('PROG/P', 'ZNOPE'),
+      'node structure for an object that is not there',
     );
 
     // Before this, the answer was { objects: [], childNodes: [] } — the server's
     // "does not exist" reported to the caller as "there is nothing here".
-    expect(error).toBeInstanceOf(AdtSAPError);
-    const refusal = error as AdtSAPError;
+    expect(refusal.origin).toBe('refusal');
     expect(refusal.message).toContain(MESSAGE);
-    expect(refusal.document).toBe(EXCEPTION_XML);
+    expect(refusal.response?.data).toBe(EXCEPTION_XML);
     expect(refusal.adtType).toBe('ExceptionResourceNotFound');
     expect(refusal.namespace).toBe('com.sap.adt');
   });
 
-  it('getAllTypes throws rather than answering an empty list', async () => {
+  it('getAllTypes fails rather than answering an empty list', async () => {
     const utils = new AdtUtils(connectionAnswering(200, EXCEPTION_XML), logger);
 
-    const error = await orThrow(utils.getAllTypes()).then(
-      () => {
-        throw new Error('expected a rejection');
-      },
-      (e: unknown) => e as AdtSAPError,
-    );
+    const refusal = expectFailure(await utils.getAllTypes(), 'all types');
 
-    expect(error).toBeInstanceOf(AdtSAPError);
-    expect(error.document).toBe(EXCEPTION_XML);
+    expect(refusal.response?.data).toBe(EXCEPTION_XML);
   });
 
   it("keeps the document even when the exception's own XML will not parse", async () => {
     const truncated = '<exc:exception><message>cut off here';
     const utils = new AdtUtils(connectionAnswering(200, truncated), logger);
 
-    const error = await orThrow(utils.getAllTypes()).then(
-      () => {
-        throw new Error('expected a rejection');
-      },
-      (e: unknown) => e as AdtSAPError,
-    );
+    const refusal = expectFailure(await utils.getAllTypes(), 'all types');
 
     // A refusal that cannot be read is still a refusal. What the library cannot
     // interpret it hands over instead of discarding.
-    expect(error).toBeInstanceOf(AdtSAPError);
-    expect(error.document).toBe(truncated);
+    expect(refusal.origin).toBe('refusal');
+    expect(refusal.response?.data).toBe(truncated);
   });
 });
 
@@ -214,21 +200,28 @@ describe('200 with a genuinely empty result stays an empty result', () => {
   });
 });
 
-describe('a strategy must not become a place a refusal can hide', () => {
-  it('never runs the parser on an exception document', async () => {
-    const utils = new AdtUtils(connectionAnswering(200, EXCEPTION_XML), logger);
-
+describe('a reading must not become a place a refusal can hide', () => {
+  it('never runs the reading on an exception document', async () => {
     const seen: unknown[] = [];
-    const response = await utils.search({ query: 'Z*' }, (data) => {
-      seen.push(data);
-      return String(data);
-    });
+    const utils = new AdtUtils(
+      connectionAnswering(200, EXCEPTION_XML),
+      logger,
+      {
+        ...utilDocuments,
+        search: (answer) => {
+          seen.push(answer.data);
+          return String(answer.data);
+        },
+      },
+    );
 
-    // The parser is not called at all. Handing it the refusal would look
-    // harmless — the document arrives — but a parser looking for hits in an
-    // exception document finds none and answers "nothing found". The strategy is
-    // there to control how much of a large answer the caller takes, not to
-    // decide whether the request was refused.
+    const response = await utils.search({ query: 'Z*' });
+
+    // The reading is not called at all. Handing it the refusal would look
+    // harmless — the document arrives — but a reading looking for hits in an
+    // exception document finds none and answers "nothing found". The two axes
+    // are separate on purpose: `analyse` decides whether this is a failure, and
+    // only then does a reading get to say what the answer becomes.
     expect(seen).toEqual([]);
     expect(response.ok).toBe(false);
     if (response.ok) throw new Error('expected a failure');
@@ -238,11 +231,12 @@ describe('a strategy must not become a place a refusal can hide', () => {
 
   it('still hands over a real answer untouched', async () => {
     const document = '<adtcore:objectReferences/>';
-    const utils = new AdtUtils(connectionAnswering(200, document), logger);
+    const utils = new AdtUtils(connectionAnswering(200, document), logger, {
+      ...utilDocuments,
+      search: (answer) => String(answer.data),
+    });
 
-    const response = await utils.search({ query: 'Z*' }, (data) =>
-      String(data),
-    );
+    const response = await utils.search({ query: 'Z*' });
     expect(response.ok).toBe(true);
     if (!response.ok) throw new Error('expected a result');
     expect(response.getResult().value).toBe(document);

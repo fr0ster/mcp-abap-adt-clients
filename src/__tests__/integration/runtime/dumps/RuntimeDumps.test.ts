@@ -23,6 +23,7 @@ import type {
 import * as dotenv from 'dotenv';
 import { AdtExecutor } from '../../../../clients/AdtExecutor';
 import { AdtRuntimeClient } from '../../../../clients/AdtRuntimeClient';
+import { expectResult } from '../../../helpers/contract';
 import { resolveDumpClassName } from '../../../helpers/dumpClassHelper';
 import {
   createTestConnection,
@@ -168,13 +169,14 @@ describe('Runtime Dumps (using AdtRuntimeClient)', () => {
         const beforeDumpIds = new Set<string>();
 
         logTestStep('list runtime dumps', testsLogger);
-        const listResponse = await runtime.getDumps().list({
-          top,
-          inlinecount,
-        });
-        expect(listResponse.status).toBeGreaterThanOrEqual(200);
-        expect(listResponse.status).toBeLessThan(300);
-        expect(listResponse.data).toBeDefined();
+        const listResponse = expectResult(
+          await runtime.getDumps().list({
+            top,
+            inlinecount,
+          }),
+          'listResponse',
+        );
+        expect(listResponse).toBeDefined();
 
         logTestStep('list runtime dumps with from/to filter', testsLogger);
         const now = new Date();
@@ -184,42 +186,43 @@ describe('Runtime Dumps (using AdtRuntimeClient)', () => {
           .toISOString()
           .replace(/[-:T]/g, '')
           .slice(0, 14);
-        const filteredResponse = await runtime.getDumps().list({
-          from: fromDate,
-          to: toDate,
-          top,
-          inlinecount,
-        });
-        expect(filteredResponse.status).toBeGreaterThanOrEqual(200);
-        expect(filteredResponse.status).toBeLessThan(300);
-        expect(filteredResponse.data).toBeDefined();
+        const filteredResponse = expectResult(
+          await runtime.getDumps().list({
+            from: fromDate,
+            to: toDate,
+            top,
+            inlinecount,
+          }),
+          'filteredResponse',
+        );
+        expect(filteredResponse).toBeDefined();
 
         logTestStep('list runtime dumps by user', testsLogger);
-        const byUserResponse = await runtime.getDumps().listByUser(user, {
-          top,
-          inlinecount,
-        });
-        expect(byUserResponse.status).toBeGreaterThanOrEqual(200);
-        expect(byUserResponse.status).toBeLessThan(300);
+        const byUserResponse = expectResult(
+          await runtime.getDumps().listByUser(user, {
+            top,
+            inlinecount,
+          }),
+          'byUserResponse',
+        );
 
         logTestStep(
           'list runtime dumps by user with from/to filter',
           testsLogger,
         );
-        const byUserFilteredResponse = await runtime
-          .getDumps()
-          .listByUser(user, {
+        const byUserFilteredResponse = expectResult(
+          await runtime.getDumps().listByUser(user, {
             top,
             inlinecount,
             from: fromDate,
             to: toDate,
-          });
-        expect(byUserFilteredResponse.status).toBeGreaterThanOrEqual(200);
-        expect(byUserFilteredResponse.status).toBeLessThan(300);
-        for (const id of extractDumpIds(listResponse.data)) {
+          }),
+          'byUserFilteredResponse',
+        );
+        for (const id of extractDumpIds(listResponse)) {
           beforeDumpIds.add(id);
         }
-        for (const id of extractDumpIds(byUserResponse.data)) {
+        for (const id of extractDumpIds(byUserResponse)) {
           beforeDumpIds.add(id);
         }
 
@@ -230,22 +233,25 @@ describe('Runtime Dumps (using AdtRuntimeClient)', () => {
             `run shared dump class ${className} (division by zero)`,
             testsLogger,
           );
-          try {
-            await executor.getClassExecutor().run({ className });
-          } catch (_runError) {
-            // Expected: run should fail and produce dump
-          }
+          // The answer is ignored on purpose: this run is *meant* to fail —
+          // a division by zero — and what the test is after is the dump SAP
+          // writes because of it, read below. A failure comes back in the
+          // answer now rather than being thrown, so there is nothing to catch.
+          await executor.getClassExecutor().run({ className });
 
           for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
             logTestStep(
               `discover generated dump attempt ${attempt}/${maxAttempts}`,
               testsLogger,
             );
-            const current = await runtime.getDumps().listByUser(user, {
-              top: Math.max(top, 50),
-              inlinecount,
-            });
-            const ids = extractDumpIds(current.data);
+            const current = expectResult(
+              await runtime.getDumps().listByUser(user, {
+                top: Math.max(top, 50),
+                inlinecount,
+              }),
+              'current',
+            );
+            const ids = extractDumpIds(current);
             generatedDumpId = ids.find((id) => !beforeDumpIds.has(id));
             if (generatedDumpId) {
               break;
@@ -268,7 +274,7 @@ describe('Runtime Dumps (using AdtRuntimeClient)', () => {
           typeof params.dump_id === 'string' && params.dump_id.trim()
             ? params.dump_id.trim()
             : undefined;
-        const discoveredDumpId = extractDumpId(listResponse.data);
+        const discoveredDumpId = extractDumpId(listResponse);
         const dumpId = generatedDumpId || configuredDumpId || discoveredDumpId;
         const dumpIdSource = generatedDumpId
           ? 'forced_class_failure'
@@ -289,10 +295,11 @@ describe('Runtime Dumps (using AdtRuntimeClient)', () => {
             testsLogger,
           );
           logTestStep(`read runtime dump by id: ${dumpId}`, testsLogger);
-          const dumpResponse = await runtime.getDumps().getById(dumpId);
-          expect(dumpResponse.status).toBeGreaterThanOrEqual(200);
-          expect(dumpResponse.status).toBeLessThan(300);
-          expect(dumpResponse.data).toBeDefined();
+          const dumpResponse = expectResult(
+            await runtime.getDumps().getById(dumpId),
+            'dumpResponse',
+          );
+          expect(dumpResponse).toBeDefined();
 
           logTestStep(
             `read via getRuntimeDumpById(view=summary) (endpoint=/sap/bc/adt/runtime/dump/{id}/summary)`,
@@ -302,12 +309,13 @@ describe('Runtime Dumps (using AdtRuntimeClient)', () => {
             `read runtime dump summary by id: ${dumpId}`,
             testsLogger,
           );
-          const summaryResponse = await runtime.getDumps().getById(dumpId, {
-            view: 'summary',
-          });
-          expect(summaryResponse.status).toBeGreaterThanOrEqual(200);
-          expect(summaryResponse.status).toBeLessThan(300);
-          expect(summaryResponse.data).toBeDefined();
+          const summaryResponse = expectResult(
+            await runtime.getDumps().getById(dumpId, {
+              view: 'summary',
+            }),
+            'summaryResponse',
+          );
+          expect(summaryResponse).toBeDefined();
 
           logTestStep(
             `read via getRuntimeDumpById(view=formatted) (endpoint=/sap/bc/adt/runtime/dump/{id}/formatted)`,
@@ -317,12 +325,13 @@ describe('Runtime Dumps (using AdtRuntimeClient)', () => {
             `read runtime dump formatted by id: ${dumpId}`,
             testsLogger,
           );
-          const formattedResponse = await runtime.getDumps().getById(dumpId, {
-            view: 'formatted',
-          });
-          expect(formattedResponse.status).toBeGreaterThanOrEqual(200);
-          expect(formattedResponse.status).toBeLessThan(300);
-          expect(formattedResponse.data).toBeDefined();
+          const formattedResponse = expectResult(
+            await runtime.getDumps().getById(dumpId, {
+              view: 'formatted',
+            }),
+            'formattedResponse',
+          );
+          expect(formattedResponse).toBeDefined();
         } else {
           const reason = generateArtificialDump
             ? 'forced dump was not discovered and no fallback dump_id/feed id'

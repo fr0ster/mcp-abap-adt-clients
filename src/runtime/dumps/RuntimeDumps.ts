@@ -1,11 +1,13 @@
 import type {
   IAbapConnection,
-  IAdtWireResponse,
+  IAdtResponse,
   ILogger,
   IRuntimeDumpReadOptions,
   IRuntimeDumps,
   IRuntimeDumpsListOptions,
 } from '@mcp-abap-adt/interfaces';
+import { answering } from '../../utils/adtResponse';
+import { rawDocument } from '../../utils/resultStrategy';
 import {
   buildDumpIdPrefix,
   buildRuntimeDumpsUserQuery,
@@ -14,29 +16,40 @@ import {
   listRuntimeDumpsByUser,
 } from './read';
 
-export class RuntimeDumps implements IRuntimeDumps {
+export class RuntimeDumps implements IRuntimeDumps<string, string> {
   readonly kind = 'runtimeDumps' as const;
   constructor(
     private readonly connection: IAbapConnection,
     private readonly logger: ILogger,
   ) {}
 
-  async list(options?: IRuntimeDumpsListOptions): Promise<IAdtWireResponse> {
-    return listRuntimeDumps(this.connection, options ?? {});
+  async list(
+    options?: IRuntimeDumpsListOptions,
+  ): Promise<IAdtResponse<string>> {
+    return answering(
+      () => listRuntimeDumps(this.connection, options ?? {}),
+      rawDocument,
+    );
   }
 
   async listByUser(
     user?: string,
     options?: Omit<IRuntimeDumpsListOptions, 'query'>,
-  ): Promise<IAdtWireResponse> {
-    return listRuntimeDumpsByUser(this.connection, user, options);
+  ): Promise<IAdtResponse<string>> {
+    return answering(
+      () => listRuntimeDumpsByUser(this.connection, user, options),
+      rawDocument,
+    );
   }
 
   async getById(
     dumpId: string,
     options?: IRuntimeDumpReadOptions,
-  ): Promise<IAdtWireResponse> {
-    return getRuntimeDumpById(this.connection, dumpId, options);
+  ): Promise<IAdtResponse<string>> {
+    return answering(
+      () => getRuntimeDumpById(this.connection, dumpId, options),
+      rawDocument,
+    );
   }
 
   buildIdPrefix(

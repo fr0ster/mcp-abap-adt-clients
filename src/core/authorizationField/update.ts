@@ -4,7 +4,11 @@
  * Requires a valid lockHandle (acquired via lockAuthorizationField).
  */
 
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+  ILogger,
+} from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_AUTHORIZATION_FIELD,
   CT_AUTHORIZATION_FIELD,
@@ -26,7 +30,7 @@ export async function updateAuthorizationField(
   params: ICreateAuthorizationFieldParams,
   lockHandle: string,
   logger?: ILogger,
-): Promise<void> {
+): Promise<IAdtWireResponse> {
   if (!params.authorization_field_name) {
     throw new Error('authorization_field_name is required');
   }
@@ -49,7 +53,7 @@ export async function updateAuthorizationField(
     logger?.debug?.(xmlBody);
   }
 
-  await connection.makeAdtRequest({
+  return connection.makeAdtRequest({
     url,
     method: 'PUT',
     timeout: getTimeout('default'),

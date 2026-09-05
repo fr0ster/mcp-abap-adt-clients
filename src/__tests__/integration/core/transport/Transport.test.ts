@@ -20,6 +20,7 @@ import type {
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -89,10 +90,41 @@ describe('AdtRequest', () => {
   });
 
   afterAll(async () => {
+    // Outermost, and before the connection goes back: an inner `describe`'s
+    // `afterAll` runs when that block finishes, so a cleanup placed there ran
+    // before the later blocks had created anything — measured, one of three
+    // transports deleted.
+    //
+    // They *can* be deleted, and this suite is why the system had nine of them.
+    // "Transports cannot be deleted, so no cleanup needed" is what stood here,
+    // and it is not true: ADT deletes an EMPTY request, which is what these are
+    // — created, read, never written to.
+    //
+    // A refusal is logged, not thrown: cleanup must not turn a green run red,
+    // and a request that holds objects is the server protecting them.
+    for (const number of createdTransports) {
+      const answer = await client
+        .getRequest()
+        .delete({ transportNumber: number });
+      if (answer.ok) {
+        testsLogger.info?.(`Deleted test transport ${number}`);
+      } else {
+        testsLogger.warn?.(
+          `Could not delete test transport ${number}: ${answer.getError().message}`,
+        );
+      }
+    }
+    createdTransports.length = 0;
+
     if (connection) {
       await releaseTestConnection(connection);
     }
   });
+
+  /**
+   * Every transport this suite created, so `afterAll` can take them back out.
+   */
+  const createdTransports: string[] = [];
 
   function getTestDefinition() {
     return getTestCaseDefinition('create_transport', 'builder_transport');
@@ -139,15 +171,6 @@ describe('AdtRequest', () => {
       }
 
       testCase = tc;
-      // Transports are created dynamically, no cleanup needed
-    });
-
-    afterAll(async () => {
-      // Transports cannot be deleted, so no cleanup needed
-      // Just log if needed
-      testsLogger.debug?.(
-        '[BUILDER TESTS] Transport was created (cannot be deleted)',
-      );
     });
 
     it(
@@ -174,15 +197,16 @@ describe('AdtRequest', () => {
 
         try {
           logTestStep('create', testsLogger);
-          const createState = await client
-            .getRequest()
-            .create(buildConfig(testCase) as any);
+          const created = expectResult(
+            await client.getRequest().create(buildConfig(testCase) as any),
+            'create transport request',
+          );
 
-          expect(createState.createResult).toBeDefined();
-          expect(createState.transportNumber).toBeDefined();
-          expect(createState.errors.length).toBe(0);
+          // A create that answers no number is a create nothing else can use.
+          expect(created.transportNumber).toMatch(/\S/);
 
-          transportNumber = createState.transportNumber || null;
+          transportNumber = created.transportNumber || null;
+          if (transportNumber) createdTransports.push(transportNumber);
 
           logTestSuccess(testsLogger, 'AdtRequest - full workflow');
         } catch (error: any) {
@@ -215,16 +239,22 @@ describe('AdtRequest', () => {
           if (transportNumber) {
             try {
               logTestStep('read', testsLogger);
-              const readState = await client.getRequest().read({
-                transportNumber,
-              });
+              const readState = expectResult(
+                await client.getRequest().read({
+                  transportNumber,
+                }),
+                'readState',
+              );
               expect(readState).toBeDefined();
-              expect(readState?.readResult).toBeDefined();
-              const metadataState = await client.getRequest().readMetadata({
-                transportNumber,
-              });
+              expect(readState).toBeDefined();
+              const metadataState = expectResult(
+                await client.getRequest().readMetadata({
+                  transportNumber,
+                }),
+                'metadataState',
+              );
               expect(metadataState).toBeDefined();
-              expect(metadataState.readResult).toBeDefined();
+              expect(metadataState).toBeDefined();
             } catch (readError: any) {
               testsLogger.warn?.(
                 `Failed to read transport ${transportNumber}:`,
@@ -280,10 +310,14 @@ describe('AdtRequest', () => {
           if (testCase) {
             try {
               logTestStep('create (discriminator transport)', testsLogger);
-              const createState = await client
-                .getRequest()
-                .create(buildConfig(testCase) as any);
+              const createState = expectResult(
+                await client.getRequest().create(buildConfig(testCase) as any),
+                'createState',
+              );
               knownTransportNumber = createState.transportNumber || null;
+              if (knownTransportNumber) {
+                createdTransports.push(knownTransportNumber);
+              }
             } catch (createError: any) {
               testsLogger.warn?.(
                 'Could not create a discriminator transport for the list ' +
@@ -294,15 +328,16 @@ describe('AdtRequest', () => {
           }
 
           logTestStep('list', testsLogger);
-          const listState = await client.getRequest().list();
+          // The shipped reading of a listing is the parsed tree, so the
+          // assertions below are about requests rather than about a document.
+          const tree = expectResult(
+            await client.getRequest().list(),
+            'list transport requests',
+          );
 
-          expect(listState.errors.length).toBe(0);
-          expect(listState.listResult).toBeDefined();
-
-          const body = String(listState.listResult?.data ?? '');
-          expect(body).toContain('tm:root');
-
-          const requestCount = (body.match(/<tm:request /g) ?? []).length;
+          expect(Array.isArray(tree.requests)).toBe(true);
+          const numbers = tree.requests.map((r) => r.attributes['tm:number']);
+          const requestCount = tree.requests.length;
           logTestStep(`requests returned: ${requestCount}`, testsLogger);
 
           if (knownTransportNumber) {
@@ -312,21 +347,21 @@ describe('AdtRequest', () => {
               `known-request case: expecting ${knownTransportNumber} in the list body`,
               testsLogger,
             );
-            expect(body).toContain(knownTransportNumber);
+            expect(numbers).toContain(knownTransportNumber);
           } else {
             // Fallback case: no discriminator was available (no test case
             // configured/enabled, or creation itself failed on this system —
             // e.g. legacy systems without the configured user). This branch
-            // only confirms the response is a well-formed tm:root document;
-            // it does NOT treat zero requests as suspicious. A system that
-            // genuinely holds no transport requests must be able to report
-            // zero without being flagged as broken.
+            // only confirms the tree parsed; it does NOT treat zero requests
+            // as suspicious. A system that genuinely holds no transport
+            // requests must be able to report zero without being flagged as
+            // broken.
             logTestStep(
               'fallback case: no discriminator transport available, ' +
                 `asserting response shape only (requests returned: ${requestCount})`,
               testsLogger,
             );
-            expect(body).toMatch(/<tm:root[^>]*\/>|<\/tm:root>/);
+            expect(tree.attributes).toBeDefined();
           }
 
           logTestSuccess(testsLogger, 'AdtRequest - list transports');

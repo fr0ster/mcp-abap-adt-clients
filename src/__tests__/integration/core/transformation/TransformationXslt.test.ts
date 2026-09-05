@@ -15,10 +15,7 @@ import * as path from 'node:path';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type {
-  ITransformationConfig,
-  ITransformationState,
-} from '../../../../core/transformation';
+import type { ITransformationConfig } from '../../../../core/transformation';
 import { getTransformation } from '../../../../core/transformation/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
@@ -60,7 +57,7 @@ describe('Transformation - XSLTProgram (using AdtClient)', () => {
   let client: AdtClient;
   let hasConfig = false;
   let isCloudSystem = false;
-  let tester: BaseTester<ITransformationConfig, ITransformationState>;
+  let tester: BaseTester<ITransformationConfig>;
 
   beforeAll(async () => {
     try {

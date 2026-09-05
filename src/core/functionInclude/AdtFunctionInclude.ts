@@ -1,38 +1,48 @@
-import { beginCriticalSection } from '../../utils/criticalSection';
-import { assertDeletable } from '../../utils/deletionCheck';
 /**
- * AdtFunctionInclude - High-level CRUD operations for Function Include (FUGR/I).
+ * AdtFunctionInclude - CRUD for `FUGR/I` function-group includes.
  *
- * Implements IAdtObject with automatic operation chains, error handling,
- * and resource cleanup.
+ * **Not the same thing as a standalone `PROG/I` include** — see
+ * `src/core/include/index.ts` for the comparison. This one is a sub-resource of
+ * a function group, so every request needs both names and there is no
+ * validation collection of its own.
  *
- * Session management:
- * - stateful: only when doing lock / unlock / source upload
- * - stateless: obligatory after unlock
- * - activate uses the same session / cookies (no stateful required)
- *
- * Operation chains:
- * - Create: validate (parent group) → create → (if sourceCode) lock → upload → unlock → activate
- * - Update: lock → check(inactive, sourceCode?) → updateMetadata → (optional sourceUpload) → read polling → unlock → check(inactive) → optional activate + read
- * - Delete: check(deletion) → delete
+ * Every member answers `IAdtResponse<T>`, where T is what the result set given
+ * at construction makes of that endpoint's answer.
  */
 
 import type {
-  HttpError,
   IAbapConnection,
   IAdtActivatable,
   IAdtCheckable,
   IAdtContentTypes,
-  IAdtCrud,
+  IAdtCreatable,
+  IAdtDeletable,
+  IAdtError,
   IAdtLockable,
   IAdtOperationOptions,
+  IAdtReadable,
+  IAdtResponse,
   IAdtSystemContext,
+  IAdtUpdatable,
   IAdtValidatable,
   IAdtVersionable,
+  ICreateFunctionIncludeParams,
   ILogger,
+  IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
-import { safeErrorMessage } from '../../utils/internalUtils';
+import { activationRefusal } from '../../utils/activationUtils';
+import {
+  answering,
+  type IAdtOptions,
+  type IAnalyse,
+} from '../../utils/adtResponse';
+import { beginCriticalSection } from '../../utils/criticalSection';
+import { deletionRefusal } from '../../utils/deletionCheck';
+import { validationRefusal } from '../../utils/validationRefusal';
+import { chain } from '../shared/chain';
 import type { LockRegistry } from '../shared/LockRegistry';
+import type { ObjectVersion } from '../shared/results';
+import type { IReadOptions } from '../shared/types';
 import { activateFunctionInclude } from './activation';
 import { checkFunctionInclude } from './check';
 import { create as createFunctionInclude } from './create';
@@ -42,30 +52,47 @@ import {
   type IDeleteFunctionIncludeParams,
 } from './delete';
 import { lockFunctionInclude } from './lock';
-import { type IReadOptions, readFunctionInclude } from './read';
+import { readFunctionInclude } from './read';
 import { readFunctionIncludeSource } from './readSource';
-import type {
-  ICreateFunctionIncludeParams,
-  IFunctionIncludeConfig,
-  IFunctionIncludeState,
+import {
+  functionIncludeDocuments,
+  type IFunctionIncludeConfig,
+  type IFunctionIncludeResults,
 } from './types';
 import { unlockFunctionInclude } from './unlock';
 import { updateFunctionInclude } from './update';
 import { uploadFunctionIncludeSource } from './updateSource';
 import { validateFunctionIncludeName } from './validation';
-
 import {
   getFunctionIncludeVersionSource,
   getFunctionIncludeVersions,
 } from './versions';
-export class AdtFunctionInclude
-  implements
-    IAdtCrud<IFunctionIncludeConfig, IFunctionIncludeState>,
-    IAdtValidatable<IFunctionIncludeConfig, IFunctionIncludeState>,
-    IAdtCheckable<IFunctionIncludeConfig, IFunctionIncludeState>,
-    IAdtActivatable<IFunctionIncludeConfig, IFunctionIncludeState>,
-    IAdtLockable<IFunctionIncludeConfig, IFunctionIncludeState>,
-    IAdtVersionable<IFunctionIncludeConfig>
+
+export class AdtFunctionInclude<
+  R extends IFunctionIncludeResults<
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown
+  > = IFunctionIncludeResults,
+> implements
+    IAdtCreatable<IFunctionIncludeConfig, ReturnType<R['created']>>,
+    IAdtReadable<
+      IFunctionIncludeConfig,
+      ReturnType<R['source']>,
+      ReturnType<R['metadata']>
+    >,
+    IAdtUpdatable<IFunctionIncludeConfig, ReturnType<R['updated']>>,
+    IAdtDeletable<IFunctionIncludeConfig, ReturnType<R['deletion']>>,
+    IAdtValidatable<IFunctionIncludeConfig, ReturnType<R['validation']>>,
+    IAdtCheckable<IFunctionIncludeConfig, ReturnType<R['check']>>,
+    IAdtActivatable<IFunctionIncludeConfig, ReturnType<R['activation']>>,
+    IAdtLockable<IFunctionIncludeConfig>,
+    IAdtVersionable<IFunctionIncludeConfig, ObjectVersion[], string>
 {
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
@@ -80,6 +107,8 @@ export class AdtFunctionInclude
     systemContext?: IAdtSystemContext,
     contentTypes?: IAdtContentTypes,
     lockRegistry?: LockRegistry,
+    // The one cast in this file, and it is on the default. See AdtClass.
+    protected readonly results: R = functionIncludeDocuments as unknown as R,
   ) {
     this.connection = connection;
     this.logger = logger;
@@ -95,11 +124,10 @@ export class AdtFunctionInclude
 
   /** Record a held lock; the unlock thunk needs the parent function group. */
   private trackLock(
-    group: string | undefined,
-    includeName: string | undefined,
+    group: string,
+    includeName: string,
     lockHandle: string,
   ): void {
-    if (!group || !includeName) return;
     // Raw unlock — LockRegistry.unlockAll() manages the session for the batch.
     this.lockRegistry?.track(this.lockKey(group, includeName), () =>
       unlockFunctionInclude(this.connection, group, includeName, lockHandle),
@@ -107,17 +135,25 @@ export class AdtFunctionInclude
   }
 
   /** Drop a lock from the registry after a clean unlock. */
-  private untrackLock(
-    group: string | undefined,
-    includeName: string | undefined,
-  ): void {
-    if (!group || !includeName) return;
+  private untrackLock(group: string, includeName: string): void {
     this.lockRegistry?.untrack(this.lockKey(group, includeName));
   }
 
-  /**
-   * Map camelCase config to the snake_case low-level params.
-   */
+  /** Both names, or the caller's mistake. */
+  private names(config: Partial<IFunctionIncludeConfig>): {
+    group: string;
+    include: string;
+  } {
+    if (!config.functionGroupName) {
+      throw new Error('Function group name is required');
+    }
+    if (!config.includeName) {
+      throw new Error('Include name is required');
+    }
+    return { group: config.functionGroupName, include: config.includeName };
+  }
+
+  /** Map camelCase config to the snake_case low-level params. */
   private buildCreateParams(
     config: IFunctionIncludeConfig,
   ): ICreateFunctionIncludeParams {
@@ -154,720 +190,544 @@ export class AdtFunctionInclude
   }
 
   /**
-   * Validate by probing parent function group's existence.
+   * Validate by probing the parent function group's existence.
+   *
+   * There is no validation resource for a function include, so this is the only
+   * thing that can be checked before the POST.
    */
-  async validate(
+  async validate<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionIncludeConfig>,
-  ): Promise<IFunctionIncludeState> {
-    if (!config.functionGroupName) {
-      throw new Error(
-        'Function group name is required for function include validation',
-      );
-    }
-    if (!config.includeName) {
-      throw new Error(
-        'Include name is required for function include validation',
-      );
-    }
-    const validationResponse = await validateFunctionIncludeName(
-      this.connection,
-      config.functionGroupName,
-      config.includeName,
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+    const { group, include } = this.names(config);
+
+    return answering(
+      () => validateFunctionIncludeName(this.connection, group, include),
+      this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
+      (options?.analyse ?? validationRefusal) as IAnalyse<E>,
     );
-    return {
-      validationResponse,
-      errors: [],
-    };
   }
 
-  /**
-   * Create function include (optionally uploading source and activating).
-   */
-  async create(
+  /** Create the include, and write and activate its source if any was given. */
+  async create<E extends IAdtError = IAdtError>(
     config: IFunctionIncludeConfig,
-    options?: IAdtOperationOptions,
-  ): Promise<IFunctionIncludeState> {
-    if (!config.functionGroupName) {
-      throw new Error('Function group name is required');
-    }
-    if (!config.includeName) {
-      throw new Error('Include name is required');
-    }
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    const { group, include } = this.names(config);
     if (!config.description) {
       throw new Error('Description is required');
     }
+    const source = options?.sourceCode || config.sourceCode;
 
-    let objectCreated = false;
-    let lockHandle: string | undefined;
-    const state: IFunctionIncludeState = { errors: [] };
-
-    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
-
-    // the lock but leaves the work half-done.
-
+    // The source upload below is a LOCK…UNLOCK window.
     const endCriticalSection = beginCriticalSection(this.connection);
 
-    try {
-      // 0. Validate parent group existence
-      this.logger?.info?.('Validating parent function group');
-      await validateFunctionIncludeName(
-        this.connection,
-        config.functionGroupName,
-        config.includeName,
-      );
-
-      // 1. Create include metadata
-      this.logger?.info?.('Creating function include');
-      const createResponse = await createFunctionInclude(
-        this.connection,
-        this.buildCreateParams(config),
-      );
-      state.createResult = createResponse;
-      objectCreated = true;
-      this.logger?.info?.('Function include created');
-
-      // 2. Upload source (if provided)
-      const sourceCode = options?.sourceCode || config.sourceCode;
-      if (sourceCode) {
-        this.logger?.info?.(
-          'Step 2: Locking function include for source upload',
-        );
-        this.connection.setSessionType('stateful');
-        lockHandle = await lockFunctionInclude(
-          this.connection,
-          config.functionGroupName,
-          config.includeName,
-          this.logger,
-        );
-        this.trackLock(
-          config.functionGroupName,
-          config.includeName,
-          lockHandle,
-        );
-        state.lockHandle = lockHandle;
-        config.onLock?.(lockHandle);
-
-        this.logger?.info?.('Step 3: Uploading function include source');
-        await uploadFunctionIncludeSource(
-          this.connection,
-          config.functionGroupName,
-          config.includeName,
-          sourceCode,
-          lockHandle,
-          this.isUnicode(),
-          config.transportRequest,
-        );
-
-        this.logger?.info?.('Step 4: Unlocking function include');
-        this.connection.setSessionType('stateful');
-        await unlockFunctionInclude(
-          this.connection,
-          config.functionGroupName,
-          config.includeName,
-          lockHandle,
-        );
+    return chain(this.logger, async ({ step, onScopeEnd, onFailure }) => {
+      onScopeEnd(async () => {
+        endCriticalSection();
+      });
+      onScopeEnd(async () => {
         this.connection.setSessionType('stateless');
-        this.untrackLock(config.functionGroupName, config.includeName);
-        lockHandle = undefined;
+      });
 
-        this.logger?.info?.('Step 5: Activating function include');
-        const activateResponse = await activateFunctionInclude(
-          this.connection,
-          config.functionGroupName,
-          config.includeName,
-        );
-        state.activateResult = activateResponse;
-      }
-
-      return state;
-    } catch (error: unknown) {
-      // Error cleanup: unlock if still locked, then ensure stateless
-      if (lockHandle) {
-        try {
-          this.logger?.warn?.(
-            'Unlocking function include during error cleanup',
-          );
-          this.connection.setSessionType('stateful');
-          await unlockFunctionInclude(
-            this.connection,
-            config.functionGroupName,
-            config.includeName,
-            lockHandle,
-          );
-          this.connection.setSessionType('stateless');
-          this.untrackLock(config.functionGroupName, config.includeName);
-        } catch (unlockError) {
-          this.logger?.warn?.(
-            'Failed to unlock during cleanup:',
-            safeErrorMessage(unlockError),
-          );
-        }
-      } else {
-        this.connection.setSessionType('stateless');
-      }
-
-      if (objectCreated && options?.deleteOnFailure) {
-        try {
+      let created = false;
+      if (options?.deleteOnFailure ?? true) {
+        onFailure(async () => {
+          if (!created) return;
           this.logger?.warn?.('Deleting function include after failure');
           await deleteFunctionInclude(
             this.connection,
             this.buildDeleteParams(config),
           );
-        } catch (deleteError) {
-          this.logger?.warn?.(
-            'Failed to delete function include after failure:',
-            safeErrorMessage(deleteError),
+        });
+      }
+
+      this.logger?.info?.('Validating parent function group');
+      await step(this.validate(config, options));
+
+      this.logger?.info?.('Creating function include');
+      const value = await step(
+        answering(
+          () =>
+            createFunctionInclude(
+              this.connection,
+              this.buildCreateParams(config),
+            ),
+          this.results.created as IResultStrategy<ReturnType<R['created']>>,
+          options?.analyse,
+        ),
+      );
+      created = true;
+      this.logger?.info?.('Function include created');
+
+      if (source) {
+        this.logger?.info?.('Locking function include for source upload');
+        this.connection.setSessionType('stateful');
+        const lockHandle = await lockFunctionInclude(
+          this.connection,
+          group,
+          include,
+          this.logger,
+        );
+        this.trackLock(group, include, lockHandle);
+        config.onLock?.(lockHandle);
+        const releaseLock = onScopeEnd(async () => {
+          await unlockFunctionInclude(
+            this.connection,
+            group,
+            include,
+            lockHandle,
           );
-        }
+          this.untrackLock(group, include);
+        });
+
+        this.logger?.info?.('Uploading function include source');
+        await step(
+          answering(
+            () =>
+              uploadFunctionIncludeSource(
+                this.connection,
+                group,
+                include,
+                source,
+                lockHandle,
+                this.isUnicode(),
+                config.transportRequest,
+              ),
+            this.results.source as IResultStrategy<ReturnType<R['source']>>,
+            options?.analyse,
+          ),
+        );
+
+        this.logger?.info?.('Unlocking function include');
+        this.connection.setSessionType('stateful');
+        await unlockFunctionInclude(
+          this.connection,
+          group,
+          include,
+          lockHandle,
+        );
+        this.connection.setSessionType('stateless');
+        this.untrackLock(group, include);
+        releaseLock();
+
+        this.logger?.info?.('Activating function include');
+        await step(this.activate(config, options));
       }
 
-      this.logger?.error('Create failed:', safeErrorMessage(error));
-      throw error;
-    } finally {
-      endCriticalSection();
-    }
+      return value;
+    });
   }
 
   /**
-   * Read function include SOURCE code.
+   * Read the include's source.
    *
-   * Per the IAdtObject contract, `read()` returns source for objects that have
-   * it (metadata is available via `readMetadata()`). This object has source, so
-   * `read()` is an alias of `readSource()`. (Historically it returned metadata,
-   * which was inconsistent with class/program/function-module `read()`.)
+   * `read()` is the source, as the contract says of an object that has one.
+   * Historically it answered metadata, which disagreed with class, program and
+   * function module.
    */
-  async read(
+  async read<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionIncludeConfig>,
     version?: 'active' | 'inactive',
-    _options?: IReadOptions,
-  ): Promise<IFunctionIncludeState | undefined> {
-    return this.readSource(config, version);
+    options?: IReadOptions & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
+    const { group, include } = this.names(config);
+
+    return answering(
+      () =>
+        readFunctionIncludeSource(
+          this.connection,
+          group,
+          include,
+          version ?? 'active',
+        ),
+      this.results.source as IResultStrategy<ReturnType<R['source']>>,
+      options?.analyse,
+    );
   }
 
   /**
-   * Low-level metadata read (the object's `finclude` XML), with 404 -> undefined.
-   * Used by readMetadata() and by the create/update readiness polling, which
-   * need metadata semantics and long-polling options (the source endpoint does
-   * not take them).
-   */
-  private async readMetadataRaw(
-    config: Partial<IFunctionIncludeConfig>,
-    version?: 'active' | 'inactive',
-    options?: IReadOptions,
-  ): Promise<IFunctionIncludeState | undefined> {
-    if (!config.functionGroupName) {
-      throw new Error('Function group name is required');
-    }
-    if (!config.includeName) {
-      throw new Error('Include name is required');
-    }
-
-    try {
-      const response = await readFunctionInclude(
-        this.connection,
-        config.functionGroupName,
-        config.includeName,
-        version ?? 'active',
-        options,
-      );
-      return { readResult: response, errors: [] };
-    } catch (error: unknown) {
-      const e = error as HttpError;
-      if (e.response?.status === 404) {
-        return undefined;
-      }
-      this.logger?.error('Read failed:', safeErrorMessage(error));
-      throw error;
-    }
-  }
-
-  /**
-   * Read function include source code.
-   */
-  async readSource(
-    config: Partial<IFunctionIncludeConfig>,
-    version?: 'active' | 'inactive',
-  ): Promise<IFunctionIncludeState | undefined> {
-    if (!config.functionGroupName) {
-      throw new Error('Function group name is required');
-    }
-    if (!config.includeName) {
-      throw new Error('Include name is required');
-    }
-
-    try {
-      const response = await readFunctionIncludeSource(
-        this.connection,
-        config.functionGroupName,
-        config.includeName,
-        version ?? 'active',
-      );
-      return { readResult: response, errors: [] };
-    } catch (error: unknown) {
-      const e = error as HttpError;
-      if (e.response?.status === 404) {
-        return undefined;
-      }
-      this.logger?.error('readSource failed:', safeErrorMessage(error));
-      throw error;
-    }
-  }
-
-  /**
-   * Read metadata — for this object, read() already returns metadata.
+   * Read the include's `finclude` metadata document.
+   *
+   * A different resource from the source, and the only one that takes
+   * `withLongPolling` — which is why the readiness polls after a write read
+   * this rather than the source.
    */
   async readMetadata(
     config: Partial<IFunctionIncludeConfig>,
-    options?: IReadOptions & { version?: 'active' | 'inactive' },
-  ): Promise<IFunctionIncludeState> {
-    const state: IFunctionIncludeState = { errors: [] };
-    if (!config.functionGroupName) {
-      const error = new Error('Function group name is required');
-      state.errors.push({
-        method: 'readMetadata',
-        error,
-        timestamp: new Date(),
-      });
-      throw error;
-    }
-    if (!config.includeName) {
-      const error = new Error('Include name is required');
-      state.errors.push({
-        method: 'readMetadata',
-        error,
-        timestamp: new Date(),
-      });
-      throw error;
-    }
-    try {
-      const readState = await this.readMetadataRaw(
-        config,
-        options?.version ?? 'active',
-        options,
-      );
-      if (readState) {
-        state.metadataResult = readState.readResult;
-        state.readResult = readState.readResult;
-      } else {
-        const error = new Error(
-          `Function include '${config.includeName}' not found in group '${config.functionGroupName}'`,
-        );
-        state.errors.push({
-          method: 'readMetadata',
-          error,
-          timestamp: new Date(),
-        });
-        throw error;
-      }
-      this.logger?.info?.('Function include metadata read successfully');
-      return state;
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({
-        method: 'readMetadata',
-        error: err,
-        timestamp: new Date(),
-      });
-      this.logger?.error('readMetadata', safeErrorMessage(err));
-      throw err;
-    }
+    options?: IReadOptions & {
+      version?: 'active' | 'inactive';
+    } & IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['metadata']>>> {
+    const { group, include } = this.names(config);
+
+    return answering(
+      () =>
+        readFunctionInclude(
+          this.connection,
+          group,
+          include,
+          options?.version ?? 'active',
+          options,
+        ),
+      this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
+      options?.analyse,
+    );
   }
 
   /**
-   * Update function include with full operation chain.
+   * Update the include: its metadata, and its source when source was given.
+   *
+   * With `options.lockHandle` the caller holds the lock and owns the chain.
    */
-  async update(
+  async update<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionIncludeConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IFunctionIncludeState> {
-    if (!config.functionGroupName) {
-      throw new Error('Function group name is required');
-    }
-    if (!config.includeName) {
-      throw new Error('Include name is required');
-    }
-
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+    const { group, include } = this.names(config);
     const fullConfig: IFunctionIncludeConfig = {
       ...(config as IFunctionIncludeConfig),
     };
     const params = this.buildCreateParams(fullConfig);
+    const source = options?.sourceCode || config.sourceCode;
 
-    // Low-level mode: if lockHandle is provided, perform only update operation
     if (options?.lockHandle) {
-      const codeToUpdate = options?.sourceCode || config.sourceCode;
+      const handle = options.lockHandle;
       this.logger?.info?.(
         'Low-level update: performing update only (lockHandle provided)',
       );
-      await updateFunctionInclude(
-        this.connection,
-        params,
-        options.lockHandle,
-        this.logger,
-      );
-      if (codeToUpdate) {
-        await uploadFunctionIncludeSource(
-          this.connection,
-          fullConfig.functionGroupName,
-          fullConfig.includeName,
-          codeToUpdate,
-          options.lockHandle,
-          this.isUnicode(),
-          fullConfig.transportRequest,
+      return chain(this.logger, async ({ step }) => {
+        const updated = await step(
+          answering(
+            () =>
+              updateFunctionInclude(
+                this.connection,
+                params,
+                handle,
+                this.logger,
+              ),
+            this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+            options?.analyse,
+          ),
         );
-      }
-      this.logger?.info?.('Function include updated (low-level)');
-      return { errors: [] };
+        if (source) {
+          await step(
+            answering(
+              () =>
+                uploadFunctionIncludeSource(
+                  this.connection,
+                  group,
+                  include,
+                  source,
+                  handle,
+                  this.isUnicode(),
+                  fullConfig.transportRequest,
+                ),
+              this.results.source as IResultStrategy<ReturnType<R['source']>>,
+              options?.analyse,
+            ),
+          );
+        }
+        return updated;
+      });
     }
 
-    let lockHandle: string | undefined;
-    const state: IFunctionIncludeState = { errors: [] };
-
-    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
-
-    // the lock but leaves the work half-done.
-
+    // A LOCK…UNLOCK window: a timeout in the middle releases the lock and
+    // leaves the work half done.
     const endCriticalSection = beginCriticalSection(this.connection);
 
-    try {
-      // 1. Lock
+    return chain(this.logger, async ({ step, onScopeEnd }) => {
+      onScopeEnd(async () => {
+        endCriticalSection();
+      });
+
       this.logger?.info?.('Step 1: Locking function include');
       this.connection.setSessionType('stateful');
-      lockHandle = await lockFunctionInclude(
+      // Registered FIRST so it unwinds LAST: a handle is only valid inside a
+      // stateful request on older BASIS (#106).
+      onScopeEnd(async () => {
+        this.connection.setSessionType('stateless');
+      });
+
+      const lockHandle = await lockFunctionInclude(
         this.connection,
-        fullConfig.functionGroupName,
-        fullConfig.includeName,
+        group,
+        include,
         this.logger,
       );
-      state.lockHandle = lockHandle;
-      this.trackLock(
-        fullConfig.functionGroupName,
-        fullConfig.includeName,
-        lockHandle,
-      );
+      this.trackLock(group, include, lockHandle);
       fullConfig.onLock?.(lockHandle);
+      const releaseLock = onScopeEnd(async () => {
+        await unlockFunctionInclude(
+          this.connection,
+          group,
+          include,
+          lockHandle,
+        );
+        this.untrackLock(group, include);
+      });
       this.logger?.info?.('Function include locked, handle:', lockHandle);
 
-      // 2. Check inactive with source code for update (if provided)
-      const codeToCheck = options?.sourceCode || fullConfig.sourceCode;
-      if (codeToCheck) {
+      if (source) {
         this.logger?.info?.(
           'Step 2: Checking inactive version with update content',
         );
-        const deletionCheck = await checkFunctionInclude(
-          this.connection,
-          fullConfig.functionGroupName,
-          fullConfig.includeName,
-          'inactive',
-          codeToCheck,
-          this.sourceArtifactContentType(),
+        await step(
+          answering(
+            () =>
+              checkFunctionInclude(
+                this.connection,
+                group,
+                include,
+                'inactive',
+                source,
+                this.sourceArtifactContentType(),
+              ),
+            this.results.check as IResultStrategy<ReturnType<R['check']>>,
+            options?.analyse,
+          ),
         );
-        state.checkResult = deletionCheck;
-        this.logger?.info?.('Check inactive with update content passed');
       }
 
-      // 3. Update metadata
       this.logger?.info?.('Step 3: Updating function include metadata');
-      await updateFunctionInclude(
-        this.connection,
-        params,
-        lockHandle,
-        this.logger,
+      const updated = await step(
+        answering(
+          () =>
+            updateFunctionInclude(
+              this.connection,
+              params,
+              lockHandle,
+              this.logger,
+            ),
+          this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+          options?.analyse,
+        ),
       );
 
-      // 3.5. Upload source if provided
-      if (codeToCheck) {
+      if (source) {
         this.logger?.info?.('Step 3b: Uploading function include source');
-        await uploadFunctionIncludeSource(
-          this.connection,
-          fullConfig.functionGroupName,
-          fullConfig.includeName,
-          codeToCheck,
-          lockHandle,
-          this.isUnicode(),
-          fullConfig.transportRequest,
+        await step(
+          answering(
+            () =>
+              uploadFunctionIncludeSource(
+                this.connection,
+                group,
+                include,
+                source,
+                lockHandle,
+                this.isUnicode(),
+                fullConfig.transportRequest,
+              ),
+            this.results.source as IResultStrategy<ReturnType<R['source']>>,
+            options?.analyse,
+          ),
         );
 
-        // Poll the inactive version: the write above produced it; the active version may not exist yet.
-        // Wait for object to be ready after update
-        this.logger?.info?.('read (wait for object ready after update)');
-        try {
-          await this.readMetadataRaw(
-            {
-              functionGroupName: fullConfig.functionGroupName,
-              includeName: fullConfig.includeName,
-            },
-            'inactive',
-            { withLongPolling: true },
-          );
-          this.logger?.info?.('object is ready after update');
-        } catch (readError) {
+        // The write produced the inactive version; the active one may not exist
+        // yet. A failure here is not the update's failure, so it is logged and
+        // the chain continues — the unlock still has to happen.
+        const ready = await this.readMetadata(config, {
+          version: 'inactive',
+          withLongPolling: true,
+        });
+        if (!ready.ok) {
           this.logger?.warn?.(
             'read with long polling failed after update:',
-            safeErrorMessage(readError),
+            ready.getError().message,
           );
         }
       }
 
-      // 4. Unlock
       this.logger?.info?.('Step 4: Unlocking function include');
       this.connection.setSessionType('stateful');
-      await unlockFunctionInclude(
-        this.connection,
-        fullConfig.functionGroupName,
-        fullConfig.includeName,
-        lockHandle,
-      );
+      await unlockFunctionInclude(this.connection, group, include, lockHandle);
       this.connection.setSessionType('stateless');
-      this.untrackLock(fullConfig.functionGroupName, fullConfig.includeName);
-      lockHandle = undefined;
+      this.untrackLock(group, include);
+      releaseLock();
 
-      // 5. Final check
       this.logger?.info?.('Step 5: Final check');
-      const finalCheck = await checkFunctionInclude(
-        this.connection,
-        fullConfig.functionGroupName,
-        fullConfig.includeName,
-        'inactive',
-      );
-      state.checkResult = finalCheck;
+      await step(this.check(config, 'inactive', options));
 
-      // 6. Activate (optional)
       if (options?.activateOnUpdate) {
         this.logger?.info?.('Step 6: Activating function include');
-        const activateResponse = await activateFunctionInclude(
-          this.connection,
-          fullConfig.functionGroupName,
-          fullConfig.includeName,
-        );
-        state.activateResult = activateResponse;
+        await step(this.activate(config, options));
 
-        try {
-          const readState = await this.readMetadataRaw(
-            {
-              functionGroupName: fullConfig.functionGroupName,
-              includeName: fullConfig.includeName,
-            },
-            'active',
-            { withLongPolling: true },
-          );
-          if (readState) {
-            state.readResult = readState.readResult;
-          }
-        } catch (readError) {
+        const ready = await this.readMetadata(config, {
+          version: 'active',
+          withLongPolling: true,
+        });
+        if (!ready.ok) {
           this.logger?.warn?.(
             'read with long polling failed after activation:',
-            safeErrorMessage(readError),
-          );
-        }
-      } else {
-        // No activation happened: return the version just written (inactive),
-        // not the stale active one.
-        const readResponse = await readFunctionInclude(
-          this.connection,
-          fullConfig.functionGroupName,
-          fullConfig.includeName,
-          'inactive',
-        );
-        state.readResult = readResponse;
-      }
-
-      return state;
-    } catch (error: unknown) {
-      if (lockHandle) {
-        try {
-          this.logger?.warn?.(
-            'Unlocking function include during error cleanup',
-          );
-          this.connection.setSessionType('stateful');
-          await unlockFunctionInclude(
-            this.connection,
-            fullConfig.functionGroupName,
-            fullConfig.includeName,
-            lockHandle,
-          );
-          this.connection.setSessionType('stateless');
-          this.untrackLock(
-            fullConfig.functionGroupName,
-            fullConfig.includeName,
-          );
-        } catch (unlockError) {
-          this.logger?.warn?.(
-            'Failed to unlock during cleanup:',
-            safeErrorMessage(unlockError),
-          );
-        }
-      } else {
-        this.connection.setSessionType('stateless');
-      }
-
-      if (options?.deleteOnFailure) {
-        try {
-          this.logger?.warn?.('Deleting function include after failure');
-          await deleteFunctionInclude(
-            this.connection,
-            this.buildDeleteParams(fullConfig),
-          );
-        } catch (deleteError) {
-          this.logger?.warn?.(
-            'Failed to delete function include after failure:',
-            safeErrorMessage(deleteError),
+            ready.getError().message,
           );
         }
       }
 
-      this.logger?.error('Update failed:', safeErrorMessage(error));
-      throw error;
-    } finally {
-      endCriticalSection();
-    }
+      return updated;
+    });
   }
 
   /**
-   * Delete function include.
+   * Delete the include.
+   *
+   * The deletion check is read, not merely performed — see AdtProgram.delete.
    */
-  async delete(
+  async delete<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionIncludeConfig>,
-  ): Promise<IFunctionIncludeState> {
-    if (!config.functionGroupName) {
-      throw new Error('Function group name is required');
-    }
-    if (!config.includeName) {
-      throw new Error('Include name is required');
-    }
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+    this.names(config);
 
-    const state: IFunctionIncludeState = { errors: [] };
-
-    try {
+    return chain(this.logger, async ({ step }) => {
       this.logger?.info?.('Checking function include for deletion');
-      const deletionCheck = await checkDeletion(
-        this.connection,
-        this.buildDeleteParams(config),
+      await step(
+        answering(
+          () => checkDeletion(this.connection, this.buildDeleteParams(config)),
+          this.results.check as IResultStrategy<ReturnType<R['check']>>,
+          (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
+        ),
       );
-      // ADT already said whether this may be deleted; refusing to read that
-      // answer is how a delete came to report success while the object
-      // stayed. Throws on isDeletable=false or a message of type E; a W
-      // is a warning and passes.
-      assertDeletable(deletionCheck.data);
-      state.checkResult = deletionCheck;
       this.logger?.info?.('Deletion check passed');
 
       this.logger?.info?.('Deleting function include');
-      const deleteResponse = await deleteFunctionInclude(
-        this.connection,
-        this.buildDeleteParams(config),
+      const value = await step(
+        answering(
+          () =>
+            deleteFunctionInclude(
+              this.connection,
+              this.buildDeleteParams(config),
+            ),
+          this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+          options?.analyse,
+        ),
       );
-      state.deleteResult = deleteResponse;
       this.logger?.info?.('Function include deleted');
-
-      return state;
-    } catch (error: unknown) {
-      this.logger?.error('Delete failed:', safeErrorMessage(error));
-      throw error;
-    }
+      return value;
+    });
   }
 
-  /**
-   * Activate function include.
-   */
-  async activate(
+  /** Activate the include. */
+  async activate<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionIncludeConfig>,
-  ): Promise<IFunctionIncludeState> {
-    if (!config.functionGroupName) {
-      throw new Error('Function group name is required');
-    }
-    if (!config.includeName) {
-      throw new Error('Include name is required');
-    }
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+    const { group, include } = this.names(config);
 
-    const state: IFunctionIncludeState = { errors: [] };
-    try {
-      const activateResponse = await activateFunctionInclude(
-        this.connection,
-        config.functionGroupName,
-        config.includeName,
-      );
-      state.activateResult = activateResponse;
-      return state;
-    } catch (error: unknown) {
-      this.logger?.error('Activate failed:', safeErrorMessage(error));
-      throw error;
-    }
+    return answering(
+      () => activateFunctionInclude(this.connection, group, include),
+      this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
+      (options?.analyse ?? activationRefusal) as IAnalyse<E>,
+    );
   }
 
-  /**
-   * Check function include.
-   */
-  async check(
+  /** Check the include. */
+  async check<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionIncludeConfig>,
     status?: string,
-  ): Promise<IFunctionIncludeState> {
-    if (!config.functionGroupName) {
-      throw new Error('Function group name is required');
-    }
-    if (!config.includeName) {
-      throw new Error('Include name is required');
-    }
-
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+    const { group, include } = this.names(config);
     const version: 'active' | 'inactive' =
       status === 'active' ? 'active' : 'inactive';
-    const deletionCheck = await checkFunctionInclude(
-      this.connection,
-      config.functionGroupName,
-      config.includeName,
-      version,
-      config.sourceCode,
-      this.sourceArtifactContentType(),
+
+    return answering(
+      () =>
+        checkFunctionInclude(
+          this.connection,
+          group,
+          include,
+          version,
+          config.sourceCode,
+          this.sourceArtifactContentType(),
+        ),
+      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      options?.analyse,
     );
-    return { checkResult: deletionCheck, errors: [] };
   }
 
-  /**
-   * Lock function include for modification.
-   */
-  async lock(config: Partial<IFunctionIncludeConfig>): Promise<string> {
-    if (!config.functionGroupName || !config.includeName) {
-      throw new Error('Function group name and include name are required');
-    }
+  /** Lock the include for modification. */
+  async lock(
+    config: Partial<IFunctionIncludeConfig>,
+  ): Promise<IAdtResponse<string>> {
+    const { group, include } = this.names(config);
 
-    this.connection.setSessionType('stateful');
-    const lockHandle = await lockFunctionInclude(
-      this.connection,
-      config.functionGroupName,
-      config.includeName,
-      this.logger,
+    return answering(
+      async () => {
+        this.connection.setSessionType('stateful');
+        const lockHandle = await lockFunctionInclude(
+          this.connection,
+          group,
+          include,
+          this.logger,
+        );
+        this.trackLock(group, include, lockHandle);
+        // The handle is the value, and the request does not keep the wire it
+        // came on — so the answer is built around what the request produced.
+        return {
+          data: lockHandle,
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+        };
+      },
+      (answer) => String(answer.data),
     );
-    this.trackLock(config.functionGroupName, config.includeName, lockHandle);
-    return lockHandle;
   }
 
-  /**
-   * Unlock function include.
-   */
+  /** Unlock the include. */
   async unlock(
     config: Partial<IFunctionIncludeConfig>,
     lockHandle: string,
-  ): Promise<IFunctionIncludeState> {
-    if (!config.functionGroupName || !config.includeName) {
-      throw new Error('Function group name and include name are required');
-    }
+  ): Promise<IAdtResponse<void>> {
+    const { group, include } = this.names(config);
 
-    this.connection.setSessionType('stateful');
-    await unlockFunctionInclude(
-      this.connection,
-      config.functionGroupName,
-      config.includeName,
-      lockHandle,
+    return answering(
+      async () => {
+        // UNLOCK must run stateful (older BASIS #106); stateless after.
+        this.connection.setSessionType('stateful');
+        const result = await unlockFunctionInclude(
+          this.connection,
+          group,
+          include,
+          lockHandle,
+        );
+        this.connection.setSessionType('stateless');
+        this.untrackLock(group, include);
+        return result;
+      },
+      () => undefined,
     );
-    this.connection.setSessionType('stateless');
-    this.untrackLock(config.functionGroupName, config.includeName);
-    return { errors: [] };
   }
 
-  getVersions(config: Partial<IFunctionIncludeConfig>) {
-    return getFunctionIncludeVersions(this.connection, config);
+  /** Version history of the include's source. */
+  async getVersions(
+    config: Partial<IFunctionIncludeConfig>,
+  ): Promise<IAdtResponse<ObjectVersion[]>> {
+    return answering(
+      async () => ({
+        data: await getFunctionIncludeVersions(this.connection, config),
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+      }),
+      (answer) => answer.data as ObjectVersion[],
+    );
   }
 
-  getVersionSource(contentUri: string) {
-    return getFunctionIncludeVersionSource(this.connection, contentUri);
+  /** The source of one version, by the `contentUri` an entry carries. */
+  async getVersionSource(contentUri: string): Promise<IAdtResponse<string>> {
+    return answering(
+      async () => ({
+        data: await getFunctionIncludeVersionSource(
+          this.connection,
+          contentUri,
+        ),
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+      }),
+      (answer) => String(answer.data),
+    );
   }
 }

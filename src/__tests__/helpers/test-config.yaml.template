@@ -1168,13 +1168,17 @@ create_service_definition:
       available_in: ["onprem", "cloud"]
       description: "Service definition reserved for AdtServiceDefinition tests"
       params:
-        service_definition_name: "ZAC_SRVD01"  # Replace with your service definition name
+        # Its own name, not ZAC_SRVD01: this flow CREATES AND DELETES its
+        # subject, and ZAC_SRVD01 is the permanent dependency of
+        # create_service_binding below. Sharing one name makes the delete
+        # answer "Used by 1 other object", every run.
+        service_definition_name: "ZAC_SRVD03"  # Replace with your service definition name
         description: "AdtServiceDefinition workflow service definition"
         # package_name: "ZAC_PKG01"  # Uses environment.default_package if omitted
         # transport_request: ""  # Uses environment.default_transport if omitted
         source_code: |
           @EndUserText.label: 'AdtServiceDefinition workflow service definition'
-          define service ZAC_SRVD01 {
+          define service ZAC_SRVD03 {
             expose ZAC_SHR_CDSUT_DDLS;
           }
 

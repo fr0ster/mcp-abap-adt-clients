@@ -79,6 +79,124 @@ the same answer as a failure reports an error for an empty package.
 Neither reading can be the library's, which is why it is a decision you supply:
 pass `analyse` in the operation options to say which one applies to your call.
 
+## "Resource  ZCL_X: wrong input data for processing" on a read
+
+A `400` with an `<exc:exception>`, `adtType` `ExceptionResourceWrongData`, T100
+`SADT_RESOURCE/007`. Note the double space: the object type belongs there and
+the server left it out, which is the first sign the message is not about your
+request at all.
+
+It means **a class was created and no source has been written to it yet**. Every
+read of one refuses this way — `active`, `inactive`, or neither, metadata or
+source. Waiting thirty seconds does not help, and neither does a lock/unlock
+cycle. Writing the source does, immediately and without any activation.
+
+The object is not empty and it is not broken: SAP generated a minimal class and
+stored it as the active version, and you can read it back the moment the first
+write lands. It is unfinished, not absent.
+
+Specific to classes. An interface created the same way reads its generated
+skeleton at once, a domain is complete on creation, a DDL source answers 200
+with an empty body, and a service definition cannot be created bare at all —
+its POST is refused with "Check of condition failed".
+
+The trap is that it reads as "your request is malformed", so the natural
+response is to retry, and retrying never works. This library's own suite spent
+sixteen seconds a run on eight such retries before anyone measured it, and the
+assertion after them had never once executed.
+
+**What to do:** write the source. A class reads at `version=inactive` while
+still under its lock, long before any activation. Do not reach for
+`getVersions()` to test readiness — it answers `ok` in this state too, listing
+version slots rather than content. See
+[OBJECT_LIFECYCLE.md](OBJECT_LIFECYCLE.md#what-a-bare-create-actually-leaves-per-type).
+
+## "Class ZCL_X does not have a TMDIR entry" on an activation
+
+A `200` carrying `<msg type="E" code="OO(045)">`, alongside an informational
+`EU(239)` "Errors occurred during generation" — note that the summary of the
+errors is severity `I`, so counting by severity finds one error, not two.
+
+It means **the object does not exist**. The activation went straight to
+generation, looked for the class in the method directory, and found nothing.
+It does not say "not found", so it reads like a corrupt object; it is an absent
+one. The same message serves interfaces, with `Interface` in `T100KEY-V1`.
+
+Distinguish it from the entry above: `wrong input data` is an object that exists
+with nothing in it, `TMDIR` is an object that is not there at all.
+
+## A message class exists; its messages do not
+
+`getMessageClassMessage().read()` answering `OBJECT_NOT_FOUND` is **this library
+reading content**, not SAP reporting absence. A message class is a container and
+its messages are rows in it: only the container has existence on the wire — 404
+before it is created, 404 after it is deleted — while a row has none. Measured,
+`POST …/messages/001?_action=LOCK_MSG` answers `200` before message 001 exists,
+because the PUT after it is what creates it.
+
+So there is nothing to ask about a row, and nothing refuses. The member fetches
+the class document and looks for the number itself. A consumer who replaces the
+reading replaces that verdict along with it.
+
+## `validate()` passed and the create says the name is taken
+
+Fixed in this package, and worth knowing if you are on an older version or
+reading raw ADT traffic: a validation refuses a taken name two different ways.
+A domain, a structure, a table, a class and a service definition answer a
+failing status. A **function group and a DDL source answer `200`** with the
+verdict in the body:
+
+```xml
+<SEVERITY>ERROR</SEVERITY>
+<SHORT_TEXT>Data definition ZAC_X already exists</SHORT_TEXT>
+```
+
+Only the function group's reading looked at that, so `getDdl().validate()`
+reported success for a name the system had already rejected, and a caller who
+validates before creating was waved through into a create that then failed.
+`validationRefusal` is the default on every `validate()` now.
+
+Note what `validate()` still does not answer: whether the object exists. A free
+name validates fine either way. And note what an abandoned create leaves — the
+name is held from the POST onward whatever state the object is in, including a
+class that no read can see.
+
+## An object that exists, holds its name, and cannot be deleted
+
+`delete()` works on anything you can name — with one exception, and it is the
+expensive one: **an object that was created but never bound to a package.** It
+holds its name against every future create, and nothing removes it.
+
+The mechanism shows in the deletion check's own answer. When it can resolve the
+object it names the package:
+
+```xml
+<del:object del:isDeletable="true"  adtcore:name="ZAC_X" adtcore:packageName="ZADT_BLD_PKG03"/>
+<del:object del:isDeletable="false" adtcore:name="ZAC_X">
+  <del:message del:type="E"><del:text>Object does not exist</del:text></del:message>
+```
+
+The second shape is what an absent object gets — and an unbound one gets it too,
+because the check resolves through the package. So the system reports "does not
+exist" about something whose name is demonstrably taken, and the delete has
+nothing to work on.
+
+**This page does not reproduce it on purpose.** The experiment succeeds by
+leaving exactly the undeletable object it is describing.
+
+**Prevention is the whole remedy this library offers:**
+
+- pass `deleteOnFailure` in the operation options on a create, so a chain that
+  fails after the POST removes what it made;
+- treat a create as unfinished until you have seen the object *in its package* —
+  `getUtils().search({ query: name })` answers `adtcore:packageName` for an
+  object that resolved, and that is the attribute to look for;
+- do not abandon a create halfway on purpose.
+
+There is no member for re-binding an object to a package, and adding one would
+not help: the resource that would accept it is reached the same way. Cleaning up
+an object already in this state is SAP GUI territory.
+
 ## A refusal can arrive with a 2xx
 
 ADT answers some refusals with **200** carrying an `<exc:exception>` document.

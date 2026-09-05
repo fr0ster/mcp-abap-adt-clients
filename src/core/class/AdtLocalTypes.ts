@@ -1,33 +1,96 @@
 /**
- * AdtLocalTypes - High-level CRUD operations for Local Types (implementations include)
+ * The implementations include of a class — where its local types live.
  *
- * Local types are defined in the implementations include of an ABAP class.
- * All operations require the parent class to be locked.
+ * ADT addresses the include, not one type inside it, and it is written under
+ * the **class's** lock: everything here is one class, seen through one of its
+ * source resources. What that means for the atoms this handler declares is that
+ * `delete` is a write of an empty include, and `activate` activates the class.
+ * Both say so in their own comment rather than pretending the include is an
+ * object of its own.
  */
 
 import type {
-  HttpError,
+  IAbapConnection,
+  IAdtActivatable,
+  IAdtCheckable,
+  IAdtContentTypes,
+  IAdtDeletable,
+  IAdtError,
   IAdtOperationOptions,
+  IAdtReadable,
+  IAdtResponse,
+  IAdtSystemContext,
+  IAdtUpdatable,
+  IAdtValidatable,
   ILocalTypesConfig,
-  IObjectVersion,
+  ILogger,
+  IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
-import { safeErrorMessage } from '../../utils/internalUtils';
+import {
+  answering,
+  type IAdtOptions,
+  type IAnalyse,
+} from '../../utils/adtResponse';
+import { validationRefusal } from '../../utils/validationRefusal';
+import { chain } from '../shared/chain';
+import type { LockRegistry } from '../shared/LockRegistry';
+import type { ObjectVersion } from '../shared/results';
 import type { IReadOptions } from '../shared/types';
 import { AdtClassMemberBase } from './AdtClassMemberBase';
 import { checkClassLocalTypes } from './check';
 import { updateClassLocalTypes } from './includes';
-import type { IClassState } from './types';
+import { getClassImplementationsInclude } from './read';
+import { classDocuments, type IClassResults } from './types';
 
 // Types defined in @mcp-abap-adt/interfaces
 export type { ILocalTypesConfig } from '@mcp-abap-adt/interfaces';
 
-export class AdtLocalTypes extends AdtClassMemberBase {
+export class AdtLocalTypes<
+    R extends IClassResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    > = IClassResults,
+  >
+  extends AdtClassMemberBase<R>
+  implements
+    IAdtReadable<
+      ILocalTypesConfig,
+      ReturnType<R['source']>,
+      ReturnType<R['metadata']>
+    >,
+    IAdtUpdatable<ILocalTypesConfig, ReturnType<R['updated']>>,
+    IAdtDeletable<ILocalTypesConfig, ReturnType<R['updated']>>,
+    IAdtValidatable<ILocalTypesConfig, ReturnType<R['validation']>>,
+    IAdtCheckable<ILocalTypesConfig, ReturnType<R['check']>>,
+    IAdtActivatable<ILocalTypesConfig, ReturnType<R['activation']>>
+{
   public readonly objectType: string = 'LocalTypes';
 
-  /**
-   * Validate local types code
-   */
-  async validate(config: Partial<ILocalTypesConfig>): Promise<IClassState> {
+  constructor(
+    connection: IAbapConnection,
+    logger?: ILogger,
+    systemContext?: IAdtSystemContext,
+    contentTypes?: IAdtContentTypes,
+    lockRegistry?: LockRegistry,
+    // See AdtClass: the one cast is on the default, never on a member.
+    protected readonly results: R = classDocuments as unknown as R,
+  ) {
+    super(connection, logger, systemContext, contentTypes, lockRegistry);
+  }
+
+  /** Syntax-check the source a caller is about to write. */
+  async validate<E extends IAdtError = IAdtError>(
+    config: Partial<ILocalTypesConfig>,
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+    // Nothing was asked of the server yet, so there is no answer to describe:
+    // a missing required argument is the caller's mistake and it throws.
     if (!config.className) {
       throw new Error('Class name is required for validation');
     }
@@ -35,64 +98,59 @@ export class AdtLocalTypes extends AdtClassMemberBase {
       throw new Error('Local types code is required for validation');
     }
 
-    const checkResponse = await checkClassLocalTypes(
-      this.connection,
-      config.className,
-      config.localTypesCode,
-      'inactive',
-      this.contentTypes?.sourceArtifactContentType(),
+    return answering(
+      () =>
+        checkClassLocalTypes(
+          this.connection,
+          config.className as string,
+          config.localTypesCode as string,
+          'inactive',
+          this.contentTypes?.sourceArtifactContentType(),
+        ),
+      this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
+      (options?.analyse ?? validationRefusal) as IAnalyse<E>,
     );
-
-    return {
-      validationResponse: checkResponse,
-      errors: [],
-    };
   }
 
-  /**
-   * Read local types code
-   */
-  async read(
+  /** Read the include's source. */
+  async read<E extends IAdtError = IAdtError>(
     config: Partial<ILocalTypesConfig>,
     version: 'active' | 'inactive' = 'active',
-    options?: IReadOptions,
-  ): Promise<IClassState | undefined> {
+    options?: IReadOptions & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
 
-    try {
-      const { getClassImplementationsInclude } = await import('./read');
-      const response = await getClassImplementationsInclude(
-        this.connection,
-        config.className,
-        version,
-        this.logger,
-        options,
-      );
-      return {
-        readResult: response,
-        errors: [],
-      };
-    } catch (error: unknown) {
-      const e = error as HttpError;
-      if (e.response?.status === 404) {
-        return undefined;
-      }
-      this.logger?.error('Read LocalTypes failed:', safeErrorMessage(error));
-      throw error;
-    }
+    // No 404 special case any more: ADT answers a read for an include that was
+    // never written with 200 and an empty body, so absence was never a status
+    // to branch on, and whether an empty body *is* absence is the caller's
+    // reading — supplied through `analyse`.
+    return answering(
+      () =>
+        getClassImplementationsInclude(
+          this.connection,
+          config.className as string,
+          version,
+          this.logger,
+          options,
+        ),
+      this.results.source as IResultStrategy<ReturnType<R['source']>>,
+      options?.analyse,
+    );
   }
 
   /**
-   * Update local types with full operation chain
-   * Requires parent class to be locked
-   * If options.lockHandle is provided, performs only low-level update without lock/check/unlock chain
+   * Write the include.
+   *
+   * With `options.lockHandle` the caller holds the class's lock and owns the
+   * chain, so this is one request. Without it, this locks the class, checks,
+   * writes and unlocks — and the unlock happens on every path out.
    */
-  async update(
+  async update<E extends IAdtError = IAdtError>(
     config: Partial<ILocalTypesConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IClassState> {
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
@@ -105,132 +163,121 @@ export class AdtLocalTypes extends AdtClassMemberBase {
       throw new Error('Local types code is required');
     }
 
-    // Low-level mode: if lockHandle is provided, perform only update operation
-    if (options?.lockHandle) {
-      const codeToUpdate = options?.sourceCode ?? config.localTypesCode ?? '';
+    const name = config.className;
+    const source = options?.sourceCode ?? config.localTypesCode ?? '';
 
+    if (options?.lockHandle) {
       this.logger?.info?.(
         'Low-level update: performing update only (lockHandle provided)',
       );
-      const updateResponse = await updateClassLocalTypes(
-        this.connection,
-        config.className,
-        codeToUpdate,
-        options.lockHandle,
-        config.transportRequest,
-        this.contentTypes?.sourceArtifactContentType(),
+      return answering(
+        () =>
+          updateClassLocalTypes(
+            this.connection,
+            name,
+            source,
+            options.lockHandle as string,
+            config.transportRequest,
+            this.contentTypes?.sourceArtifactContentType(),
+          ),
+        this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+        options?.analyse,
       );
-      this.logger?.info?.('Local types updated (low-level)');
-      return {
-        updateResult: updateResponse,
-        errors: [],
-      };
     }
 
-    let lockHandle: string | undefined;
-
-    try {
-      // 1. Lock parent class (stateful only for lock)
+    return chain(this.logger, async ({ step, onScopeEnd }) => {
       this.logger?.info?.('Step 1: Locking parent class');
-      lockHandle = await super.lock({ className: config.className });
+      // Registered before the lock is taken, so the session is restored even if
+      // the lock itself is refused; and last to unwind, because on older BASIS
+      // a handle is only valid inside a stateful request (#106).
+      onScopeEnd(async () => {
+        this.connection.setSessionType('stateless');
+      });
+      const lockHandle = await this.lockCap.lockHandle({ className: name });
+      this.lockTracker.track(name, lockHandle);
+      const releaseLock = onScopeEnd(async () => {
+        await this.lockCap.release({ className: name }, lockHandle);
+        this.lockTracker.untrack(name);
+      });
       this.logger?.info?.('Parent class locked, handle:', lockHandle);
 
-      // 2. Check local types code
-      // Empty source is a deletion — nothing to syntax-check.
-      const codeToCheck = options?.sourceCode ?? config.localTypesCode ?? '';
-      const state: IClassState = {
-        errors: [],
-      };
-
-      if (codeToCheck !== '') {
+      // Empty source is a deletion — there is nothing to syntax-check, and ADT
+      // refuses an empty body on the check resource.
+      if (source !== '') {
         this.logger?.info?.('Step 2: Checking local types code');
-        const checkResponse = await checkClassLocalTypes(
-          this.connection,
-          config.className,
-          codeToCheck,
-          'inactive',
-          this.contentTypes?.sourceArtifactContentType(),
+        await step(
+          answering(
+            () =>
+              checkClassLocalTypes(
+                this.connection,
+                name,
+                source,
+                'inactive',
+                this.contentTypes?.sourceArtifactContentType(),
+              ),
+            this.results.check as IResultStrategy<ReturnType<R['check']>>,
+            options?.analyse,
+          ),
         );
-        state.checkResult = checkResponse;
-        this.logger?.info?.('Local types check passed');
       }
 
-      // 3. Update local types
       this.logger?.info?.('Step 3: Updating local types');
-      const updateResponse = await updateClassLocalTypes(
-        this.connection,
-        config.className,
-        codeToCheck,
-        lockHandle,
-        config.transportRequest,
-        this.contentTypes?.sourceArtifactContentType(),
+      const updated = await step(
+        answering(
+          () =>
+            updateClassLocalTypes(
+              this.connection,
+              name,
+              source,
+              lockHandle,
+              config.transportRequest,
+              this.contentTypes?.sourceArtifactContentType(),
+            ),
+          this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+          options?.analyse,
+        ),
       );
-      state.updateResult = updateResponse;
       this.logger?.info?.('Local types updated');
 
-      // 4. Unlock parent class (obligatory stateless after unlock)
       this.logger?.info?.('Step 4: Unlocking parent class');
-      const unlockState = await super.unlock(
-        { className: config.className },
-        lockHandle,
-      );
-      state.unlockResult = unlockState.unlockResult;
-      lockHandle = undefined;
+      await this.lockCap.release({ className: name }, lockHandle);
+      this.lockTracker.untrack(name);
+      // Unlocked as its own step, so the registration is discharged rather than
+      // run a second time when the scope unwinds.
+      releaseLock();
 
-      return state;
-    } catch (error: unknown) {
-      // Cleanup on error
-      if (lockHandle) {
-        try {
-          this.logger?.warn?.('Unlocking parent class during error cleanup');
-          await super.unlock({ className: config.className }, lockHandle);
-        } catch (unlockError) {
-          this.logger?.warn?.(
-            'Failed to unlock parent class after error:',
-            safeErrorMessage(unlockError),
-          );
-        }
+      if (options?.activateOnUpdate) {
+        this.logger?.info?.('Step 5: Activating parent class');
+        await step(this.activate({ className: name }, options));
       }
 
-      this.logger?.error('Update LocalTypes failed:', safeErrorMessage(error));
-      throw error;
-    }
-  }
-
-  /**
-   * Delete local types
-   * Performs update with empty code to remove the local types
-   */
-  async delete(config: Partial<ILocalTypesConfig>): Promise<IClassState> {
-    if (!config.className) {
-      throw new Error('Class name is required');
-    }
-
-    // Delete by updating with empty code
-    return await this.update({
-      ...config,
-      localTypesCode: '',
+      return updated;
     });
   }
 
   /**
-   * Activate parent class (local types are activated with parent class)
+   * Empty the include.
+   *
+   * There is no DELETE for a class include: ADT removes local types by writing
+   * the include empty, so this answers what that write answered.
    */
-  async activate(config: Partial<ILocalTypesConfig>): Promise<IClassState> {
+  async delete<E extends IAdtError = IAdtError>(
+    config: Partial<ILocalTypesConfig>,
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
 
-    return await super.activate({ className: config.className });
+    return await this.update({ ...config, localTypesCode: '' }, options);
   }
 
-  /**
-   * Check local types code
-   */
-  async check(
+  /** Syntax-check the include. */
+  async check<E extends IAdtError = IAdtError>(
     config: Partial<ILocalTypesConfig>,
-    version: 'active' | 'inactive' = 'inactive',
-  ): Promise<IClassState> {
+    status: string = 'inactive',
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
@@ -238,30 +285,34 @@ export class AdtLocalTypes extends AdtClassMemberBase {
       throw new Error('Local types code is required');
     }
 
-    const checkResponse = await checkClassLocalTypes(
-      this.connection,
-      config.className,
-      config.localTypesCode,
-      version,
-      this.contentTypes?.sourceArtifactContentType(),
+    return answering(
+      () =>
+        checkClassLocalTypes(
+          this.connection,
+          config.className as string,
+          config.localTypesCode as string,
+          status === 'active' ? 'active' : 'inactive',
+          this.contentTypes?.sourceArtifactContentType(),
+        ),
+      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      options?.analyse,
     );
-
-    return {
-      checkResult: checkResponse,
-      errors: [],
-    };
   }
 
-  // TODO: Investigate lock/unlock/delete operations for local types
-  // - Currently uses parent class lock (lockClass) for all operations
-  // - Eclipse ADT logs show parent class lock is used before updating local includes
-  // - Delete operation currently uses update() with empty code, but validation prevents empty strings
-  // - Consider: Should delete() bypass validation or use a different approach?
-
-  getVersions(
-    config: Partial<{ className: string }>,
-  ): Promise<IObjectVersion[]> {
+  /** Version history of this include. */
+  async getVersions(
+    config: Partial<ILocalTypesConfig>,
+  ): Promise<IAdtResponse<ObjectVersion[]>> {
     if (!config.className) throw new Error('className is required');
-    return this.getIncludeVersions(config.className, 'implementations');
+    const name = config.className;
+    return answering(
+      async () => ({
+        data: await this.getIncludeVersions(name, 'implementations'),
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+      }),
+      (answer) => answer.data as ObjectVersion[],
+    );
   }
 }

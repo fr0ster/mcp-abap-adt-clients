@@ -1,40 +1,46 @@
-import type { CheckRunVersion } from '../../utils/checkRun';
-import { beginCriticalSection } from '../../utils/criticalSection';
-import { assertDeletable } from '../../utils/deletionCheck';
 /**
- * AdtTransformation - High-level CRUD operations for XSLT Transformation objects
+ * AdtTransformation - CRUD for `XSLT/VT` transformations.
  *
- * Implements IAdtObject interface with automatic operation chains,
- * error handling, and resource cleanup.
- *
- * Uses low-level functions directly (not Builder classes).
- *
- * Session management:
- * - stateful: only when doing lock/update/unlock operations
- * - stateless: obligatory after unlock
- * - If no lock/unlock, no stateful needed
- * - activate uses same session/cookies (no stateful needed)
- *
- * Operation chains:
- * - Create: validate → create → (return state, no auto source update)
- * - Update: lock → check(inactive with source) → update → read(longPolling) → unlock → check → activate(optional)
- * - Delete: check(deletion) → delete
+ * Every member answers `IAdtResponse<T>`, where T is what the result set given
+ * at construction makes of that endpoint's answer.
  */
-
 import type {
-  HttpError,
+  AdtNoFailure,
   IAbapConnection,
+  IAdtActivatable,
+  IAdtCheckable,
+  IAdtCreatable,
+  IAdtDeletable,
+  IAdtError,
+  IAdtLockable,
   IAdtOperationOptions,
-  IAdtSourceObject,
+  IAdtReadable,
+  IAdtResponse,
   IAdtSystemContext,
+  IAdtTransportAware,
+  IAdtUpdatable,
+  IAdtValidatable,
+  IAdtVersionable,
+  IAdtWireResponse,
   ILogger,
+  IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
-import { safeErrorMessage } from '../../utils/internalUtils';
+import { ADT_NO_FAILURE, AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
+import { activationRefusal } from '../../utils/activationUtils';
+import {
+  answering,
+  type IAdtOptions,
+  type IAnalyse,
+} from '../../utils/adtResponse';
+import { beginCriticalSection } from '../../utils/criticalSection';
+import { deletionRefusal } from '../../utils/deletionCheck';
+import { chain } from '../shared/chain';
 import {
   createLockTracker,
   type LockRegistry,
   type LockTracker,
 } from '../shared/LockRegistry';
+import type { ObjectVersion } from '../shared/results';
 import type { IReadOptions } from '../shared/types';
 import { activateTransformation } from './activation';
 import { checkTransformation } from './check';
@@ -46,21 +52,77 @@ import {
   getTransformationSource,
   getTransformationTransport,
 } from './read';
-import type { ITransformationConfig, ITransformationState } from './types';
+import {
+  type ITransformationConfig,
+  type ITransformationResults,
+  transformationDocuments,
+} from './types';
 import { unlockTransformation } from './unlock';
 import { updateTransformation } from './update';
 import { validateTransformationName } from './validation';
-
 import {
   getTransformationVersionSource,
   getTransformationVersions,
 } from './versions';
-export class AdtTransformation
-  implements IAdtSourceObject<ITransformationConfig, ITransformationState>
+
+/**
+ * The shipped reading of a validation answer this system may not offer.
+ *
+ * Measured on a cloud trial: `/xslt/transformations/validation` answers 404
+ * there. That is not a verdict about the name, and the old code turned it into
+ * a fabricated `{ status: 200, data: '' }` — a success the server never gave.
+ * It comes back as a failure named
+ * {@link AdtObjectErrorCodes.UNSUPPORTED_OPERATION} instead, so a consumer can
+ * see the difference between "the name is taken" and "this system does not
+ * check names".
+ */
+export const validationUnavailable = (
+  verdict: IAdtError | AdtNoFailure,
+  answer?: IAdtWireResponse,
+): IAdtError | AdtNoFailure => {
+  if (verdict === ADT_NO_FAILURE) return ADT_NO_FAILURE;
+  const status = verdict.response?.status ?? answer?.status;
+  return status === 404
+    ? {
+        ...verdict,
+        code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION,
+        message:
+          'This system does not offer transformation name validation (HTTP 404)',
+      }
+    : verdict;
+};
+
+export class AdtTransformation<
+  R extends ITransformationResults<
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown
+  > = ITransformationResults,
+> implements
+    IAdtCreatable<ITransformationConfig, ReturnType<R['created']>>,
+    IAdtReadable<
+      ITransformationConfig,
+      ReturnType<R['source']>,
+      ReturnType<R['metadata']>
+    >,
+    IAdtUpdatable<ITransformationConfig, ReturnType<R['updated']>>,
+    IAdtDeletable<ITransformationConfig, ReturnType<R['deletion']>>,
+    IAdtValidatable<ITransformationConfig, ReturnType<R['validation']>>,
+    IAdtCheckable<ITransformationConfig, ReturnType<R['check']>>,
+    IAdtActivatable<ITransformationConfig, ReturnType<R['activation']>>,
+    IAdtLockable<ITransformationConfig>,
+    IAdtTransportAware<ITransformationConfig, ReturnType<R['transport']>>,
+    IAdtVersionable<ITransformationConfig, ObjectVersion[], string>
 {
-  private readonly connection: IAbapConnection;
-  private readonly logger?: ILogger;
-  private readonly systemContext: IAdtSystemContext;
+  protected readonly connection: IAbapConnection;
+  protected readonly logger?: ILogger;
+  protected readonly systemContext: IAdtSystemContext;
   private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'Transformation';
 
@@ -69,6 +131,11 @@ export class AdtTransformation
     logger?: ILogger,
     systemContext?: IAdtSystemContext,
     lockRegistry?: LockRegistry,
+    // The one cast in this file, and it is on the default: the shipped set
+    // satisfies the erased bound, which the compiler cannot see through the
+    // `unknown`s. A cast on a member would be the factory lying about what it
+    // answers.
+    protected readonly results: R = transformationDocuments as unknown as R,
   ) {
     this.connection = connection;
     this.logger = logger;
@@ -76,67 +143,45 @@ export class AdtTransformation
     this.lockTracker = createLockTracker(
       lockRegistry,
       this.objectType,
-      (transformationName, lockHandle) =>
-        unlockTransformation(this.connection, transformationName, lockHandle),
+      (name, lockHandle) =>
+        unlockTransformation(this.connection, name, lockHandle),
     );
   }
 
-  /**
-   * Validate transformation configuration before creation
-   */
-  async validate(
-    config: Partial<ITransformationConfig>,
-  ): Promise<ITransformationState> {
-    const state: ITransformationState = { errors: [] };
+  /** The name, or the caller's mistake — nothing was asked of the server yet. */
+  private name(config: Partial<ITransformationConfig>): string {
     if (!config.transformationName) {
-      const error = new Error('Transformation name is required for validation');
-      state.errors.push({ method: 'validate', error, timestamp: new Date() });
-      throw error;
+      throw new Error('Transformation name is required');
     }
-
-    try {
-      const response = await validateTransformationName(
-        this.connection,
-        config.transformationName,
-        config.packageName,
-        config.description,
-      );
-      state.validationResponse = response;
-      return state;
-    } catch (error) {
-      // Validation endpoint may not exist on all systems (e.g. cloud trial)
-      const e = error as HttpError;
-      if (e.response?.status === 404) {
-        this.logger?.warn?.(
-          'Validation endpoint not available, skipping validation',
-        );
-        state.validationResponse = { status: 200, data: '' } as any;
-        return state;
-      }
-      const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({
-        method: 'validate',
-        error: err,
-        timestamp: new Date(),
-      });
-      this.logger?.error('validate', safeErrorMessage(err));
-      throw err;
-    }
+    return config.transformationName;
   }
 
-  /**
-   * Create transformation with full operation chain
-   */
-  async create(
+  /** Validate the name before creating the object. */
+  async validate<E extends IAdtError = IAdtError>(
+    config: Partial<ITransformationConfig>,
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+    const name = this.name(config);
+
+    return answering(
+      () =>
+        validateTransformationName(
+          this.connection,
+          name,
+          config.packageName,
+          config.description,
+        ),
+      this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
+      (options?.analyse ?? validationUnavailable) as IAnalyse<E>,
+    );
+  }
+
+  /** Create the object. */
+  async create<E extends IAdtError = IAdtError>(
     config: ITransformationConfig,
-    _options?: IAdtOperationOptions,
-  ): Promise<ITransformationState> {
-    const state: ITransformationState = { errors: [] };
-    if (!config.transformationName) {
-      const error = new Error('Transformation name is required');
-      state.errors.push({ method: 'create', error, timestamp: new Date() });
-      throw error;
-    }
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    const name = this.name(config);
     if (!config.packageName) {
       throw new Error('Package name is required');
     }
@@ -147,513 +192,426 @@ export class AdtTransformation
       throw new Error('Transformation type is required');
     }
 
-    try {
-      // Create transformation
-      this.logger?.info?.('Creating transformation');
-      const createResponse = await createTransformation(this.connection, {
-        transformation_name: config.transformationName,
-        transformation_type: config.transformationType,
-        package_name: config.packageName,
-        transport_request: config.transportRequest,
-        description: config.description,
-        masterSystem: this.systemContext.masterSystem,
-        responsible: this.systemContext.responsible,
-        masterLanguage:
-          config.masterLanguage ?? this.systemContext.masterLanguage,
+    return chain(this.logger, async ({ step, onScopeEnd, onFailure }) => {
+      onScopeEnd(async () => {
+        this.connection.setSessionType('stateless');
       });
-      state.createResult = createResponse;
-      this.logger?.info?.('Transformation created');
 
-      return state;
-    } catch (error: unknown) {
-      this.logger?.error('Create failed:', safeErrorMessage(error));
-      throw error;
-    }
+      let created = false;
+      if (options?.deleteOnFailure ?? true) {
+        onFailure(async () => {
+          if (!created) return;
+          this.logger?.warn?.('Deleting transformation after failure');
+          await deleteTransformation(this.connection, {
+            transformation_name: name,
+            transport_request: config.transportRequest,
+          });
+        });
+      }
+
+      this.logger?.info?.('Creating transformation');
+      const value = await step(
+        answering(
+          () =>
+            createTransformation(this.connection, {
+              transformation_name: name,
+              transformation_type: config.transformationType,
+              package_name: config.packageName as string,
+              transport_request: config.transportRequest,
+              description: config.description,
+              masterSystem: this.systemContext.masterSystem,
+              responsible: this.systemContext.responsible,
+              masterLanguage:
+                config.masterLanguage ?? this.systemContext.masterLanguage,
+            }),
+          this.results.created as IResultStrategy<ReturnType<R['created']>>,
+          options?.analyse,
+        ),
+      );
+      // Only past the step: a refused create leaves nothing to delete, and the
+      // cleanup above must not remove an object this call did not make.
+      created = true;
+      this.logger?.info?.('Transformation created');
+      return value;
+    });
   }
 
-  /**
-   * Read transformation source code
-   */
-  async read(
+  /** Read the object. */
+  async read<E extends IAdtError = IAdtError>(
     config: Partial<ITransformationConfig>,
     version?: 'active' | 'inactive',
-    options?: IReadOptions,
-  ): Promise<ITransformationState | undefined> {
-    const state: ITransformationState = { errors: [] };
-    if (!config.transformationName) {
-      const error = new Error('Transformation name is required');
-      state.errors.push({ method: 'read', error, timestamp: new Date() });
-      throw error;
-    }
+    options?: IReadOptions & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
+    const name = this.name(config);
 
-    try {
-      const response = await getTransformationSource(
-        this.connection,
-        config.transformationName,
-        version,
-        options,
-        this.logger,
-      );
-      state.readResult = response;
-      return state;
-    } catch (error: unknown) {
-      const e = error as HttpError;
-      if (e.response?.status === 404) {
-        return undefined;
-      }
-      throw error;
-    }
+    // No 404 special case: ADT answers a read for a missing object with 200 and
+    // an empty body, so absence was never a status to branch on — and whether
+    // an empty body *is* absence is the caller's reading, through `analyse`.
+    return answering(
+      () =>
+        getTransformationSource(
+          this.connection,
+          name,
+          version ?? 'active',
+          options,
+        ),
+      this.results.source as IResultStrategy<ReturnType<R['source']>>,
+      options?.analyse,
+    );
+  }
+
+  /** Read the object's metadata document. */
+  async readMetadata<E extends IAdtError = IAdtError>(
+    config: Partial<ITransformationConfig>,
+    options?: IReadOptions & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+    const name = this.name(config);
+
+    return answering(
+      () =>
+        getTransformation(
+          this.connection,
+          name,
+          options?.version ?? 'active',
+          options,
+        ),
+      this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
+      options?.analyse,
+    );
+  }
+
+  /** The transport request the object belongs to. */
+  async readTransport<E extends IAdtError = IAdtError>(
+    config: Partial<ITransformationConfig>,
+    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
+    const name = this.name(config);
+
+    return answering(
+      () =>
+        getTransformationTransport(
+          this.connection,
+          name,
+          options?.withLongPolling !== undefined
+            ? { withLongPolling: options.withLongPolling }
+            : undefined,
+        ),
+      this.results.transport as IResultStrategy<ReturnType<R['transport']>>,
+      options?.analyse,
+    );
   }
 
   /**
-   * Read transformation metadata (object characteristics: package, responsible, description, etc.)
+   * Write the object.
+   *
+   * With `options.lockHandle` the caller holds the lock and owns the chain, so
+   * this is one request. Without it, this locks, checks, writes and unlocks —
+   * and the unlock happens on every path out.
    */
-  async readMetadata(
+  async update<E extends IAdtError = IAdtError>(
     config: Partial<ITransformationConfig>,
-    options?: IReadOptions,
-  ): Promise<ITransformationState> {
-    const state: ITransformationState = { errors: [] };
-    if (!config.transformationName) {
-      const error = new Error('Transformation name is required');
-      state.errors.push({
-        method: 'readMetadata',
-        error,
-        timestamp: new Date(),
-      });
-      throw error;
-    }
-    try {
-      const response = await getTransformation(
-        this.connection,
-        config.transformationName,
-        'inactive',
-        options,
-        this.logger,
-      );
-      state.metadataResult = response;
-      this.logger?.info?.('Transformation metadata read successfully');
-      return state;
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({
-        method: 'readMetadata',
-        error: err,
-        timestamp: new Date(),
-      });
-      this.logger?.error('readMetadata', safeErrorMessage(err));
-      throw err;
-    }
-  }
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+    const name = this.name(config);
+    const source = options?.sourceCode || config.sourceCode;
 
-  /**
-   * Read transport request information for the transformation
-   */
-  async readTransport(
-    config: Partial<ITransformationConfig>,
-    options?: { withLongPolling?: boolean },
-  ): Promise<ITransformationState> {
-    const state: ITransformationState = { errors: [] };
-    if (!config.transformationName) {
-      const error = new Error('Transformation name is required');
-      state.errors.push({
-        method: 'readTransport',
-        error,
-        timestamp: new Date(),
-      });
-      throw error;
-    }
-    try {
-      const response = await getTransformationTransport(
-        this.connection,
-        config.transformationName,
-        options?.withLongPolling !== undefined
-          ? { withLongPolling: options.withLongPolling }
-          : undefined,
-      );
-      state.transportResult = response;
-      this.logger?.info?.('Transformation transport request read successfully');
-      return state;
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({
-        method: 'readTransport',
-        error: err,
-        timestamp: new Date(),
-      });
-      this.logger?.error('readTransport', safeErrorMessage(err));
-      throw err;
-    }
-  }
-
-  /**
-   * Update transformation with full operation chain
-   * Always starts with lock
-   * If options.lockHandle is provided, performs only low-level update without lock/check/unlock chain
-   */
-  async update(
-    config: Partial<ITransformationConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<ITransformationState> {
-    const state: ITransformationState = { errors: [] };
-    if (!config.transformationName) {
-      const error = new Error('Transformation name is required');
-      state.errors.push({ method: 'update', error, timestamp: new Date() });
-      throw error;
-    }
-
-    // Low-level mode: if lockHandle is provided, perform only update operation
     if (options?.lockHandle) {
-      const codeToUpdate = options?.sourceCode || config.sourceCode;
-      if (!codeToUpdate) {
+      const lockHandle = options.lockHandle;
+      if (!source) {
         throw new Error('Source code is required for update');
       }
-
       this.logger?.info?.(
         'Low-level update: performing update only (lockHandle provided)',
       );
-      const updateResponse = await updateTransformation(
-        this.connection,
-        {
-          transformation_name: config.transformationName,
-          source_code: codeToUpdate,
-          transport_request: config.transportRequest,
-        },
-        options.lockHandle,
+      return answering(
+        () =>
+          updateTransformation(
+            this.connection,
+            {
+              transformation_name: name,
+              source_code: source as string,
+              transport_request: config.transportRequest,
+            },
+            lockHandle,
+          ),
+        this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+        options?.analyse,
       );
-      this.logger?.info?.('Transformation updated (low-level)');
-      return {
-        updateResult: updateResponse,
-        errors: [],
-      };
     }
 
-    let lockHandle: string | undefined;
-
-    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
-
-    // the lock but leaves the work half-done.
-
+    // A LOCK…UNLOCK window: a timeout in the middle releases the lock and
+    // leaves the work half done, so the connection is told this is critical.
     const endCriticalSection = beginCriticalSection(this.connection);
 
-    try {
-      // 1. Lock (update always starts with lock, stateful ONLY before lock)
+    return chain(this.logger, async ({ step, onScopeEnd }) => {
+      onScopeEnd(async () => {
+        endCriticalSection();
+      });
+
       this.logger?.info?.('Step 1: Locking transformation');
       this.connection.setSessionType('stateful');
-      lockHandle = await lockTransformation(
-        this.connection,
-        config.transformationName,
-      );
-      this.lockTracker.track(config.transformationName, lockHandle);
+      // Registered FIRST so it unwinds LAST: on older BASIS a lock handle is
+      // only valid inside a stateful request, so going stateless before the
+      // unlock would break the unlock (#106); and if the lock itself throws,
+      // the session is still restored.
+      onScopeEnd(async () => {
+        this.connection.setSessionType('stateless');
+      });
+
+      const lockHandle = await lockTransformation(this.connection, name);
+      this.lockTracker.track(name, lockHandle);
+      const releaseLock = onScopeEnd(async () => {
+        await unlockTransformation(this.connection, name, lockHandle);
+        this.lockTracker.untrack(name);
+      });
       this.logger?.info?.('Transformation locked, handle:', lockHandle);
 
-      // 2. Check inactive with code for update (from options or config)
-      const codeToCheck = options?.sourceCode || config.sourceCode;
-      if (codeToCheck) {
+      if (source) {
         this.logger?.info?.(
           'Step 2: Checking inactive version with update content',
         );
-        await checkTransformation(
-          this.connection,
-          config.transformationName,
-          'inactive',
-          codeToCheck,
+        await step(
+          answering(
+            () =>
+              checkTransformation(this.connection, name, 'inactive', source),
+            this.results.check as IResultStrategy<ReturnType<R['check']>>,
+            options?.analyse,
+          ),
         );
-        this.logger?.info?.('Check inactive with update content passed');
       }
 
-      // 3. Update
-      if (codeToCheck && lockHandle) {
+      let updated = undefined as ReturnType<R['updated']>;
+      if (source) {
         this.logger?.info?.('Step 3: Updating transformation');
-        await updateTransformation(
-          this.connection,
-          {
-            transformation_name: config.transformationName,
-            source_code: codeToCheck,
-            transport_request: config.transportRequest,
-          },
-          lockHandle,
+        updated = await step(
+          answering(
+            () =>
+              updateTransformation(
+                this.connection,
+                {
+                  transformation_name: name,
+                  source_code: source as string,
+                  transport_request: config.transportRequest,
+                },
+                lockHandle,
+              ),
+            this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+            options?.analyse,
+          ),
         );
         this.logger?.info?.('Transformation updated');
 
-        // Poll the inactive version: the write above produced it; the active version may not exist yet.
-        // 3.5. Read with long polling (wait for object to be ready after update)
-        this.logger?.info?.('read (wait for object ready after update)');
-        try {
-          await this.read(
-            { transformationName: config.transformationName },
-            'inactive',
-            { withLongPolling: true },
-          );
-          this.logger?.info?.('object is ready after update');
-        } catch (readError) {
+        // The write produced the inactive version; the active one may not exist
+        // yet. A failure here is not the update's failure, so it is logged and
+        // the chain continues — the unlock still has to happen.
+        const ready = await this.read(config, 'inactive', {
+          withLongPolling: true,
+        });
+        if (!ready.ok) {
           this.logger?.warn?.(
-            'read with long polling failed (object may not be ready yet):',
-            safeErrorMessage(readError),
+            'read with long polling failed after update:',
+            ready.getError().message,
           );
-          // Continue anyway - unlock might still work
         }
       }
 
-      // 4. Unlock (obligatory stateless after unlock)
-      if (lockHandle) {
-        this.logger?.info?.('Step 4: Unlocking transformation');
-        this.connection.setSessionType('stateful');
-        await unlockTransformation(
-          this.connection,
-          config.transformationName,
-          lockHandle,
-        );
-        this.connection.setSessionType('stateless');
-        this.lockTracker.untrack(config.transformationName);
-        lockHandle = undefined;
-        this.logger?.info?.('Transformation unlocked');
-      }
+      this.logger?.info?.('Step 4: Unlocking transformation');
+      this.connection.setSessionType('stateful');
+      await unlockTransformation(this.connection, name, lockHandle);
+      this.connection.setSessionType('stateless');
+      this.lockTracker.untrack(name);
+      // Unlocked as its own step, so the registration is discharged rather than
+      // run a second time when the scope unwinds.
+      releaseLock();
+      this.logger?.info?.('Transformation unlocked');
 
-      // 5. Final check (no stateful needed)
       this.logger?.info?.('Step 5: Final check');
-      await checkTransformation(
-        this.connection,
-        config.transformationName,
-        'inactive',
+      await step(
+        answering(
+          () => checkTransformation(this.connection, name, 'inactive'),
+          this.results.check as IResultStrategy<ReturnType<R['check']>>,
+          options?.analyse,
+        ),
       );
-      this.logger?.info?.('Final check passed');
 
-      // 6. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnUpdate) {
         this.logger?.info?.('Step 6: Activating transformation');
-        const activateResponse = await activateTransformation(
-          this.connection,
-          config.transformationName,
+        await step(
+          answering(
+            () => activateTransformation(this.connection, name),
+            this.results.activation as IResultStrategy<
+              ReturnType<R['activation']>
+            >,
+            (options?.analyse ?? activationRefusal) as IAnalyse<E>,
+          ),
         );
-        this.logger?.info?.(
-          'Transformation activated, status:',
-          activateResponse.status,
-        );
 
-        // 6.5. Read with long polling (wait for object to be ready after activation)
-        this.logger?.info?.('read (wait for object ready after activation)');
-        try {
-          await this.read(
-            { transformationName: config.transformationName },
-            'active',
-            { withLongPolling: true },
-          );
-          this.logger?.info?.('object is ready after activation');
-        } catch (readError) {
+        const ready = await this.read(config, 'active', {
+          withLongPolling: true,
+        });
+        if (!ready.ok) {
           this.logger?.warn?.(
-            'read with long polling failed (object may not be ready yet):',
-            safeErrorMessage(readError),
-          );
-          // Continue anyway - return activation response
-        }
-
-        return {
-          activateResult: activateResponse,
-          errors: [],
-        };
-      }
-
-      // Read and return result (no stateful needed)
-      const readResponse = await getTransformationSource(
-        this.connection,
-        config.transformationName,
-      );
-
-      return {
-        readResult: readResponse,
-        errors: [],
-      };
-    } catch (error: unknown) {
-      // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
-      if (lockHandle) {
-        try {
-          this.logger?.warn?.('Unlocking transformation during error cleanup');
-          this.connection.setSessionType('stateful');
-          await unlockTransformation(
-            this.connection,
-            config.transformationName,
-            lockHandle,
-          );
-          this.connection.setSessionType('stateless');
-          this.lockTracker.untrack(config.transformationName);
-        } catch (unlockError) {
-          this.logger?.warn?.(
-            'Failed to unlock during cleanup:',
-            safeErrorMessage(unlockError),
-          );
-        }
-      } else {
-        // Ensure stateless if lock failed
-        this.connection.setSessionType('stateless');
-      }
-
-      if (options?.deleteOnFailure) {
-        try {
-          this.logger?.warn?.('Deleting transformation after failure');
-          // No stateful needed - delete doesn't use lock/unlock
-          await deleteTransformation(this.connection, {
-            transformation_name: config.transformationName,
-            transport_request: config.transportRequest,
-          });
-        } catch (deleteError) {
-          this.logger?.warn?.(
-            'Failed to delete transformation after failure:',
-            safeErrorMessage(deleteError),
+            'read with long polling failed after activation:',
+            ready.getError().message,
           );
         }
       }
 
-      this.logger?.error('Update failed:', safeErrorMessage(error));
-      throw error;
-    } finally {
-      endCriticalSection();
-    }
+      return updated;
+    });
   }
 
   /**
-   * Delete transformation
+   * Delete the object.
+   *
+   * The deletion check is read, not merely performed: ADT answers a refusal
+   * with `del:isDeletable="false"` inside a 200, and a delete that ignored it
+   * reported success while the object stayed. {@link deletionRefusal} is the
+   * shipped reading of that answer; a caller who wants another passes their own
+   * `analyse`.
    */
-  async delete(
+  async delete<E extends IAdtError = IAdtError>(
     config: Partial<ITransformationConfig>,
-  ): Promise<ITransformationState> {
-    const state: ITransformationState = { errors: [] };
-    if (!config.transformationName) {
-      const error = new Error('Transformation name is required');
-      state.errors.push({ method: 'delete', error, timestamp: new Date() });
-      throw error;
-    }
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+    const name = this.name(config);
 
-    try {
-      // Check for deletion (no stateful needed)
+    return chain(this.logger, async ({ step }) => {
       this.logger?.info?.('Checking transformation for deletion');
-      const deletionCheck = await checkDeletion(this.connection, {
-        transformation_name: config.transformationName,
-        transport_request: config.transportRequest,
-      });
-      // ADT already said whether this may be deleted; refusing to read that
-      // answer is how a delete came to report success while the object
-      // stayed. Throws on isDeletable=false or a message of type E; a W
-      // is a warning and passes.
-      assertDeletable(deletionCheck.data);
+      await step(
+        answering(
+          () =>
+            checkDeletion(this.connection, {
+              transformation_name: name,
+              transport_request: config.transportRequest,
+            }),
+          this.results.check as IResultStrategy<ReturnType<R['check']>>,
+          (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
+        ),
+      );
       this.logger?.info?.('Deletion check passed');
 
-      // Delete (no stateful needed - no lock/unlock)
+      // No stateful session: this delete uses no lock.
       this.logger?.info?.('Deleting transformation');
-      const result = await deleteTransformation(this.connection, {
-        transformation_name: config.transformationName,
-        transport_request: config.transportRequest,
-      });
-      this.logger?.info?.('Transformation deleted');
-
-      return {
-        deleteResult: result,
-        errors: [],
-      };
-    } catch (error: unknown) {
-      this.logger?.error('Delete failed:', safeErrorMessage(error));
-      throw error;
-    }
-  }
-
-  /**
-   * Activate transformation
-   * No stateful needed - uses same session/cookies
-   */
-  async activate(
-    config: Partial<ITransformationConfig>,
-  ): Promise<ITransformationState> {
-    const state: ITransformationState = { errors: [] };
-    if (!config.transformationName) {
-      const error = new Error('Transformation name is required');
-      state.errors.push({ method: 'activate', error, timestamp: new Date() });
-      throw error;
-    }
-
-    try {
-      const result = await activateTransformation(
-        this.connection,
-        config.transformationName,
+      const value = await step(
+        answering(
+          () =>
+            deleteTransformation(this.connection, {
+              transformation_name: name,
+              transport_request: config.transportRequest,
+            }),
+          this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+          options?.analyse,
+        ),
       );
-      state.activateResult = result;
-      return state;
-    } catch (error: unknown) {
-      this.logger?.error('Activate failed:', safeErrorMessage(error));
-      throw error;
-    }
+      this.logger?.info?.('Transformation deleted');
+      return value;
+    });
   }
 
-  /**
-   * Check transformation
-   */
-  async check(
+  /** Activate the object. Needs no stateful session. */
+  async activate<E extends IAdtError = IAdtError>(
+    config: Partial<ITransformationConfig>,
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+    const name = this.name(config);
+
+    return answering(
+      () => activateTransformation(this.connection, name),
+      this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
+      (options?.analyse ?? activationRefusal) as IAnalyse<E>,
+    );
+  }
+
+  /** Check the object. */
+  async check<E extends IAdtError = IAdtError>(
     config: Partial<ITransformationConfig>,
     status?: string,
-  ): Promise<ITransformationState> {
-    const state: ITransformationState = { errors: [] };
-    if (!config.transformationName) {
-      const error = new Error('Transformation name is required');
-      state.errors.push({ method: 'check', error, timestamp: new Date() });
-      throw error;
-    }
-
-    // Map status to version
-    const version: CheckRunVersion =
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+    const name = this.name(config);
+    const version: 'active' | 'inactive' =
       status === 'active' ? 'active' : 'inactive';
-    state.checkResult = await checkTransformation(
-      this.connection,
-      config.transformationName,
-      version,
+
+    return answering(
+      () =>
+        checkTransformation(this.connection, name, version, config.sourceCode),
+      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      options?.analyse,
     );
-    return state;
   }
 
-  /**
-   * Lock transformation for modification
-   */
-  async lock(config: Partial<ITransformationConfig>): Promise<string> {
-    if (!config.transformationName) {
-      throw new Error('Transformation name is required');
-    }
+  /** Lock the object for modification. */
+  async lock(
+    config: Partial<ITransformationConfig>,
+  ): Promise<IAdtResponse<string>> {
+    const name = this.name(config);
 
-    this.connection.setSessionType('stateful');
-    const lockHandle = await lockTransformation(
-      this.connection,
-      config.transformationName,
+    return answering(
+      async () => {
+        this.connection.setSessionType('stateful');
+        const lockHandle = await lockTransformation(this.connection, name);
+        this.lockTracker.track(name, lockHandle);
+        // The handle is the value, and the request does not keep the wire it
+        // came on — so the answer is built around what the request produced.
+        return {
+          data: lockHandle,
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+        };
+      },
+      (answer) => String(answer.data),
     );
-    this.lockTracker.track(config.transformationName, lockHandle);
-    return lockHandle;
   }
 
-  /**
-   * Unlock transformation
-   */
+  /** Unlock the object. */
   async unlock(
     config: Partial<ITransformationConfig>,
     lockHandle: string,
-  ): Promise<ITransformationState> {
-    if (!config.transformationName) {
-      throw new Error('Transformation name is required');
-    }
+  ): Promise<IAdtResponse<void>> {
+    const name = this.name(config);
 
-    this.connection.setSessionType('stateful');
-    const result = await unlockTransformation(
-      this.connection,
-      config.transformationName,
-      lockHandle,
+    return answering(
+      async () => {
+        // UNLOCK must run stateful (older BASIS #106); stateless after.
+        this.connection.setSessionType('stateful');
+        try {
+          return await unlockTransformation(this.connection, name, lockHandle);
+        } finally {
+          this.connection.setSessionType('stateless');
+          this.lockTracker.untrack(name);
+        }
+      },
+      () => undefined,
     );
-    this.connection.setSessionType('stateless');
-    this.lockTracker.untrack(config.transformationName);
-    return {
-      unlockResult: result,
-      errors: [],
-    };
   }
 
-  getVersions(config: Partial<ITransformationConfig>) {
-    return getTransformationVersions(this.connection, config);
+  /** Version history of the object's source. */
+  async getVersions(
+    config: Partial<ITransformationConfig>,
+  ): Promise<IAdtResponse<ObjectVersion[]>> {
+    return answering(
+      async () => ({
+        data: await getTransformationVersions(this.connection, config),
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+      }),
+      (answer) => answer.data as ObjectVersion[],
+    );
   }
 
-  getVersionSource(contentUri: string) {
-    return getTransformationVersionSource(this.connection, contentUri);
+  /** The source of one version, by the `contentUri` an entry carries. */
+  async getVersionSource(contentUri: string): Promise<IAdtResponse<string>> {
+    return answering(
+      async () => ({
+        data: await getTransformationVersionSource(this.connection, contentUri),
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+      }),
+      (answer) => String(answer.data),
+    );
   }
 }

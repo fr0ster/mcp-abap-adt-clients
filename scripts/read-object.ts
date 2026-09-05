@@ -154,7 +154,7 @@ function parseArgs(argv: string[]): Options {
 function getHandler(
   client: AdtClient,
   options: Options,
-): IAdtReadable<any, any> {
+): IAdtReadable<any, any, any> {
   switch (options.objectType) {
     case 'class':
       return client.getClass();
@@ -309,10 +309,10 @@ async function run(): Promise<void> {
       console.log('--- SOURCE ---');
       try {
         const state = await handler.read(readConfig);
-        if (state) {
+        if (state.ok) {
           printResult('Source', state);
         } else {
-          console.log('[Object not found]');
+          console.log(`[Object not found: ${state.getError().message}]`);
         }
       } catch (error: any) {
         console.error(
@@ -328,10 +328,10 @@ async function run(): Promise<void> {
       console.log('--- METADATA ---');
       try {
         const state = await handler.readMetadata(readConfig);
-        if (state) {
+        if (state.ok) {
           printResult('Metadata', state);
         } else {
-          console.log('[No metadata returned]');
+          console.log(`[No metadata returned: ${state.getError().message}]`);
         }
       } catch (error: any) {
         console.error(

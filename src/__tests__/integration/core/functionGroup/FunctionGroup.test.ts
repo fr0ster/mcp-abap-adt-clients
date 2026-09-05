@@ -12,19 +12,14 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type {
-  IAbapConnection,
-  IAdtObject,
-  ILogger,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type {
-  IFunctionGroupConfig,
-  IFunctionGroupState,
-} from '../../../../core/functionGroup';
+import type { IFunctionGroupConfig } from '../../../../core/functionGroup';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { expectResult } from '../../../helpers/contract';
+import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -73,7 +68,7 @@ describe('FunctionGroup (using AdtClient)', () => {
   let hasConfig = false;
   let isCloudSystem = false;
   let isLegacy = false;
-  let tester: BaseTester<IFunctionGroupConfig, IFunctionGroupState>;
+  let tester: BaseTester<IFunctionGroupConfig>;
 
   beforeAll(async () => {
     try {
@@ -92,10 +87,7 @@ describe('FunctionGroup (using AdtClient)', () => {
       tester = new BaseTester(
         // getFunctionGroup() declares no IAdtVersionable (no
         // getVersions/getVersionSource); cast through the full interface.
-        client.getFunctionGroup() as unknown as IAdtObject<
-          IFunctionGroupConfig,
-          IFunctionGroupState
-        >,
+        client.getFunctionGroup(),
         'FunctionGroup',
         'create_function_group',
         'adt_function_group',
@@ -134,19 +126,22 @@ describe('FunctionGroup (using AdtClient)', () => {
               libraryLogger,
               systemContext,
             );
-            const existing = await cleanupClient
-              .getFunctionGroup()
-              .read({ functionGroupName });
-            if (existing) {
+            const existing = presenceOf(
+              await cleanupClient
+                .getFunctionGroup()
+                .read({ functionGroupName }),
+              `function group ${functionGroupName}`,
+            );
+            if (existing.present === true) {
               // Try to release any stale lock before deleting
               try {
-                const lockHandle = await cleanupClient
+                const locked = await cleanupClient
                   .getFunctionGroup()
                   .lock({ functionGroupName });
-                if (lockHandle) {
+                if (locked.ok) {
                   await cleanupClient
                     .getFunctionGroup()
-                    .unlock({ functionGroupName }, lockHandle);
+                    .unlock({ functionGroupName }, locked.getResult().value);
                   testsLogger.info?.(
                     `Released stale lock on ${functionGroupName}`,
                   );
@@ -281,9 +276,9 @@ describe('FunctionGroup (using AdtClient)', () => {
             functionGroupName: standardFunctionGroupName,
           });
           expect(resultState).toBeDefined();
-          expect(resultState?.readResult).toBeDefined();
+          expect(resultState).toBeDefined();
           // FunctionGroup read returns function group config - check if functionGroupName is present
-          const functionGroupConfig = resultState?.readResult;
+          const functionGroupConfig = resultState;
           if (
             functionGroupConfig &&
             typeof functionGroupConfig === 'object' &&

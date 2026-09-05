@@ -12,17 +12,14 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type {
-  IAbapConnection,
-  IAdtObject,
-  ILogger,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type { IDomainConfig, IDomainState } from '../../../../core/domain';
+import type { IDomainConfig } from '../../../../core/domain';
 import { getDomain } from '../../../../core/domain/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -70,7 +67,7 @@ describe('Domain (using AdtClient)', () => {
   let hasConfig = false;
   let isLegacy = false;
   let isCloudSystem = false;
-  let tester: BaseTester<IDomainConfig, IDomainState>;
+  let tester: BaseTester<IDomainConfig>;
 
   beforeAll(async () => {
     try {
@@ -89,10 +86,7 @@ describe('Domain (using AdtClient)', () => {
       tester = new BaseTester(
         // getDomain() declares no IAdtVersionable (no
         // getVersions/getVersionSource); cast through the full interface.
-        client.getDomain() as unknown as IAdtObject<
-          IDomainConfig,
-          IDomainState
-        >,
+        client.getDomain(),
         'Domain',
         'create_domain',
         'adt_domain',
@@ -236,8 +230,8 @@ describe('Domain (using AdtClient)', () => {
           const resultState = await tester.readTest({
             domainName: standardDomainName,
           });
-          expect(resultState?.readResult).toBeDefined();
-          const domainConfig = resultState?.readResult;
+          expect(resultState).toBeDefined();
+          const domainConfig = resultState;
           if (
             domainConfig &&
             typeof domainConfig === 'object' &&

@@ -2,7 +2,9 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
+import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
 import { AdtAppendStructure } from '../../../../core/appendStructure/AdtAppendStructure';
+import { expectFailure, expectResult } from '../../../helpers/contract';
 
 function makeConn(handler: (r: any) => Partial<IAdtWireResponse> | Error) {
   const sessionTypes: string[] = [];
@@ -54,26 +56,39 @@ describe('AdtAppendStructure handler', () => {
     expect(calls[0].url).toBe('/sap/bc/adt/ddic/structures');
   });
 
-  it('public unlock() resets to stateless even when unlock throws', async () => {
+  it('public unlock() resets to stateless even when the unlock is refused', async () => {
     const { conn, sessionTypes } = makeConn((r) =>
       r.url.includes('_action=UNLOCK')
         ? new Error('unlock boom')
         : { data: '' },
     );
     const as = new AdtAppendStructure(conn);
-    await expect(
-      as.unlock({ appendStructureName: 'ZOK_S' }, 'LH1'),
-    ).rejects.toThrow('unlock boom');
+
+    const failure = expectFailure(
+      await as.unlock({ appendStructureName: 'ZOK_S' }, 'LH1'),
+      'unlock the server refused',
+    );
+
+    expect(failure.message).toContain('unlock boom');
+    // The session is what this case is about: a refused unlock that left the
+    // client stateful poisons every later request on it.
     expect(sessionTypes[sessionTypes.length - 1]).toBe('stateless');
   });
 
-  it('validate() maps 501 to validationSupported:false', async () => {
+  it('validate() names 501 as unsupported, not as a bad name', async () => {
     const { conn } = makeConn(() =>
       Object.assign(new Error('nope'), { response: { status: 501 } }),
     );
     const as = new AdtAppendStructure(conn);
-    const state = await as.validate({ appendStructureName: 'ZOK_S' });
-    expect(state.validationSupported).toBe(false);
+    // A system with no validation resource has not looked at the name. The
+    // shipped `analyse` says so with a code, so a consumer branches on that
+    // rather than on a status they would have to dig out themselves.
+    const failure = expectFailure(
+      await as.validate({ appendStructureName: 'ZOK_S' }),
+      'validate where the resource is absent',
+    );
+    expect(failure.code).toBe(AdtObjectErrorCodes.UNSUPPORTED_OPERATION);
+    expect(failure.message).toContain('501');
   });
 
   it('update() happy path: lock→check→PUT→long-poll-read→unlock→check→read, ends stateless', async () => {

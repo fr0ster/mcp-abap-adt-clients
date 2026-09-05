@@ -8,23 +8,21 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type {
-  IAbapConnection,
-  IAdtObject,
-  ILogger,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type { IPackageConfig, IPackageState } from '../../../../core/package';
+import type { IPackageConfig } from '../../../../core/package';
 import { deletePackage } from '../../../../core/package/delete';
-import { getPackage } from '../../../../core/package/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { expectResult } from '../../../helpers/contract';
+import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
   createTestConnection,
   getConfig,
   getConnectionType,
+  recycleTestSession,
   resolveSystemContext,
   skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
@@ -76,7 +74,7 @@ describe('Package (using AdtClient)', () => {
   let hasConfig = false;
   let isLegacy = false;
   let isCloudSystem = false;
-  let tester: BaseTester<IPackageConfig, IPackageState>;
+  let tester: BaseTester<IPackageConfig>;
 
   beforeAll(async () => {
     try {
@@ -99,10 +97,7 @@ describe('Package (using AdtClient)', () => {
         // Lockable & TransportAware (no activate/getVersions); BaseTester's
         // flowTest still exercises activate, which the concrete handler
         // implements at runtime — cast through the full interface.
-        client.getPackage() as unknown as IAdtObject<
-          IPackageConfig,
-          IPackageState
-        >,
+        client.getPackage(),
         'Package',
         'create_package',
         'adt_package',
@@ -161,28 +156,54 @@ describe('Package (using AdtClient)', () => {
           // If some system does show the delete failing from the creating
           // session, it comes back as `recycleTestSession(connection)` —
           // replacing the run's one session, never opening a second beside it.
-          await deletePackage(connection, {
-            package_name: cfg.packageName,
-            transport_request: cfg.transportRequest,
-          });
+          // A fresh session first, and this is the one type that needs it.
+          // The PAK lock belongs to the ABAP session, so a package this session
+          // has just updated cannot be deleted by it — `deletion/check` answers
+          // `isDeletable="true"` and `deletion/delete` answers 200 carrying
+          // `isDeleted="false"` with PAK/058, "already locked". Measured on E19
+          // 2026-08-31 and again on the trial. Not a delay: retried for thirty
+          // seconds it never succeeds, and the same request one second after
+          // the run ends works first time.
+          //
+          // `recycleTestSession` replaces the run's one session and publishes
+          // the replacement — it never opens a second beside it.
+          if (connection) {
+            await recycleTestSession(connection);
+          }
+
+          // Through the handler, not the low-level writer. The writer hands
+          // the document on and says nothing about it — the verdict belongs to
+          // `packageDeletionRefusal`, and only `delete()` applies it. Calling
+          // the writer here made a refused delete silent: three runs passed
+          // this flow and left ZAC_INNER_PKG04 behind every time.
+          expectResult(
+            await client.getPackage().delete({
+              packageName: cfg.packageName,
+              transportRequest: cfg.transportRequest,
+            }),
+            `delete package ${cfg.packageName}`,
+          );
         },
         ensureObjectReady: async (packageName: string) => {
-          if (!connection) return { success: true };
-          try {
-            await getPackage(connection, packageName);
+          if (!connection || !client) return { success: true };
+          // The answer decides — see `presenceOf`. "Could not find out" stays
+          // apart from "it is not there": creating over a package that may be
+          // there is the irreversible half of that guess.
+          const presence = presenceOf(
+            await client.getPackage().read({ packageName }),
+            `package ${packageName}`,
+          );
+          if (presence.present === 'unknown') {
+            return { success: false, reason: `⚠️ SAFETY: ${presence.reason}` };
+          }
+          if (presence.present) {
             return {
               success: false,
               objectExists: true,
               reason: `⚠️ SAFETY: Package ${packageName} already exists!`,
             };
-          } catch (error: any) {
-            const status = error.response?.status;
-            if (status === 404) return { success: true };
-            return {
-              success: false,
-              reason: `⚠️ SAFETY: Cannot verify package ${packageName} doesn't exist (HTTP ${status})`,
-            };
           }
+          return { success: true };
         },
       });
     } catch (error) {
@@ -193,53 +214,6 @@ describe('Package (using AdtClient)', () => {
   });
 
   afterAll(() => tester?.afterAll()());
-
-  /**
-   * Pre-check: Verify test package doesn't exist
-   * Safety: Skip test if object exists to avoid accidental deletion
-   */
-  async function _ensurePackageReady(
-    packageName: string,
-  ): Promise<{ success: boolean; reason?: string }> {
-    if (!connection) {
-      return { success: true };
-    }
-
-    // Check if package exists
-    try {
-      await getPackage(connection, packageName);
-      // Package exists - skip test for safety
-      return {
-        success: false,
-        reason:
-          `⚠️ SAFETY: Package ${packageName} already exists! ` +
-          `Delete manually or use different test name to avoid accidental deletion.`,
-      };
-    } catch (error: any) {
-      const status = error.response?.status;
-
-      // 404 is expected - object doesn't exist, we can proceed
-      if (status === 404) {
-        return { success: true };
-      }
-
-      // Any other error (including locked state) means package might exist
-      // Better to skip test for safety
-      const errorMsg = error.message || 'Unknown error';
-      if (debugEnabled) {
-        libraryLogger.warn?.(
-          `[PRE-CHECK] Package ${packageName} check failed with status ${status}: ${errorMsg}`,
-        );
-      }
-
-      return {
-        success: false,
-        reason:
-          `⚠️ SAFETY: Cannot verify package ${packageName} doesn't exist (HTTP ${status}). ` +
-          `May be locked or inaccessible. Delete/unlock manually to proceed.`,
-      };
-    }
-  }
 
   describe('Full workflow', () => {
     beforeEach(() => tester?.beforeEach()());
@@ -345,8 +319,8 @@ describe('Package (using AdtClient)', () => {
           const resultState = await tester.readTest({
             packageName: standardPackageName,
           });
-          expect(resultState?.readResult).toBeDefined();
-          const packageConfig = resultState?.readResult;
+          expect(resultState).toBeDefined();
+          const packageConfig = resultState;
           if (
             packageConfig &&
             typeof packageConfig === 'object' &&

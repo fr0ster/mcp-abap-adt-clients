@@ -11,6 +11,9 @@
  * says only that it is answered.
  */
 
+import type { IResultStrategy } from '@mcp-abap-adt/interfaces';
+import { nothing, rawDocument } from '../../utils/resultStrategy';
+
 // Types defined in @mcp-abap-adt/interfaces
 export type {
   IClassConfig,
@@ -68,3 +71,56 @@ export type ClassDeletionResult = string;
 
 /** An update writes; ADT answers it with nothing worth reading. */
 export type ClassUpdated = void;
+
+/**
+ * One strategy per member of a class implementation.
+ *
+ * An implementation is given a whole set when it is constructed, not a strategy
+ * per call: a consumer that wants documents whole wants them for every member it
+ * touches, and none of them changes its mind between `create` and `read` of the
+ * same object.
+ *
+ * The parameters default to the shapes above, so a consumer who names nothing is
+ * unmoved by this migration. A consumer who wants their own supplies a set whose
+ * strategies return them, and `AdtClass` answers those types instead — the whole
+ * point of `interfaces@31.0.0` taking the shapes out of the contract.
+ */
+export interface IClassResults<
+  TCreated = ClassCreated,
+  TSource = ClassSource,
+  TMetadata = ClassMetadata,
+  TCheck = ClassCheckResult,
+  TActivation = ClassActivationResult,
+  TValidation = ClassValidationResult,
+  TDeletion = ClassDeletionResult,
+  TUpdated = ClassUpdated,
+> {
+  readonly created: IResultStrategy<TCreated>;
+  readonly source: IResultStrategy<TSource>;
+  readonly metadata: IResultStrategy<TMetadata>;
+  readonly check: IResultStrategy<TCheck>;
+  readonly activation: IResultStrategy<TActivation>;
+  readonly validation: IResultStrategy<TValidation>;
+  readonly deletion: IResultStrategy<TDeletion>;
+  readonly updated: IResultStrategy<TUpdated>;
+}
+
+/**
+ * The shipped default: every member answers its document as it arrived.
+ *
+ * `satisfies`, never a `: IClassResults` annotation. The interface types its
+ * fields by the parameters' defaults, and annotating a constant with it would
+ * widen every strategy to those — which happens to be right here and is wrong
+ * the moment a set narrows one, so the rule is the same everywhere: shape
+ * checked, types kept.
+ */
+export const classDocuments = {
+  created: rawDocument,
+  source: rawDocument,
+  metadata: rawDocument,
+  check: rawDocument,
+  activation: rawDocument,
+  validation: rawDocument,
+  deletion: rawDocument,
+  updated: nothing,
+} satisfies IClassResults;

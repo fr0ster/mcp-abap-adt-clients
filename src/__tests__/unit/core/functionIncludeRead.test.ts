@@ -1,5 +1,6 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AdtFunctionInclude } from '../../../core/functionInclude/AdtFunctionInclude';
+import { expectResult } from '../../helpers/contract';
 
 function makeConn() {
   const calls: Array<{ url: string; method?: string }> = [];
@@ -21,11 +22,14 @@ describe('AdtFunctionInclude read() vs readMetadata()', () => {
   it('read() returns source (hits the /source/main endpoint)', async () => {
     const { connection, calls } = makeConn();
     const fi = new AdtFunctionInclude(connection);
-    const state = await fi.read({
-      functionGroupName: 'ZG',
-      includeName: 'LZG_C01',
-    });
-    expect(state?.readResult).toBeDefined();
+    const source = expectResult(
+      await fi.read({
+        functionGroupName: 'ZG',
+        includeName: 'LZG_C01',
+      }),
+      'read include source',
+    );
+    expect(source).toBe('DATA: gv TYPE i.');
     expect(
       calls.some((c) => c.url.toLowerCase().includes('/source/main')),
     ).toBe(true);

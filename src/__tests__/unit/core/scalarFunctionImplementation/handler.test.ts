@@ -2,7 +2,9 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
+import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
 import { AdtScalarFunctionImplementation } from '../../../../core/scalarFunctionImplementation/AdtScalarFunctionImplementation';
+import { expectFailure } from '../../../helpers/contract';
 
 function makeConn(handler: (r: any) => Partial<IAdtWireResponse> | Error) {
   const sessionTypes: string[] = [];
@@ -106,30 +108,47 @@ describe('AdtScalarFunctionImplementation handler', () => {
     expect(sessionTypes[sessionTypes.length - 1]).toBe('stateless');
   });
 
-  it('read() returns undefined on 404', async () => {
+  it('read() answers a failure on 404', async () => {
     const { conn } = makeConn(() =>
       Object.assign(new Error('nf'), { response: { status: 404 } }),
     );
     const h = new AdtScalarFunctionImplementation(conn);
-    expect(await h.read({ implementationName: 'ZI' })).toBeUndefined();
+    // `undefined` used to be the answer, and it read like an empty object.
+    expect(
+      expectFailure(
+        await h.read({ implementationName: 'ZI' }),
+        'read an implementation that is not there',
+      ).origin,
+    ).toBe('connection');
   });
 
-  it('validate() maps 405 → validationSupported:false; public unlock resets stateless on throw', async () => {
+  it('validate() names 405 as unsupported; public unlock resets stateless on throw', async () => {
     const v = makeConn(() =>
       Object.assign(new Error('no'), { response: { status: 405 } }),
     );
     const hv = new AdtScalarFunctionImplementation(v.conn);
+    // Some systems have no validation resource. That is not a verdict about
+    // the name, and reporting it as one told a caller their name was rejected
+    // by a system that never looked at it.
     expect(
-      (await hv.validate({ implementationName: 'ZI' })).validationSupported,
-    ).toBe(false);
+      expectFailure(
+        await hv.validate({ implementationName: 'ZI' }),
+        'validate where the resource is absent',
+      ).code,
+    ).toBe(AdtObjectErrorCodes.UNSUPPORTED_OPERATION);
 
     const u = makeConn((r) =>
       r.url.includes('_action=UNLOCK') ? new Error('boom') : { data: '' },
     );
     const hu = new AdtScalarFunctionImplementation(u.conn);
-    await expect(
-      hu.unlock({ implementationName: 'ZI' }, 'LH1'),
-    ).rejects.toThrow('boom');
+    expect(
+      expectFailure(
+        await hu.unlock({ implementationName: 'ZI' }, 'LH1'),
+        'unlock the server refused',
+      ).message,
+    ).toContain('boom');
+    // A refused unlock that left the client stateful poisons every later
+    // request on the same connection.
     expect(u.sessionTypes[u.sessionTypes.length - 1]).toBe('stateless');
   });
 });

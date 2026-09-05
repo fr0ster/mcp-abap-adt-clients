@@ -13,17 +13,23 @@
  * handler then carries only methods it means.
  */
 
-import {
-  AdtObjectErrorCodes,
-  AdtOperationError,
-  type HttpError,
-  type IAbapConnection,
-  type IAdtContentTypes,
-  type IAdtSystemContext,
-  type ILogger,
-  type IObjectVersion,
+import type {
+  IAbapConnection,
+  IAdtContentTypes,
+  IAdtError,
+  IAdtOperationOptions,
+  IAdtResponse,
+  IAdtSystemContext,
+  ILogger,
+  IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
-import { safeErrorMessage, safeStringify } from '../../utils/internalUtils';
+import { activationRefusal } from '../../utils/activationUtils';
+import {
+  answering,
+  type IAdtOptions,
+  type IAnalyse,
+} from '../../utils/adtResponse';
+import { nothing, rawDocument } from '../../utils/resultStrategy';
 import {
   type ICapabilityContext,
   LockCapability,
@@ -34,11 +40,12 @@ import {
   type LockRegistry,
   type LockTracker,
 } from '../shared/LockRegistry';
+import type { ObjectVersion } from '../shared/results';
 import type { IReadOptions } from '../shared/types';
 import { activateClass } from './activation';
 import { lockClass } from './lock';
 import { getClassMetadata, getClassTransport } from './read';
-import type { IClassConfig, IClassState } from './types';
+import type { IClassConfig, IClassResults } from './types';
 import { unlockClass } from './unlock';
 import {
   type ClassIncludeType,
@@ -46,7 +53,29 @@ import {
   getClassVersionSource,
 } from './versions';
 
-export abstract class AdtClassMemberBase {
+export abstract class AdtClassMemberBase<
+  R extends IClassResults<
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown
+  > = IClassResults,
+> {
+  /**
+   * The readings this implementation performs, given when it was constructed.
+   *
+   * Declared here and abstract, so every concrete subclass carries it: `activate`
+   * and `readMetadata` below answer `ReturnType<R[…]>`, and a base fixed to the
+   * defaults would bind them to those while the subclass's `implements` clause
+   * promises the caller's — the class would not satisfy the atoms it claims, for
+   * exactly the members a consumer is least likely to test.
+   */
+  protected abstract readonly results: R;
+
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
   protected readonly systemContext: IAdtSystemContext;
@@ -61,22 +90,21 @@ export abstract class AdtClassMemberBase {
     logger: this.logger,
   });
 
-  private readonly lockCap = new LockCapability<IClassConfig, IClassState>(
-    this.capCtx,
-    {
-      nameOf: (c) => {
-        if (!c.className) throw new Error('Class name is required');
-        return c.className;
-      },
-      acquire: async (ctx, name) => ({
-        lockHandle: await lockClass(ctx.connection, name),
-      }),
-      release: async (ctx, name, handle) => {
-        const result = await unlockClass(ctx.connection, name, handle);
-        return { unlockResult: result, errors: [] };
-      },
+  // One type argument since 31.0.0: the release no longer builds a state shape
+  // for anyone to read — `unlock` answers `IAdtResponse<void>`, and what ADT
+  // said on the way out is nothing a caller asked for.
+  protected readonly lockCap = new LockCapability<IClassConfig>(this.capCtx, {
+    nameOf: (c) => {
+      if (!c.className) throw new Error('Class name is required');
+      return c.className;
     },
-  );
+    acquire: async (ctx, name) => ({
+      lockHandle: await lockClass(ctx.connection, name),
+    }),
+    release: async (ctx, name, handle) => {
+      await unlockClass(ctx.connection, name, handle);
+    },
+  });
 
   private readonly versionsCap = new VersionsCapability<IClassConfig>(
     this.capCtx,
@@ -117,20 +145,30 @@ export abstract class AdtClassMemberBase {
    * `/oo/classes/{name}`, never the include, and the PUT that writes the
    * include carries the class's handle.
    */
-  async lock(config: Partial<IClassConfig>): Promise<string> {
-    const handle = await this.lockCap.lock(config);
-    this.lockTracker.track(config.className as string, handle);
-    return handle;
+  async lock(config: Partial<IClassConfig>): Promise<IAdtResponse<string>> {
+    return answering(
+      async () => {
+        const handle = await this.lockCap.lockHandle(config);
+        this.lockTracker.track(config.className as string, handle);
+        // The lock handle is the value, and the wire it came on is not kept by
+        // the capability — so this is the one place a strategy has nothing to
+        // read and the answer is built from what the request produced.
+        return { data: handle, status: 200, statusText: 'OK', headers: {} };
+      },
+      (answer) => String(answer.data),
+    );
   }
 
   /** Unlock the class. */
   async unlock(
     config: Partial<IClassConfig>,
     lockHandle: string,
-  ): Promise<IClassState> {
-    const state = await this.lockCap.unlock(config, lockHandle);
-    this.lockTracker.untrack(config.className as string);
-    return state;
+  ): Promise<IAdtResponse<void>> {
+    return answering(async () => {
+      await this.lockCap.release(config, lockHandle);
+      this.lockTracker.untrack(config.className as string);
+      return { data: '', status: 200, statusText: 'OK', headers: {} };
+    }, nothing);
   }
 
   /**
@@ -139,50 +177,21 @@ export abstract class AdtClassMemberBase {
    * An include has no activation of its own — activating the class publishes
    * whatever its includes now contain.
    */
-  async activate(config: Partial<IClassConfig>): Promise<IClassState> {
+  async activate<E extends IAdtError = IAdtError>(
+    config: Partial<IClassConfig>,
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+    // No server was asked anything, so there is no answer to describe. A missing
+    // required argument is the caller's mistake, and it throws.
     if (!config.className) {
       throw new Error('Class name is required');
     }
 
-    const state: IClassState = {
-      errors: [],
-    };
-
-    try {
-      const activateResult = await activateClass(
-        this.connection,
-        config.className,
-      );
-      state.activateResult = activateResult;
-      return state;
-    } catch (error: unknown) {
-      const e = error as HttpError;
-      const status = e.response?.status;
-      const statusText = e.response?.statusText;
-      const errorMessage = e.response?.data
-        ? typeof e.response.data === 'string'
-          ? e.response.data.substring(0, 500)
-          : safeStringify(e.response.data).substring(0, 500)
-        : e.message || 'Unknown error';
-
-      this.logger?.error?.(
-        `Activate failed: HTTP ${status || '?'} ${statusText || ''}`,
-        { status, statusText, message: errorMessage },
-      );
-
-      if (status && status >= 400 && status < 500) {
-        const customError = new AdtOperationError(
-          `Activation failed for object '${config.className}': ${errorMessage}`,
-        );
-        customError.code = AdtObjectErrorCodes.ACTIVATE_FAILED;
-        customError.status = status;
-        customError.statusText = statusText;
-        customError.originalError = error;
-        throw customError;
-      }
-
-      throw error;
-    }
+    return answering(
+      () => activateClass(this.connection, config.className as string),
+      this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
+      (options?.analyse ?? activationRefusal) as IAnalyse<E>,
+    );
   }
 
   /**
@@ -192,42 +201,28 @@ export abstract class AdtClassMemberBase {
    * responsible are the class's. This reads the class, and says so rather than
    * implying the include carries any of it.
    */
-  async readMetadata(
+  async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig>,
-    options?: IReadOptions,
-  ): Promise<IClassState> {
-    const state: IClassState = { errors: [] };
+    options?: IReadOptions & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
     if (!config.className) {
-      const error = new Error('Class name is required');
-      state.errors.push({
-        method: 'readMetadata',
-        error,
-        timestamp: new Date(),
-      });
-      throw error;
+      throw new Error('Class name is required');
     }
-    try {
-      const readOptions = this.contentTypes
-        ? { ...options, accept: this.contentTypes.classRead().accept }
-        : options;
-      const response = await getClassMetadata(
-        this.connection,
-        config.className,
-        readOptions,
-      );
-      state.metadataResult = response;
-      this.logger?.info?.('Class metadata read successfully');
-      return state;
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({
-        method: 'readMetadata',
-        error: err,
-        timestamp: new Date(),
-      });
-      this.logger?.error('Read metadata failed:', safeErrorMessage(err));
-      throw err;
-    }
+
+    const readOptions = this.contentTypes
+      ? { ...options, accept: this.contentTypes.classRead().accept }
+      : options;
+
+    return answering(
+      () =>
+        getClassMetadata(
+          this.connection,
+          config.className as string,
+          readOptions,
+        ),
+      this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
+      options?.analyse,
+    );
   }
 
   /**
@@ -236,55 +231,50 @@ export abstract class AdtClassMemberBase {
    * An include is never in a transport of its own — it travels inside its
    * class, so this reads the class's.
    */
-  async readTransport(
+  async readTransport<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig>,
-    options?: { withLongPolling?: boolean },
-  ): Promise<IClassState> {
-    const state: IClassState = { errors: [] };
+    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+  ): Promise<IAdtResponse<string, E>> {
     if (!config.className) {
-      const error = new Error('Class name is required');
-      state.errors.push({
-        method: 'readTransport',
-        error,
-        timestamp: new Date(),
-      });
-      throw error;
+      throw new Error('Class name is required');
     }
-    try {
-      const response = await getClassTransport(
-        this.connection,
-        config.className,
-        options,
-      );
-      state.transportResult = response;
-      this.logger?.info?.('Transport request read successfully');
-      return state;
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({
-        method: 'readTransport',
-        error: err,
-        timestamp: new Date(),
-      });
-      this.logger?.error('Read transport failed:', safeErrorMessage(err));
-      throw err;
-    }
+
+    return answering(
+      () =>
+        getClassTransport(this.connection, config.className as string, options),
+      rawDocument,
+      options?.analyse,
+    );
   }
 
-  getVersionSource(contentUri: string): Promise<string> {
-    return this.versionsCap.getVersionSource(contentUri);
+  async getVersionSource(contentUri: string): Promise<IAdtResponse<string>> {
+    return answering(
+      async () => ({
+        data: await this.versionsCap.getVersionSource(contentUri),
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+      }),
+      rawDocument,
+    );
   }
 
   /** Version history of one include, or of `main` for the class itself. */
   protected getIncludeVersions(
     className: string,
     includeType: ClassIncludeType,
-  ): Promise<IObjectVersion[]> {
+  ): Promise<ObjectVersion[]> {
     return getClassIncludeVersions(this.connection, className, includeType);
   }
 
-  /** Version history of whatever the concrete handler's subject is. */
+  /**
+   * Version history of whatever the concrete handler's subject is.
+   *
+   * `ObjectVersion` left `@mcp-abap-adt/interfaces` in 31.0.0 with the other
+   * result shapes; {@link ObjectVersion} is this package's, declared beside the
+   * reading that builds it.
+   */
   abstract getVersions(
     config: Partial<IClassConfig>,
-  ): Promise<IObjectVersion[]>;
+  ): Promise<IAdtResponse<ObjectVersion[]>>;
 }

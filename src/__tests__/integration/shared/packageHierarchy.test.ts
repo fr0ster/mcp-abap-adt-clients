@@ -7,14 +7,16 @@
 
 import type {
   IAbapConnection,
-  IAdtObject,
   IAdtOperationOptions,
+  IAdtResponse,
   ILogger,
-  IPackageHierarchyNode,
 } from '@mcp-abap-adt/interfaces';
+import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
 import type { AdtClient } from '../../../clients/AdtClient';
-import { orThrow } from '../../../utils/adtResponse';
+import type { IPackageHierarchyNode } from '../../../core/shared/utilResults';
+import { failed } from '../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
+import type { TestableObject } from '../../helpers/BaseTester';
 import { BaseTester } from '../../helpers/BaseTester';
 import {
   createTestAdtClient,
@@ -49,7 +51,7 @@ const libraryLogger: ILogger = createLibraryLogger();
 const testsLogger: ILogger = createTestsLogger();
 
 class PackageHierarchyObject
-  implements IAdtObject<IPackageHierarchyParams, IPackageHierarchyNode>
+  implements TestableObject<IPackageHierarchyParams>
 {
   private client: AdtClient;
 
@@ -57,89 +59,48 @@ class PackageHierarchyObject
     this.client = client;
   }
 
-  private rejectUnsupported<T>(operation: string): Promise<T> {
-    return Promise.reject(
-      new Error(`Package hierarchy does not support ${operation} operation`),
+  /** Every member this resource does not have — answered, not thrown. */
+  private unsupported<T>(operation: string): Promise<IAdtResponse<T>> {
+    return Promise.resolve(
+      failed<T>({
+        origin: 'refusal',
+        code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION,
+        message: `Package hierarchy does not support ${operation}`,
+      }),
     );
   }
 
-  getVersions() {
-    return this.rejectUnsupported<never>('getVersions');
+  validate() {
+    return this.unsupported<unknown>('validate');
   }
 
-  getVersionSource() {
-    return this.rejectUnsupported<never>('getVersionSource');
-  }
-
-  validate(_config: Partial<IPackageHierarchyParams>): Promise<any> {
-    return this.rejectUnsupported('validate');
-  }
-
-  create(
-    _config: IPackageHierarchyParams,
-    _options?: IAdtOperationOptions,
-  ): Promise<any> {
-    return this.rejectUnsupported('create');
+  create() {
+    return this.unsupported<unknown>('create');
   }
 
   read(
     config: Partial<IPackageHierarchyParams>,
-    _version?: 'active' | 'inactive',
-    _options?: { withLongPolling?: boolean },
-  ): Promise<IPackageHierarchyNode | undefined> {
+  ): Promise<IAdtResponse<IPackageHierarchyNode>> {
     if (!config.package_name) {
       return Promise.reject(new Error('package_name required'));
     }
-    return orThrow(
-      this.client.getUtils().getPackageHierarchy(config.package_name),
-    );
+    return this.client.getUtils().getPackageHierarchy(config.package_name);
   }
 
-  readMetadata(
-    _config: Partial<IPackageHierarchyParams>,
-    _options?: { withLongPolling?: boolean },
-  ): Promise<any> {
-    return this.rejectUnsupported('readMetadata');
+  readMetadata() {
+    return this.unsupported<unknown>('readMetadata');
   }
 
-  update(
-    _config: Partial<IPackageHierarchyParams>,
-    _options?: IAdtOperationOptions,
-  ): Promise<any> {
-    return this.rejectUnsupported('update');
+  update() {
+    return this.unsupported<unknown>('update');
   }
 
-  delete(_config: Partial<IPackageHierarchyParams>): Promise<any> {
-    return this.rejectUnsupported('delete');
+  delete() {
+    return this.unsupported<unknown>('delete');
   }
 
-  activate(_config: Partial<IPackageHierarchyParams>): Promise<any> {
-    return this.rejectUnsupported('activate');
-  }
-
-  check(
-    _config: Partial<IPackageHierarchyParams>,
-    _status?: string,
-  ): Promise<any> {
-    return this.rejectUnsupported('check');
-  }
-
-  readTransport(
-    _config: Partial<IPackageHierarchyParams>,
-    _options?: { withLongPolling?: boolean },
-  ): Promise<any> {
-    return this.rejectUnsupported('readTransport');
-  }
-
-  lock(_config: Partial<IPackageHierarchyParams>): Promise<string> {
-    return this.rejectUnsupported('lock');
-  }
-
-  unlock(
-    _config: Partial<IPackageHierarchyParams>,
-    _lockHandle: string,
-  ): Promise<any> {
-    return this.rejectUnsupported('unlock');
+  activate() {
+    return this.unsupported<unknown>('activate');
   }
 }
 
@@ -149,7 +110,7 @@ describe('Shared - getPackageHierarchy', () => {
   let hasConfig = false;
   let isLegacy = false;
   let isCloudSystem = false;
-  let tester: BaseTester<IPackageHierarchyParams, IPackageHierarchyNode>;
+  let tester: BaseTester<IPackageHierarchyParams>;
 
   beforeAll(async () => {
     try {
@@ -244,9 +205,9 @@ describe('Shared - getPackageHierarchy', () => {
       }
 
       try {
-        const result = await tester.readTest(config, {
+        const result = (await tester.readTest(config, {
           skipReadMetadata: true,
-        });
+        })) as IPackageHierarchyNode;
         expect(result?.name).toBeDefined();
         expect(result?.name).toBe(config.package_name.toUpperCase());
         expect(result?.type).toBeDefined();

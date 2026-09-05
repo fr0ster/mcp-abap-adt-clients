@@ -3,25 +3,34 @@
  *
  * | what happened | what reaches the caller |
  * |---|---|
- * | SAP refused | `AdtSAPError` — the server's message and document |
- * | this library could not read the answer | `AdtParseError` — what it looked for, and the document |
- * | the caller's own parser threw | their exception, untouched |
+ * | SAP refused | the failure half, `origin: 'refusal'` — the server's message and document |
+ * | no answer arrived at all | the failure half, `origin: 'connection'` |
+ * | a reading could not read the answer | its exception, thrown past the contract |
  *
- * Before the second existed, it looked like a *result*: a document the library
- * could not read parsed to nothing and went back as an empty list. A logon page —
- * what an expired session answers with — read as "the package is empty".
+ * The first two are verdicts *about the server*, and those are the only two
+ * origins `interfaces@31.0.0` has. The third is deliberately not one of them: a
+ * document this library could not read is this library's failure, not SAP's, and
+ * calling it `origin: 'parse'` told a caller to go and look at a system that had
+ * answered them correctly.
  *
- * The third is left alone on purpose. Wrapping it would put this library's name
- * on a failure that is not its own, and a caller debugging their parser would
- * have to unwrap to find their own stack.
+ * It is also not wrapped. Whether the reading is the shipped one or a
+ * consumer's, its exception surfaces as itself — renaming it would put this
+ * library's name on a failure that is not its own, and a caller debugging their
+ * own reading would have to unwrap to find their own stack.
  *
- * The fourth case is the one that must NOT be an error: an empty answer. Nothing
+ * Before any of this existed the unreadable case looked like a *result*: a
+ * document the library could not read parsed to nothing and went back as an
+ * empty list. A logon page — what an expired session answers with — read as
+ * "the package is empty".
+ *
+ * The last case is the one that must NOT be an error: an empty answer. Nothing
  * matched is a result, and turning it into a failure would break every honest
  * empty read.
  */
 
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import { AdtUtils } from '../../../core/shared/AdtUtils';
+import { utilDocuments } from '../../../core/shared/utilResultSet';
 import { AdtParseError, AdtSAPError } from '../../../utils/adtErrors';
 
 const REFUSAL =
@@ -81,45 +90,43 @@ describe('the three origins stay apart', () => {
     expect(response.getError().origin).not.toBe('connection');
   });
 
-  it('this library could not read it — a different origin, not "no types"', async () => {
+  it('this library could not read it — thrown, not "no types"', async () => {
     const utils = new AdtUtils(answering(LOGON_PAGE), logger);
 
-    const response = await utils.getAllTypes();
-
-    // Not an empty list. `origin` is what tells a caller which remedy applies —
-    // fix a parser, versus ask the server something else.
-    expect(response.ok).toBe(false);
-    if (response.ok) throw new Error('expected a failure');
-    expect(response.getError().origin).toBe('parse');
-    expect(response.getError().cause).toBeInstanceOf(AdtParseError);
+    // Not an empty list, and not a verdict about SAP either: the server
+    // answered, the shipped reading could not make types out of a logon page,
+    // and that is this library failing rather than the system refusing.
+    await expect(utils.getAllTypes()).rejects.toBeInstanceOf(AdtParseError);
   });
 
-  it("the caller's parser threw — their error, untouched", async () => {
+  it("a consumer's own reading threw — their error, untouched", async () => {
     const utils = new AdtUtils(
       answering('<adtcore:objectReferences xmlns:adtcore="x"/>'),
       logger,
+      {
+        ...utilDocuments,
+        search: () => {
+          throw new ConsumerParserBug();
+        },
+      },
     );
 
-    const error = await utils
-      .search({ query: 'Z*' }, () => {
-        throw new ConsumerParserBug();
-      })
-      .then(
-        (answer) => {
-          throw new Error(
-            `expected the parser's own error, got ${JSON.stringify(answer.ok)}`,
-          );
-        },
-        (e: unknown) => e,
-      );
+    const error = await utils.search({ query: 'Z*' }).then(
+      (answer) => {
+        throw new Error(
+          `expected the reading's own error, got ${JSON.stringify(answer.ok)}`,
+        );
+      },
+      (e: unknown) => e,
+    );
 
     // Not wrapped, not classified, not renamed. It surfaces as itself.
     //
-    // The first version of this case checked only that the error survived in
+    // An earlier version of this case checked only that the error survived in
     // `cause` — and passed while the library was labelling it
     // `origin: 'connection'`, which tells a caller to reauthenticate or check
-    // the network over a bug in their own parser. A test that reads the payload
-    // and not the classification cannot see that.
+    // the network over a bug in their own reading. A test that reads the
+    // payload and not the classification cannot see that.
     expect(error).toBeInstanceOf(ConsumerParserBug);
     expect(error).not.toBeInstanceOf(AdtParseError);
     expect(error).not.toBeInstanceOf(AdtSAPError);

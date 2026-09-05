@@ -25,6 +25,7 @@ import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IDomainConfig } from '../../../../core/domain';
 import { getDomain } from '../../../../core/domain/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -145,7 +146,10 @@ describe('Domain lock registry (using AdtClient)', () => {
         // Lock through the client — the handler records it in the session-scoped
         // registry. Deliberately do NOT unlock here.
         const domain = client.getDomain();
-        const lockHandle = await domain.lock(config);
+        const lockHandle = expectResult(
+          await domain.lock(config),
+          'lockHandle',
+        );
         expect(typeof lockHandle).toBe('string');
         expect(lockHandle.length).toBeGreaterThan(0);
 

@@ -16,6 +16,7 @@
 
 import type { IAbapConnection, IAtcRunTarget } from '@mcp-abap-adt/interfaces';
 import { AdtAtc } from '../../../runtime/atc/AdtAtc';
+import { expectResult } from '../../helpers/contract';
 
 // The properties as the trial sent them: four of them, and the one this client
 // needs is not the first.
@@ -121,7 +122,10 @@ describe('AdtAtc — resolving the check variant', () => {
   it('run(target) with no options at all uses every default', async () => {
     const { connection, calls } = connectionFor();
 
-    const result = await new AdtAtc(connection, logger() as never).run(TARGET);
+    const result = expectResult(
+      await new AdtAtc(connection, logger() as never).run(TARGET),
+      'result',
+    );
 
     expect(result).toEqual({
       waited: false,
@@ -260,7 +264,10 @@ describe('AdtAtc — what a started run answers with', () => {
   it('wait: false returns the run id from Location and the created worklist id', async () => {
     const { connection } = connectionFor();
 
-    const result = await new AdtAtc(connection, logger() as never).run(TARGET);
+    const result = expectResult(
+      await new AdtAtc(connection, logger() as never).run(TARGET),
+      'result',
+    );
 
     expect(result).toEqual({
       waited: false,
@@ -287,9 +294,12 @@ describe('AdtAtc — what a started run answers with', () => {
       run: { status: 200, data: WAITING_RUN, headers: {} },
     });
 
-    const result = await new AdtAtc(connection, logger() as never).run(TARGET, {
-      wait: true,
-    });
+    const result = expectResult(
+      await new AdtAtc(connection, logger() as never).run(TARGET, {
+        wait: true,
+      }),
+      'result',
+    );
 
     expect(result).toEqual({
       waited: true,
@@ -327,9 +337,12 @@ describe('AdtAtc — what a started run answers with', () => {
       },
     });
 
-    const result = await new AdtAtc(connection, log as never).run(TARGET, {
-      wait: true,
-    });
+    const result = expectResult(
+      await new AdtAtc(connection, log as never).run(TARGET, {
+        wait: true,
+      }),
+      'result',
+    );
 
     expect(result).toMatchObject({ waited: true, worklistId: WORKLIST_ID });
     expect(log.warn).toHaveBeenCalledWith(
@@ -346,9 +359,14 @@ describe('AdtAtc — what a started run answers with', () => {
       },
     });
 
-    await expect(
-      new AdtAtc(connection, logger() as never).run(TARGET, { wait: true }),
-    ).resolves.toMatchObject({
+    const result = expectResult(
+      await new AdtAtc(connection, logger() as never).run(TARGET, {
+        wait: true,
+      }),
+      'waiting run',
+    );
+
+    expect(result).toMatchObject({
       worklistId: WORKLIST_ID,
       findingStats: '1,2,3',
     });
@@ -373,12 +391,11 @@ describe('AdtAtc — asking whether a run is done', () => {
         },
       });
 
-      const result = await new AdtAtc(
-        connection,
-        logger() as never,
-      ).getRunStatus(RUN_ID);
+      const result = expectResult(
+        await new AdtAtc(connection, logger() as never).getRunStatus(RUN_ID),
+        'result',
+      );
 
-      expect(result.status).toBe(status);
       expect(result.isFinished).toBe(expected);
     }
   });
@@ -388,8 +405,9 @@ describe('AdtAtc — asking whether a run is done', () => {
   it('takes each id from its own atom link', async () => {
     const { connection } = connectionFor();
 
-    const result = await new AdtAtc(connection, logger() as never).getRunStatus(
-      RUN_ID,
+    const result = expectResult(
+      await new AdtAtc(connection, logger() as never).getRunStatus(RUN_ID),
+      'result',
     );
 
     expect(result.worklistId).toBe(WORKLIST_ID);
@@ -406,8 +424,9 @@ describe('AdtAtc — asking whether a run is done', () => {
       },
     });
 
-    const result = await new AdtAtc(connection, logger() as never).getRunStatus(
-      RUN_ID,
+    const result = expectResult(
+      await new AdtAtc(connection, logger() as never).getRunStatus(RUN_ID),
+      'result',
     );
 
     expect(result).toEqual({
@@ -510,8 +529,9 @@ describe('AdtAtc — the documents are read structurally', () => {
       },
     });
 
-    const result = await new AdtAtc(connection, logger() as never).getRunStatus(
-      RUN_ID,
+    const result = expectResult(
+      await new AdtAtc(connection, logger() as never).getRunStatus(RUN_ID),
+      'result',
     );
 
     expect(result).toMatchObject({ status: 'finished', isFinished: true });
@@ -529,8 +549,9 @@ describe('AdtAtc — the documents are read structurally', () => {
       },
     });
 
-    const result = await new AdtAtc(connection, logger() as never).getRunStatus(
-      RUN_ID,
+    const result = expectResult(
+      await new AdtAtc(connection, logger() as never).getRunStatus(RUN_ID),
+      'result',
     );
 
     expect(result.worklistId).toBe(WORKLIST_ID);
@@ -551,9 +572,16 @@ describe('AdtAtc — the documents are read structurally', () => {
       },
     });
 
-    await expect(
-      new AdtAtc(connection, logger() as never).run(TARGET, { wait: true }),
-    ).resolves.toMatchObject({ findingStats: '4,5,6' });
+    const result = expectResult(
+      await new AdtAtc(connection, logger() as never).run(TARGET, {
+        wait: true,
+      }),
+      'waiting run',
+    );
+
+    // The union discriminates on `waited`; `findingStats` is on the waiting
+    // arm alone, which is what a `wait: true` run answers.
+    expect(result).toMatchObject({ waited: true, findingStats: '4,5,6' });
   });
 
   // An all-digit id is a string, not a number: `String(12345)` would round-trip
@@ -572,9 +600,12 @@ describe('AdtAtc — the documents are read structurally', () => {
     });
     const log = logger();
 
-    const result = await new AdtAtc(connection, log as never).run(TARGET, {
-      wait: true,
-    });
+    const result = expectResult(
+      await new AdtAtc(connection, log as never).run(TARGET, {
+        wait: true,
+      }),
+      'result',
+    );
 
     // The echo differs from the created id, so it is warned about verbatim —
     // which is where a number would have shown itself.

@@ -1982,6 +1982,38 @@ function resolveSharedDependency(type, name) {
 }
 
 /**
+ * The value, or a throw carrying what SAP said.
+ *
+ * Every create and update below used to be `await client.getX().y(...)` with
+ * the answer dropped on the floor. That was survivable while a failure threw;
+ * since the contract migration a failure is the other half of the answer, so a
+ * create that never happened returned normally and the setup counted it as
+ * done. Measured: `shared:setup` announced "ZAC_SHR_RUN01 updated and
+ * activated", reported "16 already existed, 0 failed", and the class was not on
+ * the system at all.
+ *
+ * It throws rather than returning a flag because every caller here is a setup
+ * step whose next step depends on it, and because the surrounding `catch`
+ * blocks — the cloud post-create verify, the "already exists" recovery — were
+ * written for a throw.
+ */
+function mustSucceed(answer, what) {
+  if (!answer || typeof answer.ok !== 'boolean') {
+    // Not a contract: a helper that answers something else is doing its own
+    // thing, and this is not the place to guess what.
+    return answer;
+  }
+  if (!answer.ok) {
+    const failure = answer.getError();
+    throw new Error(
+      `${what} failed [${failure.origin}]: ${failure.message}` +
+        (failure.request?.url ? ` (${failure.request.url})` : ''),
+    );
+  }
+  return answer.getResult().value;
+}
+
+/**
  * Ensure the shared sub-package exists (create if missing).
  * Skips after first successful verification (in-memory flag).
  * @param {Object} client - AdtClient instance
@@ -1995,11 +2027,15 @@ async function ensureSharedPackage(client, logger) {
 
   const packageName = sharedConfig.package;
 
-  // Check if package exists
+  // Check if package exists.
+  //
+  // `readResult` was a field on the state bag, and the state bags are gone: this
+  // read `readResult?.readResult`, which is now always `undefined`, so the
+  // package was re-created on every run and the "already exists" recovery below
+  // was doing the real work.
   try {
-    const pkgHandler = client.getPackage();
-    const readResult = await pkgHandler.read({ packageName });
-    if (readResult?.readResult) {
+    const answer = await client.getPackage().read({ packageName });
+    if (answer.ok && String(answer.getResult().value ?? '').trim() !== '') {
       logger?.info?.(`Shared package ${packageName} already exists`);
       _sharedPackageReady = true;
       return;
@@ -2013,15 +2049,18 @@ async function ensureSharedPackage(client, logger) {
     const transportRequest = resolveTransportRequest(
       sharedConfig.transport_request,
     );
-    await client.getPackage().create({
-      packageName,
-      description: 'Shared test dependencies package',
-      superPackage: sharedConfig.super_package,
-      softwareComponent: sharedConfig.software_component,
-      transportLayer: sharedConfig.transport_layer,
-      packageType: 'development',
-      transportRequest,
-    });
+    mustSucceed(
+      await client.getPackage().create({
+        packageName,
+        description: 'Shared test dependencies package',
+        superPackage: sharedConfig.super_package,
+        softwareComponent: sharedConfig.software_component,
+        transportLayer: sharedConfig.transport_layer,
+        packageType: 'development',
+        transportRequest,
+      }),
+      `shared package create ${packageName}`,
+    );
     logger?.info?.(`Created shared package ${packageName}`);
   } catch (error) {
     if (
@@ -2134,41 +2173,53 @@ async function updateAndActivateShared(
         { activateOnUpdate: true, sourceCode: depConfig.source },
       );
   } else if (type === 'access_controls') {
-    await client.getAccessControl().update(
-      {
-        accessControlName: name,
-        sourceCode: depConfig.source,
-        transportRequest,
-      },
-      { activateOnUpdate: true, sourceCode: depConfig.source },
+    mustSucceed(
+      await client.getAccessControl().update(
+        {
+          accessControlName: name,
+          sourceCode: depConfig.source,
+          transportRequest,
+        },
+        { activateOnUpdate: true, sourceCode: depConfig.source },
+      ),
+      `shared accesscontrol update ${name}`,
     );
   } else if (type === 'interfaces') {
-    await client.getInterface().update(
-      {
-        interfaceName: name,
-        sourceCode: depConfig.source,
-        transportRequest,
-      },
-      { activateOnUpdate: true, sourceCode: depConfig.source },
+    mustSucceed(
+      await client.getInterface().update(
+        {
+          interfaceName: name,
+          sourceCode: depConfig.source,
+          transportRequest,
+        },
+        { activateOnUpdate: true, sourceCode: depConfig.source },
+      ),
+      `shared interface update ${name}`,
     );
   } else if (type === 'function_modules') {
-    await client.getFunctionModule().update(
-      {
-        functionModuleName: name,
-        functionGroupName: depConfig.function_group,
-        sourceCode: depConfig.source,
-        transportRequest,
-      },
-      { activateOnUpdate: true, sourceCode: depConfig.source },
+    mustSucceed(
+      await client.getFunctionModule().update(
+        {
+          functionModuleName: name,
+          functionGroupName: depConfig.function_group,
+          sourceCode: depConfig.source,
+          transportRequest,
+        },
+        { activateOnUpdate: true, sourceCode: depConfig.source },
+      ),
+      `shared functionmodule update ${name}`,
     );
   } else if (type === 'service_definitions') {
-    await client.getServiceDefinition().update(
-      {
-        serviceDefinitionName: name,
-        sourceCode: depConfig.source,
-        transportRequest,
-      },
-      { activateOnUpdate: true, sourceCode: depConfig.source },
+    mustSucceed(
+      await client.getServiceDefinition().update(
+        {
+          serviceDefinitionName: name,
+          sourceCode: depConfig.source,
+          transportRequest,
+        },
+        { activateOnUpdate: true, sourceCode: depConfig.source },
+      ),
+      `shared servicedefinition update ${name}`,
     );
   } else {
     logger?.info?.(`Shared ${type} ${name} — no update logic, skipping`);
@@ -2205,80 +2256,111 @@ async function ensureSharedDependency(client, type, name, logger) {
   // always brought to configuration and activated, existing or not.
   const ALWAYS_RECONCILE = new Set(['domains', 'data_elements']);
 
-  // Check if the object already exists
-  let exists = false;
-  try {
+  // Check if the object already exists.
+  //
+  // **The answer, not `undefined`.** Every handler used to return `undefined`
+  // for an object that is not there, and this read `result !== undefined`. Since
+  // the contract migration a read always answers an `IAdtResponse` object, so
+  // that expression was `true` for every object on every system — setup took
+  // the "it exists, update it" branch for all twenty, announced "updated and
+  // activated", created nothing, and reported success.
+  //
+  // Absence is read from the answer now: a failure that says 404 or names the
+  // object as non-existent, or a success carrying an empty document — ADT
+  // answers absence with 200 and no body on the measured systems, and a
+  // source-bearing shared object with an empty body is not one a later run
+  // should accept as satisfied.
+  const readShared = async () => {
     if (type === 'domains') {
-      const result = await client.getDomain().read({ domainName: name });
-      exists = result !== undefined;
-    } else if (type === 'data_elements') {
-      const result = await client
-        .getDataElement()
-        .read({ dataElementName: name });
-      exists = result !== undefined;
-    } else if (type === 'structures') {
-      const result = await client.getStructure().read({ structureName: name });
-      exists = result !== undefined;
-    } else if (type === 'tables') {
-      const result = await client.getTable().read({ tableName: name });
-      // Table read returns { readResult: undefined } on 404 (quirk)
-      exists = result?.readResult !== undefined;
-    } else if (type === 'views') {
-      const result = await client.getDdl().read({ ddlName: name });
-      exists = result !== undefined;
-    } else if (type === 'programs') {
-      const result = await client.getProgram().read({ programName: name });
-      exists = result !== undefined;
-    } else if (type === 'behavior_definitions') {
-      const result = await client.getBehaviorDefinition().read({ name });
-      exists = result !== undefined;
-    } else if (type === 'classes') {
-      const result = await client.getClass().read({ className: name });
-      exists = result !== undefined;
-    } else if (type === 'access_controls') {
-      const result = await client
-        .getAccessControl()
-        .read({ accessControlName: name });
-      exists = result !== undefined;
-    } else if (type === 'interfaces') {
-      const result = await client.getInterface().read({ interfaceName: name });
-      exists = result !== undefined;
-    } else if (type === 'function_groups') {
-      const result = await client
-        .getFunctionGroup()
-        .read({ functionGroupName: name });
-      exists = result !== undefined;
-    } else if (type === 'function_modules') {
-      const result = await client.getFunctionModule().read({
+      return client.getDomain().read({ domainName: name });
+    }
+    if (type === 'data_elements') {
+      return client.getDataElement().read({ dataElementName: name });
+    }
+    if (type === 'structures') {
+      return client.getStructure().read({ structureName: name });
+    }
+    if (type === 'tables') {
+      return client.getTable().read({ tableName: name });
+    }
+    if (type === 'views') {
+      return client.getDdl().read({ ddlName: name });
+    }
+    if (type === 'programs') {
+      return client.getProgram().read({ programName: name });
+    }
+    if (type === 'behavior_definitions') {
+      return client.getBehaviorDefinition().read({ name });
+    }
+    if (type === 'classes') {
+      return client.getClass().read({ className: name });
+    }
+    if (type === 'access_controls') {
+      return client.getAccessControl().read({ accessControlName: name });
+    }
+    if (type === 'interfaces') {
+      return client.getInterface().read({ interfaceName: name });
+    }
+    if (type === 'function_groups') {
+      return client.getFunctionGroup().read({ functionGroupName: name });
+    }
+    if (type === 'function_modules') {
+      return client.getFunctionModule().read({
         functionModuleName: name,
         functionGroupName: depConfig.function_group,
       });
-      exists = result !== undefined;
-    } else if (type === 'service_definitions') {
-      const result = await client
+    }
+    if (type === 'service_definitions') {
+      return client
         .getServiceDefinition()
         .read({ serviceDefinitionName: name });
-      exists = result !== undefined;
-    } else if (type === 'service_bindings') {
-      const result = await client
-        .getServiceBinding()
-        .read({ bindingName: name });
-      exists = result !== undefined;
+    }
+    if (type === 'service_bindings') {
+      return client.getServiceBinding().read({ bindingName: name });
+    }
+    return undefined;
+  };
+
+  let exists = false;
+  try {
+    const answer = await readShared();
+    if (answer === undefined) {
+      // A type this function has no read for. Unknown, not absent.
+      exists = false;
+    } else if (answer.ok) {
+      const value = answer.getResult().value;
+      exists =
+        typeof value === 'string'
+          ? value.trim() !== ''
+          : value !== undefined && value !== null;
+    } else {
+      const failure = answer.getError();
+      const status = failure.response?.status;
+      // A refused read is not absence unless it says so — it is "we did not
+      // find out", and turning that into `exists = false` is a guess that then
+      // does something irreversible.
+      //
+      // Measured on the BTP trial: reads of ZAC_SHR_GA_DOM and ZAC_SHR_STRU
+      // failed on a flaky link, the blanket catch here called them missing, and
+      // the create that followed came back
+      // `400 ExceptionResourceAlreadyExists: Resource Domain ZAC_SHR_GA_DOM
+      // does already exist` — the objects were there all along. A 403, a 500 or
+      // a timeout would read the same way.
+      //
+      // A refusal naming the object as non-existent is absence: that is the
+      // sentence a cloud system answers in place of a 404.
+      const saysAbsent =
+        status === 404 || /does not exist/i.test(failure.message ?? '');
+      if (!saysAbsent) {
+        throw new Error(
+          `Could not determine whether shared ${type} ${name} exists: ${failure.message}. ` +
+            'Refusing to assume it is missing — the create that would follow ' +
+            'either fails on an object that exists or writes over one that does.',
+        );
+      }
+      exists = false;
     }
   } catch (error) {
-    // Absence is `undefined` from read(), which every handler returns on 404.
-    // A THROWN error is not absence — it is "we did not find out", and turning
-    // it into `exists = false` is a guess that then does something irreversible.
-    //
-    // Measured on the BTP trial: reads of ZAC_SHR_GA_DOM and ZAC_SHR_STRU threw
-    // on a flaky link, the blanket catch here called them missing, and the
-    // create that followed came back
-    // `400 ExceptionResourceAlreadyExists: Resource Domain ZAC_SHR_GA_DOM does
-    // already exist` — the objects were there all along. A 403, a 500 or a
-    // timeout would read the same way.
-    //
-    // A status is still honoured if one arrived saying 404, since a handler may
-    // surface that as an error rather than as `undefined`.
     const status = error?.response?.status ?? error?.status;
     if (status !== 404) {
       throw new Error(
@@ -2320,28 +2402,35 @@ async function ensureSharedDependency(client, type, name, logger) {
       // reads back.
       try {
         if (type === 'domains') {
-          await client.getDomain().update(
-            {
-              domainName: name,
-              packageName,
-              description: depConfig.description || 'Shared test domain',
-              datatype: depConfig.datatype || 'CHAR',
-              length: depConfig.length || 10,
-              transportRequest,
-            },
-            { activateOnUpdate: true },
+          mustSucceed(
+            await client.getDomain().update(
+              {
+                domainName: name,
+                packageName,
+                description: depConfig.description || 'Shared test domain',
+                datatype: depConfig.datatype || 'CHAR',
+                length: depConfig.length || 10,
+                transportRequest,
+              },
+              { activateOnUpdate: true },
+            ),
+            `shared domain update ${name}`,
           );
         } else {
-          await client.getDataElement().update(
-            {
-              dataElementName: name,
-              packageName,
-              description: depConfig.description || 'Shared test data element',
-              typeKind: depConfig.type_kind || 'domain',
-              typeName: depConfig.domain_name,
-              transportRequest,
-            },
-            { activateOnUpdate: true },
+          mustSucceed(
+            await client.getDataElement().update(
+              {
+                dataElementName: name,
+                packageName,
+                description:
+                  depConfig.description || 'Shared test data element',
+                typeKind: depConfig.type_kind || 'domain',
+                typeName: depConfig.domain_name,
+                transportRequest,
+              },
+              { activateOnUpdate: true },
+            ),
+            `shared dataelement update ${name}`,
           );
         }
         logger?.info?.(`Shared ${type} ${name} reconciled to configuration`);
@@ -2365,267 +2454,349 @@ async function ensureSharedDependency(client, type, name, logger) {
   logger?.info?.(`Creating shared ${type} ${name}...`);
   try {
     if (type === 'domains') {
-      await client.getDomain().create({
-        domainName: name,
-        packageName,
-        description: depConfig.description || 'Shared test domain',
-        datatype: depConfig.datatype || 'CHAR',
-        length: depConfig.length || 10,
-        transportRequest,
-      });
-      // A domain carries no source: create only makes the shell, update fills
-      // in the type, and without that step it stays an empty object with no
-      // data type at all.
-      await client.getDomain().update(
-        {
+      mustSucceed(
+        await client.getDomain().create({
           domainName: name,
-          // The update needs the package as much as the create did: measured on
-          // E19, the first-ever setup of a shared domain failed with `Package
-          // name is required for update` and the next run passed, because by
-          // then the object existed and the reconcile branch — which does pass
-          // it — took over. A defect only a fresh system ever sees.
           packageName,
           description: depConfig.description || 'Shared test domain',
           datatype: depConfig.datatype || 'CHAR',
           length: depConfig.length || 10,
           transportRequest,
-        },
-        { activateOnUpdate: true },
+        }),
+        `shared domain create ${name}`,
+      );
+      // A domain carries no source: create only makes the shell, update fills
+      // in the type, and without that step it stays an empty object with no
+      // data type at all.
+      mustSucceed(
+        await client.getDomain().update(
+          {
+            domainName: name,
+            // The update needs the package as much as the create did: measured on
+            // E19, the first-ever setup of a shared domain failed with `Package
+            // name is required for update` and the next run passed, because by
+            // then the object existed and the reconcile branch — which does pass
+            // it — took over. A defect only a fresh system ever sees.
+            packageName,
+            description: depConfig.description || 'Shared test domain',
+            datatype: depConfig.datatype || 'CHAR',
+            length: depConfig.length || 10,
+            transportRequest,
+          },
+          { activateOnUpdate: true },
+        ),
+        `shared domain update ${name}`,
       );
     } else if (type === 'data_elements') {
-      await client.getDataElement().create({
-        dataElementName: name,
-        packageName,
-        description: depConfig.description || 'Shared test data element',
-        typeKind: depConfig.type_kind || 'domain',
-        typeName: depConfig.domain_name,
-        transportRequest,
-      });
-      await client.getDataElement().update(
-        {
+      mustSucceed(
+        await client.getDataElement().create({
           dataElementName: name,
-          // Same omission as the domain above, and the same fresh-system-only
-          // failure waiting behind it.
           packageName,
           description: depConfig.description || 'Shared test data element',
           typeKind: depConfig.type_kind || 'domain',
           typeName: depConfig.domain_name,
           transportRequest,
-        },
-        { activateOnUpdate: true },
+        }),
+        `shared dataelement create ${name}`,
       );
-    } else if (type === 'structures') {
-      await client.getStructure().create({
-        structureName: name,
-        packageName,
-        description: depConfig.description || 'Shared test structure',
-        ddlCode: depConfig.source,
-        transportRequest,
-      });
-      if (depConfig.source) {
-        logger?.info?.(`Activating shared structure ${name}...`);
-        await client.getStructure().update(
+      mustSucceed(
+        await client.getDataElement().update(
           {
-            structureName: name,
-            ddlCode: depConfig.source,
+            dataElementName: name,
+            // Same omission as the domain above, and the same fresh-system-only
+            // failure waiting behind it.
+            packageName,
+            description: depConfig.description || 'Shared test data element',
+            typeKind: depConfig.type_kind || 'domain',
+            typeName: depConfig.domain_name,
             transportRequest,
           },
-          { activateOnUpdate: true, sourceCode: depConfig.source },
+          { activateOnUpdate: true },
+        ),
+        `shared dataelement update ${name}`,
+      );
+    } else if (type === 'structures') {
+      mustSucceed(
+        await client.getStructure().create({
+          structureName: name,
+          packageName,
+          description: depConfig.description || 'Shared test structure',
+          ddlCode: depConfig.source,
+          transportRequest,
+        }),
+        `shared structure create ${name}`,
+      );
+      if (depConfig.source) {
+        logger?.info?.(`Activating shared structure ${name}...`);
+        mustSucceed(
+          await client.getStructure().update(
+            {
+              structureName: name,
+              ddlCode: depConfig.source,
+              transportRequest,
+            },
+            { activateOnUpdate: true, sourceCode: depConfig.source },
+          ),
+          `shared structure update ${name}`,
         );
         logger?.info?.(`Shared structure ${name} activated`);
       }
     } else if (type === 'tables') {
-      await client.getTable().create({
-        tableName: name,
-        packageName,
-        description: depConfig.description || 'Shared test table',
-        ddlCode: depConfig.source,
-        transportRequest,
-      });
+      mustSucceed(
+        await client.getTable().create({
+          tableName: name,
+          packageName,
+          description: depConfig.description || 'Shared test table',
+          ddlCode: depConfig.source,
+          transportRequest,
+        }),
+        `shared table create ${name}`,
+      );
       if (depConfig.source) {
         logger?.info?.(`Activating shared table ${name}...`);
-        await client.getTable().update(
-          {
-            tableName: name,
-            ddlCode: depConfig.source,
-            transportRequest,
-          },
-          { activateOnUpdate: true, sourceCode: depConfig.source },
+        mustSucceed(
+          await client.getTable().update(
+            {
+              tableName: name,
+              ddlCode: depConfig.source,
+              transportRequest,
+            },
+            { activateOnUpdate: true, sourceCode: depConfig.source },
+          ),
+          `shared table update ${name}`,
         );
         logger?.info?.(`Shared table ${name} activated`);
       }
     } else if (type === 'views') {
-      await client.getDdl().create({
-        ddlName: name,
-        packageName,
-        description: depConfig.description || 'Shared test view',
-        ddlSource: depConfig.source,
-        transportRequest,
-      });
+      mustSucceed(
+        await client.getDdl().create({
+          ddlName: name,
+          packageName,
+          description: depConfig.description || 'Shared test view',
+          ddlSource: depConfig.source,
+          transportRequest,
+        }),
+        `shared ddl create ${name}`,
+      );
       if (depConfig.source) {
         logger?.info?.(`Activating shared view ${name}...`);
-        await client.getDdl().update(
-          {
-            ddlName: name,
-            ddlSource: depConfig.source,
-            transportRequest,
-          },
-          { activateOnUpdate: true, sourceCode: depConfig.source },
+        mustSucceed(
+          await client.getDdl().update(
+            {
+              ddlName: name,
+              ddlSource: depConfig.source,
+              transportRequest,
+            },
+            { activateOnUpdate: true, sourceCode: depConfig.source },
+          ),
+          `shared ddl update ${name}`,
         );
         logger?.info?.(`Shared view ${name} activated`);
       }
     } else if (type === 'programs') {
-      await client.getProgram().create({
-        programName: name,
-        packageName,
-        description: depConfig.description || 'Shared test program',
-        transportRequest,
-      });
+      mustSucceed(
+        await client.getProgram().create({
+          programName: name,
+          packageName,
+          description: depConfig.description || 'Shared test program',
+          transportRequest,
+        }),
+        `shared program create ${name}`,
+      );
       if (depConfig.source) {
-        await client.getProgram().update(
-          {
-            programName: name,
-            sourceCode: depConfig.source,
-            transportRequest,
-          },
-          { activateOnUpdate: true, sourceCode: depConfig.source },
+        mustSucceed(
+          await client.getProgram().update(
+            {
+              programName: name,
+              sourceCode: depConfig.source,
+              transportRequest,
+            },
+            { activateOnUpdate: true, sourceCode: depConfig.source },
+          ),
+          `shared program update ${name}`,
         );
       }
     } else if (type === 'behavior_definitions') {
-      await client.getBehaviorDefinition().create({
-        name,
-        packageName,
-        rootEntity: depConfig.root_entity || name,
-        implementationType: depConfig.implementation_type || 'Managed',
-        description: depConfig.description || 'Shared test BDEF',
-        sourceCode: depConfig.source,
-        transportRequest,
-      });
+      mustSucceed(
+        await client.getBehaviorDefinition().create({
+          name,
+          packageName,
+          rootEntity: depConfig.root_entity || name,
+          implementationType: depConfig.implementation_type || 'Managed',
+          description: depConfig.description || 'Shared test BDEF',
+          sourceCode: depConfig.source,
+          transportRequest,
+        }),
+        `shared behaviordefinition create ${name}`,
+      );
       if (depConfig.source) {
         logger?.info?.(`Activating shared behavior definition ${name}...`);
-        await client.getBehaviorDefinition().update(
-          {
-            name,
-            sourceCode: depConfig.source,
-            transportRequest,
-          },
-          { activateOnUpdate: true, sourceCode: depConfig.source },
+        mustSucceed(
+          await client.getBehaviorDefinition().update(
+            {
+              name,
+              sourceCode: depConfig.source,
+              transportRequest,
+            },
+            { activateOnUpdate: true, sourceCode: depConfig.source },
+          ),
+          `shared behaviordefinition update ${name}`,
         );
         logger?.info?.(`Shared behavior definition ${name} activated`);
       }
     } else if (type === 'classes') {
-      await client.getClass().create({
-        className: name,
-        packageName,
-        description: depConfig.description || 'Shared test class',
-        transportRequest,
-      });
+      mustSucceed(
+        await client.getClass().create({
+          className: name,
+          packageName,
+          description: depConfig.description || 'Shared test class',
+          transportRequest,
+        }),
+        `shared class create ${name}`,
+      );
       if (depConfig.source) {
         logger?.info?.(`Activating shared class ${name}...`);
-        await client.getClass().update(
-          {
-            className: name,
-            sourceCode: depConfig.source,
-            transportRequest,
-          },
-          { activateOnUpdate: true, sourceCode: depConfig.source },
+        mustSucceed(
+          await client.getClass().update(
+            {
+              className: name,
+              sourceCode: depConfig.source,
+              transportRequest,
+            },
+            { activateOnUpdate: true, sourceCode: depConfig.source },
+          ),
+          `shared class update ${name}`,
         );
         logger?.info?.(`Shared class ${name} activated`);
       }
     } else if (type === 'access_controls') {
-      await client.getAccessControl().create({
-        accessControlName: name,
-        packageName,
-        description: depConfig.description || 'Shared test access control',
-        sourceCode: depConfig.source,
-        transportRequest,
-      });
+      mustSucceed(
+        await client.getAccessControl().create({
+          accessControlName: name,
+          packageName,
+          description: depConfig.description || 'Shared test access control',
+          sourceCode: depConfig.source,
+          transportRequest,
+        }),
+        `shared accesscontrol create ${name}`,
+      );
       if (depConfig.source) {
         logger?.info?.(`Activating shared access control ${name}...`);
-        await client.getAccessControl().update(
-          {
-            accessControlName: name,
-            sourceCode: depConfig.source,
-            transportRequest,
-          },
-          { activateOnUpdate: true, sourceCode: depConfig.source },
+        mustSucceed(
+          await client.getAccessControl().update(
+            {
+              accessControlName: name,
+              sourceCode: depConfig.source,
+              transportRequest,
+            },
+            { activateOnUpdate: true, sourceCode: depConfig.source },
+          ),
+          `shared accesscontrol update ${name}`,
         );
         logger?.info?.(`Shared access control ${name} activated`);
       }
     } else if (type === 'interfaces') {
-      await client.getInterface().create({
-        interfaceName: name,
-        packageName,
-        description: depConfig.description || 'Shared test interface',
-        transportRequest,
-      });
+      mustSucceed(
+        await client.getInterface().create({
+          interfaceName: name,
+          packageName,
+          description: depConfig.description || 'Shared test interface',
+          transportRequest,
+        }),
+        `shared interface create ${name}`,
+      );
       if (depConfig.source) {
         logger?.info?.(`Activating shared interface ${name}...`);
-        await client.getInterface().update(
-          {
-            interfaceName: name,
-            sourceCode: depConfig.source,
-            transportRequest,
-          },
-          { activateOnUpdate: true, sourceCode: depConfig.source },
+        mustSucceed(
+          await client.getInterface().update(
+            {
+              interfaceName: name,
+              sourceCode: depConfig.source,
+              transportRequest,
+            },
+            { activateOnUpdate: true, sourceCode: depConfig.source },
+          ),
+          `shared interface update ${name}`,
         );
         logger?.info?.(`Shared interface ${name} activated`);
       }
     } else if (type === 'function_groups') {
       try {
-        await client.getFunctionGroup().create({
-          functionGroupName: name,
-          packageName,
-          description: depConfig.description || 'Shared test FUGR',
-          transportRequest,
-        });
+        mustSucceed(
+          await client.getFunctionGroup().create({
+            functionGroupName: name,
+            packageName,
+            description: depConfig.description || 'Shared test FUGR',
+            transportRequest,
+          }),
+          `shared functiongroup create ${name}`,
+        );
       } catch (createErr) {
         // On cloud, HTTP create may succeed but post-create read fails (404).
         // Wait and verify the object actually exists before re-throwing.
+        //
+        // `!verify` was the check, and a read always answers an object now — so
+        // this swallowed every create failure it was meant to re-throw. The
+        // answer decides: a document means the group is there despite the error.
         await new Promise((r) => setTimeout(r, 5000));
         const verify = await client
           .getFunctionGroup()
           .read({ functionGroupName: name });
-        if (!verify) throw createErr;
+        const arrived =
+          verify.ok && String(verify.getResult().value ?? '').trim() !== '';
+        if (!arrived) throw createErr;
       }
     } else if (type === 'function_modules') {
-      await client.getFunctionModule().create({
-        functionModuleName: name,
-        functionGroupName: depConfig.function_group,
-        packageName,
-        description: depConfig.description || 'Shared test FM',
-        transportRequest,
-      });
+      mustSucceed(
+        await client.getFunctionModule().create({
+          functionModuleName: name,
+          functionGroupName: depConfig.function_group,
+          packageName,
+          description: depConfig.description || 'Shared test FM',
+          transportRequest,
+        }),
+        `shared functionmodule create ${name}`,
+      );
       if (depConfig.source) {
         logger?.info?.(`Activating shared function module ${name}...`);
-        await client.getFunctionModule().update(
-          {
-            functionModuleName: name,
-            functionGroupName: depConfig.function_group,
-            sourceCode: depConfig.source,
-            transportRequest,
-          },
-          { activateOnUpdate: true, sourceCode: depConfig.source },
+        mustSucceed(
+          await client.getFunctionModule().update(
+            {
+              functionModuleName: name,
+              functionGroupName: depConfig.function_group,
+              sourceCode: depConfig.source,
+              transportRequest,
+            },
+            { activateOnUpdate: true, sourceCode: depConfig.source },
+          ),
+          `shared functionmodule update ${name}`,
         );
         logger?.info?.(`Shared function module ${name} activated`);
       }
     } else if (type === 'service_definitions') {
-      await client.getServiceDefinition().create({
-        serviceDefinitionName: name,
-        packageName,
-        description: depConfig.description || 'Shared test service definition',
-        transportRequest,
-        sourceCode: depConfig.source,
-      });
+      mustSucceed(
+        await client.getServiceDefinition().create({
+          serviceDefinitionName: name,
+          packageName,
+          description:
+            depConfig.description || 'Shared test service definition',
+          transportRequest,
+          sourceCode: depConfig.source,
+        }),
+        `shared servicedefinition create ${name}`,
+      );
       if (depConfig.source && !depConfig.skip_activation) {
         logger?.info?.(`Activating shared service definition ${name}...`);
-        await client.getServiceDefinition().update(
-          {
-            serviceDefinitionName: name,
-            sourceCode: depConfig.source,
-            transportRequest,
-          },
-          { activateOnUpdate: true, sourceCode: depConfig.source },
+        mustSucceed(
+          await client.getServiceDefinition().update(
+            {
+              serviceDefinitionName: name,
+              sourceCode: depConfig.source,
+              transportRequest,
+            },
+            { activateOnUpdate: true, sourceCode: depConfig.source },
+          ),
+          `shared servicedefinition update ${name}`,
         );
         logger?.info?.(`Shared service definition ${name} activated`);
       } else if (depConfig.skip_activation) {
@@ -2634,24 +2805,27 @@ async function ensureSharedDependency(client, type, name, logger) {
         );
       }
     } else if (type === 'service_bindings') {
-      await client.getServiceBinding().create(
-        {
-          bindingName: name,
-          packageName,
-          description: depConfig.description || 'Shared test service binding',
-          serviceDefinitionName: depConfig.service_definition,
-          serviceName: depConfig.service_name || name,
-          serviceVersion: depConfig.service_version || '0001',
-          // adt-clients takes a single bindingVariant (e.g. ODATA_V4_WEB_API),
-          // not separate type/version. Prefer an explicit binding_variant;
-          // otherwise derive it from binding_type/binding_version (defaulting
-          // the category to WEB_API).
-          bindingVariant:
-            depConfig.binding_variant ||
-            `${depConfig.binding_type || 'ODATA'}_${depConfig.binding_version || 'V4'}_WEB_API`,
-          transportRequest,
-        },
-        { activateOnCreate: !depConfig.skip_activation },
+      mustSucceed(
+        await client.getServiceBinding().create(
+          {
+            bindingName: name,
+            packageName,
+            description: depConfig.description || 'Shared test service binding',
+            serviceDefinitionName: depConfig.service_definition,
+            serviceName: depConfig.service_name || name,
+            serviceVersion: depConfig.service_version || '0001',
+            // adt-clients takes a single bindingVariant (e.g. ODATA_V4_WEB_API),
+            // not separate type/version. Prefer an explicit binding_variant;
+            // otherwise derive it from binding_type/binding_version (defaulting
+            // the category to WEB_API).
+            bindingVariant:
+              depConfig.binding_variant ||
+              `${depConfig.binding_type || 'ODATA'}_${depConfig.binding_version || 'V4'}_WEB_API`,
+            transportRequest,
+          },
+          { activateOnCreate: !depConfig.skip_activation },
+        ),
+        `shared servicebinding create ${name}`,
       );
       if (depConfig.skip_activation) {
         logger?.info?.(

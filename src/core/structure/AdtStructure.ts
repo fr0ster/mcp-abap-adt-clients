@@ -1,39 +1,47 @@
-import { beginCriticalSection } from '../../utils/criticalSection';
-import { assertDeletable } from '../../utils/deletionCheck';
 /**
- * AdtStructure - High-level CRUD operations for Structure objects
+ * AdtStructure - CRUD for `TABL/DS` structures.
  *
- * Implements IAdtObject interface with automatic operation chains,
- * error handling, and resource cleanup.
+ * `create` is metadata only; the fields come through `update`, which writes DDL
+ * source.
  *
- * Uses low-level functions directly (not Builder classes).
- *
- * Session management:
- * - stateful: only when doing lock/update/unlock operations
- * - stateless: obligatory after unlock
- * - If no lock/unlock, no stateful needed
- * - activate uses same session/cookies (no stateful needed)
- *
- * Operation chains:
- * - Create: validate → create → check → lock → check(inactive) → update → unlock → check → activate
- * - Update: lock → check(inactive) → update → unlock → check → activate
- * - Delete: check(deletion) → delete
+ * Every member answers `IAdtResponse<T>`, where T is what the result set given
+ * at construction makes of that endpoint's answer.
  */
-
 import type {
-  HttpError,
   IAbapConnection,
+  IAdtActivatable,
+  IAdtCheckable,
+  IAdtCreatable,
+  IAdtDeletable,
+  IAdtError,
+  IAdtLockable,
   IAdtOperationOptions,
-  IAdtSourceObject,
+  IAdtReadable,
+  IAdtResponse,
   IAdtSystemContext,
+  IAdtTransportAware,
+  IAdtUpdatable,
+  IAdtValidatable,
+  IAdtVersionable,
   ILogger,
+  IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
-import { safeErrorMessage } from '../../utils/internalUtils';
+import { activationRefusal } from '../../utils/activationUtils';
+import {
+  answering,
+  type IAdtOptions,
+  type IAnalyse,
+} from '../../utils/adtResponse';
+import { beginCriticalSection } from '../../utils/criticalSection';
+import { deletionRefusal } from '../../utils/deletionCheck';
+import { validationRefusal } from '../../utils/validationRefusal';
+import { chain } from '../shared/chain';
 import {
   createLockTracker,
   type LockRegistry,
   type LockTracker,
 } from '../shared/LockRegistry';
+import type { ObjectVersion } from '../shared/results';
 import type { IReadOptions } from '../shared/types';
 import { activateStructure } from './activation';
 import { checkStructure } from './check';
@@ -45,18 +53,47 @@ import {
   getStructureSource,
   getStructureTransport,
 } from './read';
-import type { IStructureConfig, IStructureState } from './types';
+import {
+  type IStructureConfig,
+  type IStructureResults,
+  structureDocuments,
+} from './types';
 import { unlockStructure } from './unlock';
 import { upload } from './update';
 import { validateStructureName } from './validation';
-
 import { getStructureVersionSource, getStructureVersions } from './versions';
-export class AdtStructure
-  implements IAdtSourceObject<IStructureConfig, IStructureState>
+
+export class AdtStructure<
+  R extends IStructureResults<
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown
+  > = IStructureResults,
+> implements
+    IAdtCreatable<IStructureConfig, ReturnType<R['created']>>,
+    IAdtReadable<
+      IStructureConfig,
+      ReturnType<R['source']>,
+      ReturnType<R['metadata']>
+    >,
+    IAdtUpdatable<IStructureConfig, ReturnType<R['updated']>>,
+    IAdtDeletable<IStructureConfig, ReturnType<R['deletion']>>,
+    IAdtValidatable<IStructureConfig, ReturnType<R['validation']>>,
+    IAdtCheckable<IStructureConfig, ReturnType<R['check']>>,
+    IAdtActivatable<IStructureConfig, ReturnType<R['activation']>>,
+    IAdtLockable<IStructureConfig>,
+    IAdtTransportAware<IStructureConfig, ReturnType<R['transport']>>,
+    IAdtVersionable<IStructureConfig, ObjectVersion[], string>
 {
-  private readonly connection: IAbapConnection;
-  private readonly logger?: ILogger;
-  private readonly systemContext: IAdtSystemContext;
+  protected readonly connection: IAbapConnection;
+  protected readonly logger?: ILogger;
+  protected readonly systemContext: IAdtSystemContext;
   private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'Structure';
 
@@ -65,6 +102,11 @@ export class AdtStructure
     logger?: ILogger,
     systemContext?: IAdtSystemContext,
     lockRegistry?: LockRegistry,
+    // The one cast in this file, and it is on the default: the shipped set
+    // satisfies the erased bound, which the compiler cannot see through the
+    // `unknown`s. A cast on a member would be the factory lying about what it
+    // answers.
+    protected readonly results: R = structureDocuments as unknown as R,
   ) {
     this.connection = connection;
     this.logger = logger;
@@ -76,45 +118,34 @@ export class AdtStructure
     );
   }
 
-  /**
-   * Validate structure configuration before creation
-   */
-  async validate(config: Partial<IStructureConfig>): Promise<IStructureState> {
-    if (!config.structureName) {
-      throw new Error('Structure name is required for validation');
-    }
-
-    const state: IStructureState = { errors: [] };
-    try {
-      const response = await validateStructureName(
-        this.connection,
-        config.structureName,
-        config.description,
-      );
-      state.validationResponse = response;
-      return state;
-    } catch (error: unknown) {
-      state.errors.push({
-        method: 'validate',
-        error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date(),
-      });
-      this.logger?.error('validate failed:', safeErrorMessage(error));
-      throw error;
-    }
-  }
-
-  /**
-   * Create structure metadata only
-   * Use update() to upload DDL code after creation
-   */
-  async create(
-    config: IStructureConfig,
-    options?: IAdtOperationOptions,
-  ): Promise<IStructureState> {
+  /** The name, or the caller's mistake — nothing was asked of the server yet. */
+  private name(config: Partial<IStructureConfig>): string {
     if (!config.structureName) {
       throw new Error('Structure name is required');
     }
+    return config.structureName;
+  }
+
+  /** Validate the name before creating the object. */
+  async validate<E extends IAdtError = IAdtError>(
+    config: Partial<IStructureConfig>,
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+    const name = this.name(config);
+
+    return answering(
+      () => validateStructureName(this.connection, name, config.description),
+      this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
+      (options?.analyse ?? validationRefusal) as IAnalyse<E>,
+    );
+  }
+
+  /** Create the object. */
+  async create<E extends IAdtError = IAdtError>(
+    config: IStructureConfig,
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    const name = this.name(config);
     if (!config.packageName) {
       throw new Error('Package name is required');
     }
@@ -122,523 +153,430 @@ export class AdtStructure
       throw new Error('Description is required');
     }
 
-    let objectCreated = false;
-    const state: IStructureState = {
-      errors: [],
-    };
-
-    try {
-      // Create structure
-      this.logger?.info?.('Creating structure');
-      const createResponse = await createStructure(this.connection, {
-        structureName: config.structureName,
-        packageName: config.packageName,
-        transportRequest: config.transportRequest,
-        description: config.description,
-        masterSystem: this.systemContext.masterSystem,
-        responsible: this.systemContext.responsible,
-        masterLanguage:
-          config.masterLanguage ?? this.systemContext.masterLanguage,
+    return chain(this.logger, async ({ step, onScopeEnd, onFailure }) => {
+      onScopeEnd(async () => {
+        this.connection.setSessionType('stateless');
       });
-      objectCreated = true;
-      state.createResult = createResponse;
-      this.logger?.info?.('Structure created');
 
-      return state;
-    } catch (error: unknown) {
-      if (objectCreated && options?.deleteOnFailure) {
-        try {
+      let created = false;
+      if (options?.deleteOnFailure ?? true) {
+        onFailure(async () => {
+          if (!created) return;
           this.logger?.warn?.('Deleting structure after failure');
           await deleteStructure(this.connection, {
-            structure_name: config.structureName,
+            structure_name: name,
             transport_request: config.transportRequest,
           });
-        } catch (deleteError) {
-          this.logger?.warn?.(
-            'Failed to delete structure after failure:',
-            safeErrorMessage(deleteError),
-          );
-        }
+        });
       }
 
-      this.logger?.error('Create failed:', safeErrorMessage(error));
-      throw error;
-    }
+      this.logger?.info?.('Creating structure');
+      const value = await step(
+        answering(
+          () =>
+            createStructure(this.connection, {
+              structureName: name,
+              packageName: config.packageName as string,
+              transportRequest: config.transportRequest,
+              description: config.description as string,
+              masterSystem: this.systemContext.masterSystem,
+              responsible: this.systemContext.responsible,
+              masterLanguage:
+                config.masterLanguage ?? this.systemContext.masterLanguage,
+            }),
+          this.results.created as IResultStrategy<ReturnType<R['created']>>,
+          options?.analyse,
+        ),
+      );
+      // Only past the step: a refused create leaves nothing to delete, and the
+      // cleanup above must not remove an object this call did not make.
+      created = true;
+      this.logger?.info?.('Structure created');
+      return value;
+    });
   }
 
-  /**
-   * Read structure
-   */
-  async read(
+  /** Read the object. */
+  async read<E extends IAdtError = IAdtError>(
     config: Partial<IStructureConfig>,
     version?: 'active' | 'inactive',
-    options?: IReadOptions,
-  ): Promise<IStructureState | undefined> {
-    if (!config.structureName) {
-      throw new Error('Structure name is required');
-    }
+    options?: IReadOptions & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
+    const name = this.name(config);
 
-    try {
-      const response = await getStructureSource(
-        this.connection,
-        config.structureName,
-        version,
-        options,
-      );
-      return {
-        readResult: response,
-        errors: [],
-      };
-    } catch (error: unknown) {
-      const e = error as HttpError;
-      if (e.response?.status === 404) {
-        return undefined;
-      }
-      throw error;
-    }
+    // No 404 special case: ADT answers a read for a missing object with 200 and
+    // an empty body, so absence was never a status to branch on — and whether
+    // an empty body *is* absence is the caller's reading, through `analyse`.
+    return answering(
+      () => getStructureSource(this.connection, name, version, options),
+      this.results.source as IResultStrategy<ReturnType<R['source']>>,
+      options?.analyse,
+    );
+  }
+
+  /** Read the object's metadata document. */
+  async readMetadata<E extends IAdtError = IAdtError>(
+    config: Partial<IStructureConfig>,
+    options?: IReadOptions & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+    const name = this.name(config);
+
+    return answering(
+      () => getStructureMetadata(this.connection, name, options),
+      this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
+      options?.analyse,
+    );
+  }
+
+  /** The transport request the object belongs to. */
+  async readTransport<E extends IAdtError = IAdtError>(
+    config: Partial<IStructureConfig>,
+    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
+    const name = this.name(config);
+
+    return answering(
+      () =>
+        getStructureTransport(
+          this.connection,
+          name,
+          options?.withLongPolling !== undefined
+            ? { withLongPolling: options.withLongPolling }
+            : undefined,
+        ),
+      this.results.transport as IResultStrategy<ReturnType<R['transport']>>,
+      options?.analyse,
+    );
   }
 
   /**
-   * Read structure metadata (object characteristics: package, responsible, description, etc.)
+   * Write the object.
+   *
+   * With `options.lockHandle` the caller holds the lock and owns the chain, so
+   * this is one request. Without it, this locks, checks, writes and unlocks —
+   * and the unlock happens on every path out.
    */
-  async readMetadata(
+  async update<E extends IAdtError = IAdtError>(
     config: Partial<IStructureConfig>,
-    options?: IReadOptions,
-  ): Promise<IStructureState> {
-    const state: IStructureState = { errors: [] };
-    if (!config.structureName) {
-      const error = new Error('Structure name is required');
-      state.errors.push({
-        method: 'readMetadata',
-        error,
-        timestamp: new Date(),
-      });
-      throw error;
-    }
-    try {
-      const response = await getStructureMetadata(
-        this.connection,
-        config.structureName,
-        options,
-      );
-      state.metadataResult = response;
-      this.logger?.info?.('Structure metadata read successfully');
-      return state;
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({
-        method: 'readMetadata',
-        error: err,
-        timestamp: new Date(),
-      });
-      this.logger?.error('readMetadata', safeErrorMessage(err));
-      throw err;
-    }
-  }
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+    const name = this.name(config);
+    const source = options?.sourceCode || config.ddlCode;
 
-  /**
-   * Read transport request information for the structure
-   */
-  async readTransport(
-    config: Partial<IStructureConfig>,
-    options?: { withLongPolling?: boolean },
-  ): Promise<IStructureState> {
-    const state: IStructureState = { errors: [] };
-    if (!config.structureName) {
-      const error = new Error('Structure name is required');
-      state.errors.push({
-        method: 'readTransport',
-        error,
-        timestamp: new Date(),
-      });
-      throw error;
-    }
-    try {
-      const response = await getStructureTransport(
-        this.connection,
-        config.structureName,
-        options?.withLongPolling !== undefined
-          ? { withLongPolling: options.withLongPolling }
-          : undefined,
-      );
-      state.transportResult = response;
-      this.logger?.info?.('Structure transport request read successfully');
-      return state;
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({
-        method: 'readTransport',
-        error: err,
-        timestamp: new Date(),
-      });
-      this.logger?.error('readTransport', safeErrorMessage(err));
-      throw err;
-    }
-  }
-
-  /**
-   * Update structure with full operation chain
-   * Always starts with lock
-   * If options.low is true, performs only low-level update without lock/check/unlock chain
-   */
-  async update(
-    config: Partial<IStructureConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IStructureState> {
-    if (!config.structureName) {
-      throw new Error('Structure name is required');
-    }
-
-    // Low-level mode: if lockHandle is provided, perform only update operation
     if (options?.lockHandle) {
-      const codeToUpdate = options?.sourceCode || config.ddlCode;
-      if (!codeToUpdate) {
+      const lockHandle = options.lockHandle;
+      if (!source) {
         throw new Error('Source code (ddlCode) is required for update');
       }
-
       this.logger?.info?.(
         'Low-level update: performing update only (lockHandle provided)',
       );
-      const updateResponse = await upload(
-        this.connection,
-        {
-          structureName: config.structureName,
-          ddlCode: codeToUpdate,
-          transportRequest: config.transportRequest,
-        },
-        options.lockHandle,
+      return answering(
+        () =>
+          upload(
+            this.connection,
+            {
+              structureName: name,
+              ddlCode: source as string,
+              transportRequest: config.transportRequest,
+            },
+            lockHandle,
+          ),
+        this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+        options?.analyse,
       );
-      this.logger?.info?.('Structure updated (low-level)');
-      return {
-        updateResult: updateResponse,
-        errors: [],
-      };
     }
 
-    let lockHandle: string | undefined;
-
-    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
-
-    // the lock but leaves the work half-done.
-
+    // A LOCK…UNLOCK window: a timeout in the middle releases the lock and
+    // leaves the work half done, so the connection is told this is critical.
     const endCriticalSection = beginCriticalSection(this.connection);
 
-    try {
-      // 1. Lock (update always starts with lock, stateful ONLY before lock)
+    return chain(this.logger, async ({ step, onScopeEnd }) => {
+      onScopeEnd(async () => {
+        endCriticalSection();
+      });
+
       this.logger?.info?.('Step 1: Locking structure');
       this.connection.setSessionType('stateful');
-      lockHandle = await lockStructure(this.connection, config.structureName);
-      this.lockTracker.track(config.structureName, lockHandle);
+      // Registered FIRST so it unwinds LAST: on older BASIS a lock handle is
+      // only valid inside a stateful request, so going stateless before the
+      // unlock would break the unlock (#106); and if the lock itself throws,
+      // the session is still restored.
+      onScopeEnd(async () => {
+        this.connection.setSessionType('stateless');
+      });
+
+      const lockHandle = await lockStructure(this.connection, name);
+      this.lockTracker.track(name, lockHandle);
+      const releaseLock = onScopeEnd(async () => {
+        await unlockStructure(this.connection, name, lockHandle);
+        this.lockTracker.untrack(name);
+      });
       this.logger?.info?.('Structure locked, handle:', lockHandle);
 
-      // 2. Check inactive with code for update (from options or config)
-      const codeToCheck = options?.sourceCode || config.ddlCode;
-      if (codeToCheck) {
+      if (source) {
         this.logger?.info?.(
           'Step 2: Checking inactive version with update content',
         );
-        await checkStructure(
-          this.connection,
-          config.structureName,
-          'inactive',
-          codeToCheck,
-          this.logger,
+        await step(
+          answering(
+            () =>
+              checkStructure(
+                this.connection,
+                name,
+                'inactive',
+                source,
+                this.logger,
+              ),
+            this.results.check as IResultStrategy<ReturnType<R['check']>>,
+            options?.analyse,
+          ),
         );
-        this.logger?.info?.('Check inactive with update content passed');
       }
 
-      // 3. Update
-      if (codeToCheck && lockHandle) {
+      let updated = undefined as ReturnType<R['updated']>;
+      if (source) {
         this.logger?.info?.('Step 3: Updating structure');
-        await upload(
-          this.connection,
-          {
-            structureName: config.structureName,
-            ddlCode: codeToCheck,
-            transportRequest: config.transportRequest,
-          },
-          lockHandle,
+        updated = await step(
+          answering(
+            () =>
+              upload(
+                this.connection,
+                {
+                  structureName: name,
+                  ddlCode: source as string,
+                  transportRequest: config.transportRequest,
+                },
+                lockHandle,
+              ),
+            this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+            options?.analyse,
+          ),
         );
         this.logger?.info?.('Structure updated');
 
-        // Poll the inactive version: the write above produced it; the active version may not exist yet.
-        // 3.5. Read with long polling to ensure object is ready after update
-        this.logger?.info?.('read (wait for object ready after update)');
-        try {
-          await this.read({ structureName: config.structureName }, 'inactive', {
-            withLongPolling: true,
-          });
-          this.logger?.info?.('object is ready after update');
-        } catch (readError) {
+        // The write produced the inactive version; the active one may not exist
+        // yet. A failure here is not the update's failure, so it is logged and
+        // the chain continues — the unlock still has to happen.
+        const ready = await this.read(config, 'inactive', {
+          withLongPolling: true,
+        });
+        if (!ready.ok) {
           this.logger?.warn?.(
             'read with long polling failed after update:',
-            safeErrorMessage(readError),
+            ready.getError().message,
           );
-          // Continue anyway - unlock might still work
         }
       }
 
-      // 4. Unlock (obligatory stateless after unlock)
-      if (lockHandle) {
-        this.logger?.info?.('Step 4: Unlocking structure');
-        this.connection.setSessionType('stateful');
-        await unlockStructure(
-          this.connection,
-          config.structureName,
-          lockHandle,
-        );
-        this.connection.setSessionType('stateless');
-        this.lockTracker.untrack(config.structureName);
-        lockHandle = undefined;
-        this.logger?.info?.('Structure unlocked');
-      }
+      this.logger?.info?.('Step 4: Unlocking structure');
+      this.connection.setSessionType('stateful');
+      await unlockStructure(this.connection, name, lockHandle);
+      this.connection.setSessionType('stateless');
+      this.lockTracker.untrack(name);
+      // Unlocked as its own step, so the registration is discharged rather than
+      // run a second time when the scope unwinds.
+      releaseLock();
+      this.logger?.info?.('Structure unlocked');
 
-      // 5. Final check (no stateful needed)
       this.logger?.info?.('Step 5: Final check');
-      await checkStructure(
-        this.connection,
-        config.structureName,
-        'inactive',
-        undefined,
-        this.logger,
+      await step(
+        answering(
+          () =>
+            checkStructure(
+              this.connection,
+              name,
+              'inactive',
+              undefined,
+              this.logger,
+            ),
+          this.results.check as IResultStrategy<ReturnType<R['check']>>,
+          options?.analyse,
+        ),
       );
-      this.logger?.info?.('Final check passed');
 
-      // 6. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnUpdate) {
         this.logger?.info?.('Step 6: Activating structure');
-        const activateResponse = await activateStructure(
-          this.connection,
-          config.structureName,
-        );
-        this.logger?.info?.(
-          'Structure activated, status:',
-          activateResponse.status,
+        await step(
+          answering(
+            () => activateStructure(this.connection, name),
+            this.results.activation as IResultStrategy<
+              ReturnType<R['activation']>
+            >,
+            (options?.analyse ?? activationRefusal) as IAnalyse<E>,
+          ),
         );
 
-        // 6.5. Read with long polling to ensure object is ready after activation
-        this.logger?.info?.('read (wait for object ready after activation)');
-        try {
-          const readState = await this.read(
-            { structureName: config.structureName },
-            'active',
-            { withLongPolling: true },
-          );
-          if (readState) {
-            return {
-              activateResult: activateResponse,
-              readResult: readState.readResult,
-              errors: [],
-            };
-          }
-          this.logger?.info?.('object is ready after activation');
-        } catch (readError) {
+        const ready = await this.read(config, 'active', {
+          withLongPolling: true,
+        });
+        if (!ready.ok) {
           this.logger?.warn?.(
             'read with long polling failed after activation:',
-            safeErrorMessage(readError),
-          );
-          // Continue anyway - activation was successful
-        }
-        return {
-          activateResult: activateResponse,
-          errors: [],
-        };
-      }
-
-      // Read and return result (no stateful needed)
-      const readResponse = await getStructureSource(
-        this.connection,
-        config.structureName,
-        'inactive',
-      );
-      return {
-        readResult: readResponse,
-        errors: [],
-      };
-    } catch (error: unknown) {
-      // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
-      if (lockHandle) {
-        try {
-          this.logger?.warn?.('Unlocking structure during error cleanup');
-          this.connection.setSessionType('stateful');
-          await unlockStructure(
-            this.connection,
-            config.structureName,
-            lockHandle,
-          );
-          this.connection.setSessionType('stateless');
-          this.lockTracker.untrack(config.structureName);
-        } catch (unlockError) {
-          this.logger?.warn?.(
-            'Failed to unlock during cleanup:',
-            safeErrorMessage(unlockError),
-          );
-        }
-      } else {
-        // Ensure stateless if lock failed
-        this.connection.setSessionType('stateless');
-      }
-
-      if (options?.deleteOnFailure) {
-        try {
-          this.logger?.warn?.('Deleting structure after failure');
-          // No stateful needed - delete doesn't use lock/unlock
-          await deleteStructure(this.connection, {
-            structure_name: config.structureName,
-            transport_request: config.transportRequest,
-          });
-        } catch (deleteError) {
-          this.logger?.warn?.(
-            'Failed to delete structure after failure:',
-            safeErrorMessage(deleteError),
+            ready.getError().message,
           );
         }
       }
 
-      this.logger?.error('Update failed:', safeErrorMessage(error));
-      throw error;
-    } finally {
-      endCriticalSection();
-    }
+      return updated;
+    });
   }
 
   /**
-   * Delete structure
+   * Delete the object.
+   *
+   * The deletion check is read, not merely performed: ADT answers a refusal
+   * with `del:isDeletable="false"` inside a 200, and a delete that ignored it
+   * reported success while the object stayed. {@link deletionRefusal} is the
+   * shipped reading of that answer; a caller who wants another passes their own
+   * `analyse`.
    */
-  async delete(config: Partial<IStructureConfig>): Promise<IStructureState> {
-    if (!config.structureName) {
-      throw new Error('Structure name is required');
-    }
+  async delete<E extends IAdtError = IAdtError>(
+    config: Partial<IStructureConfig>,
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+    const name = this.name(config);
 
-    try {
-      // Check for deletion (no stateful needed)
+    return chain(this.logger, async ({ step }) => {
       this.logger?.info?.('Checking structure for deletion');
-      const deletionCheck = await checkDeletion(this.connection, {
-        structure_name: config.structureName,
-        transport_request: config.transportRequest,
-      });
-      // ADT already said whether this may be deleted; refusing to read that
-      // answer is how a delete came to report success while the object
-      // stayed. Throws on isDeletable=false or a message of type E; a W
-      // is a warning and passes.
-      assertDeletable(deletionCheck.data);
+      await step(
+        answering(
+          () =>
+            checkDeletion(this.connection, {
+              structure_name: name,
+              transport_request: config.transportRequest,
+            }),
+          this.results.check as IResultStrategy<ReturnType<R['check']>>,
+          (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
+        ),
+      );
       this.logger?.info?.('Deletion check passed');
 
-      // Delete (no stateful needed - no lock/unlock)
+      // No stateful session: this delete uses no lock.
       this.logger?.info?.('Deleting structure');
-      const result = await deleteStructure(this.connection, {
-        structure_name: config.structureName,
-        transport_request: config.transportRequest,
-      });
-      this.logger?.info?.('Structure deleted');
-
-      return {
-        deleteResult: result,
-        errors: [],
-      };
-    } catch (error: unknown) {
-      this.logger?.error('Delete failed:', safeErrorMessage(error));
-      throw error;
-    }
-  }
-
-  /**
-   * Activate structure
-   * No stateful needed - uses same session/cookies
-   */
-  async activate(config: Partial<IStructureConfig>): Promise<IStructureState> {
-    if (!config.structureName) {
-      throw new Error('Structure name is required');
-    }
-
-    try {
-      const result = await activateStructure(
-        this.connection,
-        config.structureName,
+      const value = await step(
+        answering(
+          () =>
+            deleteStructure(this.connection, {
+              structure_name: name,
+              transport_request: config.transportRequest,
+            }),
+          this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+          options?.analyse,
+        ),
       );
-      return {
-        activateResult: result,
-        errors: [],
-      };
-    } catch (error: unknown) {
-      this.logger?.error('Activate failed:', safeErrorMessage(error));
-      throw error;
-    }
+      this.logger?.info?.('Structure deleted');
+      return value;
+    });
   }
 
-  /**
-   * Check structure
-   */
-  async check(
+  /** Activate the object. Needs no stateful session. */
+  async activate<E extends IAdtError = IAdtError>(
+    config: Partial<IStructureConfig>,
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+    const name = this.name(config);
+
+    return answering(
+      () => activateStructure(this.connection, name),
+      this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
+      (options?.analyse ?? activationRefusal) as IAnalyse<E>,
+    );
+  }
+
+  /** Check the object. */
+  async check<E extends IAdtError = IAdtError>(
     config: Partial<IStructureConfig>,
     status?: string,
-  ): Promise<IStructureState> {
-    if (!config.structureName) {
-      throw new Error('Structure name is required');
-    }
-
-    // Map status to version
+    options?: IAdtOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+    const name = this.name(config);
     const version: 'active' | 'inactive' =
       status === 'active' ? 'active' : 'inactive';
-    return {
-      checkResult: await checkStructure(
-        this.connection,
-        config.structureName,
-        version,
-        undefined,
-        this.logger,
-      ),
-      errors: [],
-    };
-  }
 
-  /**
-   * Lock structure for modification
-   */
-  async lock(config: Partial<IStructureConfig>): Promise<string> {
-    if (!config.structureName) {
-      throw new Error('Structure name is required');
-    }
-
-    this.connection.setSessionType('stateful');
-    const lockHandle = await lockStructure(
-      this.connection,
-      config.structureName,
+    return answering(
+      () =>
+        checkStructure(
+          this.connection,
+          name,
+          version,
+          config.ddlCode,
+          this.logger,
+        ),
+      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      options?.analyse,
     );
-    this.lockTracker.track(config.structureName, lockHandle);
-    return lockHandle;
   }
 
-  /**
-   * Unlock structure
-   */
+  /** Lock the object for modification. */
+  async lock(config: Partial<IStructureConfig>): Promise<IAdtResponse<string>> {
+    const name = this.name(config);
+
+    return answering(
+      async () => {
+        this.connection.setSessionType('stateful');
+        const lockHandle = await lockStructure(this.connection, name);
+        this.lockTracker.track(name, lockHandle);
+        // The handle is the value, and the request does not keep the wire it
+        // came on — so the answer is built around what the request produced.
+        return {
+          data: lockHandle,
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+        };
+      },
+      (answer) => String(answer.data),
+    );
+  }
+
+  /** Unlock the object. */
   async unlock(
     config: Partial<IStructureConfig>,
     lockHandle: string,
-  ): Promise<IStructureState> {
-    if (!config.structureName) {
-      throw new Error('Structure name is required');
-    }
+  ): Promise<IAdtResponse<void>> {
+    const name = this.name(config);
 
-    this.connection.setSessionType('stateful');
-    const result = await unlockStructure(
-      this.connection,
-      config.structureName,
-      lockHandle,
+    return answering(
+      async () => {
+        // UNLOCK must run stateful (older BASIS #106); stateless after.
+        this.connection.setSessionType('stateful');
+        try {
+          return await unlockStructure(this.connection, name, lockHandle);
+        } finally {
+          this.connection.setSessionType('stateless');
+          this.lockTracker.untrack(name);
+        }
+      },
+      () => undefined,
     );
-    this.connection.setSessionType('stateless');
-    this.lockTracker.untrack(config.structureName);
-    return {
-      unlockResult: result,
-      errors: [],
-    };
   }
 
-  getVersions(config: Partial<IStructureConfig>) {
-    return getStructureVersions(this.connection, config);
+  /** Version history of the object's source. */
+  async getVersions(
+    config: Partial<IStructureConfig>,
+  ): Promise<IAdtResponse<ObjectVersion[]>> {
+    return answering(
+      async () => ({
+        data: await getStructureVersions(this.connection, config),
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+      }),
+      (answer) => answer.data as ObjectVersion[],
+    );
   }
 
-  getVersionSource(contentUri: string) {
-    return getStructureVersionSource(this.connection, contentUri);
+  /** The source of one version, by the `contentUri` an entry carries. */
+  async getVersionSource(contentUri: string): Promise<IAdtResponse<string>> {
+    return answering(
+      async () => ({
+        data: await getStructureVersionSource(this.connection, contentUri),
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+      }),
+      (answer) => String(answer.data),
+    );
   }
 }

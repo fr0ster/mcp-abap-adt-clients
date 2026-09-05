@@ -19,6 +19,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import { AdtRuntimeClient } from '../../../../clients/AdtRuntimeClient';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestConnection,
   releaseTestConnection,
@@ -107,10 +108,11 @@ describe('SystemMessages (using AdtRuntimeClient)', () => {
 
       try {
         logTestStep('list system messages', testsLogger);
-        const response = await runtime.getSystemMessages().list();
-        expect(response.status).toBeGreaterThanOrEqual(200);
-        expect(response.status).toBeLessThan(300);
-        expect(response.data).toBeDefined();
+        const response = expectResult(
+          await runtime.getSystemMessages().list(),
+          'response',
+        );
+        expect(response).toBeDefined();
 
         logTestSuccess(testsLogger, testName);
       } catch (error) {
@@ -163,12 +165,11 @@ describe('SystemMessages (using AdtRuntimeClient)', () => {
 
       try {
         logTestStep('list system messages with maxResults: 5', testsLogger);
-        const response = await runtime
-          .getSystemMessages()
-          .list({ maxResults: 5 });
-        expect(response.status).toBeGreaterThanOrEqual(200);
-        expect(response.status).toBeLessThan(300);
-        expect(response.data).toBeDefined();
+        const response = expectResult(
+          await runtime.getSystemMessages().list({ maxResults: 5 }),
+          'response',
+        );
+        expect(response).toBeDefined();
 
         logTestSuccess(testsLogger, testName);
       } catch (error) {

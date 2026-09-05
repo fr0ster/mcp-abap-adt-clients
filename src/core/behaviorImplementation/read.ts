@@ -29,13 +29,11 @@ export async function getBehaviorImplementationMetadata(
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
-  return orThrow(
-    getUtils(connection, logger).readObjectMetadata(
-      'class',
-      className,
-      undefined,
-      options,
-    ),
+  return getUtils(connection, logger).objectMetadataWire(
+    'class',
+    className,
+    undefined,
+    options,
   );
 }
 
@@ -52,14 +50,12 @@ export async function getBehaviorImplementationSource(
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
-  return orThrow(
-    getUtils(connection, logger).readObjectSource(
-      'class',
-      className,
-      undefined,
-      version,
-      options,
-    ),
+  return getUtils(connection, logger).objectSourceWire(
+    'class',
+    className,
+    undefined,
+    version,
+    options,
   );
 }
 

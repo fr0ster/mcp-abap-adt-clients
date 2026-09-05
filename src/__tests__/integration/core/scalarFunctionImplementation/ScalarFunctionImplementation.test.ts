@@ -24,6 +24,7 @@ import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import { orThrow } from '../../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -235,7 +236,10 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
             transportRequest,
             description: 'DSFI integration AMDP implementation',
           });
-          const amdpLock = await cls.lock({ className: amdpName });
+          const amdpLock = expectResult(
+            await cls.lock({ className: amdpName }),
+            'lock AMDP class',
+          );
           await cls.update(
             { className: amdpName, transportRequest, sourceCode: amdpSource },
             { lockHandle: amdpLock },
@@ -276,29 +280,33 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
           );
 
           // 5) Read implementation source (JSON) — must contain the amdpReference.
-          const readState = await dsfi.read(
-            { implementationName: implName },
-            'active',
+          // The DSFI source resource answers JSON, which the transport parses
+          // on the way in — so the shipped reading re-serialises it rather than
+          // stringifying an object into `[object Object]`.
+          const sourceText = expectResult(
+            await dsfi.read({ implementationName: implName }, 'active'),
+            'read implementation source',
           );
-          expect(readState?.readResult).toBeDefined();
-          const sourceText =
-            typeof readState?.readResult?.data === 'string'
-              ? readState.readResult.data
-              : JSON.stringify(readState?.readResult?.data);
           expect(sourceText).toContain(`${amdpName}=>GET_SUM`);
 
           // 6) Read metadata (blues v2 XML).
-          const metaState = await dsfi.readMetadata({
-            implementationName: implName,
-          });
-          expect(metaState.metadataResult).toBeDefined();
+          const metaState = expectResult(
+            await dsfi.readMetadata({
+              implementationName: implName,
+            }),
+            'metaState',
+          );
+          expect(metaState).toBeDefined();
 
           // 7) Delete the trio.
-          const del = await dsfi.delete({
-            implementationName: implName,
-            transportRequest,
-          });
-          expect(del.deleteResult).toBeDefined();
+          const del = expectResult(
+            await dsfi.delete({
+              implementationName: implName,
+              transportRequest,
+            }),
+            'del',
+          );
+          expect(del).toBeDefined();
           await cls.delete({ className: amdpName, transportRequest });
           await sf.delete({ scalarFunctionName: funcName, transportRequest });
 

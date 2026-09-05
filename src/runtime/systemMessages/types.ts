@@ -1,1 +1,1 @@
-export type { ISystemMessageEntry } from '@mcp-abap-adt/interfaces';
+export type { ISystemMessageEntry } from '../feeds/types';
