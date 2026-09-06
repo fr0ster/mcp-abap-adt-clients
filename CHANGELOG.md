@@ -5,17 +5,100 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
-## [18.0.0] - 2026-09-05
+## [18.0.0] - 2026-09-06
 
-Requires `@mcp-abap-adt/interfaces@^31.0.0`.
+Requires `@mcp-abap-adt/interfaces@^34.0.0`.
 
-**Every member answers the contract, and the reading is yours.** 17.0.0 moved
-`getUtils()` onto `IAdtResponse` and said the per-type handlers had not followed;
-this is them following, plus the two decisions the contracts made in 30.0.0 and
-31.0.0 — one member per endpoint, and the result shape injected into the
-implementation once rather than chosen at each call.
+**Every member answers the contract, issues one request, and the reading is
+yours.** 17.0.0 moved `getUtils()` onto `IAdtResponse` and said the per-type
+handlers had not followed; this is them following, plus the decisions the
+contracts made in 30.0.0 through 34.0.0 — one member per endpoint, the result
+shape injected into the implementation once rather than chosen at each call, and
+the sequence around a write handed back to the consumer.
 
 ### Breaking
+
+- **One endpoint, one member — the operation chains are gone.** A member issues
+  exactly one ADT request. `create` is the POST; `update` is the write and
+  carries `options.lockHandle` as given; `delete` is the DELETE. None of them
+  validates, checks, locks, polls for readiness, activates or rolls back any
+  more, and none of them touches `connection.setSessionType()`.
+
+  A multi-step operation is the consumer's sequence, because it is the consumer
+  that knows what belongs between the steps and what a failure at each one
+  means:
+
+  ```typescript
+  // before — one call, six requests, and no way to see or steer them
+  await client.getClass().create(config, { activateOnCreate: true });
+
+  // after — the calls are yours, and every one answers
+  const cls = client.getClass();
+  await cls.create(config);
+
+  const locked = await cls.lock(config);
+  if (!locked.ok) throw new Error(locked.getError().message);
+  const lockHandle = locked.getResult().value;
+  try {
+    await cls.update(config, { sourceCode, lockHandle });
+  } finally {
+    await cls.unlock(config, lockHandle);
+  }
+
+  await cls.activate(config);
+  ```
+
+  **Passing no lock handle is allowed.** Whether an unlocked write is accepted
+  is ADT's judgement about that object on that system, and its refusal comes
+  back in the answer. The seven low-level writes that used to throw
+  `lockHandle is required` before reaching the wire no longer do — they were
+  turning a server verdict into an exception the caller could not read.
+
+- **`activateOnCreate`, `activateOnUpdate` and `deleteOnFailure` are gone** from
+  `IAdtOperationOptions` (interfaces 34.0.0). They asked for extra steps, and
+  there are none left to ask for. Call `activate()` when you want the object
+  active. Nothing needs a rollback: a `create` that answers a result made
+  exactly one object, and one that answers a failure made none.
+
+- **`checkDeletion()` is a member on 24 types.** The deletion approval ADT wants
+  before a delete used to run inside `delete()`, where a caller could neither
+  skip it nor read what it said. Call it yourself:
+
+  ```typescript
+  const approved = await client.getClass().checkDeletion(config);
+  if (!approved.ok) throw new Error(approved.getError().message);
+  await client.getClass().delete(config);
+  ```
+
+  Deleting without it is allowed — ADT answers its own refusal. What you lose is
+  the reason: the check's document names what still points at the object.
+
+- **Two endpoints that were reachable no other way are now members:**
+  `AdtFunctionInclude.updateSource()` writes `/source/main` (its `update` writes
+  the `finclude` metadata), and `AdtBehaviorImplementation.updateMain()` writes
+  the generated shell that binds the class to its behavior definition.
+
+- **Removed for being compositions rather than requests:**
+  `AdtServiceBinding.createAndGenerateServiceBinding()` (call `create` then
+  `generateServiceBinding`), and the implicit unpublish inside a binding's
+  `delete()` — a published binding is unpublished with
+  `update({ desiredPublicationState: 'unpublished' })`, which is a call whose
+  answer you can see.
+
+- **`AdtUnitTest` and `AdtCdsUnitTest`: `create` is the container class's POST
+  and `validate` is its name validation.** Writing the tests into the class is
+  `getLocalTestClass().update()`, and the class must be active before its
+  include can be locked — an order that is not free, which is exactly why it
+  belongs to the caller rather than to a chain it cannot see into.
+
+- **`switchOn` / `switchOff` on a feature toggle answer the toggle's own
+  response**, not a runtime state read after it. Use `getRuntimeState()` for the
+  state.
+
+- **`AdtMessageClassMessage` keeps its chain, and is the only member that does.**
+  A message is a row inside its class's document: the write is one PUT, but it
+  needs two lock handles and a read-modify-write of XML this library assembles.
+  Making it single-request would mean publishing that assembly.
 
 - **Every member answers `IAdtResponse<T>`.** `client.getClass().create(...)`
   and its neighbours return a result or a failure instead of a state object, and
@@ -37,7 +120,6 @@ implementation once rather than chosen at each call.
   stored envelopes on them (`createResult`, `updateResult`, `checkResult`,
   `readResult`, `validationResponse`, `transportResult`, …) and the `errors`
   array. A member answers one value; a failure is the other half of the answer.
-  A chain answers for the operation asked for, not for each of its steps.
 
 - **`AdtFailureOrigin` has two values**, `'connection'` and `'refusal'`, and
   `IAdtError.cause` is gone. `'parse'` described *this library* failing to read a
@@ -112,11 +194,11 @@ implementation once rather than chosen at each call.
   the connection is shared. See "Service bindings: publishing is the editing" in
   `docs/usage/CLIENT_API_REFERENCE.md` for the shape a consumer writes.
 
-- **`AdtServiceBinding` no longer declares `implements IAdtServiceBinding`**, and
+- **`IAdtServiceBinding` is gone from `@mcp-abap-adt/interfaces`**, and
   `IServiceBindingPublicationParams` / `IServiceGroupParams` are declared in this
-  package rather than in the contracts one. The contract still names the two
-  removed members; this shape is being settled against measured traffic and
-  moves to `@mcp-abap-adt/interfaces` before the release.
+  package. A per-object interface that restated the capability atoms told a
+  consumer nothing the atoms did not, and it named two members that no longer
+  exist.
 
 - **`AdtRequest.create()` answers the created request**, not its document:
   `{ transportNumber, description, type, targetSystem, owner, uri, … }`. The
@@ -129,9 +211,11 @@ implementation once rather than chosen at each call.
 - **A `deleteOnFailure` create deleted the object it had just made.** The
   rollback was registered with `chain`'s `onScopeEnd`, which runs on every path
   including success, and its `created` guard was true by then. Twenty-four
-  handlers. `chain` now has `onFailure` beside `onScopeEnd` and the two kinds are
-  named apart; cleanups unwind first, rollbacks after, because a delete issued
-  while the chain still holds the lock is answered 403.
+  handlers. Fixed by naming the two kinds apart — `chain` gained `onFailure`
+  beside `onScopeEnd` — and then removed entirely with the chains themselves: a
+  `create` that is one POST has nothing to roll back. Recorded because the
+  defect shipped, and because the shape that produced it (cleanup and rollback
+  sharing one registration) is worth recognising elsewhere.
 
 - **A refused activation was reported as a connection failure.** Every activation
   path threw a plain `Error` for the `<msg type="E">` ADT delivers inside a 200,
@@ -197,19 +281,29 @@ implementation once rather than chosen at each call.
   name is unreachable from outside the package.
 
 - **`chain`'s `onFailure`** — a rollback that runs only when the chain fails.
+  One member uses `chain` now (`AdtMessageClassMessage.writeClass`); the helper
+  stays exported because a consumer composing its own sequence wants the same
+  unwind, including the visibility of a rollback that could not complete.
 
 - **`parseCreatedTransport`** — the reading of a transport create response.
 
 ### Documentation
 
 - **[`docs/usage/OBJECT_LIFECYCLE.md`](docs/usage/OBJECT_LIFECYCLE.md)** — the
-  flow the members compose into: create → lock → update → unlock → activate.
-  What `create()` does and does not do (it makes the object shell; source,
-  activation and rollback are options that have to be asked for), that
-  `update()` owns the whole lock window and releases it on every path, that
-  `delete()` takes no lock, and the two places the flow does not hold — a
-  service binding, which is published rather than edited, and a transport
-  request, which is not a locked object.
+  flow **you** compose: create → lock → update → unlock → activate. What
+  `create()` does and does not do (it makes the object shell, and nothing else),
+  that `update()` is the write with the lock window around it as a `try/finally`
+  of your own, that `delete()` takes no lock and stands beside `checkDeletion()`,
+  and the places the flow does not hold — a service binding, which is published
+  rather than edited, and a transport request, which is not a locked object.
+
+- **`README.md`, `CLAUDE.md`, `docs/README.md`,
+  [`STATEFUL_SESSION_GUIDE.md`](docs/usage/STATEFUL_SESSION_GUIDE.md),
+  [`CLIENT_API_REFERENCE.md`](docs/usage/CLIENT_API_REFERENCE.md) and
+  [`TROUBLESHOOTING.md`](docs/usage/TROUBLESHOOTING.md)** — every example that
+  passed an option to run a step now makes the call. The session guide states
+  the invariant that replaces the old automatic handling: only `lock` and
+  `unlock` change the session type.
 
 ### Migration
 
@@ -229,6 +323,17 @@ implementation once rather than chosen at each call.
    `@mcp-abap-adt/adt-clients`; the shapes themselves are unchanged.
 5. Replace a `parse` argument with a result set passed to the factory.
 6. If you branched on `origin === 'parse'`, catch `AdtParseError` instead.
+7. **Write the sequence a chain used to run for you.** A create that must end
+   active is now `create` → `lock` → `update` → `unlock` → `activate`, and each
+   one answers. Drop `activateOnCreate` / `activateOnUpdate` and call
+   `activate()`; drop `deleteOnFailure` and, if your own sequence can stop after
+   the POST, call `delete()` on that path yourself.
+8. **Pass `lockHandle` to every `update` and `delete` that needs one.** The
+   member no longer takes a lock, and it no longer refuses when none was given:
+   a write without a handle goes to ADT, and ADT decides. If your calls start
+   coming back with lock refusals from the server, that is the missing step.
+9. **Call `checkDeletion()` before `delete()`** where you relied on the delete
+   refusing an object something still points at.
 
 ## [17.0.0] - 2026-09-02
 
