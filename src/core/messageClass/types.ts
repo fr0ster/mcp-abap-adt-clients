@@ -63,7 +63,7 @@ export interface IMessageClassResults<
   TMetadata = MessageClassMetadata,
   TValidation = MessageClassValidationResult,
   TDeletion = MessageClassDeletionResult,
-  TUpdated = MessageClassUpdated,
+  TMetadataUpdated = MessageClassUpdated,
   TDeletionCheck = DeletionCheckResult,
 > {
   readonly created: IResultStrategy<TCreated>;
@@ -71,7 +71,7 @@ export interface IMessageClassResults<
   readonly metadata: IResultStrategy<TMetadata>;
   readonly validation: IResultStrategy<TValidation>;
   readonly deletion: IResultStrategy<TDeletion>;
-  readonly updated: IResultStrategy<TUpdated>;
+  readonly metadataUpdated: IResultStrategy<TMetadataUpdated>;
   /** What a deletion check answers: `del:checkResponse`. */
   readonly deletionCheck: IResultStrategy<TDeletionCheck>;
 }
@@ -87,7 +87,7 @@ export const messageClassDocuments = {
   metadata: rawDocument,
   validation: rawDocument,
   deletion: rawDocument,
-  updated: rawDocument,
+  metadataUpdated: rawDocument,
   deletionCheck: rawDocument,
 } satisfies IMessageClassResults;
 

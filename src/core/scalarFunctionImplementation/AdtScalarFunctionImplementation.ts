@@ -347,7 +347,7 @@ export class AdtScalarFunctionImplementation<
   async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IScalarFunctionImplementationConfig>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
     const name = this.name(config);
     const source = options?.sourceCode ?? config.sourceCode;
     if (!source) {
@@ -365,7 +365,9 @@ export class AdtScalarFunctionImplementation<
           },
           options?.lockHandle,
         ),
-      this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
+      this.results.metadataUpdated as IResultStrategy<
+        ReturnType<R['metadataUpdated']>
+      >,
       options?.analyse,
     );
   }

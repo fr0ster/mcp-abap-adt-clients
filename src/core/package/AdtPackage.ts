@@ -75,7 +75,7 @@ export class AdtPackage<
 > implements
     IAdtCreatable<IPackageConfig, ReturnType<R['created']>>,
     IAdtMetadataReadable<IPackageConfig, ReturnType<R['metadata']>>,
-    IAdtMetadataUpdatable<IPackageConfig, ReturnType<R['updated']>>,
+    IAdtMetadataUpdatable<IPackageConfig, ReturnType<R['metadataUpdated']>>,
     IAdtDeletable<
       IPackageConfig,
       ReturnType<R['deletion']>,
@@ -274,7 +274,7 @@ export class AdtPackage<
   async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IPackageConfig>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
     const name = this.name(config);
     if (!config.superPackage) {
       throw new Error('Super package is required for update');
@@ -299,7 +299,9 @@ export class AdtPackage<
     return answering(
       () =>
         updatePackage(this.connection, fields, options?.lockHandle as string),
-      this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      this.results.metadataUpdated as IResultStrategy<
+        ReturnType<R['metadataUpdated']>
+      >,
       options?.analyse,
     );
   }

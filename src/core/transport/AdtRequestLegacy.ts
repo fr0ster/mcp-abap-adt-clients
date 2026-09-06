@@ -85,7 +85,7 @@ export class AdtRequestLegacy<
   override async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<ITransportConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['read']>, E>> {
+  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
     if (!config.transportNumber) {
       throw new Error('Transport request number is required');
     }
@@ -93,7 +93,7 @@ export class AdtRequestLegacy<
 
     return answering(
       () => getTransportLegacy(this.conn, number),
-      this.results.read as IResultStrategy<ReturnType<R['read']>>,
+      this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
     );
   }
 
@@ -130,9 +130,9 @@ export class AdtRequestLegacy<
 
   /** Refused: the legacy endpoint's update shape has never been captured. */
   override async updateMetadata<E extends IAdtError = IAdtError>(): Promise<
-    IAdtResponse<ReturnType<R['updated']>, E>
+    IAdtResponse<ReturnType<R['metadataUpdated']>, E>
   > {
-    return failed<ReturnType<R['updated']>, E>(
+    return failed<ReturnType<R['metadataUpdated']>, E>(
       unsupported(
         'Updating transport requests',
         'The legacy /sap/bc/cts/transportrequests endpoint has never been captured, so whether or how it supports changing a description is unknown.',

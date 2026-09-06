@@ -67,7 +67,10 @@ export class AdtAuthorizationField<
 > implements
     IAdtCreatable<IAuthorizationFieldConfig, ReturnType<R['created']>>,
     IAdtMetadataReadable<IAuthorizationFieldConfig, ReturnType<R['metadata']>>,
-    IAdtMetadataUpdatable<IAuthorizationFieldConfig, ReturnType<R['updated']>>,
+    IAdtMetadataUpdatable<
+      IAuthorizationFieldConfig,
+      ReturnType<R['metadataUpdated']>
+    >,
     IAdtDeletable<
       IAuthorizationFieldConfig,
       ReturnType<R['deletion']>,
@@ -207,7 +210,7 @@ export class AdtAuthorizationField<
   async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IAuthorizationFieldConfig>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
     const name = this.name(config);
     if (!config.packageName) {
       throw new Error('Package name is required for update');
@@ -240,7 +243,9 @@ export class AdtAuthorizationField<
           options?.lockHandle,
           this.logger,
         ),
-      this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      this.results.metadataUpdated as IResultStrategy<
+        ReturnType<R['metadataUpdated']>
+      >,
       options?.analyse,
     );
   }

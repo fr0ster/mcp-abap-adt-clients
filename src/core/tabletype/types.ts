@@ -81,7 +81,7 @@ export interface ITableTypeResults<
   TActivation = TableTypeActivationResult,
   TValidation = TableTypeValidationResult,
   TDeletion = TableTypeDeletionResult,
-  TUpdated = TableTypeUpdated,
+  TMetadataUpdated = TableTypeUpdated,
   TTransport = TableTypeTransport,
   TDeletionCheck = DeletionCheckResult,
 > {
@@ -92,7 +92,7 @@ export interface ITableTypeResults<
   readonly activation: IResultStrategy<TActivation>;
   readonly validation: IResultStrategy<TValidation>;
   readonly deletion: IResultStrategy<TDeletion>;
-  readonly updated: IResultStrategy<TUpdated>;
+  readonly metadataUpdated: IResultStrategy<TMetadataUpdated>;
   readonly transport: IResultStrategy<TTransport>;
   /** What a deletion check answers: `del:checkResponse`. */
   readonly deletionCheck: IResultStrategy<TDeletionCheck>;
@@ -111,7 +111,7 @@ export const tableTypeDocuments = {
   activation: rawDocument,
   validation: rawDocument,
   deletion: rawDocument,
-  updated: rawDocument,
+  metadataUpdated: rawDocument,
   transport: rawDocument,
   deletionCheck: rawDocument,
 } satisfies ITableTypeResults;

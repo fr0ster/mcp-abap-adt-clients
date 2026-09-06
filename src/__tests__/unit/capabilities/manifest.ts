@@ -1275,10 +1275,9 @@ export const HANDLERS = {
     requests: {
       create: '/sap/bc/adt/messageclass/zguard_msg',
       read: '/sap/bc/adt/messageclass/zguard_msg',
-      readMetadata: '/sap/bc/adt/messageclass/zguard_msg',
       update: '/sap/bc/adt/messageclass/zguard_msg',
     },
-    capabilities: ['creatable', 'readable', 'metadataReadable', 'updatable'],
+    capabilities: ['creatable', 'readable', 'updatable'],
     why: 'A message is created, read, changed and removed through its class’s XML, and is nothing else in its own right.',
   },
   transport: {

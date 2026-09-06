@@ -299,10 +299,10 @@ export class AdtBehaviorImplementation<
     const name = this.name(config);
     const source =
       options?.sourceCode || config.implementationCode || config.sourceCode;
-    if (!config.behaviorDefinition) {
-      throw new Error('behaviorDefinition is required for update');
-    }
-
+    // No `behaviorDefinition` guard: this writes the implementation include and
+    // never reads the definition's name. It was required here while `update`
+    // also wrote the generated shell, which does mention it — the guard outlived
+    // the reason for it and refused a write it had no stake in.
     if (!source) {
       throw new Error('Implementation code is required for update');
     }

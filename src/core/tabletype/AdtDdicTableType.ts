@@ -73,7 +73,7 @@ export class AdtDdicTableType<
 > implements
     IAdtCreatable<ITableTypeConfig, ReturnType<R['created']>>,
     IAdtMetadataReadable<ITableTypeConfig, ReturnType<R['metadata']>>,
-    IAdtMetadataUpdatable<ITableTypeConfig, ReturnType<R['updated']>>,
+    IAdtMetadataUpdatable<ITableTypeConfig, ReturnType<R['metadataUpdated']>>,
     IAdtDeletable<
       ITableTypeConfig,
       ReturnType<R['deletion']>,
@@ -199,7 +199,7 @@ export class AdtDdicTableType<
   async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<ITableTypeConfig>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
     const name = this.name(config);
     const source =
       config.rowTypeName && config.rowTypeName.trim().length > 0
@@ -226,7 +226,9 @@ export class AdtDdicTableType<
           options?.lockHandle,
           this.logger,
         ),
-      this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      this.results.metadataUpdated as IResultStrategy<
+        ReturnType<R['metadataUpdated']>
+      >,
       options?.analyse,
     );
   }

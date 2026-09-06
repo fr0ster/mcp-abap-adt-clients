@@ -384,7 +384,7 @@ export type IDomainContract<
   >,
 > = IAdtCreatable<IDomainConfig, ReturnType<R['created']>> &
   IAdtMetadataReadable<IDomainConfig, ReturnType<R['metadata']>> &
-  IAdtMetadataUpdatable<IDomainConfig, ReturnType<R['updated']>> &
+  IAdtMetadataUpdatable<IDomainConfig, ReturnType<R['metadataUpdated']>> &
   IAdtDeletable<
     IDomainConfig,
     ReturnType<R['deletion']>,
@@ -410,7 +410,7 @@ export type IDataElementContract<
   >,
 > = IAdtCreatable<IDataElementConfig, ReturnType<R['created']>> &
   IAdtMetadataReadable<IDataElementConfig, ReturnType<R['metadata']>> &
-  IAdtMetadataUpdatable<IDataElementConfig, ReturnType<R['updated']>> &
+  IAdtMetadataUpdatable<IDataElementConfig, ReturnType<R['metadataUpdated']>> &
   IAdtDeletable<
     IDataElementConfig,
     ReturnType<R['deletion']>,
@@ -435,7 +435,10 @@ export type IAuthorizationFieldContract<
   >,
 > = IAdtCreatable<IAuthorizationFieldConfig, ReturnType<R['created']>> &
   IAdtMetadataReadable<IAuthorizationFieldConfig, ReturnType<R['metadata']>> &
-  IAdtMetadataUpdatable<IAuthorizationFieldConfig, ReturnType<R['updated']>> &
+  IAdtMetadataUpdatable<
+    IAuthorizationFieldConfig,
+    ReturnType<R['metadataUpdated']>
+  > &
   IAdtDeletable<
     IAuthorizationFieldConfig,
     ReturnType<R['deletion']>,
@@ -516,7 +519,7 @@ export type ITableTypeContract<
   >,
 > = IAdtCreatable<ITableTypeConfig, ReturnType<R['created']>> &
   IAdtMetadataReadable<ITableTypeConfig, ReturnType<R['metadata']>> &
-  IAdtMetadataUpdatable<ITableTypeConfig, ReturnType<R['updated']>> &
+  IAdtMetadataUpdatable<ITableTypeConfig, ReturnType<R['metadataUpdated']>> &
   IAdtDeletable<
     ITableTypeConfig,
     ReturnType<R['deletion']>,
@@ -571,7 +574,10 @@ export type IFunctionGroupContract<
   >,
 > = IAdtCreatable<IFunctionGroupConfig, ReturnType<R['created']>> &
   IAdtMetadataReadable<IFunctionGroupConfig, ReturnType<R['metadata']>> &
-  IAdtMetadataUpdatable<IFunctionGroupConfig, ReturnType<R['updated']>> &
+  IAdtMetadataUpdatable<
+    IFunctionGroupConfig,
+    ReturnType<R['metadataUpdated']>
+  > &
   IAdtDeletable<
     IFunctionGroupConfig,
     ReturnType<R['deletion']>,
@@ -651,7 +657,7 @@ export type IPackageContract<
   >,
 > = IAdtCreatable<IPackageConfig, ReturnType<R['created']>> &
   IAdtMetadataReadable<IPackageConfig, ReturnType<R['metadata']>> &
-  IAdtMetadataUpdatable<IPackageConfig, ReturnType<R['updated']>> &
+  IAdtMetadataUpdatable<IPackageConfig, ReturnType<R['metadataUpdated']>> &
   IAdtDeletable<
     IPackageConfig,
     ReturnType<R['deletion']>,
@@ -673,7 +679,7 @@ export type IMessageClassContract<
   >,
 > = IAdtCreatable<IMessageClassConfig, ReturnType<R['created']>> &
   IAdtMetadataReadable<IMessageClassConfig, ReturnType<R['metadata']>> &
-  IAdtMetadataUpdatable<IMessageClassConfig, ReturnType<R['updated']>> &
+  IAdtMetadataUpdatable<IMessageClassConfig, ReturnType<R['metadataUpdated']>> &
   IAdtDeletable<
     IMessageClassConfig,
     ReturnType<R['deletion']>,
@@ -685,7 +691,6 @@ export type IMessageClassMessageContract<
   R extends IMessageClassMessageResults<unknown, unknown, unknown>,
 > = IAdtCreatable<IMessageClassMessageConfig, ReturnType<R['written']>> &
   IAdtReadable<IMessageClassMessageConfig, ReturnType<R['read']>> &
-  IAdtMetadataReadable<IMessageClassMessageConfig, ReturnType<R['read']>> &
   IAdtUpdatable<IMessageClassMessageConfig, ReturnType<R['written']>>;
 export type IAccessControlContract<
   R extends IAccessControlResults<
@@ -998,8 +1003,8 @@ export type IRequestContract<
     unknown
   >,
 > = IAdtCreatable<ITransportConfig, ReturnType<R['created']>> &
-  IAdtMetadataReadable<ITransportConfig, ReturnType<R['read']>> &
-  IAdtMetadataUpdatable<ITransportConfig, ReturnType<R['updated']>> &
+  IAdtMetadataReadable<ITransportConfig, ReturnType<R['metadata']>> &
+  IAdtMetadataUpdatable<ITransportConfig, ReturnType<R['metadataUpdated']>> &
   IAdtDeletable<
     ITransportConfig,
     ReturnType<R['deleted']>,

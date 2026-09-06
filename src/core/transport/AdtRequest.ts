@@ -87,8 +87,8 @@ export class AdtRequest<
   > = ITransportResults,
 > implements
     IAdtCreatable<ITransportConfig, ReturnType<R['created']>>,
-    IAdtMetadataReadable<ITransportConfig, ReturnType<R['read']>>,
-    IAdtMetadataUpdatable<ITransportConfig, ReturnType<R['updated']>>,
+    IAdtMetadataReadable<ITransportConfig, ReturnType<R['metadata']>>,
+    IAdtMetadataUpdatable<ITransportConfig, ReturnType<R['metadataUpdated']>>,
     IAdtDeletable<
       ITransportConfig,
       ReturnType<R['deleted']>,
@@ -164,12 +164,12 @@ export class AdtRequest<
   async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<ITransportConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['read']>, E>> {
+  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
     const number = this.number(config);
 
     return answering(
       () => getTransport(this.connection, number),
-      this.results.read as IResultStrategy<ReturnType<R['read']>>,
+      this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
       options?.analyse,
     );
   }
@@ -256,7 +256,7 @@ export class AdtRequest<
   async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<ITransportConfig>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
     const number = this.number(config);
     if (!config.description) {
       throw new Error('Transport request description is required for update');
@@ -266,7 +266,9 @@ export class AdtRequest<
     this.logger?.info?.('Updating transport request description:', number);
     return answering(
       () => updateTransport(this.connection, number, description),
-      this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      this.results.metadataUpdated as IResultStrategy<
+        ReturnType<R['metadataUpdated']>
+      >,
       options?.analyse,
     );
   }

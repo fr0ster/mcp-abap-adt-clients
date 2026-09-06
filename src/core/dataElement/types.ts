@@ -88,7 +88,7 @@ export interface IDataElementResults<
   TActivation = DataElementActivationResult,
   TValidation = DataElementValidationResult,
   TDeletion = DataElementDeletionResult,
-  TUpdated = DataElementUpdated,
+  TMetadataUpdated = DataElementUpdated,
   TTransport = DataElementTransport,
   TDeletionCheck = DeletionCheckResult,
 > {
@@ -99,7 +99,7 @@ export interface IDataElementResults<
   readonly activation: IResultStrategy<TActivation>;
   readonly validation: IResultStrategy<TValidation>;
   readonly deletion: IResultStrategy<TDeletion>;
-  readonly updated: IResultStrategy<TUpdated>;
+  readonly metadataUpdated: IResultStrategy<TMetadataUpdated>;
   readonly transport: IResultStrategy<TTransport>;
   /** What a deletion check answers: `del:checkResponse`. */
   readonly deletionCheck: IResultStrategy<TDeletionCheck>;
@@ -118,7 +118,7 @@ export const dataElementDocuments = {
   activation: rawDocument,
   validation: rawDocument,
   deletion: rawDocument,
-  updated: rawDocument,
+  metadataUpdated: rawDocument,
   transport: rawDocument,
   deletionCheck: rawDocument,
 } satisfies IDataElementResults;

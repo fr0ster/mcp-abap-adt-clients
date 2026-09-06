@@ -69,7 +69,7 @@ export class AdtDomain<
 > implements
     IAdtCreatable<IDomainConfig, ReturnType<R['created']>>,
     IAdtMetadataReadable<IDomainConfig, ReturnType<R['metadata']>>,
-    IAdtMetadataUpdatable<IDomainConfig, ReturnType<R['updated']>>,
+    IAdtMetadataUpdatable<IDomainConfig, ReturnType<R['metadataUpdated']>>,
     IAdtDeletable<
       IDomainConfig,
       ReturnType<R['deletion']>,
@@ -216,7 +216,7 @@ export class AdtDomain<
   async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IDomainConfig>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
     const name = this.name(config);
     if (!config.packageName) {
       throw new Error('Package name is required for update');
@@ -244,7 +244,9 @@ export class AdtDomain<
           },
           options?.lockHandle,
         ),
-      this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      this.results.metadataUpdated as IResultStrategy<
+        ReturnType<R['metadataUpdated']>
+      >,
       options?.analyse,
     );
   }

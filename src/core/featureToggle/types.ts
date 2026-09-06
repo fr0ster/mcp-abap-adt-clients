@@ -111,6 +111,7 @@ export interface IFeatureToggleResults<
   TUpdated = FeatureToggleUpdated,
   TSourceDocument = FeatureToggleSourceDocument,
   TDeletionCheck = DeletionCheckResult,
+  TMetadataUpdated = string,
 > {
   readonly created: IResultStrategy<TCreated>;
   readonly source: IResultStrategy<TSource>;
@@ -123,6 +124,8 @@ export interface IFeatureToggleResults<
   readonly sourceDocument: IResultStrategy<TSourceDocument>;
   /** What a deletion check answers: `del:checkResponse`. */
   readonly deletionCheck: IResultStrategy<TDeletionCheck>;
+  /** What the object's own document answers when written. */
+  readonly metadataUpdated: IResultStrategy<TMetadataUpdated>;
 }
 
 /**
@@ -141,4 +144,5 @@ export const featureToggleDocuments = {
   updated: rawDocument,
   sourceDocument: rawDocument,
   deletionCheck: rawDocument,
+  metadataUpdated: rawDocument,
 } satisfies IFeatureToggleResults;

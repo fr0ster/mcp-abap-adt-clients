@@ -88,6 +88,7 @@ export interface IFunctionIncludeResults<
   TDeletion = FunctionIncludeDeletionResult,
   TUpdated = FunctionIncludeUpdated,
   TDeletionCheck = DeletionCheckResult,
+  TMetadataUpdated = string,
 > {
   readonly created: IResultStrategy<TCreated>;
   readonly source: IResultStrategy<TSource>;
@@ -99,6 +100,8 @@ export interface IFunctionIncludeResults<
   readonly updated: IResultStrategy<TUpdated>;
   /** What a deletion check answers: `del:checkResponse`. */
   readonly deletionCheck: IResultStrategy<TDeletionCheck>;
+  /** What the object's own document answers when written. */
+  readonly metadataUpdated: IResultStrategy<TMetadataUpdated>;
 }
 
 /**
@@ -116,4 +119,5 @@ export const functionIncludeDocuments = {
   deletion: rawDocument,
   updated: rawDocument,
   deletionCheck: rawDocument,
+  metadataUpdated: rawDocument,
 } satisfies IFunctionIncludeResults;

@@ -63,7 +63,10 @@ export class AdtMessageClass<
 > implements
     IAdtCreatable<IMessageClassConfig, ReturnType<R['created']>>,
     IAdtMetadataReadable<IMessageClassConfig, ReturnType<R['metadata']>>,
-    IAdtMetadataUpdatable<IMessageClassConfig, ReturnType<R['updated']>>,
+    IAdtMetadataUpdatable<
+      IMessageClassConfig,
+      ReturnType<R['metadataUpdated']>
+    >,
     IAdtDeletable<
       IMessageClassConfig,
       ReturnType<R['deletion']>,
@@ -187,7 +190,7 @@ export class AdtMessageClass<
   async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IMessageClassConfig>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
     const name = this.name(config);
 
     return answering(
@@ -199,7 +202,9 @@ export class AdtMessageClass<
           config.description,
           config.transportRequest,
         ),
-      this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      this.results.metadataUpdated as IResultStrategy<
+        ReturnType<R['metadataUpdated']>
+      >,
       options?.analyse,
     );
   }

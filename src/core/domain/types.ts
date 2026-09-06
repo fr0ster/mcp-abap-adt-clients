@@ -85,7 +85,7 @@ export interface IDomainResults<
   TActivation = DomainActivationResult,
   TValidation = DomainValidationResult,
   TDeletion = DomainDeletionResult,
-  TUpdated = DomainUpdated,
+  TMetadataUpdated = DomainUpdated,
   TTransport = DomainTransport,
   TDeletionCheck = DeletionCheckResult,
 > {
@@ -96,7 +96,7 @@ export interface IDomainResults<
   readonly activation: IResultStrategy<TActivation>;
   readonly validation: IResultStrategy<TValidation>;
   readonly deletion: IResultStrategy<TDeletion>;
-  readonly updated: IResultStrategy<TUpdated>;
+  readonly metadataUpdated: IResultStrategy<TMetadataUpdated>;
   readonly transport: IResultStrategy<TTransport>;
   /** What a deletion check answers: `del:checkResponse`. */
   readonly deletionCheck: IResultStrategy<TDeletionCheck>;
@@ -115,7 +115,7 @@ export const domainDocuments = {
   activation: rawDocument,
   validation: rawDocument,
   deletion: rawDocument,
-  updated: rawDocument,
+  metadataUpdated: rawDocument,
   transport: rawDocument,
   deletionCheck: rawDocument,
 } satisfies IDomainResults;

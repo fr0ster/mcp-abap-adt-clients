@@ -126,10 +126,13 @@ the sequence around a write handed back to the consumer.
   );
   ```
 
-- **Two endpoints that were reachable no other way are now members:**
-  `AdtFunctionInclude.updateSource()` writes `/source/main` (its `update` writes
-  the `finclude` metadata), and `AdtBehaviorImplementation.updateMain()` writes
-  the generated shell that binds the class to its behavior definition.
+- **Two endpoints that were reachable no other way became members**, and both
+  ended up with the names the resource split gave them: writing a function
+  include's `/source/main` is `update` (its `finclude` document is
+  `updateMetadata`), and the generated shell that binds a behavior
+  implementation to its definition is written with the **class's** `update`,
+  from the exported `mainSourceFor`. The `updateSource()` and `updateMain()`
+  names existed briefly on this branch and are not in the release.
 
 - **Removed for being compositions rather than requests:**
   `AdtServiceBinding.createAndGenerateServiceBinding()` (call `create` then

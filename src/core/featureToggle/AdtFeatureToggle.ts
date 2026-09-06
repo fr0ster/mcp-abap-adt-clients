@@ -234,7 +234,7 @@ export class AdtFeatureToggle<
   async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IFeatureToggleConfig>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
     return answering(
       () =>
         updateFeatureToggle(
@@ -242,7 +242,9 @@ export class AdtFeatureToggle<
           this.createParams(config as IFeatureToggleConfig),
           options?.lockHandle,
         ),
-      this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      this.results.metadataUpdated as IResultStrategy<
+        ReturnType<R['metadataUpdated']>
+      >,
       options?.analyse,
     );
   }

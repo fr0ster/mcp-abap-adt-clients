@@ -87,6 +87,7 @@ export interface IScalarFunctionImplementationResults<
   TUpdated = ScalarFunctionImplementationUpdated,
   TTransport = ScalarFunctionImplementationTransport,
   TDeletionCheck = DeletionCheckResult,
+  TMetadataUpdated = string,
 > {
   readonly created: IResultStrategy<TCreated>;
   readonly source: IResultStrategy<TSource>;
@@ -99,6 +100,8 @@ export interface IScalarFunctionImplementationResults<
   readonly transport: IResultStrategy<TTransport>;
   /** What a deletion check answers: `del:checkResponse`. */
   readonly deletionCheck: IResultStrategy<TDeletionCheck>;
+  /** What the object's own document answers when written. */
+  readonly metadataUpdated: IResultStrategy<TMetadataUpdated>;
 }
 
 /**
@@ -117,4 +120,5 @@ export const scalarFunctionImplementationDocuments = {
   updated: rawDocument,
   transport: rawDocument,
   deletionCheck: rawDocument,
+  metadataUpdated: rawDocument,
 } satisfies IScalarFunctionImplementationResults;

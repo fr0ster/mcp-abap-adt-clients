@@ -289,7 +289,7 @@ export class AdtFunctionInclude<
   async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionIncludeConfig>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
     const params = this.buildCreateParams({
       ...(config as IFunctionIncludeConfig),
     });
@@ -302,7 +302,9 @@ export class AdtFunctionInclude<
           options?.lockHandle,
           this.logger,
         ),
-      this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      this.results.metadataUpdated as IResultStrategy<
+        ReturnType<R['metadataUpdated']>
+      >,
       options?.analyse,
     );
   }
@@ -317,11 +319,11 @@ export class AdtFunctionInclude<
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionIncludeConfig>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
+  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     const { group, include } = this.names(config);
     const source = options?.sourceCode || config.sourceCode;
     if (source === undefined) {
-      throw new Error('Source code is required for updateSource');
+      throw new Error('Source code is required for update');
     }
 
     return answering(
@@ -335,7 +337,7 @@ export class AdtFunctionInclude<
           this.isUnicode(),
           config.transportRequest,
         ),
-      this.results.source as IResultStrategy<ReturnType<R['source']>>,
+      this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
       options?.analyse,
     );
   }

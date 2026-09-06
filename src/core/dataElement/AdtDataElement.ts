@@ -70,7 +70,7 @@ export class AdtDataElement<
 > implements
     IAdtCreatable<IDataElementConfig, ReturnType<R['created']>>,
     IAdtMetadataReadable<IDataElementConfig, ReturnType<R['metadata']>>,
-    IAdtMetadataUpdatable<IDataElementConfig, ReturnType<R['updated']>>,
+    IAdtMetadataUpdatable<IDataElementConfig, ReturnType<R['metadataUpdated']>>,
     IAdtDeletable<
       IDataElementConfig,
       ReturnType<R['deletion']>,
@@ -225,7 +225,7 @@ export class AdtDataElement<
   async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IDataElementConfig>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
     const name = this.name(config);
     if (!config.packageName) {
       throw new Error('Package name is required for update');
@@ -259,7 +259,9 @@ export class AdtDataElement<
           options?.lockHandle,
           this.logger,
         ),
-      this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      this.results.metadataUpdated as IResultStrategy<
+        ReturnType<R['metadataUpdated']>
+      >,
       options?.analyse,
     );
   }

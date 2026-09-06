@@ -65,9 +65,9 @@ export class AdtPackageLegacy<
   }
 
   override async updateMetadata<E extends IAdtError = IAdtError>(): Promise<
-    IAdtResponse<ReturnType<R['updated']>, E>
+    IAdtResponse<ReturnType<R['metadataUpdated']>, E>
   > {
-    return failed<ReturnType<R['updated']>, E>(UNSUPPORTED as E);
+    return failed<ReturnType<R['metadataUpdated']>, E>(UNSUPPORTED as E);
   }
 
   override async delete<E extends IAdtError = IAdtError>(): Promise<

@@ -84,7 +84,10 @@ export class AdtFunctionGroup<
 > implements
     IAdtCreatable<IFunctionGroupConfig, ReturnType<R['created']>>,
     IAdtMetadataReadable<IFunctionGroupConfig, ReturnType<R['metadata']>>,
-    IAdtMetadataUpdatable<IFunctionGroupConfig, ReturnType<R['updated']>>,
+    IAdtMetadataUpdatable<
+      IFunctionGroupConfig,
+      ReturnType<R['metadataUpdated']>
+    >,
     IAdtDeletable<
       IFunctionGroupConfig,
       ReturnType<R['deletion']>,
@@ -242,7 +245,7 @@ export class AdtFunctionGroup<
   async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionGroupConfig>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
     if (!config.functionGroupName) {
       throw new Error('Function group name is required');
     }
@@ -264,7 +267,9 @@ export class AdtFunctionGroup<
           },
           this.contentTypes,
         ),
-      this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      this.results.metadataUpdated as IResultStrategy<
+        ReturnType<R['metadataUpdated']>
+      >,
       options?.analyse,
     );
   }

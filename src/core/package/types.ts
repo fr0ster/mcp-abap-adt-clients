@@ -82,7 +82,7 @@ export interface IPackageResults<
   TCheck = PackageCheckResult,
   TValidation = PackageValidationResult,
   TDeletion = PackageDeletionResult,
-  TUpdated = PackageUpdated,
+  TMetadataUpdated = PackageUpdated,
   TTransport = PackageTransport,
   TDeletionCheck = DeletionCheckResult,
 > {
@@ -92,7 +92,7 @@ export interface IPackageResults<
   readonly check: IResultStrategy<TCheck>;
   readonly validation: IResultStrategy<TValidation>;
   readonly deletion: IResultStrategy<TDeletion>;
-  readonly updated: IResultStrategy<TUpdated>;
+  readonly metadataUpdated: IResultStrategy<TMetadataUpdated>;
   readonly transport: IResultStrategy<TTransport>;
   /** What a deletion check answers: `del:checkResponse`. */
   readonly deletionCheck: IResultStrategy<TDeletionCheck>;
@@ -110,7 +110,7 @@ export const packageDocuments = {
   check: rawDocument,
   validation: rawDocument,
   deletion: rawDocument,
-  updated: rawDocument,
+  metadataUpdated: rawDocument,
   transport: rawDocument,
   deletionCheck: rawDocument,
 } satisfies IPackageResults;

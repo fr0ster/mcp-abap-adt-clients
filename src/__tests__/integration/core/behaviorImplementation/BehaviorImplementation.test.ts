@@ -222,7 +222,8 @@ describe('BehaviorImplementation (using AdtClient)', () => {
           // **The third request, and the flow cannot guess it.** `create` makes
           // the class; `update` writes its implementation include. The class's
           // own `source/main` — the generated shell that binds it to its
-          // behavior definition — is `updateMain()`, and until it is written the
+          // behavior definition — is the class's own `update`, and until it is
+          // written the
           // class is not readable at all: ADT answers `Resource …: wrong input
           // data for processing` to every read, which is what the first run
           // after the chains came out failed on.

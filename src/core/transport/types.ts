@@ -105,9 +105,9 @@ export interface ITransportTree {
 /** One strategy per member of a transport-request implementation. */
 export interface ITransportResults<
   TCreated = ICreatedTransport,
-  TRead = string,
+  TMetadata = string,
   TList = ITransportTree,
-  TUpdated = string,
+  TMetadataUpdated = string,
   TDeleted = string,
   TDeletionCheck = DeletionCheckResult,
 > {
@@ -120,7 +120,7 @@ export interface ITransportResults<
    */
   readonly created: IResultStrategy<TCreated>;
   /** What a read of one request answers. */
-  readonly read: IResultStrategy<TRead>;
+  readonly metadata: IResultStrategy<TMetadata>;
   /**
    * What the listing answers.
    *
@@ -131,7 +131,7 @@ export interface ITransportResults<
    */
   readonly list: IResultStrategy<TList>;
   /** What the description update answers. */
-  readonly updated: IResultStrategy<TUpdated>;
+  readonly metadataUpdated: IResultStrategy<TMetadataUpdated>;
   /** What the deletion answers. */
   readonly deleted: IResultStrategy<TDeleted>;
   /** What a deletion check answers: `del:checkResponse`. */
@@ -145,9 +145,9 @@ export interface ITransportResults<
  */
 export const transportDocuments = {
   created: (answer) => parseCreatedTransport(answer.data),
-  read: rawDocument,
+  metadata: rawDocument,
   list: (answer) => parseTransportTree(answer.data),
-  updated: rawDocument,
+  metadataUpdated: rawDocument,
   deleted: rawDocument,
   deletionCheck: rawDocument,
 } satisfies ITransportResults;

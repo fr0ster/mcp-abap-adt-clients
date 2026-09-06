@@ -74,7 +74,7 @@ export interface IAuthorizationFieldResults<
   TActivation = AuthorizationFieldActivationResult,
   TValidation = AuthorizationFieldValidationResult,
   TDeletion = AuthorizationFieldDeletionResult,
-  TUpdated = AuthorizationFieldUpdated,
+  TMetadataUpdated = AuthorizationFieldUpdated,
   TDeletionCheck = DeletionCheckResult,
 > {
   readonly created: IResultStrategy<TCreated>;
@@ -84,7 +84,7 @@ export interface IAuthorizationFieldResults<
   readonly activation: IResultStrategy<TActivation>;
   readonly validation: IResultStrategy<TValidation>;
   readonly deletion: IResultStrategy<TDeletion>;
-  readonly updated: IResultStrategy<TUpdated>;
+  readonly metadataUpdated: IResultStrategy<TMetadataUpdated>;
   /** What a deletion check answers: `del:checkResponse`. */
   readonly deletionCheck: IResultStrategy<TDeletionCheck>;
 }
@@ -102,6 +102,6 @@ export const authorizationFieldDocuments = {
   activation: rawDocument,
   validation: rawDocument,
   deletion: rawDocument,
-  updated: rawDocument,
+  metadataUpdated: rawDocument,
   deletionCheck: rawDocument,
 } satisfies IAuthorizationFieldResults;
