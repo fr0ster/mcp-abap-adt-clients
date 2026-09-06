@@ -76,16 +76,22 @@ All clients accept `IAbapConnection` + `ILogger`. Optional: `options.enableAccep
 
 ### Design Patterns
 
-**Factory + Handler Pattern**: `AdtClient` creates object-specific handlers that manage operation chains automatically.
+**Factory pattern**: `AdtClient` creates object-specific implementations of the capability contracts in `@mcp-abap-adt/interfaces`.
 
-**Operation Chains**: Handlers orchestrate multi-step operations:
-- Create: validate → create → check → lock → update → unlock → activate
-- Update: lock → check → update → unlock → activate
-- Delete: check(deletion) → delete
+**One endpoint, one member**: every member issues exactly one ADT request. `create` is the POST; `update` is the write and carries `options.lockHandle` as given; `delete` is the DELETE; `checkDeletion` is the approval ADT wants first; `lock`/`unlock` are the lock window. Nothing composes them for the caller.
 
-Error handling in chains: automatic unlock + `setSessionType('stateless')` on any failure. `lockHandle` is always preserved for cleanup.
+A multi-step operation is therefore the consumer's sequence, in the order it chooses:
 
-**Session Management**: Handlers toggle between stateful (during lock) and stateless modes automatically via `connection.setSessionType()`.
+```typescript
+const handle = (await cls.lock(config)).getResult().value;
+await cls.update(config, { sourceCode, lockHandle: handle });
+await cls.unlock(config, handle);
+await cls.activate(config);
+```
+
+The one exception is `AdtMessageClassMessage`, where a message is a row inside its class's document: the write is one PUT, but it needs two lock handles and a read-modify-write of XML this library assembles.
+
+**Session Management**: `lock` sets stateful and `unlock` restores stateless. No other member touches `connection.setSessionType()` — asserted by `src/__tests__/unit/capabilities/behaviour.test.ts`.
 
 **Interface-Only Communication**: All code depends on `IAbapConnection` interface, not concrete implementations. `@mcp-abap-adt/connection` (dev dependency) provides the concrete implementation, used only in tests.
 

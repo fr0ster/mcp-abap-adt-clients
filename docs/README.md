@@ -14,7 +14,7 @@ Complete documentation for the `@mcp-abap-adt/adt-clients` package.
 
 ## Usage Guides
 
-- [**OBJECT_LIFECYCLE.md**](usage/OBJECT_LIFECYCLE.md) — create → lock → update → unlock → activate: what each member does, what is opt-in, where the flow does not hold
+- [**OBJECT_LIFECYCLE.md**](usage/OBJECT_LIFECYCLE.md) — create → lock → update → unlock → activate: the calls you make, what each one does, where the flow does not hold
 - [**CLIENT_API_REFERENCE.md**](usage/CLIENT_API_REFERENCE.md) - Complete API reference for `AdtClient`
 - [**RFC_CONNECTION.md**](usage/RFC_CONNECTION.md) - RFC connection guide for legacy systems
 - [**STATEFUL_SESSION_GUIDE.md**](usage/STATEFUL_SESSION_GUIDE.md) - Guide for stateful session management
@@ -60,7 +60,7 @@ docs/
 
 The package provides the main client classes:
 
-- **AdtClient** - High-level CRUD API with automatic operation chains (recommended)
+- **AdtClient** - High-level CRUD API; one member, one ADT request (recommended)
 - **AdtRuntimeClient** - Runtime operations (ABAP debugger, traces, dumps, logs, feeds, ATC check runs)
 
 See [CLIENT_API_REFERENCE.md](usage/CLIENT_API_REFERENCE.md) for complete method documentation.

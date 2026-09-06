@@ -7,7 +7,7 @@ TypeScript clients for SAP ABAP Development Tools (ADT).
 ## Features
 
 - ✅ **Client API** – simplified interface for common operations:
-  - `AdtClient` – high-level CRUD API with automatic operation chains
+  - `AdtClient` – high-level CRUD API; one member, one ADT request
   - `AdtExecutor` – execution API via `IExecutor` contracts (class/program, with profiling)
   - `AdtRuntimeClient` – runtime operations (ABAP debugger, traces, logs, dumps, ATC check runs)
   - `AdtClientsWS` – realtime WebSocket facade for event-driven workflows
@@ -86,11 +86,11 @@ npm install @mcp-abap-adt/adt-clients
 ### Public API
 
 1. **AdtClient** (High-level, recommended)
-   - Simplified CRUD operations with automatic operation chains
+   - CRUD operations, one ADT request per member
    - Factory pattern: `client.getClass()`, `client.getProgram()`, etc.
-   - Automatic error handling and resource cleanup
+   - Every answer is a contract — a result or a failure, never a throw
    - Utility functions via `client.getUtils()`
-   - Example: `await client.getClass().create({...}, { activateOnCreate: true })`
+   - Example: `await client.getClass().create({...})` — the POST, and nothing else
 
 2. **AdtRuntimeClient**
    - Stable runtime operations for ABAP debugging, traces, dumps, logs, feeds, ATC check runs, and more
@@ -173,12 +173,24 @@ await connection.connect();
 
 const client = new AdtClient(connection, console);
 
-// Simple CRUD operations with automatic operation chains
+// One member, one request: this is the POST that makes the class shell.
+// Writing its source and activating it are calls of your own, below.
 await client.getClass().create({
   className: 'ZCL_TEST',
   packageName: 'ZPACKAGE',
   description: 'Test class'
-}, { activateOnCreate: true });
+});
+
+// The lock window is yours: lock, write, unlock, activate — in the order you
+// choose, each answering its own contract.
+const config = { className: 'ZCL_TEST' };
+const locked = await client.getClass().lock(config);
+if (locked.ok) {
+  const lockHandle = locked.getResult().value;
+  await client.getClass().update(config, { sourceCode, lockHandle });
+  await client.getClass().unlock(config, lockHandle);
+}
+await client.getClass().activate(config);
 
 // Every member answers a contract: a result or a failure, and the compiler
 // makes you say which you are reading.
@@ -287,9 +299,9 @@ await utils.readObjectSource('view' satisfies AdtSourceObjectType, 'ZOK_I_CDS_TE
 ```
 
 **Benefits:**
-- ✅ Simplified API - no manual lock/unlock management
-- ✅ Automatic operation chains (validate → create → check → lock → update → unlock → activate)
-- ✅ Consistent error handling and resource cleanup
+- ✅ One member, one ADT request — what went to the server is what you asked for
+- ✅ The sequence is yours: you decide what happens between lock, write and activate, and you see every answer
+- ✅ Consistent error handling — a refusal is in the answer, never a throw
 - ✅ Separation of CRUD operations and utility functions
 - ✅ Long polling support for object readiness
 
@@ -375,9 +387,11 @@ await client.getBehaviorImplementation().create(
     behaviorDefinition: 'ZOK_I_CDS_TEST',
     description: 'Behavior Implementation for ZOK_I_CDS_TEST',
     transportRequest: 'E19K900001'
-  },
-  { activateOnCreate: true }
+  }
 );
+// The class shell exists. Its `source/main` — the generated binding to the
+// behavior definition — is `updateMain()`, and activation is `activate()`.
+await client.getBehaviorImplementation().activate({ className: 'ZBP_OK_I_CDS_TEST' });
 ```
 
 ## Developer Tools

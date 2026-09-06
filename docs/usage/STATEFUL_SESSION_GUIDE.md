@@ -6,28 +6,47 @@ This guide explains how `@mcp-abap-adt/adt-clients` manages ADT sessions for CRU
 
 - `AdtClient` and `Adt*` objects operate through `IAbapConnection`.
 - The connection maintains the ADT session (`sap-adt-connection-id`).
-- Lock/unlock operations return a `lockHandle` used by update/delete flows.
+- `lock` returns the `lockHandle`; `update` and `delete` carry it in
+  `options.lockHandle`, and `unlock` gives it back.
+- **Only `lock` and `unlock` change the session type.** `lock` sets stateful,
+  `unlock` restores stateless. No other member touches it — which is what stops
+  one object's write from resetting the session while another holds a lock.
 - Tests and helpers track locks in `.locks/active-locks.json`.
 
 ## Workflow Example
 
+Every member is one request, so the window is yours to open and close:
+
 ```typescript
 const client = new AdtClient(connection);
+const cls = client.getClass();
+const config = { className: 'ZCL_TEST' };
 
-await client.getClass().create({
-  className: 'ZCL_TEST',
-  packageName: 'ZPKG',
-  description: 'Test',
-}, { activateOnCreate: true });
+// The POST that makes the class shell. Nothing else.
+await cls.create({ ...config, packageName: 'ZPKG', description: 'Test' });
 
-await client.getClass().update({
-  className: 'ZCL_TEST',
-}, { sourceCode: updatedCode, activateOnUpdate: true });
+const locked = await cls.lock(config);          // stateful from here
+if (!locked.ok) throw new Error(locked.getError().message);
+const lockHandle = locked.getResult().value;
+
+try {
+  await cls.update(config, { sourceCode: updatedCode, lockHandle });
+} finally {
+  await cls.unlock(config, lockHandle);          // stateless again
+}
+
+await cls.activate(config);
 ```
+
+Passing no `lockHandle` is allowed. Whether a write without a lock is accepted
+is ADT's judgement about that object on that system, and its refusal comes back
+in the answer rather than as an exception this library invented.
 
 ## Cleanup Guidance
 
-- Always unlock or delete objects after failures.
+- Always unlock or delete objects after failures — the `try/finally` above is
+  the shape, because a handle left held makes the next create answer 403 with
+  nothing appearing to hold it.
 - Use the lock registry helpers to recover stale locks.
 
 ## The session belongs to the caller, not to this library

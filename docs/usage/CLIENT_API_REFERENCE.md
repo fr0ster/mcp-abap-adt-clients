@@ -7,9 +7,12 @@ This project exposes the following client classes:
 
 `ReadOnlyClient` and `CrudClient` have been removed in the builderless API.
 
-For the flow these members compose into — create → lock → update → unlock →
-activate, what each step actually does, and the two types where it does not
-hold — see [OBJECT_LIFECYCLE.md](OBJECT_LIFECYCLE.md).
+**Every member issues one ADT request.** `create` is the POST, `update` is the
+write and carries `options.lockHandle` as given, `delete` is the DELETE,
+`checkDeletion` is the approval ADT wants first, and `lock`/`unlock` are the
+window. You compose them — see
+[OBJECT_LIFECYCLE.md](OBJECT_LIFECYCLE.md) for the flow they make and the one
+type where it does not hold.
 
 ## AdtClient
 
@@ -158,18 +161,16 @@ const sourceState = await toggle.readSource(
 console.log(sourceState.sourceResult?.rollout?.defaultEnabledFor);
 // 'none' | 'someCustomers' | 'allCustomers' | ...
 
-// --- 7. Update the toggle (metadata + optional source) ---
-// The update chain is the canonical IAdtObject flow: lock → check → update →
-// (if source provided) uploadSource → unlock → check → activate. Pass
-// config.source to change rollout, toggledPackages, or attributes.
-await toggle.update(
-  { featureToggleName: 'ZMY_FEATURE' },
-  {
-    sourceCode: undefined,          // not used (source is JSON)
-    xmlContent: undefined,
-    activateOnUpdate: true,
-  },
-);
+// --- 7. Update the toggle (one request: the write) ---
+// Since 18.0.0 `update` is the write and nothing else. Lock it first if the
+// system asks for a handle, and activate afterwards if you want it active.
+const locked = await toggle.lock({ featureToggleName: 'ZMY_FEATURE' });
+const lockHandle = locked.ok ? locked.getResult().value : undefined;
+await toggle.update({ featureToggleName: 'ZMY_FEATURE' }, { lockHandle });
+if (lockHandle) {
+  await toggle.unlock({ featureToggleName: 'ZMY_FEATURE' }, lockHandle);
+}
+await toggle.activate({ featureToggleName: 'ZMY_FEATURE' });
 
 // --- 8. What a feature toggle does not have ---
 // Since 12.0.0 there is no readTransport(), and no getVersions()/
@@ -193,37 +194,32 @@ include — three different things, two of them easy to confuse:
 ```typescript
 const include = client.getInclude();
 
-await include.create(
-  {
-    includeName: 'ZMY_INCLUDE',
-    packageName: 'ZMY_PACKAGE',
-    description: 'Shared form routines',
-    transportRequest: 'DEVK900123',
-    sourceCode: '" shared routines',
-  },
-  { activateOnCreate: true },
-);
+// The POST that makes the include. It does not write the source.
+await include.create({
+  includeName: 'ZMY_INCLUDE',
+  packageName: 'ZMY_PACKAGE',
+  description: 'Shared form routines',
+  transportRequest: 'DEVK900123',
+});
 
 const source = await include.read({ includeName: 'ZMY_INCLUDE' });
 await include.update(
   { includeName: 'ZMY_INCLUDE' },
-  { sourceCode: '" changed', activateOnUpdate: true },
+  { sourceCode: '" changed' },
 );
+await include.activate({ includeName: 'ZMY_INCLUDE' });
 await include.delete({ includeName: 'ZMY_INCLUDE' });
 ```
 
 Contract notes:
-- **Activation is opt-in**, as `IAdtOperationOptions` says: `activateOnCreate`
-  and `activateOnUpdate` both default to `false`. `options.sourceCode` wins over
-  the config's, and `options.lockHandle` means you hold the lock — the handler
-  then writes only, and neither locks nor unlocks.
+- **Activation is a call, not an option.** `activate()` is its own member and
+  runs when you call it. `options.sourceCode` wins over the config's, and
+  `options.lockHandle` is passed to the write as given — including not at all,
+  in which case ADT decides whether an unlocked write is allowed and says so in
+  the answer.
 - **An empty source is a source.** `sourceCode: ''` clears an include; only
   `undefined` means none was given. An empty include is a valid object, so
   emptiness must be expressible.
-- **`deleteOnFailure`** removes the include again when a step *after* the
-  metadata POST fails — without it a half-made object is left behind under a
-  name your next attempt collides with. The original failure stays the reported
-  one; a rollback that cannot complete is recorded beside it, never instead.
 - **Creating one works on modern on-prem only.** Only there does discovery give
   the includes collection an `app:accept`, and a collection without one is not a
   POST target. Cloud answers `403 S_DEVELOP` for the type.

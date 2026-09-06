@@ -186,8 +186,10 @@ leaving exactly the undeletable object it is describing.
 
 **Prevention is the whole remedy this library offers:**
 
-- pass `deleteOnFailure` in the operation options on a create, so a chain that
-  fails after the POST removes what it made;
+- since 18.0.0 `create` is one POST, so it cannot leave a half-made object of
+  its own; what can is *your* sequence stopping between the POST and the write.
+  Wrap the steps that follow a create so a failure calls `delete` while the
+  object is still bound to its package;
 - treat a create as unfinished until you have seen the object *in its package* —
   `getUtils().search({ query: name })` answers `adtcore:packageName` for an
   object that resolved, and that is the attribute to look for;
@@ -203,7 +205,7 @@ ADT answers some refusals with **200** carrying an `<exc:exception>` document.
 The request reached the server and came back, so nothing throws and every layer
 above stores the body as a result.
 
-Measured on a trial: five of seven probed operation chains reported no errors
+Measured on a trial: five of seven probed operations reported no errors
 while SAP had refused, three of them writes — a caller believed an object existed
 that did not, and that one had been deleted that had not.
 

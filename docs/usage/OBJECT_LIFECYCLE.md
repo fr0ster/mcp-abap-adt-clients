@@ -7,8 +7,12 @@ they compose into one flow:
 create → lock → update → unlock → activate
 ```
 
-`read`, `check` and `delete` sit outside it. This page says what each member
-actually does, which parts are opt-in, and where the flow does not hold — the
+**You compose it.** Each member is one ADT request — that is the rule this
+library holds to since 18.0.0 — so the arrows above are calls you make, in the
+order you choose, seeing every answer. Nothing runs behind them.
+
+`read`, `checkDeletion`, `check` and `delete` sit outside the flow. This page
+says what each member actually does and where the flow does not hold — the
 exceptions are few and each of them is a property of ADT, not of this library.
 
 Everything below is measured against a real system. Where a claim is about the
@@ -32,74 +36,71 @@ What comes back is an object that exists, is inactive, and is empty. Source is a
 separate write, and activation is a separate call — which is exactly the order
 Eclipse uses.
 
-**Three options extend the create**, and each has to be asked for:
+**Nothing extends the create.** Since 18.0.0 it is the POST for every type,
+including the four that used to do more — function group, package, unit test
+class, service binding. The options that asked for extra steps
+(`activateOnCreate`, `deleteOnFailure`) are gone from `IAdtOperationOptions`,
+because there are no extra steps left to attach them to.
 
-| Option | What it adds |
-|---|---|
-| `sourceCode` | a lock → PUT → unlock after the create, for the types that carry source |
-| `activateOnCreate` | an activation once the source is in |
-| `deleteOnFailure` | deletes the object again if a later step in the same call fails |
+That also removes the case a rollback existed for: a create that answers a
+result made exactly one object, and a create that answers a failure made none.
+There is nothing half-made to clean up.
 
-`deleteOnFailure` is the one worth spelling out: it runs on the failure path
-only, and only if the create itself succeeded. A refused create leaves nothing
-to roll back, and the rollback must never remove an object the call did not
-make.
+## `update()` is the write, and the lock window is yours
 
-**Types whose create does more, unconditionally:**
-
-- **Function group** — validate → create → check. The check reads; it writes
-  nothing.
-- **Package** — validate → create → check.
-- **Unit test class** — creates the container class, activates it, then writes
-  the tests into it. A test class has nowhere to live otherwise; this one is
-  composite by nature.
-- **Service binding** — see [Service bindings](#service-bindings-publishing-is-the-editing)
-  below.
-
-## `update()` owns the lock window
-
-An update is the whole window, not just the PUT:
-
-```
-lock → check(source) → PUT → unlock → check(inactive) → [activate]
-```
-
-The lock is taken as the first step and released as its own step, and the
-session goes `stateful` for the lock and back to `stateless` after the unlock —
-a lock handle is only valid inside a stateful request on some releases, so
-going stateless before the unlock would break the unlock itself.
-
-If anything inside the window fails, the unlock still runs. That is not a
-`catch` around the PUT; it is registered when the lock is taken and discharged
-when the unlock happens normally, so it cannot run twice and cannot be skipped.
-
-**Activation is opt-in**: pass `activateOnUpdate`. Without it the object is left
-saved-but-inactive, which is a legitimate state and sometimes the one you want
-(several objects activated together afterwards, for instance).
-
-**To hold the lock yourself**, pass `lockHandle` in the options. The member then
-does the PUT and nothing else — no lock, no unlock, no check — and the chain is
-yours:
+An update is the PUT. It carries `options.lockHandle` as given, and issues no
+other request:
 
 ```typescript
-const lockHandle = /* from your own lock */;
-await client.getClass().update({ className: 'ZCL_TEST' }, {
-  sourceCode,
-  lockHandle,
-});
+const cls = client.getClass();
+const config = { className: 'ZCL_TEST' };
+
+const locked = await cls.lock(config);           // stateful from here
+if (!locked.ok) throw new Error(locked.getError().message);
+const lockHandle = locked.getResult().value;
+
+try {
+  await cls.update(config, { sourceCode, lockHandle });
+} finally {
+  await cls.unlock(config, lockHandle);           // stateless again
+}
+
+await cls.activate(config);                       // when you want it active
 ```
 
-This is what you want when one lock covers several writes — a class and its test
-include, say, which are written under the *class's* lock.
+`lock` and `unlock` are the only members that change the session type: `lock`
+sets `stateful`, `unlock` restores `stateless`. A lock handle is only valid
+inside a stateful request on some releases, which is why the unlock has to
+happen before anything puts the session back — and why the `finally` above is
+the shape to copy.
+
+**Passing no handle is allowed.** Whether a write without a lock is accepted is
+ADT's judgement about that object on that system; its refusal comes back in the
+answer, naming what it wants. This library does not raise one of its own.
+
+**One lock can cover several writes** — a class and its test include, say, which
+are both written under the *class's* lock. That was always possible by passing
+`lockHandle`; now it is simply how the member works.
+
+**Leaving an object saved-but-inactive is a legitimate state**, and sometimes the
+one you want — several objects activated together afterwards, for instance. Not
+calling `activate` is how you get it.
 
 ## `delete()` does not lock, and works on all but one thing
 
-```
-check(deletion) → delete
+`delete` is the delete, and `checkDeletion` is the approval ADT wants first —
+two members, one request each, both against `/sap/bc/adt/deletion/…`, which is
+ADT's own deletion service. There is no lock to take and none to release.
+
+```typescript
+const approved = await client.getClass().checkDeletion(config);
+if (!approved.ok) throw new Error(approved.getError().message);
+await client.getClass().delete(config);
 ```
 
-Both go to `/sap/bc/adt/deletion/…`, which is ADT's own deletion service. There
-is no lock to take and none to release.
+Running `delete` without the check is allowed: ADT answers its own refusal. What
+you lose is the reason — the check's document names what still points at the
+object, and the delete's does not.
 
 The check is a question, and the delete is the answer to a different one. A
 refusal arrives as `del:isDeleted` on the delete — not as `del:isDeletable`,
@@ -109,8 +110,7 @@ which belongs to the check — and `packageDeletionRefusal` reads the right one.
 to a package. The deletion check resolves an object through its package — its
 answer carries `adtcore:packageName` when it found one and says "Object does not
 exist" when it did not — so an unbound object is reported absent while its name
-stays taken, and there is nothing for the delete to act on. `deleteOnFailure`
-exists for the case that produces it; see
+stays taken, and there is nothing for the delete to act on. See
 [TROUBLESHOOTING.md](TROUBLESHOOTING.md#an-object-that-exists-holds-its-name-and-cannot-be-deleted).
 
 ## `activate()` and what counts as a failure
@@ -322,10 +322,12 @@ What `validate()` does **not** answer is whether the object exists: a name that
 is free validates fine whether or not anything was ever created under it. For
 existence, read.
 
-**Which is why an abandoned create is worth cleaning up.** A create that failed
-partway, or one whose source was never written, leaves a name that nothing else
-can use and — for a class — an object that no read can see. `deleteOnFailure` in
-the operation options exists for the first case; the second is yours to notice.
+**Which is why an abandoned create is worth cleaning up.** A create whose source
+was never written leaves a name that nothing else can use and — for a class — an
+object that no read can see. Since `create` is one request, that is the only way
+to reach the state: the sequence stopped between the POST and the write, and
+noticing it is yours. `delete` is the remedy while the object is still bound to
+its package.
 
 ## Absence does not have one wording
 
