@@ -26,7 +26,10 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { activationRefusal } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
+import { deletionRefusal } from '../../utils/deletionCheck';
+import { encodeSapObjectName } from '../../utils/internalUtils';
 import { validationRefusal } from '../../utils/validationRefusal';
+import { checkDeletionByUri } from '../shared/deletionCheckByUri';
 import {
   createLockTracker,
   type LockRegistry,
@@ -255,6 +258,29 @@ export class AdtMetadataExtension<
   }
 
   /** Delete the object. */
+  /**
+   * Ask whether the object can be deleted now.
+   *
+   * Its delete is a DELETE on its own URL rather than the deletion service, but
+   * the question is the service's either way: it is asked about an address.
+   */
+  async checkDeletion<E extends IAdtError = IAdtError>(
+    config: Partial<IMetadataExtensionConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+    const name = this.name(config);
+
+    return answering(
+      () =>
+        checkDeletionByUri(
+          this.connection,
+          `/sap/bc/adt/ddic/ddlx/sources/${encodeSapObjectName(name).toLowerCase()}`,
+        ),
+      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
+    );
+  }
+
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IMetadataExtensionConfig>,
     options?: IAdtOperationOptions<E>,

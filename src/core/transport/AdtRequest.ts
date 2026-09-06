@@ -33,6 +33,7 @@ import type {
   IAdtResponse,
   IAdtSystemContext,
   IAdtUpdatable,
+  IAnalyse,
   IDeferredResponseConnection,
   IListTransportsOptions,
   ILogger,
@@ -41,6 +42,8 @@ import type {
 import { TRANSPORT_SEARCH_CONFIGURATIONS_URL } from '@mcp-abap-adt/interfaces';
 import { TransportSearchConfigurationMissing } from '../../utils/adtErrors';
 import { answering } from '../../utils/adtResponse';
+import { deletionRefusal } from '../../utils/deletionCheck';
+import { checkDeletionByUri } from '../shared/deletionCheckByUri';
 import { createTransport } from './create';
 import { deleteTransport } from './delete';
 import { getTransportSearchConfigurations, listTransports } from './list';
@@ -279,6 +282,29 @@ export class AdtRequest<
    * ADT accepts this only for a request that holds no objects; a non-empty
    * request is rejected by the server, not by this client.
    */
+  /**
+   * Ask whether the object can be deleted now.
+   *
+   * ADT deletes only an empty request, and whether this one is empty right now
+   * is the server's to say.
+   */
+  async checkDeletion<E extends IAdtError = IAdtError>(
+    config: Partial<ITransportConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deleted']>, E>> {
+    const number = this.number(config);
+
+    return answering(
+      () =>
+        checkDeletionByUri(
+          this.connection,
+          `/sap/bc/adt/cts/transportrequests/${encodeURIComponent(number)}`,
+        ),
+      this.results.deleted as IResultStrategy<ReturnType<R['deleted']>>,
+      (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
+    );
+  }
+
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<ITransportConfig>,
     options?: IAdtOperationOptions<E>,

@@ -334,6 +334,25 @@ export class AdtBehaviorImplementation<
   }
 
   /** Delete the implementation class — the class's own delete, checks and all. */
+  /**
+   * Ask whether the implementation class can be deleted now.
+   *
+   * Delegated, like the delete: a behavior implementation *is* its class, and
+   * the deletion service is asked about the class's URI.
+   */
+  async checkDeletion<E extends IAdtError = IAdtError>(
+    config: Partial<IBehaviorImplementationConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+    return this.class.checkDeletion(
+      {
+        className: this.name(config),
+        transportRequest: config.transportRequest,
+      },
+      options,
+    );
+  }
+
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IBehaviorImplementationConfig>,
     options?: IAdtOperationOptions<E>,

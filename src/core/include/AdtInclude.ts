@@ -27,11 +27,13 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { activationRefusal } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
+import { deletionRefusal } from '../../utils/deletionCheck';
 import { validationRefusal } from '../../utils/validationRefusal';
+import { checkDeletionByUri } from '../shared/deletionCheckByUri';
 import { activateInclude } from './activation';
 import { create } from './create';
 import { deleteInclude } from './delete';
-import { lockInclude } from './lock';
+import { includeUrl, lockInclude } from './lock';
 import { getIncludeMetadata, getIncludeSource } from './read';
 import { type IIncludeResults, includeDocuments } from './types';
 import { unlockInclude } from './unlock';
@@ -227,6 +229,25 @@ export class AdtInclude<
    * object is gone, so it is not a failure of the delete — which is exactly
    * what `chain` does with a cleanup that throws.
    */
+  /**
+   * Ask whether the object can be deleted now.
+   *
+   * The deletion service is asked by URI, and a standalone include has one of
+   * its own — unlike a class include, which is emptied by writing its parent.
+   */
+  async checkDeletion<E extends IAdtError = IAdtError>(
+    config: Partial<IIncludeConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+    const includeName = requireName(config);
+
+    return answering(
+      () => checkDeletionByUri(this.connection, includeUrl(includeName)),
+      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
+    );
+  }
+
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IIncludeConfig>,
     options?: IAdtOperationOptions<E>,

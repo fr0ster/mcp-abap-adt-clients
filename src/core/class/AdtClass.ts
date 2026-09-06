@@ -41,6 +41,7 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
 import { answering } from '../../utils/adtResponse';
+import { deletionRefusal } from '../../utils/deletionCheck';
 import { safeErrorMessage } from '../../utils/internalUtils';
 import { validationRefusal } from '../../utils/validationRefusal';
 import type { LockRegistry } from '../shared/LockRegistry';
@@ -49,7 +50,7 @@ import type { IReadOptions } from '../shared/types';
 import { AdtClassMemberBase } from './AdtClassMemberBase';
 import { checkClass, checkClassLocalTestClass } from './check';
 import { create as createClass } from './create';
-import { deleteClass } from './delete';
+import { checkDeletion, deleteClass } from './delete';
 import { lockClass } from './lock';
 import { getClassSource } from './read';
 import {
@@ -260,6 +261,28 @@ export class AdtClass<
   }
 
   /**
+   * Ask whether the class can be deleted now.
+   */
+  async checkDeletion<E extends IAdtError = IAdtError>(
+    config: Partial<IClassConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+    if (!config.className) {
+      throw new Error('Class name is required');
+    }
+
+    return answering(
+      () =>
+        checkDeletion(this.connection, {
+          class_name: config.className as string,
+          transport_request: config.transportRequest,
+        }),
+      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
+    );
+  }
+
+  /**
    * Delete class
    */
   async delete<E extends IAdtError = IAdtError>(
@@ -270,10 +293,9 @@ export class AdtClass<
       throw new Error('Class name is required');
     }
 
-    // One member, one endpoint. The deletion check that used to run first is a
-    // different endpoint and a different question — `getUtils().checkDeletionGroup`
-    // asks it, for one object or many — and a caller who wants it asks it. This
-    // is the delete, and it leaves the session mode alone.
+    // One member, one endpoint. The approval ADT wants first is `checkDeletion`
+    // above — a caller who wants it asks it, and reads what it said. This is the
+    // delete, and it leaves the session mode alone.
     return answering(
       () =>
         deleteClass(this.connection, {
