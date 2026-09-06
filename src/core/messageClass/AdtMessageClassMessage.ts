@@ -31,6 +31,7 @@ import type {
   IAdtCreatable,
   IAdtDeletable,
   IAdtError,
+  IAdtMetadataReadable,
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
@@ -81,11 +82,8 @@ export class AdtMessageClassMessage<
   > = IMessageClassMessageResults,
 > implements
     IAdtCreatable<IMessageClassMessageConfig, ReturnType<R['written']>>,
-    IAdtReadable<
-      IMessageClassMessageConfig,
-      ReturnType<R['read']>,
-      ReturnType<R['read']>
-    >,
+    IAdtReadable<IMessageClassMessageConfig, ReturnType<R['read']>>,
+    IAdtMetadataReadable<IMessageClassMessageConfig, ReturnType<R['read']>>,
     IAdtUpdatable<IMessageClassMessageConfig, ReturnType<R['written']>>
 {
   private readonly connection: IAbapConnection;

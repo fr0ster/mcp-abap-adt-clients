@@ -382,7 +382,7 @@ describe('Shared - read Accept headers (corrected)', () => {
     logTestStep('read domain', testsLogger);
     const state = await runReadWithAcceptLogging(
       'read domain',
-      client.getDomain().read({ domainName }),
+      client.getDomain().readMetadata({ domainName }),
     );
     assertReadResult(state, 'domain', domainName);
 
@@ -408,7 +408,7 @@ describe('Shared - read Accept headers (corrected)', () => {
     logTestStep('read data element', testsLogger);
     const state = await runReadWithAcceptLogging(
       'read data element',
-      client.getDataElement().read({ dataElementName }),
+      client.getDataElement().readMetadata({ dataElementName }),
     );
     assertReadResult(state, 'data element', dataElementName);
 
@@ -490,7 +490,7 @@ describe('Shared - read Accept headers (corrected)', () => {
     logTestStep('read table type', testsLogger);
     const state = await runReadWithAcceptLogging(
       'read table type',
-      client.getTableType().read({ tableTypeName }),
+      client.getTableType().readMetadata({ tableTypeName }),
     );
     assertReadResult(state, 'table type', tableTypeName);
 
@@ -542,7 +542,7 @@ describe('Shared - read Accept headers (corrected)', () => {
     logTestStep('read function group', testsLogger);
     const state = await runReadWithAcceptLogging(
       'read function group',
-      client.getFunctionGroup().read({ functionGroupName }),
+      client.getFunctionGroup().readMetadata({ functionGroupName }),
     );
     assertReadResult(state, 'function group', functionGroupName);
 
@@ -614,7 +614,7 @@ describe('Shared - read Accept headers (corrected)', () => {
     logTestStep('read package', testsLogger);
     const state = await runReadWithAcceptLogging(
       'read package',
-      client.getPackage().read({ packageName }),
+      client.getPackage().readMetadata({ packageName }),
     );
     assertReadResult(state, 'package', packageName);
 

@@ -153,6 +153,7 @@ const ATOM_VERB: Record<string, string | { method: string; url: RegExp }> = {
   read: 'GET',
   readMetadata: 'GET',
   update: 'PUT',
+  updateMetadata: 'PUT',
   // Not every object is deleted by a DELETE on its own URI: ADT has a deletion
   // service — POST /deletion/check then POST /deletion/delete — and the handlers
   // that carry external references go through it. Both count, and nothing else
@@ -215,12 +216,12 @@ const VERB_BY_HANDLER: Record<string, string> = {
  * here.
  */
 const VERB_NOT_REACHED: Record<string, string> = {
-  'tableType.update':
+  'tableType.updateMetadata':
     'read-modify-write: it GETs the table type first, and the generic body is not one to patch',
-  'dataElement.update':
+  'dataElement.updateMetadata':
     'read-modify-write; the generic body has no doma/dtel structure to patch',
-  'package.update': 'read-modify-write over package XML',
-  'transport.update':
+  'package.updateMetadata': 'read-modify-write over package XML',
+  'transport.updateMetadata':
     'reads the request first; the generic body is not a tm:request',
   'service.update':
     'reads the binding first; the generic body is not a binding',

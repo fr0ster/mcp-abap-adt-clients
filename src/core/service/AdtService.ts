@@ -7,6 +7,7 @@ import type {
   IAdtDeletable,
   IAdtError,
   IAdtLockable,
+  IAdtMetadataReadable,
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
@@ -108,11 +109,8 @@ export class AdtServiceBinding<
   R extends IServiceResults = typeof serviceDocuments,
 > implements
     IAdtCreatable<IServiceBindingConfig, ReturnType<R['created']>>,
-    IAdtReadable<
-      IServiceBindingConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    >,
+    IAdtReadable<IServiceBindingConfig, ReturnType<R['source']>>,
+    IAdtMetadataReadable<IServiceBindingConfig, ReturnType<R['metadata']>>,
     IAdtUpdatable<IServiceBindingConfig, ReturnType<R['updated']>>,
     IAdtDeletable<
       IServiceBindingConfig,

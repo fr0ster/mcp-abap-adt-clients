@@ -17,6 +17,7 @@ import type {
   IAdtDeletable,
   IAdtError,
   IAdtLockable,
+  IAdtMetadataReadable,
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
@@ -67,11 +68,8 @@ export class AdtDdl<
   > = IDdlResults,
 > implements
     IAdtCreatable<IDdlConfig, ReturnType<R['created']>>,
-    IAdtReadable<
-      IDdlConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    >,
+    IAdtReadable<IDdlConfig, ReturnType<R['source']>>,
+    IAdtMetadataReadable<IDdlConfig, ReturnType<R['metadata']>>,
     IAdtUpdatable<IDdlConfig, ReturnType<R['updated']>>,
     IAdtDeletable<
       IDdlConfig,

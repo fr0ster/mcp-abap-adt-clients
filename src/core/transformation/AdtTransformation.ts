@@ -13,6 +13,7 @@ import type {
   IAdtDeletable,
   IAdtError,
   IAdtLockable,
+  IAdtMetadataReadable,
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
@@ -102,11 +103,8 @@ export class AdtTransformation<
   > = ITransformationResults,
 > implements
     IAdtCreatable<ITransformationConfig, ReturnType<R['created']>>,
-    IAdtReadable<
-      ITransformationConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    >,
+    IAdtReadable<ITransformationConfig, ReturnType<R['source']>>,
+    IAdtMetadataReadable<ITransformationConfig, ReturnType<R['metadata']>>,
     IAdtUpdatable<ITransformationConfig, ReturnType<R['updated']>>,
     IAdtDeletable<
       ITransformationConfig,

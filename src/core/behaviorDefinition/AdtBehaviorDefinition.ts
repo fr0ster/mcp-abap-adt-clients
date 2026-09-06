@@ -12,6 +12,7 @@ import type {
   IAdtDeletable,
   IAdtError,
   IAdtLockable,
+  IAdtMetadataReadable,
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
@@ -74,11 +75,8 @@ export class AdtBehaviorDefinition<
   > = IBehaviorDefinitionResults,
 > implements
     IAdtCreatable<IBehaviorDefinitionConfig, ReturnType<R['created']>>,
-    IAdtReadable<
-      IBehaviorDefinitionConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    >,
+    IAdtReadable<IBehaviorDefinitionConfig, ReturnType<R['source']>>,
+    IAdtMetadataReadable<IBehaviorDefinitionConfig, ReturnType<R['metadata']>>,
     IAdtUpdatable<IBehaviorDefinitionConfig, ReturnType<R['updated']>>,
     IAdtDeletable<
       IBehaviorDefinitionConfig,

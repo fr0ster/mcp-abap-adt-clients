@@ -16,6 +16,7 @@ import type {
   IAdtContentTypes,
   IAdtDeletable,
   IAdtError,
+  IAdtMetadataReadable,
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
@@ -69,11 +70,8 @@ export class AdtLocalTypes<
   >
   extends AdtClassMemberBase<R>
   implements
-    IAdtReadable<
-      ILocalTypesConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    >,
+    IAdtReadable<ILocalTypesConfig, ReturnType<R['source']>>,
+    IAdtMetadataReadable<ILocalTypesConfig, ReturnType<R['metadata']>>,
     IAdtUpdatable<ILocalTypesConfig, ReturnType<R['updated']>>,
     IAdtValidatable<ILocalTypesConfig, ReturnType<R['validation']>>,
     IAdtCheckable<ILocalTypesConfig, ReturnType<R['check']>>,

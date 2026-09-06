@@ -66,7 +66,7 @@ describe('legacy transport update/delete', () => {
     const { connection, calls } = recordingConnection();
 
     const failure = expectFailure(
-      await new AdtRequestLegacy(connection).update(),
+      await new AdtRequestLegacy(connection).updateMetadata(),
       'legacy update',
     );
 

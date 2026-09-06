@@ -16,6 +16,7 @@ import type {
   IAdtDeletable,
   IAdtError,
   IAdtLockable,
+  IAdtMetadataReadable,
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
@@ -106,11 +107,8 @@ export class AdtAppendStructure<
   > = IAppendStructureResults,
 > implements
     IAdtCreatable<IAppendStructureConfig, ReturnType<R['created']>>,
-    IAdtReadable<
-      IAppendStructureConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    >,
+    IAdtReadable<IAppendStructureConfig, ReturnType<R['source']>>,
+    IAdtMetadataReadable<IAppendStructureConfig, ReturnType<R['metadata']>>,
     IAdtUpdatable<IAppendStructureConfig, ReturnType<R['updated']>>,
     IAdtDeletable<
       IAppendStructureConfig,

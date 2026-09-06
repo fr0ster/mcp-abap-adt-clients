@@ -16,6 +16,7 @@ import type {
   IAdtDeletable,
   IAdtError,
   IAdtLockable,
+  IAdtMetadataReadable,
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
@@ -57,6 +58,7 @@ import {
 } from './types';
 import { unlockFeatureToggle } from './unlock';
 import { updateFeatureToggle } from './update';
+import { uploadFeatureToggleSource } from './updateSource';
 import { validateFeatureToggleName } from './validation';
 
 export class AdtFeatureToggle<
@@ -74,11 +76,8 @@ export class AdtFeatureToggle<
   > = IFeatureToggleResults,
 > implements
     IAdtCreatable<IFeatureToggleConfig, ReturnType<R['created']>>,
-    IAdtReadable<
-      IFeatureToggleConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    >,
+    IAdtReadable<IFeatureToggleConfig, ReturnType<R['source']>>,
+    IAdtMetadataReadable<IFeatureToggleConfig, ReturnType<R['metadata']>>,
     IAdtUpdatable<IFeatureToggleConfig, ReturnType<R['updated']>>,
     IAdtDeletable<
       IFeatureToggleConfig,
@@ -226,13 +225,13 @@ export class AdtFeatureToggle<
   }
 
   /**
-   * Write the object.
+   * Write the toggle's own document.
    *
-   * With `options.lockHandle` the caller holds the lock and owns the chain, so
-   * this is one request. Without it, this locks, checks, writes and unlocks —
-   * and the unlock happens on every path out.
+   * A feature toggle is one of three types with two writable resources: this
+   * document at `/sfw/featuretoggles/{name}`, and its JSON source at
+   * `source/main`, which `update` writes.
    */
-  async update<E extends IAdtError = IAdtError>(
+  async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IFeatureToggleConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
@@ -242,6 +241,38 @@ export class AdtFeatureToggle<
           this.connection,
           this.createParams(config as IFeatureToggleConfig),
           options?.lockHandle,
+        ),
+      this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * Write the toggle's JSON source — the rollout, the toggled packages and the
+   * attributes.
+   *
+   * There was no member for this at all until 18.0.0: `uploadFeatureToggleSource`
+   * existed and nothing reached it, while `update` wrote the document. Now the
+   * names say which resource each one addresses, as everywhere else.
+   */
+  async update<E extends IAdtError = IAdtError>(
+    config: Partial<IFeatureToggleConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+    const name = this.name(config);
+    const source = config.source;
+    if (!source) {
+      throw new Error('source is required to write a feature toggle source');
+    }
+
+    return answering(
+      () =>
+        uploadFeatureToggleSource(
+          this.connection,
+          name,
+          source,
+          options?.lockHandle,
+          config.transportRequest,
         ),
       this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
       options?.analyse,

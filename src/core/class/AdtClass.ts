@@ -28,6 +28,7 @@ import type {
   IAdtDeletable,
   IAdtError,
   IAdtLockable,
+  IAdtMetadataReadable,
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
@@ -78,11 +79,8 @@ export class AdtClass<
   extends AdtClassMemberBase<R>
   implements
     IAdtCreatable<IClassConfig, ReturnType<R['created']>>,
-    IAdtReadable<
-      IClassConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    >,
+    IAdtReadable<IClassConfig, ReturnType<R['source']>>,
+    IAdtMetadataReadable<IClassConfig, ReturnType<R['metadata']>>,
     IAdtUpdatable<IClassConfig, ReturnType<R['updated']>>,
     IAdtDeletable<
       IClassConfig,

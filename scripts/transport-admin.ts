@@ -43,7 +43,10 @@ async function main(): Promise<void> {
 
     if (action === 'describe') {
       const [transportNumber, description] = rest;
-      const answer = await requests.update({ transportNumber, description });
+      const answer = await requests.updateMetadata({
+        transportNumber,
+        description,
+      });
       // biome-ignore lint/suspicious/noConsole: same
       console.log(
         answer.ok

@@ -46,7 +46,7 @@ export class AdtPackageLegacy<
     return failed<ReturnType<R['created']>, E>(UNSUPPORTED as E);
   }
 
-  override async read<E extends IAdtError = IAdtError>(): Promise<
+  async read<E extends IAdtError = IAdtError>(): Promise<
     IAdtResponse<ReturnType<R['source']>, E>
   > {
     return failed<ReturnType<R['source']>, E>(UNSUPPORTED as E);
@@ -64,7 +64,7 @@ export class AdtPackageLegacy<
     return failed<ReturnType<R['validation']>, E>(UNSUPPORTED as E);
   }
 
-  override async update<E extends IAdtError = IAdtError>(): Promise<
+  override async updateMetadata<E extends IAdtError = IAdtError>(): Promise<
     IAdtResponse<ReturnType<R['updated']>, E>
   > {
     return failed<ReturnType<R['updated']>, E>(UNSUPPORTED as E);

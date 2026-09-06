@@ -7,7 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [18.0.0] - 2026-09-06
 
-Requires `@mcp-abap-adt/interfaces@^35.0.0`.
+Requires `@mcp-abap-adt/interfaces@^36.0.0`.
 
 **Every member answers the contract, issues one request, and the reading is
 yours.** 17.0.0 moved `getUtils()` onto `IAdtResponse` and said the per-type
@@ -405,7 +405,12 @@ the sequence around a write handed back to the consumer.
    coming back with lock refusals from the server, that is the missing step.
 9. **Call `checkDeletion()` before `delete()`** where you relied on the delete
    refusing an object something still points at.
-10. **Replace `delete()` with `update()` on the seven types that do not delete**
+10. **Rename `read`/`update` to `readMetadata`/`updateMetadata` on the eight
+    document-only types**, and check the two whose `update` changed which
+    resource it writes (`getFunctionInclude()`, `getFeatureToggle()`). The
+    compiler finds the first group for you; it cannot find the second, because
+    the call still type-checks and writes somewhere else.
+11. **Replace `delete()` with `update()` on the seven types that do not delete**
     — the four class includes, a message-class message, and the two unit-test
     handlers. Writing empty content is what removing them has always meant, and
     the contract now says so.

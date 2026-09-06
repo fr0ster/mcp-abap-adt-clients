@@ -11,11 +11,15 @@ export async function uploadFeatureToggleSource(
   connection: IAbapConnection,
   name: string,
   source: IFeatureToggleSource,
-  lockHandle: string,
+  lockHandle?: string,
   transportRequest?: string,
 ): Promise<IAdtWireResponse> {
   const encoded = encodeSapObjectName(name.toLowerCase());
-  const params: Record<string, string> = { lockHandle };
+  // The handle is sent when there is one. Whether an unlocked write is allowed
+  // is ADT's judgement about this toggle on this system, not a refusal to raise
+  // here — the same rule every other write in this package follows.
+  const params: Record<string, string> = {};
+  if (lockHandle) params.lockHandle = lockHandle;
   if (transportRequest) params.corrNr = transportRequest;
   return connection.makeAdtRequest({
     method: 'PUT',

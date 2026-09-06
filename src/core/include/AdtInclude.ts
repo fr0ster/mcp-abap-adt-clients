@@ -15,6 +15,7 @@ import type {
   IAdtDeletable,
   IAdtError,
   IAdtLockable,
+  IAdtMetadataReadable,
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
@@ -59,11 +60,8 @@ export class AdtInclude<
   > = IIncludeResults,
 > implements
     IAdtCreatable<IIncludeConfig, ReturnType<R['created']>>,
-    IAdtReadable<
-      IIncludeConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    >,
+    IAdtReadable<IIncludeConfig, ReturnType<R['source']>>,
+    IAdtMetadataReadable<IIncludeConfig, ReturnType<R['metadata']>>,
     IAdtUpdatable<IIncludeConfig, ReturnType<R['updated']>>,
     IAdtDeletable<
       IIncludeConfig,

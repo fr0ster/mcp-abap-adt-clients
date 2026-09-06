@@ -46,6 +46,35 @@ That also removes the case a rollback existed for: a create that answers a
 result made exactly one object, and a create that answers a failure made none.
 There is nothing half-made to clean up.
 
+## A member is named for the resource it addresses
+
+Since `@mcp-abap-adt/interfaces` 36.0.0 the four members say which of an object's
+two resources they touch, and a type offers only the pairs it has:
+
+| | reads | writes |
+|---|---|---|
+| the **source** at `source/main` | `read` | `update` |
+| the object's **own document** | `readMetadata` | `updateMetadata` |
+
+A class, a program, a DDL source have a source: `read`/`update`. A **domain, a
+data element, a package, a table type, a function group, a transport request, a
+message class and an authorization field have none** — they *are* their document,
+so they offer `readMetadata`/`updateMetadata` and nothing else. Three types have
+both: a function include, a scalar function implementation and a feature toggle.
+
+```typescript
+// a class — has a source
+await client.getClass().update({ className }, { sourceCode, lockHandle });
+
+// a domain — is its document
+await client.getDomain().updateMetadata({ domainName, datatype: 'CHAR' }, { lockHandle });
+```
+
+This replaced a shape where one atom demanded both members from every type, and
+eight of them answered `read` and `readMetadata` with the **identical request** —
+one endpoint behind two members. The old contract said so itself: *"For objects
+without source code (Domain, DataElement), this returns metadata XML."*
+
 ## `update()` is the write, and the lock window is yours
 
 An update is the PUT. It carries `options.lockHandle` as given, and issues no

@@ -240,7 +240,7 @@ describe('AdtRequest', () => {
             try {
               logTestStep('read', testsLogger);
               const readState = expectResult(
-                await client.getRequest().read({
+                await client.getRequest().readMetadata({
                   transportNumber,
                 }),
                 'readState',

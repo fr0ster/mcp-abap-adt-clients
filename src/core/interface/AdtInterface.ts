@@ -21,6 +21,7 @@ import type {
   IAdtDeletable,
   IAdtError,
   IAdtLockable,
+  IAdtMetadataReadable,
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
@@ -79,11 +80,8 @@ export class AdtInterface<
   > = IInterfaceResults,
 > implements
     IAdtCreatable<IInterfaceConfig, ReturnType<R['created']>>,
-    IAdtReadable<
-      IInterfaceConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    >,
+    IAdtReadable<IInterfaceConfig, ReturnType<R['source']>>,
+    IAdtMetadataReadable<IInterfaceConfig, ReturnType<R['metadata']>>,
     IAdtUpdatable<IInterfaceConfig, ReturnType<R['updated']>>,
     IAdtDeletable<
       IInterfaceConfig,

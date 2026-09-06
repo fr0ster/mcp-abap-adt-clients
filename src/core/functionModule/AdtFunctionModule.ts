@@ -22,6 +22,7 @@ import type {
   IAdtDeletable,
   IAdtError,
   IAdtLockable,
+  IAdtMetadataReadable,
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
@@ -79,11 +80,8 @@ export class AdtFunctionModule<
   > = IFunctionModuleResults,
 > implements
     IAdtCreatable<IFunctionModuleConfig, ReturnType<R['created']>>,
-    IAdtReadable<
-      IFunctionModuleConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    >,
+    IAdtReadable<IFunctionModuleConfig, ReturnType<R['source']>>,
+    IAdtMetadataReadable<IFunctionModuleConfig, ReturnType<R['metadata']>>,
     IAdtUpdatable<IFunctionModuleConfig, ReturnType<R['updated']>>,
     IAdtDeletable<
       IFunctionModuleConfig,

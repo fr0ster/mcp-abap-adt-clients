@@ -16,6 +16,7 @@ import type {
   IAdtCreatable,
   IAdtDeletable,
   IAdtLockable,
+  IAdtMetadataReadable,
   IAdtReadable,
   IAdtRunnable,
   IAdtUpdatable,
@@ -60,7 +61,8 @@ type _UnitIsCreatable = Satisfies<
 >;
 type _UnitIsReadable = Satisfies<
   UnitTestHandler,
-  IAdtReadable<IUnitTestConfig, string, string>
+  IAdtReadable<IUnitTestConfig, string> &
+    IAdtMetadataReadable<IUnitTestConfig, string>
 >;
 type _UnitIsUpdatable = Satisfies<
   UnitTestHandler,

@@ -16,6 +16,7 @@ import type {
   IAdtDeletable,
   IAdtError,
   IAdtLockable,
+  IAdtMetadataReadable,
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
@@ -78,11 +79,8 @@ export class AdtEnhancement<
   > = IEnhancementResults,
 > implements
     IAdtCreatable<IEnhancementConfig, ReturnType<R['created']>>,
-    IAdtReadable<
-      IEnhancementConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    >,
+    IAdtReadable<IEnhancementConfig, ReturnType<R['source']>>,
+    IAdtMetadataReadable<IEnhancementConfig, ReturnType<R['metadata']>>,
     IAdtUpdatable<IEnhancementConfig, ReturnType<R['updated']>>,
     IAdtDeletable<
       IEnhancementConfig,

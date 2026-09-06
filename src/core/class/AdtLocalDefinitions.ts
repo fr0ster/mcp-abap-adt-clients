@@ -17,6 +17,7 @@ import type {
   IAdtContentTypes,
   IAdtDeletable,
   IAdtError,
+  IAdtMetadataReadable,
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
@@ -70,11 +71,8 @@ export class AdtLocalDefinitions<
   >
   extends AdtClassMemberBase<R>
   implements
-    IAdtReadable<
-      ILocalDefinitionsConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    >,
+    IAdtReadable<ILocalDefinitionsConfig, ReturnType<R['source']>>,
+    IAdtMetadataReadable<ILocalDefinitionsConfig, ReturnType<R['metadata']>>,
     IAdtUpdatable<ILocalDefinitionsConfig, ReturnType<R['updated']>>,
     IAdtValidatable<ILocalDefinitionsConfig, ReturnType<R['validation']>>,
     IAdtCheckable<ILocalDefinitionsConfig, ReturnType<R['check']>>,

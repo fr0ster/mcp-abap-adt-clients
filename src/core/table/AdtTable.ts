@@ -17,6 +17,7 @@ import type {
   IAdtDeletable,
   IAdtError,
   IAdtLockable,
+  IAdtMetadataReadable,
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
@@ -67,11 +68,8 @@ export class AdtTable<
   > = ITableResults,
 > implements
     IAdtCreatable<ITableConfig, ReturnType<R['created']>>,
-    IAdtReadable<
-      ITableConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    >,
+    IAdtReadable<ITableConfig, ReturnType<R['source']>>,
+    IAdtMetadataReadable<ITableConfig, ReturnType<R['metadata']>>,
     IAdtUpdatable<ITableConfig, ReturnType<R['updated']>>,
     IAdtDeletable<
       ITableConfig,

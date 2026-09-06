@@ -288,7 +288,7 @@ describe('ServiceBinding (using AdtClient)', () => {
     }
 
     const existing = presenceOf(
-      await client.getPackage().read({ packageName: testSubpackage }),
+      await client.getPackage().readMetadata({ packageName: testSubpackage }),
       `package ${testSubpackage}`,
     );
     if (existing.present === true) {
@@ -299,13 +299,10 @@ describe('ServiceBinding (using AdtClient)', () => {
       new Promise((resolve) => setTimeout(resolve, ms));
     const waitForPackage = async (): Promise<boolean> => {
       for (let i = 0; i < 4; i += 1) {
-        const state = await client
-          .getPackage()
-          .read(
-            { packageName: testSubpackage },
-            'active',
-            i > 0 ? { withLongPolling: true } : undefined,
-          );
+        const state = await client.getPackage().readMetadata({
+          packageName: testSubpackage,
+          ...(i > 0 ? { withLongPolling: true } : {}),
+        } as { packageName: string });
         // `state.ok`, not `state`: an answer is an object either way, so this
         // returned true on the first pass and waited for nothing.
         if (state.ok) {

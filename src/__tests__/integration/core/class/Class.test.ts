@@ -348,7 +348,7 @@ describe('Class (using AdtClient)', () => {
           const result = expectResult(
             await client
               .getRequest()
-              .read({ transportNumber: transportRequest }),
+              .readMetadata({ transportNumber: transportRequest }),
             'read transport request',
           );
           expect(result).toContain(transportRequest);

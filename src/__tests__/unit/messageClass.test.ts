@@ -127,7 +127,7 @@ describe('AdtMessageClass', () => {
           headers: {},
         }) as IAdtWireResponse,
     );
-    await new AdtMessageClass(c, noopLogger).update(
+    await new AdtMessageClass(c, noopLogger).updateMetadata(
       { name: 'ZT', description: 'NEW', transportRequest: 'DEVK900001' },
       { lockHandle: 'LOCK_HANDLE_42' },
     );
@@ -211,7 +211,10 @@ describe('AdtMessageClass', () => {
     );
     // The document, as it arrived. `parseMessageClass` is the reading beside
     // it — the member answers the class, not a shape chosen for the caller.
-    const document = expectResult(await mc.read({ name: 'ZT' }), 'read');
+    const document = expectResult(
+      await mc.readMetadata({ name: 'ZT' }),
+      'read',
+    );
     expect(parseMessageClass(String(document)).name).toBe('ZT');
   });
 
@@ -253,7 +256,7 @@ describe('AdtMessageClass', () => {
     );
 
     const mc = new AdtMessageClass(c, noopLogger);
-    await mc.update(
+    await mc.updateMetadata(
       { name: 'ZT', description: 'NEW' },
       { lockHandle: 'LOCK_HANDLE_42' },
     );
@@ -331,7 +334,7 @@ describe('AdtMessageClass', () => {
     const mc = new AdtMessageClass(c, noopLogger);
     expect(
       expectFailure(
-        await mc.update(
+        await mc.updateMetadata(
           { name: 'ZT', description: 'NEW' },
           { lockHandle: 'LOCK_HANDLE_42' },
         ),

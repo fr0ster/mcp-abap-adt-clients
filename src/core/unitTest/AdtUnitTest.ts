@@ -29,6 +29,7 @@ import type {
   IAdtDeletable,
   IAdtError,
   IAdtLockable,
+  IAdtMetadataReadable,
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
@@ -108,11 +109,8 @@ export class AdtUnitTest<
   > = IUnitTestResults,
 > implements
     IAdtCreatable<IUnitTestConfig, ReturnType<R['created']>>,
-    IAdtReadable<
-      IUnitTestConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    >,
+    IAdtReadable<IUnitTestConfig, ReturnType<R['source']>>,
+    IAdtMetadataReadable<IUnitTestConfig, ReturnType<R['metadata']>>,
     IAdtUpdatable<IUnitTestConfig, ReturnType<R['updated']>>,
     IAdtValidatable<IUnitTestConfig, ReturnType<R['validation']>>,
     IAdtLockable<IUnitTestConfig>,

@@ -22,8 +22,10 @@ import type { AdtClient } from '../../../clients/AdtClient';
 /** The atoms, and the methods each one is. */
 export const ATOM_METHODS = {
   creatable: ['create'],
-  readable: ['read', 'readMetadata'],
+  readable: ['read'],
+  metadataReadable: ['readMetadata'],
   updatable: ['update'],
+  metadataUpdatable: ['updateMetadata'],
   deletable: ['delete', 'checkDeletion'],
   validatable: ['validate'],
   checkable: ['check'],
@@ -39,6 +41,7 @@ export type Atom = keyof typeof ATOM_METHODS;
 const FULL = [
   'creatable',
   'readable',
+  'metadataReadable',
   'updatable',
   'deletable',
   'validatable',
@@ -211,6 +214,7 @@ export const HANDLERS = {
     capabilities: [
       'creatable',
       'readable',
+      'metadataReadable',
       'updatable',
       'deletable',
       'validatable',
@@ -351,7 +355,6 @@ export const HANDLERS = {
     },
     requests: {
       create: '/sap/bc/adt/ddic/tabletypes',
-      read: '/sap/bc/adt/ddic/tabletypes/ZGUARD_TTYP',
       readMetadata: '/sap/bc/adt/ddic/tabletypes/ZGUARD_TTYP',
       // One request each, since 18.0.0: `delete` deletes, and the approval
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
@@ -367,7 +370,20 @@ export const HANDLERS = {
         '/sap/bc/adt/ddic/tabletypes/ZGUARD_TTYP/source/main/versions',
       readTransport: '/sap/bc/adt/ddic/tabletypes/ZGUARD_TTYP/transport',
     },
-    capabilities: FULL,
+    // Not FULL since 36.0.0: a table type is its own document and has no source,
+    // so it composes the metadata pair rather than `readable`/`updatable`.
+    capabilities: [
+      'creatable',
+      'metadataReadable',
+      'metadataUpdatable',
+      'deletable',
+      'validatable',
+      'checkable',
+      'activatable',
+      'lockable',
+      'versionable',
+      'transportAware',
+    ],
   },
   accessControl: {
     factory: (c: AdtClient) => c.getAccessControl(),
@@ -661,6 +677,8 @@ export const HANDLERS = {
       read: '/sap/bc/adt/ddic/dsfi/zguard_dsfi/source/main',
       readMetadata: '/sap/bc/adt/ddic/dsfi/zguard_dsfi',
       update: '/sap/bc/adt/ddic/dsfi/zguard_dsfi/source/main',
+      // Its blues v2 document, beside the JSON source `update` writes.
+      updateMetadata: '/sap/bc/adt/ddic/dsfi/zguard_dsfi',
       // One request each, since 18.0.0: `delete` deletes, and the approval
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
       // whose refusal it reads, rather than a half of this one it cannot see.
@@ -674,7 +692,23 @@ export const HANDLERS = {
       getVersions: '/sap/bc/adt/ddic/dsfi/zguard_dsfi/source/main/versions',
       readTransport: '/sap/bc/adt/ddic/dsfi/zguard_dsfi/transport',
     },
-    capabilities: FULL,
+    // Not FULL since 36.0.0: a DSFI has *both* writable resources — its JSON
+    // source at `source/main` and its blues document at its own URL — so it is
+    // one of the three types composing both update atoms.
+    capabilities: [
+      'creatable',
+      'readable',
+      'metadataReadable',
+      'updatable',
+      'metadataUpdatable',
+      'deletable',
+      'validatable',
+      'checkable',
+      'activatable',
+      'lockable',
+      'versionable',
+      'transportAware',
+    ],
   },
   transformation: {
     factory: (c: AdtClient) => c.getTransformation(),
@@ -737,6 +771,7 @@ export const HANDLERS = {
     capabilities: [
       'creatable',
       'readable',
+      'metadataReadable',
       'updatable',
       'deletable',
       'validatable',
@@ -763,9 +798,8 @@ export const HANDLERS = {
     },
     requests: {
       create: '/sap/bc/adt/ddic/domains',
-      read: '/sap/bc/adt/ddic/domains/ZGUARD_DOM',
       readMetadata: '/sap/bc/adt/ddic/domains/ZGUARD_DOM',
-      update: '/sap/bc/adt/ddic/domains/zguard_dom',
+      updateMetadata: '/sap/bc/adt/ddic/domains/zguard_dom',
       // One request each, since 18.0.0: `delete` deletes, and the approval
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
       // whose refusal it reads, rather than a half of this one it cannot see.
@@ -780,8 +814,8 @@ export const HANDLERS = {
     },
     capabilities: [
       'creatable',
-      'readable',
-      'updatable',
+      'metadataReadable',
+      'metadataUpdatable',
       'deletable',
       'validatable',
       'checkable',
@@ -803,7 +837,6 @@ export const HANDLERS = {
     },
     requests: {
       create: '/sap/bc/adt/ddic/dataelements',
-      read: '/sap/bc/adt/ddic/dataelements/ZGUARD_DTEL',
       readMetadata: '/sap/bc/adt/ddic/dataelements/ZGUARD_DTEL',
       // One request each, since 18.0.0: `delete` deletes, and the approval
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
@@ -819,8 +852,8 @@ export const HANDLERS = {
     },
     capabilities: [
       'creatable',
-      'readable',
-      'updatable',
+      'metadataReadable',
+      'metadataUpdatable',
       'deletable',
       'validatable',
       'checkable',
@@ -840,9 +873,8 @@ export const HANDLERS = {
     },
     requests: {
       create: '/sap/bc/adt/functions/groups',
-      read: '/sap/bc/adt/functions/groups/ZGUARD_FG',
       readMetadata: '/sap/bc/adt/functions/groups/ZGUARD_FG',
-      update: '/sap/bc/adt/functions/groups/ZGUARD_FG',
+      updateMetadata: '/sap/bc/adt/functions/groups/ZGUARD_FG',
       // One request each, since 18.0.0: `delete` deletes, and the approval
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
       // whose refusal it reads, rather than a half of this one it cannot see.
@@ -857,8 +889,8 @@ export const HANDLERS = {
     },
     capabilities: [
       'creatable',
-      'readable',
-      'updatable',
+      'metadataReadable',
+      'metadataUpdatable',
       'deletable',
       'validatable',
       'checkable',
@@ -880,7 +912,6 @@ export const HANDLERS = {
     },
     requests: {
       create: '/sap/bc/adt/packages',
-      read: '/sap/bc/adt/packages/ZGUARD_PKG',
       readMetadata: '/sap/bc/adt/packages/ZGUARD_PKG',
       // One request each, since 18.0.0: `delete` deletes, and the approval
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
@@ -895,8 +926,8 @@ export const HANDLERS = {
     },
     capabilities: [
       'creatable',
-      'readable',
-      'updatable',
+      'metadataReadable',
+      'metadataUpdatable',
       'deletable',
       'validatable',
       'checkable',
@@ -909,6 +940,7 @@ export const HANDLERS = {
     factory: (c: AdtClient) => c.getFunctionInclude(),
     subject: '/sap/bc/adt/functions/groups/ZGUARD_FG/includes/LZGUARD_FGF01',
     config: {
+      sourceCode: '* include source',
       functionGroupName: 'ZGUARD_FG',
       includeName: 'LZGUARD_FGF01',
       packageName: '$TMP',
@@ -919,7 +951,10 @@ export const HANDLERS = {
       read: '/sap/bc/adt/functions/groups/zguard_fg/includes/LZGUARD_FGF01/source/main',
       readMetadata:
         '/sap/bc/adt/functions/groups/zguard_fg/includes/LZGUARD_FGF01',
-      update: '/sap/bc/adt/functions/groups/zguard_fg/includes/LZGUARD_FGF01',
+      update:
+        '/sap/bc/adt/functions/groups/zguard_fg/includes/LZGUARD_FGF01/source/main',
+      updateMetadata:
+        '/sap/bc/adt/functions/groups/zguard_fg/includes/LZGUARD_FGF01',
       // One request each, since 18.0.0: `delete` deletes, and the approval
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
       // whose refusal it reads, rather than a half of this one it cannot see.
@@ -936,7 +971,9 @@ export const HANDLERS = {
     capabilities: [
       'creatable',
       'readable',
+      'metadataReadable',
       'updatable',
+      'metadataUpdatable',
       'deletable',
       'validatable',
       'checkable',
@@ -956,9 +993,8 @@ export const HANDLERS = {
     },
     requests: {
       create: '/sap/bc/adt/aps/iam/auth',
-      read: '/sap/bc/adt/aps/iam/auth/ZGUARD_AUTH',
       readMetadata: '/sap/bc/adt/aps/iam/auth/ZGUARD_AUTH',
-      update: '/sap/bc/adt/aps/iam/auth/ZGUARD_AUTH',
+      updateMetadata: '/sap/bc/adt/aps/iam/auth/ZGUARD_AUTH',
       // One request each, since 18.0.0: `delete` deletes, and the approval
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
       // whose refusal it reads, rather than a half of this one it cannot see.
@@ -972,8 +1008,8 @@ export const HANDLERS = {
     },
     capabilities: [
       'creatable',
-      'readable',
-      'updatable',
+      'metadataReadable',
+      'metadataUpdatable',
       'deletable',
       'validatable',
       'checkable',
@@ -989,12 +1025,16 @@ export const HANDLERS = {
       featureToggleName: 'ZGUARD_FT',
       packageName: '$TMP',
       description: 'guard',
+      // `update` writes the toggle's JSON source since 18.0.0, so the fixture
+      // carries one; the document write is `updateMetadata`.
+      source: { rollout: { defaultEnabledFor: 'none' } },
     },
     requests: {
       create: '/sap/bc/adt/sfw/featuretoggles',
       read: '/sap/bc/adt/sfw/featuretoggles/zguard_ft',
       readMetadata: '/sap/bc/adt/sfw/featuretoggles/zguard_ft',
-      update: '/sap/bc/adt/sfw/featuretoggles/zguard_ft',
+      update: '/sap/bc/adt/sfw/featuretoggles/zguard_ft/source/main',
+      updateMetadata: '/sap/bc/adt/sfw/featuretoggles/zguard_ft',
       // One request each, since 18.0.0: `delete` deletes, and the approval
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
       // whose refusal it reads, rather than a half of this one it cannot see.
@@ -1012,7 +1052,9 @@ export const HANDLERS = {
     capabilities: [
       'creatable',
       'readable',
+      'metadataReadable',
       'updatable',
+      'metadataUpdatable',
       'deletable',
       'validatable',
       'checkable',
@@ -1051,6 +1093,7 @@ export const HANDLERS = {
     capabilities: [
       'creatable',
       'readable',
+      'metadataReadable',
       'updatable',
       'deletable',
       'validatable',
@@ -1090,6 +1133,7 @@ export const HANDLERS = {
     },
     capabilities: [
       'readable',
+      'metadataReadable',
       'updatable',
       'validatable',
       'checkable',
@@ -1120,6 +1164,7 @@ export const HANDLERS = {
     },
     capabilities: [
       'readable',
+      'metadataReadable',
       'updatable',
       'validatable',
       'checkable',
@@ -1153,6 +1198,7 @@ export const HANDLERS = {
     },
     capabilities: [
       'readable',
+      'metadataReadable',
       'updatable',
       'validatable',
       'checkable',
@@ -1182,6 +1228,7 @@ export const HANDLERS = {
     },
     capabilities: [
       'readable',
+      'metadataReadable',
       'updatable',
       'validatable',
       'checkable',
@@ -1200,9 +1247,8 @@ export const HANDLERS = {
     config: { name: 'ZGUARD_MSG', packageName: '$TMP', description: 'guard' },
     requests: {
       create: '/sap/bc/adt/messageclass',
-      read: '/sap/bc/adt/messageclass/zguard_msg',
       readMetadata: '/sap/bc/adt/messageclass/zguard_msg',
-      update: '/sap/bc/adt/messageclass/zguard_msg',
+      updateMetadata: '/sap/bc/adt/messageclass/zguard_msg',
       // One request each, since 18.0.0: `delete` deletes, and the approval
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
       // whose refusal it reads, rather than a half of this one it cannot see.
@@ -1214,8 +1260,8 @@ export const HANDLERS = {
     },
     capabilities: [
       'creatable',
-      'readable',
-      'updatable',
+      'metadataReadable',
+      'metadataUpdatable',
       'deletable',
       'validatable',
       'lockable',
@@ -1232,7 +1278,7 @@ export const HANDLERS = {
       readMetadata: '/sap/bc/adt/messageclass/zguard_msg',
       update: '/sap/bc/adt/messageclass/zguard_msg',
     },
-    capabilities: ['creatable', 'readable', 'updatable'],
+    capabilities: ['creatable', 'readable', 'metadataReadable', 'updatable'],
     why: 'A message is created, read, changed and removed through its class’s XML, and is nothing else in its own right.',
   },
   transport: {
@@ -1245,7 +1291,6 @@ export const HANDLERS = {
     },
     requests: {
       create: '/sap/bc/adt/cts/transportrequests',
-      read: '/sap/bc/adt/cts/transportrequests/DEVK900000',
       readMetadata: '/sap/bc/adt/cts/transportrequests/DEVK900000',
       delete: '/sap/bc/adt/cts/transportrequests/DEVK900000',
       // Measured: the deletion service answers `No URI-Mapping defined for
@@ -1256,7 +1301,12 @@ export const HANDLERS = {
         path: '/sap/bc/adt/cts/transportrequests/DEVK900000',
       },
     },
-    capabilities: ['creatable', 'readable', 'updatable', 'deletable'],
+    capabilities: [
+      'creatable',
+      'metadataReadable',
+      'metadataUpdatable',
+      'deletable',
+    ],
     why: 'A request is created, read, described anew and deleted while empty. Its number is system-generated, so there is nothing to validate before creating one.',
   },
 
@@ -1288,6 +1338,7 @@ export const HANDLERS = {
     capabilities: [
       'creatable',
       'readable',
+      'metadataReadable',
       'updatable',
       'validatable',
       'lockable',
@@ -1323,6 +1374,7 @@ export const HANDLERS = {
     capabilities: [
       'creatable',
       'readable',
+      'metadataReadable',
       'updatable',
       'validatable',
       'lockable',

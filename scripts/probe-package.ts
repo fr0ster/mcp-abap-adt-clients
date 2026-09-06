@@ -31,7 +31,7 @@ async function main(): Promise<void> {
   try {
     const packages = new AdtClient(connection, logger).getPackage();
     for (const name of names) {
-      const answer = await packages.read({ packageName: name });
+      const answer = await packages.readMetadata({ packageName: name });
       if (!answer.ok) {
         // biome-ignore lint/suspicious/noConsole: a probe reports to whoever ran it
         console.log(`--- ${name}: FAILED ${answer.getError().message}`);

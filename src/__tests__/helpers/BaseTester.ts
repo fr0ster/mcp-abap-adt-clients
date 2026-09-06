@@ -32,6 +32,8 @@ import type {
   IAdtCreatable,
   IAdtDeletable,
   IAdtLockable,
+  IAdtMetadataReadable,
+  IAdtMetadataUpdatable,
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
@@ -124,8 +126,18 @@ export interface IBaseTesterSetupOptions {
  * fails the test with SAP's own sentence when there is no value.
  */
 export type TestableObject<TConfig> = IAdtCreatable<TConfig, unknown> &
-  IAdtReadable<TConfig, unknown, unknown> &
-  IAdtUpdatable<TConfig, unknown> &
+  // **Both pairs are optional, and a type has at least one.** Since interfaces
+  // 36.0.0 a member is named for the resource it addresses, and eight types
+  // have no source at all — a domain, a package, a transport request *are*
+  // their document — while a class, a program and their neighbours have a
+  // source and no separate document to write. "At least one of the two" is not
+  // something a TypeScript type can say, so both are optional here and
+  // `readWhatItHas`/`writeWhatItHas` below fail loudly when an object turns out
+  // to offer neither, which is a defect in that object rather than in a test.
+  Partial<IAdtReadable<TConfig, unknown>> &
+  Partial<IAdtMetadataReadable<TConfig, unknown>> &
+  Partial<IAdtUpdatable<TConfig, unknown>> &
+  Partial<IAdtMetadataUpdatable<TConfig, unknown>> &
   IAdtDeletable<TConfig, unknown, unknown> &
   IAdtValidatable<TConfig, unknown> &
   Partial<IAdtActivatable<TConfig, unknown>> &
@@ -345,6 +357,48 @@ export class BaseTester<TConfig, TState = unknown> {
    * swallowing it — a handle left held is what makes the next run's create
    * answer 403 with nothing appearing to hold it.
    */
+  /**
+   * The object's source if it has one, its document if that is all it is.
+   *
+   * `read` and `update` address a source; `readMetadata` and `updateMetadata`
+   * address the object's own document. Which pair a type offers is a property
+   * of the type, so this harness asks for what is there rather than assuming
+   * both — the assumption the contracts dropped in 36.0.0, after eight types
+   * were measured answering `read` and `readMetadata` with one request.
+   */
+  private readWhatItHas(
+    config: Partial<TConfig>,
+    version?: 'active' | 'inactive',
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions,
+  ): Promise<IAdtResponse<unknown>> {
+    if (this.adtObject.read) {
+      return this.adtObject.read(config, version, options);
+    }
+    if (this.adtObject.readMetadata) {
+      return this.adtObject.readMetadata(config, { ...options, version });
+    }
+    throw new Error(
+      `${this.loggerPrefix} offers neither read() nor readMetadata() — every ` +
+        'ADT object has one of the two, so this is the handler to look at.',
+    );
+  }
+
+  private writeWhatItHas(
+    config: Partial<TConfig>,
+    options?: IAdtOperationOptions,
+  ): Promise<IAdtResponse<unknown>> {
+    if (this.adtObject.update) {
+      return this.adtObject.update(config, options);
+    }
+    if (this.adtObject.updateMetadata) {
+      return this.adtObject.updateMetadata(config, options);
+    }
+    throw new Error(
+      `${this.loggerPrefix} offers neither update() nor updateMetadata() — ` +
+        'every writable ADT object has one of the two.',
+    );
+  }
+
   private async updateUnderLock(
     config: Partial<TConfig>,
     options: IAdtOperationOptions,
@@ -352,14 +406,14 @@ export class BaseTester<TConfig, TState = unknown> {
     if (!(this.adtObject.lock && this.adtObject.unlock)) {
       // No lock resource for this type. The write goes out without a handle,
       // and whether that is allowed is ADT's answer to give.
-      return await this.adtObject.update(config, options);
+      return await this.writeWhatItHas(config, options);
     }
 
     const handle = expectResult(await this.adtObject.lock(config), 'lock');
     this.objectLocked = true;
     this.lockHandle = handle;
     try {
-      return await this.adtObject.update(config, {
+      return await this.writeWhatItHas(config, {
         ...options,
         lockHandle: handle,
       });
@@ -543,9 +597,9 @@ export class BaseTester<TConfig, TState = unknown> {
     ): Promise<string | undefined> => {
       logTestStep(label, this.logger);
       // No source URL logging by default (keep logs concise)
-      let answer: Awaited<ReturnType<TestableObject<TConfig>['read']>>;
+      let answer: IAdtResponse<unknown>;
       try {
-        answer = await this.adtObject.read(
+        answer = await this.readWhatItHas(
           config as Partial<TConfig>,
           version,
           withLongPolling ? { withLongPolling: true } : undefined,
@@ -560,7 +614,7 @@ export class BaseTester<TConfig, TState = unknown> {
           );
           // Small delay before retry to allow ADT to finalize object state
           await new Promise((resolve) => setTimeout(resolve, 1000));
-          answer = await this.adtObject.read(
+          answer = await this.readWhatItHas(
             config as Partial<TConfig>,
             version,
             undefined,
@@ -584,15 +638,17 @@ export class BaseTester<TConfig, TState = unknown> {
       withLongPolling: boolean = false,
     ): Promise<string | undefined> => {
       logTestStep(label, this.logger);
-      const payload = getPayloadText(
-        expectResult(
-          await this.adtObject.readMetadata(
-            config as Partial<TConfig>,
-            withLongPolling ? { withLongPolling: true } : undefined,
-          ),
-          'readMetadata',
-        ),
+      const answer = await this.adtObject.readMetadata?.(
+        config as Partial<TConfig>,
+        withLongPolling ? { withLongPolling: true } : undefined,
       );
+      if (!answer) {
+        throw new Error(
+          `${this.loggerPrefix} offers no readMetadata() — the flow asked for ` +
+            'the object document and this type has none.',
+        );
+      }
+      const payload = getPayloadText(expectResult(answer, 'readMetadata'));
       logTestStep(
         `${label} length: ${payload?.length || 0} characters`,
         this.logger,
@@ -1108,7 +1164,7 @@ export class BaseTester<TConfig, TState = unknown> {
         currentStep = 'readMetadata';
         logTestStep(currentStep, this.logger);
         try {
-          const metadataResponse = await this.adtObject.readMetadata(
+          const metadataResponse = await this.adtObject.readMetadata?.(
             config as Partial<TConfig>,
             options.readMetadataOptions,
           );
@@ -1311,7 +1367,7 @@ export class BaseTester<TConfig, TState = unknown> {
       // there answers 200 with an empty body — the caller's `analyse` decides
       // whether that is absence, and this harness reads it as an empty read.
       const readState = expectResult(
-        await this.adtObject.read(
+        await this.readWhatItHas(
           config,
           options?.version || 'active',
           options?.withLongPolling !== undefined
@@ -1327,7 +1383,7 @@ export class BaseTester<TConfig, TState = unknown> {
 
       logTestStep('readMetadata', this.logger);
       try {
-        await this.adtObject.readMetadata(
+        await this.adtObject.readMetadata?.(
           config,
           options?.withLongPolling !== undefined
             ? { withLongPolling: options.withLongPolling }
@@ -1736,7 +1792,7 @@ export class BaseTester<TConfig, TState = unknown> {
     ): Promise<string | undefined> => {
       currentStep = label;
       logTestStep(label, this.logger);
-      const state = await this.adtObject.read(
+      const state = await this.readWhatItHas(
         config as Partial<TConfig>,
         version,
       );
@@ -1815,7 +1871,7 @@ export class BaseTester<TConfig, TState = unknown> {
       if (options?.readMetadata && this.adtObject.readMetadata) {
         currentStep = 'readMetadata';
         logTestStep(currentStep, this.logger);
-        await this.adtObject.readMetadata(
+        await this.adtObject.readMetadata?.(
           config as Partial<TConfig>,
           options.readMetadataOptions?.withLongPolling
             ? { withLongPolling: true }

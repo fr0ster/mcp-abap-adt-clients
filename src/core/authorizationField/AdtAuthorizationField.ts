@@ -15,6 +15,8 @@ import type {
   IAdtDeletable,
   IAdtError,
   IAdtLockable,
+  IAdtMetadataReadable,
+  IAdtMetadataUpdatable,
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
@@ -64,12 +66,8 @@ export class AdtAuthorizationField<
   > = IAuthorizationFieldResults,
 > implements
     IAdtCreatable<IAuthorizationFieldConfig, ReturnType<R['created']>>,
-    IAdtReadable<
-      IAuthorizationFieldConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    >,
-    IAdtUpdatable<IAuthorizationFieldConfig, ReturnType<R['updated']>>,
+    IAdtMetadataReadable<IAuthorizationFieldConfig, ReturnType<R['metadata']>>,
+    IAdtMetadataUpdatable<IAuthorizationFieldConfig, ReturnType<R['updated']>>,
     IAdtDeletable<
       IAuthorizationFieldConfig,
       ReturnType<R['deletion']>,
@@ -179,32 +177,6 @@ export class AdtAuthorizationField<
     );
   }
 
-  /** Read the object.
-   *
-   * `version` is passed through; the field is XML-based and has one document. */
-  async read<E extends IAdtError = IAdtError>(
-    config: Partial<IAuthorizationFieldConfig>,
-    version?: 'active' | 'inactive',
-    options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
-    const name = this.name(config);
-
-    // No 404 special case: ADT answers a read for a missing object with 200 and
-    // an empty body, so absence was never a status to branch on — and whether
-    // an empty body *is* absence is the caller's reading, through `analyse`.
-    return answering(
-      () =>
-        readAuthorizationField(
-          this.connection,
-          name,
-          version ?? 'active',
-          options,
-        ),
-      this.results.source as IResultStrategy<ReturnType<R['source']>>,
-      options?.analyse,
-    );
-  }
-
   /** Read the object's metadata document. */
   async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IAuthorizationFieldConfig>,
@@ -232,7 +204,7 @@ export class AdtAuthorizationField<
    * this is one request. Without it, this locks, checks, writes and unlocks —
    * and the unlock happens on every path out.
    */
-  async update<E extends IAdtError = IAdtError>(
+  async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IAuthorizationFieldConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {

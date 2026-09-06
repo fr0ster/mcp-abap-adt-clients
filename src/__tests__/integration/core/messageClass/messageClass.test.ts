@@ -139,7 +139,7 @@ describe('MessageClass (using AdtClient)', () => {
           try {
             const state = await client
               .getMessageClass()
-              .read({ name: msgClassName });
+              .readMetadata({ name: msgClassName });
             // `state.ok`, not `state`: the answer is an object either way, so
             // the bare check was always true and this deleted a class that was
             // not there on every run.
@@ -155,7 +155,7 @@ describe('MessageClass (using AdtClient)', () => {
                 await new Promise((r) => setTimeout(r, 500));
                 const still = await client
                   .getMessageClass()
-                  .read({ name: msgClassName });
+                  .readMetadata({ name: msgClassName });
                 if (!still.ok) break;
               }
             }
@@ -242,13 +242,13 @@ describe('MessageClass (using AdtClient)', () => {
           // absence a failure.
           let readState = String(
             expectResult(
-              await mcHandler.read({ name: msgClassName }),
+              await mcHandler.readMetadata({ name: msgClassName }),
               'readState',
             ) ?? '',
           );
           for (let attempt = 0; !readState && attempt < 15; attempt++) {
             await new Promise((resolve) => setTimeout(resolve, 2000));
-            const again = await mcHandler.read({ name: msgClassName });
+            const again = await mcHandler.readMetadata({ name: msgClassName });
             readState = again.ok ? String(again.getResult().value ?? '') : '';
           }
           // The class document, read into its parts. `parseMessageClass` is
@@ -343,7 +343,7 @@ describe('MessageClass (using AdtClient)', () => {
           // ── Step 8: Verify message is gone from class ──────────────────────
           logTestStep('verify message removal', testsLogger);
           const readAfterMsgDelete = expectResult(
-            await mcHandler.read({
+            await mcHandler.readMetadata({
               name: msgClassName,
             }),
             'readAfterMsgDelete',
@@ -376,7 +376,9 @@ describe('MessageClass (using AdtClient)', () => {
             // the class is gone; the object it arrives in does not.
             for (let i = 0; i < 20; i++) {
               await new Promise((r) => setTimeout(r, 500));
-              const still = await mcHandler.read({ name: msgClassName });
+              const still = await mcHandler.readMetadata({
+                name: msgClassName,
+              });
               if (!still.ok) break;
             }
           } catch {

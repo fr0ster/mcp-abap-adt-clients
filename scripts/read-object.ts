@@ -32,7 +32,10 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { IAdtReadable } from '@mcp-abap-adt/interfaces';
+import type {
+  IAdtMetadataReadable,
+  IAdtReadable,
+} from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import {
   createTestConnection,
@@ -147,14 +150,19 @@ function parseArgs(argv: string[]): Options {
  *
  * It was `IAdtObject<any, any>` — the full surface — and stopped compiling when
  * 8.0.0 made each factory return only the capabilities its object actually has.
- * The script calls `read()` and `readMetadata()` and nothing else, so
- * `IAdtReadable` is what it needs; asking for the whole interface was demanding
+ * The script calls `read()` and `readMetadata()` and nothing else, so those two
+ * atoms are what it needs; asking for the whole interface was demanding
  * versioning and transports from types that never had them.
+ *
+ * **Both are `Partial`, since interfaces 36.0.0.** A domain has no source and so
+ * no `read`; a class has no separate document to write and reads its own with
+ * `readMetadata`. Which of the two a type offers is a property of the type, and
+ * the caller below asks for whichever is there.
  */
 function getHandler(
   client: AdtClient,
   options: Options,
-): IAdtReadable<any, any, any> {
+): Partial<IAdtReadable<any, any>> & Partial<IAdtMetadataReadable<any, any>> {
   switch (options.objectType) {
     case 'class':
       return client.getClass();
@@ -307,9 +315,15 @@ async function run(): Promise<void> {
   try {
     if (options.readMode === 'source' || options.readMode === 'both') {
       console.log('--- SOURCE ---');
+      // A type with no source says so by not offering the member.
+      if (!handler.read) {
+        console.log('[This object type has no source — try --mode metadata]');
+      }
       try {
-        const state = await handler.read(readConfig);
-        if (state.ok) {
+        const state = await handler.read?.(readConfig);
+        if (!state) {
+          // handled above
+        } else if (state.ok) {
           printResult('Source', state);
         } else {
           console.log(`[Object not found: ${state.getError().message}]`);
@@ -326,9 +340,14 @@ async function run(): Promise<void> {
         console.log('');
       }
       console.log('--- METADATA ---');
+      if (!handler.readMetadata) {
+        console.log('[This object type has no metadata resource of its own]');
+      }
       try {
-        const state = await handler.readMetadata(readConfig);
-        if (state.ok) {
+        const state = await handler.readMetadata?.(readConfig);
+        if (!state) {
+          // handled above
+        } else if (state.ok) {
           printResult('Metadata', state);
         } else {
           console.log(`[No metadata returned: ${state.getError().message}]`);

@@ -190,7 +190,7 @@ describe('Package (using AdtClient)', () => {
           // apart from "it is not there": creating over a package that may be
           // there is the irreversible half of that guess.
           const presence = presenceOf(
-            await client.getPackage().read({ packageName }),
+            await client.getPackage().readMetadata({ packageName }),
             `package ${packageName}`,
           );
           if (presence.present === 'unknown') {

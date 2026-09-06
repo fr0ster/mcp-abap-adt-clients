@@ -15,6 +15,8 @@ import type {
   IAdtDeletable,
   IAdtError,
   IAdtLockable,
+  IAdtMetadataReadable,
+  IAdtMetadataUpdatable,
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
@@ -60,12 +62,8 @@ export class AdtMessageClass<
   > = IMessageClassResults,
 > implements
     IAdtCreatable<IMessageClassConfig, ReturnType<R['created']>>,
-    IAdtReadable<
-      IMessageClassConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    >,
-    IAdtUpdatable<IMessageClassConfig, ReturnType<R['updated']>>,
+    IAdtMetadataReadable<IMessageClassConfig, ReturnType<R['metadata']>>,
+    IAdtMetadataUpdatable<IMessageClassConfig, ReturnType<R['updated']>>,
     IAdtDeletable<
       IMessageClassConfig,
       ReturnType<R['deletion']>,
@@ -168,29 +166,6 @@ export class AdtMessageClass<
     );
   }
 
-  /**
-   * Read the message class, messages and all.
-   *
-   * `version` is accepted and ignored: a message class has one document.
-   * {@link parseMessageClass} in this module is the reading a consumer can
-   * compose if they want the messages as a list rather than the document.
-   */
-  async read<E extends IAdtError = IAdtError>(
-    config: Partial<IMessageClassConfig>,
-    _version?: 'active' | 'inactive',
-    options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
-    const name = this.name(config);
-
-    // No 404 special case: whether an empty or missing answer *is* absence is
-    // the caller's reading, supplied through `analyse`.
-    return answering(
-      () => getMessageClassSource(this.connection, name, options),
-      this.results.source as IResultStrategy<ReturnType<R['source']>>,
-      options?.analyse,
-    );
-  }
-
   /** The same document `read` fetches — there is no metadata resource. */
   async readMetadata(
     config: Partial<IMessageClassConfig>,
@@ -209,7 +184,7 @@ export class AdtMessageClass<
   }
 
   /** Update the message class's own metadata: lock → PUT → unlock. */
-  async update<E extends IAdtError = IAdtError>(
+  async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IMessageClassConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {

@@ -26,6 +26,7 @@ import type {
   IAdtDeletable,
   IAdtError,
   IAdtLockable,
+  IAdtMetadataReadable,
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
@@ -84,11 +85,8 @@ export class AdtProgram<
   > = IProgramResults,
 > implements
     IAdtCreatable<IProgramConfig, ReturnType<R['created']>>,
-    IAdtReadable<
-      IProgramConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    >,
+    IAdtReadable<IProgramConfig, ReturnType<R['source']>>,
+    IAdtMetadataReadable<IProgramConfig, ReturnType<R['metadata']>>,
     IAdtUpdatable<IProgramConfig, ReturnType<R['updated']>>,
     IAdtDeletable<
       IProgramConfig,

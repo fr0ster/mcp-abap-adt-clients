@@ -16,6 +16,7 @@ import type {
   IAdtContentTypes,
   IAdtDeletable,
   IAdtError,
+  IAdtMetadataReadable,
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
@@ -69,11 +70,8 @@ export class AdtLocalMacros<
   >
   extends AdtClassMemberBase<R>
   implements
-    IAdtReadable<
-      ILocalMacrosConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    >,
+    IAdtReadable<ILocalMacrosConfig, ReturnType<R['source']>>,
+    IAdtMetadataReadable<ILocalMacrosConfig, ReturnType<R['metadata']>>,
     IAdtUpdatable<ILocalMacrosConfig, ReturnType<R['updated']>>,
     IAdtValidatable<ILocalMacrosConfig, ReturnType<R['validation']>>,
     IAdtCheckable<ILocalMacrosConfig, ReturnType<R['check']>>,

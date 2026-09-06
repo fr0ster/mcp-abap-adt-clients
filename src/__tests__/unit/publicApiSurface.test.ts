@@ -176,6 +176,9 @@ const RUNTIME_EXPORTS = [
   'inactiveObjects',
   'includeDocuments',
   'interfaceDocuments',
+  // The class shell a behavior implementation needs at its own `source/main`.
+  // Exported since 18.0.0, when `updateMain()` went: writing it is the caller's.
+  'mainSourceFor',
   'messageClassDocuments',
   'messageDocuments',
   'metadataExtensionDocuments',

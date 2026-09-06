@@ -19,6 +19,7 @@ import type {
   IAdtDeletable,
   IAdtError,
   IAdtLockable,
+  IAdtMetadataReadable,
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
@@ -62,7 +63,20 @@ import {
  * that definition, and it has to be written before the implementations include
  * is accepted — which is why `update` writes both.
  */
-const mainSourceFor = (className: string, behaviorDefinition: string): string =>
+/**
+ * The class shell a behavior implementation needs at its own `source/main`,
+ * binding it to its behavior definition.
+ *
+ * Exported because writing it is the caller's: a behavior implementation *is* a
+ * class, so the shell goes in with `getClass().update({ className, sourceCode })`
+ * like any other class source. There used to be an `updateMain()` member here
+ * that composed this text and wrote it; it was a second `update` on a type
+ * whose two resources are both sources, which is not the shape the atoms name.
+ */
+export const mainSourceFor = (
+  className: string,
+  behaviorDefinition: string,
+): string =>
   `CLASS ${className} DEFINITION PUBLIC ABSTRACT FINAL FOR BEHAVIOR OF ${behaviorDefinition}.
 
 ENDCLASS.
@@ -85,9 +99,9 @@ export class AdtBehaviorImplementation<
   > = IClassResults,
 > implements
     IAdtCreatable<IBehaviorImplementationConfig, ReturnType<R['created']>>,
-    IAdtReadable<
+    IAdtReadable<IBehaviorImplementationConfig, ReturnType<R['source']>>,
+    IAdtMetadataReadable<
       IBehaviorImplementationConfig,
-      ReturnType<R['source']>,
       ReturnType<R['metadata']>
     >,
     IAdtUpdatable<IBehaviorImplementationConfig, ReturnType<R['updated']>>,
@@ -298,38 +312,6 @@ export class AdtBehaviorImplementation<
           this.connection,
           name,
           source,
-          options?.lockHandle,
-          config.transportRequest,
-        ),
-      this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
-      options?.analyse,
-    );
-  }
-
-  /**
-   * Writes the class's own `source/main` — the generated shell that binds the
-   * class to its behavior definition.
-   *
-   * Its own member because it is its own endpoint. `create` makes the class and
-   * nothing else, so a consumer building a behavior implementation writes this
-   * once after the create and then writes the implementation with `update`.
-   */
-  async updateMain<E extends IAdtError = IAdtError>(
-    config: Partial<IBehaviorImplementationConfig>,
-    options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
-    const name = this.name(config);
-    if (!config.behaviorDefinition) {
-      throw new Error('behaviorDefinition is required for updateMain');
-    }
-    const behaviorDefinition = config.behaviorDefinition;
-
-    return answering(
-      () =>
-        updateClass(
-          this.connection,
-          name,
-          mainSourceFor(name, behaviorDefinition),
           options?.lockHandle,
           config.transportRequest,
         ),

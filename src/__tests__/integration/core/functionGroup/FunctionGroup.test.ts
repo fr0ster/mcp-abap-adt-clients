@@ -129,7 +129,7 @@ describe('FunctionGroup (using AdtClient)', () => {
             const existing = presenceOf(
               await cleanupClient
                 .getFunctionGroup()
-                .read({ functionGroupName }),
+                .readMetadata({ functionGroupName }),
               `function group ${functionGroupName}`,
             );
             if (existing.present === true) {

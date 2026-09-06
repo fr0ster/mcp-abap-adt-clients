@@ -12,6 +12,7 @@ import type {
   IAdtDeletable,
   IAdtError,
   IAdtLockable,
+  IAdtMetadataReadable,
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
@@ -73,11 +74,8 @@ export class AdtServiceDefinition<
   > = IServiceDefinitionResults,
 > implements
     IAdtCreatable<IServiceDefinitionConfig, ReturnType<R['created']>>,
-    IAdtReadable<
-      IServiceDefinitionConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    >,
+    IAdtReadable<IServiceDefinitionConfig, ReturnType<R['source']>>,
+    IAdtMetadataReadable<IServiceDefinitionConfig, ReturnType<R['metadata']>>,
     IAdtUpdatable<IServiceDefinitionConfig, ReturnType<R['updated']>>,
     IAdtDeletable<
       IServiceDefinitionConfig,

@@ -21,6 +21,7 @@ import type {
   IAdtDeletable,
   IAdtError,
   IAdtLockable,
+  IAdtMetadataReadable,
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
@@ -114,9 +115,9 @@ export class AdtScalarFunctionImplementation<
       IScalarFunctionImplementationConfig,
       ReturnType<R['created']>
     >,
-    IAdtReadable<
+    IAdtReadable<IScalarFunctionImplementationConfig, ReturnType<R['source']>>,
+    IAdtMetadataReadable<
       IScalarFunctionImplementationConfig,
-      ReturnType<R['source']>,
       ReturnType<R['metadata']>
     >,
     IAdtUpdatable<

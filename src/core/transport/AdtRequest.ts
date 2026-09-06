@@ -27,6 +27,8 @@ import type {
   IAdtCreatable,
   IAdtDeletable,
   IAdtError,
+  IAdtMetadataReadable,
+  IAdtMetadataUpdatable,
   IAdtOperationOptions,
   IAdtReadable,
   IAdtRequest,
@@ -85,12 +87,8 @@ export class AdtRequest<
   > = ITransportResults,
 > implements
     IAdtCreatable<ITransportConfig, ReturnType<R['created']>>,
-    IAdtReadable<
-      ITransportConfig,
-      ReturnType<R['read']>,
-      ReturnType<R['read']>
-    >,
-    IAdtUpdatable<ITransportConfig, ReturnType<R['updated']>>,
+    IAdtMetadataReadable<ITransportConfig, ReturnType<R['read']>>,
+    IAdtMetadataUpdatable<ITransportConfig, ReturnType<R['updated']>>,
     IAdtDeletable<
       ITransportConfig,
       ReturnType<R['deleted']>,
@@ -154,10 +152,17 @@ export class AdtRequest<
     );
   }
 
-  /** Read one transport request. */
-  async read<E extends IAdtError = IAdtError>(
+  /**
+   * The request's own document: its description, owner and tasks.
+   *
+   * A transport request has no source, so this is the whole of reading one —
+   * which is why the type composes `IAdtMetadataReadable` and nothing else.
+   * There used to be a `read` beside this whose body was `return
+   * this.readMetadata(...)`; one endpoint behind two members, admitted in the
+   * code.
+   */
+  async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<ITransportConfig>,
-    _version?: 'active' | 'inactive',
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['read']>, E>> {
     const number = this.number(config);
@@ -167,19 +172,6 @@ export class AdtRequest<
       this.results.read as IResultStrategy<ReturnType<R['read']>>,
       options?.analyse,
     );
-  }
-
-  /**
-   * The same document `read` fetches.
-   *
-   * A transport request has no separate metadata resource: what `read` answers
-   * *is* the description, the owner and the tasks.
-   */
-  async readMetadata<E extends IAdtError = IAdtError>(
-    config: Partial<ITransportConfig>,
-    options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['read']>, E>> {
-    return this.read(config, undefined, options);
   }
 
   /**
@@ -261,7 +253,7 @@ export class AdtRequest<
    * XML, patch the description into it, PUT it back — building the body from
    * scratch would drop every server-managed field the client does not model.
    */
-  async update<E extends IAdtError = IAdtError>(
+  async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<ITransportConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {

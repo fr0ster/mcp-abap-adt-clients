@@ -20,6 +20,8 @@ import type {
   IAdtDeletable,
   IAdtError,
   IAdtLockable,
+  IAdtMetadataReadable,
+  IAdtMetadataUpdatable,
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
@@ -72,12 +74,8 @@ export class AdtPackage<
   > = IPackageResults,
 > implements
     IAdtCreatable<IPackageConfig, ReturnType<R['created']>>,
-    IAdtReadable<
-      IPackageConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    >,
-    IAdtUpdatable<IPackageConfig, ReturnType<R['updated']>>,
+    IAdtMetadataReadable<IPackageConfig, ReturnType<R['metadata']>>,
+    IAdtMetadataUpdatable<IPackageConfig, ReturnType<R['updated']>>,
     IAdtDeletable<
       IPackageConfig,
       ReturnType<R['deletion']>,
@@ -200,29 +198,6 @@ export class AdtPackage<
     );
   }
 
-  /**
-   * Read the package.
-   *
-   * `version` is passed through, though a package has one document: the
-   * endpoint accepts it and callers pass it.
-   */
-  async read<E extends IAdtError = IAdtError>(
-    config: Partial<IPackageConfig>,
-    version?: 'active' | 'inactive',
-    options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
-    const name = this.name(config);
-
-    // No 404 special case: ADT answers a read for a package that is not there
-    // with 200 and an empty body, and whether that *is* absence is the caller's
-    // reading, supplied through `analyse`.
-    return answering(
-      () => getPackage(this.connection, name, version, options, this.logger),
-      this.results.source as IResultStrategy<ReturnType<R['source']>>,
-      options?.analyse,
-    );
-  }
-
   /** The same document `read` fetches — a package has no second resource. */
   async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IPackageConfig>,
@@ -296,7 +271,7 @@ export class AdtPackage<
    * systems, and rfc exists for BASIS < 7.50, where package CRUD is not
    * supported regardless.
    */
-  async update<E extends IAdtError = IAdtError>(
+  async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IPackageConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {

@@ -28,6 +28,8 @@ import type {
   IAdtCreatable,
   IAdtDeletable,
   IAdtLockable,
+  IAdtMetadataReadable,
+  IAdtMetadataUpdatable,
   IAdtReadable,
   IAdtTransportAware,
   IAdtUpdatable,
@@ -74,29 +76,34 @@ type Offers<T, A> = T extends A ? true : false;
 type OffersAtom<T, A extends string> = A extends 'creatable'
   ? Offers<T, IAdtCreatable<any, any>>
   : A extends 'readable'
-    ? Offers<T, IAdtReadable<any, any, any>>
-    : A extends 'updatable'
-      ? Offers<T, IAdtUpdatable<any, any>>
-      : A extends 'deletable'
-        ? Offers<T, IAdtDeletable<any, any>>
-        : A extends 'validatable'
-          ? Offers<T, IAdtValidatable<any, any>>
-          : A extends 'checkable'
-            ? Offers<T, IAdtCheckable<any, any>>
-            : A extends 'activatable'
-              ? Offers<T, IAdtActivatable<any, any>>
-              : A extends 'lockable'
-                ? Offers<T, IAdtLockable<any>>
-                : A extends 'versionable'
-                  ? Offers<T, IAdtVersionable<any, any, any>>
-                  : A extends 'transportAware'
-                    ? Offers<T, IAdtTransportAware<any, any>>
-                    : // An atom this chain does not know resolves to `never`,
-                      // and `never extends true` is vacuously true — so it would
-                      // drop out of the product and be checked by nothing at
-                      // all. `AtomsAreAllMapped` below refuses to compile if a
-                      // new atom is added to the manifest without a line here.
-                      never;
+    ? Offers<T, IAdtReadable<any, any>>
+    : A extends 'metadataReadable'
+      ? Offers<T, IAdtMetadataReadable<any, any>>
+      : A extends 'updatable'
+        ? Offers<T, IAdtUpdatable<any, any>>
+        : A extends 'metadataUpdatable'
+          ? Offers<T, IAdtMetadataUpdatable<any, any>>
+          : A extends 'deletable'
+            ? Offers<T, IAdtDeletable<any, any>>
+            : A extends 'validatable'
+              ? Offers<T, IAdtValidatable<any, any>>
+              : A extends 'checkable'
+                ? Offers<T, IAdtCheckable<any, any>>
+                : A extends 'activatable'
+                  ? Offers<T, IAdtActivatable<any, any>>
+                  : A extends 'lockable'
+                    ? Offers<T, IAdtLockable<any>>
+                    : A extends 'versionable'
+                      ? Offers<T, IAdtVersionable<any, any, any>>
+                      : A extends 'transportAware'
+                        ? Offers<T, IAdtTransportAware<any, any>>
+                        : // An atom this chain does not know resolves to
+                          // `never`, and `never extends true` is vacuously true
+                          // — so it would drop out of the product and be checked
+                          // by nothing at all. `everyAtomIsMapped` below refuses
+                          // to compile if a new atom is added to the manifest
+                          // without a line here.
+                          never;
 
 /**
  * Every atom in the manifest has a line in the chain above.

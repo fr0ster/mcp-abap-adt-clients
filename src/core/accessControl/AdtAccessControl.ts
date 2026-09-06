@@ -12,6 +12,7 @@ import type {
   IAdtDeletable,
   IAdtError,
   IAdtLockable,
+  IAdtMetadataReadable,
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
@@ -73,11 +74,8 @@ export class AdtAccessControl<
   > = IAccessControlResults,
 > implements
     IAdtCreatable<IAccessControlConfig, ReturnType<R['created']>>,
-    IAdtReadable<
-      IAccessControlConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    >,
+    IAdtReadable<IAccessControlConfig, ReturnType<R['source']>>,
+    IAdtMetadataReadable<IAccessControlConfig, ReturnType<R['metadata']>>,
     IAdtUpdatable<IAccessControlConfig, ReturnType<R['updated']>>,
     IAdtDeletable<
       IAccessControlConfig,

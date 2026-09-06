@@ -15,6 +15,8 @@ import type {
   IAdtDeletable,
   IAdtError,
   IAdtLockable,
+  IAdtMetadataReadable,
+  IAdtMetadataUpdatable,
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
@@ -66,12 +68,8 @@ export class AdtDomain<
   > = IDomainResults,
 > implements
     IAdtCreatable<IDomainConfig, ReturnType<R['created']>>,
-    IAdtReadable<
-      IDomainConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    >,
-    IAdtUpdatable<IDomainConfig, ReturnType<R['updated']>>,
+    IAdtMetadataReadable<IDomainConfig, ReturnType<R['metadata']>>,
+    IAdtMetadataUpdatable<IDomainConfig, ReturnType<R['updated']>>,
     IAdtDeletable<
       IDomainConfig,
       ReturnType<R['deletion']>,
@@ -180,27 +178,6 @@ export class AdtDomain<
     );
   }
 
-  /** Read the object.
-   *
-   * `version` is accepted and ignored: a domain is XML-based and has one
-   * document, not an active/inactive source pair. */
-  async read<E extends IAdtError = IAdtError>(
-    config: Partial<IDomainConfig>,
-    _version?: 'active' | 'inactive',
-    options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
-    const name = this.name(config);
-
-    // No 404 special case: ADT answers a read for a missing object with 200 and
-    // an empty body, so absence was never a status to branch on — and whether
-    // an empty body *is* absence is the caller's reading, through `analyse`.
-    return answering(
-      () => getDomain(this.connection, name, options),
-      this.results.source as IResultStrategy<ReturnType<R['source']>>,
-      options?.analyse,
-    );
-  }
-
   /** Read the object's metadata document. */
   async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IDomainConfig>,
@@ -236,7 +213,7 @@ export class AdtDomain<
    * this is one request. Without it, this locks, checks, writes and unlocks —
    * and the unlock happens on every path out.
    */
-  async update<E extends IAdtError = IAdtError>(
+  async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IDomainConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {

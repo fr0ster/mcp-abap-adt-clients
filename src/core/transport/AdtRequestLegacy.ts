@@ -82,9 +82,8 @@ export class AdtRequestLegacy<
    * `/sap/bc/cts/transportrequests` answers the full list for the current user;
    * the one asked for is picked out of it here.
    */
-  override async read<E extends IAdtError = IAdtError>(
+  override async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<ITransportConfig>,
-    _version?: 'active' | 'inactive',
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['read']>, E>> {
     if (!config.transportNumber) {
@@ -130,7 +129,7 @@ export class AdtRequestLegacy<
   }
 
   /** Refused: the legacy endpoint's update shape has never been captured. */
-  override async update<E extends IAdtError = IAdtError>(): Promise<
+  override async updateMetadata<E extends IAdtError = IAdtError>(): Promise<
     IAdtResponse<ReturnType<R['updated']>, E>
   > {
     return failed<ReturnType<R['updated']>, E>(

@@ -19,6 +19,7 @@ import type {
   IAdtDeletable,
   IAdtError,
   IAdtLockable,
+  IAdtMetadataReadable,
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
@@ -77,11 +78,8 @@ export class AdtFunctionInclude<
   > = IFunctionIncludeResults,
 > implements
     IAdtCreatable<IFunctionIncludeConfig, ReturnType<R['created']>>,
-    IAdtReadable<
-      IFunctionIncludeConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    >,
+    IAdtReadable<IFunctionIncludeConfig, ReturnType<R['source']>>,
+    IAdtMetadataReadable<IFunctionIncludeConfig, ReturnType<R['metadata']>>,
     IAdtUpdatable<IFunctionIncludeConfig, ReturnType<R['updated']>>,
     IAdtDeletable<
       IFunctionIncludeConfig,
@@ -288,7 +286,7 @@ export class AdtFunctionInclude<
    *
    * With `options.lockHandle` the caller holds the lock and owns the chain.
    */
-  async update<E extends IAdtError = IAdtError>(
+  async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionIncludeConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
@@ -316,7 +314,7 @@ export class AdtFunctionInclude<
    * `finclude` metadata, and a consumer that wants both issues both, in the
    * order it decides.
    */
-  async updateSource<E extends IAdtError = IAdtError>(
+  async update<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionIncludeConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {

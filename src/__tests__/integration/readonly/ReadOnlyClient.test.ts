@@ -655,7 +655,7 @@ describe('AdtClient read operations', () => {
           const requestClient = client.getRequest();
           logTestStep('read active', testsLogger);
           const readActiveState = expectResult(
-            await requestClient.read({
+            await requestClient.readMetadata({
               transportNumber: transportRequest,
             }),
             'readActiveState',
@@ -668,12 +668,9 @@ describe('AdtClient read operations', () => {
 
           logTestStep('read inactive', testsLogger);
           const readInactiveState = expectResult(
-            await requestClient.read(
-              {
-                transportNumber: transportRequest,
-              },
-              'inactive',
-            ),
+            await requestClient.readMetadata({
+              transportNumber: transportRequest,
+            }),
             'readInactiveState',
           );
           expect(readInactiveState).toBeDefined();

@@ -22,6 +22,8 @@ import type {
   IAdtDeletable,
   IAdtError,
   IAdtLockable,
+  IAdtMetadataReadable,
+  IAdtMetadataUpdatable,
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
@@ -81,12 +83,8 @@ export class AdtFunctionGroup<
   > = IFunctionGroupResults,
 > implements
     IAdtCreatable<IFunctionGroupConfig, ReturnType<R['created']>>,
-    IAdtReadable<
-      IFunctionGroupConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    >,
-    IAdtUpdatable<IFunctionGroupConfig, ReturnType<R['updated']>>,
+    IAdtMetadataReadable<IFunctionGroupConfig, ReturnType<R['metadata']>>,
+    IAdtMetadataUpdatable<IFunctionGroupConfig, ReturnType<R['updated']>>,
     IAdtDeletable<
       IFunctionGroupConfig,
       ReturnType<R['deletion']>,
@@ -187,35 +185,6 @@ export class AdtFunctionGroup<
   }
 
   /**
-   * Read the function group.
-   *
-   * `version` is accepted and ignored: a group is a container, and the resource
-   * this reads is its metadata document, which has no active/inactive pair.
-   */
-  async read<E extends IAdtError = IAdtError>(
-    config: Partial<IFunctionGroupConfig>,
-    _version?: 'active' | 'inactive',
-    options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
-    if (!config.functionGroupName) {
-      throw new Error('Function group name is required');
-    }
-
-    // No 404 special case: whether an empty or missing answer *is* absence is
-    // the caller's reading, supplied through `analyse`.
-    return answering(
-      () =>
-        getFunctionGroup(
-          this.connection,
-          config.functionGroupName as string,
-          options,
-        ),
-      this.results.source as IResultStrategy<ReturnType<R['source']>>,
-      options?.analyse,
-    );
-  }
-
-  /**
    * Read the group's metadata.
    *
    * The same resource `read` fetches — a group has no source to tell it apart
@@ -270,7 +239,7 @@ export class AdtFunctionGroup<
    * With `options.lockHandle` the caller holds the lock and owns the chain, so
    * this is one request.
    */
-  async update<E extends IAdtError = IAdtError>(
+  async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionGroupConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {

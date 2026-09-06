@@ -184,7 +184,7 @@ describe('FunctionInclude (using AdtClient)', () => {
             );
             const readResult = await client
               .getFunctionGroup()
-              .read({ functionGroupName });
+              .readMetadata({ functionGroupName });
             if (readResult) {
               testsLogger.info?.(
                 `Function group ${functionGroupName} already exists`,
@@ -202,7 +202,7 @@ describe('FunctionInclude (using AdtClient)', () => {
                 await new Promise((r) => setTimeout(r, 5000));
                 const verify = await client
                   .getFunctionGroup()
-                  .read({ functionGroupName });
+                  .readMetadata({ functionGroupName });
                 if (!verify) throw _createErr;
               }
               testsLogger.info?.(

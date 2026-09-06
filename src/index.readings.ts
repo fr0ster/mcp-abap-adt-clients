@@ -24,6 +24,14 @@ export type { IAuthorizationFieldResults } from './core/authorizationField/types
 export { authorizationFieldDocuments } from './core/authorizationField/types';
 export type { IBehaviorDefinitionResults } from './core/behaviorDefinition/types';
 export { behaviorDefinitionDocuments } from './core/behaviorDefinition/types';
+/**
+ * The class shell a behavior implementation needs at its own `source/main`.
+ *
+ * A behavior implementation is a class: the shell goes in with
+ * `getClass().update({ className, sourceCode: mainSourceFor(name, bdef) })`,
+ * which is the caller's call to make.
+ */
+export { mainSourceFor } from './core/behaviorImplementation/AdtBehaviorImplementation';
 export type { IClassResults } from './core/class/types';
 export { classDocuments } from './core/class/types';
 export type { IDataElementResults } from './core/dataElement/types';
