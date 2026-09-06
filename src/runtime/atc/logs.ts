@@ -9,19 +9,12 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
+  IGetCheckFailureLogsOptions,
 } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 
-/**
- * Get check failure logs options
- */
-export interface IGetCheckFailureLogsOptions {
-  displayId?: string;
-  objName?: string;
-  objType?: string;
-  moduleId?: string;
-  phaseKey?: string;
-}
+// Declared once, in the contract; re-exported so importers here are unchanged.
+export type { IGetCheckFailureLogsOptions } from '@mcp-abap-adt/interfaces';
 
 /**
  * Get ATC check failure logs

@@ -1,3 +1,5 @@
+import type { IAbapTimestamp } from '@mcp-abap-adt/interfaces';
+
 /**
  * Feeds Domain Data Types.
  *
@@ -10,15 +12,10 @@
  * `/sap/bc/adt/feeds` answers.
  */
 
-/**
- * ABAP timestamp string in format YYYYMMDDHHMMSS.
- * Represents an ABAP timestamp in feed query/results payloads.
- * Omitted query values are excluded from serialization.
- */
-export type IAbapTimestamp = string;
-
+// Declared once, in the contract; re-exported so importers here are unchanged.
 // Types defined in @mcp-abap-adt/interfaces
 export type {
+  IAbapTimestamp,
   IFeedQueryOptions,
   IFeedRepository,
 } from '@mcp-abap-adt/interfaces';

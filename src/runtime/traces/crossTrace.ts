@@ -19,17 +19,12 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
+  IListCrossTracesOptions,
 } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 
-/**
- * List traces options
- */
-export interface IListCrossTracesOptions {
-  traceUser?: string;
-  actCreateUser?: string;
-  actChangeUser?: string;
-}
+// Declared once, in the contract; re-exported so importers here are unchanged.
+export type { IListCrossTracesOptions } from '@mcp-abap-adt/interfaces';
 
 /**
  * List cross traces

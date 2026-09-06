@@ -8,17 +8,12 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
+  IGetActivationGraphOptions,
 } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 
-/**
- * Get activation graph options
- */
-export interface IGetActivationGraphOptions {
-  objectName?: string;
-  objectType?: string;
-  logName?: string;
-}
+// Declared once, in the contract; re-exported so importers here are unchanged.
+export type { IGetActivationGraphOptions } from '@mcp-abap-adt/interfaces';
 
 /**
  * Get DDIC activation graph with logs

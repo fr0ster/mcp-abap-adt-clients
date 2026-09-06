@@ -13,7 +13,10 @@
  * parse half of it, applied to an answer that was fetched separately.
  */
 
-import type { IResultStrategy } from '@mcp-abap-adt/interfaces';
+import type {
+  IObjectReference,
+  IResultStrategy,
+} from '@mcp-abap-adt/interfaces';
 import { parseNamedItems } from './allTypes';
 import { toNodeContents } from './nodeStructure';
 import { parseSearchResults } from './search';
@@ -68,10 +71,16 @@ export interface IWhereUsedListResult {
   references: IWhereUsedReference[];
 }
 
-/** An object reference, as group operations and inactive listings carry it. */
-export interface IObjectReference extends IAdtObjectHit {
-  parentName?: string;
-}
+/*
+ * `IObjectReference` is the contract's, not this module's.
+ *
+ * It is a **parameter**: `activateObjectsGroup`, `checkDeletionGroup` and
+ * `deleteObjectsGroup` take it, so a caller cannot make the call without it —
+ * which is why it stayed in the contract when the result shapes left in 31.0.0.
+ * The copy here extended `IAdtObjectHit`, a result shape, deriving an input from
+ * an output and picking up a `packageName` that nothing reads.
+ */
+export type { IObjectReference } from '@mcp-abap-adt/interfaces';
 
 /** What the inactive-objects listing answers, read. */
 export interface IInactiveObjectsResponse {
