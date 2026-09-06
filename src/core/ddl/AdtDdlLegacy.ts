@@ -10,7 +10,7 @@ import type {
   IAdtResponse,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
-import { answering, type IAdtOptions } from '../../utils/adtResponse';
+import { answering } from '../../utils/adtResponse';
 import { beginCriticalSection } from '../../utils/criticalSection';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { chain } from '../shared/chain';
@@ -35,7 +35,7 @@ export class AdtDdlLegacy<
 > extends AdtDdl<R> {
   override async delete<E extends IAdtError = IAdtError>(
     config: Partial<IDdlConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     if (!config.ddlName) {
       throw new Error('DDL name is required');

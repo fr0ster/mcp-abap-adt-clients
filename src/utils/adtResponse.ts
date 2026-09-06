@@ -28,10 +28,10 @@
 import type {
   AdtNoFailure,
   IAdtError,
-  IAdtOperationOptions,
   IAdtResponse,
   IAdtResult,
   IAdtWireResponse,
+  IAnalyse,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
 import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces';
@@ -113,39 +113,6 @@ export function recogniseFailure(error: unknown): IAdtError {
     request: carried?.request,
   };
 }
-
-/**
- * What a caller may supply to overrule the default verdict.
- *
- * Handed the default's verdict **and** the answer it was reached from, so it can
- * overrule in either direction: name a failure the default let through, or clear
- * one it raised. It answers {@link ADT_NO_FAILURE} for "not a failure here" —
- * never `undefined`, which already means "no strategy was supplied".
- */
-export type IAnalyse<E extends IAdtError = IAdtError> = (
-  verdict: IAdtError | AdtNoFailure,
-  answer?: IAdtWireResponse,
-) => E | AdtNoFailure;
-
-/**
- * The options a member takes, with the failure type its `analyse` names.
- *
- * `IAdtOperationOptions` pins `analyse` to `IAdtError`, so a consumer whose
- * strategy answers something richer got it back narrowed and had to cast — the
- * one thing a parameterised failure exists to avoid. The contract already
- * carries the parameter (`IAdtFailure<TError extends IAdtError>`); it is only
- * the options that stop it flowing.
- *
- * Declared here rather than in `@mcp-abap-adt/interfaces` on purpose: it stays
- * in this package while the shape is being proven against real traffic, and
- * moves into the contracts before release.
- */
-export type IAdtOptions<E extends IAdtError = IAdtError> = Omit<
-  IAdtOperationOptions,
-  'analyse'
-> & {
-  analyse?: IAnalyse<E>;
-};
 
 /**
  * Run one request and compose the two strategies over its answer.

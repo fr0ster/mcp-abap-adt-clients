@@ -89,11 +89,7 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
-import {
-  answering,
-  answeringValue,
-  type IAdtOptions,
-} from '../../utils/adtResponse';
+import { answering, answeringValue } from '../../utils/adtResponse';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { withRefusalDetection } from '../../utils/refusalAware';
 import { rawDocument } from '../../utils/resultStrategy';
@@ -239,7 +235,7 @@ export class AdtUtils<
    */
   async search<E extends IAdtError = IAdtError>(
     criteria: ISearchObjectsParams,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['search']>, E>> {
     return answering(
       () => searchObjects(this.connection, criteria),

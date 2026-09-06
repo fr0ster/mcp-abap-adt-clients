@@ -16,14 +16,11 @@ import type {
   IAdtError,
   IAdtOperationOptions,
   IAdtResponse,
+  IAnalyse,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
 import { activationRefusal } from '../../utils/activationUtils';
-import {
-  answering,
-  type IAdtOptions,
-  type IAnalyse,
-} from '../../utils/adtResponse';
+import { answering } from '../../utils/adtResponse';
 import { beginCriticalSection } from '../../utils/criticalSection';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { chain } from '../shared/chain';
@@ -56,7 +53,7 @@ export class AdtClassLegacy<
    */
   override async update<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     if (!config.className) {
       throw new Error('Class name is required');
@@ -189,7 +186,7 @@ export class AdtClassLegacy<
    */
   override async delete<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     if (!config.className) {
       throw new Error('Class name is required');

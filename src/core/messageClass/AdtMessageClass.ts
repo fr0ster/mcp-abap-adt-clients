@@ -21,14 +21,11 @@ import type {
   IAdtSystemContext,
   IAdtUpdatable,
   IAdtValidatable,
+  IAnalyse,
   ILogger,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
-import {
-  answering,
-  type IAdtOptions,
-  type IAnalyse,
-} from '../../utils/adtResponse';
+import { answering } from '../../utils/adtResponse';
 import { beginCriticalSection } from '../../utils/criticalSection';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import { getTimeout } from '../../utils/timeouts';
@@ -115,7 +112,7 @@ export class AdtMessageClass<
    */
   async validate<E extends IAdtError = IAdtError>(
     config: Partial<IMessageClassConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
     const name = this.name(config);
     const params = new URLSearchParams({ objname: name });
@@ -138,7 +135,7 @@ export class AdtMessageClass<
   /** Create the message class shell. No activation — message classes have none. */
   async create<E extends IAdtError = IAdtError>(
     config: IMessageClassConfig,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     const name = this.name(config);
     if (!config.packageName) {
@@ -178,7 +175,7 @@ export class AdtMessageClass<
   async read<E extends IAdtError = IAdtError>(
     config: Partial<IMessageClassConfig>,
     _version?: 'active' | 'inactive',
-    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     const name = this.name(config);
 
@@ -211,7 +208,7 @@ export class AdtMessageClass<
   /** Update the message class's own metadata: lock → PUT → unlock. */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IMessageClassConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     const name = this.name(config);
 
@@ -293,7 +290,7 @@ export class AdtMessageClass<
    */
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IMessageClassConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     const name = this.name(config);
 

@@ -18,6 +18,7 @@ import type {
   IAdtOperationOptions,
   IAdtResponse,
   IAdtWireResponse,
+  IAnalyse,
   ICdsTestDoubleCheckable,
   ICdsUnitTestConfig,
   ILogger,
@@ -25,11 +26,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
-import {
-  answering,
-  type IAdtOptions,
-  type IAnalyse,
-} from '../../utils/adtResponse';
+import { answering } from '../../utils/adtResponse';
 import { requestOf } from '../../utils/requestTrace';
 import { validationRefusal } from '../../utils/validationRefusal';
 import { startClassUnitTestRunByObject } from '../class/run';
@@ -148,7 +145,7 @@ export class AdtCdsUnitTest<
    */
   override async validate<E extends IAdtError = IAdtError>(
     config: Partial<ICdsUnitTestConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
     if (!(config.className && config.classTemplate && config.testClassSource)) {
       return super.validate(config, options);
@@ -201,7 +198,7 @@ export class AdtCdsUnitTest<
    */
   override async create<E extends IAdtError = IAdtError>(
     config: ICdsUnitTestConfig,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     if (!(config.className && config.classTemplate && config.testClassSource)) {
       return super.create(config, options);
@@ -257,7 +254,7 @@ export class AdtCdsUnitTest<
    */
   override async update<E extends IAdtError = IAdtError>(
     config: Partial<ICdsUnitTestConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     if (!(config.className && config.testClassSource)) {
       return super.update(config, options);
@@ -283,7 +280,7 @@ export class AdtCdsUnitTest<
    */
   override async delete<E extends IAdtError = IAdtError>(
     config: Partial<ICdsUnitTestConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deleted']>, E>> {
     if (!config.className) {
       return super.delete(config, options);

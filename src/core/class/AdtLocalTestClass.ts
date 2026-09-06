@@ -22,15 +22,12 @@ import type {
   IAdtSystemContext,
   IAdtUpdatable,
   IAdtValidatable,
+  IAnalyse,
   ILocalTestClassConfig,
   ILogger,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
-import {
-  answering,
-  type IAdtOptions,
-  type IAnalyse,
-} from '../../utils/adtResponse';
+import { answering } from '../../utils/adtResponse';
 import { validationRefusal } from '../../utils/validationRefusal';
 import { chain } from '../shared/chain';
 import type { LockRegistry } from '../shared/LockRegistry';
@@ -87,7 +84,7 @@ export class AdtLocalTestClass<
   /** Syntax-check the source a caller is about to write. */
   async validate<E extends IAdtError = IAdtError>(
     config: Partial<ILocalTestClassConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
     // Nothing was asked of the server yet, so there is no answer to describe:
     // a missing required argument is the caller's mistake and it throws.
@@ -116,7 +113,7 @@ export class AdtLocalTestClass<
   async read<E extends IAdtError = IAdtError>(
     config: Partial<ILocalTestClassConfig>,
     version: 'active' | 'inactive' = 'active',
-    options?: IReadOptions & IAdtOptions<E>,
+    options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     if (!config.className) {
       throw new Error('Class name is required');
@@ -149,7 +146,7 @@ export class AdtLocalTestClass<
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<ILocalTestClassConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     if (!config.className) {
       throw new Error('Class name is required');
@@ -263,7 +260,7 @@ export class AdtLocalTestClass<
    */
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<ILocalTestClassConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     if (!config.className) {
       throw new Error('Class name is required');
@@ -276,7 +273,7 @@ export class AdtLocalTestClass<
   async check<E extends IAdtError = IAdtError>(
     config: Partial<ILocalTestClassConfig>,
     status: string = 'inactive',
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     if (!config.className) {
       throw new Error('Class name is required');

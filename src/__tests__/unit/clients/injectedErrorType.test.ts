@@ -17,10 +17,10 @@ import type {
   IAbapConnection,
   IAdtError,
   IAdtWireResponse,
+  IAnalyse,
 } from '@mcp-abap-adt/interfaces';
 import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces';
 import { AdtClient } from '../../../clients/AdtClient';
-import type { IAnalyse } from '../../../utils/adtResponse';
 
 /**
  * What a consumer who reads T100 keys would declare. The library ships no field

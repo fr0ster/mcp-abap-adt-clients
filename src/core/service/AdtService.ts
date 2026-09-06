@@ -15,6 +15,7 @@ import type {
   IAdtUpdatable,
   IAdtValidatable,
   IAdtWireResponse,
+  IAnalyse,
   ILogger,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
@@ -32,11 +33,7 @@ import {
   CT_TRANSPORT_CHECK,
 } from '../../constants/contentTypes';
 import { activationRefusal } from '../../utils/activationUtils';
-import {
-  answering,
-  type IAdtOptions,
-  type IAnalyse,
-} from '../../utils/adtResponse';
+import { answering } from '../../utils/adtResponse';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import {
   buildQueryString,
@@ -405,7 +402,7 @@ export class AdtServiceBinding<
    */
   async validate<E extends IAdtError = IAdtError>(
     config: Partial<IServiceBindingConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
     const name = this.name(config);
     if (!config.serviceDefinitionName) {
@@ -450,7 +447,7 @@ export class AdtServiceBinding<
    */
   async create<E extends IAdtError = IAdtError>(
     config: IServiceBindingConfig,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     const name = this.name(config);
     if (!config.packageName) throw new Error('packageName is required');
@@ -567,7 +564,7 @@ export class AdtServiceBinding<
   async read<E extends IAdtError = IAdtError>(
     config: Partial<IServiceBindingConfig>,
     version?: 'active' | 'inactive',
-    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     const name = this.name(config);
 
@@ -610,7 +607,7 @@ export class AdtServiceBinding<
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IServiceBindingConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     const name = this.name(config);
     if (!config.desiredPublicationState) {
@@ -711,7 +708,7 @@ export class AdtServiceBinding<
    */
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IServiceBindingConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     const name = this.name(config);
 
@@ -791,7 +788,7 @@ export class AdtServiceBinding<
    */
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IServiceBindingConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     const name = this.name(config);
 
@@ -807,7 +804,7 @@ export class AdtServiceBinding<
   async check<E extends IAdtError = IAdtError>(
     config: Partial<IServiceBindingConfig>,
     status?: string,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     const name = this.name(config);
     const version = status === 'active' ? 'active' : 'inactive';
@@ -827,7 +824,7 @@ export class AdtServiceBinding<
    */
   async readTransport<E extends IAdtError = IAdtError>(
     config: Partial<IServiceBindingConfig>,
-    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
     const name = this.name(config);
     if (!config.packageName) {

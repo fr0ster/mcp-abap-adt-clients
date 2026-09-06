@@ -34,15 +34,12 @@ import type {
   IAdtUpdatable,
   IAdtValidatable,
   IAdtVersionable,
+  IAnalyse,
   ILogger,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
 import { activationRefusal } from '../../utils/activationUtils';
-import {
-  answering,
-  type IAdtOptions,
-  type IAnalyse,
-} from '../../utils/adtResponse';
+import { answering } from '../../utils/adtResponse';
 import { beginCriticalSection } from '../../utils/criticalSection';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import { validationRefusal } from '../../utils/validationRefusal';
@@ -136,7 +133,7 @@ export class AdtProgram<
   /** Validate a program name before creating it. */
   async validate<E extends IAdtError = IAdtError>(
     config: Partial<IProgramConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
     // Nothing was asked of the server, so there is no answer to describe: a
     // missing required argument is the caller's mistake and it throws.
@@ -166,7 +163,7 @@ export class AdtProgram<
   /** Create the program. */
   async create<E extends IAdtError = IAdtError>(
     config: IProgramConfig,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     if (!config.programName) {
       throw new Error('Program name is required');
@@ -235,7 +232,7 @@ export class AdtProgram<
   async read<E extends IAdtError = IAdtError>(
     config: Partial<IProgramConfig>,
     version?: 'active' | 'inactive',
-    options?: IReadOptions & IAdtOptions<E>,
+    options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     if (!config.programName) {
       throw new Error('Program name is required');
@@ -261,7 +258,7 @@ export class AdtProgram<
   /** Read the program's metadata: package, responsible, description. */
   async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IProgramConfig>,
-    options?: IReadOptions & IAdtOptions<E>,
+    options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
     if (!config.programName) {
       throw new Error('Program name is required');
@@ -288,7 +285,7 @@ export class AdtProgram<
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IProgramConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     if (!config.programName) {
       throw new Error('Program name is required');
@@ -457,7 +454,7 @@ export class AdtProgram<
    */
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IProgramConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     if (!config.programName) {
       throw new Error('Program name is required');
@@ -504,7 +501,7 @@ export class AdtProgram<
   /** Activate the program. Needs no stateful session. */
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IProgramConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     if (!config.programName) {
       throw new Error('Program name is required');
@@ -521,7 +518,7 @@ export class AdtProgram<
   async check<E extends IAdtError = IAdtError>(
     config: Partial<IProgramConfig>,
     status?: string,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     if (!config.programName) {
       throw new Error('Program name is required');
@@ -546,7 +543,7 @@ export class AdtProgram<
   /** The transport request the program belongs to. */
   async readTransport<E extends IAdtError = IAdtError>(
     config: Partial<IProgramConfig>,
-    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
     if (!config.programName) {
       throw new Error('Program name is required');

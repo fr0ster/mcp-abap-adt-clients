@@ -40,7 +40,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { TRANSPORT_SEARCH_CONFIGURATIONS_URL } from '@mcp-abap-adt/interfaces';
 import { TransportSearchConfigurationMissing } from '../../utils/adtErrors';
-import { answering, type IAdtOptions } from '../../utils/adtResponse';
+import { answering } from '../../utils/adtResponse';
 import { createTransport } from './create';
 import { deleteTransport } from './delete';
 import { getTransportSearchConfigurations, listTransports } from './list';
@@ -125,7 +125,7 @@ export class AdtRequest<
    */
   async create<E extends IAdtError = IAdtError>(
     config: ITransportConfig,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     if (!config.description) {
       throw new Error('Transport request description is required');
@@ -152,7 +152,7 @@ export class AdtRequest<
   async read<E extends IAdtError = IAdtError>(
     config: Partial<ITransportConfig>,
     _version?: 'active' | 'inactive',
-    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['read']>, E>> {
     const number = this.number(config);
 
@@ -171,7 +171,7 @@ export class AdtRequest<
    */
   async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<ITransportConfig>,
-    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['read']>, E>> {
     return this.read(config, undefined, options);
   }
@@ -257,7 +257,7 @@ export class AdtRequest<
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<ITransportConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     const number = this.number(config);
     if (!config.description) {
@@ -281,7 +281,7 @@ export class AdtRequest<
    */
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<ITransportConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deleted']>, E>> {
     const number = this.number(config);
 

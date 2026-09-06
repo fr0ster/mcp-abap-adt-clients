@@ -11,7 +11,7 @@ import type {
   IAdtResponse,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
-import { answering, type IAdtOptions } from '../../utils/adtResponse';
+import { answering } from '../../utils/adtResponse';
 import { beginCriticalSection } from '../../utils/criticalSection';
 import { chain } from '../shared/chain';
 import { deleteObjectDirect } from '../shared/deleteLegacy';
@@ -35,7 +35,7 @@ export class AdtFunctionGroupLegacy<
 > extends AdtFunctionGroup<R> {
   override async delete<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionGroupConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     if (!config.functionGroupName) {
       throw new Error('Function group name is required');

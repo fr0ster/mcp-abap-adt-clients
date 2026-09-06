@@ -18,6 +18,7 @@
 import type {
   IAbapConnection,
   IAdtError,
+  IAdtOperationOptions,
   IAdtResponse,
   IAdtSystemContext,
   IListTransportsOptions,
@@ -25,7 +26,7 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
-import { answering, failed, type IAdtOptions } from '../../utils/adtResponse';
+import { answering, failed } from '../../utils/adtResponse';
 import { AdtRequest } from './AdtRequest';
 import { getTransportLegacy, listTransportsLegacy } from './readLegacy';
 import type { ITransportConfig, ITransportResults } from './types';
@@ -83,7 +84,7 @@ export class AdtRequestLegacy<
   override async read<E extends IAdtError = IAdtError>(
     config: Partial<ITransportConfig>,
     _version?: 'active' | 'inactive',
-    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['read']>, E>> {
     if (!config.transportNumber) {
       throw new Error('Transport request number is required');

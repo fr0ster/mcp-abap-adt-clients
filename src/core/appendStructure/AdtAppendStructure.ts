@@ -25,16 +25,13 @@ import type {
   IAdtValidatable,
   IAdtVersionable,
   IAdtWireResponse,
+  IAnalyse,
   ILogger,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
 import { ADT_NO_FAILURE, AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
 import { activationRefusal } from '../../utils/activationUtils';
-import {
-  answering,
-  type IAdtOptions,
-  type IAnalyse,
-} from '../../utils/adtResponse';
+import { answering } from '../../utils/adtResponse';
 import { beginCriticalSection } from '../../utils/criticalSection';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import { chain } from '../shared/chain';
@@ -160,7 +157,7 @@ export class AdtAppendStructure<
   /** Validate the name, where the system offers the resource. */
   async validate<E extends IAdtError = IAdtError>(
     config: Partial<IAppendStructureConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
     const name = this.name(config);
 
@@ -175,7 +172,7 @@ export class AdtAppendStructure<
   /** Create the append structure. Metadata only — the fields come via update. */
   async create<E extends IAdtError = IAdtError>(
     config: IAppendStructureConfig,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     const name = this.name(config);
     if (!config.baseObject) throw new Error('Base object is required');
@@ -204,7 +201,7 @@ export class AdtAppendStructure<
   async read<E extends IAdtError = IAdtError>(
     config: Partial<IAppendStructureConfig>,
     version?: 'active' | 'inactive',
-    options?: IReadOptions & IAdtOptions<E>,
+    options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     const name = this.name(config);
 
@@ -227,7 +224,7 @@ export class AdtAppendStructure<
   /** Read the metadata document. */
   async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IAppendStructureConfig>,
-    options?: IReadOptions & IAdtOptions<E>,
+    options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
     const name = this.name(config);
 
@@ -248,7 +245,7 @@ export class AdtAppendStructure<
   /** The transport request the object belongs to. */
   async readTransport<E extends IAdtError = IAdtError>(
     config: Partial<IAppendStructureConfig>,
-    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
     const name = this.name(config);
 
@@ -278,7 +275,7 @@ export class AdtAppendStructure<
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IAppendStructureConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     const name = this.name(config);
     const source = options?.sourceCode || config.sourceCode;
@@ -397,7 +394,7 @@ export class AdtAppendStructure<
    */
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IAppendStructureConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     const name = this.name(config);
 
@@ -431,7 +428,7 @@ export class AdtAppendStructure<
   /** Activate the append structure. */
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IAppendStructureConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     const name = this.name(config);
 
@@ -446,7 +443,7 @@ export class AdtAppendStructure<
   async check<E extends IAdtError = IAdtError>(
     config: Partial<IAppendStructureConfig>,
     status?: string,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     const name = this.name(config);
     const version: 'active' | 'inactive' =

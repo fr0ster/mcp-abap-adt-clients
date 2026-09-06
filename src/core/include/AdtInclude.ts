@@ -20,16 +20,13 @@ import type {
   IAdtResponse,
   IAdtUpdatable,
   IAdtValidatable,
+  IAnalyse,
   IIncludeConfig,
   ILogger,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
 import { activationRefusal } from '../../utils/activationUtils';
-import {
-  answering,
-  type IAdtOptions,
-  type IAnalyse,
-} from '../../utils/adtResponse';
+import { answering } from '../../utils/adtResponse';
 import { validationRefusal } from '../../utils/validationRefusal';
 import { chain } from '../shared/chain';
 import { activateInclude } from './activation';
@@ -89,7 +86,7 @@ export class AdtInclude<
    */
   async validate<E extends IAdtError = IAdtError>(
     config: Partial<IIncludeConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
     const includeName = requireName(config);
     if (!config.packageName) {
@@ -128,7 +125,7 @@ export class AdtInclude<
    */
   async create<E extends IAdtError = IAdtError>(
     config: IIncludeConfig,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     const includeName = requireName(config);
     if (!config.packageName) {
@@ -188,7 +185,7 @@ export class AdtInclude<
   async read<E extends IAdtError = IAdtError>(
     config: Partial<IIncludeConfig>,
     version?: 'active' | 'inactive',
-    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     const includeName = requireName(config);
     return answering(
@@ -201,7 +198,7 @@ export class AdtInclude<
   /** Read the include's metadata. */
   async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IIncludeConfig>,
-    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
     const includeName = requireName(config);
     return answering(
@@ -220,7 +217,7 @@ export class AdtInclude<
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IIncludeConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     // Absence, not emptiness: clearing an include to empty is a real edit, and
     // a truthiness check made it impossible to express.
@@ -257,7 +254,7 @@ export class AdtInclude<
    */
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IIncludeConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     const includeName = requireName(config);
 
@@ -292,7 +289,7 @@ export class AdtInclude<
   /** Activate the include. */
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IIncludeConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     const includeName = requireName(config);
     return answering(
@@ -352,7 +349,7 @@ export class AdtInclude<
   private async writeSource<E extends IAdtError = IAdtError>(
     config: Partial<IIncludeConfig>,
     sourceCode: string,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     const includeName = requireName(config);
     const borrowed = options?.lockHandle;

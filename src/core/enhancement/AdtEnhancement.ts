@@ -24,15 +24,12 @@ import type {
   IAdtUpdatable,
   IAdtValidatable,
   IAdtVersionable,
+  IAnalyse,
   ILogger,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
 import { activationRefusal } from '../../utils/activationUtils';
-import {
-  answering,
-  type IAdtOptions,
-  type IAnalyse,
-} from '../../utils/adtResponse';
+import { answering } from '../../utils/adtResponse';
 import { beginCriticalSection } from '../../utils/criticalSection';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import { validationRefusal } from '../../utils/validationRefusal';
@@ -158,7 +155,7 @@ export class AdtEnhancement<
   /** Validate the name before creating the object. */
   async validate<E extends IAdtError = IAdtError>(
     config: Partial<IEnhancementConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
     const name = this.name(config);
     const type = this.enhancementType(config);
@@ -180,7 +177,7 @@ export class AdtEnhancement<
   /** Create the object. */
   async create<E extends IAdtError = IAdtError>(
     config: IEnhancementConfig,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     const name = this.name(config);
     const type = this.enhancementType(config);
@@ -243,7 +240,7 @@ export class AdtEnhancement<
   async read<E extends IAdtError = IAdtError>(
     config: Partial<IEnhancementConfig>,
     version?: 'active' | 'inactive',
-    options?: IReadOptions & IAdtOptions<E>,
+    options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     const name = this.name(config);
 
@@ -267,7 +264,7 @@ export class AdtEnhancement<
   /** Read the object's metadata document. */
   async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IEnhancementConfig>,
-    options?: IReadOptions & IAdtOptions<E>,
+    options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
     const name = this.name(config);
 
@@ -288,7 +285,7 @@ export class AdtEnhancement<
   /** The transport request the object belongs to. */
   async readTransport<E extends IAdtError = IAdtError>(
     config: Partial<IEnhancementConfig>,
-    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
     const name = this.name(config);
 
@@ -316,7 +313,7 @@ export class AdtEnhancement<
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IEnhancementConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     const name = this.name(config);
     const type = this.enhancementType(config);
@@ -505,7 +502,7 @@ export class AdtEnhancement<
    */
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IEnhancementConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     const name = this.name(config);
 
@@ -547,7 +544,7 @@ export class AdtEnhancement<
   /** Activate the object. Needs no stateful session. */
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IEnhancementConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     const name = this.name(config);
 
@@ -567,7 +564,7 @@ export class AdtEnhancement<
   async check<E extends IAdtError = IAdtError>(
     config: Partial<IEnhancementConfig>,
     status?: string,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     const name = this.name(config);
     const version: 'active' | 'inactive' =

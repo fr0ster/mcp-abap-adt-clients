@@ -36,17 +36,13 @@ import type {
   IAdtResponse,
   IAdtUpdatable,
   IAdtWireResponse,
+  IAnalyse,
   ILogger,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
 import { ADT_NO_FAILURE, AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
 import { MESSAGE_CLASS_UPDATE_CONTENT_TYPE } from '../../constants/contentTypes';
-import {
-  answering,
-  failed,
-  type IAdtOptions,
-  type IAnalyse,
-} from '../../utils/adtResponse';
+import { answering, failed } from '../../utils/adtResponse';
 import { beginCriticalSection } from '../../utils/criticalSection';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { requestOf } from '../../utils/requestTrace';
@@ -121,7 +117,7 @@ export class AdtMessageClassMessage<
   async read<E extends IAdtError = IAdtError>(
     config: Partial<IMessageClassMessageConfig>,
     _version?: 'active' | 'inactive',
-    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['read']>, E>> {
     const { name, no } = this.names(config);
 
@@ -148,7 +144,7 @@ export class AdtMessageClassMessage<
   /** The same class document `read` fetches. */
   async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IMessageClassMessageConfig>,
-    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['read']>, E>> {
     return this.read(config, undefined, options);
   }
@@ -158,7 +154,7 @@ export class AdtMessageClassMessage<
   /** Create the message — the same write as `update`; ADT upserts. */
   async create<E extends IAdtError = IAdtError>(
     config: IMessageClassMessageConfig,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['written']>, E>> {
     return this.writeClass(config, false, options);
   }
@@ -166,7 +162,7 @@ export class AdtMessageClassMessage<
   /** Update the message — see `create`. */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IMessageClassMessageConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['written']>, E>> {
     return this.writeClass(config, false, options);
   }
@@ -181,7 +177,7 @@ export class AdtMessageClassMessage<
    */
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IMessageClassMessageConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deleted']>, E>> {
     return this.writeClass(config, true, options) as Promise<
       IAdtResponse<ReturnType<R['deleted']>, E>
@@ -199,7 +195,7 @@ export class AdtMessageClassMessage<
   private async writeClass<E extends IAdtError = IAdtError>(
     config: Partial<IMessageClassMessageConfig>,
     deleting: boolean,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['written']>, E>> {
     const { name, no } = this.names(config);
     const label = deleting ? 'deleteMessage' : 'upsertMessage';

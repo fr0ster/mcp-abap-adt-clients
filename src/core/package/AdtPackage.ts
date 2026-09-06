@@ -27,14 +27,11 @@ import type {
   IAdtTransportAware,
   IAdtUpdatable,
   IAdtValidatable,
+  IAnalyse,
   ILogger,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
-import {
-  answering,
-  type IAdtOptions,
-  type IAnalyse,
-} from '../../utils/adtResponse';
+import { answering } from '../../utils/adtResponse';
 import { beginCriticalSection } from '../../utils/criticalSection';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import { validationRefusal } from '../../utils/validationRefusal';
@@ -123,7 +120,7 @@ export class AdtPackage<
   /** Validate the package's configuration before creating it. */
   async validate<E extends IAdtError = IAdtError>(
     config: Partial<IPackageConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
     const name = this.name(config);
     if (!config.superPackage) {
@@ -159,7 +156,7 @@ export class AdtPackage<
    */
   async create<E extends IAdtError = IAdtError>(
     config: IPackageConfig,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     const name = this.name(config);
     if (!config.superPackage) {
@@ -257,7 +254,7 @@ export class AdtPackage<
   async read<E extends IAdtError = IAdtError>(
     config: Partial<IPackageConfig>,
     version?: 'active' | 'inactive',
-    options?: IReadOptions & IAdtOptions<E>,
+    options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     const name = this.name(config);
 
@@ -274,7 +271,7 @@ export class AdtPackage<
   /** The same document `read` fetches — a package has no second resource. */
   async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IPackageConfig>,
-    options?: IReadOptions & IAdtOptions<E>,
+    options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
     const name = this.name(config);
 
@@ -295,7 +292,7 @@ export class AdtPackage<
   /** The transport request the package belongs to. */
   async readTransport<E extends IAdtError = IAdtError>(
     config: Partial<IPackageConfig>,
-    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
     const name = this.name(config);
 
@@ -346,7 +343,7 @@ export class AdtPackage<
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IPackageConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     const name = this.name(config);
     if (!config.superPackage) {
@@ -464,7 +461,7 @@ export class AdtPackage<
    */
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IPackageConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     const name = this.name(config);
 
@@ -509,7 +506,7 @@ export class AdtPackage<
   async check<E extends IAdtError = IAdtError>(
     config: Partial<IPackageConfig>,
     status?: string,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     const name = this.name(config);
     const version: 'active' | 'inactive' =

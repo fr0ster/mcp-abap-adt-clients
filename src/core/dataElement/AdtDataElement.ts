@@ -23,15 +23,12 @@ import type {
   IAdtTransportAware,
   IAdtUpdatable,
   IAdtValidatable,
+  IAnalyse,
   ILogger,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
 import { activationRefusal } from '../../utils/activationUtils';
-import {
-  answering,
-  type IAdtOptions,
-  type IAnalyse,
-} from '../../utils/adtResponse';
+import { answering } from '../../utils/adtResponse';
 import { beginCriticalSection } from '../../utils/criticalSection';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import { validationRefusal } from '../../utils/validationRefusal';
@@ -123,7 +120,7 @@ export class AdtDataElement<
   /** Validate the name before creating the object. */
   async validate<E extends IAdtError = IAdtError>(
     config: Partial<IDataElementConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
     const name = this.name(config);
     // The endpoint refuses an empty one, so this is a caller error rather than a
@@ -148,7 +145,7 @@ export class AdtDataElement<
   /** Create the object. */
   async create<E extends IAdtError = IAdtError>(
     config: IDataElementConfig,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     const name = this.name(config);
     if (!config.packageName) {
@@ -223,7 +220,7 @@ export class AdtDataElement<
   async read<E extends IAdtError = IAdtError>(
     config: Partial<IDataElementConfig>,
     _version?: 'active' | 'inactive',
-    options?: IReadOptions & IAdtOptions<E>,
+    options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     const name = this.name(config);
 
@@ -240,7 +237,7 @@ export class AdtDataElement<
   /** Read the object's metadata document. */
   async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IDataElementConfig>,
-    options?: IReadOptions & IAdtOptions<E>,
+    options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
     const name = this.name(config);
 
@@ -254,7 +251,7 @@ export class AdtDataElement<
   /** The transport request the object belongs to. */
   async readTransport<E extends IAdtError = IAdtError>(
     config: Partial<IDataElementConfig>,
-    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
     const name = this.name(config);
 
@@ -274,7 +271,7 @@ export class AdtDataElement<
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IDataElementConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     const name = this.name(config);
     if (!config.packageName) {
@@ -466,7 +463,7 @@ export class AdtDataElement<
    */
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IDataElementConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     const name = this.name(config);
 
@@ -506,7 +503,7 @@ export class AdtDataElement<
   /** Activate the object. Needs no stateful session. */
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IDataElementConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     const name = this.name(config);
 
@@ -521,7 +518,7 @@ export class AdtDataElement<
   async check<E extends IAdtError = IAdtError>(
     config: Partial<IDataElementConfig>,
     status?: string,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     const name = this.name(config);
     const version: 'active' | 'inactive' =

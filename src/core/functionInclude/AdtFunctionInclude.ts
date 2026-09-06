@@ -26,16 +26,13 @@ import type {
   IAdtUpdatable,
   IAdtValidatable,
   IAdtVersionable,
+  IAnalyse,
   ICreateFunctionIncludeParams,
   ILogger,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
 import { activationRefusal } from '../../utils/activationUtils';
-import {
-  answering,
-  type IAdtOptions,
-  type IAnalyse,
-} from '../../utils/adtResponse';
+import { answering } from '../../utils/adtResponse';
 import { beginCriticalSection } from '../../utils/criticalSection';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import { validationRefusal } from '../../utils/validationRefusal';
@@ -197,7 +194,7 @@ export class AdtFunctionInclude<
    */
   async validate<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionIncludeConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
     const { group, include } = this.names(config);
 
@@ -211,7 +208,7 @@ export class AdtFunctionInclude<
   /** Create the include, and write and activate its source if any was given. */
   async create<E extends IAdtError = IAdtError>(
     config: IFunctionIncludeConfig,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     const { group, include } = this.names(config);
     if (!config.description) {
@@ -329,7 +326,7 @@ export class AdtFunctionInclude<
   async read<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionIncludeConfig>,
     version?: 'active' | 'inactive',
-    options?: IReadOptions & IAdtOptions<E>,
+    options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     const { group, include } = this.names(config);
 
@@ -382,7 +379,7 @@ export class AdtFunctionInclude<
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionIncludeConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     const { group, include } = this.names(config);
     const fullConfig: IFunctionIncludeConfig = {
@@ -575,7 +572,7 @@ export class AdtFunctionInclude<
    */
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionIncludeConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     this.names(config);
 
@@ -610,7 +607,7 @@ export class AdtFunctionInclude<
   /** Activate the include. */
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionIncludeConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     const { group, include } = this.names(config);
 
@@ -625,7 +622,7 @@ export class AdtFunctionInclude<
   async check<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionIncludeConfig>,
     status?: string,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     const { group, include } = this.names(config);
     const version: 'active' | 'inactive' =

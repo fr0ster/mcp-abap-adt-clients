@@ -42,7 +42,7 @@ import type {
   IUnitTestResultOptions,
 } from '@mcp-abap-adt/interfaces';
 import { ADT_NO_FAILURE, AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
-import { answering, type IAdtOptions } from '../../utils/adtResponse';
+import { answering } from '../../utils/adtResponse';
 import { requestOf } from '../../utils/requestTrace';
 import { AdtClass, AdtLocalTestClass } from '../class';
 import { getClassUnitTestResult, getClassUnitTestStatus } from '../class/run';
@@ -154,7 +154,7 @@ export class AdtUnitTest<
    */
   async validate<E extends IAdtError = IAdtError>(
     config: Partial<IUnitTestConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
     const name = this.name(config);
 
@@ -214,7 +214,7 @@ export class AdtUnitTest<
    */
   async create<E extends IAdtError = IAdtError>(
     config: IUnitTestConfig,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     const name = this.name(config);
     if (config.testClassSource === undefined) {
@@ -281,7 +281,7 @@ export class AdtUnitTest<
   async read<E extends IAdtError = IAdtError>(
     config: Partial<IUnitTestConfig>,
     version: 'active' | 'inactive' = 'active',
-    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     const name = this.name(config);
     return this.adtLocalTestClass.read(
@@ -294,7 +294,7 @@ export class AdtUnitTest<
   /** Metadata of the container class — an include carries none of its own. */
   async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IUnitTestConfig>,
-    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
     const name = this.name(config);
     return this.adtLocalTestClass.readMetadata(
@@ -312,7 +312,7 @@ export class AdtUnitTest<
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IUnitTestConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     const name = this.name(config);
     if (
@@ -340,7 +340,7 @@ export class AdtUnitTest<
    */
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IUnitTestConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deleted']>, E>> {
     const name = this.name(config);
     return this.adtLocalTestClass.delete(

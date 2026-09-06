@@ -22,15 +22,12 @@ import type {
   IAdtSystemContext,
   IAdtUpdatable,
   IAdtValidatable,
+  IAnalyse,
   ILocalMacrosConfig,
   ILogger,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
-import {
-  answering,
-  type IAdtOptions,
-  type IAnalyse,
-} from '../../utils/adtResponse';
+import { answering } from '../../utils/adtResponse';
 import { validationRefusal } from '../../utils/validationRefusal';
 import { chain } from '../shared/chain';
 import type { LockRegistry } from '../shared/LockRegistry';
@@ -87,7 +84,7 @@ export class AdtLocalMacros<
   /** Syntax-check the source a caller is about to write. */
   async validate<E extends IAdtError = IAdtError>(
     config: Partial<ILocalMacrosConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
     // Nothing was asked of the server yet, so there is no answer to describe:
     // a missing required argument is the caller's mistake and it throws.
@@ -116,7 +113,7 @@ export class AdtLocalMacros<
   async read<E extends IAdtError = IAdtError>(
     config: Partial<ILocalMacrosConfig>,
     version: 'active' | 'inactive' = 'active',
-    options?: IReadOptions & IAdtOptions<E>,
+    options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     if (!config.className) {
       throw new Error('Class name is required');
@@ -149,7 +146,7 @@ export class AdtLocalMacros<
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<ILocalMacrosConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     if (!config.className) {
       throw new Error('Class name is required');
@@ -260,7 +257,7 @@ export class AdtLocalMacros<
    */
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<ILocalMacrosConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     if (!config.className) {
       throw new Error('Class name is required');
@@ -273,7 +270,7 @@ export class AdtLocalMacros<
   async check<E extends IAdtError = IAdtError>(
     config: Partial<ILocalMacrosConfig>,
     status: string = 'inactive',
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     if (!config.className) {
       throw new Error('Class name is required');

@@ -29,15 +29,12 @@ import type {
   IAdtUpdatable,
   IAdtValidatable,
   IAdtVersionable,
+  IAnalyse,
   ILogger,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
 import { activationRefusal } from '../../utils/activationUtils';
-import {
-  answering,
-  type IAdtOptions,
-  type IAnalyse,
-} from '../../utils/adtResponse';
+import { answering } from '../../utils/adtResponse';
 import { beginCriticalSection } from '../../utils/criticalSection';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import { validationRefusal } from '../../utils/validationRefusal';
@@ -128,7 +125,7 @@ export class AdtInterface<
   /** Validate an interface name before creating it. */
   async validate<E extends IAdtError = IAdtError>(
     config: Partial<IInterfaceConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
     if (!config.interfaceName) {
       throw new Error('Interface name is required for validation');
@@ -153,7 +150,7 @@ export class AdtInterface<
   /** Create the interface. */
   async create<E extends IAdtError = IAdtError>(
     config: IInterfaceConfig,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     if (!config.interfaceName) {
       throw new Error('Interface name is required');
@@ -217,7 +214,7 @@ export class AdtInterface<
   async read<E extends IAdtError = IAdtError>(
     config: Partial<IInterfaceConfig>,
     version?: 'active' | 'inactive',
-    options?: IReadOptions & IAdtOptions<E>,
+    options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     if (!config.interfaceName) {
       throw new Error('Interface name is required');
@@ -241,7 +238,7 @@ export class AdtInterface<
   /** Read the interface's metadata. */
   async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IInterfaceConfig>,
-    options?: IReadOptions & IAdtOptions<E>,
+    options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
     if (!config.interfaceName) {
       throw new Error('Interface name is required');
@@ -268,7 +265,7 @@ export class AdtInterface<
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IInterfaceConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     if (!config.interfaceName) {
       throw new Error('Interface name is required');
@@ -435,7 +432,7 @@ export class AdtInterface<
    */
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IInterfaceConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     if (!config.interfaceName) {
       throw new Error('Interface name is required');
@@ -482,7 +479,7 @@ export class AdtInterface<
   /** Activate the interface. Needs no stateful session. */
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IInterfaceConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     if (!config.interfaceName) {
       throw new Error('Interface name is required');
@@ -499,7 +496,7 @@ export class AdtInterface<
   async check<E extends IAdtError = IAdtError>(
     config: Partial<IInterfaceConfig>,
     status?: string,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     if (!config.interfaceName) {
       throw new Error('Interface name is required');
@@ -524,7 +521,7 @@ export class AdtInterface<
   /** The transport request the interface belongs to. */
   async readTransport<E extends IAdtError = IAdtError>(
     config: Partial<IInterfaceConfig>,
-    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
     if (!config.interfaceName) {
       throw new Error('Interface name is required');

@@ -22,16 +22,13 @@ import type {
   IAdtValidatable,
   IAdtVersionable,
   IAdtWireResponse,
+  IAnalyse,
   ILogger,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
 import { ADT_NO_FAILURE, AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
 import { activationRefusal } from '../../utils/activationUtils';
-import {
-  answering,
-  type IAdtOptions,
-  type IAnalyse,
-} from '../../utils/adtResponse';
+import { answering } from '../../utils/adtResponse';
 import { beginCriticalSection } from '../../utils/criticalSection';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import { chain } from '../shared/chain';
@@ -158,7 +155,7 @@ export class AdtScalarFunction<
   /** Validate the name before creating the object. */
   async validate<E extends IAdtError = IAdtError>(
     config: Partial<IScalarFunctionConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
     const name = this.name(config);
 
@@ -173,7 +170,7 @@ export class AdtScalarFunction<
   /** Create the object. */
   async create<E extends IAdtError = IAdtError>(
     config: IScalarFunctionConfig,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     const name = this.name(config);
     if (!config.packageName) {
@@ -230,7 +227,7 @@ export class AdtScalarFunction<
   async read<E extends IAdtError = IAdtError>(
     config: Partial<IScalarFunctionConfig>,
     version?: 'active' | 'inactive',
-    options?: IReadOptions & IAdtOptions<E>,
+    options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     const name = this.name(config);
 
@@ -253,7 +250,7 @@ export class AdtScalarFunction<
   /** Read the object's metadata document. */
   async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IScalarFunctionConfig>,
-    options?: IReadOptions & IAdtOptions<E>,
+    options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
     const name = this.name(config);
 
@@ -273,7 +270,7 @@ export class AdtScalarFunction<
   /** The transport request the object belongs to. */
   async readTransport<E extends IAdtError = IAdtError>(
     config: Partial<IScalarFunctionConfig>,
-    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
     const name = this.name(config);
 
@@ -300,7 +297,7 @@ export class AdtScalarFunction<
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IScalarFunctionConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     const name = this.name(config);
     const source = options?.sourceCode || config.sourceCode;
@@ -462,7 +459,7 @@ export class AdtScalarFunction<
    */
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IScalarFunctionConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     const name = this.name(config);
 
@@ -502,7 +499,7 @@ export class AdtScalarFunction<
   /** Activate the object. Needs no stateful session. */
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IScalarFunctionConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     const name = this.name(config);
 
@@ -517,7 +514,7 @@ export class AdtScalarFunction<
   async check<E extends IAdtError = IAdtError>(
     config: Partial<IScalarFunctionConfig>,
     status?: string,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     const name = this.name(config);
     const version: 'active' | 'inactive' =

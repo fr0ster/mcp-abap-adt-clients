@@ -26,14 +26,11 @@ import type {
   IAdtUpdatable,
   IAdtValidatable,
   IAdtVersionable,
+  IAnalyse,
   ILogger,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
-import {
-  answering,
-  type IAdtOptions,
-  type IAnalyse,
-} from '../../utils/adtResponse';
+import { answering } from '../../utils/adtResponse';
 import { getSystemInformation } from '../../utils/systemInfo';
 import { validationRefusal } from '../../utils/validationRefusal';
 import { AdtClass } from '../class/AdtClass';
@@ -140,7 +137,7 @@ export class AdtBehaviorImplementation<
   /** Validate the class name and its behavior definition before creating. */
   async validate<E extends IAdtError = IAdtError>(
     config: Partial<IBehaviorImplementationConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
     const name = this.name(config);
     if (!config.behaviorDefinition) {
@@ -173,7 +170,7 @@ export class AdtBehaviorImplementation<
    */
   async create<E extends IAdtError = IAdtError>(
     config: IBehaviorImplementationConfig,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     const name = this.name(config);
     if (!config.packageName) {
@@ -208,7 +205,7 @@ export class AdtBehaviorImplementation<
   async read<E extends IAdtError = IAdtError>(
     config: Partial<IBehaviorImplementationConfig>,
     version?: 'active' | 'inactive',
-    options?: IReadOptions & IAdtOptions<E>,
+    options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     const name = this.name(config);
 
@@ -229,7 +226,7 @@ export class AdtBehaviorImplementation<
   /** Read the class's metadata document. */
   async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IBehaviorImplementationConfig>,
-    options?: IReadOptions & IAdtOptions<E>,
+    options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
     const name = this.name(config);
 
@@ -249,7 +246,7 @@ export class AdtBehaviorImplementation<
   /** The transport request the class belongs to. */
   async readTransport<E extends IAdtError = IAdtError>(
     config: Partial<IBehaviorImplementationConfig>,
-    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<string, E>> {
     const name = this.name(config);
 
@@ -279,7 +276,7 @@ export class AdtBehaviorImplementation<
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IBehaviorImplementationConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     const name = this.name(config);
     const source =
@@ -424,7 +421,7 @@ export class AdtBehaviorImplementation<
   /** Delete the implementation class — the class's own delete, checks and all. */
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IBehaviorImplementationConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     const name = this.name(config);
 
@@ -438,7 +435,7 @@ export class AdtBehaviorImplementation<
   /** Activate the implementation class. */
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IBehaviorImplementationConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     return this.class.activate({ className: this.name(config) }, options);
   }
@@ -447,7 +444,7 @@ export class AdtBehaviorImplementation<
   async check<E extends IAdtError = IAdtError>(
     config: Partial<IBehaviorImplementationConfig>,
     status?: string,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     return this.class.check({ className: this.name(config) }, status, options);
   }

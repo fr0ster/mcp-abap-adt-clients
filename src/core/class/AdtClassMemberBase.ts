@@ -20,15 +20,12 @@ import type {
   IAdtOperationOptions,
   IAdtResponse,
   IAdtSystemContext,
+  IAnalyse,
   ILogger,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
 import { activationRefusal } from '../../utils/activationUtils';
-import {
-  answering,
-  type IAdtOptions,
-  type IAnalyse,
-} from '../../utils/adtResponse';
+import { answering } from '../../utils/adtResponse';
 import { nothing, rawDocument } from '../../utils/resultStrategy';
 import {
   type ICapabilityContext,
@@ -179,7 +176,7 @@ export abstract class AdtClassMemberBase<
    */
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig>,
-    options?: IAdtOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     // No server was asked anything, so there is no answer to describe. A missing
     // required argument is the caller's mistake, and it throws.
@@ -203,7 +200,7 @@ export abstract class AdtClassMemberBase<
    */
   async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig>,
-    options?: IReadOptions & IAdtOptions<E>,
+    options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
     if (!config.className) {
       throw new Error('Class name is required');
@@ -233,7 +230,7 @@ export abstract class AdtClassMemberBase<
    */
   async readTransport<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig>,
-    options?: { withLongPolling?: boolean } & IAdtOptions<E>,
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<string, E>> {
     if (!config.className) {
       throw new Error('Class name is required');
