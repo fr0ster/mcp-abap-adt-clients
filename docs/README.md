@@ -25,6 +25,7 @@ Complete documentation for the `@mcp-abap-adt/adt-clients` package.
 - [**OPERATION_DELAYS_SUMMARY.md**](usage/OPERATION_DELAYS_SUMMARY.md) - Quick reference for operation delays
 
 ## Development
+- [**RUNNING_TESTS.md**](development/RUNNING_TESTS.md) — how to run the suite, why an agent CLI must run it detached, and what order things go in
 - [**TEST_CONFIG_SCHEMA.md**](development/TEST_CONFIG_SCHEMA.md) - Test configuration schema and guidelines
 - [**UPDATE_CONTENT_TYPES.md**](development/UPDATE_CONTENT_TYPES.md) - Content types for update operations (text/plain vs XML)
 - [**RFC_TESTING.md**](development/RFC_TESTING.md) - RFC testing setup and environment variables
