@@ -85,3 +85,31 @@ Then `cp e19.env .env` and run as above. A legacy system (BASIS < 7.50) needs
 the RFC transport instead — see [RFC_TESTING.md](RFC_TESTING.md), and note that
 `SAPNWRFC_HOME` and `LD_LIBRARY_PATH` must be passed at launch because `dotenv`
 does not expand `PATH`.
+
+## The one case the full run deliberately leaves out
+
+**Publishing a service binding.** `create_service_binding.params.
+desired_publication_state` ships as `unchanged`, and the full run needs it to
+stay that way — not because publishing is untested by choice of convenience, but
+because of what it costs on the server:
+
+- publishing takes ~135s;
+- ADT refuses to delete a binding whose endpoints are published, so a flow that
+  publishes cannot clean up after itself;
+- one unpublish was measured still not settled after eleven minutes, and another
+  completed only after the client had given up.
+
+So the flow covers create, write, activate and delete, and does not touch
+publication. To exercise publication, run it as **two deliberate runs**:
+
+```bash
+# 1. set desired_publication_state: "published"
+npm test -- integration/core/serviceBinding 2>&1 | tee publish.log
+
+# 2. set desired_publication_state: "unpublished"
+npm test -- integration/core/serviceBinding 2>&1 | tee unpublish.log
+```
+
+Between them, check the binding's state on the system and unpublish by hand if
+the first run did not settle — the second run asks for a transition, and ADT
+refuses one that does not apply.

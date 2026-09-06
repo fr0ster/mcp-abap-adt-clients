@@ -12,8 +12,10 @@ import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IBehaviorImplementationConfig } from '../../../../core/behaviorImplementation';
+import type { AdtBehaviorImplementation } from '../../../../core/behaviorImplementation/AdtBehaviorImplementation';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { expectResult } from '../../../helpers/contract';
 import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
@@ -217,6 +219,42 @@ describe('BehaviorImplementation (using AdtClient)', () => {
           sourceCode: sourceCode,
           readMetadata: true,
           readMetadataOptions: { withLongPolling: true },
+          // **The third request, and the flow cannot guess it.** `create` makes
+          // the class; `update` writes its implementation include. The class's
+          // own `source/main` — the generated shell that binds it to its
+          // behavior definition — is `updateMain()`, and until it is written the
+          // class is not readable at all: ADT answers `Resource …: wrong input
+          // data for processing` to every read, which is what the first run
+          // after the chains came out failed on.
+          afterCreate: async () => {
+            // The concrete class, not the factory's composition. `updateMain`
+            // is on no contract — nor are `AdtFunctionInclude.updateSource` and
+            // `AdtScalarFunctionImplementation.updateMetadata` — so a consumer
+            // holding the composition cannot reach any of the three. That is a
+            // gap in what the contracts name, recorded in the PR rather than
+            // papered over here with an atom invented on the spot.
+            const bimpl =
+              client.getBehaviorImplementation() as unknown as AdtBehaviorImplementation;
+            const target = { className: config.className };
+            const locked = expectResult(
+              await bimpl.lock(target),
+              'lock for the generated shell',
+            );
+            try {
+              expectResult(
+                await bimpl.updateMain(
+                  {
+                    className: config.className,
+                    behaviorDefinition: config.behaviorDefinition,
+                  },
+                  { lockHandle: locked },
+                ),
+                'updateMain',
+              );
+            } finally {
+              await bimpl.unlock(target, locked);
+            }
+          },
           updateConfig: {
             className: config.className,
             packageName: config.packageName,

@@ -120,6 +120,41 @@ exist" when it did not — so an unbound object is reported absent while its nam
 stays taken, and there is nothing for the delete to act on. See
 [TROUBLESHOOTING.md](TROUBLESHOOTING.md#an-object-that-exists-holds-its-name-and-cannot-be-deleted).
 
+### A behavior implementation needs a third write
+
+`create` makes the class. `update` writes its implementation include. Neither
+writes the class's own `source/main` — the generated shell that binds it to its
+behavior definition — and **until that is written the class cannot be read at
+all**: ADT answers `Resource …: wrong input data for processing` to every read,
+active or inactive.
+
+That write is `updateMain()`, and it is the caller's:
+
+```typescript
+const bimpl = client.getBehaviorImplementation();
+await bimpl.create(config);
+
+const locked = await bimpl.lock({ className });
+if (!locked.ok) throw new Error(locked.getError().message);
+const lockHandle = locked.getResult().value;
+try {
+  await bimpl.updateMain({ className, behaviorDefinition }, { lockHandle });
+  await bimpl.update({ className, behaviorDefinition, sourceCode }, { lockHandle });
+} finally {
+  await bimpl.unlock({ className }, lockHandle);
+}
+
+await bimpl.activate({ className });
+```
+
+**`updateMain()` is on the concrete `AdtBehaviorImplementation`, not on the
+composition `getBehaviorImplementation()` declares** — as are
+`AdtFunctionInclude.updateSource()` and
+`AdtScalarFunctionImplementation.updateMetadata()`. Three real endpoints that no
+contract names, so a consumer holding the composition cannot reach them. That is
+a gap in what the contracts say, not a hidden feature, and it is recorded rather
+than worked around.
+
 ### The things that are not deleted
 
 Seven types offer neither member, and the omission is the statement: their

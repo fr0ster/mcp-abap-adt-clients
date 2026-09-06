@@ -70,6 +70,21 @@ export interface IFlowTestOptions {
   timeout?: number;
   readMetadata?: boolean;
   readMetadataOptions?: { withLongPolling?: boolean };
+  /**
+   * A step this flow cannot know about, run after `create` and before anything
+   * reads the object.
+   *
+   * One type needs it: a behavior implementation's `create` makes the class and
+   * `update` writes its implementation include, but the class's own
+   * `source/main` — the generated shell binding it to its behavior definition —
+   * is `updateMain()`, a third request. Until it is written the class is not
+   * readable at all: ADT answers `wrong input data for processing`.
+   *
+   * A hook rather than a flag, because what belongs here is the caller's
+   * knowledge of its own type, and this harness has no business holding a list
+   * of such knowledge.
+   */
+  afterCreate?: () => Promise<void>;
 }
 
 export interface IReadTestOptions {
@@ -884,6 +899,11 @@ export class BaseTester<TConfig, TState = unknown> {
         'create',
       );
       this.objectCreated = true;
+
+      if (options?.afterCreate) {
+        logTestStep("afterCreate (the caller's own step)", this.logger);
+        await options.afterCreate();
+      }
 
       if (options?.activateOnCreate && this.adtObject.activate) {
         logTestStep('activate (after create)', this.logger);

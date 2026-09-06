@@ -1248,7 +1248,13 @@ export const HANDLERS = {
       read: '/sap/bc/adt/cts/transportrequests/DEVK900000',
       readMetadata: '/sap/bc/adt/cts/transportrequests/DEVK900000',
       delete: '/sap/bc/adt/cts/transportrequests/DEVK900000',
-      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
+      // Measured: the deletion service answers `No URI-Mapping defined for
+      // URI /sap/bc/adt/cts/transportrequests/…`, so this type asks the only
+      // resource that can answer — its own.
+      checkDeletion: {
+        method: 'GET',
+        path: '/sap/bc/adt/cts/transportrequests/DEVK900000',
+      },
     },
     capabilities: ['creatable', 'readable', 'updatable', 'deletable'],
     why: 'A request is created, read, described anew and deleted while empty. Its number is system-generated, so there is nothing to validate before creating one.',

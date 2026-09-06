@@ -87,6 +87,14 @@ the sequence around a write handed back to the consumer.
   and a consumer who injects a parser for their check runs must not have it
   handed a deletability verdict.
 
+  **Not every type asks the deletion service.** A transport request cannot:
+  `/sap/bc/adt/deletion/check` answers `No URI-Mapping defined for URI
+  /sap/bc/adt/cts/transportrequests/…` — a fact about the address, not about the
+  request. `AdtRequest.checkDeletion` reads the request itself instead, where
+  the two things ADT actually requires (empty, unreleased) are stated. Measured
+  on the cloud trial; a standalone include and a metadata extension *are*
+  resolved by the service, and answer as a class does.
+
   Measured on the cloud trial: the check is asked about a **URI**, and its
   answer names the type and package it resolved that address to. A type with an
   address has something to ask with, whether or not its own delete goes through

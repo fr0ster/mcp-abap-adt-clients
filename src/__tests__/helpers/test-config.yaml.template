@@ -1389,7 +1389,22 @@ create_service_binding:
         service_name: "ZAC_SRVD01"  # Usually same as service_definition_name
         service_version: "0001"
         binding_variant: "ODATA_V4_WEB_API"
-        desired_publication_state: "published"  # published | unpublished | unchanged
+        # `unchanged`, and the full run must keep it that way.
+        #
+        # The flow creates a *fresh* binding, and a fresh binding is not
+        # published: asking to unpublish it is a transition ADT refuses
+        # (`Invalid state transition: cannot unpublish … allowedAction=PUBLISH`),
+        # and asking to publish it costs ~135s and leaves an object the flow
+        # cannot delete — ADT refuses to delete a binding with published
+        # endpoints, and one unpublish was measured still not settled after
+        # eleven minutes.
+        #
+        # **Publishing is exercised by two deliberate runs, not by the full
+        # one.** Set this to `published` and run
+        # `npm test -- integration/core/serviceBinding`, then set it to
+        # `unpublished` and run it again, preparing the system by hand if the
+        # first run did not settle.
+        desired_publication_state: "unchanged"  # published | unpublished | unchanged
         description: "AdtServiceBinding workflow service binding"
         # software_component: "HOME"  # Optional; if omitted, inherited from parent package metadata
         package_type: "development"

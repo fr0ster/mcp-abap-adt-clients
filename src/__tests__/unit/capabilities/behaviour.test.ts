@@ -194,6 +194,11 @@ const VERB_BY_HANDLER: Record<string, string> = {
   'messageClassMessage.delete': 'PUT',
   // A function include's name is validated the same way, against its group.
   'functionInclude.validate': 'GET',
+  // A transport request's deletion check is a GET on the request itself. The
+  // deletion service answers `No URI-Mapping defined for URI …` for a transport
+  // — measured on the cloud trial — so asking it there would report a fact
+  // about the address rather than about the request.
+  'transport.checkDeletion': 'GET',
   // Its transport is checked through POST /cts/transportchecks rather than read
   // from the object.
   'service.readTransport': 'POST',

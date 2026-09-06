@@ -42,8 +42,6 @@ import type {
 import { TRANSPORT_SEARCH_CONFIGURATIONS_URL } from '@mcp-abap-adt/interfaces';
 import { TransportSearchConfigurationMissing } from '../../utils/adtErrors';
 import { answering } from '../../utils/adtResponse';
-import { deletionRefusal } from '../../utils/deletionCheck';
-import { checkDeletionByUri } from '../shared/deletionCheckByUri';
 import { createTransport } from './create';
 import { deleteTransport } from './delete';
 import { getTransportSearchConfigurations, listTransports } from './list';
@@ -288,10 +286,23 @@ export class AdtRequest<
    * request is rejected by the server, not by this client.
    */
   /**
-   * Ask whether the object can be deleted now.
+   * Ask whether the transport request can be deleted now.
    *
-   * ADT deletes only an empty request, and whether this one is empty right now
-   * is the server's to say.
+   * **The deletion service cannot answer this one, measured rather than
+   * assumed.** A check for `/sap/bc/adt/cts/transportrequests/{n}` comes back
+   * `No URI-Mapping defined for URI …` — the service resolves repository
+   * objects through their package, and a transport request is not one. That
+   * answer is a fact about the address this library chose, not about the
+   * request, and a caller cannot act on it.
+   *
+   * So this asks the resource that *can* answer: the request itself. ADT
+   * deletes only an empty, unreleased request, and both facts are in its own
+   * document — `tm:task` entries and the objects under them. Reading the
+   * verdict out of it is the `deletionCheck` strategy's job, which is why the
+   * default hands the document over as it arrived.
+   *
+   * One request, like every other member; it is simply not the same one the
+   * other twenty-nine types use.
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
     config: Partial<ITransportConfig>,
@@ -300,15 +311,11 @@ export class AdtRequest<
     const number = this.number(config);
 
     return answering(
-      () =>
-        checkDeletionByUri(
-          this.connection,
-          `/sap/bc/adt/cts/transportrequests/${encodeURIComponent(number)}`,
-        ),
+      () => getTransport(this.connection, number),
       this.results.deletionCheck as IResultStrategy<
         ReturnType<R['deletionCheck']>
       >,
-      (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
+      options?.analyse,
     );
   }
 

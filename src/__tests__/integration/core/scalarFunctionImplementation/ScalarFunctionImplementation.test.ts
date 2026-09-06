@@ -279,11 +279,31 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
             }
             throw e;
           }
-          await dsfi.update({
-            implementationName: implName,
-            transportRequest,
-            sourceCode: implSource,
-          });
+          // Under its own lock, and its answer read. Without the handle the
+          // PUT went out unlocked, ADT did not object audibly, and the source
+          // simply did not change — the run failed three steps later on a
+          // read-back that had no `=>GET_SUM` in it. Two lessons in one call:
+          // the window is the caller's, and an unread answer is an unasked
+          // question.
+          const implLock = expectResult(
+            await dsfi.lock({ implementationName: implName }),
+            'lock DSFI',
+          );
+          try {
+            expectResult(
+              await dsfi.update(
+                {
+                  implementationName: implName,
+                  transportRequest,
+                  sourceCode: implSource,
+                },
+                { lockHandle: implLock },
+              ),
+              'update DSFI source',
+            );
+          } finally {
+            await dsfi.unlock({ implementationName: implName }, implLock);
+          }
 
           // 4) Group-activate the trio (synchronous).
           await orThrow(
