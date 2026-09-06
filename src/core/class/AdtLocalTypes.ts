@@ -63,6 +63,7 @@ export class AdtLocalTypes<
       unknown,
       unknown,
       unknown,
+      unknown,
       unknown
     > = IClassResults,
   >

@@ -80,6 +80,7 @@ export class AdtBehaviorImplementation<
     unknown,
     unknown,
     unknown,
+    unknown,
     unknown
   > = IClassResults,
 > implements
@@ -93,7 +94,7 @@ export class AdtBehaviorImplementation<
     IAdtDeletable<
       IBehaviorImplementationConfig,
       ReturnType<R['deletion']>,
-      ReturnType<R['check']>
+      ReturnType<R['deletionCheck']>
     >,
     IAdtValidatable<IBehaviorImplementationConfig, ReturnType<R['validation']>>,
     IAdtCheckable<IBehaviorImplementationConfig, ReturnType<R['check']>>,

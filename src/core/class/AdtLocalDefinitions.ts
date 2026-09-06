@@ -64,6 +64,7 @@ export class AdtLocalDefinitions<
       unknown,
       unknown,
       unknown,
+      unknown,
       unknown
     > = IClassResults,
   >

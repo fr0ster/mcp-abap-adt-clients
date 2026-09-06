@@ -172,6 +172,8 @@ const RUNTIME_EXPORTS = [
   'functionGroupDocuments',
   'functionIncludeDocuments',
   'functionModuleDocuments',
+  // The reading of `/activation/inactiveobjects` — injectable since 18.0.0.
+  'inactiveObjects',
   'includeDocuments',
   'interfaceDocuments',
   'messageClassDocuments',

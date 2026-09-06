@@ -33,6 +33,7 @@ export class AdtClassLegacy<
     unknown,
     unknown,
     unknown,
+    unknown,
     unknown
   > = IClassResults,
 > extends AdtClass<R> {

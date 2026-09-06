@@ -68,6 +68,7 @@ export class AdtServiceDefinition<
     unknown,
     unknown,
     unknown,
+    unknown,
     unknown
   > = IServiceDefinitionResults,
 > implements
@@ -81,7 +82,7 @@ export class AdtServiceDefinition<
     IAdtDeletable<
       IServiceDefinitionConfig,
       ReturnType<R['deletion']>,
-      ReturnType<R['check']>
+      ReturnType<R['deletionCheck']>
     >,
     IAdtValidatable<IServiceDefinitionConfig, ReturnType<R['validation']>>,
     IAdtCheckable<IServiceDefinitionConfig, ReturnType<R['check']>>,

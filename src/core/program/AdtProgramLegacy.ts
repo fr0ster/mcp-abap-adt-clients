@@ -26,6 +26,7 @@ export class AdtProgramLegacy<
     unknown,
     unknown,
     unknown,
+    unknown,
     unknown
   > = IProgramResults,
 > extends AdtProgram<R> {

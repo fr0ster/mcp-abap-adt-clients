@@ -65,14 +65,20 @@ describe('the deletion check reads its own document', () => {
     expect(calls[1]).toBe('/sap/bc/adt/deletion/check');
   });
 
-  it('a reading injected for `check` is not applied to the deletion check', async () => {
+  it('a reading injected for the deletion check reaches the caller, as its own type', async () => {
     const { connection } = recording();
-    // Two markers, so the answer says which strategy produced it rather than
-    // only whether it parsed.
+    // **Structurally different types on purpose.** Two string markers would
+    // pass whichever slot the member read, and would compile whether or not
+    // the ninth type parameter reaches the caller — both were true of the first
+    // version of this test, and neither is an assertion. A check run answering
+    // a string and a deletion check answering an object cannot be confused by
+    // either the runtime or the compiler.
     const cls = new AdtClient(connection, logger).getClass({
       ...classDocuments,
       check: () => 'read by the check-run strategy',
-      deletionCheck: () => 'read by the deletion-check strategy',
+      deletionCheck: (answer) => ({
+        deletable: String(answer.data).includes('isDeletable="true"'),
+      }),
     });
 
     const checked = await cls.check({ className: 'ZCL_X' });
@@ -81,9 +87,13 @@ describe('the deletion check reads its own document', () => {
     expect(checked.ok && checked.getResult().value).toBe(
       'read by the check-run strategy',
     );
-    expect(deletable.ok && deletable.getResult().value).toBe(
-      'read by the deletion-check strategy',
-    );
+    if (!deletable.ok) throw new Error('expected a result');
+
+    // The compiler has to know this is the injected shape, not `string` and not
+    // `unknown`. Written as a typed binding rather than an `expect`, because an
+    // assertion on the value would pass even if the parameter never flowed.
+    const verdict: { deletable: boolean } = deletable.getResult().value;
+    expect(verdict).toEqual({ deletable: true });
   });
 
   it('the default reads the deletion document as it arrived', async () => {

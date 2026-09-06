@@ -67,6 +67,7 @@ export class AdtPackage<
     unknown,
     unknown,
     unknown,
+    unknown,
     unknown
   > = IPackageResults,
 > implements
@@ -80,7 +81,7 @@ export class AdtPackage<
     IAdtDeletable<
       IPackageConfig,
       ReturnType<R['deletion']>,
-      ReturnType<R['check']>
+      ReturnType<R['deletionCheck']>
     >,
     IAdtValidatable<IPackageConfig, ReturnType<R['validation']>>,
     IAdtCheckable<IPackageConfig, ReturnType<R['check']>>,

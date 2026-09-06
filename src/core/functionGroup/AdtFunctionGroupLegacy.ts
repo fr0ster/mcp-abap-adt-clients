@@ -26,6 +26,7 @@ export class AdtFunctionGroupLegacy<
     unknown,
     unknown,
     unknown,
+    unknown,
     unknown
   > = IFunctionGroupResults,
 > extends AdtFunctionGroup<R> {

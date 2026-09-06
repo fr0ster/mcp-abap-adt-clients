@@ -71,6 +71,7 @@ export class AdtClass<
       unknown,
       unknown,
       unknown,
+      unknown,
       unknown
     > = IClassResults,
   >
@@ -86,7 +87,7 @@ export class AdtClass<
     IAdtDeletable<
       IClassConfig,
       ReturnType<R['deletion']>,
-      ReturnType<R['check']>
+      ReturnType<R['deletionCheck']>
     >,
     IAdtValidatable<IClassConfig, ReturnType<R['validation']>>,
     IAdtCheckable<IClassConfig, ReturnType<R['check']>>,

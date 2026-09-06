@@ -62,6 +62,7 @@ export class AdtTable<
     unknown,
     unknown,
     unknown,
+    unknown,
     unknown
   > = ITableResults,
 > implements
@@ -75,7 +76,7 @@ export class AdtTable<
     IAdtDeletable<
       ITableConfig,
       ReturnType<R['deletion']>,
-      ReturnType<R['check']>
+      ReturnType<R['deletionCheck']>
     >,
     IAdtValidatable<ITableConfig, ReturnType<R['validation']>>,
     IAdtCheckable<ITableConfig, ReturnType<R['check']>>,

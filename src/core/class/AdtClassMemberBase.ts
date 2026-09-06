@@ -59,6 +59,7 @@ export abstract class AdtClassMemberBase<
     unknown,
     unknown,
     unknown,
+    unknown,
     unknown
   > = IClassResults,
 > {

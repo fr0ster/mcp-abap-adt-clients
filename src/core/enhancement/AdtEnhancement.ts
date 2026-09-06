@@ -73,6 +73,7 @@ export class AdtEnhancement<
     unknown,
     unknown,
     unknown,
+    unknown,
     unknown
   > = IEnhancementResults,
 > implements
@@ -86,7 +87,7 @@ export class AdtEnhancement<
     IAdtDeletable<
       IEnhancementConfig,
       ReturnType<R['deletion']>,
-      ReturnType<R['check']>
+      ReturnType<R['deletionCheck']>
     >,
     IAdtValidatable<IEnhancementConfig, ReturnType<R['validation']>>,
     IAdtCheckable<IEnhancementConfig, ReturnType<R['check']>>,

@@ -74,6 +74,7 @@ export class AdtInterface<
     unknown,
     unknown,
     unknown,
+    unknown,
     unknown
   > = IInterfaceResults,
 > implements
@@ -87,7 +88,7 @@ export class AdtInterface<
     IAdtDeletable<
       IInterfaceConfig,
       ReturnType<R['deletion']>,
-      ReturnType<R['check']>
+      ReturnType<R['deletionCheck']>
     >,
     IAdtValidatable<IInterfaceConfig, ReturnType<R['validation']>>,
     IAdtCheckable<IInterfaceConfig, ReturnType<R['check']>>,

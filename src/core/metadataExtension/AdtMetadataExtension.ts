@@ -70,6 +70,7 @@ export class AdtMetadataExtension<
     unknown,
     unknown,
     unknown,
+    unknown,
     unknown
   > = IMetadataExtensionResults,
 > implements
@@ -83,7 +84,7 @@ export class AdtMetadataExtension<
     IAdtDeletable<
       IMetadataExtensionConfig,
       ReturnType<R['deletion']>,
-      ReturnType<R['deletion']>
+      ReturnType<R['deletionCheck']>
     >,
     IAdtValidatable<IMetadataExtensionConfig, ReturnType<R['validation']>>,
     IAdtCheckable<IMetadataExtensionConfig, ReturnType<R['check']>>,

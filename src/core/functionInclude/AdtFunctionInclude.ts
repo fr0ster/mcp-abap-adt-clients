@@ -72,6 +72,7 @@ export class AdtFunctionInclude<
     unknown,
     unknown,
     unknown,
+    unknown,
     unknown
   > = IFunctionIncludeResults,
 > implements
@@ -85,7 +86,7 @@ export class AdtFunctionInclude<
     IAdtDeletable<
       IFunctionIncludeConfig,
       ReturnType<R['deletion']>,
-      ReturnType<R['check']>
+      ReturnType<R['deletionCheck']>
     >,
     IAdtValidatable<IFunctionIncludeConfig, ReturnType<R['validation']>>,
     IAdtCheckable<IFunctionIncludeConfig, ReturnType<R['check']>>,

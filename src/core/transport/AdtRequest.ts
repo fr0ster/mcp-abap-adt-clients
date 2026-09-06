@@ -82,6 +82,7 @@ export class AdtRequest<
     unknown,
     unknown,
     unknown,
+    unknown,
     unknown
   > = ITransportResults,
 > implements
@@ -95,7 +96,7 @@ export class AdtRequest<
     IAdtDeletable<
       ITransportConfig,
       ReturnType<R['deleted']>,
-      ReturnType<R['deleted']>
+      ReturnType<R['deletionCheck']>
     >,
     IAdtRequest<ReturnType<R['list']>>
 {

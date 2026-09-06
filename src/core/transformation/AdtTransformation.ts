@@ -97,6 +97,7 @@ export class AdtTransformation<
     unknown,
     unknown,
     unknown,
+    unknown,
     unknown
   > = ITransformationResults,
 > implements
@@ -110,7 +111,7 @@ export class AdtTransformation<
     IAdtDeletable<
       ITransformationConfig,
       ReturnType<R['deletion']>,
-      ReturnType<R['check']>
+      ReturnType<R['deletionCheck']>
     >,
     IAdtValidatable<ITransformationConfig, ReturnType<R['validation']>>,
     IAdtCheckable<ITransformationConfig, ReturnType<R['check']>>,

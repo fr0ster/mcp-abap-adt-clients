@@ -79,6 +79,7 @@ export class AdtProgram<
     unknown,
     unknown,
     unknown,
+    unknown,
     unknown
   > = IProgramResults,
 > implements
@@ -92,7 +93,7 @@ export class AdtProgram<
     IAdtDeletable<
       IProgramConfig,
       ReturnType<R['deletion']>,
-      ReturnType<R['check']>
+      ReturnType<R['deletionCheck']>
     >,
     IAdtValidatable<IProgramConfig, ReturnType<R['validation']>>,
     IAdtCheckable<IProgramConfig, ReturnType<R['check']>>,

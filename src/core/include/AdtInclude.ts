@@ -54,6 +54,7 @@ export class AdtInclude<
     unknown,
     unknown,
     unknown,
+    unknown,
     unknown
   > = IIncludeResults,
 > implements
@@ -67,7 +68,7 @@ export class AdtInclude<
     IAdtDeletable<
       IIncludeConfig,
       ReturnType<R['deletion']>,
-      ReturnType<R['deletion']>
+      ReturnType<R['deletionCheck']>
     >,
     IAdtValidatable<IIncludeConfig, ReturnType<R['validation']>>,
     IAdtActivatable<IIncludeConfig, ReturnType<R['activation']>>,

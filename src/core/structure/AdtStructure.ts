@@ -68,6 +68,7 @@ export class AdtStructure<
     unknown,
     unknown,
     unknown,
+    unknown,
     unknown
   > = IStructureResults,
 > implements
@@ -81,7 +82,7 @@ export class AdtStructure<
     IAdtDeletable<
       IStructureConfig,
       ReturnType<R['deletion']>,
-      ReturnType<R['check']>
+      ReturnType<R['deletionCheck']>
     >,
     IAdtValidatable<IStructureConfig, ReturnType<R['validation']>>,
     IAdtCheckable<IStructureConfig, ReturnType<R['check']>>,

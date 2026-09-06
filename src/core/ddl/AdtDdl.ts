@@ -62,6 +62,7 @@ export class AdtDdl<
     unknown,
     unknown,
     unknown,
+    unknown,
     unknown
   > = IDdlResults,
 > implements
@@ -75,7 +76,7 @@ export class AdtDdl<
     IAdtDeletable<
       IDdlConfig,
       ReturnType<R['deletion']>,
-      ReturnType<R['check']>
+      ReturnType<R['deletionCheck']>
     >,
     IAdtValidatable<IDdlConfig, ReturnType<R['validation']>>,
     IAdtCheckable<IDdlConfig, ReturnType<R['check']>>,

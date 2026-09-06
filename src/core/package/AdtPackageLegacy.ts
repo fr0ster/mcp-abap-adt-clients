@@ -36,6 +36,7 @@ export class AdtPackageLegacy<
     unknown,
     unknown,
     unknown,
+    unknown,
     unknown
   > = IPackageResults,
 > extends AdtPackage<R> {

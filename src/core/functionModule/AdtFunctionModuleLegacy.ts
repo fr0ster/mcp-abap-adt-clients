@@ -27,6 +27,7 @@ export class AdtFunctionModuleLegacy<
     unknown,
     unknown,
     unknown,
+    unknown,
     unknown
   > = IFunctionModuleResults,
 > extends AdtFunctionModule<R> {

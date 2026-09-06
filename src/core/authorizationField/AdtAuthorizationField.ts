@@ -59,6 +59,7 @@ export class AdtAuthorizationField<
     unknown,
     unknown,
     unknown,
+    unknown,
     unknown
   > = IAuthorizationFieldResults,
 > implements
@@ -72,7 +73,7 @@ export class AdtAuthorizationField<
     IAdtDeletable<
       IAuthorizationFieldConfig,
       ReturnType<R['deletion']>,
-      ReturnType<R['check']>
+      ReturnType<R['deletionCheck']>
     >,
     IAdtValidatable<IAuthorizationFieldConfig, ReturnType<R['validation']>>,
     IAdtCheckable<IAuthorizationFieldConfig, ReturnType<R['check']>>,

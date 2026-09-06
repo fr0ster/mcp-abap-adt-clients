@@ -55,6 +55,7 @@ export class AdtMessageClass<
     unknown,
     unknown,
     unknown,
+    unknown,
     unknown
   > = IMessageClassResults,
 > implements
@@ -68,7 +69,7 @@ export class AdtMessageClass<
     IAdtDeletable<
       IMessageClassConfig,
       ReturnType<R['deletion']>,
-      ReturnType<R['deletion']>
+      ReturnType<R['deletionCheck']>
     >,
     IAdtValidatable<IMessageClassConfig, ReturnType<R['validation']>>,
     IAdtLockable<IMessageClassConfig>

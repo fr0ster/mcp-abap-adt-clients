@@ -61,6 +61,7 @@ export class AdtDomain<
     unknown,
     unknown,
     unknown,
+    unknown,
     unknown
   > = IDomainResults,
 > implements
@@ -74,7 +75,7 @@ export class AdtDomain<
     IAdtDeletable<
       IDomainConfig,
       ReturnType<R['deletion']>,
-      ReturnType<R['check']>
+      ReturnType<R['deletionCheck']>
     >,
     IAdtValidatable<IDomainConfig, ReturnType<R['validation']>>,
     IAdtCheckable<IDomainConfig, ReturnType<R['check']>>,

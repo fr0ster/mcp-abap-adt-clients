@@ -45,6 +45,7 @@ export class AdtRequestLegacy<
     unknown,
     unknown,
     unknown,
+    unknown,
     unknown
   > = ITransportResults,
 > extends AdtRequest<R> {

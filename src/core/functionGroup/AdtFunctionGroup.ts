@@ -76,6 +76,7 @@ export class AdtFunctionGroup<
     unknown,
     unknown,
     unknown,
+    unknown,
     unknown
   > = IFunctionGroupResults,
 > implements
@@ -89,7 +90,7 @@ export class AdtFunctionGroup<
     IAdtDeletable<
       IFunctionGroupConfig,
       ReturnType<R['deletion']>,
-      ReturnType<R['check']>
+      ReturnType<R['deletionCheck']>
     >,
     IAdtValidatable<IFunctionGroupConfig, ReturnType<R['validation']>>,
     IAdtCheckable<IFunctionGroupConfig, ReturnType<R['check']>>,

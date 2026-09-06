@@ -26,6 +26,7 @@ export class AdtDdlLegacy<
     unknown,
     unknown,
     unknown,
+    unknown,
     unknown
   > = IDdlResults,
 > extends AdtDdl<R> {

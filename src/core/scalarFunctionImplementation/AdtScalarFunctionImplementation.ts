@@ -106,6 +106,7 @@ export class AdtScalarFunctionImplementation<
     unknown,
     unknown,
     unknown,
+    unknown,
     unknown
   > = IScalarFunctionImplementationResults,
 > implements
@@ -125,7 +126,7 @@ export class AdtScalarFunctionImplementation<
     IAdtDeletable<
       IScalarFunctionImplementationConfig,
       ReturnType<R['deletion']>,
-      ReturnType<R['check']>
+      ReturnType<R['deletionCheck']>
     >,
     IAdtValidatable<
       IScalarFunctionImplementationConfig,

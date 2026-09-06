@@ -85,6 +85,7 @@ export class AdtClientLegacy extends AdtClient {
       unknown,
       unknown,
       unknown,
+      unknown,
       unknown
     > = IProgramResults,
   >(results: R = programDocuments as unknown as R): AdtProgramLegacy<R> {
@@ -100,6 +101,7 @@ export class AdtClientLegacy extends AdtClient {
 
   override getClass<
     R extends IClassResults<
+      unknown,
       unknown,
       unknown,
       unknown,
@@ -130,6 +132,7 @@ export class AdtClientLegacy extends AdtClient {
       unknown,
       unknown,
       unknown,
+      unknown,
       unknown
     > = IInterfaceResults,
   >(results: R = interfaceDocuments as unknown as R): AdtInterfaceLegacy<R> {
@@ -145,6 +148,7 @@ export class AdtClientLegacy extends AdtClient {
 
   override getFunctionGroup<
     R extends IFunctionGroupResults<
+      unknown,
       unknown,
       unknown,
       unknown,
@@ -178,6 +182,7 @@ export class AdtClientLegacy extends AdtClient {
       unknown,
       unknown,
       unknown,
+      unknown,
       unknown
     > = IFunctionModuleResults,
   >(
@@ -202,6 +207,7 @@ export class AdtClientLegacy extends AdtClient {
       unknown,
       unknown,
       unknown,
+      unknown,
       unknown
     > = IPackageResults,
   >(results: R = packageDocuments as unknown as R): AdtPackageLegacy<R> {
@@ -216,6 +222,7 @@ export class AdtClientLegacy extends AdtClient {
 
   override getDdl<
     R extends IDdlResults<
+      unknown,
       unknown,
       unknown,
       unknown,
@@ -279,6 +286,7 @@ export class AdtClientLegacy extends AdtClient {
    */
   override getRequest<
     R extends ITransportResults<
+      unknown,
       unknown,
       unknown,
       unknown,

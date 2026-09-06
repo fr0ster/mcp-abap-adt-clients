@@ -69,6 +69,7 @@ export class AdtFeatureToggle<
     unknown,
     unknown,
     unknown,
+    unknown,
     unknown
   > = IFeatureToggleResults,
 > implements
@@ -82,7 +83,7 @@ export class AdtFeatureToggle<
     IAdtDeletable<
       IFeatureToggleConfig,
       ReturnType<R['deletion']>,
-      ReturnType<R['check']>
+      ReturnType<R['deletionCheck']>
     >,
     IAdtValidatable<IFeatureToggleConfig, ReturnType<R['validation']>>,
     IAdtCheckable<IFeatureToggleConfig, ReturnType<R['check']>>,

@@ -26,6 +26,7 @@ export class AdtInterfaceLegacy<
     unknown,
     unknown,
     unknown,
+    unknown,
     unknown
   > = IInterfaceResults,
 > extends AdtInterface<R> {

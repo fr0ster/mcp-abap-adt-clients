@@ -62,6 +62,7 @@ export class AdtDataElement<
     unknown,
     unknown,
     unknown,
+    unknown,
     unknown
   > = IDataElementResults,
 > implements
@@ -75,7 +76,7 @@ export class AdtDataElement<
     IAdtDeletable<
       IDataElementConfig,
       ReturnType<R['deletion']>,
-      ReturnType<R['check']>
+      ReturnType<R['deletionCheck']>
     >,
     IAdtValidatable<IDataElementConfig, ReturnType<R['validation']>>,
     IAdtCheckable<IDataElementConfig, ReturnType<R['check']>>,

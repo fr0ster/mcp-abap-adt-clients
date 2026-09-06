@@ -65,6 +65,7 @@ export class AdtDdicTableType<
     unknown,
     unknown,
     unknown,
+    unknown,
     unknown
   > = ITableTypeResults,
 > implements
@@ -78,7 +79,7 @@ export class AdtDdicTableType<
     IAdtDeletable<
       ITableTypeConfig,
       ReturnType<R['deletion']>,
-      ReturnType<R['check']>
+      ReturnType<R['deletionCheck']>
     >,
     IAdtValidatable<ITableTypeConfig, ReturnType<R['validation']>>,
     IAdtCheckable<ITableTypeConfig, ReturnType<R['check']>>,

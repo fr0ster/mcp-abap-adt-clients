@@ -117,7 +117,7 @@ export class AdtServiceBinding<
     IAdtDeletable<
       IServiceBindingConfig,
       ReturnType<R['deletion']>,
-      ReturnType<R['check']>
+      ReturnType<R['deletionCheck']>
     >,
     IAdtValidatable<IServiceBindingConfig, ReturnType<R['validation']>>,
     IAdtCheckable<IServiceBindingConfig, ReturnType<R['check']>>,

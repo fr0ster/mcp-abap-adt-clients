@@ -101,6 +101,7 @@ export class AdtAppendStructure<
     unknown,
     unknown,
     unknown,
+    unknown,
     unknown
   > = IAppendStructureResults,
 > implements
@@ -114,7 +115,7 @@ export class AdtAppendStructure<
     IAdtDeletable<
       IAppendStructureConfig,
       ReturnType<R['deletion']>,
-      ReturnType<R['check']>
+      ReturnType<R['deletionCheck']>
     >,
     IAdtValidatable<IAppendStructureConfig, ReturnType<R['validation']>>,
     IAdtCheckable<IAppendStructureConfig, ReturnType<R['check']>>,

@@ -63,6 +63,7 @@ export class AdtLocalMacros<
       unknown,
       unknown,
       unknown,
+      unknown,
       unknown
     > = IClassResults,
   >

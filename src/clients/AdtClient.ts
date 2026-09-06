@@ -270,6 +270,7 @@ export type IClassContract<
     unknown,
     unknown,
     unknown,
+    unknown,
     unknown
   >,
 > = IAdtCreatable<IClassConfig, ReturnType<R['created']>> &
@@ -292,6 +293,7 @@ export type IClassContract<
   IAdtVersionable<IClassConfig, ObjectVersion[], string>;
 export type IProgramContract<
   R extends IProgramResults<
+    unknown,
     unknown,
     unknown,
     unknown,
@@ -328,6 +330,7 @@ export type IIncludeContract<
     unknown,
     unknown,
     unknown,
+    unknown,
     unknown
   >,
 > = IAdtCreatable<IIncludeConfig, ReturnType<R['created']>> &
@@ -347,6 +350,7 @@ export type IIncludeContract<
   IAdtLockable<IIncludeConfig>;
 export type IInterfaceContract<
   R extends IInterfaceResults<
+    unknown,
     unknown,
     unknown,
     unknown,
@@ -385,6 +389,7 @@ export type IDomainContract<
     unknown,
     unknown,
     unknown,
+    unknown,
     unknown
   >,
 > = IAdtCreatable<IDomainConfig, ReturnType<R['created']>> &
@@ -406,6 +411,7 @@ export type IDomainContract<
   IAdtTransportAware<IDomainConfig, ReturnType<R['transport']>>;
 export type IDataElementContract<
   R extends IDataElementResults<
+    unknown,
     unknown,
     unknown,
     unknown,
@@ -442,6 +448,7 @@ export type IAuthorizationFieldContract<
     unknown,
     unknown,
     unknown,
+    unknown,
     unknown
   >,
 > = IAdtCreatable<IAuthorizationFieldConfig, ReturnType<R['created']>> &
@@ -462,6 +469,7 @@ export type IAuthorizationFieldContract<
   IAdtLockable<IAuthorizationFieldConfig>;
 export type IStructureContract<
   R extends IStructureResults<
+    unknown,
     unknown,
     unknown,
     unknown,
@@ -500,6 +508,7 @@ export type ITableContract<
     unknown,
     unknown,
     unknown,
+    unknown,
     unknown
   >,
 > = IAdtCreatable<ITableConfig, ReturnType<R['created']>> &
@@ -522,6 +531,7 @@ export type ITableContract<
   IAdtVersionable<ITableConfig, ObjectVersion[], string>;
 export type ITableTypeContract<
   R extends ITableTypeResults<
+    unknown,
     unknown,
     unknown,
     unknown,
@@ -560,6 +570,7 @@ export type IDdlContract<
     unknown,
     unknown,
     unknown,
+    unknown,
     unknown
   >,
 > = IAdtCreatable<IDdlConfig, ReturnType<R['created']>> &
@@ -578,6 +589,7 @@ export type IDdlContract<
   IAdtVersionable<IDdlConfig, ObjectVersion[], string>;
 export type IFunctionGroupContract<
   R extends IFunctionGroupResults<
+    unknown,
     unknown,
     unknown,
     unknown,
@@ -615,6 +627,7 @@ export type IFunctionModuleContract<
     unknown,
     unknown,
     unknown,
+    unknown,
     unknown
   >,
 > = IAdtCreatable<IFunctionModuleConfig, ReturnType<R['created']>> &
@@ -637,6 +650,7 @@ export type IFunctionModuleContract<
   IAdtVersionable<IFunctionModuleConfig, ObjectVersion[], string>;
 export type IFunctionIncludeContract<
   R extends IFunctionIncludeResults<
+    unknown,
     unknown,
     unknown,
     unknown,
@@ -672,6 +686,7 @@ export type IPackageContract<
     unknown,
     unknown,
     unknown,
+    unknown,
     unknown
   >,
 > = IAdtCreatable<IPackageConfig, ReturnType<R['created']>> &
@@ -692,6 +707,7 @@ export type IPackageContract<
   IAdtTransportAware<IPackageConfig, ReturnType<R['transport']>>;
 export type IMessageClassContract<
   R extends IMessageClassResults<
+    unknown,
     unknown,
     unknown,
     unknown,
@@ -732,6 +748,7 @@ export type IAccessControlContract<
     unknown,
     unknown,
     unknown,
+    unknown,
     unknown
   >,
 > = IAdtCreatable<IAccessControlConfig, ReturnType<R['created']>> &
@@ -754,6 +771,7 @@ export type IAccessControlContract<
   IAdtVersionable<IAccessControlConfig, ObjectVersion[], string>;
 export type ITransformationContract<
   R extends ITransformationResults<
+    unknown,
     unknown,
     unknown,
     unknown,
@@ -792,6 +810,7 @@ export type IServiceDefinitionContract<
     unknown,
     unknown,
     unknown,
+    unknown,
     unknown
   >,
 > = IAdtCreatable<IServiceDefinitionConfig, ReturnType<R['created']>> &
@@ -822,6 +841,7 @@ export type IScalarFunctionContract<
     unknown,
     unknown,
     unknown,
+    unknown,
     unknown
   >,
 > = IAdtCreatable<IScalarFunctionConfig, ReturnType<R['created']>> &
@@ -844,6 +864,7 @@ export type IScalarFunctionContract<
   IAdtVersionable<IScalarFunctionConfig, ObjectVersion[], string>;
 export type IScalarFunctionImplementationContract<
   R extends IScalarFunctionImplementationResults<
+    unknown,
     unknown,
     unknown,
     unknown,
@@ -894,6 +915,7 @@ export type IAppendStructureContract<
     unknown,
     unknown,
     unknown,
+    unknown,
     unknown
   >,
 > = IAdtCreatable<IAppendStructureConfig, ReturnType<R['created']>> &
@@ -916,6 +938,7 @@ export type IAppendStructureContract<
   IAdtVersionable<IAppendStructureConfig, ObjectVersion[], string>;
 export type IBehaviorDefinitionContract<
   R extends IBehaviorDefinitionResults<
+    unknown,
     unknown,
     unknown,
     unknown,
@@ -953,6 +976,7 @@ export type IBehaviorImplementationContract<
     unknown,
     unknown,
     unknown,
+    unknown,
     unknown
   >,
 > = IAdtCreatable<IBehaviorImplementationConfig, ReturnType<R['created']>> &
@@ -975,6 +999,7 @@ export type IBehaviorImplementationContract<
   IAdtVersionable<IBehaviorImplementationConfig, ObjectVersion[], string>;
 export type IMetadataExtensionContract<
   R extends IMetadataExtensionResults<
+    unknown,
     unknown,
     unknown,
     unknown,
@@ -1013,6 +1038,7 @@ export type IEnhancementContract<
     unknown,
     unknown,
     unknown,
+    unknown,
     unknown
   >,
 > = IAdtCreatable<IEnhancementConfig, ReturnType<R['created']>> &
@@ -1034,7 +1060,14 @@ export type IEnhancementContract<
   IAdtTransportAware<IEnhancementConfig, ReturnType<R['transport']>> &
   IAdtVersionable<IEnhancementConfig, ObjectVersion[], string>;
 export type IRequestContract<
-  R extends ITransportResults<unknown, unknown, unknown, unknown, unknown>,
+  R extends ITransportResults<
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown
+  >,
 > = IAdtCreatable<ITransportConfig, ReturnType<R['created']>> &
   IAdtReadable<ITransportConfig, ReturnType<R['read']>, ReturnType<R['read']>> &
   IAdtUpdatable<ITransportConfig, ReturnType<R['updated']>> &
@@ -1046,6 +1079,7 @@ export type IRequestContract<
   IAdtRequest<ReturnType<R['list']>>;
 export type ILocalTestClassContract<
   R extends IClassResults<
+    unknown,
     unknown,
     unknown,
     unknown,
@@ -1076,6 +1110,7 @@ export type ILocalTypesContract<
     unknown,
     unknown,
     unknown,
+    unknown,
     unknown
   >,
 > = IAdtReadable<
@@ -1099,6 +1134,7 @@ export type ILocalDefinitionsContract<
     unknown,
     unknown,
     unknown,
+    unknown,
     unknown
   >,
 > = IAdtReadable<
@@ -1115,6 +1151,7 @@ export type ILocalDefinitionsContract<
   IAdtTransportAware<ILocalDefinitionsConfig, string>;
 export type ILocalMacrosContract<
   R extends IClassResults<
+    unknown,
     unknown,
     unknown,
     unknown,
@@ -1263,6 +1300,7 @@ export class AdtClient {
       unknown,
       unknown,
       unknown,
+      unknown,
       unknown
     >,
   >(results: R): IClassContract<R>;
@@ -1271,6 +1309,7 @@ export class AdtClient {
   // factory telling the truth in its signature and lying in its body.
   getClass<
     R extends IClassResults<
+      unknown,
       unknown,
       unknown,
       unknown,
@@ -1315,11 +1354,13 @@ export class AdtClient {
       unknown,
       unknown,
       unknown,
+      unknown,
       unknown
     >,
   >(results: R): IProgramContract<R>;
   getProgram<
     R extends IProgramResults<
+      unknown,
       unknown,
       unknown,
       unknown,
@@ -1370,11 +1411,13 @@ export class AdtClient {
       unknown,
       unknown,
       unknown,
+      unknown,
       unknown
     >,
   >(results: R): IIncludeContract<R>;
   getInclude<
     R extends IIncludeResults<
+      unknown,
       unknown,
       unknown,
       unknown,
@@ -1416,11 +1459,13 @@ export class AdtClient {
       unknown,
       unknown,
       unknown,
+      unknown,
       unknown
     >,
   >(results: R): IInterfaceContract<R>;
   getInterface<
     R extends IInterfaceResults<
+      unknown,
       unknown,
       unknown,
       unknown,
@@ -1466,11 +1511,13 @@ export class AdtClient {
       unknown,
       unknown,
       unknown,
+      unknown,
       unknown
     >,
   >(results: R): IDomainContract<R>;
   getDomain<
     R extends IDomainResults<
+      unknown,
       unknown,
       unknown,
       unknown,
@@ -1559,11 +1606,13 @@ export class AdtClient {
       unknown,
       unknown,
       unknown,
+      unknown,
       unknown
     >,
   >(results: R): IDataElementContract<R>;
   getDataElement<
     R extends IDataElementResults<
+      unknown,
       unknown,
       unknown,
       unknown,
@@ -1607,11 +1656,13 @@ export class AdtClient {
       unknown,
       unknown,
       unknown,
+      unknown,
       unknown
     >,
   >(results: R): IAuthorizationFieldContract<R>;
   getAuthorizationField<
     R extends IAuthorizationFieldResults<
+      unknown,
       unknown,
       unknown,
       unknown,
@@ -1657,11 +1708,13 @@ export class AdtClient {
       unknown,
       unknown,
       unknown,
+      unknown,
       unknown
     >,
   >(results: R): IStructureContract<R>;
   getStructure<
     R extends IStructureResults<
+      unknown,
       unknown,
       unknown,
       unknown,
@@ -1706,11 +1759,13 @@ export class AdtClient {
       unknown,
       unknown,
       unknown,
+      unknown,
       unknown
     >,
   >(results: R): ITableContract<R>;
   getTable<
     R extends ITableResults<
+      unknown,
       unknown,
       unknown,
       unknown,
@@ -1755,11 +1810,13 @@ export class AdtClient {
       unknown,
       unknown,
       unknown,
+      unknown,
       unknown
     >,
   >(results: R): ITableTypeContract<R>;
   getTableType<
     R extends ITableTypeResults<
+      unknown,
       unknown,
       unknown,
       unknown,
@@ -1807,11 +1864,13 @@ export class AdtClient {
       unknown,
       unknown,
       unknown,
+      unknown,
       unknown
     >,
   >(results: R): IDdlContract<R>;
   getDdl<
     R extends IDdlResults<
+      unknown,
       unknown,
       unknown,
       unknown,
@@ -1856,11 +1915,13 @@ export class AdtClient {
       unknown,
       unknown,
       unknown,
+      unknown,
       unknown
     >,
   >(results: R): IFunctionGroupContract<R>;
   getFunctionGroup<
     R extends IFunctionGroupResults<
+      unknown,
       unknown,
       unknown,
       unknown,
@@ -1906,11 +1967,13 @@ export class AdtClient {
       unknown,
       unknown,
       unknown,
+      unknown,
       unknown
     >,
   >(results: R): IFunctionModuleContract<R>;
   getFunctionModule<
     R extends IFunctionModuleResults<
+      unknown,
       unknown,
       unknown,
       unknown,
@@ -1957,11 +2020,13 @@ export class AdtClient {
       unknown,
       unknown,
       unknown,
+      unknown,
       unknown
     >,
   >(results: R): IFunctionIncludeContract<R>;
   getFunctionInclude<
     R extends IFunctionIncludeResults<
+      unknown,
       unknown,
       unknown,
       unknown,
@@ -2007,11 +2072,13 @@ export class AdtClient {
       unknown,
       unknown,
       unknown,
+      unknown,
       unknown
     >,
   >(results: R): IPackageContract<R>;
   getPackage<
     R extends IPackageResults<
+      unknown,
       unknown,
       unknown,
       unknown,
@@ -2052,11 +2119,13 @@ export class AdtClient {
       unknown,
       unknown,
       unknown,
+      unknown,
       unknown
     >,
   >(results: R): IMessageClassContract<R>;
   getMessageClass<
     R extends IMessageClassResults<
+      unknown,
       unknown,
       unknown,
       unknown,
@@ -2129,11 +2198,13 @@ export class AdtClient {
       unknown,
       unknown,
       unknown,
+      unknown,
       unknown
     >,
   >(results: R): IAccessControlContract<R>;
   getAccessControl<
     R extends IAccessControlResults<
+      unknown,
       unknown,
       unknown,
       unknown,
@@ -2179,11 +2250,13 @@ export class AdtClient {
       unknown,
       unknown,
       unknown,
+      unknown,
       unknown
     >,
   >(results: R): ITransformationContract<R>;
   getTransformation<
     R extends ITransformationResults<
+      unknown,
       unknown,
       unknown,
       unknown,
@@ -2230,11 +2303,13 @@ export class AdtClient {
       unknown,
       unknown,
       unknown,
+      unknown,
       unknown
     >,
   >(results: R): IServiceDefinitionContract<R>;
   getServiceDefinition<
     R extends IServiceDefinitionResults<
+      unknown,
       unknown,
       unknown,
       unknown,
@@ -2280,11 +2355,13 @@ export class AdtClient {
       unknown,
       unknown,
       unknown,
+      unknown,
       unknown
     >,
   >(results: R): IScalarFunctionContract<R>;
   getScalarFunction<
     R extends IScalarFunctionResults<
+      unknown,
       unknown,
       unknown,
       unknown,
@@ -2330,11 +2407,13 @@ export class AdtClient {
       unknown,
       unknown,
       unknown,
+      unknown,
       unknown
     >,
   >(results: R): IScalarFunctionImplementationContract<R>;
   getScalarFunctionImplementation<
     R extends IScalarFunctionImplementationResults<
+      unknown,
       unknown,
       unknown,
       unknown,
@@ -2380,11 +2459,13 @@ export class AdtClient {
       unknown,
       unknown,
       unknown,
+      unknown,
       unknown
     >,
   >(results: R): IAppendStructureContract<R>;
   getAppendStructure<
     R extends IAppendStructureResults<
+      unknown,
       unknown,
       unknown,
       unknown,
@@ -2458,11 +2539,13 @@ export class AdtClient {
       unknown,
       unknown,
       unknown,
+      unknown,
       unknown
     >,
   >(results: R): IBehaviorDefinitionContract<R>;
   getBehaviorDefinition<
     R extends IBehaviorDefinitionResults<
+      unknown,
       unknown,
       unknown,
       unknown,
@@ -2508,11 +2591,13 @@ export class AdtClient {
       unknown,
       unknown,
       unknown,
+      unknown,
       unknown
     >,
   >(results: R): IBehaviorImplementationContract<R>;
   getBehaviorImplementation<
     R extends IClassResults<
+      unknown,
       unknown,
       unknown,
       unknown,
@@ -2555,11 +2640,13 @@ export class AdtClient {
       unknown,
       unknown,
       unknown,
+      unknown,
       unknown
     >,
   >(results: R): IMetadataExtensionContract<R>;
   getMetadataExtension<
     R extends IMetadataExtensionResults<
+      unknown,
       unknown,
       unknown,
       unknown,
@@ -2612,11 +2699,13 @@ export class AdtClient {
       unknown,
       unknown,
       unknown,
+      unknown,
       unknown
     >,
   >(results: R): IEnhancementContract<R>;
   getEnhancement<
     R extends IEnhancementResults<
+      unknown,
       unknown,
       unknown,
       unknown,
@@ -2659,6 +2748,7 @@ export class AdtClient {
       unknown,
       unknown,
       unknown,
+      unknown,
       unknown
     >,
   >(
@@ -2687,6 +2777,7 @@ export class AdtClient {
     IAdtLockable<IFeatureToggleConfig>;
   getFeatureToggle<
     R extends IFeatureToggleResults<
+      unknown,
       unknown,
       unknown,
       unknown,
@@ -2861,10 +2952,18 @@ export class AdtClient {
   // and `capabilities/shape.ts` caught it.
   getRequest(): IRequestContract<ITransportResults>;
   getRequest<
-    R extends ITransportResults<unknown, unknown, unknown, unknown, unknown>,
+    R extends ITransportResults<
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    >,
   >(results: R): IRequestContract<R>;
   getRequest<
     R extends ITransportResults<
+      unknown,
       unknown,
       unknown,
       unknown,
@@ -2968,11 +3067,13 @@ export class AdtClient {
       unknown,
       unknown,
       unknown,
+      unknown,
       unknown
     >,
   >(results: R): ILocalTestClassContract<R>;
   getLocalTestClass<
     R extends IClassResults<
+      unknown,
       unknown,
       unknown,
       unknown,
@@ -3020,11 +3121,13 @@ export class AdtClient {
       unknown,
       unknown,
       unknown,
+      unknown,
       unknown
     >,
   >(results: R): ILocalTypesContract<R>;
   getLocalTypes<
     R extends IClassResults<
+      unknown,
       unknown,
       unknown,
       unknown,
@@ -3072,11 +3175,13 @@ export class AdtClient {
       unknown,
       unknown,
       unknown,
+      unknown,
       unknown
     >,
   >(results: R): ILocalDefinitionsContract<R>;
   getLocalDefinitions<
     R extends IClassResults<
+      unknown,
       unknown,
       unknown,
       unknown,
@@ -3124,11 +3229,13 @@ export class AdtClient {
       unknown,
       unknown,
       unknown,
+      unknown,
       unknown
     >,
   >(results: R): ILocalMacrosContract<R>;
   getLocalMacros<
     R extends IClassResults<
+      unknown,
       unknown,
       unknown,
       unknown,

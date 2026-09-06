@@ -74,6 +74,7 @@ export class AdtFunctionModule<
     unknown,
     unknown,
     unknown,
+    unknown,
     unknown
   > = IFunctionModuleResults,
 > implements
@@ -87,7 +88,7 @@ export class AdtFunctionModule<
     IAdtDeletable<
       IFunctionModuleConfig,
       ReturnType<R['deletion']>,
-      ReturnType<R['check']>
+      ReturnType<R['deletionCheck']>
     >,
     IAdtValidatable<IFunctionModuleConfig, ReturnType<R['validation']>>,
     IAdtCheckable<IFunctionModuleConfig, ReturnType<R['check']>>,

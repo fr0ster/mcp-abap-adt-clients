@@ -68,6 +68,7 @@ export class AdtAccessControl<
     unknown,
     unknown,
     unknown,
+    unknown,
     unknown
   > = IAccessControlResults,
 > implements
@@ -81,7 +82,7 @@ export class AdtAccessControl<
     IAdtDeletable<
       IAccessControlConfig,
       ReturnType<R['deletion']>,
-      ReturnType<R['check']>
+      ReturnType<R['deletionCheck']>
     >,
     IAdtValidatable<IAccessControlConfig, ReturnType<R['validation']>>,
     IAdtCheckable<IAccessControlConfig, ReturnType<R['check']>>,

@@ -63,6 +63,7 @@ export class AdtLocalTestClass<
       unknown,
       unknown,
       unknown,
+      unknown,
       unknown
     > = IClassResults,
   >
