@@ -1,3 +1,7 @@
+import type {
+  IAdtMetadataReadable,
+  IAdtReadable,
+} from '@mcp-abap-adt/interfaces';
 /**
  * Integration test for AdtClient read operations
  * Tests read/readMetadata for all object types
@@ -110,7 +114,16 @@ describe('AdtClient read operations', () => {
     testName: string,
     objectType: string,
     buildConfig: (name: string, group?: string) => any,
-    getAdtObject: () => any,
+    // **Typed, not `any`.** Held as `any`, this hid four calls to `read()` on
+    // types that no longer have one — a domain, a data element, a function
+    // group and a package are their own document, so reading them is
+    // `readMetadata`. `tsc` said nothing and the full run failed on all four
+    // at once. The shape below is what those handlers actually offer: either
+    // member, and the reader below asks for the one that is there.
+    getAdtObject: () =>
+      | (Partial<IAdtReadable<any, unknown>> &
+          Partial<IAdtMetadataReadable<any, unknown>>)
+      | undefined,
     handlerName?: string,
     testCaseName?: string,
   ) {
@@ -172,9 +185,29 @@ describe('AdtClient read operations', () => {
 
       try {
         const adtObject = getAdtObject();
+        if (!adtObject) throw new Error(`${testName}: no client`);
+        // A type with a source reads it; a type that *is* its document reads
+        // that. Which one this is, is a property of the type, so the test asks
+        // rather than assuming — the same choice `BaseTester` makes.
+        const readVersion = (version: 'active' | 'inactive') =>
+          adtObject.read
+            ? adtObject.read(params, version)
+            : // biome-ignore lint/style/noNonNullAssertion: one of the two is always there
+              adtObject.readMetadata!(params, { version });
+
+        const readMetadata = (version: 'active' | 'inactive') => {
+          if (!adtObject.readMetadata) {
+            throw new Error(
+              `${testName}: the handler offers no readMetadata() — every ADT ` +
+                'object has a document of its own.',
+            );
+          }
+          return adtObject.readMetadata(params, { version });
+        };
+
         logTestStep('read active', testsLogger);
         const readActiveState = expectResult(
-          await adtObject.read(params, 'active'),
+          await readVersion('active'),
           'readActiveState',
         );
         expect(readActiveState).toBeDefined();
@@ -185,7 +218,7 @@ describe('AdtClient read operations', () => {
 
         logTestStep('read inactive', testsLogger);
         const readInactiveState = expectResult(
-          await adtObject.read(params, 'inactive'),
+          await readVersion('inactive'),
           'readInactiveState',
         );
         expect(readInactiveState).toBeDefined();
@@ -196,9 +229,7 @@ describe('AdtClient read operations', () => {
 
         logTestStep('read metadata (active)', testsLogger);
         const metadataActiveState = expectResult(
-          await adtObject.readMetadata(params, {
-            version: 'active',
-          }),
+          await readMetadata('active'),
           'metadataActiveState',
         );
         expect(metadataActiveState).toBeDefined();
@@ -209,9 +240,7 @@ describe('AdtClient read operations', () => {
 
         logTestStep('read metadata (inactive)', testsLogger);
         const metadataInactiveState = expectResult(
-          await adtObject.readMetadata(params, {
-            version: 'inactive',
-          }),
+          await readMetadata('inactive'),
           'metadataInactiveState',
         );
         expect(metadataInactiveState).toBeDefined();
