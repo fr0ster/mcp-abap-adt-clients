@@ -248,6 +248,796 @@ import {
 } from '../core/unitTest';
 import { withRefusalDetection } from '../utils/refusalAware';
 
+/**
+ * **What each factory hands back, named once.**
+ *
+ * These compositions used to be written twice per factory — once in the
+ * no-argument overload and once in the parameterised one — and two copies of a
+ * type can disagree without anything noticing. One did: `getClass` declared
+ * nine atoms while `AdtClass` offered ten, and the missing `IAdtTransportAware`
+ * was invisible for as long as the no-argument overload answered the concrete
+ * class, because a class trivially offers whatever it implements.
+ *
+ * One definition per object, both overloads reading it, so that particular
+ * disagreement is no longer expressible. `capabilities/shape.ts` checks these
+ * against the manifest.
+ */
+export type IClassContract<
+  R extends IClassResults<
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown
+  >,
+> = IAdtCreatable<IClassConfig, ReturnType<R['created']>> &
+  IAdtReadable<
+    IClassConfig,
+    ReturnType<R['source']>,
+    ReturnType<R['metadata']>
+  > &
+  IAdtUpdatable<IClassConfig, ReturnType<R['updated']>> &
+  IAdtDeletable<IClassConfig, ReturnType<R['deletion']>> &
+  IAdtValidatable<IClassConfig, ReturnType<R['validation']>> &
+  IAdtCheckable<IClassConfig, ReturnType<R['check']>> &
+  IAdtActivatable<IClassConfig, ReturnType<R['activation']>> &
+  IAdtLockable<IClassConfig> &
+  IAdtTransportAware<IClassConfig, string> &
+  IAdtVersionable<IClassConfig, ObjectVersion[], string>;
+export type IProgramContract<
+  R extends IProgramResults<
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown
+  >,
+> = IAdtCreatable<IProgramConfig, ReturnType<R['created']>> &
+  IAdtReadable<
+    IProgramConfig,
+    ReturnType<R['source']>,
+    ReturnType<R['metadata']>
+  > &
+  IAdtUpdatable<IProgramConfig, ReturnType<R['updated']>> &
+  IAdtDeletable<IProgramConfig, ReturnType<R['deletion']>> &
+  IAdtValidatable<IProgramConfig, ReturnType<R['validation']>> &
+  IAdtCheckable<IProgramConfig, ReturnType<R['check']>> &
+  IAdtActivatable<IProgramConfig, ReturnType<R['activation']>> &
+  IAdtLockable<IProgramConfig> &
+  IAdtTransportAware<IProgramConfig, ReturnType<R['transport']>> &
+  IAdtVersionable<IProgramConfig, ObjectVersion[], string>;
+export type IIncludeContract<
+  R extends IIncludeResults<
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown
+  >,
+> = IAdtCreatable<IIncludeConfig, ReturnType<R['created']>> &
+  IAdtReadable<
+    IIncludeConfig,
+    ReturnType<R['source']>,
+    ReturnType<R['metadata']>
+  > &
+  IAdtUpdatable<IIncludeConfig, ReturnType<R['updated']>> &
+  IAdtDeletable<IIncludeConfig, ReturnType<R['deletion']>> &
+  IAdtValidatable<IIncludeConfig, ReturnType<R['validation']>> &
+  IAdtActivatable<IIncludeConfig, ReturnType<R['activation']>> &
+  IAdtLockable<IIncludeConfig>;
+export type IInterfaceContract<
+  R extends IInterfaceResults<
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown
+  >,
+> = IAdtCreatable<IInterfaceConfig, ReturnType<R['created']>> &
+  IAdtReadable<
+    IInterfaceConfig,
+    ReturnType<R['source']>,
+    ReturnType<R['metadata']>
+  > &
+  IAdtUpdatable<IInterfaceConfig, ReturnType<R['updated']>> &
+  IAdtDeletable<IInterfaceConfig, ReturnType<R['deletion']>> &
+  IAdtValidatable<IInterfaceConfig, ReturnType<R['validation']>> &
+  IAdtCheckable<IInterfaceConfig, ReturnType<R['check']>> &
+  IAdtActivatable<IInterfaceConfig, ReturnType<R['activation']>> &
+  IAdtLockable<IInterfaceConfig> &
+  IAdtTransportAware<IInterfaceConfig, ReturnType<R['transport']>> &
+  IAdtVersionable<IInterfaceConfig, ObjectVersion[], string>;
+export type IDomainContract<
+  R extends IDomainResults<
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown
+  >,
+> = IAdtCreatable<IDomainConfig, ReturnType<R['created']>> &
+  IAdtReadable<
+    IDomainConfig,
+    ReturnType<R['source']>,
+    ReturnType<R['metadata']>
+  > &
+  IAdtUpdatable<IDomainConfig, ReturnType<R['updated']>> &
+  IAdtDeletable<IDomainConfig, ReturnType<R['deletion']>> &
+  IAdtValidatable<IDomainConfig, ReturnType<R['validation']>> &
+  IAdtCheckable<IDomainConfig, ReturnType<R['check']>> &
+  IAdtActivatable<IDomainConfig, ReturnType<R['activation']>> &
+  IAdtLockable<IDomainConfig> &
+  IAdtTransportAware<IDomainConfig, ReturnType<R['transport']>>;
+export type IDataElementContract<
+  R extends IDataElementResults<
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown
+  >,
+> = IAdtCreatable<IDataElementConfig, ReturnType<R['created']>> &
+  IAdtReadable<
+    IDataElementConfig,
+    ReturnType<R['source']>,
+    ReturnType<R['metadata']>
+  > &
+  IAdtUpdatable<IDataElementConfig, ReturnType<R['updated']>> &
+  IAdtDeletable<IDataElementConfig, ReturnType<R['deletion']>> &
+  IAdtValidatable<IDataElementConfig, ReturnType<R['validation']>> &
+  IAdtCheckable<IDataElementConfig, ReturnType<R['check']>> &
+  IAdtActivatable<IDataElementConfig, ReturnType<R['activation']>> &
+  IAdtLockable<IDataElementConfig> &
+  IAdtTransportAware<IDataElementConfig, ReturnType<R['transport']>>;
+export type IAuthorizationFieldContract<
+  R extends IAuthorizationFieldResults<
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown
+  >,
+> = IAdtCreatable<IAuthorizationFieldConfig, ReturnType<R['created']>> &
+  IAdtReadable<
+    IAuthorizationFieldConfig,
+    ReturnType<R['source']>,
+    ReturnType<R['metadata']>
+  > &
+  IAdtUpdatable<IAuthorizationFieldConfig, ReturnType<R['updated']>> &
+  IAdtDeletable<IAuthorizationFieldConfig, ReturnType<R['deletion']>> &
+  IAdtValidatable<IAuthorizationFieldConfig, ReturnType<R['validation']>> &
+  IAdtCheckable<IAuthorizationFieldConfig, ReturnType<R['check']>> &
+  IAdtActivatable<IAuthorizationFieldConfig, ReturnType<R['activation']>> &
+  IAdtLockable<IAuthorizationFieldConfig>;
+export type IStructureContract<
+  R extends IStructureResults<
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown
+  >,
+> = IAdtCreatable<IStructureConfig, ReturnType<R['created']>> &
+  IAdtReadable<
+    IStructureConfig,
+    ReturnType<R['source']>,
+    ReturnType<R['metadata']>
+  > &
+  IAdtUpdatable<IStructureConfig, ReturnType<R['updated']>> &
+  IAdtDeletable<IStructureConfig, ReturnType<R['deletion']>> &
+  IAdtValidatable<IStructureConfig, ReturnType<R['validation']>> &
+  IAdtCheckable<IStructureConfig, ReturnType<R['check']>> &
+  IAdtActivatable<IStructureConfig, ReturnType<R['activation']>> &
+  IAdtLockable<IStructureConfig> &
+  IAdtTransportAware<IStructureConfig, ReturnType<R['transport']>> &
+  IAdtVersionable<IStructureConfig, ObjectVersion[], string>;
+export type ITableContract<
+  R extends ITableResults<
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown
+  >,
+> = IAdtCreatable<ITableConfig, ReturnType<R['created']>> &
+  IAdtReadable<
+    ITableConfig,
+    ReturnType<R['source']>,
+    ReturnType<R['metadata']>
+  > &
+  IAdtUpdatable<ITableConfig, ReturnType<R['updated']>> &
+  IAdtDeletable<ITableConfig, ReturnType<R['deletion']>> &
+  IAdtValidatable<ITableConfig, ReturnType<R['validation']>> &
+  IAdtCheckable<ITableConfig, ReturnType<R['check']>> &
+  IAdtActivatable<ITableConfig, ReturnType<R['activation']>> &
+  IAdtLockable<ITableConfig> &
+  IAdtTransportAware<ITableConfig, ReturnType<R['transport']>> &
+  IAdtVersionable<ITableConfig, ObjectVersion[], string>;
+export type ITableTypeContract<
+  R extends ITableTypeResults<
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown
+  >,
+> = IAdtCreatable<ITableTypeConfig, ReturnType<R['created']>> &
+  IAdtReadable<
+    ITableTypeConfig,
+    ReturnType<R['source']>,
+    ReturnType<R['metadata']>
+  > &
+  IAdtUpdatable<ITableTypeConfig, ReturnType<R['updated']>> &
+  IAdtDeletable<ITableTypeConfig, ReturnType<R['deletion']>> &
+  IAdtValidatable<ITableTypeConfig, ReturnType<R['validation']>> &
+  IAdtCheckable<ITableTypeConfig, ReturnType<R['check']>> &
+  IAdtActivatable<ITableTypeConfig, ReturnType<R['activation']>> &
+  IAdtLockable<ITableTypeConfig> &
+  IAdtTransportAware<ITableTypeConfig, ReturnType<R['transport']>> &
+  IAdtVersionable<ITableTypeConfig, ObjectVersion[], string>;
+export type IDdlContract<
+  R extends IDdlResults<
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown
+  >,
+> = IAdtCreatable<IDdlConfig, ReturnType<R['created']>> &
+  IAdtReadable<IDdlConfig, ReturnType<R['source']>, ReturnType<R['metadata']>> &
+  IAdtUpdatable<IDdlConfig, ReturnType<R['updated']>> &
+  IAdtDeletable<IDdlConfig, ReturnType<R['deletion']>> &
+  IAdtValidatable<IDdlConfig, ReturnType<R['validation']>> &
+  IAdtCheckable<IDdlConfig, ReturnType<R['check']>> &
+  IAdtActivatable<IDdlConfig, ReturnType<R['activation']>> &
+  IAdtLockable<IDdlConfig> &
+  IAdtTransportAware<IDdlConfig, ReturnType<R['transport']>> &
+  IAdtVersionable<IDdlConfig, ObjectVersion[], string>;
+export type IFunctionGroupContract<
+  R extends IFunctionGroupResults<
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown
+  >,
+> = IAdtCreatable<IFunctionGroupConfig, ReturnType<R['created']>> &
+  IAdtReadable<
+    IFunctionGroupConfig,
+    ReturnType<R['source']>,
+    ReturnType<R['metadata']>
+  > &
+  IAdtUpdatable<IFunctionGroupConfig, ReturnType<R['updated']>> &
+  IAdtDeletable<IFunctionGroupConfig, ReturnType<R['deletion']>> &
+  IAdtValidatable<IFunctionGroupConfig, ReturnType<R['validation']>> &
+  IAdtCheckable<IFunctionGroupConfig, ReturnType<R['check']>> &
+  IAdtActivatable<IFunctionGroupConfig, ReturnType<R['activation']>> &
+  IAdtLockable<IFunctionGroupConfig> &
+  IAdtTransportAware<IFunctionGroupConfig, ReturnType<R['transport']>>;
+export type IFunctionModuleContract<
+  R extends IFunctionModuleResults<
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown
+  >,
+> = IAdtCreatable<IFunctionModuleConfig, ReturnType<R['created']>> &
+  IAdtReadable<
+    IFunctionModuleConfig,
+    ReturnType<R['source']>,
+    ReturnType<R['metadata']>
+  > &
+  IAdtUpdatable<IFunctionModuleConfig, ReturnType<R['updated']>> &
+  IAdtDeletable<IFunctionModuleConfig, ReturnType<R['deletion']>> &
+  IAdtValidatable<IFunctionModuleConfig, ReturnType<R['validation']>> &
+  IAdtCheckable<IFunctionModuleConfig, ReturnType<R['check']>> &
+  IAdtActivatable<IFunctionModuleConfig, ReturnType<R['activation']>> &
+  IAdtLockable<IFunctionModuleConfig> &
+  IAdtTransportAware<IFunctionModuleConfig, ReturnType<R['transport']>> &
+  IAdtVersionable<IFunctionModuleConfig, ObjectVersion[], string>;
+export type IFunctionIncludeContract<
+  R extends IFunctionIncludeResults<
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown
+  >,
+> = IAdtCreatable<IFunctionIncludeConfig, ReturnType<R['created']>> &
+  IAdtReadable<
+    IFunctionIncludeConfig,
+    ReturnType<R['source']>,
+    ReturnType<R['metadata']>
+  > &
+  IAdtUpdatable<IFunctionIncludeConfig, ReturnType<R['updated']>> &
+  IAdtDeletable<IFunctionIncludeConfig, ReturnType<R['deletion']>> &
+  IAdtValidatable<IFunctionIncludeConfig, ReturnType<R['validation']>> &
+  IAdtCheckable<IFunctionIncludeConfig, ReturnType<R['check']>> &
+  IAdtActivatable<IFunctionIncludeConfig, ReturnType<R['activation']>> &
+  IAdtLockable<IFunctionIncludeConfig> &
+  IAdtVersionable<IFunctionIncludeConfig, ObjectVersion[], string>;
+export type IPackageContract<
+  R extends IPackageResults<
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown
+  >,
+> = IAdtCreatable<IPackageConfig, ReturnType<R['created']>> &
+  IAdtReadable<
+    IPackageConfig,
+    ReturnType<R['source']>,
+    ReturnType<R['metadata']>
+  > &
+  IAdtUpdatable<IPackageConfig, ReturnType<R['updated']>> &
+  IAdtDeletable<IPackageConfig, ReturnType<R['deletion']>> &
+  IAdtValidatable<IPackageConfig, ReturnType<R['validation']>> &
+  IAdtCheckable<IPackageConfig, ReturnType<R['check']>> &
+  IAdtLockable<IPackageConfig> &
+  IAdtTransportAware<IPackageConfig, ReturnType<R['transport']>>;
+export type IMessageClassContract<
+  R extends IMessageClassResults<
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown
+  >,
+> = IAdtCreatable<IMessageClassConfig, ReturnType<R['created']>> &
+  IAdtReadable<
+    IMessageClassConfig,
+    ReturnType<R['source']>,
+    ReturnType<R['metadata']>
+  > &
+  IAdtUpdatable<IMessageClassConfig, ReturnType<R['updated']>> &
+  IAdtDeletable<IMessageClassConfig, ReturnType<R['deletion']>> &
+  IAdtValidatable<IMessageClassConfig, ReturnType<R['validation']>> &
+  IAdtLockable<IMessageClassConfig>;
+export type IMessageClassMessageContract<
+  R extends IMessageClassMessageResults<unknown, unknown, unknown>,
+> = IAdtCreatable<IMessageClassMessageConfig, ReturnType<R['written']>> &
+  IAdtReadable<
+    IMessageClassMessageConfig,
+    ReturnType<R['read']>,
+    ReturnType<R['read']>
+  > &
+  IAdtUpdatable<IMessageClassMessageConfig, ReturnType<R['written']>> &
+  IAdtDeletable<IMessageClassMessageConfig, ReturnType<R['deleted']>>;
+export type IAccessControlContract<
+  R extends IAccessControlResults<
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown
+  >,
+> = IAdtCreatable<IAccessControlConfig, ReturnType<R['created']>> &
+  IAdtReadable<
+    IAccessControlConfig,
+    ReturnType<R['source']>,
+    ReturnType<R['metadata']>
+  > &
+  IAdtUpdatable<IAccessControlConfig, ReturnType<R['updated']>> &
+  IAdtDeletable<IAccessControlConfig, ReturnType<R['deletion']>> &
+  IAdtValidatable<IAccessControlConfig, ReturnType<R['validation']>> &
+  IAdtCheckable<IAccessControlConfig, ReturnType<R['check']>> &
+  IAdtActivatable<IAccessControlConfig, ReturnType<R['activation']>> &
+  IAdtLockable<IAccessControlConfig> &
+  IAdtTransportAware<IAccessControlConfig, ReturnType<R['transport']>> &
+  IAdtVersionable<IAccessControlConfig, ObjectVersion[], string>;
+export type ITransformationContract<
+  R extends ITransformationResults<
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown
+  >,
+> = IAdtCreatable<ITransformationConfig, ReturnType<R['created']>> &
+  IAdtReadable<
+    ITransformationConfig,
+    ReturnType<R['source']>,
+    ReturnType<R['metadata']>
+  > &
+  IAdtUpdatable<ITransformationConfig, ReturnType<R['updated']>> &
+  IAdtDeletable<ITransformationConfig, ReturnType<R['deletion']>> &
+  IAdtValidatable<ITransformationConfig, ReturnType<R['validation']>> &
+  IAdtCheckable<ITransformationConfig, ReturnType<R['check']>> &
+  IAdtActivatable<ITransformationConfig, ReturnType<R['activation']>> &
+  IAdtLockable<ITransformationConfig> &
+  IAdtTransportAware<ITransformationConfig, ReturnType<R['transport']>> &
+  IAdtVersionable<ITransformationConfig, ObjectVersion[], string>;
+export type IServiceDefinitionContract<
+  R extends IServiceDefinitionResults<
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown
+  >,
+> = IAdtCreatable<IServiceDefinitionConfig, ReturnType<R['created']>> &
+  IAdtReadable<
+    IServiceDefinitionConfig,
+    ReturnType<R['source']>,
+    ReturnType<R['metadata']>
+  > &
+  IAdtUpdatable<IServiceDefinitionConfig, ReturnType<R['updated']>> &
+  IAdtDeletable<IServiceDefinitionConfig, ReturnType<R['deletion']>> &
+  IAdtValidatable<IServiceDefinitionConfig, ReturnType<R['validation']>> &
+  IAdtCheckable<IServiceDefinitionConfig, ReturnType<R['check']>> &
+  IAdtActivatable<IServiceDefinitionConfig, ReturnType<R['activation']>> &
+  IAdtLockable<IServiceDefinitionConfig> &
+  IAdtTransportAware<IServiceDefinitionConfig, ReturnType<R['transport']>> &
+  IAdtVersionable<IServiceDefinitionConfig, ObjectVersion[], string>;
+export type IScalarFunctionContract<
+  R extends IScalarFunctionResults<
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown
+  >,
+> = IAdtCreatable<IScalarFunctionConfig, ReturnType<R['created']>> &
+  IAdtReadable<
+    IScalarFunctionConfig,
+    ReturnType<R['source']>,
+    ReturnType<R['metadata']>
+  > &
+  IAdtUpdatable<IScalarFunctionConfig, ReturnType<R['updated']>> &
+  IAdtDeletable<IScalarFunctionConfig, ReturnType<R['deletion']>> &
+  IAdtValidatable<IScalarFunctionConfig, ReturnType<R['validation']>> &
+  IAdtCheckable<IScalarFunctionConfig, ReturnType<R['check']>> &
+  IAdtActivatable<IScalarFunctionConfig, ReturnType<R['activation']>> &
+  IAdtLockable<IScalarFunctionConfig> &
+  IAdtTransportAware<IScalarFunctionConfig, ReturnType<R['transport']>> &
+  IAdtVersionable<IScalarFunctionConfig, ObjectVersion[], string>;
+export type IScalarFunctionImplementationContract<
+  R extends IScalarFunctionImplementationResults<
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown
+  >,
+> = IAdtCreatable<
+  IScalarFunctionImplementationConfig,
+  ReturnType<R['created']>
+> &
+  IAdtReadable<
+    IScalarFunctionImplementationConfig,
+    ReturnType<R['source']>,
+    ReturnType<R['metadata']>
+  > &
+  IAdtUpdatable<IScalarFunctionImplementationConfig, ReturnType<R['updated']>> &
+  IAdtDeletable<
+    IScalarFunctionImplementationConfig,
+    ReturnType<R['deletion']>
+  > &
+  IAdtValidatable<
+    IScalarFunctionImplementationConfig,
+    ReturnType<R['validation']>
+  > &
+  IAdtCheckable<IScalarFunctionImplementationConfig, ReturnType<R['check']>> &
+  IAdtActivatable<
+    IScalarFunctionImplementationConfig,
+    ReturnType<R['activation']>
+  > &
+  IAdtLockable<IScalarFunctionImplementationConfig> &
+  IAdtTransportAware<
+    IScalarFunctionImplementationConfig,
+    ReturnType<R['transport']>
+  > &
+  IAdtVersionable<IScalarFunctionImplementationConfig, ObjectVersion[], string>;
+export type IAppendStructureContract<
+  R extends IAppendStructureResults<
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown
+  >,
+> = IAdtCreatable<IAppendStructureConfig, ReturnType<R['created']>> &
+  IAdtReadable<
+    IAppendStructureConfig,
+    ReturnType<R['source']>,
+    ReturnType<R['metadata']>
+  > &
+  IAdtUpdatable<IAppendStructureConfig, ReturnType<R['updated']>> &
+  IAdtDeletable<IAppendStructureConfig, ReturnType<R['deletion']>> &
+  IAdtValidatable<IAppendStructureConfig, ReturnType<R['validation']>> &
+  IAdtCheckable<IAppendStructureConfig, ReturnType<R['check']>> &
+  IAdtActivatable<IAppendStructureConfig, ReturnType<R['activation']>> &
+  IAdtLockable<IAppendStructureConfig> &
+  IAdtTransportAware<IAppendStructureConfig, ReturnType<R['transport']>> &
+  IAdtVersionable<IAppendStructureConfig, ObjectVersion[], string>;
+export type IBehaviorDefinitionContract<
+  R extends IBehaviorDefinitionResults<
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown
+  >,
+> = IAdtCreatable<IBehaviorDefinitionConfig, ReturnType<R['created']>> &
+  IAdtReadable<
+    IBehaviorDefinitionConfig,
+    ReturnType<R['source']>,
+    ReturnType<R['metadata']>
+  > &
+  IAdtUpdatable<IBehaviorDefinitionConfig, ReturnType<R['updated']>> &
+  IAdtDeletable<IBehaviorDefinitionConfig, ReturnType<R['deletion']>> &
+  IAdtValidatable<IBehaviorDefinitionConfig, ReturnType<R['validation']>> &
+  IAdtCheckable<IBehaviorDefinitionConfig, ReturnType<R['check']>> &
+  IAdtActivatable<IBehaviorDefinitionConfig, ReturnType<R['activation']>> &
+  IAdtLockable<IBehaviorDefinitionConfig> &
+  IAdtTransportAware<IBehaviorDefinitionConfig, ReturnType<R['transport']>> &
+  IAdtVersionable<IBehaviorDefinitionConfig, ObjectVersion[], string>;
+export type IBehaviorImplementationContract<
+  R extends IClassResults<
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown
+  >,
+> = IAdtCreatable<IBehaviorImplementationConfig, ReturnType<R['created']>> &
+  IAdtReadable<
+    IBehaviorImplementationConfig,
+    ReturnType<R['source']>,
+    ReturnType<R['metadata']>
+  > &
+  IAdtUpdatable<IBehaviorImplementationConfig, ReturnType<R['updated']>> &
+  IAdtDeletable<IBehaviorImplementationConfig, ReturnType<R['deletion']>> &
+  IAdtValidatable<IBehaviorImplementationConfig, ReturnType<R['validation']>> &
+  IAdtCheckable<IBehaviorImplementationConfig, ReturnType<R['check']>> &
+  IAdtActivatable<IBehaviorImplementationConfig, ReturnType<R['activation']>> &
+  IAdtLockable<IBehaviorImplementationConfig> &
+  IAdtTransportAware<IBehaviorImplementationConfig, string> &
+  IAdtVersionable<IBehaviorImplementationConfig, ObjectVersion[], string>;
+export type IMetadataExtensionContract<
+  R extends IMetadataExtensionResults<
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown
+  >,
+> = IAdtCreatable<IMetadataExtensionConfig, ReturnType<R['created']>> &
+  IAdtReadable<
+    IMetadataExtensionConfig,
+    ReturnType<R['source']>,
+    ReturnType<R['metadata']>
+  > &
+  IAdtUpdatable<IMetadataExtensionConfig, ReturnType<R['updated']>> &
+  IAdtDeletable<IMetadataExtensionConfig, ReturnType<R['deletion']>> &
+  IAdtValidatable<IMetadataExtensionConfig, ReturnType<R['validation']>> &
+  IAdtCheckable<IMetadataExtensionConfig, ReturnType<R['check']>> &
+  IAdtActivatable<IMetadataExtensionConfig, ReturnType<R['activation']>> &
+  IAdtLockable<IMetadataExtensionConfig> &
+  IAdtTransportAware<IMetadataExtensionConfig, ReturnType<R['transport']>> &
+  IAdtVersionable<IMetadataExtensionConfig, ObjectVersion[], string>;
+export type IEnhancementContract<
+  R extends IEnhancementResults<
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown
+  >,
+> = IAdtCreatable<IEnhancementConfig, ReturnType<R['created']>> &
+  IAdtReadable<
+    IEnhancementConfig,
+    ReturnType<R['source']>,
+    ReturnType<R['metadata']>
+  > &
+  IAdtUpdatable<IEnhancementConfig, ReturnType<R['updated']>> &
+  IAdtDeletable<IEnhancementConfig, ReturnType<R['deletion']>> &
+  IAdtValidatable<IEnhancementConfig, ReturnType<R['validation']>> &
+  IAdtCheckable<IEnhancementConfig, ReturnType<R['check']>> &
+  IAdtActivatable<IEnhancementConfig, ReturnType<R['activation']>> &
+  IAdtLockable<IEnhancementConfig> &
+  IAdtTransportAware<IEnhancementConfig, ReturnType<R['transport']>> &
+  IAdtVersionable<IEnhancementConfig, ObjectVersion[], string>;
+export type IRequestContract<
+  R extends ITransportResults<unknown, unknown, unknown, unknown, unknown>,
+> = IAdtCreatable<ITransportConfig, ReturnType<R['created']>> &
+  IAdtReadable<ITransportConfig, ReturnType<R['read']>, ReturnType<R['read']>> &
+  IAdtUpdatable<ITransportConfig, ReturnType<R['updated']>> &
+  IAdtDeletable<ITransportConfig, ReturnType<R['deleted']>> &
+  IAdtRequest<ReturnType<R['list']>>;
+export type ILocalTestClassContract<
+  R extends IClassResults<
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown
+  >,
+> = IAdtReadable<
+  ILocalTestClassConfig,
+  ReturnType<R['source']>,
+  ReturnType<R['metadata']>
+> &
+  IAdtUpdatable<ILocalTestClassConfig, ReturnType<R['updated']>> &
+  IAdtDeletable<ILocalTestClassConfig, ReturnType<R['updated']>> &
+  IAdtValidatable<ILocalTestClassConfig, ReturnType<R['validation']>> &
+  IAdtCheckable<ILocalTestClassConfig, ReturnType<R['check']>> &
+  IAdtActivatable<ILocalTestClassConfig, ReturnType<R['activation']>> &
+  IAdtLockable<ILocalTestClassConfig> &
+  IAdtVersionable<ILocalTestClassConfig, ObjectVersion[], string> &
+  IAdtTransportAware<ILocalTestClassConfig, string>;
+export type ILocalTypesContract<
+  R extends IClassResults<
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown
+  >,
+> = IAdtReadable<
+  ILocalTypesConfig,
+  ReturnType<R['source']>,
+  ReturnType<R['metadata']>
+> &
+  IAdtUpdatable<ILocalTypesConfig, ReturnType<R['updated']>> &
+  IAdtDeletable<ILocalTypesConfig, ReturnType<R['updated']>> &
+  IAdtValidatable<ILocalTypesConfig, ReturnType<R['validation']>> &
+  IAdtCheckable<ILocalTypesConfig, ReturnType<R['check']>> &
+  IAdtActivatable<ILocalTypesConfig, ReturnType<R['activation']>> &
+  IAdtLockable<ILocalTypesConfig> &
+  IAdtVersionable<ILocalTypesConfig, ObjectVersion[], string> &
+  IAdtTransportAware<ILocalTypesConfig, string>;
+export type ILocalDefinitionsContract<
+  R extends IClassResults<
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown
+  >,
+> = IAdtReadable<
+  ILocalDefinitionsConfig,
+  ReturnType<R['source']>,
+  ReturnType<R['metadata']>
+> &
+  IAdtUpdatable<ILocalDefinitionsConfig, ReturnType<R['updated']>> &
+  IAdtDeletable<ILocalDefinitionsConfig, ReturnType<R['updated']>> &
+  IAdtValidatable<ILocalDefinitionsConfig, ReturnType<R['validation']>> &
+  IAdtCheckable<ILocalDefinitionsConfig, ReturnType<R['check']>> &
+  IAdtActivatable<ILocalDefinitionsConfig, ReturnType<R['activation']>> &
+  IAdtLockable<ILocalDefinitionsConfig> &
+  IAdtVersionable<ILocalDefinitionsConfig, ObjectVersion[], string> &
+  IAdtTransportAware<ILocalDefinitionsConfig, string>;
+export type ILocalMacrosContract<
+  R extends IClassResults<
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown
+  >,
+> = IAdtReadable<
+  ILocalMacrosConfig,
+  ReturnType<R['source']>,
+  ReturnType<R['metadata']>
+> &
+  IAdtUpdatable<ILocalMacrosConfig, ReturnType<R['updated']>> &
+  IAdtDeletable<ILocalMacrosConfig, ReturnType<R['updated']>> &
+  IAdtValidatable<ILocalMacrosConfig, ReturnType<R['validation']>> &
+  IAdtCheckable<ILocalMacrosConfig, ReturnType<R['check']>> &
+  IAdtActivatable<ILocalMacrosConfig, ReturnType<R['activation']>> &
+  IAdtLockable<ILocalMacrosConfig> &
+  IAdtVersionable<ILocalMacrosConfig, ObjectVersion[], string> &
+  IAdtTransportAware<ILocalMacrosConfig, string>;
+
 export class AdtClient {
   protected connection: IAbapConnection;
   protected logger: ILogger;
@@ -356,7 +1146,15 @@ export class AdtClient {
    * object. The return type is this package's — which is why
    * `@mcp-abap-adt/interfaces` needs no parser parameter to make this possible.
    */
-  getClass(): AdtClass;
+  // The no-argument overload answers the same composition the other one does,
+  // not the concrete class. A consumer holding `AdtXxx` gets its members'
+  // looser signatures — `activate<E>(config)` with no strategy compiles there
+  // and promises a failure nothing will produce — and the contract closed that
+  // in 32.0.0 with two call signatures per member. This is where a consumer
+  // arrives, so this is where the contract has to be. Written from the other
+  // overload rather than by hand: the first hand-written one dropped an atom,
+  // and `capabilities/shape.ts` caught it.
+  getClass(): IClassContract<IClassResults>;
   getClass<
     R extends IClassResults<
       unknown,
@@ -368,21 +1166,7 @@ export class AdtClient {
       unknown,
       unknown
     >,
-  >(
-    results: R,
-  ): IAdtCreatable<IClassConfig, ReturnType<R['created']>> &
-    IAdtReadable<
-      IClassConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    > &
-    IAdtUpdatable<IClassConfig, ReturnType<R['updated']>> &
-    IAdtDeletable<IClassConfig, ReturnType<R['deletion']>> &
-    IAdtValidatable<IClassConfig, ReturnType<R['validation']>> &
-    IAdtCheckable<IClassConfig, ReturnType<R['check']>> &
-    IAdtActivatable<IClassConfig, ReturnType<R['activation']>> &
-    IAdtLockable<IClassConfig> &
-    IAdtVersionable<IClassConfig, ObjectVersion[], string>;
+  >(results: R): IClassContract<R>;
   // The implementation is generic too. Erasing R here would build the object at
   // `unknown` while the overload promised `ReturnType<R['source']>` — the
   // factory telling the truth in its signature and lying in its body.
@@ -413,7 +1197,15 @@ export class AdtClient {
    * Get high-level operations for Program objects
    * @returns IAdtObject instance for Program operations
    */
-  getProgram(): AdtProgram;
+  // The no-argument overload answers the same composition the other one does,
+  // not the concrete class. A consumer holding `AdtXxx` gets its members'
+  // looser signatures — `activate<E>(config)` with no strategy compiles there
+  // and promises a failure nothing will produce — and the contract closed that
+  // in 32.0.0 with two call signatures per member. This is where a consumer
+  // arrives, so this is where the contract has to be. Written from the other
+  // overload rather than by hand: the first hand-written one dropped an atom,
+  // and `capabilities/shape.ts` caught it.
+  getProgram(): IProgramContract<IProgramResults>;
   getProgram<
     R extends IProgramResults<
       unknown,
@@ -426,22 +1218,7 @@ export class AdtClient {
       unknown,
       unknown
     >,
-  >(
-    results: R,
-  ): IAdtCreatable<IProgramConfig, ReturnType<R['created']>> &
-    IAdtReadable<
-      IProgramConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    > &
-    IAdtUpdatable<IProgramConfig, ReturnType<R['updated']>> &
-    IAdtDeletable<IProgramConfig, ReturnType<R['deletion']>> &
-    IAdtValidatable<IProgramConfig, ReturnType<R['validation']>> &
-    IAdtCheckable<IProgramConfig, ReturnType<R['check']>> &
-    IAdtActivatable<IProgramConfig, ReturnType<R['activation']>> &
-    IAdtLockable<IProgramConfig> &
-    IAdtTransportAware<IProgramConfig, ReturnType<R['transport']>> &
-    IAdtVersionable<IProgramConfig, ObjectVersion[], string>;
+  >(results: R): IProgramContract<R>;
   getProgram<
     R extends IProgramResults<
       unknown,
@@ -477,7 +1254,15 @@ export class AdtClient {
    * Creatable on modern on-prem only, where discovery gives the includes
    * collection an `app:accept`.
    */
-  getInclude(): AdtInclude;
+  // The no-argument overload answers the same composition the other one does,
+  // not the concrete class. A consumer holding `AdtXxx` gets its members'
+  // looser signatures — `activate<E>(config)` with no strategy compiles there
+  // and promises a failure nothing will produce — and the contract closed that
+  // in 32.0.0 with two call signatures per member. This is where a consumer
+  // arrives, so this is where the contract has to be. Written from the other
+  // overload rather than by hand: the first hand-written one dropped an atom,
+  // and `capabilities/shape.ts` caught it.
+  getInclude(): IIncludeContract<IIncludeResults>;
   getInclude<
     R extends IIncludeResults<
       unknown,
@@ -488,19 +1273,7 @@ export class AdtClient {
       unknown,
       unknown
     >,
-  >(
-    results: R,
-  ): IAdtCreatable<IIncludeConfig, ReturnType<R['created']>> &
-    IAdtReadable<
-      IIncludeConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    > &
-    IAdtUpdatable<IIncludeConfig, ReturnType<R['updated']>> &
-    IAdtDeletable<IIncludeConfig, ReturnType<R['deletion']>> &
-    IAdtValidatable<IIncludeConfig, ReturnType<R['validation']>> &
-    IAdtActivatable<IIncludeConfig, ReturnType<R['activation']>> &
-    IAdtLockable<IIncludeConfig>;
+  >(results: R): IIncludeContract<R>;
   getInclude<
     R extends IIncludeResults<
       unknown,
@@ -525,7 +1298,15 @@ export class AdtClient {
    * Get high-level operations for Interface objects
    * @returns IAdtObject instance for Interface operations
    */
-  getInterface(): AdtInterface;
+  // The no-argument overload answers the same composition the other one does,
+  // not the concrete class. A consumer holding `AdtXxx` gets its members'
+  // looser signatures — `activate<E>(config)` with no strategy compiles there
+  // and promises a failure nothing will produce — and the contract closed that
+  // in 32.0.0 with two call signatures per member. This is where a consumer
+  // arrives, so this is where the contract has to be. Written from the other
+  // overload rather than by hand: the first hand-written one dropped an atom,
+  // and `capabilities/shape.ts` caught it.
+  getInterface(): IInterfaceContract<IInterfaceResults>;
   getInterface<
     R extends IInterfaceResults<
       unknown,
@@ -538,22 +1319,7 @@ export class AdtClient {
       unknown,
       unknown
     >,
-  >(
-    results: R,
-  ): IAdtCreatable<IInterfaceConfig, ReturnType<R['created']>> &
-    IAdtReadable<
-      IInterfaceConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    > &
-    IAdtUpdatable<IInterfaceConfig, ReturnType<R['updated']>> &
-    IAdtDeletable<IInterfaceConfig, ReturnType<R['deletion']>> &
-    IAdtValidatable<IInterfaceConfig, ReturnType<R['validation']>> &
-    IAdtCheckable<IInterfaceConfig, ReturnType<R['check']>> &
-    IAdtActivatable<IInterfaceConfig, ReturnType<R['activation']>> &
-    IAdtLockable<IInterfaceConfig> &
-    IAdtTransportAware<IInterfaceConfig, ReturnType<R['transport']>> &
-    IAdtVersionable<IInterfaceConfig, ObjectVersion[], string>;
+  >(results: R): IInterfaceContract<R>;
   getInterface<
     R extends IInterfaceResults<
       unknown,
@@ -582,7 +1348,15 @@ export class AdtClient {
    * Get high-level operations for Domain objects
    * @returns IAdtObject instance for Domain operations
    */
-  getDomain(): AdtDomain;
+  // The no-argument overload answers the same composition the other one does,
+  // not the concrete class. A consumer holding `AdtXxx` gets its members'
+  // looser signatures — `activate<E>(config)` with no strategy compiles there
+  // and promises a failure nothing will produce — and the contract closed that
+  // in 32.0.0 with two call signatures per member. This is where a consumer
+  // arrives, so this is where the contract has to be. Written from the other
+  // overload rather than by hand: the first hand-written one dropped an atom,
+  // and `capabilities/shape.ts` caught it.
+  getDomain(): IDomainContract<IDomainResults>;
   getDomain<
     R extends IDomainResults<
       unknown,
@@ -595,21 +1369,7 @@ export class AdtClient {
       unknown,
       unknown
     >,
-  >(
-    results: R,
-  ): IAdtCreatable<IDomainConfig, ReturnType<R['created']>> &
-    IAdtReadable<
-      IDomainConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    > &
-    IAdtUpdatable<IDomainConfig, ReturnType<R['updated']>> &
-    IAdtDeletable<IDomainConfig, ReturnType<R['deletion']>> &
-    IAdtValidatable<IDomainConfig, ReturnType<R['validation']>> &
-    IAdtCheckable<IDomainConfig, ReturnType<R['check']>> &
-    IAdtActivatable<IDomainConfig, ReturnType<R['activation']>> &
-    IAdtLockable<IDomainConfig> &
-    IAdtTransportAware<IDomainConfig, ReturnType<R['transport']>>;
+  >(results: R): IDomainContract<R>;
   getDomain<
     R extends IDomainResults<
       unknown,
@@ -681,7 +1441,15 @@ export class AdtClient {
    * Get high-level operations for DataElement objects
    * @returns IAdtObject instance for DataElement operations
    */
-  getDataElement(): AdtDataElement;
+  // The no-argument overload answers the same composition the other one does,
+  // not the concrete class. A consumer holding `AdtXxx` gets its members'
+  // looser signatures — `activate<E>(config)` with no strategy compiles there
+  // and promises a failure nothing will produce — and the contract closed that
+  // in 32.0.0 with two call signatures per member. This is where a consumer
+  // arrives, so this is where the contract has to be. Written from the other
+  // overload rather than by hand: the first hand-written one dropped an atom,
+  // and `capabilities/shape.ts` caught it.
+  getDataElement(): IDataElementContract<IDataElementResults>;
   getDataElement<
     R extends IDataElementResults<
       unknown,
@@ -694,21 +1462,7 @@ export class AdtClient {
       unknown,
       unknown
     >,
-  >(
-    results: R,
-  ): IAdtCreatable<IDataElementConfig, ReturnType<R['created']>> &
-    IAdtReadable<
-      IDataElementConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    > &
-    IAdtUpdatable<IDataElementConfig, ReturnType<R['updated']>> &
-    IAdtDeletable<IDataElementConfig, ReturnType<R['deletion']>> &
-    IAdtValidatable<IDataElementConfig, ReturnType<R['validation']>> &
-    IAdtCheckable<IDataElementConfig, ReturnType<R['check']>> &
-    IAdtActivatable<IDataElementConfig, ReturnType<R['activation']>> &
-    IAdtLockable<IDataElementConfig> &
-    IAdtTransportAware<IDataElementConfig, ReturnType<R['transport']>>;
+  >(results: R): IDataElementContract<R>;
   getDataElement<
     R extends IDataElementResults<
       unknown,
@@ -736,7 +1490,15 @@ export class AdtClient {
    * Get high-level operations for AuthorizationField objects
    * @returns IAdtObject instance for AuthorizationField operations
    */
-  getAuthorizationField(): AdtAuthorizationField;
+  // The no-argument overload answers the same composition the other one does,
+  // not the concrete class. A consumer holding `AdtXxx` gets its members'
+  // looser signatures — `activate<E>(config)` with no strategy compiles there
+  // and promises a failure nothing will produce — and the contract closed that
+  // in 32.0.0 with two call signatures per member. This is where a consumer
+  // arrives, so this is where the contract has to be. Written from the other
+  // overload rather than by hand: the first hand-written one dropped an atom,
+  // and `capabilities/shape.ts` caught it.
+  getAuthorizationField(): IAuthorizationFieldContract<IAuthorizationFieldResults>;
   getAuthorizationField<
     R extends IAuthorizationFieldResults<
       unknown,
@@ -748,20 +1510,7 @@ export class AdtClient {
       unknown,
       unknown
     >,
-  >(
-    results: R,
-  ): IAdtCreatable<IAuthorizationFieldConfig, ReturnType<R['created']>> &
-    IAdtReadable<
-      IAuthorizationFieldConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    > &
-    IAdtUpdatable<IAuthorizationFieldConfig, ReturnType<R['updated']>> &
-    IAdtDeletable<IAuthorizationFieldConfig, ReturnType<R['deletion']>> &
-    IAdtValidatable<IAuthorizationFieldConfig, ReturnType<R['validation']>> &
-    IAdtCheckable<IAuthorizationFieldConfig, ReturnType<R['check']>> &
-    IAdtActivatable<IAuthorizationFieldConfig, ReturnType<R['activation']>> &
-    IAdtLockable<IAuthorizationFieldConfig>;
+  >(results: R): IAuthorizationFieldContract<R>;
   getAuthorizationField<
     R extends IAuthorizationFieldResults<
       unknown,
@@ -790,7 +1539,15 @@ export class AdtClient {
    * Get high-level operations for Structure objects
    * @returns IAdtObject instance for Structure operations
    */
-  getStructure(): AdtStructure;
+  // The no-argument overload answers the same composition the other one does,
+  // not the concrete class. A consumer holding `AdtXxx` gets its members'
+  // looser signatures — `activate<E>(config)` with no strategy compiles there
+  // and promises a failure nothing will produce — and the contract closed that
+  // in 32.0.0 with two call signatures per member. This is where a consumer
+  // arrives, so this is where the contract has to be. Written from the other
+  // overload rather than by hand: the first hand-written one dropped an atom,
+  // and `capabilities/shape.ts` caught it.
+  getStructure(): IStructureContract<IStructureResults>;
   getStructure<
     R extends IStructureResults<
       unknown,
@@ -803,22 +1560,7 @@ export class AdtClient {
       unknown,
       unknown
     >,
-  >(
-    results: R,
-  ): IAdtCreatable<IStructureConfig, ReturnType<R['created']>> &
-    IAdtReadable<
-      IStructureConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    > &
-    IAdtUpdatable<IStructureConfig, ReturnType<R['updated']>> &
-    IAdtDeletable<IStructureConfig, ReturnType<R['deletion']>> &
-    IAdtValidatable<IStructureConfig, ReturnType<R['validation']>> &
-    IAdtCheckable<IStructureConfig, ReturnType<R['check']>> &
-    IAdtActivatable<IStructureConfig, ReturnType<R['activation']>> &
-    IAdtLockable<IStructureConfig> &
-    IAdtTransportAware<IStructureConfig, ReturnType<R['transport']>> &
-    IAdtVersionable<IStructureConfig, ObjectVersion[], string>;
+  >(results: R): IStructureContract<R>;
   getStructure<
     R extends IStructureResults<
       unknown,
@@ -846,7 +1588,15 @@ export class AdtClient {
    * Get high-level operations for Table objects
    * @returns IAdtObject instance for Table operations
    */
-  getTable(): AdtTable;
+  // The no-argument overload answers the same composition the other one does,
+  // not the concrete class. A consumer holding `AdtXxx` gets its members'
+  // looser signatures — `activate<E>(config)` with no strategy compiles there
+  // and promises a failure nothing will produce — and the contract closed that
+  // in 32.0.0 with two call signatures per member. This is where a consumer
+  // arrives, so this is where the contract has to be. Written from the other
+  // overload rather than by hand: the first hand-written one dropped an atom,
+  // and `capabilities/shape.ts` caught it.
+  getTable(): ITableContract<ITableResults>;
   getTable<
     R extends ITableResults<
       unknown,
@@ -859,22 +1609,7 @@ export class AdtClient {
       unknown,
       unknown
     >,
-  >(
-    results: R,
-  ): IAdtCreatable<ITableConfig, ReturnType<R['created']>> &
-    IAdtReadable<
-      ITableConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    > &
-    IAdtUpdatable<ITableConfig, ReturnType<R['updated']>> &
-    IAdtDeletable<ITableConfig, ReturnType<R['deletion']>> &
-    IAdtValidatable<ITableConfig, ReturnType<R['validation']>> &
-    IAdtCheckable<ITableConfig, ReturnType<R['check']>> &
-    IAdtActivatable<ITableConfig, ReturnType<R['activation']>> &
-    IAdtLockable<ITableConfig> &
-    IAdtTransportAware<ITableConfig, ReturnType<R['transport']>> &
-    IAdtVersionable<ITableConfig, ObjectVersion[], string>;
+  >(results: R): ITableContract<R>;
   getTable<
     R extends ITableResults<
       unknown,
@@ -902,7 +1637,15 @@ export class AdtClient {
    * Get high-level operations for TableType (DDIC Table Type) objects
    * @returns IAdtObject instance for TableType operations
    */
-  getTableType(): AdtDdicTableType;
+  // The no-argument overload answers the same composition the other one does,
+  // not the concrete class. A consumer holding `AdtXxx` gets its members'
+  // looser signatures — `activate<E>(config)` with no strategy compiles there
+  // and promises a failure nothing will produce — and the contract closed that
+  // in 32.0.0 with two call signatures per member. This is where a consumer
+  // arrives, so this is where the contract has to be. Written from the other
+  // overload rather than by hand: the first hand-written one dropped an atom,
+  // and `capabilities/shape.ts` caught it.
+  getTableType(): ITableTypeContract<ITableTypeResults>;
   getTableType<
     R extends ITableTypeResults<
       unknown,
@@ -915,22 +1658,7 @@ export class AdtClient {
       unknown,
       unknown
     >,
-  >(
-    results: R,
-  ): IAdtCreatable<ITableTypeConfig, ReturnType<R['created']>> &
-    IAdtReadable<
-      ITableTypeConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    > &
-    IAdtUpdatable<ITableTypeConfig, ReturnType<R['updated']>> &
-    IAdtDeletable<ITableTypeConfig, ReturnType<R['deletion']>> &
-    IAdtValidatable<ITableTypeConfig, ReturnType<R['validation']>> &
-    IAdtCheckable<ITableTypeConfig, ReturnType<R['check']>> &
-    IAdtActivatable<ITableTypeConfig, ReturnType<R['activation']>> &
-    IAdtLockable<ITableTypeConfig> &
-    IAdtTransportAware<ITableTypeConfig, ReturnType<R['transport']>> &
-    IAdtVersionable<ITableTypeConfig, ObjectVersion[], string>;
+  >(results: R): ITableTypeContract<R>;
   getTableType<
     R extends ITableTypeResults<
       unknown,
@@ -961,7 +1689,15 @@ export class AdtClient {
    * (`/ddic/dsfd/sources/`) have their own clients.
    * @returns IAdtObject instance for DDL source operations
    */
-  getDdl(): AdtDdl;
+  // The no-argument overload answers the same composition the other one does,
+  // not the concrete class. A consumer holding `AdtXxx` gets its members'
+  // looser signatures — `activate<E>(config)` with no strategy compiles there
+  // and promises a failure nothing will produce — and the contract closed that
+  // in 32.0.0 with two call signatures per member. This is where a consumer
+  // arrives, so this is where the contract has to be. Written from the other
+  // overload rather than by hand: the first hand-written one dropped an atom,
+  // and `capabilities/shape.ts` caught it.
+  getDdl(): IDdlContract<IDdlResults>;
   getDdl<
     R extends IDdlResults<
       unknown,
@@ -974,22 +1710,7 @@ export class AdtClient {
       unknown,
       unknown
     >,
-  >(
-    results: R,
-  ): IAdtCreatable<IDdlConfig, ReturnType<R['created']>> &
-    IAdtReadable<
-      IDdlConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    > &
-    IAdtUpdatable<IDdlConfig, ReturnType<R['updated']>> &
-    IAdtDeletable<IDdlConfig, ReturnType<R['deletion']>> &
-    IAdtValidatable<IDdlConfig, ReturnType<R['validation']>> &
-    IAdtCheckable<IDdlConfig, ReturnType<R['check']>> &
-    IAdtActivatable<IDdlConfig, ReturnType<R['activation']>> &
-    IAdtLockable<IDdlConfig> &
-    IAdtTransportAware<IDdlConfig, ReturnType<R['transport']>> &
-    IAdtVersionable<IDdlConfig, ObjectVersion[], string>;
+  >(results: R): IDdlContract<R>;
   getDdl<
     R extends IDdlResults<
       unknown,
@@ -1017,7 +1738,15 @@ export class AdtClient {
    * Get high-level operations for FunctionGroup objects
    * @returns IAdtObject instance for FunctionGroup operations
    */
-  getFunctionGroup(): AdtFunctionGroup;
+  // The no-argument overload answers the same composition the other one does,
+  // not the concrete class. A consumer holding `AdtXxx` gets its members'
+  // looser signatures — `activate<E>(config)` with no strategy compiles there
+  // and promises a failure nothing will produce — and the contract closed that
+  // in 32.0.0 with two call signatures per member. This is where a consumer
+  // arrives, so this is where the contract has to be. Written from the other
+  // overload rather than by hand: the first hand-written one dropped an atom,
+  // and `capabilities/shape.ts` caught it.
+  getFunctionGroup(): IFunctionGroupContract<IFunctionGroupResults>;
   getFunctionGroup<
     R extends IFunctionGroupResults<
       unknown,
@@ -1030,21 +1759,7 @@ export class AdtClient {
       unknown,
       unknown
     >,
-  >(
-    results: R,
-  ): IAdtCreatable<IFunctionGroupConfig, ReturnType<R['created']>> &
-    IAdtReadable<
-      IFunctionGroupConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    > &
-    IAdtUpdatable<IFunctionGroupConfig, ReturnType<R['updated']>> &
-    IAdtDeletable<IFunctionGroupConfig, ReturnType<R['deletion']>> &
-    IAdtValidatable<IFunctionGroupConfig, ReturnType<R['validation']>> &
-    IAdtCheckable<IFunctionGroupConfig, ReturnType<R['check']>> &
-    IAdtActivatable<IFunctionGroupConfig, ReturnType<R['activation']>> &
-    IAdtLockable<IFunctionGroupConfig> &
-    IAdtTransportAware<IFunctionGroupConfig, ReturnType<R['transport']>>;
+  >(results: R): IFunctionGroupContract<R>;
   getFunctionGroup<
     R extends IFunctionGroupResults<
       unknown,
@@ -1073,7 +1788,15 @@ export class AdtClient {
    * Get high-level operations for FunctionModule objects
    * @returns IAdtObject instance for FunctionModule operations
    */
-  getFunctionModule(): AdtFunctionModule;
+  // The no-argument overload answers the same composition the other one does,
+  // not the concrete class. A consumer holding `AdtXxx` gets its members'
+  // looser signatures — `activate<E>(config)` with no strategy compiles there
+  // and promises a failure nothing will produce — and the contract closed that
+  // in 32.0.0 with two call signatures per member. This is where a consumer
+  // arrives, so this is where the contract has to be. Written from the other
+  // overload rather than by hand: the first hand-written one dropped an atom,
+  // and `capabilities/shape.ts` caught it.
+  getFunctionModule(): IFunctionModuleContract<IFunctionModuleResults>;
   getFunctionModule<
     R extends IFunctionModuleResults<
       unknown,
@@ -1086,22 +1809,7 @@ export class AdtClient {
       unknown,
       unknown
     >,
-  >(
-    results: R,
-  ): IAdtCreatable<IFunctionModuleConfig, ReturnType<R['created']>> &
-    IAdtReadable<
-      IFunctionModuleConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    > &
-    IAdtUpdatable<IFunctionModuleConfig, ReturnType<R['updated']>> &
-    IAdtDeletable<IFunctionModuleConfig, ReturnType<R['deletion']>> &
-    IAdtValidatable<IFunctionModuleConfig, ReturnType<R['validation']>> &
-    IAdtCheckable<IFunctionModuleConfig, ReturnType<R['check']>> &
-    IAdtActivatable<IFunctionModuleConfig, ReturnType<R['activation']>> &
-    IAdtLockable<IFunctionModuleConfig> &
-    IAdtTransportAware<IFunctionModuleConfig, ReturnType<R['transport']>> &
-    IAdtVersionable<IFunctionModuleConfig, ObjectVersion[], string>;
+  >(results: R): IFunctionModuleContract<R>;
   getFunctionModule<
     R extends IFunctionModuleResults<
       unknown,
@@ -1132,7 +1840,15 @@ export class AdtClient {
    * Get high-level operations for FunctionInclude objects
    * @returns IAdtObject instance for FunctionInclude operations
    */
-  getFunctionInclude(): AdtFunctionInclude;
+  // The no-argument overload answers the same composition the other one does,
+  // not the concrete class. A consumer holding `AdtXxx` gets its members'
+  // looser signatures — `activate<E>(config)` with no strategy compiles there
+  // and promises a failure nothing will produce — and the contract closed that
+  // in 32.0.0 with two call signatures per member. This is where a consumer
+  // arrives, so this is where the contract has to be. Written from the other
+  // overload rather than by hand: the first hand-written one dropped an atom,
+  // and `capabilities/shape.ts` caught it.
+  getFunctionInclude(): IFunctionIncludeContract<IFunctionIncludeResults>;
   getFunctionInclude<
     R extends IFunctionIncludeResults<
       unknown,
@@ -1144,21 +1860,7 @@ export class AdtClient {
       unknown,
       unknown
     >,
-  >(
-    results: R,
-  ): IAdtCreatable<IFunctionIncludeConfig, ReturnType<R['created']>> &
-    IAdtReadable<
-      IFunctionIncludeConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    > &
-    IAdtUpdatable<IFunctionIncludeConfig, ReturnType<R['updated']>> &
-    IAdtDeletable<IFunctionIncludeConfig, ReturnType<R['deletion']>> &
-    IAdtValidatable<IFunctionIncludeConfig, ReturnType<R['validation']>> &
-    IAdtCheckable<IFunctionIncludeConfig, ReturnType<R['check']>> &
-    IAdtActivatable<IFunctionIncludeConfig, ReturnType<R['activation']>> &
-    IAdtLockable<IFunctionIncludeConfig> &
-    IAdtVersionable<IFunctionIncludeConfig, ObjectVersion[], string>;
+  >(results: R): IFunctionIncludeContract<R>;
   getFunctionInclude<
     R extends IFunctionIncludeResults<
       unknown,
@@ -1188,7 +1890,15 @@ export class AdtClient {
    * Get high-level operations for Package objects
    * @returns IAdtObject instance for Package operations
    */
-  getPackage(): AdtPackage;
+  // The no-argument overload answers the same composition the other one does,
+  // not the concrete class. A consumer holding `AdtXxx` gets its members'
+  // looser signatures — `activate<E>(config)` with no strategy compiles there
+  // and promises a failure nothing will produce — and the contract closed that
+  // in 32.0.0 with two call signatures per member. This is where a consumer
+  // arrives, so this is where the contract has to be. Written from the other
+  // overload rather than by hand: the first hand-written one dropped an atom,
+  // and `capabilities/shape.ts` caught it.
+  getPackage(): IPackageContract<IPackageResults>;
   getPackage<
     R extends IPackageResults<
       unknown,
@@ -1200,20 +1910,7 @@ export class AdtClient {
       unknown,
       unknown
     >,
-  >(
-    results: R,
-  ): IAdtCreatable<IPackageConfig, ReturnType<R['created']>> &
-    IAdtReadable<
-      IPackageConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    > &
-    IAdtUpdatable<IPackageConfig, ReturnType<R['updated']>> &
-    IAdtDeletable<IPackageConfig, ReturnType<R['deletion']>> &
-    IAdtValidatable<IPackageConfig, ReturnType<R['validation']>> &
-    IAdtCheckable<IPackageConfig, ReturnType<R['check']>> &
-    IAdtLockable<IPackageConfig> &
-    IAdtTransportAware<IPackageConfig, ReturnType<R['transport']>>;
+  >(results: R): IPackageContract<R>;
   getPackage<
     R extends IPackageResults<
       unknown,
@@ -1240,7 +1937,15 @@ export class AdtClient {
    * Get high-level operations for MessageClass (MSAG/N) objects
    * @returns IAdtObject instance for MessageClass operations
    */
-  getMessageClass(): AdtMessageClass;
+  // The no-argument overload answers the same composition the other one does,
+  // not the concrete class. A consumer holding `AdtXxx` gets its members'
+  // looser signatures — `activate<E>(config)` with no strategy compiles there
+  // and promises a failure nothing will produce — and the contract closed that
+  // in 32.0.0 with two call signatures per member. This is where a consumer
+  // arrives, so this is where the contract has to be. Written from the other
+  // overload rather than by hand: the first hand-written one dropped an atom,
+  // and `capabilities/shape.ts` caught it.
+  getMessageClass(): IMessageClassContract<IMessageClassResults>;
   getMessageClass<
     R extends IMessageClassResults<
       unknown,
@@ -1250,18 +1955,7 @@ export class AdtClient {
       unknown,
       unknown
     >,
-  >(
-    results: R,
-  ): IAdtCreatable<IMessageClassConfig, ReturnType<R['created']>> &
-    IAdtReadable<
-      IMessageClassConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    > &
-    IAdtUpdatable<IMessageClassConfig, ReturnType<R['updated']>> &
-    IAdtDeletable<IMessageClassConfig, ReturnType<R['deletion']>> &
-    IAdtValidatable<IMessageClassConfig, ReturnType<R['validation']>> &
-    IAdtLockable<IMessageClassConfig>;
+  >(results: R): IMessageClassContract<R>;
   getMessageClass<
     R extends IMessageClassResults<
       unknown,
@@ -1290,19 +1984,18 @@ export class AdtClient {
    * not exist until someone adds it. So this keeps `create` — unlike a class's
    * includes, which exist because their class does.
    */
-  getMessageClassMessage(): AdtMessageClassMessage;
+  // The no-argument overload answers the same composition the other one does,
+  // not the concrete class. A consumer holding `AdtXxx` gets its members'
+  // looser signatures — `activate<E>(config)` with no strategy compiles there
+  // and promises a failure nothing will produce — and the contract closed that
+  // in 32.0.0 with two call signatures per member. This is where a consumer
+  // arrives, so this is where the contract has to be. Written from the other
+  // overload rather than by hand: the first hand-written one dropped an atom,
+  // and `capabilities/shape.ts` caught it.
+  getMessageClassMessage(): IMessageClassMessageContract<IMessageClassMessageResults>;
   getMessageClassMessage<
     R extends IMessageClassMessageResults<unknown, unknown, unknown>,
-  >(
-    results: R,
-  ): IAdtCreatable<IMessageClassMessageConfig, ReturnType<R['written']>> &
-    IAdtReadable<
-      IMessageClassMessageConfig,
-      ReturnType<R['read']>,
-      ReturnType<R['read']>
-    > &
-    IAdtUpdatable<IMessageClassMessageConfig, ReturnType<R['written']>> &
-    IAdtDeletable<IMessageClassMessageConfig, ReturnType<R['deleted']>>;
+  >(results: R): IMessageClassMessageContract<R>;
   getMessageClassMessage<
     R extends IMessageClassMessageResults<
       unknown,
@@ -1318,7 +2011,15 @@ export class AdtClient {
    * Get high-level operations for AccessControl objects
    * @returns IAdtObject instance for AccessControl operations
    */
-  getAccessControl(): AdtAccessControl;
+  // The no-argument overload answers the same composition the other one does,
+  // not the concrete class. A consumer holding `AdtXxx` gets its members'
+  // looser signatures — `activate<E>(config)` with no strategy compiles there
+  // and promises a failure nothing will produce — and the contract closed that
+  // in 32.0.0 with two call signatures per member. This is where a consumer
+  // arrives, so this is where the contract has to be. Written from the other
+  // overload rather than by hand: the first hand-written one dropped an atom,
+  // and `capabilities/shape.ts` caught it.
+  getAccessControl(): IAccessControlContract<IAccessControlResults>;
   getAccessControl<
     R extends IAccessControlResults<
       unknown,
@@ -1331,22 +2032,7 @@ export class AdtClient {
       unknown,
       unknown
     >,
-  >(
-    results: R,
-  ): IAdtCreatable<IAccessControlConfig, ReturnType<R['created']>> &
-    IAdtReadable<
-      IAccessControlConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    > &
-    IAdtUpdatable<IAccessControlConfig, ReturnType<R['updated']>> &
-    IAdtDeletable<IAccessControlConfig, ReturnType<R['deletion']>> &
-    IAdtValidatable<IAccessControlConfig, ReturnType<R['validation']>> &
-    IAdtCheckable<IAccessControlConfig, ReturnType<R['check']>> &
-    IAdtActivatable<IAccessControlConfig, ReturnType<R['activation']>> &
-    IAdtLockable<IAccessControlConfig> &
-    IAdtTransportAware<IAccessControlConfig, ReturnType<R['transport']>> &
-    IAdtVersionable<IAccessControlConfig, ObjectVersion[], string>;
+  >(results: R): IAccessControlContract<R>;
   getAccessControl<
     R extends IAccessControlResults<
       unknown,
@@ -1375,7 +2061,15 @@ export class AdtClient {
    * Supports both SimpleTransformation and XSLTProgram types
    * @returns IAdtObject instance for Transformation operations
    */
-  getTransformation(): AdtTransformation;
+  // The no-argument overload answers the same composition the other one does,
+  // not the concrete class. A consumer holding `AdtXxx` gets its members'
+  // looser signatures — `activate<E>(config)` with no strategy compiles there
+  // and promises a failure nothing will produce — and the contract closed that
+  // in 32.0.0 with two call signatures per member. This is where a consumer
+  // arrives, so this is where the contract has to be. Written from the other
+  // overload rather than by hand: the first hand-written one dropped an atom,
+  // and `capabilities/shape.ts` caught it.
+  getTransformation(): ITransformationContract<ITransformationResults>;
   getTransformation<
     R extends ITransformationResults<
       unknown,
@@ -1388,22 +2082,7 @@ export class AdtClient {
       unknown,
       unknown
     >,
-  >(
-    results: R,
-  ): IAdtCreatable<ITransformationConfig, ReturnType<R['created']>> &
-    IAdtReadable<
-      ITransformationConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    > &
-    IAdtUpdatable<ITransformationConfig, ReturnType<R['updated']>> &
-    IAdtDeletable<ITransformationConfig, ReturnType<R['deletion']>> &
-    IAdtValidatable<ITransformationConfig, ReturnType<R['validation']>> &
-    IAdtCheckable<ITransformationConfig, ReturnType<R['check']>> &
-    IAdtActivatable<ITransformationConfig, ReturnType<R['activation']>> &
-    IAdtLockable<ITransformationConfig> &
-    IAdtTransportAware<ITransformationConfig, ReturnType<R['transport']>> &
-    IAdtVersionable<ITransformationConfig, ObjectVersion[], string>;
+  >(results: R): ITransformationContract<R>;
   getTransformation<
     R extends ITransformationResults<
       unknown,
@@ -1433,7 +2112,15 @@ export class AdtClient {
    * Get high-level operations for ServiceDefinition objects
    * @returns IAdtObject instance for ServiceDefinition operations
    */
-  getServiceDefinition(): AdtServiceDefinition;
+  // The no-argument overload answers the same composition the other one does,
+  // not the concrete class. A consumer holding `AdtXxx` gets its members'
+  // looser signatures — `activate<E>(config)` with no strategy compiles there
+  // and promises a failure nothing will produce — and the contract closed that
+  // in 32.0.0 with two call signatures per member. This is where a consumer
+  // arrives, so this is where the contract has to be. Written from the other
+  // overload rather than by hand: the first hand-written one dropped an atom,
+  // and `capabilities/shape.ts` caught it.
+  getServiceDefinition(): IServiceDefinitionContract<IServiceDefinitionResults>;
   getServiceDefinition<
     R extends IServiceDefinitionResults<
       unknown,
@@ -1446,22 +2133,7 @@ export class AdtClient {
       unknown,
       unknown
     >,
-  >(
-    results: R,
-  ): IAdtCreatable<IServiceDefinitionConfig, ReturnType<R['created']>> &
-    IAdtReadable<
-      IServiceDefinitionConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    > &
-    IAdtUpdatable<IServiceDefinitionConfig, ReturnType<R['updated']>> &
-    IAdtDeletable<IServiceDefinitionConfig, ReturnType<R['deletion']>> &
-    IAdtValidatable<IServiceDefinitionConfig, ReturnType<R['validation']>> &
-    IAdtCheckable<IServiceDefinitionConfig, ReturnType<R['check']>> &
-    IAdtActivatable<IServiceDefinitionConfig, ReturnType<R['activation']>> &
-    IAdtLockable<IServiceDefinitionConfig> &
-    IAdtTransportAware<IServiceDefinitionConfig, ReturnType<R['transport']>> &
-    IAdtVersionable<IServiceDefinitionConfig, ObjectVersion[], string>;
+  >(results: R): IServiceDefinitionContract<R>;
   getServiceDefinition<
     R extends IServiceDefinitionResults<
       unknown,
@@ -1490,7 +2162,15 @@ export class AdtClient {
   /**
    * Get high-level operations for CDS Scalar Function (DSFD/SCF) objects
    */
-  getScalarFunction(): AdtScalarFunction;
+  // The no-argument overload answers the same composition the other one does,
+  // not the concrete class. A consumer holding `AdtXxx` gets its members'
+  // looser signatures — `activate<E>(config)` with no strategy compiles there
+  // and promises a failure nothing will produce — and the contract closed that
+  // in 32.0.0 with two call signatures per member. This is where a consumer
+  // arrives, so this is where the contract has to be. Written from the other
+  // overload rather than by hand: the first hand-written one dropped an atom,
+  // and `capabilities/shape.ts` caught it.
+  getScalarFunction(): IScalarFunctionContract<IScalarFunctionResults>;
   getScalarFunction<
     R extends IScalarFunctionResults<
       unknown,
@@ -1503,22 +2183,7 @@ export class AdtClient {
       unknown,
       unknown
     >,
-  >(
-    results: R,
-  ): IAdtCreatable<IScalarFunctionConfig, ReturnType<R['created']>> &
-    IAdtReadable<
-      IScalarFunctionConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    > &
-    IAdtUpdatable<IScalarFunctionConfig, ReturnType<R['updated']>> &
-    IAdtDeletable<IScalarFunctionConfig, ReturnType<R['deletion']>> &
-    IAdtValidatable<IScalarFunctionConfig, ReturnType<R['validation']>> &
-    IAdtCheckable<IScalarFunctionConfig, ReturnType<R['check']>> &
-    IAdtActivatable<IScalarFunctionConfig, ReturnType<R['activation']>> &
-    IAdtLockable<IScalarFunctionConfig> &
-    IAdtTransportAware<IScalarFunctionConfig, ReturnType<R['transport']>> &
-    IAdtVersionable<IScalarFunctionConfig, ObjectVersion[], string>;
+  >(results: R): IScalarFunctionContract<R>;
   getScalarFunction<
     R extends IScalarFunctionResults<
       unknown,
@@ -1547,7 +2212,15 @@ export class AdtClient {
   /**
    * Get high-level operations for Scalar Function Implementation (DSFI/SFI) objects
    */
-  getScalarFunctionImplementation(): AdtScalarFunctionImplementation;
+  // The no-argument overload answers the same composition the other one does,
+  // not the concrete class. A consumer holding `AdtXxx` gets its members'
+  // looser signatures — `activate<E>(config)` with no strategy compiles there
+  // and promises a failure nothing will produce — and the contract closed that
+  // in 32.0.0 with two call signatures per member. This is where a consumer
+  // arrives, so this is where the contract has to be. Written from the other
+  // overload rather than by hand: the first hand-written one dropped an atom,
+  // and `capabilities/shape.ts` caught it.
+  getScalarFunctionImplementation(): IScalarFunctionImplementationContract<IScalarFunctionImplementationResults>;
   getScalarFunctionImplementation<
     R extends IScalarFunctionImplementationResults<
       unknown,
@@ -1560,44 +2233,7 @@ export class AdtClient {
       unknown,
       unknown
     >,
-  >(
-    results: R,
-  ): IAdtCreatable<
-    IScalarFunctionImplementationConfig,
-    ReturnType<R['created']>
-  > &
-    IAdtReadable<
-      IScalarFunctionImplementationConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    > &
-    IAdtUpdatable<
-      IScalarFunctionImplementationConfig,
-      ReturnType<R['updated']>
-    > &
-    IAdtDeletable<
-      IScalarFunctionImplementationConfig,
-      ReturnType<R['deletion']>
-    > &
-    IAdtValidatable<
-      IScalarFunctionImplementationConfig,
-      ReturnType<R['validation']>
-    > &
-    IAdtCheckable<IScalarFunctionImplementationConfig, ReturnType<R['check']>> &
-    IAdtActivatable<
-      IScalarFunctionImplementationConfig,
-      ReturnType<R['activation']>
-    > &
-    IAdtLockable<IScalarFunctionImplementationConfig> &
-    IAdtTransportAware<
-      IScalarFunctionImplementationConfig,
-      ReturnType<R['transport']>
-    > &
-    IAdtVersionable<
-      IScalarFunctionImplementationConfig,
-      ObjectVersion[],
-      string
-    >;
+  >(results: R): IScalarFunctionImplementationContract<R>;
   getScalarFunctionImplementation<
     R extends IScalarFunctionImplementationResults<
       unknown,
@@ -1626,7 +2262,15 @@ export class AdtClient {
   /**
    * Get high-level operations for Append Structure (TABL/DS) objects
    */
-  getAppendStructure(): AdtAppendStructure;
+  // The no-argument overload answers the same composition the other one does,
+  // not the concrete class. A consumer holding `AdtXxx` gets its members'
+  // looser signatures — `activate<E>(config)` with no strategy compiles there
+  // and promises a failure nothing will produce — and the contract closed that
+  // in 32.0.0 with two call signatures per member. This is where a consumer
+  // arrives, so this is where the contract has to be. Written from the other
+  // overload rather than by hand: the first hand-written one dropped an atom,
+  // and `capabilities/shape.ts` caught it.
+  getAppendStructure(): IAppendStructureContract<IAppendStructureResults>;
   getAppendStructure<
     R extends IAppendStructureResults<
       unknown,
@@ -1639,22 +2283,7 @@ export class AdtClient {
       unknown,
       unknown
     >,
-  >(
-    results: R,
-  ): IAdtCreatable<IAppendStructureConfig, ReturnType<R['created']>> &
-    IAdtReadable<
-      IAppendStructureConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    > &
-    IAdtUpdatable<IAppendStructureConfig, ReturnType<R['updated']>> &
-    IAdtDeletable<IAppendStructureConfig, ReturnType<R['deletion']>> &
-    IAdtValidatable<IAppendStructureConfig, ReturnType<R['validation']>> &
-    IAdtCheckable<IAppendStructureConfig, ReturnType<R['check']>> &
-    IAdtActivatable<IAppendStructureConfig, ReturnType<R['activation']>> &
-    IAdtLockable<IAppendStructureConfig> &
-    IAdtTransportAware<IAppendStructureConfig, ReturnType<R['transport']>> &
-    IAdtVersionable<IAppendStructureConfig, ObjectVersion[], string>;
+  >(results: R): IAppendStructureContract<R>;
   getAppendStructure<
     R extends IAppendStructureResults<
       unknown,
@@ -1711,7 +2340,15 @@ export class AdtClient {
    * Get high-level operations for BehaviorDefinition objects
    * @returns IAdtObject instance for BehaviorDefinition operations
    */
-  getBehaviorDefinition(): AdtBehaviorDefinition;
+  // The no-argument overload answers the same composition the other one does,
+  // not the concrete class. A consumer holding `AdtXxx` gets its members'
+  // looser signatures — `activate<E>(config)` with no strategy compiles there
+  // and promises a failure nothing will produce — and the contract closed that
+  // in 32.0.0 with two call signatures per member. This is where a consumer
+  // arrives, so this is where the contract has to be. Written from the other
+  // overload rather than by hand: the first hand-written one dropped an atom,
+  // and `capabilities/shape.ts` caught it.
+  getBehaviorDefinition(): IBehaviorDefinitionContract<IBehaviorDefinitionResults>;
   getBehaviorDefinition<
     R extends IBehaviorDefinitionResults<
       unknown,
@@ -1724,22 +2361,7 @@ export class AdtClient {
       unknown,
       unknown
     >,
-  >(
-    results: R,
-  ): IAdtCreatable<IBehaviorDefinitionConfig, ReturnType<R['created']>> &
-    IAdtReadable<
-      IBehaviorDefinitionConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    > &
-    IAdtUpdatable<IBehaviorDefinitionConfig, ReturnType<R['updated']>> &
-    IAdtDeletable<IBehaviorDefinitionConfig, ReturnType<R['deletion']>> &
-    IAdtValidatable<IBehaviorDefinitionConfig, ReturnType<R['validation']>> &
-    IAdtCheckable<IBehaviorDefinitionConfig, ReturnType<R['check']>> &
-    IAdtActivatable<IBehaviorDefinitionConfig, ReturnType<R['activation']>> &
-    IAdtLockable<IBehaviorDefinitionConfig> &
-    IAdtTransportAware<IBehaviorDefinitionConfig, ReturnType<R['transport']>> &
-    IAdtVersionable<IBehaviorDefinitionConfig, ObjectVersion[], string>;
+  >(results: R): IBehaviorDefinitionContract<R>;
   getBehaviorDefinition<
     R extends IBehaviorDefinitionResults<
       unknown,
@@ -1769,7 +2391,15 @@ export class AdtClient {
    * Get high-level operations for BehaviorImplementation objects
    * @returns IAdtObject instance for BehaviorImplementation operations
    */
-  getBehaviorImplementation(): AdtBehaviorImplementation;
+  // The no-argument overload answers the same composition the other one does,
+  // not the concrete class. A consumer holding `AdtXxx` gets its members'
+  // looser signatures — `activate<E>(config)` with no strategy compiles there
+  // and promises a failure nothing will produce — and the contract closed that
+  // in 32.0.0 with two call signatures per member. This is where a consumer
+  // arrives, so this is where the contract has to be. Written from the other
+  // overload rather than by hand: the first hand-written one dropped an atom,
+  // and `capabilities/shape.ts` caught it.
+  getBehaviorImplementation(): IBehaviorImplementationContract<IClassResults>;
   getBehaviorImplementation<
     R extends IClassResults<
       unknown,
@@ -1781,28 +2411,7 @@ export class AdtClient {
       unknown,
       unknown
     >,
-  >(
-    results: R,
-  ): IAdtCreatable<IBehaviorImplementationConfig, ReturnType<R['created']>> &
-    IAdtReadable<
-      IBehaviorImplementationConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    > &
-    IAdtUpdatable<IBehaviorImplementationConfig, ReturnType<R['updated']>> &
-    IAdtDeletable<IBehaviorImplementationConfig, ReturnType<R['deletion']>> &
-    IAdtValidatable<
-      IBehaviorImplementationConfig,
-      ReturnType<R['validation']>
-    > &
-    IAdtCheckable<IBehaviorImplementationConfig, ReturnType<R['check']>> &
-    IAdtActivatable<
-      IBehaviorImplementationConfig,
-      ReturnType<R['activation']>
-    > &
-    IAdtLockable<IBehaviorImplementationConfig> &
-    IAdtTransportAware<IBehaviorImplementationConfig, string> &
-    IAdtVersionable<IBehaviorImplementationConfig, ObjectVersion[], string>;
+  >(results: R): IBehaviorImplementationContract<R>;
   getBehaviorImplementation<
     R extends IClassResults<
       unknown,
@@ -1828,7 +2437,15 @@ export class AdtClient {
    * Get high-level operations for MetadataExtension objects
    * @returns IAdtObject instance for MetadataExtension operations
    */
-  getMetadataExtension(): AdtMetadataExtension;
+  // The no-argument overload answers the same composition the other one does,
+  // not the concrete class. A consumer holding `AdtXxx` gets its members'
+  // looser signatures — `activate<E>(config)` with no strategy compiles there
+  // and promises a failure nothing will produce — and the contract closed that
+  // in 32.0.0 with two call signatures per member. This is where a consumer
+  // arrives, so this is where the contract has to be. Written from the other
+  // overload rather than by hand: the first hand-written one dropped an atom,
+  // and `capabilities/shape.ts` caught it.
+  getMetadataExtension(): IMetadataExtensionContract<IMetadataExtensionResults>;
   getMetadataExtension<
     R extends IMetadataExtensionResults<
       unknown,
@@ -1841,22 +2458,7 @@ export class AdtClient {
       unknown,
       unknown
     >,
-  >(
-    results: R,
-  ): IAdtCreatable<IMetadataExtensionConfig, ReturnType<R['created']>> &
-    IAdtReadable<
-      IMetadataExtensionConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    > &
-    IAdtUpdatable<IMetadataExtensionConfig, ReturnType<R['updated']>> &
-    IAdtDeletable<IMetadataExtensionConfig, ReturnType<R['deletion']>> &
-    IAdtValidatable<IMetadataExtensionConfig, ReturnType<R['validation']>> &
-    IAdtCheckable<IMetadataExtensionConfig, ReturnType<R['check']>> &
-    IAdtActivatable<IMetadataExtensionConfig, ReturnType<R['activation']>> &
-    IAdtLockable<IMetadataExtensionConfig> &
-    IAdtTransportAware<IMetadataExtensionConfig, ReturnType<R['transport']>> &
-    IAdtVersionable<IMetadataExtensionConfig, ObjectVersion[], string>;
+  >(results: R): IMetadataExtensionContract<R>;
   getMetadataExtension<
     R extends IMetadataExtensionResults<
       unknown,
@@ -1892,7 +2494,15 @@ export class AdtClient {
    * - BAdI Enhancement Spot
    * @returns IAdtObject instance for Enhancement operations
    */
-  getEnhancement(): AdtEnhancement;
+  // The no-argument overload answers the same composition the other one does,
+  // not the concrete class. A consumer holding `AdtXxx` gets its members'
+  // looser signatures — `activate<E>(config)` with no strategy compiles there
+  // and promises a failure nothing will produce — and the contract closed that
+  // in 32.0.0 with two call signatures per member. This is where a consumer
+  // arrives, so this is where the contract has to be. Written from the other
+  // overload rather than by hand: the first hand-written one dropped an atom,
+  // and `capabilities/shape.ts` caught it.
+  getEnhancement(): IEnhancementContract<IEnhancementResults>;
   getEnhancement<
     R extends IEnhancementResults<
       unknown,
@@ -1905,22 +2515,7 @@ export class AdtClient {
       unknown,
       unknown
     >,
-  >(
-    results: R,
-  ): IAdtCreatable<IEnhancementConfig, ReturnType<R['created']>> &
-    IAdtReadable<
-      IEnhancementConfig,
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>
-    > &
-    IAdtUpdatable<IEnhancementConfig, ReturnType<R['updated']>> &
-    IAdtDeletable<IEnhancementConfig, ReturnType<R['deletion']>> &
-    IAdtValidatable<IEnhancementConfig, ReturnType<R['validation']>> &
-    IAdtCheckable<IEnhancementConfig, ReturnType<R['check']>> &
-    IAdtActivatable<IEnhancementConfig, ReturnType<R['activation']>> &
-    IAdtLockable<IEnhancementConfig> &
-    IAdtTransportAware<IEnhancementConfig, ReturnType<R['transport']>> &
-    IAdtVersionable<IEnhancementConfig, ObjectVersion[], string>;
+  >(results: R): IEnhancementContract<R>;
   getEnhancement<
     R extends IEnhancementResults<
       unknown,
@@ -1948,6 +2543,12 @@ export class AdtClient {
    * Get high-level operations for FeatureToggle objects
    * @returns IFeatureToggleObject instance for FeatureToggle operations
    */
+  // **These two still answer the concrete class, and that is a finding rather
+  // than an omission.** Their declared contracts are narrower than the classes
+  // offer — `getPackageHierarchy`, `getPackageContentsList`, and the feature
+  // toggle's own members are not in them — so composing them would take away
+  // members this package's own tests and scripts call. What is incomplete is
+  // the contract; widening it is issue #109's subject, not this change's.
   getFeatureToggle(): AdtFeatureToggle;
   getFeatureToggle<
     R extends IFeatureToggleResults<
@@ -2015,6 +2616,10 @@ export class AdtClient {
    * its outcome is the reason this handler exists, and until interfaces 13.1.0
    * no contract described it, so callers cast past the type to reach it.
    */
+  // Concrete, like `getUtils` and `getFeatureToggle` above and for the same
+  // reason: a unit test handler runs its tests and reads their results, and
+  // the composition names none of that. Handing back the contract would take
+  // those members away from callers who have them today.
   getUnitTest(): AdtUnitTest;
   getUnitTest<
     R extends IUnitTestResults<
@@ -2071,6 +2676,10 @@ export class AdtClient {
    * Same capability set as {@link getUnitTest}; the CDS-specific surface
    * (`checkCdsTestDoubles`, `getCdsViewName`) is on the concrete class.
    */
+  // Concrete, like `getUtils` and `getFeatureToggle` above and for the same
+  // reason: a unit test handler runs its tests and reads their results, and
+  // the composition names none of that. Handing back the contract would take
+  // those members away from callers who have them today.
   getCdsUnitTest(): AdtCdsUnitTest;
   getCdsUnitTest<
     R extends IUnitTestResults<
@@ -2141,20 +2750,18 @@ export class AdtClient {
    *
    * @returns the transport request contract
    */
-  getRequest(): AdtRequest;
+  // The no-argument overload answers the same composition the other one does,
+  // not the concrete class. A consumer holding `AdtXxx` gets its members'
+  // looser signatures — `activate<E>(config)` with no strategy compiles there
+  // and promises a failure nothing will produce — and the contract closed that
+  // in 32.0.0 with two call signatures per member. This is where a consumer
+  // arrives, so this is where the contract has to be. Written from the other
+  // overload rather than by hand: the first hand-written one dropped an atom,
+  // and `capabilities/shape.ts` caught it.
+  getRequest(): IRequestContract<ITransportResults>;
   getRequest<
     R extends ITransportResults<unknown, unknown, unknown, unknown, unknown>,
-  >(
-    results: R,
-  ): IAdtCreatable<ITransportConfig, ReturnType<R['created']>> &
-    IAdtReadable<
-      ITransportConfig,
-      ReturnType<R['read']>,
-      ReturnType<R['read']>
-    > &
-    IAdtUpdatable<ITransportConfig, ReturnType<R['updated']>> &
-    IAdtDeletable<ITransportConfig, ReturnType<R['deleted']>> &
-    IAdtRequest<ReturnType<R['list']>>;
+  >(results: R): IRequestContract<R>;
   getRequest<
     R extends ITransportResults<
       unknown,
@@ -2201,6 +2808,12 @@ export class AdtClient {
    *
    * @returns The cross-cutting operations, as contracts
    */
+  // **These two still answer the concrete class, and that is a finding rather
+  // than an omission.** Their declared contracts are narrower than the classes
+  // offer — `getPackageHierarchy`, `getPackageContentsList`, and the feature
+  // toggle's own members are not in them — so composing them would take away
+  // members this package's own tests and scripts call. What is incomplete is
+  // the contract; widening it is issue #109's subject, not this change's.
   getUtils(): AdtUtils;
   getUtils<R extends IUtilResults<unknown, unknown, unknown>>(
     results: R,
@@ -2230,7 +2843,15 @@ export class AdtClient {
    * `update`. The lock, activation, metadata and transport it exposes are the
    * **container class's**, which is what ADT locks and activates.
    */
-  getLocalTestClass(): AdtLocalTestClass;
+  // The no-argument overload answers the same composition the other one does,
+  // not the concrete class. A consumer holding `AdtXxx` gets its members'
+  // looser signatures — `activate<E>(config)` with no strategy compiles there
+  // and promises a failure nothing will produce — and the contract closed that
+  // in 32.0.0 with two call signatures per member. This is where a consumer
+  // arrives, so this is where the contract has to be. Written from the other
+  // overload rather than by hand: the first hand-written one dropped an atom,
+  // and `capabilities/shape.ts` caught it.
+  getLocalTestClass(): ILocalTestClassContract<IClassResults>;
   getLocalTestClass<
     R extends IClassResults<
       unknown,
@@ -2242,21 +2863,7 @@ export class AdtClient {
       unknown,
       unknown
     >,
-  >(
-    results: R,
-  ): IAdtReadable<
-    ILocalTestClassConfig,
-    ReturnType<R['source']>,
-    ReturnType<R['metadata']>
-  > &
-    IAdtUpdatable<ILocalTestClassConfig, ReturnType<R['updated']>> &
-    IAdtDeletable<ILocalTestClassConfig, ReturnType<R['updated']>> &
-    IAdtValidatable<ILocalTestClassConfig, ReturnType<R['validation']>> &
-    IAdtCheckable<ILocalTestClassConfig, ReturnType<R['check']>> &
-    IAdtActivatable<ILocalTestClassConfig, ReturnType<R['activation']>> &
-    IAdtLockable<ILocalTestClassConfig> &
-    IAdtVersionable<ILocalTestClassConfig, ObjectVersion[], string> &
-    IAdtTransportAware<ILocalTestClassConfig, string>;
+  >(results: R): ILocalTestClassContract<R>;
   getLocalTestClass<
     R extends IClassResults<
       unknown,
@@ -2288,7 +2895,15 @@ export class AdtClient {
    * `update`. The lock, activation, metadata and transport it exposes are the
    * **container class's**, which is what ADT locks and activates.
    */
-  getLocalTypes(): AdtLocalTypes;
+  // The no-argument overload answers the same composition the other one does,
+  // not the concrete class. A consumer holding `AdtXxx` gets its members'
+  // looser signatures — `activate<E>(config)` with no strategy compiles there
+  // and promises a failure nothing will produce — and the contract closed that
+  // in 32.0.0 with two call signatures per member. This is where a consumer
+  // arrives, so this is where the contract has to be. Written from the other
+  // overload rather than by hand: the first hand-written one dropped an atom,
+  // and `capabilities/shape.ts` caught it.
+  getLocalTypes(): ILocalTypesContract<IClassResults>;
   getLocalTypes<
     R extends IClassResults<
       unknown,
@@ -2300,21 +2915,7 @@ export class AdtClient {
       unknown,
       unknown
     >,
-  >(
-    results: R,
-  ): IAdtReadable<
-    ILocalTypesConfig,
-    ReturnType<R['source']>,
-    ReturnType<R['metadata']>
-  > &
-    IAdtUpdatable<ILocalTypesConfig, ReturnType<R['updated']>> &
-    IAdtDeletable<ILocalTypesConfig, ReturnType<R['updated']>> &
-    IAdtValidatable<ILocalTypesConfig, ReturnType<R['validation']>> &
-    IAdtCheckable<ILocalTypesConfig, ReturnType<R['check']>> &
-    IAdtActivatable<ILocalTypesConfig, ReturnType<R['activation']>> &
-    IAdtLockable<ILocalTypesConfig> &
-    IAdtVersionable<ILocalTypesConfig, ObjectVersion[], string> &
-    IAdtTransportAware<ILocalTypesConfig, string>;
+  >(results: R): ILocalTypesContract<R>;
   getLocalTypes<
     R extends IClassResults<
       unknown,
@@ -2346,7 +2947,15 @@ export class AdtClient {
    * `update`. The lock, activation, metadata and transport it exposes are the
    * **container class's**, which is what ADT locks and activates.
    */
-  getLocalDefinitions(): AdtLocalDefinitions;
+  // The no-argument overload answers the same composition the other one does,
+  // not the concrete class. A consumer holding `AdtXxx` gets its members'
+  // looser signatures — `activate<E>(config)` with no strategy compiles there
+  // and promises a failure nothing will produce — and the contract closed that
+  // in 32.0.0 with two call signatures per member. This is where a consumer
+  // arrives, so this is where the contract has to be. Written from the other
+  // overload rather than by hand: the first hand-written one dropped an atom,
+  // and `capabilities/shape.ts` caught it.
+  getLocalDefinitions(): ILocalDefinitionsContract<IClassResults>;
   getLocalDefinitions<
     R extends IClassResults<
       unknown,
@@ -2358,21 +2967,7 @@ export class AdtClient {
       unknown,
       unknown
     >,
-  >(
-    results: R,
-  ): IAdtReadable<
-    ILocalDefinitionsConfig,
-    ReturnType<R['source']>,
-    ReturnType<R['metadata']>
-  > &
-    IAdtUpdatable<ILocalDefinitionsConfig, ReturnType<R['updated']>> &
-    IAdtDeletable<ILocalDefinitionsConfig, ReturnType<R['updated']>> &
-    IAdtValidatable<ILocalDefinitionsConfig, ReturnType<R['validation']>> &
-    IAdtCheckable<ILocalDefinitionsConfig, ReturnType<R['check']>> &
-    IAdtActivatable<ILocalDefinitionsConfig, ReturnType<R['activation']>> &
-    IAdtLockable<ILocalDefinitionsConfig> &
-    IAdtVersionable<ILocalDefinitionsConfig, ObjectVersion[], string> &
-    IAdtTransportAware<ILocalDefinitionsConfig, string>;
+  >(results: R): ILocalDefinitionsContract<R>;
   getLocalDefinitions<
     R extends IClassResults<
       unknown,
@@ -2404,7 +2999,15 @@ export class AdtClient {
    * `update`. The lock, activation, metadata and transport it exposes are the
    * **container class's**, which is what ADT locks and activates.
    */
-  getLocalMacros(): AdtLocalMacros;
+  // The no-argument overload answers the same composition the other one does,
+  // not the concrete class. A consumer holding `AdtXxx` gets its members'
+  // looser signatures — `activate<E>(config)` with no strategy compiles there
+  // and promises a failure nothing will produce — and the contract closed that
+  // in 32.0.0 with two call signatures per member. This is where a consumer
+  // arrives, so this is where the contract has to be. Written from the other
+  // overload rather than by hand: the first hand-written one dropped an atom,
+  // and `capabilities/shape.ts` caught it.
+  getLocalMacros(): ILocalMacrosContract<IClassResults>;
   getLocalMacros<
     R extends IClassResults<
       unknown,
@@ -2416,21 +3019,7 @@ export class AdtClient {
       unknown,
       unknown
     >,
-  >(
-    results: R,
-  ): IAdtReadable<
-    ILocalMacrosConfig,
-    ReturnType<R['source']>,
-    ReturnType<R['metadata']>
-  > &
-    IAdtUpdatable<ILocalMacrosConfig, ReturnType<R['updated']>> &
-    IAdtDeletable<ILocalMacrosConfig, ReturnType<R['updated']>> &
-    IAdtValidatable<ILocalMacrosConfig, ReturnType<R['validation']>> &
-    IAdtCheckable<ILocalMacrosConfig, ReturnType<R['check']>> &
-    IAdtActivatable<ILocalMacrosConfig, ReturnType<R['activation']>> &
-    IAdtLockable<ILocalMacrosConfig> &
-    IAdtVersionable<ILocalMacrosConfig, ObjectVersion[], string> &
-    IAdtTransportAware<ILocalMacrosConfig, string>;
+  >(results: R): ILocalMacrosContract<R>;
   getLocalMacros<
     R extends IClassResults<
       unknown,
