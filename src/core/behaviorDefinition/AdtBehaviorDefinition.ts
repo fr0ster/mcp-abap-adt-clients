@@ -300,11 +300,13 @@ export class AdtBehaviorDefinition<
   async checkDeletion<E extends IAdtError = IAdtError>(
     config: Partial<IBehaviorDefinitionConfig>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     const name = this.name(config);
     return answering(
       () => checkDeletion(this.connection, name),
-      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      this.results.deletionCheck as IResultStrategy<
+        ReturnType<R['deletionCheck']>
+      >,
       (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
     );
   }

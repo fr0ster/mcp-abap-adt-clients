@@ -271,7 +271,7 @@ export class AdtMetadataExtension<
   async checkDeletion<E extends IAdtError = IAdtError>(
     config: Partial<IMetadataExtensionConfig>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     const name = this.name(config);
 
     return answering(
@@ -280,7 +280,9 @@ export class AdtMetadataExtension<
           this.connection,
           `/sap/bc/adt/ddic/ddlx/sources/${encodeSapObjectName(name).toLowerCase()}`,
         ),
-      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      this.results.deletionCheck as IResultStrategy<
+        ReturnType<R['deletionCheck']>
+      >,
       (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
     );
   }

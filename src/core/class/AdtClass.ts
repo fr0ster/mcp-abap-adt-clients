@@ -270,7 +270,7 @@ export class AdtClass<
   async checkDeletion<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
@@ -281,7 +281,9 @@ export class AdtClass<
           class_name: config.className as string,
           transport_request: config.transportRequest,
         }),
-      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      this.results.deletionCheck as IResultStrategy<
+        ReturnType<R['deletionCheck']>
+      >,
       (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
     );
   }

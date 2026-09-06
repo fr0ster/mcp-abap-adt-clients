@@ -248,12 +248,14 @@ export class AdtMessageClass<
   async checkDeletion<E extends IAdtError = IAdtError>(
     config: Partial<IMessageClassConfig>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     const name = this.name(config);
 
     return answering(
       () => checkDeletion(this.connection, name),
-      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      this.results.deletionCheck as IResultStrategy<
+        ReturnType<R['deletionCheck']>
+      >,
       (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
     );
   }

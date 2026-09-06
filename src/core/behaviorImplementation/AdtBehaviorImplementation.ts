@@ -347,7 +347,7 @@ export class AdtBehaviorImplementation<
   async checkDeletion<E extends IAdtError = IAdtError>(
     config: Partial<IBehaviorImplementationConfig>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     return this.class.checkDeletion(
       {
         className: this.name(config),

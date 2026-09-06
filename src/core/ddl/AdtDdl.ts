@@ -259,7 +259,7 @@ export class AdtDdl<
   async checkDeletion<E extends IAdtError = IAdtError>(
     config: Partial<IDdlConfig>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     const name = this.name(config);
     return answering(
       () =>
@@ -267,7 +267,9 @@ export class AdtDdl<
           ddl_name: name,
           transport_request: config.transportRequest,
         }),
-      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      this.results.deletionCheck as IResultStrategy<
+        ReturnType<R['deletionCheck']>
+      >,
       (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
     );
   }

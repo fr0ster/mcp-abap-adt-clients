@@ -67,6 +67,8 @@ export interface IServiceResults {
   readonly validation: IResultStrategy<unknown>;
   /** What the deletion answers. */
   readonly deletion: IResultStrategy<unknown>;
+  /** What a deletion check answers: `del:checkResponse`. */
+  readonly deletionCheck: IResultStrategy<unknown>;
   /** What a publication change answers. */
   readonly updated: IResultStrategy<unknown>;
   /** What the transport check answers. */
@@ -103,6 +105,7 @@ export const serviceDocuments = {
   odata: rawDocument,
   publication: rawDocument,
   classification: rawDocument,
+  deletionCheck: rawDocument,
 } satisfies IServiceResults;
 
 /**

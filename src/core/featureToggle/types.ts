@@ -12,6 +12,7 @@
 
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces';
 import { rawDocument } from '../../utils/resultStrategy';
+import type { DeletionCheckResult } from '../shared/results';
 
 // Types defined in @mcp-abap-adt/interfaces
 export type {
@@ -109,6 +110,7 @@ export interface IFeatureToggleResults<
   TDeletion = FeatureToggleDeletionResult,
   TUpdated = FeatureToggleUpdated,
   TSourceDocument = FeatureToggleSourceDocument,
+  TDeletionCheck = DeletionCheckResult,
 > {
   readonly created: IResultStrategy<TCreated>;
   readonly source: IResultStrategy<TSource>;
@@ -119,6 +121,8 @@ export interface IFeatureToggleResults<
   readonly deletion: IResultStrategy<TDeletion>;
   readonly updated: IResultStrategy<TUpdated>;
   readonly sourceDocument: IResultStrategy<TSourceDocument>;
+  /** What a deletion check answers: `del:checkResponse`. */
+  readonly deletionCheck: IResultStrategy<TDeletionCheck>;
 }
 
 /**
@@ -136,4 +140,5 @@ export const featureToggleDocuments = {
   deletion: rawDocument,
   updated: rawDocument,
   sourceDocument: rawDocument,
+  deletionCheck: rawDocument,
 } satisfies IFeatureToggleResults;

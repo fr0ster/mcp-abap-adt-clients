@@ -68,7 +68,11 @@ export type { IServiceResults } from './core/service/types';
 export { serviceDocuments } from './core/service/types';
 export type { IServiceDefinitionResults } from './core/serviceDefinition/types';
 export { serviceDefinitionDocuments } from './core/serviceDefinition/types';
-export type { ObjectVersion } from './core/shared/results';
+/**
+ * What a deletion check answers, named once for every result set that carries a
+ * `deletionCheck` strategy. It is a different document from `check`'s.
+ */
+export type { DeletionCheckResult, ObjectVersion } from './core/shared/results';
 /** The shapes the shipped readings build. See `IUtilResults` for which member. */
 export type { IUtilResults } from './core/shared/utilResultSet';
 export { utilDocuments } from './core/shared/utilResultSet';

@@ -282,7 +282,7 @@ export type IClassContract<
   IAdtDeletable<
     IClassConfig,
     ReturnType<R['deletion']>,
-    ReturnType<R['check']>
+    ReturnType<R['deletionCheck']>
   > &
   IAdtValidatable<IClassConfig, ReturnType<R['validation']>> &
   IAdtCheckable<IClassConfig, ReturnType<R['check']>> &
@@ -312,7 +312,7 @@ export type IProgramContract<
   IAdtDeletable<
     IProgramConfig,
     ReturnType<R['deletion']>,
-    ReturnType<R['check']>
+    ReturnType<R['deletionCheck']>
   > &
   IAdtValidatable<IProgramConfig, ReturnType<R['validation']>> &
   IAdtCheckable<IProgramConfig, ReturnType<R['check']>> &
@@ -340,7 +340,7 @@ export type IIncludeContract<
   IAdtDeletable<
     IIncludeConfig,
     ReturnType<R['deletion']>,
-    ReturnType<R['deletion']>
+    ReturnType<R['deletionCheck']>
   > &
   IAdtValidatable<IIncludeConfig, ReturnType<R['validation']>> &
   IAdtActivatable<IIncludeConfig, ReturnType<R['activation']>> &
@@ -367,7 +367,7 @@ export type IInterfaceContract<
   IAdtDeletable<
     IInterfaceConfig,
     ReturnType<R['deletion']>,
-    ReturnType<R['check']>
+    ReturnType<R['deletionCheck']>
   > &
   IAdtValidatable<IInterfaceConfig, ReturnType<R['validation']>> &
   IAdtCheckable<IInterfaceConfig, ReturnType<R['check']>> &
@@ -397,7 +397,7 @@ export type IDomainContract<
   IAdtDeletable<
     IDomainConfig,
     ReturnType<R['deletion']>,
-    ReturnType<R['check']>
+    ReturnType<R['deletionCheck']>
   > &
   IAdtValidatable<IDomainConfig, ReturnType<R['validation']>> &
   IAdtCheckable<IDomainConfig, ReturnType<R['check']>> &
@@ -426,7 +426,7 @@ export type IDataElementContract<
   IAdtDeletable<
     IDataElementConfig,
     ReturnType<R['deletion']>,
-    ReturnType<R['check']>
+    ReturnType<R['deletionCheck']>
   > &
   IAdtValidatable<IDataElementConfig, ReturnType<R['validation']>> &
   IAdtCheckable<IDataElementConfig, ReturnType<R['check']>> &
@@ -454,7 +454,7 @@ export type IAuthorizationFieldContract<
   IAdtDeletable<
     IAuthorizationFieldConfig,
     ReturnType<R['deletion']>,
-    ReturnType<R['check']>
+    ReturnType<R['deletionCheck']>
   > &
   IAdtValidatable<IAuthorizationFieldConfig, ReturnType<R['validation']>> &
   IAdtCheckable<IAuthorizationFieldConfig, ReturnType<R['check']>> &
@@ -482,7 +482,7 @@ export type IStructureContract<
   IAdtDeletable<
     IStructureConfig,
     ReturnType<R['deletion']>,
-    ReturnType<R['check']>
+    ReturnType<R['deletionCheck']>
   > &
   IAdtValidatable<IStructureConfig, ReturnType<R['validation']>> &
   IAdtCheckable<IStructureConfig, ReturnType<R['check']>> &
@@ -512,7 +512,7 @@ export type ITableContract<
   IAdtDeletable<
     ITableConfig,
     ReturnType<R['deletion']>,
-    ReturnType<R['check']>
+    ReturnType<R['deletionCheck']>
   > &
   IAdtValidatable<ITableConfig, ReturnType<R['validation']>> &
   IAdtCheckable<ITableConfig, ReturnType<R['check']>> &
@@ -542,7 +542,7 @@ export type ITableTypeContract<
   IAdtDeletable<
     ITableTypeConfig,
     ReturnType<R['deletion']>,
-    ReturnType<R['check']>
+    ReturnType<R['deletionCheck']>
   > &
   IAdtValidatable<ITableTypeConfig, ReturnType<R['validation']>> &
   IAdtCheckable<ITableTypeConfig, ReturnType<R['check']>> &
@@ -565,7 +565,11 @@ export type IDdlContract<
 > = IAdtCreatable<IDdlConfig, ReturnType<R['created']>> &
   IAdtReadable<IDdlConfig, ReturnType<R['source']>, ReturnType<R['metadata']>> &
   IAdtUpdatable<IDdlConfig, ReturnType<R['updated']>> &
-  IAdtDeletable<IDdlConfig, ReturnType<R['deletion']>, ReturnType<R['check']>> &
+  IAdtDeletable<
+    IDdlConfig,
+    ReturnType<R['deletion']>,
+    ReturnType<R['deletionCheck']>
+  > &
   IAdtValidatable<IDdlConfig, ReturnType<R['validation']>> &
   IAdtCheckable<IDdlConfig, ReturnType<R['check']>> &
   IAdtActivatable<IDdlConfig, ReturnType<R['activation']>> &
@@ -594,7 +598,7 @@ export type IFunctionGroupContract<
   IAdtDeletable<
     IFunctionGroupConfig,
     ReturnType<R['deletion']>,
-    ReturnType<R['check']>
+    ReturnType<R['deletionCheck']>
   > &
   IAdtValidatable<IFunctionGroupConfig, ReturnType<R['validation']>> &
   IAdtCheckable<IFunctionGroupConfig, ReturnType<R['check']>> &
@@ -623,7 +627,7 @@ export type IFunctionModuleContract<
   IAdtDeletable<
     IFunctionModuleConfig,
     ReturnType<R['deletion']>,
-    ReturnType<R['check']>
+    ReturnType<R['deletionCheck']>
   > &
   IAdtValidatable<IFunctionModuleConfig, ReturnType<R['validation']>> &
   IAdtCheckable<IFunctionModuleConfig, ReturnType<R['check']>> &
@@ -652,7 +656,7 @@ export type IFunctionIncludeContract<
   IAdtDeletable<
     IFunctionIncludeConfig,
     ReturnType<R['deletion']>,
-    ReturnType<R['check']>
+    ReturnType<R['deletionCheck']>
   > &
   IAdtValidatable<IFunctionIncludeConfig, ReturnType<R['validation']>> &
   IAdtCheckable<IFunctionIncludeConfig, ReturnType<R['check']>> &
@@ -680,7 +684,7 @@ export type IPackageContract<
   IAdtDeletable<
     IPackageConfig,
     ReturnType<R['deletion']>,
-    ReturnType<R['check']>
+    ReturnType<R['deletionCheck']>
   > &
   IAdtValidatable<IPackageConfig, ReturnType<R['validation']>> &
   IAdtCheckable<IPackageConfig, ReturnType<R['check']>> &
@@ -705,7 +709,7 @@ export type IMessageClassContract<
   IAdtDeletable<
     IMessageClassConfig,
     ReturnType<R['deletion']>,
-    ReturnType<R['deletion']>
+    ReturnType<R['deletionCheck']>
   > &
   IAdtValidatable<IMessageClassConfig, ReturnType<R['validation']>> &
   IAdtLockable<IMessageClassConfig>;
@@ -740,7 +744,7 @@ export type IAccessControlContract<
   IAdtDeletable<
     IAccessControlConfig,
     ReturnType<R['deletion']>,
-    ReturnType<R['check']>
+    ReturnType<R['deletionCheck']>
   > &
   IAdtValidatable<IAccessControlConfig, ReturnType<R['validation']>> &
   IAdtCheckable<IAccessControlConfig, ReturnType<R['check']>> &
@@ -770,7 +774,7 @@ export type ITransformationContract<
   IAdtDeletable<
     ITransformationConfig,
     ReturnType<R['deletion']>,
-    ReturnType<R['check']>
+    ReturnType<R['deletionCheck']>
   > &
   IAdtValidatable<ITransformationConfig, ReturnType<R['validation']>> &
   IAdtCheckable<ITransformationConfig, ReturnType<R['check']>> &
@@ -800,7 +804,7 @@ export type IServiceDefinitionContract<
   IAdtDeletable<
     IServiceDefinitionConfig,
     ReturnType<R['deletion']>,
-    ReturnType<R['check']>
+    ReturnType<R['deletionCheck']>
   > &
   IAdtValidatable<IServiceDefinitionConfig, ReturnType<R['validation']>> &
   IAdtCheckable<IServiceDefinitionConfig, ReturnType<R['check']>> &
@@ -830,7 +834,7 @@ export type IScalarFunctionContract<
   IAdtDeletable<
     IScalarFunctionConfig,
     ReturnType<R['deletion']>,
-    ReturnType<R['check']>
+    ReturnType<R['deletionCheck']>
   > &
   IAdtValidatable<IScalarFunctionConfig, ReturnType<R['validation']>> &
   IAdtCheckable<IScalarFunctionConfig, ReturnType<R['check']>> &
@@ -862,7 +866,8 @@ export type IScalarFunctionImplementationContract<
   IAdtUpdatable<IScalarFunctionImplementationConfig, ReturnType<R['updated']>> &
   IAdtDeletable<
     IScalarFunctionImplementationConfig,
-    ReturnType<R['deletion']>
+    ReturnType<R['deletion']>,
+    ReturnType<R['deletionCheck']>
   > &
   IAdtValidatable<
     IScalarFunctionImplementationConfig,
@@ -901,7 +906,7 @@ export type IAppendStructureContract<
   IAdtDeletable<
     IAppendStructureConfig,
     ReturnType<R['deletion']>,
-    ReturnType<R['check']>
+    ReturnType<R['deletionCheck']>
   > &
   IAdtValidatable<IAppendStructureConfig, ReturnType<R['validation']>> &
   IAdtCheckable<IAppendStructureConfig, ReturnType<R['check']>> &
@@ -931,7 +936,7 @@ export type IBehaviorDefinitionContract<
   IAdtDeletable<
     IBehaviorDefinitionConfig,
     ReturnType<R['deletion']>,
-    ReturnType<R['check']>
+    ReturnType<R['deletionCheck']>
   > &
   IAdtValidatable<IBehaviorDefinitionConfig, ReturnType<R['validation']>> &
   IAdtCheckable<IBehaviorDefinitionConfig, ReturnType<R['check']>> &
@@ -960,7 +965,7 @@ export type IBehaviorImplementationContract<
   IAdtDeletable<
     IBehaviorImplementationConfig,
     ReturnType<R['deletion']>,
-    ReturnType<R['check']>
+    ReturnType<R['deletionCheck']>
   > &
   IAdtValidatable<IBehaviorImplementationConfig, ReturnType<R['validation']>> &
   IAdtCheckable<IBehaviorImplementationConfig, ReturnType<R['check']>> &
@@ -990,7 +995,7 @@ export type IMetadataExtensionContract<
   IAdtDeletable<
     IMetadataExtensionConfig,
     ReturnType<R['deletion']>,
-    ReturnType<R['check']>
+    ReturnType<R['deletionCheck']>
   > &
   IAdtValidatable<IMetadataExtensionConfig, ReturnType<R['validation']>> &
   IAdtCheckable<IMetadataExtensionConfig, ReturnType<R['check']>> &
@@ -1020,7 +1025,7 @@ export type IEnhancementContract<
   IAdtDeletable<
     IEnhancementConfig,
     ReturnType<R['deletion']>,
-    ReturnType<R['check']>
+    ReturnType<R['deletionCheck']>
   > &
   IAdtValidatable<IEnhancementConfig, ReturnType<R['validation']>> &
   IAdtCheckable<IEnhancementConfig, ReturnType<R['check']>> &
@@ -1036,7 +1041,7 @@ export type IRequestContract<
   IAdtDeletable<
     ITransportConfig,
     ReturnType<R['deleted']>,
-    ReturnType<R['deleted']>
+    ReturnType<R['deletionCheck']>
   > &
   IAdtRequest<ReturnType<R['list']>>;
 export type ILocalTestClassContract<
@@ -2668,7 +2673,7 @@ export class AdtClient {
     IAdtDeletable<
       IFeatureToggleConfig,
       ReturnType<R['deletion']>,
-      ReturnType<R['check']>
+      ReturnType<R['deletionCheck']>
     > &
     IAdtValidatable<IFeatureToggleConfig, ReturnType<R['validation']>> &
     IAdtCheckable<IFeatureToggleConfig, ReturnType<R['check']>> &

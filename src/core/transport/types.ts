@@ -9,6 +9,7 @@
 
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces';
 import { rawDocument } from '../../utils/resultStrategy';
+import type { DeletionCheckResult } from '../shared/results';
 import type { ICreatedTransport } from './parseCreatedTransport';
 import { parseCreatedTransport } from './parseCreatedTransport';
 import { parseTransportTree } from './parseTransportTree';
@@ -108,6 +109,7 @@ export interface ITransportResults<
   TList = ITransportTree,
   TUpdated = string,
   TDeleted = string,
+  TDeletionCheck = DeletionCheckResult,
 > {
   /**
    * What the create answers.
@@ -132,6 +134,8 @@ export interface ITransportResults<
   readonly updated: IResultStrategy<TUpdated>;
   /** What the deletion answers. */
   readonly deleted: IResultStrategy<TDeleted>;
+  /** What a deletion check answers: `del:checkResponse`. */
+  readonly deletionCheck: IResultStrategy<TDeletionCheck>;
 }
 
 /**
@@ -145,4 +149,5 @@ export const transportDocuments = {
   list: (answer) => parseTransportTree(answer.data),
   updated: rawDocument,
   deleted: rawDocument,
+  deletionCheck: rawDocument,
 } satisfies ITransportResults;

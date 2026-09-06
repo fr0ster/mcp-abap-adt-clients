@@ -10,6 +10,7 @@
  */
 
 import type { EnhancementType } from '@mcp-abap-adt/interfaces';
+import type { DeletionCheckResult } from '../shared/results';
 
 // Types defined in @mcp-abap-adt/interfaces
 export type {
@@ -136,6 +137,7 @@ export interface IEnhancementResults<
   TDeletion = EnhancementDeletionResult,
   TUpdated = EnhancementUpdated,
   TTransport = EnhancementTransport,
+  TDeletionCheck = DeletionCheckResult,
 > {
   readonly created: IResultStrategy<TCreated>;
   readonly source: IResultStrategy<TSource>;
@@ -146,6 +148,8 @@ export interface IEnhancementResults<
   readonly deletion: IResultStrategy<TDeletion>;
   readonly updated: IResultStrategy<TUpdated>;
   readonly transport: IResultStrategy<TTransport>;
+  /** What a deletion check answers: `del:checkResponse`. */
+  readonly deletionCheck: IResultStrategy<TDeletionCheck>;
 }
 
 /**
@@ -163,4 +167,5 @@ export const enhancementDocuments = {
   deletion: rawDocument,
   updated: rawDocument,
   transport: rawDocument,
+  deletionCheck: rawDocument,
 } satisfies IEnhancementResults;

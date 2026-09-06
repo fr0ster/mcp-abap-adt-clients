@@ -295,7 +295,7 @@ export class AdtRequest<
   async checkDeletion<E extends IAdtError = IAdtError>(
     config: Partial<ITransportConfig>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deleted']>, E>> {
+  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     const number = this.number(config);
 
     return answering(
@@ -304,7 +304,9 @@ export class AdtRequest<
           this.connection,
           `/sap/bc/adt/cts/transportrequests/${encodeURIComponent(number)}`,
         ),
-      this.results.deleted as IResultStrategy<ReturnType<R['deleted']>>,
+      this.results.deletionCheck as IResultStrategy<
+        ReturnType<R['deletionCheck']>
+      >,
       (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
     );
   }

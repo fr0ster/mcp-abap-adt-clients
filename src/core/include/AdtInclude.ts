@@ -242,12 +242,14 @@ export class AdtInclude<
   async checkDeletion<E extends IAdtError = IAdtError>(
     config: Partial<IIncludeConfig>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     const includeName = requireName(config);
 
     return answering(
       () => checkDeletionByUri(this.connection, includeUrl(includeName)),
-      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      this.results.deletionCheck as IResultStrategy<
+        ReturnType<R['deletionCheck']>
+      >,
       (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
     );
   }

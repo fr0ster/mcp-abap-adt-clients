@@ -257,13 +257,15 @@ export class AdtFeatureToggle<
   async checkDeletion<E extends IAdtError = IAdtError>(
     config: Partial<IFeatureToggleConfig>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     // Called for its guards: it throws when the name this member needs is
     // missing, which is the one thing checked before the request goes out.
     this.name(config);
     return answering(
       () => checkDeletion(this.connection, this.deleteParams(config)),
-      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      this.results.deletionCheck as IResultStrategy<
+        ReturnType<R['deletionCheck']>
+      >,
       (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
     );
   }

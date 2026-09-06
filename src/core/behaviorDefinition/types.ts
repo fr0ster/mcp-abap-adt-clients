@@ -9,6 +9,7 @@
  */
 
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces';
+import type { DeletionCheckResult } from '../shared/results';
 
 /**
  * The check reporters ADT accepts for a behavior definition.
@@ -95,6 +96,7 @@ export interface IBehaviorDefinitionResults<
   TDeletion = BehaviorDefinitionDeletionResult,
   TUpdated = BehaviorDefinitionUpdated,
   TTransport = BehaviorDefinitionTransport,
+  TDeletionCheck = DeletionCheckResult,
 > {
   readonly created: IResultStrategy<TCreated>;
   readonly source: IResultStrategy<TSource>;
@@ -105,6 +107,8 @@ export interface IBehaviorDefinitionResults<
   readonly deletion: IResultStrategy<TDeletion>;
   readonly updated: IResultStrategy<TUpdated>;
   readonly transport: IResultStrategy<TTransport>;
+  /** What a deletion check answers: `del:checkResponse`. */
+  readonly deletionCheck: IResultStrategy<TDeletionCheck>;
 }
 
 /**
@@ -122,4 +126,5 @@ export const behaviorDefinitionDocuments = {
   deletion: rawDocument,
   updated: rawDocument,
   transport: rawDocument,
+  deletionCheck: rawDocument,
 } satisfies IBehaviorDefinitionResults;

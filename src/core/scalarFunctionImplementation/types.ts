@@ -10,6 +10,7 @@
 
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces';
 import { rawDocument } from '../../utils/resultStrategy';
+import type { DeletionCheckResult } from '../shared/results';
 
 // Types defined in @mcp-abap-adt/interfaces
 export type {
@@ -85,6 +86,7 @@ export interface IScalarFunctionImplementationResults<
   TDeletion = ScalarFunctionImplementationDeletionResult,
   TUpdated = ScalarFunctionImplementationUpdated,
   TTransport = ScalarFunctionImplementationTransport,
+  TDeletionCheck = DeletionCheckResult,
 > {
   readonly created: IResultStrategy<TCreated>;
   readonly source: IResultStrategy<TSource>;
@@ -95,6 +97,8 @@ export interface IScalarFunctionImplementationResults<
   readonly deletion: IResultStrategy<TDeletion>;
   readonly updated: IResultStrategy<TUpdated>;
   readonly transport: IResultStrategy<TTransport>;
+  /** What a deletion check answers: `del:checkResponse`. */
+  readonly deletionCheck: IResultStrategy<TDeletionCheck>;
 }
 
 /**
@@ -112,4 +116,5 @@ export const scalarFunctionImplementationDocuments = {
   deletion: rawDocument,
   updated: rawDocument,
   transport: rawDocument,
+  deletionCheck: rawDocument,
 } satisfies IScalarFunctionImplementationResults;

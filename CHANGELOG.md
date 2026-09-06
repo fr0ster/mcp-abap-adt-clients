@@ -79,6 +79,14 @@ the sequence around a write handed back to the consumer.
   answer. So anything that can be deleted can be asked, and the two members are
   one atom.
 
+  **It reads its own document.** Every result set that carries the member gained
+  a `deletionCheck` strategy beside `check`, defaulting to `rawDocument`, and
+  the contract's third type parameter comes from that slot. The two are
+  different documents from different endpoints — `chkl:messages` from
+  `POST /checkruns` against `del:checkResponse` from `POST /deletion/check` —
+  and a consumer who injects a parser for their check runs must not have it
+  handed a deletability verdict.
+
   Measured on the cloud trial: the check is asked about a **URI**, and its
   answer names the type and package it resolved that address to. A type with an
   address has something to ask with, whether or not its own delete goes through

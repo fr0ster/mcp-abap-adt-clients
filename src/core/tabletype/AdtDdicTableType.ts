@@ -263,7 +263,7 @@ export class AdtDdicTableType<
   async checkDeletion<E extends IAdtError = IAdtError>(
     config: Partial<ITableTypeConfig>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     const name = this.name(config);
     return answering(
       () =>
@@ -271,7 +271,9 @@ export class AdtDdicTableType<
           tabletype_name: name,
           transport_request: config.transportRequest,
         }),
-      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      this.results.deletionCheck as IResultStrategy<
+        ReturnType<R['deletionCheck']>
+      >,
       (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
     );
   }

@@ -9,6 +9,7 @@
  */
 
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces';
+import type { DeletionCheckResult } from '../shared/results';
 
 export type { IDeleteAuthorizationFieldParams } from './delete';
 
@@ -74,6 +75,7 @@ export interface IAuthorizationFieldResults<
   TValidation = AuthorizationFieldValidationResult,
   TDeletion = AuthorizationFieldDeletionResult,
   TUpdated = AuthorizationFieldUpdated,
+  TDeletionCheck = DeletionCheckResult,
 > {
   readonly created: IResultStrategy<TCreated>;
   readonly source: IResultStrategy<TSource>;
@@ -83,6 +85,8 @@ export interface IAuthorizationFieldResults<
   readonly validation: IResultStrategy<TValidation>;
   readonly deletion: IResultStrategy<TDeletion>;
   readonly updated: IResultStrategy<TUpdated>;
+  /** What a deletion check answers: `del:checkResponse`. */
+  readonly deletionCheck: IResultStrategy<TDeletionCheck>;
 }
 
 /**
@@ -99,4 +103,5 @@ export const authorizationFieldDocuments = {
   validation: rawDocument,
   deletion: rawDocument,
   updated: rawDocument,
+  deletionCheck: rawDocument,
 } satisfies IAuthorizationFieldResults;
