@@ -15,6 +15,53 @@ let displayedTemplateWarning = false;
 let cachedEnvType = null;
 
 /**
+ * Write a shared object's source and leave it active.
+ *
+ * Since adt-clients 18.0.0 a member issues one request: `update` is the write
+ * and carries the handle it is given, so the lock, the write, the unlock and
+ * the activation are four calls a caller makes in the order it chooses. This
+ * setup script is such a caller, and it makes them here once rather than in
+ * twenty-four places.
+ *
+ * The unlock runs whatever the write answered — a handle left held is what
+ * makes the next run's create answer 403 with nothing appearing to hold it —
+ * and a refusal at any point is thrown, because a shared dependency that was
+ * not written is not one the suite can build on.
+ */
+async function writeAndActivate(handler, config, options, logger) {
+  const raise = (answer, what) => {
+    if (answer && answer.ok === false) {
+      const failure = answer.getError();
+      throw new Error(`${what} failed [${failure.origin}]: ${failure.message}`);
+    }
+    return answer && answer.ok ? answer.getResult().value : undefined;
+  };
+
+  let handle;
+  if (typeof handler.lock === 'function') {
+    handle = raise(await handler.lock(config), 'lock');
+  }
+  try {
+    raise(
+      await handler.update(config, { ...options, lockHandle: handle }),
+      'update',
+    );
+  } finally {
+    if (handle && typeof handler.unlock === 'function') {
+      const released = await handler.unlock(config, handle);
+      if (released && released.ok === false) {
+        logger?.warn?.(
+          `unlock failed, the handle may still be held: ${released.getError().message}`,
+        );
+      }
+    }
+  }
+  if (typeof handler.activate === 'function') {
+    raise(await handler.activate(config), 'activate');
+  }
+}
+
+/**
  * Load environment variables from .env file (quiet mode - no console output)
  */
 function loadTestEnv() {
@@ -2127,97 +2174,95 @@ async function updateAndActivateShared(
     `Shared ${type} ${name} exists — updating source and activating...`,
   );
   if (type === 'tables') {
-    await client
-      .getTable()
-      .update(
-        { tableName: name, ddlCode: depConfig.source, transportRequest },
-        { activateOnUpdate: true, sourceCode: depConfig.source },
-      );
+    await writeAndActivate(
+      client.getTable(),
+      { tableName: name, ddlCode: depConfig.source, transportRequest },
+      { sourceCode: depConfig.source },
+    );
   } else if (type === 'structures') {
     // A structure carries its source as `ddlCode`, like a table. Without this
     // branch it fell to the "no update logic, skipping" line below — so the run
     // announced "updating source and activating", did neither, and recorded the
     // object as satisfied. Both shared structures had been in that state.
-    await client
-      .getStructure()
-      .update(
-        { structureName: name, ddlCode: depConfig.source, transportRequest },
-        { activateOnUpdate: true, sourceCode: depConfig.source },
-      );
+    await writeAndActivate(
+      client.getStructure(),
+      { structureName: name, ddlCode: depConfig.source, transportRequest },
+      { sourceCode: depConfig.source },
+    );
   } else if (type === 'views') {
-    await client
-      .getDdl()
-      .update(
-        { ddlName: name, ddlSource: depConfig.source, transportRequest },
-        { activateOnUpdate: true, sourceCode: depConfig.source },
-      );
+    await writeAndActivate(
+      client.getDdl(),
+      { ddlName: name, ddlSource: depConfig.source, transportRequest },
+      { sourceCode: depConfig.source },
+    );
   } else if (type === 'programs') {
-    await client
-      .getProgram()
-      .update(
-        { programName: name, sourceCode: depConfig.source, transportRequest },
-        { activateOnUpdate: true, sourceCode: depConfig.source },
-      );
+    await writeAndActivate(
+      client.getProgram(),
+      { programName: name, sourceCode: depConfig.source, transportRequest },
+      { sourceCode: depConfig.source },
+    );
   } else if (type === 'behavior_definitions') {
-    await client
-      .getBehaviorDefinition()
-      .update(
-        { name, sourceCode: depConfig.source, transportRequest },
-        { activateOnUpdate: true, sourceCode: depConfig.source },
-      );
+    await writeAndActivate(
+      client.getBehaviorDefinition(),
+      { name, sourceCode: depConfig.source, transportRequest },
+      { sourceCode: depConfig.source },
+    );
   } else if (type === 'classes') {
-    await client
-      .getClass()
-      .update(
-        { className: name, sourceCode: depConfig.source, transportRequest },
-        { activateOnUpdate: true, sourceCode: depConfig.source },
-      );
+    await writeAndActivate(
+      client.getClass(),
+      { className: name, sourceCode: depConfig.source, transportRequest },
+      { sourceCode: depConfig.source },
+    );
   } else if (type === 'access_controls') {
     mustSucceed(
-      await client.getAccessControl().update(
+      await writeAndActivate(
+        client.getAccessControl(),
         {
           accessControlName: name,
           sourceCode: depConfig.source,
           transportRequest,
         },
-        { activateOnUpdate: true, sourceCode: depConfig.source },
+        { sourceCode: depConfig.source },
       ),
       `shared accesscontrol update ${name}`,
     );
   } else if (type === 'interfaces') {
     mustSucceed(
-      await client.getInterface().update(
+      await writeAndActivate(
+        client.getInterface(),
         {
           interfaceName: name,
           sourceCode: depConfig.source,
           transportRequest,
         },
-        { activateOnUpdate: true, sourceCode: depConfig.source },
+        { sourceCode: depConfig.source },
       ),
       `shared interface update ${name}`,
     );
   } else if (type === 'function_modules') {
     mustSucceed(
-      await client.getFunctionModule().update(
+      await writeAndActivate(
+        client.getFunctionModule(),
         {
           functionModuleName: name,
           functionGroupName: depConfig.function_group,
           sourceCode: depConfig.source,
           transportRequest,
         },
-        { activateOnUpdate: true, sourceCode: depConfig.source },
+        { sourceCode: depConfig.source },
       ),
       `shared functionmodule update ${name}`,
     );
   } else if (type === 'service_definitions') {
     mustSucceed(
-      await client.getServiceDefinition().update(
+      await writeAndActivate(
+        client.getServiceDefinition(),
         {
           serviceDefinitionName: name,
           sourceCode: depConfig.source,
           transportRequest,
         },
-        { activateOnUpdate: true, sourceCode: depConfig.source },
+        { sourceCode: depConfig.source },
       ),
       `shared servicedefinition update ${name}`,
     );
@@ -2403,7 +2448,8 @@ async function ensureSharedDependency(client, type, name, logger) {
       try {
         if (type === 'domains') {
           mustSucceed(
-            await client.getDomain().update(
+            await writeAndActivate(
+              client.getDomain(),
               {
                 domainName: name,
                 packageName,
@@ -2412,13 +2458,14 @@ async function ensureSharedDependency(client, type, name, logger) {
                 length: depConfig.length || 10,
                 transportRequest,
               },
-              { activateOnUpdate: true },
+              undefined,
             ),
             `shared domain update ${name}`,
           );
         } else {
           mustSucceed(
-            await client.getDataElement().update(
+            await writeAndActivate(
+              client.getDataElement(),
               {
                 dataElementName: name,
                 packageName,
@@ -2428,7 +2475,7 @@ async function ensureSharedDependency(client, type, name, logger) {
                 typeName: depConfig.domain_name,
                 transportRequest,
               },
-              { activateOnUpdate: true },
+              undefined,
             ),
             `shared dataelement update ${name}`,
           );
@@ -2469,7 +2516,8 @@ async function ensureSharedDependency(client, type, name, logger) {
       // in the type, and without that step it stays an empty object with no
       // data type at all.
       mustSucceed(
-        await client.getDomain().update(
+        await writeAndActivate(
+          client.getDomain(),
           {
             domainName: name,
             // The update needs the package as much as the create did: measured on
@@ -2483,7 +2531,7 @@ async function ensureSharedDependency(client, type, name, logger) {
             length: depConfig.length || 10,
             transportRequest,
           },
-          { activateOnUpdate: true },
+          undefined,
         ),
         `shared domain update ${name}`,
       );
@@ -2500,7 +2548,8 @@ async function ensureSharedDependency(client, type, name, logger) {
         `shared dataelement create ${name}`,
       );
       mustSucceed(
-        await client.getDataElement().update(
+        await writeAndActivate(
+          client.getDataElement(),
           {
             dataElementName: name,
             // Same omission as the domain above, and the same fresh-system-only
@@ -2511,7 +2560,7 @@ async function ensureSharedDependency(client, type, name, logger) {
             typeName: depConfig.domain_name,
             transportRequest,
           },
-          { activateOnUpdate: true },
+          undefined,
         ),
         `shared dataelement update ${name}`,
       );
@@ -2529,13 +2578,14 @@ async function ensureSharedDependency(client, type, name, logger) {
       if (depConfig.source) {
         logger?.info?.(`Activating shared structure ${name}...`);
         mustSucceed(
-          await client.getStructure().update(
+          await writeAndActivate(
+            client.getStructure(),
             {
               structureName: name,
               ddlCode: depConfig.source,
               transportRequest,
             },
-            { activateOnUpdate: true, sourceCode: depConfig.source },
+            { sourceCode: depConfig.source },
           ),
           `shared structure update ${name}`,
         );
@@ -2555,13 +2605,14 @@ async function ensureSharedDependency(client, type, name, logger) {
       if (depConfig.source) {
         logger?.info?.(`Activating shared table ${name}...`);
         mustSucceed(
-          await client.getTable().update(
+          await writeAndActivate(
+            client.getTable(),
             {
               tableName: name,
               ddlCode: depConfig.source,
               transportRequest,
             },
-            { activateOnUpdate: true, sourceCode: depConfig.source },
+            { sourceCode: depConfig.source },
           ),
           `shared table update ${name}`,
         );
@@ -2581,13 +2632,14 @@ async function ensureSharedDependency(client, type, name, logger) {
       if (depConfig.source) {
         logger?.info?.(`Activating shared view ${name}...`);
         mustSucceed(
-          await client.getDdl().update(
+          await writeAndActivate(
+            client.getDdl(),
             {
               ddlName: name,
               ddlSource: depConfig.source,
               transportRequest,
             },
-            { activateOnUpdate: true, sourceCode: depConfig.source },
+            { sourceCode: depConfig.source },
           ),
           `shared ddl update ${name}`,
         );
@@ -2605,13 +2657,14 @@ async function ensureSharedDependency(client, type, name, logger) {
       );
       if (depConfig.source) {
         mustSucceed(
-          await client.getProgram().update(
+          await writeAndActivate(
+            client.getProgram(),
             {
               programName: name,
               sourceCode: depConfig.source,
               transportRequest,
             },
-            { activateOnUpdate: true, sourceCode: depConfig.source },
+            { sourceCode: depConfig.source },
           ),
           `shared program update ${name}`,
         );
@@ -2632,13 +2685,14 @@ async function ensureSharedDependency(client, type, name, logger) {
       if (depConfig.source) {
         logger?.info?.(`Activating shared behavior definition ${name}...`);
         mustSucceed(
-          await client.getBehaviorDefinition().update(
+          await writeAndActivate(
+            client.getBehaviorDefinition(),
             {
               name,
               sourceCode: depConfig.source,
               transportRequest,
             },
-            { activateOnUpdate: true, sourceCode: depConfig.source },
+            { sourceCode: depConfig.source },
           ),
           `shared behaviordefinition update ${name}`,
         );
@@ -2657,13 +2711,14 @@ async function ensureSharedDependency(client, type, name, logger) {
       if (depConfig.source) {
         logger?.info?.(`Activating shared class ${name}...`);
         mustSucceed(
-          await client.getClass().update(
+          await writeAndActivate(
+            client.getClass(),
             {
               className: name,
               sourceCode: depConfig.source,
               transportRequest,
             },
-            { activateOnUpdate: true, sourceCode: depConfig.source },
+            { sourceCode: depConfig.source },
           ),
           `shared class update ${name}`,
         );
@@ -2683,13 +2738,14 @@ async function ensureSharedDependency(client, type, name, logger) {
       if (depConfig.source) {
         logger?.info?.(`Activating shared access control ${name}...`);
         mustSucceed(
-          await client.getAccessControl().update(
+          await writeAndActivate(
+            client.getAccessControl(),
             {
               accessControlName: name,
               sourceCode: depConfig.source,
               transportRequest,
             },
-            { activateOnUpdate: true, sourceCode: depConfig.source },
+            { sourceCode: depConfig.source },
           ),
           `shared accesscontrol update ${name}`,
         );
@@ -2708,13 +2764,14 @@ async function ensureSharedDependency(client, type, name, logger) {
       if (depConfig.source) {
         logger?.info?.(`Activating shared interface ${name}...`);
         mustSucceed(
-          await client.getInterface().update(
+          await writeAndActivate(
+            client.getInterface(),
             {
               interfaceName: name,
               sourceCode: depConfig.source,
               transportRequest,
             },
-            { activateOnUpdate: true, sourceCode: depConfig.source },
+            { sourceCode: depConfig.source },
           ),
           `shared interface update ${name}`,
         );
@@ -2760,14 +2817,15 @@ async function ensureSharedDependency(client, type, name, logger) {
       if (depConfig.source) {
         logger?.info?.(`Activating shared function module ${name}...`);
         mustSucceed(
-          await client.getFunctionModule().update(
+          await writeAndActivate(
+            client.getFunctionModule(),
             {
               functionModuleName: name,
               functionGroupName: depConfig.function_group,
               sourceCode: depConfig.source,
               transportRequest,
             },
-            { activateOnUpdate: true, sourceCode: depConfig.source },
+            { sourceCode: depConfig.source },
           ),
           `shared functionmodule update ${name}`,
         );
@@ -2788,13 +2846,14 @@ async function ensureSharedDependency(client, type, name, logger) {
       if (depConfig.source && !depConfig.skip_activation) {
         logger?.info?.(`Activating shared service definition ${name}...`);
         mustSucceed(
-          await client.getServiceDefinition().update(
+          await writeAndActivate(
+            client.getServiceDefinition(),
             {
               serviceDefinitionName: name,
               sourceCode: depConfig.source,
               transportRequest,
             },
-            { activateOnUpdate: true, sourceCode: depConfig.source },
+            { sourceCode: depConfig.source },
           ),
           `shared servicedefinition update ${name}`,
         );

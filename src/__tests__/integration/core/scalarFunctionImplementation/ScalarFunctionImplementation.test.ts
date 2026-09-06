@@ -220,13 +220,28 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
             }
             throw e;
           }
-          await sf.update(
-            {
-              scalarFunctionName: funcName,
-              transportRequest,
-              sourceCode: sigSource,
-            },
-            { activateOnUpdate: true },
+          const funcLock = expectResult(
+            await sf.lock({ scalarFunctionName: funcName }),
+            'lock scalar function',
+          );
+          try {
+            expectResult(
+              await sf.update(
+                {
+                  scalarFunctionName: funcName,
+                  transportRequest,
+                  sourceCode: sigSource,
+                },
+                { lockHandle: funcLock },
+              ),
+              'update scalar function',
+            );
+          } finally {
+            await sf.unlock({ scalarFunctionName: funcName }, funcLock);
+          }
+          expectResult(
+            await sf.activate({ scalarFunctionName: funcName }),
+            'activate scalar function',
           );
 
           // 2) AMDP class (do NOT solo-activate — it activates with the group).

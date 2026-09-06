@@ -102,16 +102,13 @@ async function testLongPollingRead() {
         console.log(`  Creating domain: ${testDomainName}`);
         console.log(`  Using package: ${packageName}`);
         const createStartTime = Date.now();
-        await client.getDomain().create(
-          {
-            domainName: testDomainName,
-            packageName: packageName,
-            datatype: 'CHAR',
-            length: 10,
-            description: 'Test domain for long polling',
-          },
-          { activateOnCreate: false },
-        );
+        await client.getDomain().create({
+          domainName: testDomainName,
+          packageName: packageName,
+          datatype: 'CHAR',
+          length: 10,
+          description: 'Test domain for long polling',
+        });
         const createTime = Date.now() - createStartTime;
         console.log(`  ✓ Domain created in ${createTime}ms`);
 
@@ -183,16 +180,13 @@ async function testLongPollingRead() {
         console.log(`  Creating domain: ${testDomainName2}`);
         console.log(`  Using package: ${packageName}`);
         const createStartTime2 = Date.now();
-        await client.getDomain().create(
-          {
-            domainName: testDomainName2,
-            packageName: packageName,
-            datatype: 'CHAR',
-            length: 10,
-            description: 'Test domain for long polling comparison',
-          },
-          { activateOnCreate: false },
-        );
+        await client.getDomain().create({
+          domainName: testDomainName2,
+          packageName: packageName,
+          datatype: 'CHAR',
+          length: 10,
+          description: 'Test domain for long polling comparison',
+        });
         const createTime2 = Date.now() - createStartTime2;
         console.log(`  ✓ Domain created in ${createTime2}ms`);
 

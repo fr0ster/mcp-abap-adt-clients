@@ -192,13 +192,28 @@ describe('ScalarFunction (DSFD/SCF) integration', () => {
 
           if (configuredSource) {
             // ── 3a) Full flow: update source + activate ──
-            await sf.update(
-              {
-                scalarFunctionName,
-                transportRequest,
-                sourceCode: configuredSource,
-              },
-              { activateOnUpdate: true },
+            const sfLock = expectResult(
+              await sf.lock({ scalarFunctionName }),
+              'lock scalar function',
+            );
+            try {
+              expectResult(
+                await sf.update(
+                  {
+                    scalarFunctionName,
+                    transportRequest,
+                    sourceCode: configuredSource,
+                  },
+                  { lockHandle: sfLock },
+                ),
+                'update scalar function',
+              );
+            } finally {
+              await sf.unlock({ scalarFunctionName }, sfLock);
+            }
+            expectResult(
+              await sf.activate({ scalarFunctionName }),
+              'activate scalar function',
             );
 
             // ── 4a) Read active ──

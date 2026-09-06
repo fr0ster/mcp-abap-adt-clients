@@ -375,20 +375,16 @@ describe('Group Activation (Shared)', () => {
           );
         } else {
           logTestStep(currentStep, testsLogger);
-          await client.getDomain().create(
-            {
-              domainName: domainName,
-              packageName: packageName,
-              description:
-                testCase.params.description ||
-                `Test domain for group activation`,
-              datatype: testCase.params.domain_datatype || 'CHAR',
-              length: testCase.params.domain_length || 10,
-              decimals: testCase.params.domain_decimals || 0,
-              transportRequest: transportRequest,
-            },
-            { activateOnCreate: false },
-          );
+          await client.getDomain().create({
+            domainName: domainName,
+            packageName: packageName,
+            description:
+              testCase.params.description || `Test domain for group activation`,
+            datatype: testCase.params.domain_datatype || 'CHAR',
+            length: testCase.params.domain_length || 10,
+            decimals: testCase.params.domain_decimals || 0,
+            transportRequest: transportRequest,
+          });
           domainCreated = true;
           await new Promise((resolve) =>
             setTimeout(resolve, getOperationDelay('create', testCase)),
@@ -431,19 +427,16 @@ describe('Group Activation (Shared)', () => {
           );
         } else {
           logTestStep(currentStep, testsLogger);
-          await client.getDataElement().create(
-            {
-              dataElementName: dataElementName,
-              packageName: packageName,
-              description:
-                testCase.params.description ||
-                `Test data element for group activation`,
-              typeKind: testCase.params.data_element_type_kind || 'domain',
-              typeName: domainName, // Reference to domain
-              transportRequest: transportRequest,
-            },
-            { activateOnCreate: false },
-          );
+          await client.getDataElement().create({
+            dataElementName: dataElementName,
+            packageName: packageName,
+            description:
+              testCase.params.description ||
+              `Test data element for group activation`,
+            typeKind: testCase.params.data_element_type_kind || 'domain',
+            typeName: domainName, // Reference to domain
+            transportRequest: transportRequest,
+          });
           dataElementCreated = true;
           await new Promise((resolve) =>
             setTimeout(resolve, getOperationDelay('create', testCase)),
@@ -489,17 +482,14 @@ define structure ${structureName} {
  mandt : abap.clnt;
  test_field : ${dataElementName};
 }`;
-        await client.getStructure().create(
-          {
-            structureName: structureName,
-            packageName: packageName,
-            description:
-              testCase.params.description ||
-              `Test structure for group activation`,
-            transportRequest: transportRequest,
-          },
-          { activateOnCreate: false },
-        );
+        await client.getStructure().create({
+          structureName: structureName,
+          packageName: packageName,
+          description:
+            testCase.params.description ||
+            `Test structure for group activation`,
+          transportRequest: transportRequest,
+        });
         structureCreated = true;
         await new Promise((resolve) =>
           setTimeout(resolve, getOperationDelay('create', testCase)),
@@ -520,7 +510,7 @@ define structure ${structureName} {
               ddlCode: structureDdlCode,
               transportRequest: transportRequest,
             },
-            { activateOnUpdate: false, lockHandle: structureLockHandle },
+            { lockHandle: structureLockHandle },
           );
         } finally {
           await structureHandler.unlock({ structureName }, structureLockHandle);

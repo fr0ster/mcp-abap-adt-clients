@@ -222,7 +222,7 @@ export class AdtCdsUnitTest<
         testClassCode: config.testClassSource,
         transportRequest: config.transportRequest,
       },
-      { ...options, activateOnUpdate: true },
+      options,
     ) as Promise<IAdtResponse<ReturnType<R['updated']>, E>>;
   }
 

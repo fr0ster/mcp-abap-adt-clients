@@ -196,7 +196,7 @@ export class AdtBehaviorImplementation<
         masterSystem: systemInfo?.systemID,
         responsible: systemInfo?.userName || '',
       },
-      { ...options, activateOnCreate: false },
+      options,
     );
   }
 

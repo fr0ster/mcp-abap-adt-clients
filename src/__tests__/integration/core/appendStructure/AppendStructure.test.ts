@@ -253,9 +253,31 @@ describe('AppendStructure (TABL/DS) integration', () => {
               .replaceAll('{base}', baseObject)
               .replaceAll('{append}', appendStructureName);
 
-            await as.update(
-              { appendStructureName, transportRequest, sourceCode: source },
-              { activateOnUpdate: true },
+            // The lock window is the caller's since 18.0.0: `update` is the
+            // PUT and takes the handle it is given, so the three calls are
+            // here, in the order this test decides.
+            const appendLock = expectResult(
+              await as.lock({ appendStructureName }),
+              'lock append structure',
+            );
+            try {
+              expectResult(
+                await as.update(
+                  {
+                    appendStructureName,
+                    transportRequest,
+                    sourceCode: source,
+                  },
+                  { lockHandle: appendLock },
+                ),
+                'update append structure',
+              );
+            } finally {
+              await as.unlock({ appendStructureName }, appendLock);
+            }
+            expectResult(
+              await as.activate({ appendStructureName }),
+              'activate append structure',
             );
 
             // ── 4) Read back — the CONTENT, not the status ──

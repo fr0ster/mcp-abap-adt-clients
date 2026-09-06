@@ -31,8 +31,10 @@ import type {
   IAdtActivatable,
   IAdtCreatable,
   IAdtDeletable,
+  IAdtLockable,
   IAdtOperationOptions,
   IAdtReadable,
+  IAdtResponse,
   IAdtUpdatable,
   IAdtValidatable,
   ILogger,
@@ -111,7 +113,14 @@ export type TestableObject<TConfig> = IAdtCreatable<TConfig, unknown> &
   IAdtUpdatable<TConfig, unknown> &
   IAdtDeletable<TConfig, unknown> &
   IAdtValidatable<TConfig, unknown> &
-  Partial<IAdtActivatable<TConfig, unknown>>;
+  Partial<IAdtActivatable<TConfig, unknown>> &
+  // Since 18.0.0 `update` takes the handle it is given and issues one request.
+  // Acquiring and releasing that handle is the caller's, and this harness is a
+  // caller — so the pair belongs in the shape it depends on. Optional because
+  // some objects have no lock at all (a message class row, a feature toggle's
+  // runtime switch), and the call site falls back to an unlocked write, which
+  // is a thing ADT is free to refuse and say why.
+  Partial<IAdtLockable<TConfig>>;
 
 export class BaseTester<TConfig, TState = unknown> {
   private readonly adtObject: TestableObject<TConfig>;
@@ -307,6 +316,48 @@ export class BaseTester<TConfig, TState = unknown> {
         `[${failure.origin}] ${failure.message}` +
           (failure.request?.url ? ` (${failure.request.url})` : ''),
       );
+    }
+  }
+
+  /**
+   * The lock window, which is the caller's since 18.0.0.
+   *
+   * `update` is one request and carries the handle it is given; opening and
+   * closing the window around it is the consumer's job, and a test harness is a
+   * consumer. Three things this does that a chain inside `update` could not:
+   * it fails the test on a refused lock with SAP's own sentence, it unlocks
+   * whatever the update answered, and it reports a failed unlock rather than
+   * swallowing it — a handle left held is what makes the next run's create
+   * answer 403 with nothing appearing to hold it.
+   */
+  private async updateUnderLock(
+    config: Partial<TConfig>,
+    options: IAdtOperationOptions,
+  ): Promise<unknown> {
+    if (!(this.adtObject.lock && this.adtObject.unlock)) {
+      // No lock resource for this type. The write goes out without a handle,
+      // and whether that is allowed is ADT's answer to give.
+      return await this.adtObject.update(config, options);
+    }
+
+    const handle = expectResult(await this.adtObject.lock(config), 'lock');
+    this.objectLocked = true;
+    this.lockHandle = handle;
+    try {
+      return await this.adtObject.update(config, {
+        ...options,
+        lockHandle: handle,
+      });
+    } finally {
+      const released = await this.adtObject.unlock(config, handle);
+      this.objectLocked = false;
+      this.lockHandle = undefined;
+      if (!released.ok) {
+        this.log(
+          LogLevel.WARN,
+          `unlock after update failed, the handle may still be held: ${released.getError().message}`,
+        );
+      }
     }
   }
 
@@ -819,14 +870,28 @@ export class BaseTester<TConfig, TState = unknown> {
       // 2. Create
       currentStep = 'create';
       logTestStep(currentStep, this.logger);
+      // `create` is the POST. `activateOnCreate` is still the flow's word for
+      // "leave this active", but it is this harness that acts on it now, with
+      // an `activate` call of its own below — the option no longer reaches into
+      // the library and asks it to run a second request.
       const createOptions: IAdtOperationOptions = {
-        activateOnCreate: options?.activateOnCreate || false,
         timeout: options?.timeout,
         sourceCode: options?.sourceCode,
         xmlContent: options?.xmlContent,
       };
-      await this.adtObject.create(config, createOptions);
+      expectResult(
+        await this.adtObject.create(config, createOptions),
+        'create',
+      );
       this.objectCreated = true;
+
+      if (options?.activateOnCreate && this.adtObject.activate) {
+        logTestStep('activate (after create)', this.logger);
+        expectResult(
+          await this.adtObject.activate(config as Partial<TConfig>),
+          'activate after create',
+        );
+      }
       // Delay after create
       await this.waitDelay(
         this.getOperationDelay('create', testCaseParams),
@@ -871,7 +936,6 @@ export class BaseTester<TConfig, TState = unknown> {
         currentStep = 'update';
         logTestStep(currentStep, this.logger);
         const updateOptions: IAdtOperationOptions = {
-          activateOnUpdate: options?.activateOnUpdate || false,
           // The UPDATE content, not the create content. Every handler resolves
           // `options.sourceCode ?? config.sourceCode` with options winning, so
           // passing the create source here overwrote the object with what it
@@ -882,10 +946,21 @@ export class BaseTester<TConfig, TState = unknown> {
           xmlContent: options?.updateConfig?.xmlContent ?? options?.xmlContent,
           timeout: options?.timeout,
         };
-        await this.adtObject.update(
-          { ...config, ...options.updateConfig } as Partial<TConfig>,
-          updateOptions,
+        expectResult(
+          (await this.updateUnderLock(
+            { ...config, ...options.updateConfig } as Partial<TConfig>,
+            updateOptions,
+          )) as IAdtResponse<unknown>,
+          'update',
         );
+
+        if (options?.activateOnUpdate && this.adtObject.activate) {
+          logTestStep('activate (after update)', this.logger);
+          expectResult(
+            await this.adtObject.activate(config as Partial<TConfig>),
+            'activate after update',
+          );
+        }
         // Delay after update
         await this.waitDelay(
           this.getOperationDelay('update', testCaseParams),
@@ -1662,12 +1737,11 @@ export class BaseTester<TConfig, TState = unknown> {
       currentStep = 'update';
       logTestStep(currentStep, this.logger);
       const updateOptions: IAdtOperationOptions = {
-        activateOnUpdate: options?.activateOnUpdate || false,
         sourceCode: options?.sourceCode,
         xmlContent: options?.xmlContent,
         timeout: options?.timeout,
       };
-      const updateState = await this.adtObject.update(
+      const updateState = await this.updateUnderLock(
         { ...config, ...options?.updateConfig } as Partial<TConfig>,
         updateOptions,
       );
