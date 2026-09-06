@@ -2922,7 +2922,7 @@ export class AdtClient {
   // members this package's own tests and scripts call. What is incomplete is
   // the contract; widening it is issue #109's subject, not this change's.
   getUtils(): AdtUtils;
-  getUtils<R extends IUtilResults<unknown, unknown, unknown>>(
+  getUtils<R extends IUtilResults<unknown, unknown, unknown, unknown>>(
     results: R,
   ): IAdtInformationSystem<
     ReturnType<R['search']>,
@@ -2931,13 +2931,13 @@ export class AdtClient {
   > &
     IAdtRepositoryStructure<ReturnType<R['node']>> &
     IAdtPackageBrowsing<IPackageContentItem[]> &
-    IAdtGroupLifecycle<IInactiveObjectsResponse> &
+    IAdtGroupLifecycle<ReturnType<R['inactive']>> &
     IAdtDataPreview &
     IAdtDiscovery &
     IAdtObjectAccess;
-  getUtils<R extends IUtilResults<unknown, unknown, unknown> = IUtilResults>(
-    results: R = utilDocuments as unknown as R,
-  ): AdtUtils<R> {
+  getUtils<
+    R extends IUtilResults<unknown, unknown, unknown, unknown> = IUtilResults,
+  >(results: R = utilDocuments as unknown as R): AdtUtils<R> {
     this.assertConnected();
     return new AdtUtils<R>(this.connection, this.logger, results);
   }

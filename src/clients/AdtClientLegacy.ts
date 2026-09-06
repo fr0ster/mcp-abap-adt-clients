@@ -313,7 +313,7 @@ export class AdtClientLegacy extends AdtClient {
    * be told about a refusal differently.
    */
   override getUtils<
-    R extends IUtilResults<unknown, unknown, unknown> = IUtilResults,
+    R extends IUtilResults<unknown, unknown, unknown, unknown> = IUtilResults,
   >(results: R = utilDocuments as unknown as R): AdtUtilsLegacy<R> {
     return new AdtUtilsLegacy<R>(this.connection, this.logger, results);
   }

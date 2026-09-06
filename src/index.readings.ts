@@ -68,6 +68,8 @@ export type { IServiceResults } from './core/service/types';
 export { serviceDocuments } from './core/service/types';
 export type { IServiceDefinitionResults } from './core/serviceDefinition/types';
 export { serviceDefinitionDocuments } from './core/serviceDefinition/types';
+/** The reading of `/activation/inactiveobjects`, injectable since 18.0.0. */
+export { inactiveObjects } from './core/shared/getInactiveObjects';
 /**
  * What a deletion check answers, named once for every result set that carries a
  * `deletionCheck` strategy. It is a different document from `check`'s.

@@ -98,7 +98,7 @@ import { getAllTypes as getAllTypesUtil } from './allTypes';
 import { getDiscovery as getDiscoveryUtil } from './discovery';
 import { listFunctionGroupIncludes } from './functionGroupIncludesList';
 import { listFunctionModules } from './functionModulesList';
-import { getInactiveObjects } from './getInactiveObjects';
+import { fetchInactiveObjects } from './getInactiveObjects';
 import { activateObjectsGroup } from './groupActivation';
 import { checkDeletionGroup, deleteObjectsGroup } from './groupDeletion';
 import { getInclude as getIncludeUtil } from './include';
@@ -204,7 +204,7 @@ import { type IUtilResults, utilDocuments } from './utilResultSet';
  * which no strategy sees.
  */
 export class AdtUtils<
-  R extends IUtilResults<unknown, unknown, unknown> = IUtilResults,
+  R extends IUtilResults<unknown, unknown, unknown, unknown> = IUtilResults,
 > implements
     IAdtInformationSystem<
       ReturnType<R['search']>,
@@ -213,7 +213,7 @@ export class AdtUtils<
     >,
     IAdtRepositoryStructure<ReturnType<R['node']>>,
     IAdtPackageBrowsing<IPackageContentItem[]>,
-    IAdtGroupLifecycle<IInactiveObjectsResponse>,
+    IAdtGroupLifecycle<ReturnType<R['inactive']>>,
     IAdtDataPreview,
     IAdtDiscovery,
     IAdtObjectAccess
@@ -439,10 +439,15 @@ export class AdtUtils<
    * @param options - Optional parameters
    * @returns List of inactive objects with their metadata
    */
-  async getInactiveObjects(options?: {
-    includeRawXml?: boolean;
-  }): Promise<IAdtResponse<IInactiveObjectsResponse>> {
-    return answeringValue(() => getInactiveObjects(this.connection, options));
+  async getInactiveObjects(): Promise<IAdtResponse<ReturnType<R['inactive']>>> {
+    // One GET, one answer, one reading — injected like every other. The
+    // `includeRawXml` flag is gone with it: a consumer who wants the document
+    // passes `rawDocument` as the `inactive` strategy, which is the same
+    // removal `getWhereUsedList`'s flag got.
+    return answering(
+      () => fetchInactiveObjects(this.connection),
+      this.results.inactive as IResultStrategy<ReturnType<R['inactive']>>,
+    );
   }
 
   /**

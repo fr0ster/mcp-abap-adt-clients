@@ -34,7 +34,7 @@ function unsupportedError(operation: string, endpoint: string): string {
 }
 
 export class AdtUtilsLegacy<
-  R extends IUtilResults<unknown, unknown, unknown> = IUtilResults,
+  R extends IUtilResults<unknown, unknown, unknown, unknown> = IUtilResults,
 > extends AdtUtils<R> {
   /**
    * Legacy group activation — synchronous POST to /sap/bc/adt/activation

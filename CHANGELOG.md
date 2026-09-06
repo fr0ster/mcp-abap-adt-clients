@@ -145,6 +145,24 @@ the sequence around a write handed back to the consumer.
   needs two lock handles and a read-modify-write of XML this library assembles.
   Making it single-request would mean publishing that assembly.
 
+- **`getInactiveObjects()` takes its reading from the result set.** It is one
+  GET with one answer, which is exactly what an `IResultStrategy` types, and it
+  was the last such member answering a shape nobody could change. `IUtilResults`
+  gained an `inactive` strategy, `getUtils(results)` declares
+  `IAdtGroupLifecycle<ReturnType<R['inactive']>>`, and the `includeRawXml` flag
+  is gone with the split — a consumer who wants the document passes
+  `rawDocument`, the same removal that flag got on `getWhereUsedList`.
+
+  `getPackageContents`, `getPackageHierarchy` and `getWhereUsedList` keep their
+  fixed readings, and the reason is measured rather than habitual: each makes
+  *several* requests — one node-structure request per object type plus a walk
+  into subpackages, or the scope then the search — and assembles one shape from
+  all of them. `IResultStrategy<T> = (answer: IAdtWireResponse) => T` cannot
+  type that. A consumer who wants another shape implements
+  `IAdtPackageBrowsing` or `IAdtInformationSystem` themselves; that the factory
+  cannot hand them one is a gap in the composition, recorded as open in the
+  contracts package's `DECISIONS.md` rather than claimed to be solved here.
+
 - **Every member answers `IAdtResponse<T>`.** `client.getClass().create(...)`
   and its neighbours return a result or a failure instead of a state object, and
   signal a refusal in the answer instead of throwing. Reading the result without
