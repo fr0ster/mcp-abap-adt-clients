@@ -65,7 +65,11 @@ export class AdtMessageClass<
       ReturnType<R['metadata']>
     >,
     IAdtUpdatable<IMessageClassConfig, ReturnType<R['updated']>>,
-    IAdtDeletable<IMessageClassConfig, ReturnType<R['deletion']>>,
+    IAdtDeletable<
+      IMessageClassConfig,
+      ReturnType<R['deletion']>,
+      ReturnType<R['deletion']>
+    >,
     IAdtValidatable<IMessageClassConfig, ReturnType<R['validation']>>,
     IAdtLockable<IMessageClassConfig>
 {

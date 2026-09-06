@@ -92,7 +92,11 @@ export class AdtRequest<
       ReturnType<R['read']>
     >,
     IAdtUpdatable<ITransportConfig, ReturnType<R['updated']>>,
-    IAdtDeletable<ITransportConfig, ReturnType<R['deleted']>>,
+    IAdtDeletable<
+      ITransportConfig,
+      ReturnType<R['deleted']>,
+      ReturnType<R['deleted']>
+    >,
     IAdtRequest<ReturnType<R['list']>>
 {
   private readonly connection: IAbapConnection;

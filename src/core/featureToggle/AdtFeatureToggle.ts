@@ -79,7 +79,11 @@ export class AdtFeatureToggle<
       ReturnType<R['metadata']>
     >,
     IAdtUpdatable<IFeatureToggleConfig, ReturnType<R['updated']>>,
-    IAdtDeletable<IFeatureToggleConfig, ReturnType<R['deletion']>>,
+    IAdtDeletable<
+      IFeatureToggleConfig,
+      ReturnType<R['deletion']>,
+      ReturnType<R['check']>
+    >,
     IAdtValidatable<IFeatureToggleConfig, ReturnType<R['validation']>>,
     IAdtCheckable<IFeatureToggleConfig, ReturnType<R['check']>>,
     IAdtActivatable<IFeatureToggleConfig, ReturnType<R['activation']>>,

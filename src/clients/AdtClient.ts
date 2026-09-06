@@ -279,7 +279,11 @@ export type IClassContract<
     ReturnType<R['metadata']>
   > &
   IAdtUpdatable<IClassConfig, ReturnType<R['updated']>> &
-  IAdtDeletable<IClassConfig, ReturnType<R['deletion']>> &
+  IAdtDeletable<
+    IClassConfig,
+    ReturnType<R['deletion']>,
+    ReturnType<R['check']>
+  > &
   IAdtValidatable<IClassConfig, ReturnType<R['validation']>> &
   IAdtCheckable<IClassConfig, ReturnType<R['check']>> &
   IAdtActivatable<IClassConfig, ReturnType<R['activation']>> &
@@ -305,7 +309,11 @@ export type IProgramContract<
     ReturnType<R['metadata']>
   > &
   IAdtUpdatable<IProgramConfig, ReturnType<R['updated']>> &
-  IAdtDeletable<IProgramConfig, ReturnType<R['deletion']>> &
+  IAdtDeletable<
+    IProgramConfig,
+    ReturnType<R['deletion']>,
+    ReturnType<R['check']>
+  > &
   IAdtValidatable<IProgramConfig, ReturnType<R['validation']>> &
   IAdtCheckable<IProgramConfig, ReturnType<R['check']>> &
   IAdtActivatable<IProgramConfig, ReturnType<R['activation']>> &
@@ -329,7 +337,11 @@ export type IIncludeContract<
     ReturnType<R['metadata']>
   > &
   IAdtUpdatable<IIncludeConfig, ReturnType<R['updated']>> &
-  IAdtDeletable<IIncludeConfig, ReturnType<R['deletion']>> &
+  IAdtDeletable<
+    IIncludeConfig,
+    ReturnType<R['deletion']>,
+    ReturnType<R['deletion']>
+  > &
   IAdtValidatable<IIncludeConfig, ReturnType<R['validation']>> &
   IAdtActivatable<IIncludeConfig, ReturnType<R['activation']>> &
   IAdtLockable<IIncludeConfig>;
@@ -352,7 +364,11 @@ export type IInterfaceContract<
     ReturnType<R['metadata']>
   > &
   IAdtUpdatable<IInterfaceConfig, ReturnType<R['updated']>> &
-  IAdtDeletable<IInterfaceConfig, ReturnType<R['deletion']>> &
+  IAdtDeletable<
+    IInterfaceConfig,
+    ReturnType<R['deletion']>,
+    ReturnType<R['check']>
+  > &
   IAdtValidatable<IInterfaceConfig, ReturnType<R['validation']>> &
   IAdtCheckable<IInterfaceConfig, ReturnType<R['check']>> &
   IAdtActivatable<IInterfaceConfig, ReturnType<R['activation']>> &
@@ -378,7 +394,11 @@ export type IDomainContract<
     ReturnType<R['metadata']>
   > &
   IAdtUpdatable<IDomainConfig, ReturnType<R['updated']>> &
-  IAdtDeletable<IDomainConfig, ReturnType<R['deletion']>> &
+  IAdtDeletable<
+    IDomainConfig,
+    ReturnType<R['deletion']>,
+    ReturnType<R['check']>
+  > &
   IAdtValidatable<IDomainConfig, ReturnType<R['validation']>> &
   IAdtCheckable<IDomainConfig, ReturnType<R['check']>> &
   IAdtActivatable<IDomainConfig, ReturnType<R['activation']>> &
@@ -403,7 +423,11 @@ export type IDataElementContract<
     ReturnType<R['metadata']>
   > &
   IAdtUpdatable<IDataElementConfig, ReturnType<R['updated']>> &
-  IAdtDeletable<IDataElementConfig, ReturnType<R['deletion']>> &
+  IAdtDeletable<
+    IDataElementConfig,
+    ReturnType<R['deletion']>,
+    ReturnType<R['check']>
+  > &
   IAdtValidatable<IDataElementConfig, ReturnType<R['validation']>> &
   IAdtCheckable<IDataElementConfig, ReturnType<R['check']>> &
   IAdtActivatable<IDataElementConfig, ReturnType<R['activation']>> &
@@ -427,7 +451,11 @@ export type IAuthorizationFieldContract<
     ReturnType<R['metadata']>
   > &
   IAdtUpdatable<IAuthorizationFieldConfig, ReturnType<R['updated']>> &
-  IAdtDeletable<IAuthorizationFieldConfig, ReturnType<R['deletion']>> &
+  IAdtDeletable<
+    IAuthorizationFieldConfig,
+    ReturnType<R['deletion']>,
+    ReturnType<R['check']>
+  > &
   IAdtValidatable<IAuthorizationFieldConfig, ReturnType<R['validation']>> &
   IAdtCheckable<IAuthorizationFieldConfig, ReturnType<R['check']>> &
   IAdtActivatable<IAuthorizationFieldConfig, ReturnType<R['activation']>> &
@@ -451,7 +479,11 @@ export type IStructureContract<
     ReturnType<R['metadata']>
   > &
   IAdtUpdatable<IStructureConfig, ReturnType<R['updated']>> &
-  IAdtDeletable<IStructureConfig, ReturnType<R['deletion']>> &
+  IAdtDeletable<
+    IStructureConfig,
+    ReturnType<R['deletion']>,
+    ReturnType<R['check']>
+  > &
   IAdtValidatable<IStructureConfig, ReturnType<R['validation']>> &
   IAdtCheckable<IStructureConfig, ReturnType<R['check']>> &
   IAdtActivatable<IStructureConfig, ReturnType<R['activation']>> &
@@ -477,7 +509,11 @@ export type ITableContract<
     ReturnType<R['metadata']>
   > &
   IAdtUpdatable<ITableConfig, ReturnType<R['updated']>> &
-  IAdtDeletable<ITableConfig, ReturnType<R['deletion']>> &
+  IAdtDeletable<
+    ITableConfig,
+    ReturnType<R['deletion']>,
+    ReturnType<R['check']>
+  > &
   IAdtValidatable<ITableConfig, ReturnType<R['validation']>> &
   IAdtCheckable<ITableConfig, ReturnType<R['check']>> &
   IAdtActivatable<ITableConfig, ReturnType<R['activation']>> &
@@ -503,7 +539,11 @@ export type ITableTypeContract<
     ReturnType<R['metadata']>
   > &
   IAdtUpdatable<ITableTypeConfig, ReturnType<R['updated']>> &
-  IAdtDeletable<ITableTypeConfig, ReturnType<R['deletion']>> &
+  IAdtDeletable<
+    ITableTypeConfig,
+    ReturnType<R['deletion']>,
+    ReturnType<R['check']>
+  > &
   IAdtValidatable<ITableTypeConfig, ReturnType<R['validation']>> &
   IAdtCheckable<ITableTypeConfig, ReturnType<R['check']>> &
   IAdtActivatable<ITableTypeConfig, ReturnType<R['activation']>> &
@@ -525,7 +565,7 @@ export type IDdlContract<
 > = IAdtCreatable<IDdlConfig, ReturnType<R['created']>> &
   IAdtReadable<IDdlConfig, ReturnType<R['source']>, ReturnType<R['metadata']>> &
   IAdtUpdatable<IDdlConfig, ReturnType<R['updated']>> &
-  IAdtDeletable<IDdlConfig, ReturnType<R['deletion']>> &
+  IAdtDeletable<IDdlConfig, ReturnType<R['deletion']>, ReturnType<R['check']>> &
   IAdtValidatable<IDdlConfig, ReturnType<R['validation']>> &
   IAdtCheckable<IDdlConfig, ReturnType<R['check']>> &
   IAdtActivatable<IDdlConfig, ReturnType<R['activation']>> &
@@ -551,7 +591,11 @@ export type IFunctionGroupContract<
     ReturnType<R['metadata']>
   > &
   IAdtUpdatable<IFunctionGroupConfig, ReturnType<R['updated']>> &
-  IAdtDeletable<IFunctionGroupConfig, ReturnType<R['deletion']>> &
+  IAdtDeletable<
+    IFunctionGroupConfig,
+    ReturnType<R['deletion']>,
+    ReturnType<R['check']>
+  > &
   IAdtValidatable<IFunctionGroupConfig, ReturnType<R['validation']>> &
   IAdtCheckable<IFunctionGroupConfig, ReturnType<R['check']>> &
   IAdtActivatable<IFunctionGroupConfig, ReturnType<R['activation']>> &
@@ -576,7 +620,11 @@ export type IFunctionModuleContract<
     ReturnType<R['metadata']>
   > &
   IAdtUpdatable<IFunctionModuleConfig, ReturnType<R['updated']>> &
-  IAdtDeletable<IFunctionModuleConfig, ReturnType<R['deletion']>> &
+  IAdtDeletable<
+    IFunctionModuleConfig,
+    ReturnType<R['deletion']>,
+    ReturnType<R['check']>
+  > &
   IAdtValidatable<IFunctionModuleConfig, ReturnType<R['validation']>> &
   IAdtCheckable<IFunctionModuleConfig, ReturnType<R['check']>> &
   IAdtActivatable<IFunctionModuleConfig, ReturnType<R['activation']>> &
@@ -601,7 +649,11 @@ export type IFunctionIncludeContract<
     ReturnType<R['metadata']>
   > &
   IAdtUpdatable<IFunctionIncludeConfig, ReturnType<R['updated']>> &
-  IAdtDeletable<IFunctionIncludeConfig, ReturnType<R['deletion']>> &
+  IAdtDeletable<
+    IFunctionIncludeConfig,
+    ReturnType<R['deletion']>,
+    ReturnType<R['check']>
+  > &
   IAdtValidatable<IFunctionIncludeConfig, ReturnType<R['validation']>> &
   IAdtCheckable<IFunctionIncludeConfig, ReturnType<R['check']>> &
   IAdtActivatable<IFunctionIncludeConfig, ReturnType<R['activation']>> &
@@ -625,7 +677,11 @@ export type IPackageContract<
     ReturnType<R['metadata']>
   > &
   IAdtUpdatable<IPackageConfig, ReturnType<R['updated']>> &
-  IAdtDeletable<IPackageConfig, ReturnType<R['deletion']>> &
+  IAdtDeletable<
+    IPackageConfig,
+    ReturnType<R['deletion']>,
+    ReturnType<R['check']>
+  > &
   IAdtValidatable<IPackageConfig, ReturnType<R['validation']>> &
   IAdtCheckable<IPackageConfig, ReturnType<R['check']>> &
   IAdtLockable<IPackageConfig> &
@@ -646,7 +702,11 @@ export type IMessageClassContract<
     ReturnType<R['metadata']>
   > &
   IAdtUpdatable<IMessageClassConfig, ReturnType<R['updated']>> &
-  IAdtDeletable<IMessageClassConfig, ReturnType<R['deletion']>> &
+  IAdtDeletable<
+    IMessageClassConfig,
+    ReturnType<R['deletion']>,
+    ReturnType<R['deletion']>
+  > &
   IAdtValidatable<IMessageClassConfig, ReturnType<R['validation']>> &
   IAdtLockable<IMessageClassConfig>;
 export type IMessageClassMessageContract<
@@ -657,8 +717,7 @@ export type IMessageClassMessageContract<
     ReturnType<R['read']>,
     ReturnType<R['read']>
   > &
-  IAdtUpdatable<IMessageClassMessageConfig, ReturnType<R['written']>> &
-  IAdtDeletable<IMessageClassMessageConfig, ReturnType<R['deleted']>>;
+  IAdtUpdatable<IMessageClassMessageConfig, ReturnType<R['written']>>;
 export type IAccessControlContract<
   R extends IAccessControlResults<
     unknown,
@@ -678,7 +737,11 @@ export type IAccessControlContract<
     ReturnType<R['metadata']>
   > &
   IAdtUpdatable<IAccessControlConfig, ReturnType<R['updated']>> &
-  IAdtDeletable<IAccessControlConfig, ReturnType<R['deletion']>> &
+  IAdtDeletable<
+    IAccessControlConfig,
+    ReturnType<R['deletion']>,
+    ReturnType<R['check']>
+  > &
   IAdtValidatable<IAccessControlConfig, ReturnType<R['validation']>> &
   IAdtCheckable<IAccessControlConfig, ReturnType<R['check']>> &
   IAdtActivatable<IAccessControlConfig, ReturnType<R['activation']>> &
@@ -704,7 +767,11 @@ export type ITransformationContract<
     ReturnType<R['metadata']>
   > &
   IAdtUpdatable<ITransformationConfig, ReturnType<R['updated']>> &
-  IAdtDeletable<ITransformationConfig, ReturnType<R['deletion']>> &
+  IAdtDeletable<
+    ITransformationConfig,
+    ReturnType<R['deletion']>,
+    ReturnType<R['check']>
+  > &
   IAdtValidatable<ITransformationConfig, ReturnType<R['validation']>> &
   IAdtCheckable<ITransformationConfig, ReturnType<R['check']>> &
   IAdtActivatable<ITransformationConfig, ReturnType<R['activation']>> &
@@ -730,7 +797,11 @@ export type IServiceDefinitionContract<
     ReturnType<R['metadata']>
   > &
   IAdtUpdatable<IServiceDefinitionConfig, ReturnType<R['updated']>> &
-  IAdtDeletable<IServiceDefinitionConfig, ReturnType<R['deletion']>> &
+  IAdtDeletable<
+    IServiceDefinitionConfig,
+    ReturnType<R['deletion']>,
+    ReturnType<R['check']>
+  > &
   IAdtValidatable<IServiceDefinitionConfig, ReturnType<R['validation']>> &
   IAdtCheckable<IServiceDefinitionConfig, ReturnType<R['check']>> &
   IAdtActivatable<IServiceDefinitionConfig, ReturnType<R['activation']>> &
@@ -756,7 +827,11 @@ export type IScalarFunctionContract<
     ReturnType<R['metadata']>
   > &
   IAdtUpdatable<IScalarFunctionConfig, ReturnType<R['updated']>> &
-  IAdtDeletable<IScalarFunctionConfig, ReturnType<R['deletion']>> &
+  IAdtDeletable<
+    IScalarFunctionConfig,
+    ReturnType<R['deletion']>,
+    ReturnType<R['check']>
+  > &
   IAdtValidatable<IScalarFunctionConfig, ReturnType<R['validation']>> &
   IAdtCheckable<IScalarFunctionConfig, ReturnType<R['check']>> &
   IAdtActivatable<IScalarFunctionConfig, ReturnType<R['activation']>> &
@@ -823,7 +898,11 @@ export type IAppendStructureContract<
     ReturnType<R['metadata']>
   > &
   IAdtUpdatable<IAppendStructureConfig, ReturnType<R['updated']>> &
-  IAdtDeletable<IAppendStructureConfig, ReturnType<R['deletion']>> &
+  IAdtDeletable<
+    IAppendStructureConfig,
+    ReturnType<R['deletion']>,
+    ReturnType<R['check']>
+  > &
   IAdtValidatable<IAppendStructureConfig, ReturnType<R['validation']>> &
   IAdtCheckable<IAppendStructureConfig, ReturnType<R['check']>> &
   IAdtActivatable<IAppendStructureConfig, ReturnType<R['activation']>> &
@@ -849,7 +928,11 @@ export type IBehaviorDefinitionContract<
     ReturnType<R['metadata']>
   > &
   IAdtUpdatable<IBehaviorDefinitionConfig, ReturnType<R['updated']>> &
-  IAdtDeletable<IBehaviorDefinitionConfig, ReturnType<R['deletion']>> &
+  IAdtDeletable<
+    IBehaviorDefinitionConfig,
+    ReturnType<R['deletion']>,
+    ReturnType<R['check']>
+  > &
   IAdtValidatable<IBehaviorDefinitionConfig, ReturnType<R['validation']>> &
   IAdtCheckable<IBehaviorDefinitionConfig, ReturnType<R['check']>> &
   IAdtActivatable<IBehaviorDefinitionConfig, ReturnType<R['activation']>> &
@@ -874,7 +957,11 @@ export type IBehaviorImplementationContract<
     ReturnType<R['metadata']>
   > &
   IAdtUpdatable<IBehaviorImplementationConfig, ReturnType<R['updated']>> &
-  IAdtDeletable<IBehaviorImplementationConfig, ReturnType<R['deletion']>> &
+  IAdtDeletable<
+    IBehaviorImplementationConfig,
+    ReturnType<R['deletion']>,
+    ReturnType<R['check']>
+  > &
   IAdtValidatable<IBehaviorImplementationConfig, ReturnType<R['validation']>> &
   IAdtCheckable<IBehaviorImplementationConfig, ReturnType<R['check']>> &
   IAdtActivatable<IBehaviorImplementationConfig, ReturnType<R['activation']>> &
@@ -900,7 +987,11 @@ export type IMetadataExtensionContract<
     ReturnType<R['metadata']>
   > &
   IAdtUpdatable<IMetadataExtensionConfig, ReturnType<R['updated']>> &
-  IAdtDeletable<IMetadataExtensionConfig, ReturnType<R['deletion']>> &
+  IAdtDeletable<
+    IMetadataExtensionConfig,
+    ReturnType<R['deletion']>,
+    ReturnType<R['check']>
+  > &
   IAdtValidatable<IMetadataExtensionConfig, ReturnType<R['validation']>> &
   IAdtCheckable<IMetadataExtensionConfig, ReturnType<R['check']>> &
   IAdtActivatable<IMetadataExtensionConfig, ReturnType<R['activation']>> &
@@ -926,7 +1017,11 @@ export type IEnhancementContract<
     ReturnType<R['metadata']>
   > &
   IAdtUpdatable<IEnhancementConfig, ReturnType<R['updated']>> &
-  IAdtDeletable<IEnhancementConfig, ReturnType<R['deletion']>> &
+  IAdtDeletable<
+    IEnhancementConfig,
+    ReturnType<R['deletion']>,
+    ReturnType<R['check']>
+  > &
   IAdtValidatable<IEnhancementConfig, ReturnType<R['validation']>> &
   IAdtCheckable<IEnhancementConfig, ReturnType<R['check']>> &
   IAdtActivatable<IEnhancementConfig, ReturnType<R['activation']>> &
@@ -938,7 +1033,11 @@ export type IRequestContract<
 > = IAdtCreatable<ITransportConfig, ReturnType<R['created']>> &
   IAdtReadable<ITransportConfig, ReturnType<R['read']>, ReturnType<R['read']>> &
   IAdtUpdatable<ITransportConfig, ReturnType<R['updated']>> &
-  IAdtDeletable<ITransportConfig, ReturnType<R['deleted']>> &
+  IAdtDeletable<
+    ITransportConfig,
+    ReturnType<R['deleted']>,
+    ReturnType<R['deleted']>
+  > &
   IAdtRequest<ReturnType<R['list']>>;
 export type ILocalTestClassContract<
   R extends IClassResults<
@@ -957,7 +1056,6 @@ export type ILocalTestClassContract<
   ReturnType<R['metadata']>
 > &
   IAdtUpdatable<ILocalTestClassConfig, ReturnType<R['updated']>> &
-  IAdtDeletable<ILocalTestClassConfig, ReturnType<R['updated']>> &
   IAdtValidatable<ILocalTestClassConfig, ReturnType<R['validation']>> &
   IAdtCheckable<ILocalTestClassConfig, ReturnType<R['check']>> &
   IAdtActivatable<ILocalTestClassConfig, ReturnType<R['activation']>> &
@@ -981,7 +1079,6 @@ export type ILocalTypesContract<
   ReturnType<R['metadata']>
 > &
   IAdtUpdatable<ILocalTypesConfig, ReturnType<R['updated']>> &
-  IAdtDeletable<ILocalTypesConfig, ReturnType<R['updated']>> &
   IAdtValidatable<ILocalTypesConfig, ReturnType<R['validation']>> &
   IAdtCheckable<ILocalTypesConfig, ReturnType<R['check']>> &
   IAdtActivatable<ILocalTypesConfig, ReturnType<R['activation']>> &
@@ -1005,7 +1102,6 @@ export type ILocalDefinitionsContract<
   ReturnType<R['metadata']>
 > &
   IAdtUpdatable<ILocalDefinitionsConfig, ReturnType<R['updated']>> &
-  IAdtDeletable<ILocalDefinitionsConfig, ReturnType<R['updated']>> &
   IAdtValidatable<ILocalDefinitionsConfig, ReturnType<R['validation']>> &
   IAdtCheckable<ILocalDefinitionsConfig, ReturnType<R['check']>> &
   IAdtActivatable<ILocalDefinitionsConfig, ReturnType<R['activation']>> &
@@ -1029,7 +1125,6 @@ export type ILocalMacrosContract<
   ReturnType<R['metadata']>
 > &
   IAdtUpdatable<ILocalMacrosConfig, ReturnType<R['updated']>> &
-  IAdtDeletable<ILocalMacrosConfig, ReturnType<R['updated']>> &
   IAdtValidatable<ILocalMacrosConfig, ReturnType<R['validation']>> &
   IAdtCheckable<ILocalMacrosConfig, ReturnType<R['check']>> &
   IAdtActivatable<ILocalMacrosConfig, ReturnType<R['activation']>> &
@@ -2570,7 +2665,11 @@ export class AdtClient {
       ReturnType<R['metadata']>
     > &
     IAdtUpdatable<IFeatureToggleConfig, ReturnType<R['updated']>> &
-    IAdtDeletable<IFeatureToggleConfig, ReturnType<R['deletion']>> &
+    IAdtDeletable<
+      IFeatureToggleConfig,
+      ReturnType<R['deletion']>,
+      ReturnType<R['check']>
+    > &
     IAdtValidatable<IFeatureToggleConfig, ReturnType<R['validation']>> &
     IAdtCheckable<IFeatureToggleConfig, ReturnType<R['check']>> &
     IAdtActivatable<IFeatureToggleConfig, ReturnType<R['activation']>> &
@@ -2642,7 +2741,6 @@ export class AdtClient {
       ReturnType<R['metadata']>
     > &
     IAdtUpdatable<IUnitTestConfig, ReturnType<R['updated']>> &
-    IAdtDeletable<IUnitTestConfig, ReturnType<R['deleted']>> &
     IAdtValidatable<IUnitTestConfig, ReturnType<R['validation']>> &
     IAdtLockable<IUnitTestConfig> &
     IAdtRunnable<
@@ -2702,7 +2800,6 @@ export class AdtClient {
       ReturnType<R['metadata']>
     > &
     IAdtUpdatable<ICdsUnitTestConfig, ReturnType<R['updated']>> &
-    IAdtDeletable<ICdsUnitTestConfig, ReturnType<R['deleted']>> &
     IAdtValidatable<ICdsUnitTestConfig, ReturnType<R['validation']>> &
     IAdtLockable<ICdsUnitTestConfig> &
     IAdtRunnable<

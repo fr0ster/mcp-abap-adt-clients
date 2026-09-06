@@ -9,8 +9,9 @@ This project exposes the following client classes:
 
 **Every member issues one ADT request.** `create` is the POST, `update` is the
 write and carries `options.lockHandle` as given, `delete` is the DELETE,
-`checkDeletion` is the approval ADT wants first, and `lock`/`unlock` are the
-window. You compose them — see
+`checkDeletion` is the approval ADT wants first — both on `IAdtDeletable`, since
+anything that can be deleted can be asked whether it can be deleted *now* — and
+`lock`/`unlock` are the window. You compose them — see
 [OBJECT_LIFECYCLE.md](OBJECT_LIFECYCLE.md) for the flow they make and the one
 type where it does not hold.
 

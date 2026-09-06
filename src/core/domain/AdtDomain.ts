@@ -71,7 +71,11 @@ export class AdtDomain<
       ReturnType<R['metadata']>
     >,
     IAdtUpdatable<IDomainConfig, ReturnType<R['updated']>>,
-    IAdtDeletable<IDomainConfig, ReturnType<R['deletion']>>,
+    IAdtDeletable<
+      IDomainConfig,
+      ReturnType<R['deletion']>,
+      ReturnType<R['check']>
+    >,
     IAdtValidatable<IDomainConfig, ReturnType<R['validation']>>,
     IAdtCheckable<IDomainConfig, ReturnType<R['check']>>,
     IAdtActivatable<IDomainConfig, ReturnType<R['activation']>>,

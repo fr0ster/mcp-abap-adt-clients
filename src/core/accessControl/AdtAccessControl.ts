@@ -78,7 +78,11 @@ export class AdtAccessControl<
       ReturnType<R['metadata']>
     >,
     IAdtUpdatable<IAccessControlConfig, ReturnType<R['updated']>>,
-    IAdtDeletable<IAccessControlConfig, ReturnType<R['deletion']>>,
+    IAdtDeletable<
+      IAccessControlConfig,
+      ReturnType<R['deletion']>,
+      ReturnType<R['check']>
+    >,
     IAdtValidatable<IAccessControlConfig, ReturnType<R['validation']>>,
     IAdtCheckable<IAccessControlConfig, ReturnType<R['check']>>,
     IAdtActivatable<IAccessControlConfig, ReturnType<R['activation']>>,

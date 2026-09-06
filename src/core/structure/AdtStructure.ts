@@ -78,7 +78,11 @@ export class AdtStructure<
       ReturnType<R['metadata']>
     >,
     IAdtUpdatable<IStructureConfig, ReturnType<R['updated']>>,
-    IAdtDeletable<IStructureConfig, ReturnType<R['deletion']>>,
+    IAdtDeletable<
+      IStructureConfig,
+      ReturnType<R['deletion']>,
+      ReturnType<R['check']>
+    >,
     IAdtValidatable<IStructureConfig, ReturnType<R['validation']>>,
     IAdtCheckable<IStructureConfig, ReturnType<R['check']>>,
     IAdtActivatable<IStructureConfig, ReturnType<R['activation']>>,

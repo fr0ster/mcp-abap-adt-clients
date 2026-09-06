@@ -77,7 +77,11 @@ export class AdtPackage<
       ReturnType<R['metadata']>
     >,
     IAdtUpdatable<IPackageConfig, ReturnType<R['updated']>>,
-    IAdtDeletable<IPackageConfig, ReturnType<R['deletion']>>,
+    IAdtDeletable<
+      IPackageConfig,
+      ReturnType<R['deletion']>,
+      ReturnType<R['check']>
+    >,
     IAdtValidatable<IPackageConfig, ReturnType<R['validation']>>,
     IAdtCheckable<IPackageConfig, ReturnType<R['check']>>,
     IAdtLockable<IPackageConfig>,

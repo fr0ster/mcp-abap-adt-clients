@@ -106,7 +106,11 @@ export class AdtScalarFunction<
       ReturnType<R['metadata']>
     >,
     IAdtUpdatable<IScalarFunctionConfig, ReturnType<R['updated']>>,
-    IAdtDeletable<IScalarFunctionConfig, ReturnType<R['deletion']>>,
+    IAdtDeletable<
+      IScalarFunctionConfig,
+      ReturnType<R['deletion']>,
+      ReturnType<R['check']>
+    >,
     IAdtValidatable<IScalarFunctionConfig, ReturnType<R['validation']>>,
     IAdtCheckable<IScalarFunctionConfig, ReturnType<R['check']>>,
     IAdtActivatable<IScalarFunctionConfig, ReturnType<R['activation']>>,

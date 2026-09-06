@@ -159,6 +159,9 @@ const ATOM_VERB: Record<string, string | { method: string; url: RegExp }> = {
   // does. (The spec's flat "delete → DELETE" is an over-generalisation; found by
   // this assertion the first time it ran.)
   delete: { method: 'DELETE', url: /.*/ },
+  // The approval ADT wants before a delete: `POST /deletion/check`, everywhere
+  // it is offered, because the deletion service is asked about a URI.
+  checkDeletion: 'POST',
   validate: 'POST',
   check: 'POST',
   activate: 'POST',

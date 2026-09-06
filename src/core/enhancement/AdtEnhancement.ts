@@ -83,7 +83,11 @@ export class AdtEnhancement<
       ReturnType<R['metadata']>
     >,
     IAdtUpdatable<IEnhancementConfig, ReturnType<R['updated']>>,
-    IAdtDeletable<IEnhancementConfig, ReturnType<R['deletion']>>,
+    IAdtDeletable<
+      IEnhancementConfig,
+      ReturnType<R['deletion']>,
+      ReturnType<R['check']>
+    >,
     IAdtValidatable<IEnhancementConfig, ReturnType<R['validation']>>,
     IAdtCheckable<IEnhancementConfig, ReturnType<R['check']>>,
     IAdtActivatable<IEnhancementConfig, ReturnType<R['activation']>>,

@@ -111,7 +111,7 @@ export interface IBaseTesterSetupOptions {
 export type TestableObject<TConfig> = IAdtCreatable<TConfig, unknown> &
   IAdtReadable<TConfig, unknown, unknown> &
   IAdtUpdatable<TConfig, unknown> &
-  IAdtDeletable<TConfig, unknown> &
+  IAdtDeletable<TConfig, unknown, unknown> &
   IAdtValidatable<TConfig, unknown> &
   Partial<IAdtActivatable<TConfig, unknown>> &
   // Since 18.0.0 `update` takes the handle it is given and issues one request.

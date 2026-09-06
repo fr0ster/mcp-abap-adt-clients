@@ -82,7 +82,11 @@ export class AdtFunctionInclude<
       ReturnType<R['metadata']>
     >,
     IAdtUpdatable<IFunctionIncludeConfig, ReturnType<R['updated']>>,
-    IAdtDeletable<IFunctionIncludeConfig, ReturnType<R['deletion']>>,
+    IAdtDeletable<
+      IFunctionIncludeConfig,
+      ReturnType<R['deletion']>,
+      ReturnType<R['check']>
+    >,
     IAdtValidatable<IFunctionIncludeConfig, ReturnType<R['validation']>>,
     IAdtCheckable<IFunctionIncludeConfig, ReturnType<R['check']>>,
     IAdtActivatable<IFunctionIncludeConfig, ReturnType<R['activation']>>,

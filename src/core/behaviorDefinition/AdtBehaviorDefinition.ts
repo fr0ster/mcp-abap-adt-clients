@@ -79,7 +79,11 @@ export class AdtBehaviorDefinition<
       ReturnType<R['metadata']>
     >,
     IAdtUpdatable<IBehaviorDefinitionConfig, ReturnType<R['updated']>>,
-    IAdtDeletable<IBehaviorDefinitionConfig, ReturnType<R['deletion']>>,
+    IAdtDeletable<
+      IBehaviorDefinitionConfig,
+      ReturnType<R['deletion']>,
+      ReturnType<R['check']>
+    >,
     IAdtValidatable<IBehaviorDefinitionConfig, ReturnType<R['validation']>>,
     IAdtCheckable<IBehaviorDefinitionConfig, ReturnType<R['check']>>,
     IAdtActivatable<IBehaviorDefinitionConfig, ReturnType<R['activation']>>,

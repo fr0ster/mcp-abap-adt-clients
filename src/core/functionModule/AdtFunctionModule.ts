@@ -84,7 +84,11 @@ export class AdtFunctionModule<
       ReturnType<R['metadata']>
     >,
     IAdtUpdatable<IFunctionModuleConfig, ReturnType<R['updated']>>,
-    IAdtDeletable<IFunctionModuleConfig, ReturnType<R['deletion']>>,
+    IAdtDeletable<
+      IFunctionModuleConfig,
+      ReturnType<R['deletion']>,
+      ReturnType<R['check']>
+    >,
     IAdtValidatable<IFunctionModuleConfig, ReturnType<R['validation']>>,
     IAdtCheckable<IFunctionModuleConfig, ReturnType<R['check']>>,
     IAdtActivatable<IFunctionModuleConfig, ReturnType<R['activation']>>,

@@ -64,7 +64,11 @@ export class AdtInclude<
       ReturnType<R['metadata']>
     >,
     IAdtUpdatable<IIncludeConfig, ReturnType<R['updated']>>,
-    IAdtDeletable<IIncludeConfig, ReturnType<R['deletion']>>,
+    IAdtDeletable<
+      IIncludeConfig,
+      ReturnType<R['deletion']>,
+      ReturnType<R['deletion']>
+    >,
     IAdtValidatable<IIncludeConfig, ReturnType<R['validation']>>,
     IAdtActivatable<IIncludeConfig, ReturnType<R['activation']>>,
     IAdtLockable<IIncludeConfig>

@@ -84,7 +84,11 @@ export class AdtInterface<
       ReturnType<R['metadata']>
     >,
     IAdtUpdatable<IInterfaceConfig, ReturnType<R['updated']>>,
-    IAdtDeletable<IInterfaceConfig, ReturnType<R['deletion']>>,
+    IAdtDeletable<
+      IInterfaceConfig,
+      ReturnType<R['deletion']>,
+      ReturnType<R['check']>
+    >,
     IAdtValidatable<IInterfaceConfig, ReturnType<R['validation']>>,
     IAdtCheckable<IInterfaceConfig, ReturnType<R['check']>>,
     IAdtActivatable<IInterfaceConfig, ReturnType<R['activation']>>,

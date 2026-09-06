@@ -80,6 +80,19 @@ export const startedRun = (
       };
 };
 
+/**
+ * Not `IAdtDeletable`, and that is the honest shape rather than an omission.
+ *
+ * Removing this is a write of its parent: `delete()` below is
+ * `update()` with empty content, which is what ADT offers — there is no
+ * resource to DELETE and none to ask about. Measured beside it: the deletion
+ * service resolves a *message class*, `adtcore:type="MSAG/N"`, and knows
+ * nothing of the rows inside it; the same holds for a class and its includes.
+ *
+ * So the atom that carries `delete` and `checkDeletion` does not apply, and
+ * `delete()` stays as the convenience it always was — a name for writing
+ * emptiness — rather than a claim that this is a deletable object.
+ */
 export class AdtUnitTest<
   R extends IUnitTestResults<
     unknown,
@@ -101,7 +114,6 @@ export class AdtUnitTest<
       ReturnType<R['metadata']>
     >,
     IAdtUpdatable<IUnitTestConfig, ReturnType<R['updated']>>,
-    IAdtDeletable<IUnitTestConfig, ReturnType<R['deleted']>>,
     IAdtValidatable<IUnitTestConfig, ReturnType<R['validation']>>,
     IAdtLockable<IUnitTestConfig>,
     IAdtRunnable<

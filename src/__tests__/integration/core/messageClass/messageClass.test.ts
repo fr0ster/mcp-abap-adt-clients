@@ -25,6 +25,7 @@ import type {
   IParsedMessage,
 } from '../../../../core/messageClass';
 import { parseMessageClass } from '../../../../core/messageClass';
+import type { AdtMessageClassMessage } from '../../../../core/messageClass/AdtMessageClassMessage';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { expectResult } from '../../../helpers/contract';
@@ -323,10 +324,15 @@ describe('MessageClass (using AdtClient)', () => {
           ).messages.find((m: IParsedMessage) => m.msgno === msgNo);
           expect(updatedMessage?.msgtext).toBe(msgTextUpdated);
 
-          // ── Step 7: Delete message ─────────────────────────────────────────
-          logTestStep(`delete message ${msgNo}`, testsLogger);
+          // ── Step 7: Remove the message ─────────────────────────────────────
+          // A message is a row inside its class's document, so removing it is a
+          // write of that document — not a deletion, and the contract no longer
+          // calls it one. `AdtMessageClassMessage` keeps `delete()` as the name
+          // for writing the row away, and it is reached on the class rather than
+          // through the composition the factory declares.
+          logTestStep(`remove message ${msgNo}`, testsLogger);
           const msgDeleteState = expectResult(
-            await msgHandler.delete({
+            await (msgHandler as unknown as AdtMessageClassMessage).delete({
               className: msgClassName,
               msgno: msgNo,
               transportRequest: config.transportRequest,

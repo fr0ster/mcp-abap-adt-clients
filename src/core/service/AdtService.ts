@@ -114,7 +114,11 @@ export class AdtServiceBinding<
       ReturnType<R['metadata']>
     >,
     IAdtUpdatable<IServiceBindingConfig, ReturnType<R['updated']>>,
-    IAdtDeletable<IServiceBindingConfig, ReturnType<R['deletion']>>,
+    IAdtDeletable<
+      IServiceBindingConfig,
+      ReturnType<R['deletion']>,
+      ReturnType<R['check']>
+    >,
     IAdtValidatable<IServiceBindingConfig, ReturnType<R['validation']>>,
     IAdtCheckable<IServiceBindingConfig, ReturnType<R['check']>>,
     IAdtActivatable<IServiceBindingConfig, ReturnType<R['activation']>>,

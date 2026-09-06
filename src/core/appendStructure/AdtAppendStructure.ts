@@ -111,7 +111,11 @@ export class AdtAppendStructure<
       ReturnType<R['metadata']>
     >,
     IAdtUpdatable<IAppendStructureConfig, ReturnType<R['updated']>>,
-    IAdtDeletable<IAppendStructureConfig, ReturnType<R['deletion']>>,
+    IAdtDeletable<
+      IAppendStructureConfig,
+      ReturnType<R['deletion']>,
+      ReturnType<R['check']>
+    >,
     IAdtValidatable<IAppendStructureConfig, ReturnType<R['validation']>>,
     IAdtCheckable<IAppendStructureConfig, ReturnType<R['check']>>,
     IAdtActivatable<IAppendStructureConfig, ReturnType<R['activation']>>,

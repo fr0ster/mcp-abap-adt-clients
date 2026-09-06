@@ -72,7 +72,11 @@ export class AdtDdl<
       ReturnType<R['metadata']>
     >,
     IAdtUpdatable<IDdlConfig, ReturnType<R['updated']>>,
-    IAdtDeletable<IDdlConfig, ReturnType<R['deletion']>>,
+    IAdtDeletable<
+      IDdlConfig,
+      ReturnType<R['deletion']>,
+      ReturnType<R['check']>
+    >,
     IAdtValidatable<IDdlConfig, ReturnType<R['validation']>>,
     IAdtCheckable<IDdlConfig, ReturnType<R['check']>>,
     IAdtActivatable<IDdlConfig, ReturnType<R['activation']>>,

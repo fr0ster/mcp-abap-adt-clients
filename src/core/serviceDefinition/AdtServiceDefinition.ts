@@ -78,7 +78,11 @@ export class AdtServiceDefinition<
       ReturnType<R['metadata']>
     >,
     IAdtUpdatable<IServiceDefinitionConfig, ReturnType<R['updated']>>,
-    IAdtDeletable<IServiceDefinitionConfig, ReturnType<R['deletion']>>,
+    IAdtDeletable<
+      IServiceDefinitionConfig,
+      ReturnType<R['deletion']>,
+      ReturnType<R['check']>
+    >,
     IAdtValidatable<IServiceDefinitionConfig, ReturnType<R['validation']>>,
     IAdtCheckable<IServiceDefinitionConfig, ReturnType<R['check']>>,
     IAdtActivatable<IServiceDefinitionConfig, ReturnType<R['activation']>>,

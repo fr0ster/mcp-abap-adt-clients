@@ -182,7 +182,8 @@ await client.getClass().create({
 });
 
 // The lock window is yours: lock, write, unlock, activate — in the order you
-// choose, each answering its own contract.
+// choose, each answering its own contract. Deleting works the same way:
+// `checkDeletion()` asks whether it can go, `delete()` does it.
 const config = { className: 'ZCL_TEST' };
 const locked = await client.getClass().lock(config);
 if (locked.ok) {

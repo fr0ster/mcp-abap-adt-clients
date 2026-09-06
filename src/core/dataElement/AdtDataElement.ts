@@ -72,7 +72,11 @@ export class AdtDataElement<
       ReturnType<R['metadata']>
     >,
     IAdtUpdatable<IDataElementConfig, ReturnType<R['updated']>>,
-    IAdtDeletable<IDataElementConfig, ReturnType<R['deletion']>>,
+    IAdtDeletable<
+      IDataElementConfig,
+      ReturnType<R['deletion']>,
+      ReturnType<R['check']>
+    >,
     IAdtValidatable<IDataElementConfig, ReturnType<R['validation']>>,
     IAdtCheckable<IDataElementConfig, ReturnType<R['check']>>,
     IAdtActivatable<IDataElementConfig, ReturnType<R['activation']>>,

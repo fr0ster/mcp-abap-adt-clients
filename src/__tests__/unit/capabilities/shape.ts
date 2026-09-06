@@ -140,7 +140,7 @@ type Disagreements = {
  * The earlier version claimed the first was the second — caught in review,
  * 2026-08-14, by running the failure and reading the log.
  */
-type Offenders = {
+export type Offenders = {
   [H in keyof Disagreements]: {
     [A in keyof Disagreements[H]]: `${H & string}.${A & string} — ${Disagreements[H][A] & string}`;
   }[keyof Disagreements[H]];

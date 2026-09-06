@@ -86,7 +86,11 @@ export class AdtFunctionGroup<
       ReturnType<R['metadata']>
     >,
     IAdtUpdatable<IFunctionGroupConfig, ReturnType<R['updated']>>,
-    IAdtDeletable<IFunctionGroupConfig, ReturnType<R['deletion']>>,
+    IAdtDeletable<
+      IFunctionGroupConfig,
+      ReturnType<R['deletion']>,
+      ReturnType<R['check']>
+    >,
     IAdtValidatable<IFunctionGroupConfig, ReturnType<R['validation']>>,
     IAdtCheckable<IFunctionGroupConfig, ReturnType<R['check']>>,
     IAdtActivatable<IFunctionGroupConfig, ReturnType<R['activation']>>,

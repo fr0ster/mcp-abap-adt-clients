@@ -83,7 +83,11 @@ export class AdtClass<
       ReturnType<R['metadata']>
     >,
     IAdtUpdatable<IClassConfig, ReturnType<R['updated']>>,
-    IAdtDeletable<IClassConfig, ReturnType<R['deletion']>>,
+    IAdtDeletable<
+      IClassConfig,
+      ReturnType<R['deletion']>,
+      ReturnType<R['check']>
+    >,
     IAdtValidatable<IClassConfig, ReturnType<R['validation']>>,
     IAdtCheckable<IClassConfig, ReturnType<R['check']>>,
     IAdtActivatable<IClassConfig, ReturnType<R['activation']>>,

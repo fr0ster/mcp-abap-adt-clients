@@ -116,6 +116,10 @@ class NodeStructureObject implements TestableObject<INodeStructureParams> {
     return this.unsupported<unknown>('delete');
   }
 
+  checkDeletion() {
+    return this.unsupported<unknown>('checkDeletion');
+  }
+
   activate() {
     return this.unsupported<unknown>('activate');
   }

@@ -75,7 +75,11 @@ export class AdtDdicTableType<
       ReturnType<R['metadata']>
     >,
     IAdtUpdatable<ITableTypeConfig, ReturnType<R['updated']>>,
-    IAdtDeletable<ITableTypeConfig, ReturnType<R['deletion']>>,
+    IAdtDeletable<
+      ITableTypeConfig,
+      ReturnType<R['deletion']>,
+      ReturnType<R['check']>
+    >,
     IAdtValidatable<ITableTypeConfig, ReturnType<R['validation']>>,
     IAdtCheckable<ITableTypeConfig, ReturnType<R['check']>>,
     IAdtActivatable<ITableTypeConfig, ReturnType<R['activation']>>,

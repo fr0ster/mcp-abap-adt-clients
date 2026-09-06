@@ -89,7 +89,11 @@ export class AdtProgram<
       ReturnType<R['metadata']>
     >,
     IAdtUpdatable<IProgramConfig, ReturnType<R['updated']>>,
-    IAdtDeletable<IProgramConfig, ReturnType<R['deletion']>>,
+    IAdtDeletable<
+      IProgramConfig,
+      ReturnType<R['deletion']>,
+      ReturnType<R['check']>
+    >,
     IAdtValidatable<IProgramConfig, ReturnType<R['validation']>>,
     IAdtCheckable<IProgramConfig, ReturnType<R['check']>>,
     IAdtActivatable<IProgramConfig, ReturnType<R['activation']>>,

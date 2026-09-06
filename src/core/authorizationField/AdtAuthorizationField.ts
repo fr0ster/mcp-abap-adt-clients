@@ -69,7 +69,11 @@ export class AdtAuthorizationField<
       ReturnType<R['metadata']>
     >,
     IAdtUpdatable<IAuthorizationFieldConfig, ReturnType<R['updated']>>,
-    IAdtDeletable<IAuthorizationFieldConfig, ReturnType<R['deletion']>>,
+    IAdtDeletable<
+      IAuthorizationFieldConfig,
+      ReturnType<R['deletion']>,
+      ReturnType<R['check']>
+    >,
     IAdtValidatable<IAuthorizationFieldConfig, ReturnType<R['validation']>>,
     IAdtCheckable<IAuthorizationFieldConfig, ReturnType<R['check']>>,
     IAdtActivatable<IAuthorizationFieldConfig, ReturnType<R['activation']>>,

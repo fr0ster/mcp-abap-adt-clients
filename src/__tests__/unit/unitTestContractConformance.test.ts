@@ -66,10 +66,10 @@ type _UnitIsUpdatable = Satisfies<
   UnitTestHandler,
   IAdtUpdatable<IUnitTestConfig, string>
 >;
-type _UnitIsDeletable = Satisfies<
-  UnitTestHandler,
-  IAdtDeletable<IUnitTestConfig, string>
->;
+// Not deletable, and the absence is the assertion. A unit test class's
+// `delete()` empties its `testclasses` include — `this.update({ testClassCode:
+// '' })`, literally — so there is no deletion to approve and no
+// `checkDeletion` to answer. Declaring the atom would have claimed both.
 type _UnitIsValidatable = Satisfies<
   UnitTestHandler,
   IAdtValidatable<IUnitTestConfig, string>

@@ -124,7 +124,8 @@ export class AdtScalarFunctionImplementation<
     >,
     IAdtDeletable<
       IScalarFunctionImplementationConfig,
-      ReturnType<R['deletion']>
+      ReturnType<R['deletion']>,
+      ReturnType<R['check']>
     >,
     IAdtValidatable<
       IScalarFunctionImplementationConfig,

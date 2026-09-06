@@ -80,7 +80,11 @@ export class AdtMetadataExtension<
       ReturnType<R['metadata']>
     >,
     IAdtUpdatable<IMetadataExtensionConfig, ReturnType<R['updated']>>,
-    IAdtDeletable<IMetadataExtensionConfig, ReturnType<R['deletion']>>,
+    IAdtDeletable<
+      IMetadataExtensionConfig,
+      ReturnType<R['deletion']>,
+      ReturnType<R['deletion']>
+    >,
     IAdtValidatable<IMetadataExtensionConfig, ReturnType<R['validation']>>,
     IAdtCheckable<IMetadataExtensionConfig, ReturnType<R['check']>>,
     IAdtActivatable<IMetadataExtensionConfig, ReturnType<R['activation']>>,

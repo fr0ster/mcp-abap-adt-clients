@@ -24,7 +24,7 @@ export const ATOM_METHODS = {
   creatable: ['create'],
   readable: ['read', 'readMetadata'],
   updatable: ['update'],
-  deletable: ['delete'],
+  deletable: ['delete', 'checkDeletion'],
   validatable: ['validate'],
   checkable: ['check'],
   activatable: ['activate'],
@@ -141,6 +141,7 @@ export const HANDLERS = {
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
       // whose refusal it reads, rather than a half of this one it cannot see.
       delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/oo/validation/objectname',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -169,6 +170,7 @@ export const HANDLERS = {
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
       // whose refusal it reads, rather than a half of this one it cannot see.
       delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/oo/validation/objectname',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -194,6 +196,7 @@ export const HANDLERS = {
       readMetadata: '/sap/bc/adt/programs/includes/zguard_inc',
       update: '/sap/bc/adt/programs/includes/zguard_inc/source/main',
       delete: '/sap/bc/adt/programs/includes/zguard_inc',
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/includes/validation',
       activate: '/sap/bc/adt/activation',
       lock: '/sap/bc/adt/programs/includes/zguard_inc',
@@ -233,6 +236,7 @@ export const HANDLERS = {
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
       // whose refusal it reads, rather than a half of this one it cannot see.
       delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/programs/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -262,6 +266,7 @@ export const HANDLERS = {
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
       // whose refusal it reads, rather than a half of this one it cannot see.
       delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/ddic/ddl/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -292,6 +297,7 @@ export const HANDLERS = {
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
       // whose refusal it reads, rather than a half of this one it cannot see.
       delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/ddic/tables/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -321,6 +327,7 @@ export const HANDLERS = {
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
       // whose refusal it reads, rather than a half of this one it cannot see.
       delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/ddic/structures/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -350,6 +357,7 @@ export const HANDLERS = {
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
       // whose refusal it reads, rather than a half of this one it cannot see.
       delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/ddic/tabletypes/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -379,6 +387,7 @@ export const HANDLERS = {
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
       // whose refusal it reads, rather than a half of this one it cannot see.
       delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/acm/dcl/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -409,6 +418,7 @@ export const HANDLERS = {
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
       // whose refusal it reads, rather than a half of this one it cannot see.
       delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/ddic/structures/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -440,6 +450,7 @@ export const HANDLERS = {
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
       // whose refusal it reads, rather than a half of this one it cannot see.
       delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/bo/behaviordefinitions/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -470,6 +481,7 @@ export const HANDLERS = {
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
       // whose refusal it reads, rather than a half of this one it cannot see.
       delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/oo/validation/objectname',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -496,6 +508,7 @@ export const HANDLERS = {
       update: '/sap/bc/adt/ddic/ddlx/sources/zguard_ddlx/source/main',
       readMetadata: '/sap/bc/adt/ddic/ddlx/sources/zguard_ddlx',
       delete: '/sap/bc/adt/ddic/ddlx/sources/zguard_ddlx',
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/ddic/ddlx/sources/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -528,6 +541,7 @@ export const HANDLERS = {
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
       // whose refusal it reads, rather than a half of this one it cannot see.
       delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/enhancements/enhoxhh/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -557,6 +571,7 @@ export const HANDLERS = {
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
       // whose refusal it reads, rather than a half of this one it cannot see.
       delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/ddic/srvd/sources/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -588,6 +603,7 @@ export const HANDLERS = {
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
       // whose refusal it reads, rather than a half of this one it cannot see.
       delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/functions/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -618,6 +634,7 @@ export const HANDLERS = {
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
       // whose refusal it reads, rather than a half of this one it cannot see.
       delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/ddic/dsfd/sources/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -648,6 +665,7 @@ export const HANDLERS = {
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
       // whose refusal it reads, rather than a half of this one it cannot see.
       delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/ddic/dsfi/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -677,6 +695,7 @@ export const HANDLERS = {
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
       // whose refusal it reads, rather than a half of this one it cannot see.
       delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/xslt/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -707,6 +726,7 @@ export const HANDLERS = {
       read: '/sap/bc/adt/businessservices/bindings/zguard_srvb',
       readMetadata: '/sap/bc/adt/businessservices/bindings/zguard_srvb',
       delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/cts/transportchecks',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -750,6 +770,7 @@ export const HANDLERS = {
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
       // whose refusal it reads, rather than a half of this one it cannot see.
       delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/ddic/domains/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -788,6 +809,7 @@ export const HANDLERS = {
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
       // whose refusal it reads, rather than a half of this one it cannot see.
       delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/ddic/dataelements/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -825,6 +847,7 @@ export const HANDLERS = {
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
       // whose refusal it reads, rather than a half of this one it cannot see.
       delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/functions/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -863,6 +886,7 @@ export const HANDLERS = {
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
       // whose refusal it reads, rather than a half of this one it cannot see.
       delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/packages/validation',
       check: '/sap/bc/adt/checkruns',
       lock: '/sap/bc/adt/packages/zguard_pkg',
@@ -900,6 +924,7 @@ export const HANDLERS = {
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
       // whose refusal it reads, rather than a half of this one it cannot see.
       delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/functions/groups/zguard_fg',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -938,6 +963,7 @@ export const HANDLERS = {
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
       // whose refusal it reads, rather than a half of this one it cannot see.
       delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/aps/iam/auth/validation',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -973,6 +999,7 @@ export const HANDLERS = {
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
       // whose refusal it reads, rather than a half of this one it cannot see.
       delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       // The collection answers a GET with 400 "URI-Mapping cannot be
       // performed"; discovery advertises this sub-resource for validation, and
       // it answers a POST with CHECK_RESULT. Measured on E19 2026-08-31.
@@ -1013,6 +1040,7 @@ export const HANDLERS = {
       read: '/sap/bc/adt/businessservices/bindings/zguard_srvb',
       readMetadata: '/sap/bc/adt/businessservices/bindings/zguard_srvb',
       delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/cts/transportchecks',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -1051,7 +1079,6 @@ export const HANDLERS = {
       read: '/sap/bc/adt/oo/classes/ZCL_GUARD/includes/testclasses',
       readMetadata: '/sap/bc/adt/oo/classes/ZCL_GUARD',
       update: '/sap/bc/adt/oo/classes/zcl_guard/includes/testclasses',
-      delete: '/sap/bc/adt/oo/classes/zcl_guard/includes/testclasses',
       validate: '/sap/bc/adt/checkruns',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -1064,7 +1091,6 @@ export const HANDLERS = {
     capabilities: [
       'readable',
       'updatable',
-      'deletable',
       'validatable',
       'checkable',
       'activatable',
@@ -1083,7 +1109,6 @@ export const HANDLERS = {
       read: '/sap/bc/adt/oo/classes/ZCL_GUARD/includes/implementations',
       readMetadata: '/sap/bc/adt/oo/classes/ZCL_GUARD',
       update: '/sap/bc/adt/oo/classes/zcl_guard/includes/implementations',
-      delete: '/sap/bc/adt/oo/classes/zcl_guard/includes/implementations',
       validate: '/sap/bc/adt/checkruns',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -1096,7 +1121,6 @@ export const HANDLERS = {
     capabilities: [
       'readable',
       'updatable',
-      'deletable',
       'validatable',
       'checkable',
       'activatable',
@@ -1118,7 +1142,6 @@ export const HANDLERS = {
       read: '/sap/bc/adt/oo/classes/ZCL_GUARD/includes/definitions',
       readMetadata: '/sap/bc/adt/oo/classes/ZCL_GUARD',
       update: '/sap/bc/adt/oo/classes/zcl_guard/includes/definitions',
-      delete: '/sap/bc/adt/oo/classes/zcl_guard/includes/definitions',
       validate: '/sap/bc/adt/checkruns',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -1131,7 +1154,6 @@ export const HANDLERS = {
     capabilities: [
       'readable',
       'updatable',
-      'deletable',
       'validatable',
       'checkable',
       'activatable',
@@ -1150,7 +1172,6 @@ export const HANDLERS = {
       read: '/sap/bc/adt/oo/classes/ZCL_GUARD/includes/macros',
       readMetadata: '/sap/bc/adt/oo/classes/ZCL_GUARD',
       update: '/sap/bc/adt/oo/classes/zcl_guard/includes/macros',
-      delete: '/sap/bc/adt/oo/classes/zcl_guard/includes/macros',
       validate: '/sap/bc/adt/checkruns',
       check: '/sap/bc/adt/checkruns',
       activate: '/sap/bc/adt/activation',
@@ -1162,7 +1183,6 @@ export const HANDLERS = {
     capabilities: [
       'readable',
       'updatable',
-      'deletable',
       'validatable',
       'checkable',
       'activatable',
@@ -1187,6 +1207,7 @@ export const HANDLERS = {
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
       // whose refusal it reads, rather than a half of this one it cannot see.
       delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/messageclass/validation',
       lock: '/sap/bc/adt/messageclass/zguard_msg',
       unlock: '/sap/bc/adt/messageclass/zguard_msg',
@@ -1210,9 +1231,8 @@ export const HANDLERS = {
       read: '/sap/bc/adt/messageclass/zguard_msg',
       readMetadata: '/sap/bc/adt/messageclass/zguard_msg',
       update: '/sap/bc/adt/messageclass/zguard_msg',
-      delete: '/sap/bc/adt/messageclass/zguard_msg',
     },
-    capabilities: ['creatable', 'readable', 'updatable', 'deletable'],
+    capabilities: ['creatable', 'readable', 'updatable'],
     why: 'A message is created, read, changed and removed through its class’s XML, and is nothing else in its own right.',
   },
   transport: {
@@ -1228,6 +1248,7 @@ export const HANDLERS = {
       read: '/sap/bc/adt/cts/transportrequests/DEVK900000',
       readMetadata: '/sap/bc/adt/cts/transportrequests/DEVK900000',
       delete: '/sap/bc/adt/cts/transportrequests/DEVK900000',
+      checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
     },
     capabilities: ['creatable', 'readable', 'updatable', 'deletable'],
     why: 'A request is created, read, described anew and deleted while empty. Its number is system-generated, so there is nothing to validate before creating one.',
@@ -1252,7 +1273,6 @@ export const HANDLERS = {
       read: '/sap/bc/adt/oo/classes/ZCL_GUARD_TESTS/includes/testclasses',
       readMetadata: '/sap/bc/adt/oo/classes/ZCL_GUARD_TESTS',
       update: '/sap/bc/adt/oo/classes/zcl_guard_tests/includes/testclasses',
-      delete: '/sap/bc/adt/oo/classes/zcl_guard_tests/includes/testclasses',
       // The container class's name. The test source is validated with
       // `getLocalTestClass().validate()`, when the consumer wants that verdict.
       validate: '/sap/bc/adt/oo/validation/objectname',
@@ -1263,7 +1283,6 @@ export const HANDLERS = {
       'creatable',
       'readable',
       'updatable',
-      'deletable',
       'validatable',
       'lockable',
     ],
@@ -1291,7 +1310,6 @@ export const HANDLERS = {
       // One request each, since 18.0.0: `delete` deletes, and the approval
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
       // whose refusal it reads, rather than a half of this one it cannot see.
-      delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
       validate: '/sap/bc/adt/oo/validation/objectname',
       lock: '/sap/bc/adt/oo/classes/zcl_guard_cds_tests',
       unlock: '/sap/bc/adt/oo/classes/zcl_guard_cds_tests',
@@ -1300,7 +1318,6 @@ export const HANDLERS = {
       'creatable',
       'readable',
       'updatable',
-      'deletable',
       'validatable',
       'lockable',
     ],

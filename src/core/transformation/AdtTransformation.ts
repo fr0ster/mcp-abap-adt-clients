@@ -107,7 +107,11 @@ export class AdtTransformation<
       ReturnType<R['metadata']>
     >,
     IAdtUpdatable<ITransformationConfig, ReturnType<R['updated']>>,
-    IAdtDeletable<ITransformationConfig, ReturnType<R['deletion']>>,
+    IAdtDeletable<
+      ITransformationConfig,
+      ReturnType<R['deletion']>,
+      ReturnType<R['check']>
+    >,
     IAdtValidatable<ITransformationConfig, ReturnType<R['validation']>>,
     IAdtCheckable<ITransformationConfig, ReturnType<R['check']>>,
     IAdtActivatable<ITransformationConfig, ReturnType<R['activation']>>,

@@ -92,6 +92,13 @@ calling `activate` is how you get it.
 two members, one request each, both against `/sap/bc/adt/deletion/…`, which is
 ADT's own deletion service. There is no lock to take and none to release.
 
+Both live on `IAdtDeletable`, because anything that can be deleted can be asked
+whether it can be deleted *now*. Almost everything created can be removed; what
+varies is the moment — something still references it, a transport holds it,
+another user holds its lock — and every one of those is the server's to answer.
+The check asks about a **URI**, and its answer names the type and package it
+resolved that address to, so a type with an address has something to ask with.
+
 ```typescript
 const approved = await client.getClass().checkDeletion(config);
 if (!approved.ok) throw new Error(approved.getError().message);
@@ -112,6 +119,26 @@ answer carries `adtcore:packageName` when it found one and says "Object does not
 exist" when it did not — so an unbound object is reported absent while its name
 stays taken, and there is nothing for the delete to act on. See
 [TROUBLESHOOTING.md](TROUBLESHOOTING.md#an-object-that-exists-holds-its-name-and-cannot-be-deleted).
+
+### The things that are not deleted
+
+Seven types offer neither member, and the omission is the statement: their
+removal is a **write of the parent**, so there is nothing to delete and nothing
+to approve.
+
+| type | what "removing" means |
+|---|---|
+| `getLocalTestClass()`, `getLocalTypes()`, `getLocalDefinitions()`, `getLocalMacros()` | `update()` with an empty source — the class include is emptied, not removed |
+| `getMessageClassMessage()` | the message class is written without that row |
+| `getUnitTest()`, `getCdsUnitTest()` | the container class's `testclasses` include is emptied |
+
+Measured beside it: the deletion service resolves a *message class*
+(`adtcore:type="MSAG/N"`) and knows nothing of the rows inside it. The same holds
+for a class and its includes.
+
+The concrete classes keep a `delete()` as the name for writing emptiness, but the
+contract the factory hands back does not declare it — writing the empty content
+through `update()` is the operation, and it is the one ADT offers.
 
 ## `activate()` and what counts as a failure
 

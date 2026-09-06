@@ -7,7 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [18.0.0] - 2026-09-06
 
-Requires `@mcp-abap-adt/interfaces@^34.0.0`.
+Requires `@mcp-abap-adt/interfaces@^35.0.0`.
 
 **Every member answers the contract, issues one request, and the reading is
 yours.** 17.0.0 moved `getUtils()` onto `IAdtResponse` and said the per-type
@@ -60,9 +60,9 @@ the sequence around a write handed back to the consumer.
   active. Nothing needs a rollback: a `create` that answers a result made
   exactly one object, and one that answers a failure made none.
 
-- **`checkDeletion()` is a member on 24 types.** The deletion approval ADT wants
-  before a delete used to run inside `delete()`, where a caller could neither
-  skip it nor read what it said. Call it yourself:
+- **`checkDeletion()` is a member of `IAdtDeletable`, on 30 types.** The
+  deletion approval ADT wants before a delete used to run inside `delete()`,
+  where a caller could neither skip it nor read what it said. Call it yourself:
 
   ```typescript
   const approved = await client.getClass().checkDeletion(config);
@@ -72,6 +72,43 @@ the sequence around a write handed back to the consumer.
 
   Deleting without it is allowed — ADT answers its own refusal. What you lose is
   the reason: the check's document names what still points at the object.
+
+  It is not a capability of its own. Almost everything created can be removed;
+  what varies is the *moment* — something still references it, a transport holds
+  it, another user holds its lock — and every one of those is the server's to
+  answer. So anything that can be deleted can be asked, and the two members are
+  one atom.
+
+  Measured on the cloud trial: the check is asked about a **URI**, and its
+  answer names the type and package it resolved that address to. A type with an
+  address has something to ask with, whether or not its own delete goes through
+  the deletion service — which is how `getInclude()`, `getMetadataExtension()`
+  and `getRequest()` came to offer it.
+
+- **Seven types no longer declare `IAdtDeletable`**, because they do not delete:
+  `getLocalTestClass()`, `getLocalTypes()`, `getLocalDefinitions()`,
+  `getLocalMacros()`, `getMessageClassMessage()`, `getUnitTest()` and
+  `getCdsUnitTest()`. Removing any of them is a **write of the parent** —
+  `delete()` on a class include is literally `update({ testClassCode: '' })`,
+  and removing a message rewrites its message class. There is no resource to
+  DELETE and none to ask about; the deletion service resolves a *message class*
+  and knows nothing of the rows inside it.
+
+  The concrete classes keep a `delete()` as the name for writing emptiness, but
+  the contract the factory hands back no longer declares it. **A caller reaching
+  it through the factory writes the empty content instead**, which is the
+  operation ADT actually offers:
+
+  ```typescript
+  // before
+  await client.getLocalTestClass().delete({ className: 'ZCL_X' });
+
+  // after
+  await client.getLocalTestClass().update(
+    { className: 'ZCL_X', testClassCode: '' },
+    { lockHandle },
+  );
+  ```
 
 - **Two endpoints that were reachable no other way are now members:**
   `AdtFunctionInclude.updateSource()` writes `/source/main` (its `update` writes
@@ -334,6 +371,10 @@ the sequence around a write handed back to the consumer.
    coming back with lock refusals from the server, that is the missing step.
 9. **Call `checkDeletion()` before `delete()`** where you relied on the delete
    refusing an object something still points at.
+10. **Replace `delete()` with `update()` on the seven types that do not delete**
+    — the four class includes, a message-class message, and the two unit-test
+    handlers. Writing empty content is what removing them has always meant, and
+    the contract now says so.
 
 ## [17.0.0] - 2026-09-02
 
