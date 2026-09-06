@@ -107,39 +107,4 @@ describe('AdtDomain lock registry wiring', () => {
     logTestSuccess(testsLogger, 'Domain lock registry - unlockAll() releases');
     logTestEnd(testsLogger, 'Domain lock registry - unlockAll() releases');
   });
-
-  it('managed update() retains the lock when the flow fails and cleanup unlock also fails', async () => {
-    logTestStart(testsLogger, 'Domain lock registry - managed retention', {
-      name: 'managed_retention',
-      params: { domain_name: domainName, package_name: packageName },
-    });
-    // LOCK succeeds; the update read-modify-write fails; and the error-path
-    // cleanup unlock ALSO fails (server context still busy). The registry must
-    // keep the lock so unlockAll() is the last resort.
-    const makeAdtRequest = jest.fn(async (req: any) => {
-      if (String(req.url).includes('_action=LOCK')) {
-        return { status: 200, data: LOCK_XML };
-      }
-      if (String(req.url).includes('_action=UNLOCK')) {
-        throw new Error('context busy');
-      }
-      throw new Error('update failed');
-    });
-    const setSessionType = jest.fn();
-    const conn = {
-      makeAdtRequest,
-      setSessionType,
-    } as unknown as IAbapConnection;
-    const registry = new LockRegistry();
-    const domain = new AdtDomain(conn, undefined, undefined, registry);
-
-    expectFailure(
-      await domain.update({ domainName, packageName }),
-      'update whose flow and cleanup both failed',
-    );
-
-    expect(registry.pending).toEqual([lockKey]);
-    logTestSuccess(testsLogger, 'Domain lock registry - managed retention');
-    logTestEnd(testsLogger, 'Domain lock registry - managed retention');
-  });
 });

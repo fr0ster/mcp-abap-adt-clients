@@ -1,17 +1,15 @@
 /**
- * `validate()` checks what is about to be born, and it issues requests.
+ * `validate()` issues a request, and it is one request.
  *
- * It used to return what its own comment called "a mock success response", and
- * a later attempt validated the wrong thing — a **name** check against a class
- * that already existed, which is meaningless: `validateClassName` takes a
- * package and a description, parameters that only mean anything before an
- * object exists.
+ * It used to return what its own comment called "a mock success response". The
+ * fix made it real but grew it into a fork — read the class, then validate the
+ * name or check the code depending on what was found — and 18.0.0 removed the
+ * fork rather than the honesty: `validate` is the container class's name
+ * validation, always, and the test source is checked with
+ * `getLocalTestClass().validate()` when the consumer wants that second verdict.
  *
- * So validation forks on what is about to be created:
- *
- * - the container class does not exist yet → validate the **name**;
- * - it does → confirm it is there, by reading it;
- * - source was given → check the **code**, whichever branch was taken.
+ * What survives from the old file is the part that mattered: the answer is the
+ * server's, a refusal is a refusal, and a caller error costs no request.
  */
 
 import type {
@@ -60,57 +58,8 @@ describe('AdtUnitTest.validate()', () => {
     expect(calls).toHaveLength(0);
   });
 
-  it('confirms an existing container by reading it, and validates nothing more', async () => {
+  it('validates the container class name — one request, whatever exists', async () => {
     const { conn, calls } = makeConn((r) => {
-      expect(r.method).toBe('GET');
-      expect(r.url).toBe('/sap/bc/adt/oo/classes/ZCL_CONTAINER/source/main');
-      return { status: 200, data: 'CLASS zcl_container DEFINITION.' };
-    });
-    const h = new AdtUnitTest(conn, createLibraryLogger());
-
-    // One request, and it is the read. The class is there and no source was
-    // given, so there is nothing left to check — the answer succeeds carrying
-    // no verdict, which is different from a verdict that says "fine".
-    const verdict = expectResult(
-      await h.validate({ className: 'ZCL_CONTAINER' }),
-      'validation',
-    );
-
-    expect(calls).toHaveLength(1);
-    expect(verdict).toBeUndefined();
-  });
-
-  it('checks the test source too, when there is source to check', async () => {
-    const { conn, calls } = makeConn((r, i) => {
-      if (i === 0) return { status: 200, data: 'CLASS zcl_container.' };
-      expect(r.method).toBe('POST');
-      expect(r.url).toContain('/sap/bc/adt/checkruns');
-      expect(String(r.data)).toContain(
-        '/sap/bc/adt/oo/classes/zcl_container/includes/testclasses',
-      );
-      return { status: 200, data: '<code-ok/>' };
-    });
-    const h = new AdtUnitTest(conn, createLibraryLogger());
-
-    const verdict = expectResult(
-      await h.validate({
-        className: 'ZCL_CONTAINER',
-        testClassSource: 'CLASS ltcl_test DEFINITION FOR TESTING.',
-      }),
-      'validation',
-    );
-
-    expect(calls).toHaveLength(2);
-    expect(verdict).toBe('<code-ok/>');
-  });
-
-  it('validates the NAME when the container does not exist yet — the create path', async () => {
-    const { conn, calls } = makeConn((r, i) => {
-      if (i === 0) {
-        return Object.assign(new Error('not found'), {
-          response: { status: 404, statusText: 'Not Found', data: '' },
-        });
-      }
       expect(r.method).toBe('POST');
       expect(r.url).toContain('/sap/bc/adt/oo/validation/objectname');
       expect(r.url).toContain('objname=ZCL_NEW_TESTS');
@@ -127,50 +76,41 @@ describe('AdtUnitTest.validate()', () => {
       'validation',
     );
 
-    expect(calls).toHaveLength(2);
+    // No probing read first. Whether the class is already there is something
+    // the server answers, and it answers it in this document.
+    expect(calls).toHaveLength(1);
     expect(verdict).toBe('<name-ok/>');
   });
-  it('a read that fails for any other reason is reported, not treated as absence', async () => {
-    // A 500 is a fact about the request, not about the class. Routing it into
-    // the create path would validate a NAME for a class that exists and report
-    // something nobody asked — caught in review, 2026-08-14.
+
+  it('a refusal is reported as one, not swallowed', async () => {
     const { conn, calls } = makeConn(() =>
       Object.assign(new Error('server error'), {
-        response: {
-          status: 500,
-          statusText: 'Internal Server Error',
-          data: '',
-        },
+        response: { status: 500, statusText: 'Server Error', data: '' },
       }),
     );
     const h = new AdtUnitTest(conn, createLibraryLogger());
 
-    // Reported, and it stops the chain: one request, and the failure is the
-    // 500 rather than a name check nobody asked for.
     const failure = expectFailure(
-      await h.validate({ className: 'ZCL_CONTAINER' }),
+      await h.validate({
+        className: 'ZCL_CONTAINER',
+        packageName: 'ZPKG',
+        description: 'tests',
+      }),
       'validate against a server that failed',
     );
-    expect(failure.message).toMatch(/server error/i);
+
+    expect(failure.response?.status).toBe(500);
     expect(calls).toHaveLength(1);
   });
 });
 
 describe('AdtCdsUnitTest.validate()', () => {
-  it('issues both the name validation and the local-test-class check, in order', async () => {
-    const { conn, calls } = makeConn((r, i) => {
-      if (i === 0) {
-        expect(r.method).toBe('POST');
-        expect(r.url).toContain('/sap/bc/adt/oo/validation/objectname');
-        expect(r.url).toContain('objname=ZCL_CDS_DUMMY');
-        return { status: 200, data: '<name-ok/>' };
-      }
+  it('validates the generated class name — the name check alone', async () => {
+    const { conn, calls } = makeConn((r) => {
       expect(r.method).toBe('POST');
-      expect(r.url).toContain('/sap/bc/adt/checkruns');
-      expect(String(r.data)).toContain(
-        '/sap/bc/adt/oo/classes/zcl_cds_dummy/includes/testclasses',
-      );
-      return { status: 200, data: '<code-ok/>' };
+      expect(r.url).toContain('/sap/bc/adt/oo/validation/objectname');
+      expect(r.url).toContain('objname=ZCL_CDS_DUMMY');
+      return { status: 200, data: '<name-ok/>' };
     });
     const h = new AdtCdsUnitTest(conn, createLibraryLogger());
 
@@ -184,10 +124,7 @@ describe('AdtCdsUnitTest.validate()', () => {
       'validation',
     );
 
-    // Both requests went out — the handler above asserts which is which — and
-    // the answer is the name check's document. The code check is not dropped:
-    // its failure would have come back instead of this.
-    expect(calls).toHaveLength(2);
+    expect(calls).toHaveLength(1);
     expect(verdict).toBe('<name-ok/>');
   });
 
@@ -221,8 +158,6 @@ describe('AdtCdsUnitTest.validate()', () => {
     // invented fields beside the message.
     expect(failure.response?.status).toBe(400);
     expect(failure.message).toContain('invalid object name');
-    // And it stopped: the local-test-class check never went out over a name
-    // the server had already refused.
     expect(calls).toHaveLength(1);
   });
 
@@ -248,20 +183,20 @@ describe('AdtCdsUnitTest.validate()', () => {
     expect(calls).toHaveLength(0);
   });
 
-  it('falls back to the parent check when no class is being generated', async () => {
+  it('falls back to the parent when no class is being generated', async () => {
     const { conn, calls } = makeConn((r) => {
-      expect(r.method).toBe('GET');
-      expect(r.url).toBe('/sap/bc/adt/oo/classes/ZCL_CONTAINER/source/main');
-      return { status: 200, data: 'CLASS zcl_container DEFINITION.' };
+      expect(r.method).toBe('POST');
+      expect(r.url).toContain('/sap/bc/adt/oo/validation/objectname');
+      return { status: 200, data: '<name-ok/>' };
     });
     const h = new AdtCdsUnitTest(conn, createLibraryLogger());
 
     const verdict = expectResult(
-      await h.validate({ className: 'ZCL_CONTAINER' }),
+      await h.validate({ className: 'ZCL_CONTAINER', packageName: 'ZPKG' }),
       'validation',
     );
 
     expect(calls).toHaveLength(1);
-    expect(verdict).toBeUndefined();
+    expect(verdict).toBe('<name-ok/>');
   });
 });

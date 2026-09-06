@@ -8,7 +8,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
 import { activateObjectInSession } from '../../utils/activationUtils';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -19,7 +19,7 @@ export async function updateClassTestInclude(
   connection: IAbapConnection,
   className: string,
   testClassSource: string,
-  lockHandle: string,
+  lockHandle?: string,
   transportRequest?: string,
   sourceContentType?: string,
 ): Promise<IAdtWireResponse> {
@@ -29,15 +29,8 @@ export async function updateClassTestInclude(
     throw new Error('Test class source code is required');
   }
 
-  if (!lockHandle) {
-    throw new Error('lockHandle is required to update test classes');
-  }
-
   const encodedName = encodeSapObjectName(className).toLowerCase();
-  let url = `/sap/bc/adt/oo/classes/${encodedName}/includes/testclasses?lockHandle=${encodeURIComponent(lockHandle)}`;
-  if (transportRequest) {
-    url += `&corrNr=${transportRequest}`;
-  }
+  const url = `/sap/bc/adt/oo/classes/${encodedName}/includes/testclasses${writeQuery(lockHandle, transportRequest)}`;
 
   const contentType = sourceContentType || CT_SOURCE;
   const headers = {

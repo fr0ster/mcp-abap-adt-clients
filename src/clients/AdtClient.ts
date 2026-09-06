@@ -117,7 +117,6 @@ import {
   featureToggleDocuments,
   type IFeatureToggleConfig,
   type IFeatureToggleResults,
-  type IFeatureToggleRuntimeState,
 } from '../core/featureToggle';
 import {
   AdtFunctionGroup,

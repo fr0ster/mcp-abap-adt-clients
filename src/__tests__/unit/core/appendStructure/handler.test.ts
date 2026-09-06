@@ -91,41 +91,23 @@ describe('AdtAppendStructure handler', () => {
     expect(failure.message).toContain('501');
   });
 
-  it('update() happy path: lock→check→PUT→long-poll-read→unlock→check→read, ends stateless', async () => {
-    const LOCK_HANDLE = 'LOCK_HANDLE_42';
-    const lockXml = `<?xml version="1.0" encoding="utf-8"?>
-<asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
-  <asx:values>
-    <DATA>
-      <LOCK_HANDLE>${LOCK_HANDLE}</LOCK_HANDLE>
-    </DATA>
-  </asx:values>
-</asx:abap>`;
-
-    const { conn, sessionTypes, calls } = makeConn((r) => {
-      if (r.url.includes('_action=LOCK')) return { data: lockXml };
-      if (r.url.includes('checkruns')) return { data: '' };
-      if (r.method === 'PUT') return { data: '' };
-      if (r.url.includes('_action=UNLOCK')) return { data: '' };
-      if (r.method === 'GET') return { data: 'source code' };
-      return { data: '' };
-    });
+  it('update() is the PUT, and it carries the handle it was given', async () => {
+    const { conn, sessionTypes, calls } = makeConn(() => ({ data: '' }));
 
     const as = new AdtAppendStructure(conn);
-    await as.update({ appendStructureName: 'ZOK_X', sourceCode: 'new source' });
-
-    const putCall = calls.find((c) => c.method === 'PUT');
-    expect(putCall).toBeDefined();
-    expect(putCall?.url).toContain('/source/main');
-
-    const longPollCall = calls.find(
-      (c) =>
-        c.method === 'GET' &&
-        c.url.includes('version=active') &&
-        c.url.includes('withLongPolling=true'),
+    await as.update(
+      { appendStructureName: 'ZOK_X', sourceCode: 'new source' },
+      { lockHandle: 'LOCK_HANDLE_42' },
     );
-    expect(longPollCall).toBeDefined();
 
-    expect(sessionTypes[sessionTypes.length - 1]).toBe('stateless');
+    // One request, and it is the write. No lock, no check, no readiness poll:
+    // those are calls the consumer makes when it wants them.
+    expect(calls).toHaveLength(1);
+    expect(calls[0].method).toBe('PUT');
+    expect(calls[0].url).toContain('/source/main');
+    expect(calls[0].url).toContain('lockHandle=LOCK_HANDLE_42');
+
+    // And the session is the consumer's: the member did not touch it.
+    expect(sessionTypes).toEqual([]);
   });
 });

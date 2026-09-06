@@ -89,27 +89,6 @@ describe('AdtInclude', () => {
       expect(calls.some((c) => c.url.includes('/activation'))).toBe(false);
     });
 
-    it('activates on create when activateOnCreate says so', async () => {
-      const { connection, calls } = createConnection();
-      await new AdtInclude(connection, logger).create(
-        { ...BASE, sourceCode: '" code' },
-        { activateOnCreate: true },
-      );
-
-      expect(calls.some((c) => c.url.includes('/activation'))).toBe(true);
-    });
-
-    it('takes the source from options, which win over the config', async () => {
-      const { connection, calls } = createConnection();
-      await new AdtInclude(connection, logger).create(
-        { ...BASE, sourceCode: '" from config' },
-        { sourceCode: '" from options' },
-      );
-
-      const put = calls.find((c) => c.method === 'PUT');
-      expect(put?.data).toBe('" from options');
-    });
-
     it('accepts a source given only in options, with none in the config', async () => {
       const { connection, calls } = createConnection();
       await new AdtInclude(connection, logger).update(
@@ -165,16 +144,6 @@ describe('AdtInclude', () => {
       expect(put?.data).toBe('');
     });
 
-    it('writes an empty source on create too', async () => {
-      const { connection, calls } = createConnection();
-      await new AdtInclude(connection, logger).create({
-        ...BASE,
-        sourceCode: '',
-      });
-
-      expect(calls.some((c) => c.method === 'PUT')).toBe(true);
-    });
-
     it('still refuses an update with no source at all', async () => {
       const { connection } = createConnection();
       await expect(
@@ -183,109 +152,41 @@ describe('AdtInclude', () => {
     });
   });
 
-  describe('deleteOnFailure', () => {
-    /** Metadata POST succeeds; the source write does not. */
-    function createWithFailingUpload() {
-      const { connection, calls } = createConnection();
-      (connection.makeAdtRequest as jest.Mock).mockImplementation(
-        async (request: any) => {
-          calls.push({
-            url: request.url,
-            method: request.method,
-            data: request.data,
-          });
-          if (request.method === 'PUT') {
-            throw new Error('source rejected');
-          }
-          if (String(request.url).includes('_action=LOCK')) {
-            return { status: 200, data: LOCK_XML, headers: {} };
-          }
-          return { status: 200, data: '', headers: {} };
-        },
-      );
-      return { connection, calls };
-    }
-
-    it('removes the half-made include when asked', async () => {
-      const { connection, calls } = createWithFailingUpload();
-      const failure = expectFailure(
-        await new AdtInclude(connection, logger).create(
-          { ...BASE, sourceCode: '" code' },
-          { deleteOnFailure: true },
-        ),
-        'create whose source write is rejected',
-      );
-
-      expect(calls.some((c) => c.method === 'DELETE')).toBe(true);
-      // The failure that caused the rollback is what comes back. The rollback
-      // is cleanup; it does not become the answer, and it does not hide the
-      // reason the include is not there.
-      expect(failure.message).toContain('source rejected');
-    });
-
-    it('rolls back without being asked — the default is on', async () => {
-      // It used to be off, and this test asserted that. The reason it changed:
-      // a create that fails after the object exists leaves a name taken, and
-      // the caller asked for a created-and-written include rather than for
-      // whatever this left. The object removed is one this call made moments
-      // earlier, so there is nothing of the caller's to lose.
-      const { connection, calls } = createWithFailingUpload();
-      await new AdtInclude(connection, logger).create({
-        ...BASE,
-        sourceCode: '" code',
-      });
-
-      expect(calls.some((c) => c.method === 'DELETE')).toBe(true);
-    });
-
-    it('leaves it in place when told not to', async () => {
-      const { connection, calls } = createWithFailingUpload();
-      await new AdtInclude(connection, logger).create(
-        { ...BASE, sourceCode: '" code' },
-        { deleteOnFailure: false },
-      );
-
-      expect(calls.some((c) => c.method === 'DELETE')).toBe(false);
-    });
-
-    it('does not roll back a create that succeeded', async () => {
-      const { connection, calls } = createConnection();
-      await new AdtInclude(connection, logger).create(
-        { ...BASE, sourceCode: '" code' },
-        { deleteOnFailure: true },
-      );
-
-      expect(calls.some((c) => c.method === 'DELETE')).toBe(false);
-    });
-  });
+  /**
+   * `deleteOnFailure` was the rollback for a create that had more to it than
+   * the POST — the source write and the activation could fail after the object
+   * existed, leaving a name taken. Since 18.0.0 `create` is the POST alone: a
+   * refused POST made nothing, and a create that answered success made exactly
+   * the object the caller asked for. There is nothing left to roll back, and
+   * this block asserted the machinery rather than an outcome.
+   */
 
   describe('errors say which operation failed', () => {
-    it('names activation, not lock cleanup, when activation fails', async () => {
-      const { connection } = createConnection();
+    it('an activation that is refused answers the refusal, and only it', async () => {
+      const { connection, calls } = createConnection();
       (connection.makeAdtRequest as jest.Mock).mockImplementation(
         async (request: any) => {
+          calls.push({ url: request.url, method: request.method });
           if (String(request.url).includes('/activation')) {
             throw new Error('activation refused');
           }
-          if (String(request.url).includes('_action=LOCK')) {
-            return { status: 200, data: LOCK_XML, headers: {} };
-          }
           return { status: 200, data: '', headers: {} };
         },
       );
 
       const failure = expectFailure(
-        await new AdtInclude(connection, logger).update(
-          { includeName: 'ZMY_INC', sourceCode: '" code' },
-          { activateOnUpdate: true },
-        ),
-        'update whose activation is refused',
+        await new AdtInclude(connection, logger).activate({
+          includeName: 'ZMY_INC',
+        }),
+        'an activation the server refuses',
       );
 
-      // Reported as 'releaseLock' once, which sent the reader looking at lock
-      // cleanup for a failure that happened in activation. The unlock still
-      // runs — it is scope cleanup — but it is not what the caller is told.
+      // It used to be reported as 'releaseLock', which sent the reader looking
+      // at lock cleanup for a failure that happened in activation. Now there is
+      // no cleanup to confuse it with: activation is one request and its answer
+      // is the member's.
       expect(failure.message).toContain('activation refused');
+      expect(calls).toHaveLength(1);
     });
   });
 

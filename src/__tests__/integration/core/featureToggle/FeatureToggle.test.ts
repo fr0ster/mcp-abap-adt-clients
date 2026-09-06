@@ -504,16 +504,27 @@ describe('FeatureToggle (using AdtClient)', () => {
           testCase?.params?.transport_request,
         );
         const handler = client.getFeatureToggle();
-        const onState = expectResult(
+        // The switch answers the toggle's own response; the runtime state is a
+        // second request, and the test makes it because the library no longer
+        // makes it for the caller.
+        expectResult(
           await handler.switchOn({ featureToggleName }, { transportRequest }),
+          'switchOn',
+        );
+        const onState = expectResult(
+          await handler.getRuntimeState({ featureToggleName }),
           'onState',
         );
         expect(
           onState?.clientState === 'on' || onState?.clientState === 'undefined',
         ).toBe(true);
 
-        const offState = expectResult(
+        expectResult(
           await handler.switchOff({ featureToggleName }, { transportRequest }),
+          'switchOff',
+        );
+        const offState = expectResult(
+          await handler.getRuntimeState({ featureToggleName }),
           'offState',
         );
         expect(

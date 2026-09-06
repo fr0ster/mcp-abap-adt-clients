@@ -51,7 +51,7 @@ function makeConn(
 }
 
 describe('AdtUnitTest — managing the tests', () => {
-  it('create POSTs the container class before writing anything into it', async () => {
+  it('create POSTs the container class, and nothing else', async () => {
     const { conn, calls } = makeConn();
     const h = new AdtUnitTest(conn, createLibraryLogger());
 
@@ -62,21 +62,13 @@ describe('AdtUnitTest — managing the tests', () => {
       testClassSource: 'CLASS ltcl DEFINITION FOR TESTING.',
     });
 
-    // The class is created first — a POST to the classes collection — and only
-    // then is the include written.
-    const post = calls.find(
-      (c) => c.method === 'POST' && c.url.endsWith('/oo/classes'),
-    );
-    expect(post).toBeDefined();
-
-    const put = calls.find(
-      (c) => c.method === 'PUT' && c.url.includes('/includes/testclasses'),
-    );
-    expect(put).toBeDefined();
-    expect(String(put?.data)).toContain('ltcl');
-    expect(calls.indexOf(post as Call)).toBeLessThan(
-      calls.indexOf(put as Call),
-    );
+    // One request: the class. Writing the tests into it is
+    // `getLocalTestClass().update()`, which the consumer issues once the class
+    // is active — an order this member cannot get right on its behalf, because
+    // it is the consumer that knows whether the activation happened.
+    expect(calls).toHaveLength(1);
+    expect(calls[0].method).toBe('POST');
+    expect(calls[0].url.endsWith('/oo/classes')).toBe(true);
   });
 
   it('update writes only the include — no class is created', async () => {

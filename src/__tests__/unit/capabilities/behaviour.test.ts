@@ -108,11 +108,14 @@ function bodyFor(url: string, activationBody: string): string {
 
 function recordingClient(activationBody: string = ACTIVATION_OK) {
   const calls: Recorded[] = [];
+  const sessionTypes: string[] = [];
   const connection = {
     connect: async () => {},
     getBaseUrl: async () => 'https://example',
     getSessionId: () => null,
-    setSessionType: () => {},
+    setSessionType: (type: string) => {
+      sessionTypes.push(type);
+    },
     makeAdtRequest: async (
       req: Recorded & { params?: Record<string, unknown> },
     ) => {
@@ -130,7 +133,7 @@ function recordingClient(activationBody: string = ACTIVATION_OK) {
   // can answer that — a connection without isConnected() is taken at its word,
   // which is what this stub is.
   const client = new AdtClient(connection, createLibraryLogger());
-  return { client, calls };
+  return { client, calls, sessionTypes };
 }
 
 /**
@@ -188,10 +191,6 @@ const VERB_BY_HANDLER: Record<string, string> = {
   'messageClassMessage.delete': 'PUT',
   // A function include's name is validated the same way, against its group.
   'functionInclude.validate': 'GET',
-  // A service binding's validation starts with a GET on the bindingtypes
-  // discovery endpoint; a transport check POSTs after it.
-  'service.validate': 'GET',
-  'serviceBinding.validate': 'GET',
   // Its transport is checked through POST /cts/transportchecks rather than read
   // from the object.
   'service.readTransport': 'POST',
@@ -208,43 +207,20 @@ const VERB_BY_HANDLER: Record<string, string> = {
  * here.
  */
 const VERB_NOT_REACHED: Record<string, string> = {
+  'tableType.update':
+    'read-modify-write: it GETs the table type first, and the generic body is not one to patch',
   'dataElement.update':
     'read-modify-write; the generic body has no doma/dtel structure to patch',
-  'ddl.update': 'read-modify-write over DDL source metadata',
-  'metadataExtension.update': 'read-modify-write over DDLX metadata',
-  'structure.update': 'read-modify-write over DDIC structure XML',
-  'table.update': 'read-modify-write over DDIC table XML',
-  'tableType.update': 'read-modify-write over DDIC table-type XML',
   'package.update': 'read-modify-write over package XML',
-  'featureToggle.update':
-    'reads the toggle collection first; the generic body carries no toggle',
   'transport.update':
     'reads the request first; the generic body is not a tm:request',
   'service.update':
     'reads the binding first; the generic body is not a binding',
   'serviceBinding.update': 'as service.update',
-  'service.create':
-    'asks the bindingtypes discovery endpoint first and refuses when the generic body lists no variant',
-  'serviceBinding.create': 'as service.create',
 };
 
 /** The content URI `getVersionSource` is handed, and must fetch. */
 const VERSION_CONTENT_URI = '/sap/bc/adt/guard/versions/1';
-
-/**
- * Where a method addresses a resource that is neither the object nor one of the
- * shared services — verified by reading the handler, like the verb deviations.
- */
-const RESOURCE_BY_HANDLER: Record<string, string> = {
-  // A binding's variant is validated against the discovery endpoint that lists
-  // the variants this system offers — a sibling of the binding, not an
-  // ancestor of it.
-  'service.validate': '/sap/bc/adt/businessservices/bindings/bindingtypes',
-  'serviceBinding.validate':
-    '/sap/bc/adt/businessservices/bindings/bindingtypes',
-  // Creating a message writes the class it lives in.
-  'messageClassMessage.create': '/sap/bc/adt/messageclass/zguard_msg',
-};
 
 /**
  * Which resource the matching request has to have addressed.
@@ -258,7 +234,6 @@ const RESOURCE_BY_HANDLER: Record<string, string> = {
  * one deletion service — and those are named here once rather than per handler.
  */
 function expectedResource(
-  key: string,
   entry: HandlerEntry,
   method: string,
   defaultVerb: string,
@@ -441,7 +416,7 @@ describe('capability guard — behaviour', () => {
 
             // And on the right resource. A verb on the wrong URL is still the
             // wrong request — the whole point of naming a capability.
-            const resource = expectedResource(key, entry, method, verb);
+            const resource = expectedResource(entry, method, verb);
             const made = calls
               .filter(
                 (c) =>
@@ -479,5 +454,57 @@ describe('capability guard — behaviour', () => {
         }
       }
     });
+  }
+});
+
+/**
+ * A member does not touch the session.
+ *
+ * Statefulness belongs to the lock window, and since 18.0.0 a lock window is
+ * something the consumer opens: it calls `lock`, then the write, then `unlock`,
+ * and it is the one that knows whether those three belong to the same session.
+ * A member that flipped the connection to stateful and back would take that
+ * decision away — and worse, would reset it under a *different* handler that
+ * happens to hold a lock on the same connection. That was the E19 incident, and
+ * this is the assertion that keeps its cause from coming back.
+ *
+ * `lock` and `unlock` are exempt on purpose: they are the session, not a
+ * request that happens inside one.
+ */
+describe('capability guard — a member leaves the session alone', () => {
+  for (const [name, entry] of Object.entries(
+    HANDLERS as Record<string, HandlerEntry>,
+  )) {
+    for (const atom of entry.capabilities) {
+      for (const method of ATOM_METHODS[atom as Atom]) {
+        if (method === 'lock' || method === 'unlock') continue;
+        // The one exception in the library, and it is named rather than
+        // skipped: a message is a row inside its class's document, so writing
+        // one takes two lock handles and a read-modify-write of XML this
+        // library assembles. Its session handling is the write's own.
+        const exempt =
+          name === 'messageClassMessage' &&
+          (method === 'create' || method === 'update' || method === 'delete');
+        it(`${name}.${method} ${exempt ? 'owns its session window' : 'never calls setSessionType'}`, async () => {
+          const { client, sessionTypes } = recordingClient();
+          const handler = entry.factory(client) as unknown as Record<
+            string,
+            unknown
+          >;
+          try {
+            await invoke(handler, method, entry.config);
+          } catch {
+            // What the member answered is another test's subject. Even a
+            // refusal must not have moved the session on its way out.
+          }
+          if (exempt) {
+            expect(sessionTypes.length).toBeGreaterThan(0);
+            expect(sessionTypes[sessionTypes.length - 1]).toBe('stateless');
+            return;
+          }
+          expect(sessionTypes).toEqual([]);
+        });
+      }
+    }
   }
 });

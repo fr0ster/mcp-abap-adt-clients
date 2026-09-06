@@ -116,44 +116,19 @@ describe('AdtScalarFunction handler', () => {
     expect(sessionTypes[sessionTypes.length - 1]).toBe('stateless');
   });
 
-  it('update() happy path: lock→check→PUT→long-poll-read→unlock→check, ends stateless', async () => {
-    const LOCK_HANDLE = 'LOCK_HANDLE_42';
-    const lockXml = `<?xml version="1.0" encoding="utf-8"?>
-<asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
-  <asx:values>
-    <DATA>
-      <LOCK_HANDLE>${LOCK_HANDLE}</LOCK_HANDLE>
-    </DATA>
-  </asx:values>
-</asx:abap>`;
-
-    const { conn, sessionTypes, calls } = makeConn((r) => {
-      if (r.url.includes('_action=LOCK')) return { data: lockXml };
-      if (r.url.includes('checkruns')) return { data: '' };
-      if (r.method === 'PUT') return { data: '' };
-      if (r.url.includes('_action=UNLOCK')) return { data: '' };
-      if (r.method === 'GET') return { data: 'source code' };
-      return { data: '' };
-    });
+  it('update() is the PUT, and it carries the handle it was given', async () => {
+    const { conn, sessionTypes, calls } = makeConn(() => ({ data: '' }));
 
     const sf = new AdtScalarFunction(conn);
-    await sf.update({ scalarFunctionName: 'ZOK_X', sourceCode: 'new source' });
-
-    const putCall = calls.find((c) => c.method === 'PUT');
-    expect(putCall).toBeDefined();
-    expect(putCall?.url).toContain('/source/main');
-
-    // The readiness poll waits on the version the write produced. It read
-    // `version=active` once, which is the version the update cannot have
-    // changed — see `updateNoActivateReadsInactive.test.ts` for the rule.
-    const longPollCall = calls.find(
-      (c) =>
-        c.method === 'GET' &&
-        c.url.includes('version=inactive') &&
-        c.url.includes('withLongPolling=true'),
+    await sf.update(
+      { scalarFunctionName: 'ZOK_SF', sourceCode: 'new source' },
+      { lockHandle: 'LOCK_HANDLE_42' },
     );
-    expect(longPollCall).toBeDefined();
 
-    expect(sessionTypes[sessionTypes.length - 1]).toBe('stateless');
+    expect(calls).toHaveLength(1);
+    expect(calls[0].method).toBe('PUT');
+    expect(calls[0].url).toContain('/source/main');
+    expect(calls[0].url).toContain('lockHandle=LOCK_HANDLE_42');
+    expect(sessionTypes).toEqual([]);
   });
 });
