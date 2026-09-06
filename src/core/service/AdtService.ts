@@ -129,12 +129,13 @@ export class AdtServiceBinding<
     IAdtTransportAware<IServiceBindingConfig, ReturnType<R['transport']>>,
     IAdtLockable<IServiceBindingConfig>
 {
-  // `IAdtServiceBinding` from the contracts package is deliberately NOT in the
-  // list above yet. It still declares `publishODataV2` and `unpublishODataV2` —
-  // two method names for what is one endpoint with a `serviceType` parameter,
-  // and both of them GET a `…jobs` URL that Eclipse POSTs to. The shape here is
-  // being settled against measured traffic first; it moves to
-  // `@mcp-abap-adt/interfaces` when it does what it needs to, not before.
+  // The list above is the whole of it. `IAdtServiceBinding` used to sit in the
+  // contracts package declaring `publishODataV2` and `unpublishODataV2` — two
+  // method names for one endpoint with a `serviceType` parameter — and this
+  // class deliberately did not implement it while the shape was settled against
+  // measured traffic. It is gone as of interfaces 33.0.0, and nothing replaced
+  // it: a binding is the atoms, composed, like every other object. Publishing is
+  // an `update`, because `desiredPublicationState` is a field of the config.
 
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;

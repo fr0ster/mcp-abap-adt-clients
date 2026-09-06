@@ -3,7 +3,6 @@ export type {
   DesiredPublicationState,
   GeneratedServiceType,
   IActivateServiceBindingParams,
-  IAdtServiceBinding,
   ICheckServiceBindingParams,
   IClassifyServiceBindingParams,
   ICreateAndGenerateServiceBindingParams,

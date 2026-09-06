@@ -2311,7 +2311,7 @@ export class AdtClient {
 
   /**
    * Get high-level operations for ServiceBinding objects
-   * @returns IAdtServiceBinding instance for ServiceBinding CRUD and lifecycle operations
+   * @returns a ServiceBinding handler — CRUD and lifecycle, as the atoms
    */
   getServiceBinding(): AdtServiceBinding;
   getServiceBinding<R extends IServiceResults>(
