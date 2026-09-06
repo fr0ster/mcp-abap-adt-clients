@@ -2800,11 +2800,17 @@ export class AdtClient {
    * where it is handed out — and it caught two members returning the envelope
    * while the contract promised a parsed result.
    *
-   * Narrower than the class on purpose. `searchObjects`, `getWhereUsed` and
-   * `getPackageContents` stay on `AdtUtils` and are not here: each issues the
-   * same request as a sibling that has a contract, and one endpoint is one member
-   * (decision 16 in `@mcp-abap-adt/interfaces`). A caller who needs the raw
-   * document passes a parser to the sibling.
+   * Narrower than the class on purpose — and the gap is wider than this comment
+   * used to admit. `searchObjects`, `getWhereUsed` and `getPackageContents` are
+   * not here because each issues the same request as a sibling that has a
+   * contract, and one endpoint is one member (decision 16 in
+   * `@mcp-abap-adt/interfaces`).
+   *
+   * The sentence that stood here — "a caller who needs the raw document passes a
+   * parser to the sibling" — described an API that no longer exists: the parser
+   * overloads went in 30.0.0, when the reading became something injected once
+   * rather than passed per call. There is no way to ask these members for
+   * another shape today, and saying otherwise was worse than saying nothing.
    *
    * @returns The cross-cutting operations, as contracts
    */

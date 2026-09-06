@@ -182,12 +182,26 @@ import { type IUtilResults, utilDocuments } from './utilResultSet';
  * and until it does, the information system is the one this class answers to,
  * because that is what `getUtils()` hands out.
  *
- * The three members not in any atom — `searchObjects`, `getWhereUsed`,
- * `getPackageContents` — stay on the class and are simply not in what
- * `getUtils()` promises. Each has a contract-shaped sibling over the same
- * endpoint (`search`, `getWhereUsedList`, `getPackageContentsList`), which is
- * decision 16: one endpoint is one member, and a caller who needs the raw
- * document passes a parser to the one that has a contract.
+ * **The members not in any atom stay on the class**, and this paragraph used to
+ * describe them wrongly in two ways worth naming, since both were caught in
+ * review rather than by anything here.
+ *
+ * It named `getPackageContents` as the one outside the contract. It is the one
+ * *inside* it — `IAdtPackageBrowsing` declares exactly that member — and
+ * `getPackageContentsList`, which it called the contract-shaped sibling, is the
+ * extra. Backwards. What is true: `searchObjects` and `getWhereUsed` have
+ * contract-shaped siblings (`search`, `getWhereUsedList`) over the same
+ * endpoint, and `getPackageContents` delegates to `getPackageContentsList` —
+ * one endpoint answered by two public members, which decision 16 says it should
+ * not be.
+ *
+ * And it said a caller who needs another shape "passes a parser" to the sibling.
+ * The parser overloads went in 30.0.0, when the reading became something
+ * injected once rather than passed per call. There is no way to ask for another
+ * shape from these members today: `IUtilResults` carries readings for `search`,
+ * `types` and `node` only, and the package, where-used and inactive-object
+ * members build their value from several requests through `answeringValue`,
+ * which no strategy sees.
  */
 export class AdtUtils<
   R extends IUtilResults<unknown, unknown, unknown> = IUtilResults,
