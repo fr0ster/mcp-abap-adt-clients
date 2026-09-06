@@ -65,17 +65,7 @@ import {
 } from './versions';
 
 export class AdtFunctionInclude<
-  R extends IFunctionIncludeResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  > = IFunctionIncludeResults,
+  R extends IFunctionIncludeResults = typeof functionIncludeDocuments,
 > implements
     IAdtCreatable<IFunctionIncludeConfig, ReturnType<R['created']>>,
     IAdtReadable<IFunctionIncludeConfig, ReturnType<R['source']>>,

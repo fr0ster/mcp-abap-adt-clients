@@ -67,25 +67,16 @@ export type IncludeDeletionResult = string;
 export type IncludeUpdated = void;
 
 /** One strategy per member of a include implementation. See `IClassResults`. */
-export interface IIncludeResults<
-  TCreated = IncludeCreated,
-  TSource = IncludeSource,
-  TMetadata = IncludeMetadata,
-  TActivation = IncludeActivationResult,
-  TValidation = IncludeValidationResult,
-  TDeletion = IncludeDeletionResult,
-  TUpdated = IncludeUpdated,
-  TDeletionCheck = DeletionCheckResult,
-> {
-  readonly created: IResultStrategy<TCreated>;
-  readonly source: IResultStrategy<TSource>;
-  readonly metadata: IResultStrategy<TMetadata>;
-  readonly activation: IResultStrategy<TActivation>;
-  readonly validation: IResultStrategy<TValidation>;
-  readonly deletion: IResultStrategy<TDeletion>;
-  readonly updated: IResultStrategy<TUpdated>;
+export interface IIncludeResults {
+  readonly created: IResultStrategy<unknown>;
+  readonly source: IResultStrategy<unknown>;
+  readonly metadata: IResultStrategy<unknown>;
+  readonly activation: IResultStrategy<unknown>;
+  readonly validation: IResultStrategy<unknown>;
+  readonly deletion: IResultStrategy<unknown>;
+  readonly updated: IResultStrategy<unknown>;
   /** What a deletion check answers: `del:checkResponse`. */
-  readonly deletionCheck: IResultStrategy<TDeletionCheck>;
+  readonly deletionCheck: IResultStrategy<unknown>;
 }
 
 /**

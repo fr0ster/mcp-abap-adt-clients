@@ -48,20 +48,15 @@ import {
   searchHits,
 } from './utilResults';
 
-export interface IUtilResults<
-  TSearch = ISearchResult[],
-  TTypes = INamedItem[],
-  TNode = IRepositoryNodeContents,
-  TInactive = IInactiveObjectsResponse,
-> {
+export interface IUtilResults {
   /** Hits of an object search. */
-  readonly search: IResultStrategy<TSearch>;
+  readonly search: IResultStrategy<unknown>;
   /** A named-item list — the repository's types. */
-  readonly types: IResultStrategy<TTypes>;
+  readonly types: IResultStrategy<unknown>;
   /** One level of the repository tree, with what is below it. */
-  readonly node: IResultStrategy<TNode>;
+  readonly node: IResultStrategy<unknown>;
   /** What `/activation/inactiveobjects` answers — one GET, one answer. */
-  readonly inactive: IResultStrategy<TInactive>;
+  readonly inactive: IResultStrategy<unknown>;
 }
 
 /**

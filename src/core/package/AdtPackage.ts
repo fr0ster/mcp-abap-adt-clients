@@ -60,19 +60,8 @@ import { unlockPackage } from './unlock';
 import { updatePackage } from './update';
 import { validatePackageBasic } from './validation';
 
-export class AdtPackage<
-  R extends IPackageResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  > = IPackageResults,
-> implements
+export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
+  implements
     IAdtCreatable<IPackageConfig, ReturnType<R['created']>>,
     IAdtMetadataReadable<IPackageConfig, ReturnType<R['metadata']>>,
     IAdtMetadataUpdatable<IPackageConfig, ReturnType<R['metadataUpdated']>>,

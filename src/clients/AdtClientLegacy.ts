@@ -75,20 +75,9 @@ export class AdtClientLegacy extends AdtClient {
 
   // --- Supported types with legacy overrides ---
 
-  override getProgram<
-    R extends IProgramResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    > = IProgramResults,
-  >(results: R = programDocuments as unknown as R): AdtProgramLegacy<R> {
+  override getProgram<R extends IProgramResults = typeof programDocuments>(
+    results: R = programDocuments as unknown as R,
+  ): AdtProgramLegacy<R> {
     return new AdtProgramLegacy<R>(
       this.connection,
       this.logger,
@@ -99,19 +88,9 @@ export class AdtClientLegacy extends AdtClient {
     );
   }
 
-  override getClass<
-    R extends IClassResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    > = IClassResults,
-  >(results: R = classDocuments as unknown as R): AdtClassLegacy<R> {
+  override getClass<R extends IClassResults = typeof classDocuments>(
+    results: R = classDocuments as unknown as R,
+  ): AdtClassLegacy<R> {
     return new AdtClassLegacy<R>(
       this.connection,
       this.logger,
@@ -123,18 +102,7 @@ export class AdtClientLegacy extends AdtClient {
   }
 
   override getInterface<
-    R extends IInterfaceResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    > = IInterfaceResults,
+    R extends IInterfaceResults = typeof interfaceDocuments,
   >(results: R = interfaceDocuments as unknown as R): AdtInterfaceLegacy<R> {
     return new AdtInterfaceLegacy<R>(
       this.connection,
@@ -147,18 +115,7 @@ export class AdtClientLegacy extends AdtClient {
   }
 
   override getFunctionGroup<
-    R extends IFunctionGroupResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    > = IFunctionGroupResults,
+    R extends IFunctionGroupResults = typeof functionGroupDocuments,
   >(
     results: R = functionGroupDocuments as unknown as R,
   ): AdtFunctionGroupLegacy<R> {
@@ -173,18 +130,7 @@ export class AdtClientLegacy extends AdtClient {
   }
 
   override getFunctionModule<
-    R extends IFunctionModuleResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    > = IFunctionModuleResults,
+    R extends IFunctionModuleResults = typeof functionModuleDocuments,
   >(
     results: R = functionModuleDocuments as unknown as R,
   ): AdtFunctionModuleLegacy<R> {
@@ -198,19 +144,9 @@ export class AdtClientLegacy extends AdtClient {
     );
   }
 
-  override getPackage<
-    R extends IPackageResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    > = IPackageResults,
-  >(results: R = packageDocuments as unknown as R): AdtPackageLegacy<R> {
+  override getPackage<R extends IPackageResults = typeof packageDocuments>(
+    results: R = packageDocuments as unknown as R,
+  ): AdtPackageLegacy<R> {
     return new AdtPackageLegacy<R>(
       this.connection,
       this.logger,
@@ -220,20 +156,9 @@ export class AdtClientLegacy extends AdtClient {
     );
   }
 
-  override getDdl<
-    R extends IDdlResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    > = IDdlResults,
-  >(results: R = ddlDocuments as unknown as R): AdtDdlLegacy<R> {
+  override getDdl<R extends IDdlResults = typeof ddlDocuments>(
+    results: R = ddlDocuments as unknown as R,
+  ): AdtDdlLegacy<R> {
     return new AdtDdlLegacy<R>(
       this.connection,
       this.logger,
@@ -245,20 +170,9 @@ export class AdtClientLegacy extends AdtClient {
 
   // --- Unit tests with legacy endpoints ---
 
-  override getUnitTest<
-    R extends IUnitTestResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    > = IUnitTestResults,
-  >(results: R = unitTestDocuments as unknown as R): AdtUnitTestLegacy<R> {
+  override getUnitTest<R extends IUnitTestResults = typeof unitTestDocuments>(
+    results: R = unitTestDocuments as unknown as R,
+  ): AdtUnitTestLegacy<R> {
     return new AdtUnitTestLegacy<R>(this.connection, this.logger, results);
   }
 
@@ -284,16 +198,9 @@ export class AdtClientLegacy extends AdtClient {
    * So the declaration is honest about the type and silent about the behaviour,
    * and the gap is tracked rather than papered over: #109.
    */
-  override getRequest<
-    R extends ITransportResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    > = ITransportResults,
-  >(results: R = transportDocuments as unknown as R): AdtRequestLegacy<R> {
+  override getRequest<R extends ITransportResults = typeof transportDocuments>(
+    results: R = transportDocuments as unknown as R,
+  ): AdtRequestLegacy<R> {
     return new AdtRequestLegacy<R>(
       this.connection,
       this.logger,
@@ -320,9 +227,9 @@ export class AdtClientLegacy extends AdtClient {
    * contract branches on `ok` either way, and a legacy system is not a reason to
    * be told about a refusal differently.
    */
-  override getUtils<
-    R extends IUtilResults<unknown, unknown, unknown, unknown> = IUtilResults,
-  >(results: R = utilDocuments as unknown as R): AdtUtilsLegacy<R> {
+  override getUtils<R extends IUtilResults = typeof utilDocuments>(
+    results: R = utilDocuments as unknown as R,
+  ): AdtUtilsLegacy<R> {
     return new AdtUtilsLegacy<R>(this.connection, this.logger, results);
   }
 

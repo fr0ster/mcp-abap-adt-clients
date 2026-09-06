@@ -70,29 +70,18 @@ export type AccessControlUpdated = string;
 export type AccessControlTransport = string;
 
 /** One strategy per member of a accessControl implementation. See `IClassResults`. */
-export interface IAccessControlResults<
-  TCreated = AccessControlCreated,
-  TSource = AccessControlSource,
-  TMetadata = AccessControlMetadata,
-  TCheck = AccessControlCheckResult,
-  TActivation = AccessControlActivationResult,
-  TValidation = AccessControlValidationResult,
-  TDeletion = AccessControlDeletionResult,
-  TUpdated = AccessControlUpdated,
-  TTransport = AccessControlTransport,
-  TDeletionCheck = DeletionCheckResult,
-> {
-  readonly created: IResultStrategy<TCreated>;
-  readonly source: IResultStrategy<TSource>;
-  readonly metadata: IResultStrategy<TMetadata>;
-  readonly check: IResultStrategy<TCheck>;
-  readonly activation: IResultStrategy<TActivation>;
-  readonly validation: IResultStrategy<TValidation>;
-  readonly deletion: IResultStrategy<TDeletion>;
-  readonly updated: IResultStrategy<TUpdated>;
-  readonly transport: IResultStrategy<TTransport>;
+export interface IAccessControlResults {
+  readonly created: IResultStrategy<unknown>;
+  readonly source: IResultStrategy<unknown>;
+  readonly metadata: IResultStrategy<unknown>;
+  readonly check: IResultStrategy<unknown>;
+  readonly activation: IResultStrategy<unknown>;
+  readonly validation: IResultStrategy<unknown>;
+  readonly deletion: IResultStrategy<unknown>;
+  readonly updated: IResultStrategy<unknown>;
+  readonly transport: IResultStrategy<unknown>;
   /** What a deletion check answers: `del:checkResponse`. */
-  readonly deletionCheck: IResultStrategy<TDeletionCheck>;
+  readonly deletionCheck: IResultStrategy<unknown>;
 }
 
 /**

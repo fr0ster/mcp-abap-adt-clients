@@ -53,20 +53,8 @@ import { updateDdl } from './update';
 import { validateDdlName } from './validation';
 import { getDdlVersionSource, getDdlVersions } from './versions';
 
-export class AdtDdl<
-  R extends IDdlResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  > = IDdlResults,
-> implements
+export class AdtDdl<R extends IDdlResults = typeof ddlDocuments>
+  implements
     IAdtCreatable<IDdlConfig, ReturnType<R['created']>>,
     IAdtReadable<IDdlConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<IDdlConfig, ReturnType<R['metadata']>>,

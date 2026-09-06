@@ -88,18 +88,7 @@ export const validationUnsupported = (
 };
 
 export class AdtScalarFunction<
-  R extends IScalarFunctionResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  > = IScalarFunctionResults,
+  R extends IScalarFunctionResults = typeof scalarFunctionDocuments,
 > implements
     IAdtCreatable<IScalarFunctionConfig, ReturnType<R['created']>>,
     IAdtReadable<IScalarFunctionConfig, ReturnType<R['source']>>,

@@ -57,23 +57,15 @@ export type MessageClassDeletionResult = string;
 export type MessageClassUpdated = string;
 
 /** One strategy per member of a messageClass implementation. See `IClassResults`. */
-export interface IMessageClassResults<
-  TCreated = MessageClassCreated,
-  TSource = MessageClassSource,
-  TMetadata = MessageClassMetadata,
-  TValidation = MessageClassValidationResult,
-  TDeletion = MessageClassDeletionResult,
-  TMetadataUpdated = MessageClassUpdated,
-  TDeletionCheck = DeletionCheckResult,
-> {
-  readonly created: IResultStrategy<TCreated>;
-  readonly source: IResultStrategy<TSource>;
-  readonly metadata: IResultStrategy<TMetadata>;
-  readonly validation: IResultStrategy<TValidation>;
-  readonly deletion: IResultStrategy<TDeletion>;
-  readonly metadataUpdated: IResultStrategy<TMetadataUpdated>;
+export interface IMessageClassResults {
+  readonly created: IResultStrategy<unknown>;
+  readonly source: IResultStrategy<unknown>;
+  readonly metadata: IResultStrategy<unknown>;
+  readonly validation: IResultStrategy<unknown>;
+  readonly deletion: IResultStrategy<unknown>;
+  readonly metadataUpdated: IResultStrategy<unknown>;
   /** What a deletion check answers: `del:checkResponse`. */
-  readonly deletionCheck: IResultStrategy<TDeletionCheck>;
+  readonly deletionCheck: IResultStrategy<unknown>;
 }
 
 /**

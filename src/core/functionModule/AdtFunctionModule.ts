@@ -66,18 +66,7 @@ import {
 } from './versions';
 
 export class AdtFunctionModule<
-  R extends IFunctionModuleResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  > = IFunctionModuleResults,
+  R extends IFunctionModuleResults = typeof functionModuleDocuments,
 > implements
     IAdtCreatable<IFunctionModuleConfig, ReturnType<R['created']>>,
     IAdtReadable<IFunctionModuleConfig, ReturnType<R['source']>>,

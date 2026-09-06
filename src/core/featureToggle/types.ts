@@ -100,32 +100,20 @@ export type FeatureToggleUpdated = string;
 export type FeatureToggleSourceDocument = string;
 
 /** One strategy per member of a feature-toggle implementation. */
-export interface IFeatureToggleResults<
-  TCreated = FeatureToggleCreated,
-  TSource = FeatureToggleSource,
-  TMetadata = FeatureToggleMetadata,
-  TCheck = FeatureToggleCheckResult,
-  TActivation = FeatureToggleActivationResult,
-  TValidation = FeatureToggleValidationResult,
-  TDeletion = FeatureToggleDeletionResult,
-  TUpdated = FeatureToggleUpdated,
-  TSourceDocument = FeatureToggleSourceDocument,
-  TDeletionCheck = DeletionCheckResult,
-  TMetadataUpdated = string,
-> {
-  readonly created: IResultStrategy<TCreated>;
-  readonly source: IResultStrategy<TSource>;
-  readonly metadata: IResultStrategy<TMetadata>;
-  readonly check: IResultStrategy<TCheck>;
-  readonly activation: IResultStrategy<TActivation>;
-  readonly validation: IResultStrategy<TValidation>;
-  readonly deletion: IResultStrategy<TDeletion>;
-  readonly updated: IResultStrategy<TUpdated>;
-  readonly sourceDocument: IResultStrategy<TSourceDocument>;
+export interface IFeatureToggleResults {
+  readonly created: IResultStrategy<unknown>;
+  readonly source: IResultStrategy<unknown>;
+  readonly metadata: IResultStrategy<unknown>;
+  readonly check: IResultStrategy<unknown>;
+  readonly activation: IResultStrategy<unknown>;
+  readonly validation: IResultStrategy<unknown>;
+  readonly deletion: IResultStrategy<unknown>;
+  readonly updated: IResultStrategy<unknown>;
+  readonly sourceDocument: IResultStrategy<unknown>;
   /** What a deletion check answers: `del:checkResponse`. */
-  readonly deletionCheck: IResultStrategy<TDeletionCheck>;
+  readonly deletionCheck: IResultStrategy<unknown>;
   /** What the object's own document answers when written. */
-  readonly metadataUpdated: IResultStrategy<TMetadataUpdated>;
+  readonly metadataUpdated: IResultStrategy<unknown>;
 }
 
 /**

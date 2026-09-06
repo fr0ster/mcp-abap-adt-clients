@@ -15,21 +15,14 @@ import { answering } from '../../utils/adtResponse';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { deleteObjectDirect } from '../shared/deleteLegacy';
 import { AdtFunctionModule } from './AdtFunctionModule';
-import type { IFunctionModuleConfig, IFunctionModuleResults } from './types';
+import type {
+  functionModuleDocuments,
+  IFunctionModuleConfig,
+  IFunctionModuleResults,
+} from './types';
 
 export class AdtFunctionModuleLegacy<
-  R extends IFunctionModuleResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  > = IFunctionModuleResults,
+  R extends IFunctionModuleResults = typeof functionModuleDocuments,
 > extends AdtFunctionModule<R> {
   override async delete<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionModuleConfig>,

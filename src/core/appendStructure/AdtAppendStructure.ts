@@ -93,18 +93,7 @@ export const validationUnsupported = (
 };
 
 export class AdtAppendStructure<
-  R extends IAppendStructureResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  > = IAppendStructureResults,
+  R extends IAppendStructureResults = typeof appendStructureDocuments,
 > implements
     IAdtCreatable<IAppendStructureConfig, ReturnType<R['created']>>,
     IAdtReadable<IAppendStructureConfig, ReturnType<R['source']>>,

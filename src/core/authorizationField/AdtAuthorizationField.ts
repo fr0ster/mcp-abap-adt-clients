@@ -53,17 +53,7 @@ import { updateAuthorizationField } from './update';
 import { validateAuthorizationFieldName } from './validation';
 
 export class AdtAuthorizationField<
-  R extends IAuthorizationFieldResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  > = IAuthorizationFieldResults,
+  R extends IAuthorizationFieldResults = typeof authorizationFieldDocuments,
 > implements
     IAdtCreatable<IAuthorizationFieldConfig, ReturnType<R['created']>>,
     IAdtMetadataReadable<IAuthorizationFieldConfig, ReturnType<R['metadata']>>,

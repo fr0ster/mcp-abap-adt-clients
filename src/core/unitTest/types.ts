@@ -57,38 +57,27 @@ export const runId: IResultStrategy<string> = (answer: IAdtWireResponse) => {
 };
 
 /** One strategy per member of a unit-test implementation. */
-export interface IUnitTestResults<
-  TCreated = string,
-  TSource = string,
-  TMetadata = string,
-  TValidation = string,
-  TUpdated = string,
-  TDeleted = string,
-  TRun = string,
-  TStatus = string,
-  TResult = string,
-  TCdsCheck = string,
-> {
+export interface IUnitTestResults {
   /** The container class's create. */
-  readonly created: IResultStrategy<TCreated>;
+  readonly created: IResultStrategy<unknown>;
   /** The `testclasses` include, read whole. */
-  readonly source: IResultStrategy<TSource>;
+  readonly source: IResultStrategy<unknown>;
   /** The container class's metadata — an include carries none of its own. */
-  readonly metadata: IResultStrategy<TMetadata>;
+  readonly metadata: IResultStrategy<unknown>;
   /** What a name check or a source check answers. */
-  readonly validation: IResultStrategy<TValidation>;
+  readonly validation: IResultStrategy<unknown>;
   /** What writing the include answers. */
-  readonly updated: IResultStrategy<TUpdated>;
+  readonly updated: IResultStrategy<unknown>;
   /** What emptying the include answers. */
-  readonly deleted: IResultStrategy<TDeleted>;
+  readonly deleted: IResultStrategy<unknown>;
   /** What starting a run answers — its id, by default. */
-  readonly run: IResultStrategy<TRun>;
+  readonly run: IResultStrategy<unknown>;
   /** What polling a run answers. */
-  readonly status: IResultStrategy<TStatus>;
+  readonly status: IResultStrategy<unknown>;
   /** What a finished run's result document answers. */
-  readonly result: IResultStrategy<TResult>;
+  readonly result: IResultStrategy<unknown>;
   /** What the CDS test-doubles check answers. */
-  readonly cdsCheck: IResultStrategy<TCdsCheck>;
+  readonly cdsCheck: IResultStrategy<unknown>;
 }
 
 /**

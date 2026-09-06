@@ -76,16 +76,8 @@ export function hasDeferredResponses<T extends object>(
   );
 }
 
-export class AdtRequest<
-  R extends ITransportResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  > = ITransportResults,
-> implements
+export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
+  implements
     IAdtCreatable<ITransportConfig, ReturnType<R['created']>>,
     IAdtMetadataReadable<ITransportConfig, ReturnType<R['metadata']>>,
     IAdtMetadataUpdatable<ITransportConfig, ReturnType<R['metadataUpdated']>>,

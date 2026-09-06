@@ -23,24 +23,14 @@ import type {
   IClassUnitTestDefinition,
   IClassUnitTestRunOptions,
   IUnitTestResults,
+  unitTestDocuments,
 } from './types';
 
 /** Synthetic run ID for legacy synchronous results */
 const LEGACY_SYNC_RUN_ID = 'legacy-sync';
 
 export class AdtUnitTestLegacy<
-  R extends IUnitTestResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  > = IUnitTestResults,
+  R extends IUnitTestResults = typeof unitTestDocuments,
 > extends AdtUnitTest<R> {
   /**
    * Run the tests.

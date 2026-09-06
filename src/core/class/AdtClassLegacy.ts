@@ -22,20 +22,10 @@ import { answering } from '../../utils/adtResponse';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { deleteObjectDirect } from '../shared/deleteLegacy';
 import { AdtClass } from './AdtClass';
-import type { IClassConfig, IClassResults } from './types';
+import type { classDocuments, IClassConfig, IClassResults } from './types';
 
 export class AdtClassLegacy<
-  R extends IClassResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  > = IClassResults,
+  R extends IClassResults = typeof classDocuments,
 > extends AdtClass<R> {
   /**
    * Update class — legacy override.

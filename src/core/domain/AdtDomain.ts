@@ -53,20 +53,8 @@ import { unlockDomain } from './unlock';
 import { updateDomain } from './update';
 import { validateDomainName } from './validation';
 
-export class AdtDomain<
-  R extends IDomainResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  > = IDomainResults,
-> implements
+export class AdtDomain<R extends IDomainResults = typeof domainDocuments>
+  implements
     IAdtCreatable<IDomainConfig, ReturnType<R['created']>>,
     IAdtMetadataReadable<IDomainConfig, ReturnType<R['metadata']>>,
     IAdtMetadataUpdatable<IDomainConfig, ReturnType<R['metadataUpdated']>>,

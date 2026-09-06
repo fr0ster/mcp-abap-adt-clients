@@ -75,11 +75,7 @@ const BASE = '/sap/bc/adt/messageclass';
  * emptiness — rather than a claim that this is a deletable object.
  */
 export class AdtMessageClassMessage<
-  R extends IMessageClassMessageResults<
-    unknown,
-    unknown,
-    unknown
-  > = IMessageClassMessageResults,
+  R extends IMessageClassMessageResults = typeof messageDocuments,
 > implements
     IAdtCreatable<IMessageClassMessageConfig, ReturnType<R['written']>>,
     IAdtReadable<IMessageClassMessageConfig, ReturnType<R['read']>>,

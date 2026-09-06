@@ -57,17 +57,7 @@ export type { ILocalDefinitionsConfig } from '@mcp-abap-adt/interfaces';
  * emptiness — rather than a claim that this is a deletable object.
  */
 export class AdtLocalDefinitions<
-    R extends IClassResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    > = IClassResults,
+    R extends IClassResults = typeof classDocuments,
   >
   extends AdtClassMemberBase<R>
   implements

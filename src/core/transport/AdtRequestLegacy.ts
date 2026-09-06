@@ -29,7 +29,11 @@ import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
 import { answering, failed } from '../../utils/adtResponse';
 import { AdtRequest } from './AdtRequest';
 import { getTransportLegacy, listTransportsLegacy } from './readLegacy';
-import type { ITransportConfig, ITransportResults } from './types';
+import type {
+  ITransportConfig,
+  ITransportResults,
+  transportDocuments,
+} from './types';
 
 const unsupported = (what: string, why: string): IAdtError => ({
   origin: 'refusal',
@@ -40,14 +44,7 @@ const unsupported = (what: string, why: string): IAdtError => ({
 });
 
 export class AdtRequestLegacy<
-  R extends ITransportResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  > = ITransportResults,
+  R extends ITransportResults = typeof transportDocuments,
 > extends AdtRequest<R> {
   private readonly conn: IAbapConnection;
 

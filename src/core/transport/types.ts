@@ -103,14 +103,7 @@ export interface ITransportTree {
 }
 
 /** One strategy per member of a transport-request implementation. */
-export interface ITransportResults<
-  TCreated = ICreatedTransport,
-  TMetadata = string,
-  TList = ITransportTree,
-  TMetadataUpdated = string,
-  TDeleted = string,
-  TDeletionCheck = DeletionCheckResult,
-> {
+export interface ITransportResults {
   /**
    * What the create answers.
    *
@@ -118,9 +111,9 @@ export interface ITransportResults<
    * a create they cannot use, and the number is the only thing the document is
    * there to deliver. `rawDocument` gives the document back untouched.
    */
-  readonly created: IResultStrategy<TCreated>;
+  readonly created: IResultStrategy<unknown>;
   /** What a read of one request answers. */
-  readonly metadata: IResultStrategy<TMetadata>;
+  readonly metadata: IResultStrategy<unknown>;
   /**
    * What the listing answers.
    *
@@ -129,13 +122,13 @@ export interface ITransportResults<
    * which a consumer could reach before without re-fetching and parsing the
    * document themselves. `rawDocument` gives the document back untouched.
    */
-  readonly list: IResultStrategy<TList>;
+  readonly list: IResultStrategy<unknown>;
   /** What the description update answers. */
-  readonly metadataUpdated: IResultStrategy<TMetadataUpdated>;
+  readonly metadataUpdated: IResultStrategy<unknown>;
   /** What the deletion answers. */
-  readonly deleted: IResultStrategy<TDeleted>;
+  readonly deleted: IResultStrategy<unknown>;
   /** What a deletion check answers: `del:checkResponse`. */
-  readonly deletionCheck: IResultStrategy<TDeletionCheck>;
+  readonly deletionCheck: IResultStrategy<unknown>;
 }
 
 /**

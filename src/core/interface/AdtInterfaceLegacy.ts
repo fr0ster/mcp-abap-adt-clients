@@ -14,21 +14,14 @@ import { answering } from '../../utils/adtResponse';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { deleteObjectDirect } from '../shared/deleteLegacy';
 import { AdtInterface } from './AdtInterface';
-import type { IInterfaceConfig, IInterfaceResults } from './types';
+import type {
+  IInterfaceConfig,
+  IInterfaceResults,
+  interfaceDocuments,
+} from './types';
 
 export class AdtInterfaceLegacy<
-  R extends IInterfaceResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  > = IInterfaceResults,
+  R extends IInterfaceResults = typeof interfaceDocuments,
 > extends AdtInterface<R> {
   override async delete<E extends IAdtError = IAdtError>(
     config: Partial<IInterfaceConfig>,

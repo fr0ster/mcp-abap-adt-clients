@@ -203,9 +203,8 @@ import { type IUtilResults, utilDocuments } from './utilResultSet';
  * members build their value from several requests through `answeringValue`,
  * which no strategy sees.
  */
-export class AdtUtils<
-  R extends IUtilResults<unknown, unknown, unknown, unknown> = IUtilResults,
-> implements
+export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
+  implements
     IAdtInformationSystem<
       ReturnType<R['search']>,
       IWhereUsedListResult,

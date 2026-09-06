@@ -75,18 +75,7 @@ export const testDoublesVerdict = (
 };
 
 export class AdtCdsUnitTest<
-    R extends IUnitTestResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    > = IUnitTestResults,
+    R extends IUnitTestResults = typeof unitTestDocuments,
   >
   extends AdtUnitTest<R>
   implements ICdsTestDoubleCheckable<ReturnType<R['cdsCheck']>>

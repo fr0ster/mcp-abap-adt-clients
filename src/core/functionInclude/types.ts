@@ -78,30 +78,19 @@ export type FunctionIncludeDeletionResult = string;
 export type FunctionIncludeUpdated = string;
 
 /** One strategy per member of a functionInclude implementation. See `IClassResults`. */
-export interface IFunctionIncludeResults<
-  TCreated = FunctionIncludeCreated,
-  TSource = FunctionIncludeSource,
-  TMetadata = FunctionIncludeMetadata,
-  TCheck = FunctionIncludeCheckResult,
-  TActivation = FunctionIncludeActivationResult,
-  TValidation = FunctionIncludeValidationResult,
-  TDeletion = FunctionIncludeDeletionResult,
-  TUpdated = FunctionIncludeUpdated,
-  TDeletionCheck = DeletionCheckResult,
-  TMetadataUpdated = string,
-> {
-  readonly created: IResultStrategy<TCreated>;
-  readonly source: IResultStrategy<TSource>;
-  readonly metadata: IResultStrategy<TMetadata>;
-  readonly check: IResultStrategy<TCheck>;
-  readonly activation: IResultStrategy<TActivation>;
-  readonly validation: IResultStrategy<TValidation>;
-  readonly deletion: IResultStrategy<TDeletion>;
-  readonly updated: IResultStrategy<TUpdated>;
+export interface IFunctionIncludeResults {
+  readonly created: IResultStrategy<unknown>;
+  readonly source: IResultStrategy<unknown>;
+  readonly metadata: IResultStrategy<unknown>;
+  readonly check: IResultStrategy<unknown>;
+  readonly activation: IResultStrategy<unknown>;
+  readonly validation: IResultStrategy<unknown>;
+  readonly deletion: IResultStrategy<unknown>;
+  readonly updated: IResultStrategy<unknown>;
   /** What a deletion check answers: `del:checkResponse`. */
-  readonly deletionCheck: IResultStrategy<TDeletionCheck>;
+  readonly deletionCheck: IResultStrategy<unknown>;
   /** What the object's own document answers when written. */
-  readonly metadataUpdated: IResultStrategy<TMetadataUpdated>;
+  readonly metadataUpdated: IResultStrategy<unknown>;
 }
 
 /**

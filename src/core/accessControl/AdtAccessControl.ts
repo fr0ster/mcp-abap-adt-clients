@@ -60,18 +60,7 @@ import {
 } from './versions';
 
 export class AdtAccessControl<
-  R extends IAccessControlResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  > = IAccessControlResults,
+  R extends IAccessControlResults = typeof accessControlDocuments,
 > implements
     IAdtCreatable<IAccessControlConfig, ReturnType<R['created']>>,
     IAdtReadable<IAccessControlConfig, ReturnType<R['source']>>,

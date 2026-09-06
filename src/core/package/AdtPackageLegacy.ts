@@ -9,7 +9,7 @@ import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
 import { failed } from '../../utils/adtResponse';
 import { AdtPackage } from './AdtPackage';
-import type { IPackageResults } from './types';
+import type { IPackageResults, packageDocuments } from './types';
 
 const UNSUPPORTED: IAdtError = {
   origin: 'refusal',
@@ -28,17 +28,7 @@ const UNSUPPORTED: IAdtError = {
  * consumer branches on `UNSUPPORTED_OPERATION` rather than matching a message.
  */
 export class AdtPackageLegacy<
-  R extends IPackageResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  > = IPackageResults,
+  R extends IPackageResults = typeof packageDocuments,
 > extends AdtPackage<R> {
   override async create<E extends IAdtError = IAdtError>(): Promise<
     IAdtResponse<ReturnType<R['created']>, E>

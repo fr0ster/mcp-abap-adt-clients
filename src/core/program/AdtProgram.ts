@@ -70,20 +70,8 @@ import { uploadProgramSource } from './update';
 import { validateProgramName } from './validation';
 import { getProgramVersionSource, getProgramVersions } from './versions';
 
-export class AdtProgram<
-  R extends IProgramResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  > = IProgramResults,
-> implements
+export class AdtProgram<R extends IProgramResults = typeof programDocuments>
+  implements
     IAdtCreatable<IProgramConfig, ReturnType<R['created']>>,
     IAdtReadable<IProgramConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<IProgramConfig, ReturnType<R['metadata']>>,

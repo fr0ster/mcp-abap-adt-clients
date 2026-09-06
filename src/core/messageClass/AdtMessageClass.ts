@@ -51,15 +51,7 @@ import { updateMessageClass } from './update';
 const VALIDATE_BASE = '/sap/bc/adt/messageclass/validation';
 
 export class AdtMessageClass<
-  R extends IMessageClassResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  > = IMessageClassResults,
+  R extends IMessageClassResults = typeof messageClassDocuments,
 > implements
     IAdtCreatable<IMessageClassConfig, ReturnType<R['created']>>,
     IAdtMetadataReadable<IMessageClassConfig, ReturnType<R['metadata']>>,

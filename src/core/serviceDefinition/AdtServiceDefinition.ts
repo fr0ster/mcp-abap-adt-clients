@@ -60,18 +60,7 @@ import {
 } from './versions';
 
 export class AdtServiceDefinition<
-  R extends IServiceDefinitionResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  > = IServiceDefinitionResults,
+  R extends IServiceDefinitionResults = typeof serviceDefinitionDocuments,
 > implements
     IAdtCreatable<IServiceDefinitionConfig, ReturnType<R['created']>>,
     IAdtReadable<IServiceDefinitionConfig, ReturnType<R['source']>>,

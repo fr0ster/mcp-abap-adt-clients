@@ -263,19 +263,10 @@ import { withRefusalDetection } from '../utils/refusalAware';
  * disagreement is no longer expressible. `capabilities/shape.ts` checks these
  * against the manifest.
  */
-export type IClassContract<
-  R extends IClassResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  >,
-> = IAdtCreatable<IClassConfig, ReturnType<R['created']>> &
+export type IClassContract<R extends IClassResults> = IAdtCreatable<
+  IClassConfig,
+  ReturnType<R['created']>
+> &
   IAdtReadable<IClassConfig, ReturnType<R['source']>> &
   IAdtMetadataReadable<IClassConfig, ReturnType<R['metadata']>> &
   IAdtUpdatable<IClassConfig, ReturnType<R['updated']>> &
@@ -290,20 +281,10 @@ export type IClassContract<
   IAdtLockable<IClassConfig> &
   IAdtTransportAware<IClassConfig, string> &
   IAdtVersionable<IClassConfig, ObjectVersion[], string>;
-export type IProgramContract<
-  R extends IProgramResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  >,
-> = IAdtCreatable<IProgramConfig, ReturnType<R['created']>> &
+export type IProgramContract<R extends IProgramResults> = IAdtCreatable<
+  IProgramConfig,
+  ReturnType<R['created']>
+> &
   IAdtReadable<IProgramConfig, ReturnType<R['source']>> &
   IAdtMetadataReadable<IProgramConfig, ReturnType<R['metadata']>> &
   IAdtUpdatable<IProgramConfig, ReturnType<R['updated']>> &
@@ -318,18 +299,10 @@ export type IProgramContract<
   IAdtLockable<IProgramConfig> &
   IAdtTransportAware<IProgramConfig, ReturnType<R['transport']>> &
   IAdtVersionable<IProgramConfig, ObjectVersion[], string>;
-export type IIncludeContract<
-  R extends IIncludeResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  >,
-> = IAdtCreatable<IIncludeConfig, ReturnType<R['created']>> &
+export type IIncludeContract<R extends IIncludeResults> = IAdtCreatable<
+  IIncludeConfig,
+  ReturnType<R['created']>
+> &
   IAdtReadable<IIncludeConfig, ReturnType<R['source']>> &
   IAdtMetadataReadable<IIncludeConfig, ReturnType<R['metadata']>> &
   IAdtUpdatable<IIncludeConfig, ReturnType<R['updated']>> &
@@ -341,20 +314,10 @@ export type IIncludeContract<
   IAdtValidatable<IIncludeConfig, ReturnType<R['validation']>> &
   IAdtActivatable<IIncludeConfig, ReturnType<R['activation']>> &
   IAdtLockable<IIncludeConfig>;
-export type IInterfaceContract<
-  R extends IInterfaceResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  >,
-> = IAdtCreatable<IInterfaceConfig, ReturnType<R['created']>> &
+export type IInterfaceContract<R extends IInterfaceResults> = IAdtCreatable<
+  IInterfaceConfig,
+  ReturnType<R['created']>
+> &
   IAdtReadable<IInterfaceConfig, ReturnType<R['source']>> &
   IAdtMetadataReadable<IInterfaceConfig, ReturnType<R['metadata']>> &
   IAdtUpdatable<IInterfaceConfig, ReturnType<R['updated']>> &
@@ -369,20 +332,10 @@ export type IInterfaceContract<
   IAdtLockable<IInterfaceConfig> &
   IAdtTransportAware<IInterfaceConfig, ReturnType<R['transport']>> &
   IAdtVersionable<IInterfaceConfig, ObjectVersion[], string>;
-export type IDomainContract<
-  R extends IDomainResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  >,
-> = IAdtCreatable<IDomainConfig, ReturnType<R['created']>> &
+export type IDomainContract<R extends IDomainResults> = IAdtCreatable<
+  IDomainConfig,
+  ReturnType<R['created']>
+> &
   IAdtMetadataReadable<IDomainConfig, ReturnType<R['metadata']>> &
   IAdtMetadataUpdatable<IDomainConfig, ReturnType<R['metadataUpdated']>> &
   IAdtDeletable<
@@ -395,20 +348,10 @@ export type IDomainContract<
   IAdtActivatable<IDomainConfig, ReturnType<R['activation']>> &
   IAdtLockable<IDomainConfig> &
   IAdtTransportAware<IDomainConfig, ReturnType<R['transport']>>;
-export type IDataElementContract<
-  R extends IDataElementResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  >,
-> = IAdtCreatable<IDataElementConfig, ReturnType<R['created']>> &
+export type IDataElementContract<R extends IDataElementResults> = IAdtCreatable<
+  IDataElementConfig,
+  ReturnType<R['created']>
+> &
   IAdtMetadataReadable<IDataElementConfig, ReturnType<R['metadata']>> &
   IAdtMetadataUpdatable<IDataElementConfig, ReturnType<R['metadataUpdated']>> &
   IAdtDeletable<
@@ -421,47 +364,26 @@ export type IDataElementContract<
   IAdtActivatable<IDataElementConfig, ReturnType<R['activation']>> &
   IAdtLockable<IDataElementConfig> &
   IAdtTransportAware<IDataElementConfig, ReturnType<R['transport']>>;
-export type IAuthorizationFieldContract<
-  R extends IAuthorizationFieldResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  >,
-> = IAdtCreatable<IAuthorizationFieldConfig, ReturnType<R['created']>> &
-  IAdtMetadataReadable<IAuthorizationFieldConfig, ReturnType<R['metadata']>> &
-  IAdtMetadataUpdatable<
-    IAuthorizationFieldConfig,
-    ReturnType<R['metadataUpdated']>
-  > &
-  IAdtDeletable<
-    IAuthorizationFieldConfig,
-    ReturnType<R['deletion']>,
-    ReturnType<R['deletionCheck']>
-  > &
-  IAdtValidatable<IAuthorizationFieldConfig, ReturnType<R['validation']>> &
-  IAdtCheckable<IAuthorizationFieldConfig, ReturnType<R['check']>> &
-  IAdtActivatable<IAuthorizationFieldConfig, ReturnType<R['activation']>> &
-  IAdtLockable<IAuthorizationFieldConfig>;
-export type IStructureContract<
-  R extends IStructureResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  >,
-> = IAdtCreatable<IStructureConfig, ReturnType<R['created']>> &
+export type IAuthorizationFieldContract<R extends IAuthorizationFieldResults> =
+  IAdtCreatable<IAuthorizationFieldConfig, ReturnType<R['created']>> &
+    IAdtMetadataReadable<IAuthorizationFieldConfig, ReturnType<R['metadata']>> &
+    IAdtMetadataUpdatable<
+      IAuthorizationFieldConfig,
+      ReturnType<R['metadataUpdated']>
+    > &
+    IAdtDeletable<
+      IAuthorizationFieldConfig,
+      ReturnType<R['deletion']>,
+      ReturnType<R['deletionCheck']>
+    > &
+    IAdtValidatable<IAuthorizationFieldConfig, ReturnType<R['validation']>> &
+    IAdtCheckable<IAuthorizationFieldConfig, ReturnType<R['check']>> &
+    IAdtActivatable<IAuthorizationFieldConfig, ReturnType<R['activation']>> &
+    IAdtLockable<IAuthorizationFieldConfig>;
+export type IStructureContract<R extends IStructureResults> = IAdtCreatable<
+  IStructureConfig,
+  ReturnType<R['created']>
+> &
   IAdtReadable<IStructureConfig, ReturnType<R['source']>> &
   IAdtMetadataReadable<IStructureConfig, ReturnType<R['metadata']>> &
   IAdtUpdatable<IStructureConfig, ReturnType<R['updated']>> &
@@ -476,20 +398,10 @@ export type IStructureContract<
   IAdtLockable<IStructureConfig> &
   IAdtTransportAware<IStructureConfig, ReturnType<R['transport']>> &
   IAdtVersionable<IStructureConfig, ObjectVersion[], string>;
-export type ITableContract<
-  R extends ITableResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  >,
-> = IAdtCreatable<ITableConfig, ReturnType<R['created']>> &
+export type ITableContract<R extends ITableResults> = IAdtCreatable<
+  ITableConfig,
+  ReturnType<R['created']>
+> &
   IAdtReadable<ITableConfig, ReturnType<R['source']>> &
   IAdtMetadataReadable<ITableConfig, ReturnType<R['metadata']>> &
   IAdtUpdatable<ITableConfig, ReturnType<R['updated']>> &
@@ -504,20 +416,10 @@ export type ITableContract<
   IAdtLockable<ITableConfig> &
   IAdtTransportAware<ITableConfig, ReturnType<R['transport']>> &
   IAdtVersionable<ITableConfig, ObjectVersion[], string>;
-export type ITableTypeContract<
-  R extends ITableTypeResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  >,
-> = IAdtCreatable<ITableTypeConfig, ReturnType<R['created']>> &
+export type ITableTypeContract<R extends ITableTypeResults> = IAdtCreatable<
+  ITableTypeConfig,
+  ReturnType<R['created']>
+> &
   IAdtMetadataReadable<ITableTypeConfig, ReturnType<R['metadata']>> &
   IAdtMetadataUpdatable<ITableTypeConfig, ReturnType<R['metadataUpdated']>> &
   IAdtDeletable<
@@ -531,20 +433,10 @@ export type ITableTypeContract<
   IAdtLockable<ITableTypeConfig> &
   IAdtTransportAware<ITableTypeConfig, ReturnType<R['transport']>> &
   IAdtVersionable<ITableTypeConfig, ObjectVersion[], string>;
-export type IDdlContract<
-  R extends IDdlResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  >,
-> = IAdtCreatable<IDdlConfig, ReturnType<R['created']>> &
+export type IDdlContract<R extends IDdlResults> = IAdtCreatable<
+  IDdlConfig,
+  ReturnType<R['created']>
+> &
   IAdtReadable<IDdlConfig, ReturnType<R['source']>> &
   IAdtMetadataReadable<IDdlConfig, ReturnType<R['metadata']>> &
   IAdtUpdatable<IDdlConfig, ReturnType<R['updated']>> &
@@ -559,103 +451,62 @@ export type IDdlContract<
   IAdtLockable<IDdlConfig> &
   IAdtTransportAware<IDdlConfig, ReturnType<R['transport']>> &
   IAdtVersionable<IDdlConfig, ObjectVersion[], string>;
-export type IFunctionGroupContract<
-  R extends IFunctionGroupResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  >,
-> = IAdtCreatable<IFunctionGroupConfig, ReturnType<R['created']>> &
-  IAdtMetadataReadable<IFunctionGroupConfig, ReturnType<R['metadata']>> &
-  IAdtMetadataUpdatable<
-    IFunctionGroupConfig,
-    ReturnType<R['metadataUpdated']>
-  > &
-  IAdtDeletable<
-    IFunctionGroupConfig,
-    ReturnType<R['deletion']>,
-    ReturnType<R['deletionCheck']>
-  > &
-  IAdtValidatable<IFunctionGroupConfig, ReturnType<R['validation']>> &
-  IAdtCheckable<IFunctionGroupConfig, ReturnType<R['check']>> &
-  IAdtActivatable<IFunctionGroupConfig, ReturnType<R['activation']>> &
-  IAdtLockable<IFunctionGroupConfig> &
-  IAdtTransportAware<IFunctionGroupConfig, ReturnType<R['transport']>>;
-export type IFunctionModuleContract<
-  R extends IFunctionModuleResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  >,
-> = IAdtCreatable<IFunctionModuleConfig, ReturnType<R['created']>> &
-  IAdtReadable<IFunctionModuleConfig, ReturnType<R['source']>> &
-  IAdtMetadataReadable<IFunctionModuleConfig, ReturnType<R['metadata']>> &
-  IAdtUpdatable<IFunctionModuleConfig, ReturnType<R['updated']>> &
-  IAdtDeletable<
-    IFunctionModuleConfig,
-    ReturnType<R['deletion']>,
-    ReturnType<R['deletionCheck']>
-  > &
-  IAdtValidatable<IFunctionModuleConfig, ReturnType<R['validation']>> &
-  IAdtCheckable<IFunctionModuleConfig, ReturnType<R['check']>> &
-  IAdtActivatable<IFunctionModuleConfig, ReturnType<R['activation']>> &
-  IAdtLockable<IFunctionModuleConfig> &
-  IAdtTransportAware<IFunctionModuleConfig, ReturnType<R['transport']>> &
-  IAdtVersionable<IFunctionModuleConfig, ObjectVersion[], string>;
-export type IFunctionIncludeContract<
-  R extends IFunctionIncludeResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  >,
-> = IAdtCreatable<IFunctionIncludeConfig, ReturnType<R['created']>> &
-  IAdtReadable<IFunctionIncludeConfig, ReturnType<R['source']>> &
-  IAdtMetadataReadable<IFunctionIncludeConfig, ReturnType<R['metadata']>> &
-  IAdtUpdatable<IFunctionIncludeConfig, ReturnType<R['updated']>> &
-  IAdtMetadataUpdatable<IFunctionIncludeConfig, ReturnType<R['metadata']>> &
-  IAdtDeletable<
-    IFunctionIncludeConfig,
-    ReturnType<R['deletion']>,
-    ReturnType<R['deletionCheck']>
-  > &
-  IAdtValidatable<IFunctionIncludeConfig, ReturnType<R['validation']>> &
-  IAdtCheckable<IFunctionIncludeConfig, ReturnType<R['check']>> &
-  IAdtActivatable<IFunctionIncludeConfig, ReturnType<R['activation']>> &
-  IAdtLockable<IFunctionIncludeConfig> &
-  IAdtVersionable<IFunctionIncludeConfig, ObjectVersion[], string>;
-export type IPackageContract<
-  R extends IPackageResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  >,
-> = IAdtCreatable<IPackageConfig, ReturnType<R['created']>> &
+export type IFunctionGroupContract<R extends IFunctionGroupResults> =
+  IAdtCreatable<IFunctionGroupConfig, ReturnType<R['created']>> &
+    IAdtMetadataReadable<IFunctionGroupConfig, ReturnType<R['metadata']>> &
+    IAdtMetadataUpdatable<
+      IFunctionGroupConfig,
+      ReturnType<R['metadataUpdated']>
+    > &
+    IAdtDeletable<
+      IFunctionGroupConfig,
+      ReturnType<R['deletion']>,
+      ReturnType<R['deletionCheck']>
+    > &
+    IAdtValidatable<IFunctionGroupConfig, ReturnType<R['validation']>> &
+    IAdtCheckable<IFunctionGroupConfig, ReturnType<R['check']>> &
+    IAdtActivatable<IFunctionGroupConfig, ReturnType<R['activation']>> &
+    IAdtLockable<IFunctionGroupConfig> &
+    IAdtTransportAware<IFunctionGroupConfig, ReturnType<R['transport']>>;
+export type IFunctionModuleContract<R extends IFunctionModuleResults> =
+  IAdtCreatable<IFunctionModuleConfig, ReturnType<R['created']>> &
+    IAdtReadable<IFunctionModuleConfig, ReturnType<R['source']>> &
+    IAdtMetadataReadable<IFunctionModuleConfig, ReturnType<R['metadata']>> &
+    IAdtUpdatable<IFunctionModuleConfig, ReturnType<R['updated']>> &
+    IAdtDeletable<
+      IFunctionModuleConfig,
+      ReturnType<R['deletion']>,
+      ReturnType<R['deletionCheck']>
+    > &
+    IAdtValidatable<IFunctionModuleConfig, ReturnType<R['validation']>> &
+    IAdtCheckable<IFunctionModuleConfig, ReturnType<R['check']>> &
+    IAdtActivatable<IFunctionModuleConfig, ReturnType<R['activation']>> &
+    IAdtLockable<IFunctionModuleConfig> &
+    IAdtTransportAware<IFunctionModuleConfig, ReturnType<R['transport']>> &
+    IAdtVersionable<IFunctionModuleConfig, ObjectVersion[], string>;
+export type IFunctionIncludeContract<R extends IFunctionIncludeResults> =
+  IAdtCreatable<IFunctionIncludeConfig, ReturnType<R['created']>> &
+    IAdtReadable<IFunctionIncludeConfig, ReturnType<R['source']>> &
+    IAdtMetadataReadable<IFunctionIncludeConfig, ReturnType<R['metadata']>> &
+    IAdtUpdatable<IFunctionIncludeConfig, ReturnType<R['updated']>> &
+    IAdtMetadataUpdatable<
+      IFunctionIncludeConfig,
+      ReturnType<R['metadataUpdated']>
+    > &
+    IAdtDeletable<
+      IFunctionIncludeConfig,
+      ReturnType<R['deletion']>,
+      ReturnType<R['deletionCheck']>
+    > &
+    IAdtValidatable<IFunctionIncludeConfig, ReturnType<R['validation']>> &
+    IAdtCheckable<IFunctionIncludeConfig, ReturnType<R['check']>> &
+    IAdtActivatable<IFunctionIncludeConfig, ReturnType<R['activation']>> &
+    IAdtLockable<IFunctionIncludeConfig> &
+    IAdtVersionable<IFunctionIncludeConfig, ObjectVersion[], string>;
+export type IPackageContract<R extends IPackageResults> = IAdtCreatable<
+  IPackageConfig,
+  ReturnType<R['created']>
+> &
   IAdtMetadataReadable<IPackageConfig, ReturnType<R['metadata']>> &
   IAdtMetadataUpdatable<IPackageConfig, ReturnType<R['metadataUpdated']>> &
   IAdtDeletable<
@@ -667,156 +518,91 @@ export type IPackageContract<
   IAdtCheckable<IPackageConfig, ReturnType<R['check']>> &
   IAdtLockable<IPackageConfig> &
   IAdtTransportAware<IPackageConfig, ReturnType<R['transport']>>;
-export type IMessageClassContract<
-  R extends IMessageClassResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  >,
-> = IAdtCreatable<IMessageClassConfig, ReturnType<R['created']>> &
-  IAdtMetadataReadable<IMessageClassConfig, ReturnType<R['metadata']>> &
-  IAdtMetadataUpdatable<IMessageClassConfig, ReturnType<R['metadataUpdated']>> &
-  IAdtDeletable<
-    IMessageClassConfig,
-    ReturnType<R['deletion']>,
-    ReturnType<R['deletionCheck']>
-  > &
-  IAdtValidatable<IMessageClassConfig, ReturnType<R['validation']>> &
-  IAdtLockable<IMessageClassConfig>;
+export type IMessageClassContract<R extends IMessageClassResults> =
+  IAdtCreatable<IMessageClassConfig, ReturnType<R['created']>> &
+    IAdtMetadataReadable<IMessageClassConfig, ReturnType<R['metadata']>> &
+    IAdtMetadataUpdatable<
+      IMessageClassConfig,
+      ReturnType<R['metadataUpdated']>
+    > &
+    IAdtDeletable<
+      IMessageClassConfig,
+      ReturnType<R['deletion']>,
+      ReturnType<R['deletionCheck']>
+    > &
+    IAdtValidatable<IMessageClassConfig, ReturnType<R['validation']>> &
+    IAdtLockable<IMessageClassConfig>;
 export type IMessageClassMessageContract<
-  R extends IMessageClassMessageResults<unknown, unknown, unknown>,
+  R extends IMessageClassMessageResults,
 > = IAdtCreatable<IMessageClassMessageConfig, ReturnType<R['written']>> &
   IAdtReadable<IMessageClassMessageConfig, ReturnType<R['read']>> &
   IAdtUpdatable<IMessageClassMessageConfig, ReturnType<R['written']>>;
-export type IAccessControlContract<
-  R extends IAccessControlResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  >,
-> = IAdtCreatable<IAccessControlConfig, ReturnType<R['created']>> &
-  IAdtReadable<IAccessControlConfig, ReturnType<R['source']>> &
-  IAdtMetadataReadable<IAccessControlConfig, ReturnType<R['metadata']>> &
-  IAdtUpdatable<IAccessControlConfig, ReturnType<R['updated']>> &
-  IAdtDeletable<
-    IAccessControlConfig,
-    ReturnType<R['deletion']>,
-    ReturnType<R['deletionCheck']>
-  > &
-  IAdtValidatable<IAccessControlConfig, ReturnType<R['validation']>> &
-  IAdtCheckable<IAccessControlConfig, ReturnType<R['check']>> &
-  IAdtActivatable<IAccessControlConfig, ReturnType<R['activation']>> &
-  IAdtLockable<IAccessControlConfig> &
-  IAdtTransportAware<IAccessControlConfig, ReturnType<R['transport']>> &
-  IAdtVersionable<IAccessControlConfig, ObjectVersion[], string>;
-export type ITransformationContract<
-  R extends ITransformationResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  >,
-> = IAdtCreatable<ITransformationConfig, ReturnType<R['created']>> &
-  IAdtReadable<ITransformationConfig, ReturnType<R['source']>> &
-  IAdtMetadataReadable<ITransformationConfig, ReturnType<R['metadata']>> &
-  IAdtUpdatable<ITransformationConfig, ReturnType<R['updated']>> &
-  IAdtDeletable<
-    ITransformationConfig,
-    ReturnType<R['deletion']>,
-    ReturnType<R['deletionCheck']>
-  > &
-  IAdtValidatable<ITransformationConfig, ReturnType<R['validation']>> &
-  IAdtCheckable<ITransformationConfig, ReturnType<R['check']>> &
-  IAdtActivatable<ITransformationConfig, ReturnType<R['activation']>> &
-  IAdtLockable<ITransformationConfig> &
-  IAdtTransportAware<ITransformationConfig, ReturnType<R['transport']>> &
-  IAdtVersionable<ITransformationConfig, ObjectVersion[], string>;
-export type IServiceDefinitionContract<
-  R extends IServiceDefinitionResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  >,
-> = IAdtCreatable<IServiceDefinitionConfig, ReturnType<R['created']>> &
-  IAdtReadable<IServiceDefinitionConfig, ReturnType<R['source']>> &
-  IAdtMetadataReadable<IServiceDefinitionConfig, ReturnType<R['metadata']>> &
-  IAdtUpdatable<IServiceDefinitionConfig, ReturnType<R['updated']>> &
-  IAdtDeletable<
-    IServiceDefinitionConfig,
-    ReturnType<R['deletion']>,
-    ReturnType<R['deletionCheck']>
-  > &
-  IAdtValidatable<IServiceDefinitionConfig, ReturnType<R['validation']>> &
-  IAdtCheckable<IServiceDefinitionConfig, ReturnType<R['check']>> &
-  IAdtActivatable<IServiceDefinitionConfig, ReturnType<R['activation']>> &
-  IAdtLockable<IServiceDefinitionConfig> &
-  IAdtTransportAware<IServiceDefinitionConfig, ReturnType<R['transport']>> &
-  IAdtVersionable<IServiceDefinitionConfig, ObjectVersion[], string>;
-export type IScalarFunctionContract<
-  R extends IScalarFunctionResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  >,
-> = IAdtCreatable<IScalarFunctionConfig, ReturnType<R['created']>> &
-  IAdtReadable<IScalarFunctionConfig, ReturnType<R['source']>> &
-  IAdtMetadataReadable<IScalarFunctionConfig, ReturnType<R['metadata']>> &
-  IAdtUpdatable<IScalarFunctionConfig, ReturnType<R['updated']>> &
-  IAdtDeletable<
-    IScalarFunctionConfig,
-    ReturnType<R['deletion']>,
-    ReturnType<R['deletionCheck']>
-  > &
-  IAdtValidatable<IScalarFunctionConfig, ReturnType<R['validation']>> &
-  IAdtCheckable<IScalarFunctionConfig, ReturnType<R['check']>> &
-  IAdtActivatable<IScalarFunctionConfig, ReturnType<R['activation']>> &
-  IAdtLockable<IScalarFunctionConfig> &
-  IAdtTransportAware<IScalarFunctionConfig, ReturnType<R['transport']>> &
-  IAdtVersionable<IScalarFunctionConfig, ObjectVersion[], string>;
+export type IAccessControlContract<R extends IAccessControlResults> =
+  IAdtCreatable<IAccessControlConfig, ReturnType<R['created']>> &
+    IAdtReadable<IAccessControlConfig, ReturnType<R['source']>> &
+    IAdtMetadataReadable<IAccessControlConfig, ReturnType<R['metadata']>> &
+    IAdtUpdatable<IAccessControlConfig, ReturnType<R['updated']>> &
+    IAdtDeletable<
+      IAccessControlConfig,
+      ReturnType<R['deletion']>,
+      ReturnType<R['deletionCheck']>
+    > &
+    IAdtValidatable<IAccessControlConfig, ReturnType<R['validation']>> &
+    IAdtCheckable<IAccessControlConfig, ReturnType<R['check']>> &
+    IAdtActivatable<IAccessControlConfig, ReturnType<R['activation']>> &
+    IAdtLockable<IAccessControlConfig> &
+    IAdtTransportAware<IAccessControlConfig, ReturnType<R['transport']>> &
+    IAdtVersionable<IAccessControlConfig, ObjectVersion[], string>;
+export type ITransformationContract<R extends ITransformationResults> =
+  IAdtCreatable<ITransformationConfig, ReturnType<R['created']>> &
+    IAdtReadable<ITransformationConfig, ReturnType<R['source']>> &
+    IAdtMetadataReadable<ITransformationConfig, ReturnType<R['metadata']>> &
+    IAdtUpdatable<ITransformationConfig, ReturnType<R['updated']>> &
+    IAdtDeletable<
+      ITransformationConfig,
+      ReturnType<R['deletion']>,
+      ReturnType<R['deletionCheck']>
+    > &
+    IAdtValidatable<ITransformationConfig, ReturnType<R['validation']>> &
+    IAdtCheckable<ITransformationConfig, ReturnType<R['check']>> &
+    IAdtActivatable<ITransformationConfig, ReturnType<R['activation']>> &
+    IAdtLockable<ITransformationConfig> &
+    IAdtTransportAware<ITransformationConfig, ReturnType<R['transport']>> &
+    IAdtVersionable<ITransformationConfig, ObjectVersion[], string>;
+export type IServiceDefinitionContract<R extends IServiceDefinitionResults> =
+  IAdtCreatable<IServiceDefinitionConfig, ReturnType<R['created']>> &
+    IAdtReadable<IServiceDefinitionConfig, ReturnType<R['source']>> &
+    IAdtMetadataReadable<IServiceDefinitionConfig, ReturnType<R['metadata']>> &
+    IAdtUpdatable<IServiceDefinitionConfig, ReturnType<R['updated']>> &
+    IAdtDeletable<
+      IServiceDefinitionConfig,
+      ReturnType<R['deletion']>,
+      ReturnType<R['deletionCheck']>
+    > &
+    IAdtValidatable<IServiceDefinitionConfig, ReturnType<R['validation']>> &
+    IAdtCheckable<IServiceDefinitionConfig, ReturnType<R['check']>> &
+    IAdtActivatable<IServiceDefinitionConfig, ReturnType<R['activation']>> &
+    IAdtLockable<IServiceDefinitionConfig> &
+    IAdtTransportAware<IServiceDefinitionConfig, ReturnType<R['transport']>> &
+    IAdtVersionable<IServiceDefinitionConfig, ObjectVersion[], string>;
+export type IScalarFunctionContract<R extends IScalarFunctionResults> =
+  IAdtCreatable<IScalarFunctionConfig, ReturnType<R['created']>> &
+    IAdtReadable<IScalarFunctionConfig, ReturnType<R['source']>> &
+    IAdtMetadataReadable<IScalarFunctionConfig, ReturnType<R['metadata']>> &
+    IAdtUpdatable<IScalarFunctionConfig, ReturnType<R['updated']>> &
+    IAdtDeletable<
+      IScalarFunctionConfig,
+      ReturnType<R['deletion']>,
+      ReturnType<R['deletionCheck']>
+    > &
+    IAdtValidatable<IScalarFunctionConfig, ReturnType<R['validation']>> &
+    IAdtCheckable<IScalarFunctionConfig, ReturnType<R['check']>> &
+    IAdtActivatable<IScalarFunctionConfig, ReturnType<R['activation']>> &
+    IAdtLockable<IScalarFunctionConfig> &
+    IAdtTransportAware<IScalarFunctionConfig, ReturnType<R['transport']>> &
+    IAdtVersionable<IScalarFunctionConfig, ObjectVersion[], string>;
 export type IScalarFunctionImplementationContract<
-  R extends IScalarFunctionImplementationResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  >,
+  R extends IScalarFunctionImplementationResults,
 > = IAdtCreatable<
   IScalarFunctionImplementationConfig,
   ReturnType<R['created']>
@@ -829,7 +615,7 @@ export type IScalarFunctionImplementationContract<
   IAdtUpdatable<IScalarFunctionImplementationConfig, ReturnType<R['updated']>> &
   IAdtMetadataUpdatable<
     IScalarFunctionImplementationConfig,
-    ReturnType<R['metadata']>
+    ReturnType<R['metadataUpdated']>
   > &
   IAdtDeletable<
     IScalarFunctionImplementationConfig,
@@ -851,134 +637,83 @@ export type IScalarFunctionImplementationContract<
     ReturnType<R['transport']>
   > &
   IAdtVersionable<IScalarFunctionImplementationConfig, ObjectVersion[], string>;
-export type IAppendStructureContract<
-  R extends IAppendStructureResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  >,
-> = IAdtCreatable<IAppendStructureConfig, ReturnType<R['created']>> &
-  IAdtReadable<IAppendStructureConfig, ReturnType<R['source']>> &
-  IAdtMetadataReadable<IAppendStructureConfig, ReturnType<R['metadata']>> &
-  IAdtUpdatable<IAppendStructureConfig, ReturnType<R['updated']>> &
-  IAdtDeletable<
-    IAppendStructureConfig,
-    ReturnType<R['deletion']>,
-    ReturnType<R['deletionCheck']>
-  > &
-  IAdtValidatable<IAppendStructureConfig, ReturnType<R['validation']>> &
-  IAdtCheckable<IAppendStructureConfig, ReturnType<R['check']>> &
-  IAdtActivatable<IAppendStructureConfig, ReturnType<R['activation']>> &
-  IAdtLockable<IAppendStructureConfig> &
-  IAdtTransportAware<IAppendStructureConfig, ReturnType<R['transport']>> &
-  IAdtVersionable<IAppendStructureConfig, ObjectVersion[], string>;
-export type IBehaviorDefinitionContract<
-  R extends IBehaviorDefinitionResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  >,
-> = IAdtCreatable<IBehaviorDefinitionConfig, ReturnType<R['created']>> &
-  IAdtReadable<IBehaviorDefinitionConfig, ReturnType<R['source']>> &
-  IAdtMetadataReadable<IBehaviorDefinitionConfig, ReturnType<R['metadata']>> &
-  IAdtUpdatable<IBehaviorDefinitionConfig, ReturnType<R['updated']>> &
-  IAdtDeletable<
-    IBehaviorDefinitionConfig,
-    ReturnType<R['deletion']>,
-    ReturnType<R['deletionCheck']>
-  > &
-  IAdtValidatable<IBehaviorDefinitionConfig, ReturnType<R['validation']>> &
-  IAdtCheckable<IBehaviorDefinitionConfig, ReturnType<R['check']>> &
-  IAdtActivatable<IBehaviorDefinitionConfig, ReturnType<R['activation']>> &
-  IAdtLockable<IBehaviorDefinitionConfig> &
-  IAdtTransportAware<IBehaviorDefinitionConfig, ReturnType<R['transport']>> &
-  IAdtVersionable<IBehaviorDefinitionConfig, ObjectVersion[], string>;
-export type IBehaviorImplementationContract<
-  R extends IClassResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  >,
-> = IAdtCreatable<IBehaviorImplementationConfig, ReturnType<R['created']>> &
-  IAdtReadable<IBehaviorImplementationConfig, ReturnType<R['source']>> &
-  IAdtMetadataReadable<
-    IBehaviorImplementationConfig,
-    ReturnType<R['metadata']>
-  > &
-  IAdtUpdatable<IBehaviorImplementationConfig, ReturnType<R['updated']>> &
-  IAdtDeletable<
-    IBehaviorImplementationConfig,
-    ReturnType<R['deletion']>,
-    ReturnType<R['deletionCheck']>
-  > &
-  IAdtValidatable<IBehaviorImplementationConfig, ReturnType<R['validation']>> &
-  IAdtCheckable<IBehaviorImplementationConfig, ReturnType<R['check']>> &
-  IAdtActivatable<IBehaviorImplementationConfig, ReturnType<R['activation']>> &
-  IAdtLockable<IBehaviorImplementationConfig> &
-  IAdtTransportAware<IBehaviorImplementationConfig, string> &
-  IAdtVersionable<IBehaviorImplementationConfig, ObjectVersion[], string>;
-export type IMetadataExtensionContract<
-  R extends IMetadataExtensionResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  >,
-> = IAdtCreatable<IMetadataExtensionConfig, ReturnType<R['created']>> &
-  IAdtReadable<IMetadataExtensionConfig, ReturnType<R['source']>> &
-  IAdtMetadataReadable<IMetadataExtensionConfig, ReturnType<R['metadata']>> &
-  IAdtUpdatable<IMetadataExtensionConfig, ReturnType<R['updated']>> &
-  IAdtDeletable<
-    IMetadataExtensionConfig,
-    ReturnType<R['deletion']>,
-    ReturnType<R['deletionCheck']>
-  > &
-  IAdtValidatable<IMetadataExtensionConfig, ReturnType<R['validation']>> &
-  IAdtCheckable<IMetadataExtensionConfig, ReturnType<R['check']>> &
-  IAdtActivatable<IMetadataExtensionConfig, ReturnType<R['activation']>> &
-  IAdtLockable<IMetadataExtensionConfig> &
-  IAdtTransportAware<IMetadataExtensionConfig, ReturnType<R['transport']>> &
-  IAdtVersionable<IMetadataExtensionConfig, ObjectVersion[], string>;
-export type IEnhancementContract<
-  R extends IEnhancementResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  >,
-> = IAdtCreatable<IEnhancementConfig, ReturnType<R['created']>> &
+export type IAppendStructureContract<R extends IAppendStructureResults> =
+  IAdtCreatable<IAppendStructureConfig, ReturnType<R['created']>> &
+    IAdtReadable<IAppendStructureConfig, ReturnType<R['source']>> &
+    IAdtMetadataReadable<IAppendStructureConfig, ReturnType<R['metadata']>> &
+    IAdtUpdatable<IAppendStructureConfig, ReturnType<R['updated']>> &
+    IAdtDeletable<
+      IAppendStructureConfig,
+      ReturnType<R['deletion']>,
+      ReturnType<R['deletionCheck']>
+    > &
+    IAdtValidatable<IAppendStructureConfig, ReturnType<R['validation']>> &
+    IAdtCheckable<IAppendStructureConfig, ReturnType<R['check']>> &
+    IAdtActivatable<IAppendStructureConfig, ReturnType<R['activation']>> &
+    IAdtLockable<IAppendStructureConfig> &
+    IAdtTransportAware<IAppendStructureConfig, ReturnType<R['transport']>> &
+    IAdtVersionable<IAppendStructureConfig, ObjectVersion[], string>;
+export type IBehaviorDefinitionContract<R extends IBehaviorDefinitionResults> =
+  IAdtCreatable<IBehaviorDefinitionConfig, ReturnType<R['created']>> &
+    IAdtReadable<IBehaviorDefinitionConfig, ReturnType<R['source']>> &
+    IAdtMetadataReadable<IBehaviorDefinitionConfig, ReturnType<R['metadata']>> &
+    IAdtUpdatable<IBehaviorDefinitionConfig, ReturnType<R['updated']>> &
+    IAdtDeletable<
+      IBehaviorDefinitionConfig,
+      ReturnType<R['deletion']>,
+      ReturnType<R['deletionCheck']>
+    > &
+    IAdtValidatable<IBehaviorDefinitionConfig, ReturnType<R['validation']>> &
+    IAdtCheckable<IBehaviorDefinitionConfig, ReturnType<R['check']>> &
+    IAdtActivatable<IBehaviorDefinitionConfig, ReturnType<R['activation']>> &
+    IAdtLockable<IBehaviorDefinitionConfig> &
+    IAdtTransportAware<IBehaviorDefinitionConfig, ReturnType<R['transport']>> &
+    IAdtVersionable<IBehaviorDefinitionConfig, ObjectVersion[], string>;
+export type IBehaviorImplementationContract<R extends IClassResults> =
+  IAdtCreatable<IBehaviorImplementationConfig, ReturnType<R['created']>> &
+    IAdtReadable<IBehaviorImplementationConfig, ReturnType<R['source']>> &
+    IAdtMetadataReadable<
+      IBehaviorImplementationConfig,
+      ReturnType<R['metadata']>
+    > &
+    IAdtUpdatable<IBehaviorImplementationConfig, ReturnType<R['updated']>> &
+    IAdtDeletable<
+      IBehaviorImplementationConfig,
+      ReturnType<R['deletion']>,
+      ReturnType<R['deletionCheck']>
+    > &
+    IAdtValidatable<
+      IBehaviorImplementationConfig,
+      ReturnType<R['validation']>
+    > &
+    IAdtCheckable<IBehaviorImplementationConfig, ReturnType<R['check']>> &
+    IAdtActivatable<
+      IBehaviorImplementationConfig,
+      ReturnType<R['activation']>
+    > &
+    IAdtLockable<IBehaviorImplementationConfig> &
+    IAdtTransportAware<IBehaviorImplementationConfig, string> &
+    IAdtVersionable<IBehaviorImplementationConfig, ObjectVersion[], string>;
+export type IMetadataExtensionContract<R extends IMetadataExtensionResults> =
+  IAdtCreatable<IMetadataExtensionConfig, ReturnType<R['created']>> &
+    IAdtReadable<IMetadataExtensionConfig, ReturnType<R['source']>> &
+    IAdtMetadataReadable<IMetadataExtensionConfig, ReturnType<R['metadata']>> &
+    IAdtUpdatable<IMetadataExtensionConfig, ReturnType<R['updated']>> &
+    IAdtDeletable<
+      IMetadataExtensionConfig,
+      ReturnType<R['deletion']>,
+      ReturnType<R['deletionCheck']>
+    > &
+    IAdtValidatable<IMetadataExtensionConfig, ReturnType<R['validation']>> &
+    IAdtCheckable<IMetadataExtensionConfig, ReturnType<R['check']>> &
+    IAdtActivatable<IMetadataExtensionConfig, ReturnType<R['activation']>> &
+    IAdtLockable<IMetadataExtensionConfig> &
+    IAdtTransportAware<IMetadataExtensionConfig, ReturnType<R['transport']>> &
+    IAdtVersionable<IMetadataExtensionConfig, ObjectVersion[], string>;
+export type IEnhancementContract<R extends IEnhancementResults> = IAdtCreatable<
+  IEnhancementConfig,
+  ReturnType<R['created']>
+> &
   IAdtReadable<IEnhancementConfig, ReturnType<R['source']>> &
   IAdtMetadataReadable<IEnhancementConfig, ReturnType<R['metadata']>> &
   IAdtUpdatable<IEnhancementConfig, ReturnType<R['updated']>> &
@@ -993,16 +728,10 @@ export type IEnhancementContract<
   IAdtLockable<IEnhancementConfig> &
   IAdtTransportAware<IEnhancementConfig, ReturnType<R['transport']>> &
   IAdtVersionable<IEnhancementConfig, ObjectVersion[], string>;
-export type IRequestContract<
-  R extends ITransportResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  >,
-> = IAdtCreatable<ITransportConfig, ReturnType<R['created']>> &
+export type IRequestContract<R extends ITransportResults> = IAdtCreatable<
+  ITransportConfig,
+  ReturnType<R['created']>
+> &
   IAdtMetadataReadable<ITransportConfig, ReturnType<R['metadata']>> &
   IAdtMetadataUpdatable<ITransportConfig, ReturnType<R['metadataUpdated']>> &
   IAdtDeletable<
@@ -1011,19 +740,10 @@ export type IRequestContract<
     ReturnType<R['deletionCheck']>
   > &
   IAdtRequest<ReturnType<R['list']>>;
-export type ILocalTestClassContract<
-  R extends IClassResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  >,
-> = IAdtReadable<ILocalTestClassConfig, ReturnType<R['source']>> &
+export type ILocalTestClassContract<R extends IClassResults> = IAdtReadable<
+  ILocalTestClassConfig,
+  ReturnType<R['source']>
+> &
   IAdtMetadataReadable<ILocalTestClassConfig, ReturnType<R['metadata']>> &
   IAdtUpdatable<ILocalTestClassConfig, ReturnType<R['updated']>> &
   IAdtValidatable<ILocalTestClassConfig, ReturnType<R['validation']>> &
@@ -1032,19 +752,10 @@ export type ILocalTestClassContract<
   IAdtLockable<ILocalTestClassConfig> &
   IAdtVersionable<ILocalTestClassConfig, ObjectVersion[], string> &
   IAdtTransportAware<ILocalTestClassConfig, string>;
-export type ILocalTypesContract<
-  R extends IClassResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  >,
-> = IAdtReadable<ILocalTypesConfig, ReturnType<R['source']>> &
+export type ILocalTypesContract<R extends IClassResults> = IAdtReadable<
+  ILocalTypesConfig,
+  ReturnType<R['source']>
+> &
   IAdtMetadataReadable<ILocalTypesConfig, ReturnType<R['metadata']>> &
   IAdtUpdatable<ILocalTypesConfig, ReturnType<R['updated']>> &
   IAdtValidatable<ILocalTypesConfig, ReturnType<R['validation']>> &
@@ -1053,19 +764,10 @@ export type ILocalTypesContract<
   IAdtLockable<ILocalTypesConfig> &
   IAdtVersionable<ILocalTypesConfig, ObjectVersion[], string> &
   IAdtTransportAware<ILocalTypesConfig, string>;
-export type ILocalDefinitionsContract<
-  R extends IClassResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  >,
-> = IAdtReadable<ILocalDefinitionsConfig, ReturnType<R['source']>> &
+export type ILocalDefinitionsContract<R extends IClassResults> = IAdtReadable<
+  ILocalDefinitionsConfig,
+  ReturnType<R['source']>
+> &
   IAdtMetadataReadable<ILocalDefinitionsConfig, ReturnType<R['metadata']>> &
   IAdtUpdatable<ILocalDefinitionsConfig, ReturnType<R['updated']>> &
   IAdtValidatable<ILocalDefinitionsConfig, ReturnType<R['validation']>> &
@@ -1074,19 +776,10 @@ export type ILocalDefinitionsContract<
   IAdtLockable<ILocalDefinitionsConfig> &
   IAdtVersionable<ILocalDefinitionsConfig, ObjectVersion[], string> &
   IAdtTransportAware<ILocalDefinitionsConfig, string>;
-export type ILocalMacrosContract<
-  R extends IClassResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  >,
-> = IAdtReadable<ILocalMacrosConfig, ReturnType<R['source']>> &
+export type ILocalMacrosContract<R extends IClassResults> = IAdtReadable<
+  ILocalMacrosConfig,
+  ReturnType<R['source']>
+> &
   IAdtMetadataReadable<ILocalMacrosConfig, ReturnType<R['metadata']>> &
   IAdtUpdatable<ILocalMacrosConfig, ReturnType<R['updated']>> &
   IAdtValidatable<ILocalMacrosConfig, ReturnType<R['validation']>> &
@@ -1212,36 +905,14 @@ export class AdtClient {
   // arrives, so this is where the contract has to be. Written from the other
   // overload rather than by hand: the first hand-written one dropped an atom,
   // and `capabilities/shape.ts` caught it.
-  getClass(): IClassContract<IClassResults>;
-  getClass<
-    R extends IClassResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    >,
-  >(results: R): IClassContract<R>;
+  getClass(): IClassContract<typeof classDocuments>;
+  getClass<R extends IClassResults>(results: R): IClassContract<R>;
   // The implementation is generic too. Erasing R here would build the object at
   // `unknown` while the overload promised `ReturnType<R['source']>` — the
   // factory telling the truth in its signature and lying in its body.
-  getClass<
-    R extends IClassResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    > = IClassResults,
-  >(results: R = classDocuments as unknown as R): AdtClass<R> {
+  getClass<R extends IClassResults = typeof classDocuments>(
+    results: R = classDocuments as unknown as R,
+  ): AdtClass<R> {
     this.assertConnected();
     return new AdtClass<R>(
       this.connection,
@@ -1265,35 +936,11 @@ export class AdtClient {
   // arrives, so this is where the contract has to be. Written from the other
   // overload rather than by hand: the first hand-written one dropped an atom,
   // and `capabilities/shape.ts` caught it.
-  getProgram(): IProgramContract<IProgramResults>;
-  getProgram<
-    R extends IProgramResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    >,
-  >(results: R): IProgramContract<R>;
-  getProgram<
-    R extends IProgramResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    > = IProgramResults,
-  >(results: R = programDocuments as unknown as R): AdtProgram<R> {
+  getProgram(): IProgramContract<typeof programDocuments>;
+  getProgram<R extends IProgramResults>(results: R): IProgramContract<R>;
+  getProgram<R extends IProgramResults = typeof programDocuments>(
+    results: R = programDocuments as unknown as R,
+  ): AdtProgram<R> {
     this.assertConnected();
     return new AdtProgram<R>(
       this.connection,
@@ -1324,31 +971,11 @@ export class AdtClient {
   // arrives, so this is where the contract has to be. Written from the other
   // overload rather than by hand: the first hand-written one dropped an atom,
   // and `capabilities/shape.ts` caught it.
-  getInclude(): IIncludeContract<IIncludeResults>;
-  getInclude<
-    R extends IIncludeResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    >,
-  >(results: R): IIncludeContract<R>;
-  getInclude<
-    R extends IIncludeResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    > = IIncludeResults,
-  >(results: R = includeDocuments as unknown as R): AdtInclude<R> {
+  getInclude(): IIncludeContract<typeof includeDocuments>;
+  getInclude<R extends IIncludeResults>(results: R): IIncludeContract<R>;
+  getInclude<R extends IIncludeResults = typeof includeDocuments>(
+    results: R = includeDocuments as unknown as R,
+  ): AdtInclude<R> {
     this.assertConnected();
     return new AdtInclude<R>(
       this.connection,
@@ -1370,35 +997,11 @@ export class AdtClient {
   // arrives, so this is where the contract has to be. Written from the other
   // overload rather than by hand: the first hand-written one dropped an atom,
   // and `capabilities/shape.ts` caught it.
-  getInterface(): IInterfaceContract<IInterfaceResults>;
-  getInterface<
-    R extends IInterfaceResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    >,
-  >(results: R): IInterfaceContract<R>;
-  getInterface<
-    R extends IInterfaceResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    > = IInterfaceResults,
-  >(results: R = interfaceDocuments as unknown as R): AdtInterface<R> {
+  getInterface(): IInterfaceContract<typeof interfaceDocuments>;
+  getInterface<R extends IInterfaceResults>(results: R): IInterfaceContract<R>;
+  getInterface<R extends IInterfaceResults = typeof interfaceDocuments>(
+    results: R = interfaceDocuments as unknown as R,
+  ): AdtInterface<R> {
     this.assertConnected();
     return new AdtInterface<R>(
       this.connection,
@@ -1422,35 +1025,11 @@ export class AdtClient {
   // arrives, so this is where the contract has to be. Written from the other
   // overload rather than by hand: the first hand-written one dropped an atom,
   // and `capabilities/shape.ts` caught it.
-  getDomain(): IDomainContract<IDomainResults>;
-  getDomain<
-    R extends IDomainResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    >,
-  >(results: R): IDomainContract<R>;
-  getDomain<
-    R extends IDomainResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    > = IDomainResults,
-  >(results: R = domainDocuments as unknown as R): AdtDomain<R> {
+  getDomain(): IDomainContract<typeof domainDocuments>;
+  getDomain<R extends IDomainResults>(results: R): IDomainContract<R>;
+  getDomain<R extends IDomainResults = typeof domainDocuments>(
+    results: R = domainDocuments as unknown as R,
+  ): AdtDomain<R> {
     this.assertConnected();
     return new AdtDomain<R>(
       this.connection,
@@ -1517,35 +1096,13 @@ export class AdtClient {
   // arrives, so this is where the contract has to be. Written from the other
   // overload rather than by hand: the first hand-written one dropped an atom,
   // and `capabilities/shape.ts` caught it.
-  getDataElement(): IDataElementContract<IDataElementResults>;
-  getDataElement<
-    R extends IDataElementResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    >,
-  >(results: R): IDataElementContract<R>;
-  getDataElement<
-    R extends IDataElementResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    > = IDataElementResults,
-  >(results: R = dataElementDocuments as unknown as R): AdtDataElement<R> {
+  getDataElement(): IDataElementContract<typeof dataElementDocuments>;
+  getDataElement<R extends IDataElementResults>(
+    results: R,
+  ): IDataElementContract<R>;
+  getDataElement<R extends IDataElementResults = typeof dataElementDocuments>(
+    results: R = dataElementDocuments as unknown as R,
+  ): AdtDataElement<R> {
     this.assertConnected();
     return new AdtDataElement<R>(
       this.connection,
@@ -1568,32 +1125,14 @@ export class AdtClient {
   // arrives, so this is where the contract has to be. Written from the other
   // overload rather than by hand: the first hand-written one dropped an atom,
   // and `capabilities/shape.ts` caught it.
-  getAuthorizationField(): IAuthorizationFieldContract<IAuthorizationFieldResults>;
+  getAuthorizationField(): IAuthorizationFieldContract<
+    typeof authorizationFieldDocuments
+  >;
+  getAuthorizationField<R extends IAuthorizationFieldResults>(
+    results: R,
+  ): IAuthorizationFieldContract<R>;
   getAuthorizationField<
-    R extends IAuthorizationFieldResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    >,
-  >(results: R): IAuthorizationFieldContract<R>;
-  getAuthorizationField<
-    R extends IAuthorizationFieldResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    > = IAuthorizationFieldResults,
+    R extends IAuthorizationFieldResults = typeof authorizationFieldDocuments,
   >(
     results: R = authorizationFieldDocuments as unknown as R,
   ): AdtAuthorizationField<R> {
@@ -1619,35 +1158,11 @@ export class AdtClient {
   // arrives, so this is where the contract has to be. Written from the other
   // overload rather than by hand: the first hand-written one dropped an atom,
   // and `capabilities/shape.ts` caught it.
-  getStructure(): IStructureContract<IStructureResults>;
-  getStructure<
-    R extends IStructureResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    >,
-  >(results: R): IStructureContract<R>;
-  getStructure<
-    R extends IStructureResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    > = IStructureResults,
-  >(results: R = structureDocuments as unknown as R): AdtStructure<R> {
+  getStructure(): IStructureContract<typeof structureDocuments>;
+  getStructure<R extends IStructureResults>(results: R): IStructureContract<R>;
+  getStructure<R extends IStructureResults = typeof structureDocuments>(
+    results: R = structureDocuments as unknown as R,
+  ): AdtStructure<R> {
     this.assertConnected();
     return new AdtStructure<R>(
       this.connection,
@@ -1670,35 +1185,11 @@ export class AdtClient {
   // arrives, so this is where the contract has to be. Written from the other
   // overload rather than by hand: the first hand-written one dropped an atom,
   // and `capabilities/shape.ts` caught it.
-  getTable(): ITableContract<ITableResults>;
-  getTable<
-    R extends ITableResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    >,
-  >(results: R): ITableContract<R>;
-  getTable<
-    R extends ITableResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    > = ITableResults,
-  >(results: R = tableDocuments as unknown as R): AdtTable<R> {
+  getTable(): ITableContract<typeof tableDocuments>;
+  getTable<R extends ITableResults>(results: R): ITableContract<R>;
+  getTable<R extends ITableResults = typeof tableDocuments>(
+    results: R = tableDocuments as unknown as R,
+  ): AdtTable<R> {
     this.assertConnected();
     return new AdtTable<R>(
       this.connection,
@@ -1721,35 +1212,11 @@ export class AdtClient {
   // arrives, so this is where the contract has to be. Written from the other
   // overload rather than by hand: the first hand-written one dropped an atom,
   // and `capabilities/shape.ts` caught it.
-  getTableType(): ITableTypeContract<ITableTypeResults>;
-  getTableType<
-    R extends ITableTypeResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    >,
-  >(results: R): ITableTypeContract<R>;
-  getTableType<
-    R extends ITableTypeResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    > = ITableTypeResults,
-  >(results: R = tableTypeDocuments as unknown as R): AdtDdicTableType<R> {
+  getTableType(): ITableTypeContract<typeof tableTypeDocuments>;
+  getTableType<R extends ITableTypeResults>(results: R): ITableTypeContract<R>;
+  getTableType<R extends ITableTypeResults = typeof tableTypeDocuments>(
+    results: R = tableTypeDocuments as unknown as R,
+  ): AdtDdicTableType<R> {
     this.assertConnected();
     return new AdtDdicTableType<R>(
       this.connection,
@@ -1775,35 +1242,11 @@ export class AdtClient {
   // arrives, so this is where the contract has to be. Written from the other
   // overload rather than by hand: the first hand-written one dropped an atom,
   // and `capabilities/shape.ts` caught it.
-  getDdl(): IDdlContract<IDdlResults>;
-  getDdl<
-    R extends IDdlResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    >,
-  >(results: R): IDdlContract<R>;
-  getDdl<
-    R extends IDdlResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    > = IDdlResults,
-  >(results: R = ddlDocuments as unknown as R): AdtDdl<R> {
+  getDdl(): IDdlContract<typeof ddlDocuments>;
+  getDdl<R extends IDdlResults>(results: R): IDdlContract<R>;
+  getDdl<R extends IDdlResults = typeof ddlDocuments>(
+    results: R = ddlDocuments as unknown as R,
+  ): AdtDdl<R> {
     this.assertConnected();
     return new AdtDdl<R>(
       this.connection,
@@ -1826,34 +1269,12 @@ export class AdtClient {
   // arrives, so this is where the contract has to be. Written from the other
   // overload rather than by hand: the first hand-written one dropped an atom,
   // and `capabilities/shape.ts` caught it.
-  getFunctionGroup(): IFunctionGroupContract<IFunctionGroupResults>;
+  getFunctionGroup(): IFunctionGroupContract<typeof functionGroupDocuments>;
+  getFunctionGroup<R extends IFunctionGroupResults>(
+    results: R,
+  ): IFunctionGroupContract<R>;
   getFunctionGroup<
-    R extends IFunctionGroupResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    >,
-  >(results: R): IFunctionGroupContract<R>;
-  getFunctionGroup<
-    R extends IFunctionGroupResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    > = IFunctionGroupResults,
+    R extends IFunctionGroupResults = typeof functionGroupDocuments,
   >(results: R = functionGroupDocuments as unknown as R): AdtFunctionGroup<R> {
     this.assertConnected();
     return new AdtFunctionGroup<R>(
@@ -1878,34 +1299,12 @@ export class AdtClient {
   // arrives, so this is where the contract has to be. Written from the other
   // overload rather than by hand: the first hand-written one dropped an atom,
   // and `capabilities/shape.ts` caught it.
-  getFunctionModule(): IFunctionModuleContract<IFunctionModuleResults>;
+  getFunctionModule(): IFunctionModuleContract<typeof functionModuleDocuments>;
+  getFunctionModule<R extends IFunctionModuleResults>(
+    results: R,
+  ): IFunctionModuleContract<R>;
   getFunctionModule<
-    R extends IFunctionModuleResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    >,
-  >(results: R): IFunctionModuleContract<R>;
-  getFunctionModule<
-    R extends IFunctionModuleResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    > = IFunctionModuleResults,
+    R extends IFunctionModuleResults = typeof functionModuleDocuments,
   >(
     results: R = functionModuleDocuments as unknown as R,
   ): AdtFunctionModule<R> {
@@ -1932,32 +1331,14 @@ export class AdtClient {
   // arrives, so this is where the contract has to be. Written from the other
   // overload rather than by hand: the first hand-written one dropped an atom,
   // and `capabilities/shape.ts` caught it.
-  getFunctionInclude(): IFunctionIncludeContract<IFunctionIncludeResults>;
+  getFunctionInclude(): IFunctionIncludeContract<
+    typeof functionIncludeDocuments
+  >;
+  getFunctionInclude<R extends IFunctionIncludeResults>(
+    results: R,
+  ): IFunctionIncludeContract<R>;
   getFunctionInclude<
-    R extends IFunctionIncludeResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    >,
-  >(results: R): IFunctionIncludeContract<R>;
-  getFunctionInclude<
-    R extends IFunctionIncludeResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    > = IFunctionIncludeResults,
+    R extends IFunctionIncludeResults = typeof functionIncludeDocuments,
   >(
     results: R = functionIncludeDocuments as unknown as R,
   ): AdtFunctionInclude<R> {
@@ -1984,33 +1365,11 @@ export class AdtClient {
   // arrives, so this is where the contract has to be. Written from the other
   // overload rather than by hand: the first hand-written one dropped an atom,
   // and `capabilities/shape.ts` caught it.
-  getPackage(): IPackageContract<IPackageResults>;
-  getPackage<
-    R extends IPackageResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    >,
-  >(results: R): IPackageContract<R>;
-  getPackage<
-    R extends IPackageResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    > = IPackageResults,
-  >(results: R = packageDocuments as unknown as R): AdtPackage<R> {
+  getPackage(): IPackageContract<typeof packageDocuments>;
+  getPackage<R extends IPackageResults>(results: R): IPackageContract<R>;
+  getPackage<R extends IPackageResults = typeof packageDocuments>(
+    results: R = packageDocuments as unknown as R,
+  ): AdtPackage<R> {
     this.assertConnected();
     return new AdtPackage<R>(
       this.connection,
@@ -2033,28 +1392,12 @@ export class AdtClient {
   // arrives, so this is where the contract has to be. Written from the other
   // overload rather than by hand: the first hand-written one dropped an atom,
   // and `capabilities/shape.ts` caught it.
-  getMessageClass(): IMessageClassContract<IMessageClassResults>;
+  getMessageClass(): IMessageClassContract<typeof messageClassDocuments>;
+  getMessageClass<R extends IMessageClassResults>(
+    results: R,
+  ): IMessageClassContract<R>;
   getMessageClass<
-    R extends IMessageClassResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    >,
-  >(results: R): IMessageClassContract<R>;
-  getMessageClass<
-    R extends IMessageClassResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    > = IMessageClassResults,
+    R extends IMessageClassResults = typeof messageClassDocuments,
   >(results: R = messageClassDocuments as unknown as R): AdtMessageClass<R> {
     this.assertConnected();
     return new AdtMessageClass<R>(
@@ -2082,16 +1425,14 @@ export class AdtClient {
   // arrives, so this is where the contract has to be. Written from the other
   // overload rather than by hand: the first hand-written one dropped an atom,
   // and `capabilities/shape.ts` caught it.
-  getMessageClassMessage(): IMessageClassMessageContract<IMessageClassMessageResults>;
+  getMessageClassMessage(): IMessageClassMessageContract<
+    typeof messageDocuments
+  >;
+  getMessageClassMessage<R extends IMessageClassMessageResults>(
+    results: R,
+  ): IMessageClassMessageContract<R>;
   getMessageClassMessage<
-    R extends IMessageClassMessageResults<unknown, unknown, unknown>,
-  >(results: R): IMessageClassMessageContract<R>;
-  getMessageClassMessage<
-    R extends IMessageClassMessageResults<
-      unknown,
-      unknown,
-      unknown
-    > = IMessageClassMessageResults,
+    R extends IMessageClassMessageResults = typeof messageDocuments,
   >(results: R = messageDocuments as unknown as R): AdtMessageClassMessage<R> {
     this.assertConnected();
     return new AdtMessageClassMessage<R>(this.connection, this.logger, results);
@@ -2109,34 +1450,12 @@ export class AdtClient {
   // arrives, so this is where the contract has to be. Written from the other
   // overload rather than by hand: the first hand-written one dropped an atom,
   // and `capabilities/shape.ts` caught it.
-  getAccessControl(): IAccessControlContract<IAccessControlResults>;
+  getAccessControl(): IAccessControlContract<typeof accessControlDocuments>;
+  getAccessControl<R extends IAccessControlResults>(
+    results: R,
+  ): IAccessControlContract<R>;
   getAccessControl<
-    R extends IAccessControlResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    >,
-  >(results: R): IAccessControlContract<R>;
-  getAccessControl<
-    R extends IAccessControlResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    > = IAccessControlResults,
+    R extends IAccessControlResults = typeof accessControlDocuments,
   >(results: R = accessControlDocuments as unknown as R): AdtAccessControl<R> {
     this.assertConnected();
     return new AdtAccessControl<R>(
@@ -2161,34 +1480,12 @@ export class AdtClient {
   // arrives, so this is where the contract has to be. Written from the other
   // overload rather than by hand: the first hand-written one dropped an atom,
   // and `capabilities/shape.ts` caught it.
-  getTransformation(): ITransformationContract<ITransformationResults>;
+  getTransformation(): ITransformationContract<typeof transformationDocuments>;
+  getTransformation<R extends ITransformationResults>(
+    results: R,
+  ): ITransformationContract<R>;
   getTransformation<
-    R extends ITransformationResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    >,
-  >(results: R): ITransformationContract<R>;
-  getTransformation<
-    R extends ITransformationResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    > = ITransformationResults,
+    R extends ITransformationResults = typeof transformationDocuments,
   >(
     results: R = transformationDocuments as unknown as R,
   ): AdtTransformation<R> {
@@ -2214,34 +1511,14 @@ export class AdtClient {
   // arrives, so this is where the contract has to be. Written from the other
   // overload rather than by hand: the first hand-written one dropped an atom,
   // and `capabilities/shape.ts` caught it.
-  getServiceDefinition(): IServiceDefinitionContract<IServiceDefinitionResults>;
+  getServiceDefinition(): IServiceDefinitionContract<
+    typeof serviceDefinitionDocuments
+  >;
+  getServiceDefinition<R extends IServiceDefinitionResults>(
+    results: R,
+  ): IServiceDefinitionContract<R>;
   getServiceDefinition<
-    R extends IServiceDefinitionResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    >,
-  >(results: R): IServiceDefinitionContract<R>;
-  getServiceDefinition<
-    R extends IServiceDefinitionResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    > = IServiceDefinitionResults,
+    R extends IServiceDefinitionResults = typeof serviceDefinitionDocuments,
   >(
     results: R = serviceDefinitionDocuments as unknown as R,
   ): AdtServiceDefinition<R> {
@@ -2266,34 +1543,12 @@ export class AdtClient {
   // arrives, so this is where the contract has to be. Written from the other
   // overload rather than by hand: the first hand-written one dropped an atom,
   // and `capabilities/shape.ts` caught it.
-  getScalarFunction(): IScalarFunctionContract<IScalarFunctionResults>;
+  getScalarFunction(): IScalarFunctionContract<typeof scalarFunctionDocuments>;
+  getScalarFunction<R extends IScalarFunctionResults>(
+    results: R,
+  ): IScalarFunctionContract<R>;
   getScalarFunction<
-    R extends IScalarFunctionResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    >,
-  >(results: R): IScalarFunctionContract<R>;
-  getScalarFunction<
-    R extends IScalarFunctionResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    > = IScalarFunctionResults,
+    R extends IScalarFunctionResults = typeof scalarFunctionDocuments,
   >(
     results: R = scalarFunctionDocuments as unknown as R,
   ): AdtScalarFunction<R> {
@@ -2318,34 +1573,15 @@ export class AdtClient {
   // arrives, so this is where the contract has to be. Written from the other
   // overload rather than by hand: the first hand-written one dropped an atom,
   // and `capabilities/shape.ts` caught it.
-  getScalarFunctionImplementation(): IScalarFunctionImplementationContract<IScalarFunctionImplementationResults>;
+  getScalarFunctionImplementation(): IScalarFunctionImplementationContract<
+    typeof scalarFunctionImplementationDocuments
+  >;
   getScalarFunctionImplementation<
-    R extends IScalarFunctionImplementationResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    >,
+    R extends IScalarFunctionImplementationResults,
   >(results: R): IScalarFunctionImplementationContract<R>;
   getScalarFunctionImplementation<
-    R extends IScalarFunctionImplementationResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    > = IScalarFunctionImplementationResults,
+    R extends
+      IScalarFunctionImplementationResults = typeof scalarFunctionImplementationDocuments,
   >(
     results: R = scalarFunctionImplementationDocuments as unknown as R,
   ): AdtScalarFunctionImplementation<R> {
@@ -2370,34 +1606,14 @@ export class AdtClient {
   // arrives, so this is where the contract has to be. Written from the other
   // overload rather than by hand: the first hand-written one dropped an atom,
   // and `capabilities/shape.ts` caught it.
-  getAppendStructure(): IAppendStructureContract<IAppendStructureResults>;
+  getAppendStructure(): IAppendStructureContract<
+    typeof appendStructureDocuments
+  >;
+  getAppendStructure<R extends IAppendStructureResults>(
+    results: R,
+  ): IAppendStructureContract<R>;
   getAppendStructure<
-    R extends IAppendStructureResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    >,
-  >(results: R): IAppendStructureContract<R>;
-  getAppendStructure<
-    R extends IAppendStructureResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    > = IAppendStructureResults,
+    R extends IAppendStructureResults = typeof appendStructureDocuments,
   >(
     results: R = appendStructureDocuments as unknown as R,
   ): AdtAppendStructure<R> {
@@ -2450,34 +1666,14 @@ export class AdtClient {
   // arrives, so this is where the contract has to be. Written from the other
   // overload rather than by hand: the first hand-written one dropped an atom,
   // and `capabilities/shape.ts` caught it.
-  getBehaviorDefinition(): IBehaviorDefinitionContract<IBehaviorDefinitionResults>;
+  getBehaviorDefinition(): IBehaviorDefinitionContract<
+    typeof behaviorDefinitionDocuments
+  >;
+  getBehaviorDefinition<R extends IBehaviorDefinitionResults>(
+    results: R,
+  ): IBehaviorDefinitionContract<R>;
   getBehaviorDefinition<
-    R extends IBehaviorDefinitionResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    >,
-  >(results: R): IBehaviorDefinitionContract<R>;
-  getBehaviorDefinition<
-    R extends IBehaviorDefinitionResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    > = IBehaviorDefinitionResults,
+    R extends IBehaviorDefinitionResults = typeof behaviorDefinitionDocuments,
   >(
     results: R = behaviorDefinitionDocuments as unknown as R,
   ): AdtBehaviorDefinition<R> {
@@ -2503,33 +1699,15 @@ export class AdtClient {
   // arrives, so this is where the contract has to be. Written from the other
   // overload rather than by hand: the first hand-written one dropped an atom,
   // and `capabilities/shape.ts` caught it.
-  getBehaviorImplementation(): IBehaviorImplementationContract<IClassResults>;
-  getBehaviorImplementation<
-    R extends IClassResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    >,
-  >(results: R): IBehaviorImplementationContract<R>;
-  getBehaviorImplementation<
-    R extends IClassResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    > = IClassResults,
-  >(results: R = classDocuments as unknown as R): AdtBehaviorImplementation<R> {
+  getBehaviorImplementation(): IBehaviorImplementationContract<
+    typeof classDocuments
+  >;
+  getBehaviorImplementation<R extends IClassResults>(
+    results: R,
+  ): IBehaviorImplementationContract<R>;
+  getBehaviorImplementation<R extends IClassResults = typeof classDocuments>(
+    results: R = classDocuments as unknown as R,
+  ): AdtBehaviorImplementation<R> {
     this.assertConnected();
     return new AdtBehaviorImplementation<R>(
       this.connection,
@@ -2551,34 +1729,14 @@ export class AdtClient {
   // arrives, so this is where the contract has to be. Written from the other
   // overload rather than by hand: the first hand-written one dropped an atom,
   // and `capabilities/shape.ts` caught it.
-  getMetadataExtension(): IMetadataExtensionContract<IMetadataExtensionResults>;
+  getMetadataExtension(): IMetadataExtensionContract<
+    typeof metadataExtensionDocuments
+  >;
+  getMetadataExtension<R extends IMetadataExtensionResults>(
+    results: R,
+  ): IMetadataExtensionContract<R>;
   getMetadataExtension<
-    R extends IMetadataExtensionResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    >,
-  >(results: R): IMetadataExtensionContract<R>;
-  getMetadataExtension<
-    R extends IMetadataExtensionResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    > = IMetadataExtensionResults,
+    R extends IMetadataExtensionResults = typeof metadataExtensionDocuments,
   >(
     results: R = metadataExtensionDocuments as unknown as R,
   ): AdtMetadataExtension<R> {
@@ -2610,35 +1768,13 @@ export class AdtClient {
   // arrives, so this is where the contract has to be. Written from the other
   // overload rather than by hand: the first hand-written one dropped an atom,
   // and `capabilities/shape.ts` caught it.
-  getEnhancement(): IEnhancementContract<IEnhancementResults>;
-  getEnhancement<
-    R extends IEnhancementResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    >,
-  >(results: R): IEnhancementContract<R>;
-  getEnhancement<
-    R extends IEnhancementResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    > = IEnhancementResults,
-  >(results: R = enhancementDocuments as unknown as R): AdtEnhancement<R> {
+  getEnhancement(): IEnhancementContract<typeof enhancementDocuments>;
+  getEnhancement<R extends IEnhancementResults>(
+    results: R,
+  ): IEnhancementContract<R>;
+  getEnhancement<R extends IEnhancementResults = typeof enhancementDocuments>(
+    results: R = enhancementDocuments as unknown as R,
+  ): AdtEnhancement<R> {
     this.assertConnected();
     return new AdtEnhancement<R>(
       this.connection,
@@ -2660,25 +1796,16 @@ export class AdtClient {
   // members this package's own tests and scripts call. What is incomplete is
   // the contract; widening it is issue #109's subject, not this change's.
   getFeatureToggle(): AdtFeatureToggle;
-  getFeatureToggle<
-    R extends IFeatureToggleResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    >,
-  >(
+  getFeatureToggle<R extends IFeatureToggleResults>(
     results: R,
   ): IAdtCreatable<IFeatureToggleConfig, ReturnType<R['created']>> &
     IAdtReadable<IFeatureToggleConfig, ReturnType<R['source']>> &
     IAdtMetadataReadable<IFeatureToggleConfig, ReturnType<R['metadata']>> &
     IAdtUpdatable<IFeatureToggleConfig, ReturnType<R['updated']>> &
+    IAdtMetadataUpdatable<
+      IFeatureToggleConfig,
+      ReturnType<R['metadataUpdated']>
+    > &
     IAdtDeletable<
       IFeatureToggleConfig,
       ReturnType<R['deletion']>,
@@ -2695,18 +1822,7 @@ export class AdtClient {
     // decision 24 is the rule it collides with.
     IAdtLockable<IFeatureToggleConfig>;
   getFeatureToggle<
-    R extends IFeatureToggleResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    > = IFeatureToggleResults,
+    R extends IFeatureToggleResults = typeof featureToggleDocuments,
   >(results: R = featureToggleDocuments as unknown as R): AdtFeatureToggle<R> {
     this.assertConnected();
     return new AdtFeatureToggle<R>(
@@ -2734,20 +1850,7 @@ export class AdtClient {
   // the composition names none of that. Handing back the contract would take
   // those members away from callers who have them today.
   getUnitTest(): AdtUnitTest;
-  getUnitTest<
-    R extends IUnitTestResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    >,
-  >(
+  getUnitTest<R extends IUnitTestResults>(
     results: R,
   ): IAdtCreatable<IUnitTestConfig, ReturnType<R['created']>> &
     IAdtReadable<IUnitTestConfig, ReturnType<R['source']>> &
@@ -2761,20 +1864,9 @@ export class AdtClient {
       IClassUnitTestRunOptions
     > &
     ITestRunInformation<ReturnType<R['status']>, ReturnType<R['result']>>;
-  getUnitTest<
-    R extends IUnitTestResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    > = IUnitTestResults,
-  >(results: R = unitTestDocuments as unknown as R): AdtUnitTest<R> {
+  getUnitTest<R extends IUnitTestResults = typeof unitTestDocuments>(
+    results: R = unitTestDocuments as unknown as R,
+  ): AdtUnitTest<R> {
     this.assertConnected();
     return new AdtUnitTest<R>(this.connection, this.logger, results);
   }
@@ -2790,20 +1882,7 @@ export class AdtClient {
   // the composition names none of that. Handing back the contract would take
   // those members away from callers who have them today.
   getCdsUnitTest(): AdtCdsUnitTest;
-  getCdsUnitTest<
-    R extends IUnitTestResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    >,
-  >(
+  getCdsUnitTest<R extends IUnitTestResults>(
     results: R,
   ): IAdtCreatable<ICdsUnitTestConfig, ReturnType<R['created']>> &
     IAdtReadable<ICdsUnitTestConfig, ReturnType<R['source']>> &
@@ -2818,20 +1897,9 @@ export class AdtClient {
     > &
     ITestRunInformation<ReturnType<R['status']>, ReturnType<R['result']>> &
     ICdsTestDoubleCheckable<ReturnType<R['cdsCheck']>>;
-  getCdsUnitTest<
-    R extends IUnitTestResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    > = IUnitTestResults,
-  >(results: R = unitTestDocuments as unknown as R): AdtCdsUnitTest<R> {
+  getCdsUnitTest<R extends IUnitTestResults = typeof unitTestDocuments>(
+    results: R = unitTestDocuments as unknown as R,
+  ): AdtCdsUnitTest<R> {
     this.assertConnected();
     return new AdtCdsUnitTest<R>(this.connection, this.logger, results);
   }
@@ -2863,27 +1931,11 @@ export class AdtClient {
   // arrives, so this is where the contract has to be. Written from the other
   // overload rather than by hand: the first hand-written one dropped an atom,
   // and `capabilities/shape.ts` caught it.
-  getRequest(): IRequestContract<ITransportResults>;
-  getRequest<
-    R extends ITransportResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    >,
-  >(results: R): IRequestContract<R>;
-  getRequest<
-    R extends ITransportResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    > = ITransportResults,
-  >(results: R = transportDocuments as unknown as R): AdtRequest<R> {
+  getRequest(): IRequestContract<typeof transportDocuments>;
+  getRequest<R extends ITransportResults>(results: R): IRequestContract<R>;
+  getRequest<R extends ITransportResults = typeof transportDocuments>(
+    results: R = transportDocuments as unknown as R,
+  ): AdtRequest<R> {
     this.assertConnected();
     return new AdtRequest<R>(
       this.connection,
@@ -2934,7 +1986,7 @@ export class AdtClient {
   // members this package's own tests and scripts call. What is incomplete is
   // the contract; widening it is issue #109's subject, not this change's.
   getUtils(): AdtUtils;
-  getUtils<R extends IUtilResults<unknown, unknown, unknown, unknown>>(
+  getUtils<R extends IUtilResults>(
     results: R,
   ): IAdtInformationSystem<
     ReturnType<R['search']>,
@@ -2947,9 +1999,9 @@ export class AdtClient {
     IAdtDataPreview &
     IAdtDiscovery &
     IAdtObjectAccess;
-  getUtils<
-    R extends IUtilResults<unknown, unknown, unknown, unknown> = IUtilResults,
-  >(results: R = utilDocuments as unknown as R): AdtUtils<R> {
+  getUtils<R extends IUtilResults = typeof utilDocuments>(
+    results: R = utilDocuments as unknown as R,
+  ): AdtUtils<R> {
     this.assertConnected();
     return new AdtUtils<R>(this.connection, this.logger, results);
   }
@@ -2970,33 +2022,13 @@ export class AdtClient {
   // arrives, so this is where the contract has to be. Written from the other
   // overload rather than by hand: the first hand-written one dropped an atom,
   // and `capabilities/shape.ts` caught it.
-  getLocalTestClass(): ILocalTestClassContract<IClassResults>;
-  getLocalTestClass<
-    R extends IClassResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    >,
-  >(results: R): ILocalTestClassContract<R>;
-  getLocalTestClass<
-    R extends IClassResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    > = IClassResults,
-  >(results: R = classDocuments as unknown as R): AdtLocalTestClass<R> {
+  getLocalTestClass(): ILocalTestClassContract<typeof classDocuments>;
+  getLocalTestClass<R extends IClassResults>(
+    results: R,
+  ): ILocalTestClassContract<R>;
+  getLocalTestClass<R extends IClassResults = typeof classDocuments>(
+    results: R = classDocuments as unknown as R,
+  ): AdtLocalTestClass<R> {
     this.assertConnected();
     return new AdtLocalTestClass<R>(
       this.connection,
@@ -3024,33 +2056,11 @@ export class AdtClient {
   // arrives, so this is where the contract has to be. Written from the other
   // overload rather than by hand: the first hand-written one dropped an atom,
   // and `capabilities/shape.ts` caught it.
-  getLocalTypes(): ILocalTypesContract<IClassResults>;
-  getLocalTypes<
-    R extends IClassResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    >,
-  >(results: R): ILocalTypesContract<R>;
-  getLocalTypes<
-    R extends IClassResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    > = IClassResults,
-  >(results: R = classDocuments as unknown as R): AdtLocalTypes<R> {
+  getLocalTypes(): ILocalTypesContract<typeof classDocuments>;
+  getLocalTypes<R extends IClassResults>(results: R): ILocalTypesContract<R>;
+  getLocalTypes<R extends IClassResults = typeof classDocuments>(
+    results: R = classDocuments as unknown as R,
+  ): AdtLocalTypes<R> {
     this.assertConnected();
     return new AdtLocalTypes<R>(
       this.connection,
@@ -3078,33 +2088,13 @@ export class AdtClient {
   // arrives, so this is where the contract has to be. Written from the other
   // overload rather than by hand: the first hand-written one dropped an atom,
   // and `capabilities/shape.ts` caught it.
-  getLocalDefinitions(): ILocalDefinitionsContract<IClassResults>;
-  getLocalDefinitions<
-    R extends IClassResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    >,
-  >(results: R): ILocalDefinitionsContract<R>;
-  getLocalDefinitions<
-    R extends IClassResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    > = IClassResults,
-  >(results: R = classDocuments as unknown as R): AdtLocalDefinitions<R> {
+  getLocalDefinitions(): ILocalDefinitionsContract<typeof classDocuments>;
+  getLocalDefinitions<R extends IClassResults>(
+    results: R,
+  ): ILocalDefinitionsContract<R>;
+  getLocalDefinitions<R extends IClassResults = typeof classDocuments>(
+    results: R = classDocuments as unknown as R,
+  ): AdtLocalDefinitions<R> {
     this.assertConnected();
     return new AdtLocalDefinitions<R>(
       this.connection,
@@ -3132,33 +2122,11 @@ export class AdtClient {
   // arrives, so this is where the contract has to be. Written from the other
   // overload rather than by hand: the first hand-written one dropped an atom,
   // and `capabilities/shape.ts` caught it.
-  getLocalMacros(): ILocalMacrosContract<IClassResults>;
-  getLocalMacros<
-    R extends IClassResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    >,
-  >(results: R): ILocalMacrosContract<R>;
-  getLocalMacros<
-    R extends IClassResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    > = IClassResults,
-  >(results: R = classDocuments as unknown as R): AdtLocalMacros<R> {
+  getLocalMacros(): ILocalMacrosContract<typeof classDocuments>;
+  getLocalMacros<R extends IClassResults>(results: R): ILocalMacrosContract<R>;
+  getLocalMacros<R extends IClassResults = typeof classDocuments>(
+    results: R = classDocuments as unknown as R,
+  ): AdtLocalMacros<R> {
     this.assertConnected();
     return new AdtLocalMacros<R>(
       this.connection,

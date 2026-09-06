@@ -42,7 +42,7 @@ import type { IReadOptions } from '../shared/types';
 import { activateClass } from './activation';
 import { lockClass } from './lock';
 import { getClassMetadata, getClassTransport } from './read';
-import type { IClassConfig, IClassResults } from './types';
+import type { classDocuments, IClassConfig, IClassResults } from './types';
 import { unlockClass } from './unlock';
 import {
   type ClassIncludeType,
@@ -51,17 +51,7 @@ import {
 } from './versions';
 
 export abstract class AdtClassMemberBase<
-  R extends IClassResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  > = IClassResults,
+  R extends IClassResults = typeof classDocuments,
 > {
   /**
    * The readings this implementation performs, given when it was constructed.

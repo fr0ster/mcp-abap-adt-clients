@@ -55,18 +55,7 @@ import { updateDataElement } from './update';
 import { validateDataElementName } from './validation';
 
 export class AdtDataElement<
-  R extends IDataElementResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  > = IDataElementResults,
+  R extends IDataElementResults = typeof dataElementDocuments,
 > implements
     IAdtCreatable<IDataElementConfig, ReturnType<R['created']>>,
     IAdtMetadataReadable<IDataElementConfig, ReturnType<R['metadata']>>,

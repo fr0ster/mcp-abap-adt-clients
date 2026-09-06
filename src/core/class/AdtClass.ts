@@ -63,19 +63,7 @@ import { unlockClass } from './unlock';
 import { updateClass } from './update';
 import { validateClassName } from './validation';
 
-export class AdtClass<
-    R extends IClassResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    > = IClassResults,
-  >
+export class AdtClass<R extends IClassResults = typeof classDocuments>
   extends AdtClassMemberBase<R>
   implements
     IAdtCreatable<IClassConfig, ReturnType<R['created']>>,

@@ -65,18 +65,7 @@ import {
 } from './versions';
 
 export class AdtEnhancement<
-  R extends IEnhancementResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  > = IEnhancementResults,
+  R extends IEnhancementResults = typeof enhancementDocuments,
 > implements
     IAdtCreatable<IEnhancementConfig, ReturnType<R['created']>>,
     IAdtReadable<IEnhancementConfig, ReturnType<R['source']>>,

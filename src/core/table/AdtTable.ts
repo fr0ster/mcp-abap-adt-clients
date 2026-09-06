@@ -53,20 +53,8 @@ import { updateTable } from './update';
 import { validateTableName } from './validation';
 import { getTableVersionSource, getTableVersions } from './versions';
 
-export class AdtTable<
-  R extends ITableResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  > = ITableResults,
-> implements
+export class AdtTable<R extends ITableResults = typeof tableDocuments>
+  implements
     IAdtCreatable<ITableConfig, ReturnType<R['created']>>,
     IAdtReadable<ITableConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<ITableConfig, ReturnType<R['metadata']>>,

@@ -89,18 +89,7 @@ export const validationUnavailable = (
 };
 
 export class AdtTransformation<
-  R extends ITransformationResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  > = ITransformationResults,
+  R extends ITransformationResults = typeof transformationDocuments,
 > implements
     IAdtCreatable<ITransformationConfig, ReturnType<R['created']>>,
     IAdtReadable<ITransformationConfig, ReturnType<R['source']>>,

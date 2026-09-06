@@ -94,20 +94,8 @@ export const startedRun = (
  * `delete()` stays as the convenience it always was — a name for writing
  * emptiness — rather than a claim that this is a deletable object.
  */
-export class AdtUnitTest<
-  R extends IUnitTestResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  > = IUnitTestResults,
-> implements
+export class AdtUnitTest<R extends IUnitTestResults = typeof unitTestDocuments>
+  implements
     IAdtCreatable<IUnitTestConfig, ReturnType<R['created']>>,
     IAdtReadable<IUnitTestConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<IUnitTestConfig, ReturnType<R['metadata']>>,

@@ -55,19 +55,7 @@ export type { ILocalTestClassConfig } from '@mcp-abap-adt/interfaces';
  * `delete()` stays as the convenience it always was — a name for writing
  * emptiness — rather than a claim that this is a deletable object.
  */
-export class AdtLocalTestClass<
-    R extends IClassResults<
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    > = IClassResults,
-  >
+export class AdtLocalTestClass<R extends IClassResults = typeof classDocuments>
   extends AdtClassMemberBase<R>
   implements
     IAdtReadable<ILocalTestClassConfig, ReturnType<R['source']>>,

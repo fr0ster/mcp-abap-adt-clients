@@ -62,18 +62,7 @@ import {
 } from './versions';
 
 export class AdtMetadataExtension<
-  R extends IMetadataExtensionResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  > = IMetadataExtensionResults,
+  R extends IMetadataExtensionResults = typeof metadataExtensionDocuments,
 > implements
     IAdtCreatable<IMetadataExtensionConfig, ReturnType<R['created']>>,
     IAdtReadable<IMetadataExtensionConfig, ReturnType<R['source']>>,

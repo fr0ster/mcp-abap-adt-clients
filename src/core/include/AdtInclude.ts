@@ -47,18 +47,8 @@ function requireName(config: Partial<IIncludeConfig>): string {
   return config.includeName;
 }
 
-export class AdtInclude<
-  R extends IIncludeResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  > = IIncludeResults,
-> implements
+export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
+  implements
     IAdtCreatable<IIncludeConfig, ReturnType<R['created']>>,
     IAdtReadable<IIncludeConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<IIncludeConfig, ReturnType<R['metadata']>>,

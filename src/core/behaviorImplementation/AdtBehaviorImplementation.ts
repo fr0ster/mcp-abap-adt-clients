@@ -86,17 +86,7 @@ CLASS ${className} IMPLEMENTATION.
 ENDCLASS.`;
 
 export class AdtBehaviorImplementation<
-  R extends IClassResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  > = IClassResults,
+  R extends IClassResults = typeof classDocuments,
 > implements
     IAdtCreatable<IBehaviorImplementationConfig, ReturnType<R['created']>>,
     IAdtReadable<IBehaviorImplementationConfig, ReturnType<R['source']>>,

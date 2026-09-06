@@ -81,42 +81,37 @@ export type ClassUpdated = void;
  * touches, and none of them changes its mind between `create` and `read` of the
  * same object.
  *
- * The parameters default to the shapes above, so a consumer who names nothing is
- * unmoved by this migration. A consumer who wants their own supplies a set whose
- * strategies return them, and `AdtClass` answers those types instead — the whole
- * point of `interfaces@31.0.0` taking the shapes out of the contract.
+ * **The set carries no type parameters.** `ReturnType<R['created']>` reads the
+ * type out of the strategy a consumer passed, so a positional parameter per slot
+ * would only restate what is already derivable — and every constraint naming the
+ * interface would have to repeat them. It did, and adding a slot then left the
+ * new parameter at its default in every constraint that still listed the old
+ * count: legal TypeScript, silently un-injectable. Twice. The shipped defaults
+ * live in the `…Documents` constant below instead, which is what the handlers
+ * default their `R` to.
  */
-export interface IClassResults<
-  TCreated = ClassCreated,
-  TSource = ClassSource,
-  TMetadata = ClassMetadata,
-  TCheck = ClassCheckResult,
-  TActivation = ClassActivationResult,
-  TValidation = ClassValidationResult,
-  TDeletion = ClassDeletionResult,
-  TUpdated = ClassUpdated,
-  TDeletionCheck = DeletionCheckResult,
-> {
-  readonly created: IResultStrategy<TCreated>;
-  readonly source: IResultStrategy<TSource>;
-  readonly metadata: IResultStrategy<TMetadata>;
-  readonly check: IResultStrategy<TCheck>;
-  readonly activation: IResultStrategy<TActivation>;
-  readonly validation: IResultStrategy<TValidation>;
-  readonly deletion: IResultStrategy<TDeletion>;
-  readonly updated: IResultStrategy<TUpdated>;
+export interface IClassResults {
+  readonly created: IResultStrategy<unknown>;
+  readonly source: IResultStrategy<unknown>;
+  readonly metadata: IResultStrategy<unknown>;
+  readonly check: IResultStrategy<unknown>;
+  readonly activation: IResultStrategy<unknown>;
+  readonly validation: IResultStrategy<unknown>;
+  readonly deletion: IResultStrategy<unknown>;
+  readonly updated: IResultStrategy<unknown>;
   /** What a deletion check answers: `del:checkResponse`. */
-  readonly deletionCheck: IResultStrategy<TDeletionCheck>;
+  readonly deletionCheck: IResultStrategy<unknown>;
 }
 
 /**
  * The shipped default: every member answers its document as it arrived.
  *
- * `satisfies`, never a `: IClassResults` annotation. The interface types its
- * fields by the parameters' defaults, and annotating a constant with it would
- * widen every strategy to those — which happens to be right here and is wrong
- * the moment a set narrows one, so the rule is the same everywhere: shape
- * checked, types kept.
+ * `satisfies`, never a `: IClassResults` annotation, and it matters more now
+ * than it did: the interface types every field as `IResultStrategy<unknown>`,
+ * so annotating this constant with it would widen all of them to `unknown` and
+ * `ReturnType<R['created']>` would answer `unknown` for the default set. With
+ * `satisfies` the shape is checked and the types are kept, which is what makes
+ * the positional parameters unnecessary. The rule is the same everywhere.
  */
 export const classDocuments = {
   created: rawDocument,

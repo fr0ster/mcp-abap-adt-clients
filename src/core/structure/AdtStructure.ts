@@ -60,18 +60,7 @@ import { validateStructureName } from './validation';
 import { getStructureVersionSource, getStructureVersions } from './versions';
 
 export class AdtStructure<
-  R extends IStructureResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  > = IStructureResults,
+  R extends IStructureResults = typeof structureDocuments,
 > implements
     IAdtCreatable<IStructureConfig, ReturnType<R['created']>>,
     IAdtReadable<IStructureConfig, ReturnType<R['source']>>,

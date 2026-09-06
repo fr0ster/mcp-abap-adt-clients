@@ -66,18 +66,7 @@ import { validateInterfaceName } from './validation';
 import { getInterfaceVersionSource, getInterfaceVersions } from './versions';
 
 export class AdtInterface<
-  R extends IInterfaceResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  > = IInterfaceResults,
+  R extends IInterfaceResults = typeof interfaceDocuments,
 > implements
     IAdtCreatable<IInterfaceConfig, ReturnType<R['created']>>,
     IAdtReadable<IInterfaceConfig, ReturnType<R['source']>>,

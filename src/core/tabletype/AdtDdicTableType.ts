@@ -58,18 +58,7 @@ import { validateTableTypeName } from './validation';
 import { getTableTypeVersionSource, getTableTypeVersions } from './versions';
 
 export class AdtDdicTableType<
-  R extends ITableTypeResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  > = ITableTypeResults,
+  R extends ITableTypeResults = typeof tableTypeDocuments,
 > implements
     IAdtCreatable<ITableTypeConfig, ReturnType<R['created']>>,
     IAdtMetadataReadable<ITableTypeConfig, ReturnType<R['metadata']>>,

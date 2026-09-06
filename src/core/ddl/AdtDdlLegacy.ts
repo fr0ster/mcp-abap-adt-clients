@@ -14,21 +14,10 @@ import { answering } from '../../utils/adtResponse';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { deleteObjectDirect } from '../shared/deleteLegacy';
 import { AdtDdl } from './AdtDdl';
-import type { IDdlConfig, IDdlResults } from './types';
+import type { ddlDocuments, IDdlConfig, IDdlResults } from './types';
 
 export class AdtDdlLegacy<
-  R extends IDdlResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  > = IDdlResults,
+  R extends IDdlResults = typeof ddlDocuments,
 > extends AdtDdl<R> {
   override async delete<E extends IAdtError = IAdtError>(
     config: Partial<IDdlConfig>,

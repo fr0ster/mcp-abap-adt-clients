@@ -61,18 +61,7 @@ import {
 } from './versions';
 
 export class AdtBehaviorDefinition<
-  R extends IBehaviorDefinitionResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  > = IBehaviorDefinitionResults,
+  R extends IBehaviorDefinitionResults = typeof behaviorDefinitionDocuments,
 > implements
     IAdtCreatable<IBehaviorDefinitionConfig, ReturnType<R['created']>>,
     IAdtReadable<IBehaviorDefinitionConfig, ReturnType<R['source']>>,

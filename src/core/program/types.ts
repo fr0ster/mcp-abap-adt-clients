@@ -70,29 +70,18 @@ export type ProgramUpdated = void;
 export type ProgramTransport = string;
 
 /** One strategy per member of a program implementation. See `IClassResults`. */
-export interface IProgramResults<
-  TCreated = ProgramCreated,
-  TSource = ProgramSource,
-  TMetadata = ProgramMetadata,
-  TCheck = ProgramCheckResult,
-  TActivation = ProgramActivationResult,
-  TValidation = ProgramValidationResult,
-  TDeletion = ProgramDeletionResult,
-  TUpdated = ProgramUpdated,
-  TTransport = ProgramTransport,
-  TDeletionCheck = DeletionCheckResult,
-> {
-  readonly created: IResultStrategy<TCreated>;
-  readonly source: IResultStrategy<TSource>;
-  readonly metadata: IResultStrategy<TMetadata>;
-  readonly check: IResultStrategy<TCheck>;
-  readonly activation: IResultStrategy<TActivation>;
-  readonly validation: IResultStrategy<TValidation>;
-  readonly deletion: IResultStrategy<TDeletion>;
-  readonly updated: IResultStrategy<TUpdated>;
-  readonly transport: IResultStrategy<TTransport>;
+export interface IProgramResults {
+  readonly created: IResultStrategy<unknown>;
+  readonly source: IResultStrategy<unknown>;
+  readonly metadata: IResultStrategy<unknown>;
+  readonly check: IResultStrategy<unknown>;
+  readonly activation: IResultStrategy<unknown>;
+  readonly validation: IResultStrategy<unknown>;
+  readonly deletion: IResultStrategy<unknown>;
+  readonly updated: IResultStrategy<unknown>;
+  readonly transport: IResultStrategy<unknown>;
   /** What a deletion check answers: `del:checkResponse`. */
-  readonly deletionCheck: IResultStrategy<TDeletionCheck>;
+  readonly deletionCheck: IResultStrategy<unknown>;
 }
 
 /**

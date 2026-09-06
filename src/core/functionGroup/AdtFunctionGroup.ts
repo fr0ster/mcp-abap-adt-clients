@@ -69,18 +69,7 @@ import { validateFunctionGroupName } from './validation';
 export const validationSeverity = validationRefusal;
 
 export class AdtFunctionGroup<
-  R extends IFunctionGroupResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  > = IFunctionGroupResults,
+  R extends IFunctionGroupResults = typeof functionGroupDocuments,
 > implements
     IAdtCreatable<IFunctionGroupConfig, ReturnType<R['created']>>,
     IAdtMetadataReadable<IFunctionGroupConfig, ReturnType<R['metadata']>>,

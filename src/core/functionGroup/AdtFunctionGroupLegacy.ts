@@ -14,21 +14,14 @@ import type {
 import { answering } from '../../utils/adtResponse';
 import { deleteObjectDirect } from '../shared/deleteLegacy';
 import { AdtFunctionGroup } from './AdtFunctionGroup';
-import type { IFunctionGroupConfig, IFunctionGroupResults } from './types';
+import type {
+  functionGroupDocuments,
+  IFunctionGroupConfig,
+  IFunctionGroupResults,
+} from './types';
 
 export class AdtFunctionGroupLegacy<
-  R extends IFunctionGroupResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  > = IFunctionGroupResults,
+  R extends IFunctionGroupResults = typeof functionGroupDocuments,
 > extends AdtFunctionGroup<R> {
   override async delete<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionGroupConfig>,

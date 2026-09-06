@@ -62,18 +62,7 @@ import { uploadFeatureToggleSource } from './updateSource';
 import { validateFeatureToggleName } from './validation';
 
 export class AdtFeatureToggle<
-  R extends IFeatureToggleResults<
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown,
-    unknown
-  > = IFeatureToggleResults,
+  R extends IFeatureToggleResults = typeof featureToggleDocuments,
 > implements
     IAdtCreatable<IFeatureToggleConfig, ReturnType<R['created']>>,
     IAdtReadable<IFeatureToggleConfig, ReturnType<R['source']>>,
