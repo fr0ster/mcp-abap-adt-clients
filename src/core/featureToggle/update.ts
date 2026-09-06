@@ -15,12 +15,13 @@ import { buildFeatureToggleXml } from './xmlBuilder';
 export async function updateFeatureToggle(
   connection: IAbapConnection,
   params: ICreateFeatureToggleParams,
-  lockHandle: string,
+  lockHandle?: string,
   _logger?: ILogger,
 ): Promise<IAdtWireResponse> {
   const encoded = encodeSapObjectName(params.feature_toggle_name.toLowerCase());
   const xml = buildFeatureToggleXml(params);
-  const query: Record<string, string> = { lockHandle };
+  const query: Record<string, string> = {};
+  if (lockHandle) query.lockHandle = lockHandle;
   if (params.transport_request) query.corrNr = params.transport_request;
   return connection.makeAdtRequest({
     method: 'PUT',

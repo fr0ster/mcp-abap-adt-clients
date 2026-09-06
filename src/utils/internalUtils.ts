@@ -127,3 +127,26 @@ export function safeStringify(value: unknown, maxLength = 500): string {
     return String(value).substring(0, maxLength);
   }
 }
+
+/**
+ * The query string a write carries.
+ *
+ * Both parts are the caller's to supply, and both are omitted when absent. In
+ * particular a missing lock handle is not an error this library raises: whether
+ * a write without a lock is allowed is ADT's judgement about that object on
+ * that system, and refusing it here would turn a server verdict into a thrown
+ * exception the caller cannot read.
+ */
+export function writeQuery(
+  lockHandle?: string,
+  transportRequest?: string,
+): string {
+  const parts: string[] = [];
+  if (lockHandle) {
+    parts.push(`lockHandle=${encodeURIComponent(lockHandle)}`);
+  }
+  if (transportRequest) {
+    parts.push(`corrNr=${encodeURIComponent(transportRequest)}`);
+  }
+  return parts.length > 0 ? `?${parts.join('&')}` : '';
+}

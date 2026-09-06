@@ -19,7 +19,6 @@ import type {
   IAdtReadable,
   IAdtResponse,
   IAdtSystemContext,
-  IAdtTransportAware,
   IAdtUpdatable,
   IAdtValidatable,
   IAnalyse,
@@ -28,10 +27,8 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { activationRefusal } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
-import { beginCriticalSection } from '../../utils/criticalSection';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import { validationRefusal } from '../../utils/validationRefusal';
-import { chain } from '../shared/chain';
 import {
   createLockTracker,
   type LockRegistry,
@@ -151,58 +148,30 @@ export class AdtAuthorizationField<
     if (!config.description) {
       throw new Error('Description is required');
     }
-
-    return chain(this.logger, async ({ step, onScopeEnd, onFailure }) => {
-      onScopeEnd(async () => {
-        this.connection.setSessionType('stateless');
-      });
-
-      let created = false;
-      if (options?.deleteOnFailure ?? true) {
-        onFailure(async () => {
-          if (!created) return;
-          this.logger?.warn?.('Deleting authorization field after failure');
-          await deleteAuthorizationField(this.connection, {
-            authorization_field_name: name,
-            transport_request: config.transportRequest,
-          });
-        });
-      }
-
-      this.logger?.info?.('Creating authorization field');
-      const value = await step(
-        answering(
-          () =>
-            createAuthorizationField(this.connection, {
-              authorization_field_name: name,
-              description: config.description,
-              package_name: config.packageName ?? '',
-              transport_request: config.transportRequest,
-              master_system:
-                config.masterSystem ?? this.systemContext.masterSystem,
-              responsible: config.responsible ?? this.systemContext.responsible,
-              field_name: config.fieldName,
-              roll_name: config.rollName,
-              check_table: config.checkTable,
-              exit_fb: config.exitFb,
-              abap_language_version: config.abapLanguageVersion,
-              search: config.search,
-              objexit: config.objexit,
-              domname: config.domname,
-              outputlen: config.outputlen,
-              convexit: config.convexit,
-              orglvlinfo: config.orglvlinfo,
-            }),
-          this.results.created as IResultStrategy<ReturnType<R['created']>>,
-          options?.analyse,
-        ),
-      );
-      // Only past the step: a refused create leaves nothing to delete, and the
-      // cleanup above must not remove an object this call did not make.
-      created = true;
-      this.logger?.info?.('Authorization field created');
-      return value;
-    });
+    return answering(
+      () =>
+        createAuthorizationField(this.connection, {
+          authorization_field_name: name,
+          description: config.description,
+          package_name: config.packageName ?? '',
+          transport_request: config.transportRequest,
+          master_system: config.masterSystem ?? this.systemContext.masterSystem,
+          responsible: config.responsible ?? this.systemContext.responsible,
+          field_name: config.fieldName,
+          roll_name: config.rollName,
+          check_table: config.checkTable,
+          exit_fb: config.exitFb,
+          abap_language_version: config.abapLanguageVersion,
+          search: config.search,
+          objexit: config.objexit,
+          domname: config.domname,
+          outputlen: config.outputlen,
+          convexit: config.convexit,
+          orglvlinfo: config.orglvlinfo,
+        }),
+      this.results.created as IResultStrategy<ReturnType<R['created']>>,
+      options?.analyse,
+    );
   }
 
   /** Read the object.
@@ -266,183 +235,60 @@ export class AdtAuthorizationField<
     if (!config.packageName) {
       throw new Error('Package name is required for update');
     }
-    const source = options?.xmlContent;
 
-    if (options?.lockHandle) {
-      const lockHandle = options.lockHandle;
-      this.logger?.info?.(
-        'Low-level update: performing update only (lockHandle provided)',
-      );
-      return answering(
-        () =>
-          updateAuthorizationField(
-            this.connection,
-            {
-              authorization_field_name: name,
-              description: config.description,
-              package_name: config.packageName ?? '',
-              transport_request: config.transportRequest,
-              master_system:
-                config.masterSystem ?? this.systemContext.masterSystem,
-              responsible: config.responsible ?? this.systemContext.responsible,
-              field_name: config.fieldName,
-              roll_name: config.rollName,
-              check_table: config.checkTable,
-              exit_fb: config.exitFb,
-              abap_language_version: config.abapLanguageVersion,
-              search: config.search,
-              objexit: config.objexit,
-              domname: config.domname,
-              outputlen: config.outputlen,
-              convexit: config.convexit,
-              orglvlinfo: config.orglvlinfo,
-            },
-            lockHandle,
-            this.logger,
-          ),
-        this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
-        options?.analyse,
-      );
-    }
-
-    // A LOCK…UNLOCK window: a timeout in the middle releases the lock and
-    // leaves the work half done, so the connection is told this is critical.
-    const endCriticalSection = beginCriticalSection(this.connection);
-
-    return chain(this.logger, async ({ step, onScopeEnd }) => {
-      onScopeEnd(async () => {
-        endCriticalSection();
-      });
-
-      this.logger?.info?.('Step 1: Locking authorization field');
-      this.connection.setSessionType('stateful');
-      // Registered FIRST so it unwinds LAST: on older BASIS a lock handle is
-      // only valid inside a stateful request, so going stateless before the
-      // unlock would break the unlock (#106); and if the lock itself throws,
-      // the session is still restored.
-      onScopeEnd(async () => {
-        this.connection.setSessionType('stateless');
-      });
-
-      const lockHandle = await lockAuthorizationField(this.connection, name);
-      this.lockTracker.track(name, lockHandle);
-      const releaseLock = onScopeEnd(async () => {
-        await unlockAuthorizationField(this.connection, name, lockHandle);
-        this.lockTracker.untrack(name);
-      });
-      this.logger?.info?.('Authorization field locked, handle:', lockHandle);
-
-      if (source) {
-        this.logger?.info?.(
-          'Step 2: Checking inactive version with update content',
-        );
-        await step(
-          answering(
-            () => checkAuthorizationField(this.connection, name, 'inactive'),
-            this.results.check as IResultStrategy<ReturnType<R['check']>>,
-            options?.analyse,
-          ),
-        );
-      }
-
-      // Always written: the fields come from the config, not from a
-      // source string a caller may or may not have passed, so there is
-      // nothing to skip and nothing to leave undefined.
-      this.logger?.info?.('Step 3: Updating authorization field');
-      const updated = await step(
-        answering(
-          () =>
-            updateAuthorizationField(
-              this.connection,
-              {
-                authorization_field_name: name,
-                description: config.description,
-                package_name: config.packageName ?? '',
-                transport_request: config.transportRequest,
-                master_system:
-                  config.masterSystem ?? this.systemContext.masterSystem,
-                responsible:
-                  config.responsible ?? this.systemContext.responsible,
-                field_name: config.fieldName,
-                roll_name: config.rollName,
-                check_table: config.checkTable,
-                exit_fb: config.exitFb,
-                abap_language_version: config.abapLanguageVersion,
-                search: config.search,
-                objexit: config.objexit,
-                domname: config.domname,
-                outputlen: config.outputlen,
-                convexit: config.convexit,
-                orglvlinfo: config.orglvlinfo,
-              },
-              lockHandle,
-              this.logger,
-            ),
-          this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
-          options?.analyse,
+    return answering(
+      () =>
+        updateAuthorizationField(
+          this.connection,
+          {
+            authorization_field_name: name,
+            description: config.description,
+            package_name: config.packageName ?? '',
+            transport_request: config.transportRequest,
+            master_system:
+              config.masterSystem ?? this.systemContext.masterSystem,
+            responsible: config.responsible ?? this.systemContext.responsible,
+            field_name: config.fieldName,
+            roll_name: config.rollName,
+            check_table: config.checkTable,
+            exit_fb: config.exitFb,
+            abap_language_version: config.abapLanguageVersion,
+            search: config.search,
+            objexit: config.objexit,
+            domname: config.domname,
+            outputlen: config.outputlen,
+            convexit: config.convexit,
+            orglvlinfo: config.orglvlinfo,
+          },
+          options?.lockHandle,
+          this.logger,
         ),
-      );
-      this.logger?.info?.('Authorization field updated');
+      this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      options?.analyse,
+    );
+  }
 
-      // The write produced the inactive version, and that is the one polled:
-      // the active one still holds the pre-update content, so waiting on it
-      // returns something the update cannot have changed. A failure here is not
-      // the update's failure, so it is logged and the chain continues — the
-      // unlock still has to happen.
-      const ready = await this.read(config, 'inactive', {
-        withLongPolling: true,
-      });
-      if (!ready.ok) {
-        this.logger?.warn?.(
-          'read with long polling failed after update:',
-          ready.getError().message,
-        );
-      }
-
-      this.logger?.info?.('Step 4: Unlocking authorization field');
-      this.connection.setSessionType('stateful');
-      await unlockAuthorizationField(this.connection, name, lockHandle);
-      this.connection.setSessionType('stateless');
-      this.lockTracker.untrack(name);
-      // Unlocked as its own step, so the registration is discharged rather than
-      // run a second time when the scope unwinds.
-      releaseLock();
-      this.logger?.info?.('Authorization field unlocked');
-
-      this.logger?.info?.('Step 5: Final check');
-      await step(
-        answering(
-          () => checkAuthorizationField(this.connection, name, 'inactive'),
-          this.results.check as IResultStrategy<ReturnType<R['check']>>,
-          options?.analyse,
-        ),
-      );
-
-      if (options?.activateOnUpdate) {
-        this.logger?.info?.('Step 6: Activating authorization field');
-        await step(
-          answering(
-            () => activateAuthorizationField(this.connection, name),
-            this.results.activation as IResultStrategy<
-              ReturnType<R['activation']>
-            >,
-            (options?.analyse ?? activationRefusal) as IAnalyse<E>,
-          ),
-        );
-
-        const ready = await this.read(config, 'active', {
-          withLongPolling: true,
-        });
-        if (!ready.ok) {
-          this.logger?.warn?.(
-            'read with long polling failed after activation:',
-            ready.getError().message,
-          );
-        }
-      }
-
-      return updated;
-    });
+  /**
+   * Asks ADT whether the object can be deleted.
+   *
+   * Its own member because it is its own endpoint. `delete` no longer runs
+   * it: a consumer that wants the check runs this first and decides what a
+   * refusal means.
+   */
+  async checkDeletion<E extends IAdtError = IAdtError>(
+    config: Partial<IAuthorizationFieldConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+    const name = this.name(config);
+    return answering(
+      () =>
+        checkDeletion(this.connection, {
+          authorization_field_name: name,
+          transport_request: config.transportRequest,
+        }),
+      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
+    );
   }
 
   /**
@@ -459,38 +305,15 @@ export class AdtAuthorizationField<
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     const name = this.name(config);
-
-    return chain(this.logger, async ({ step }) => {
-      this.logger?.info?.('Checking authorization field for deletion');
-      await step(
-        answering(
-          () =>
-            checkDeletion(this.connection, {
-              authorization_field_name: name,
-              transport_request: config.transportRequest,
-            }),
-          this.results.check as IResultStrategy<ReturnType<R['check']>>,
-          (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
-        ),
-      );
-      this.logger?.info?.('Deletion check passed');
-
-      // No stateful session: this delete uses no lock.
-      this.logger?.info?.('Deleting authorization field');
-      const value = await step(
-        answering(
-          () =>
-            deleteAuthorizationField(this.connection, {
-              authorization_field_name: name,
-              transport_request: config.transportRequest,
-            }),
-          this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
-          options?.analyse,
-        ),
-      );
-      this.logger?.info?.('Authorization field deleted');
-      return value;
-    });
+    return answering(
+      () =>
+        deleteAuthorizationField(this.connection, {
+          authorization_field_name: name,
+          transport_request: config.transportRequest,
+        }),
+      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      options?.analyse,
+    );
   }
 
   /** Activate the object. Needs no stateful session. */

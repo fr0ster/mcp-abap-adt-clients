@@ -32,9 +32,7 @@ import type {
 import { ADT_NO_FAILURE, AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
 import { activationRefusal } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
-import { beginCriticalSection } from '../../utils/criticalSection';
 import { deletionRefusal } from '../../utils/deletionCheck';
-import { chain } from '../shared/chain';
 import {
   createLockTracker,
   type LockRegistry,
@@ -280,111 +278,44 @@ export class AdtAppendStructure<
     const name = this.name(config);
     const source = options?.sourceCode || config.sourceCode;
 
-    if (options?.lockHandle) {
-      if (!source) throw new Error('Source code is required for update');
-      return answering(
-        () =>
-          updateAppendStructure(
-            this.connection,
-            {
-              append_structure_name: name,
-              source_code: source,
-              transport_request: config.transportRequest,
-            },
-            options.lockHandle as string,
-          ),
-        this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
-        options?.analyse,
-      );
-    }
-
-    // A LOCK…UNLOCK window: a timeout in the middle releases the lock and
-    // leaves the work half done.
-    const endCriticalSection = beginCriticalSection(this.connection);
-
-    return chain(this.logger, async ({ step, onScopeEnd, onFailure }) => {
-      onScopeEnd(async () => {
-        endCriticalSection();
-      });
-
-      this.connection.setSessionType('stateful');
-      // Registered FIRST so it unwinds LAST: a handle is only valid inside a
-      // stateful request on older BASIS (#106).
-      onScopeEnd(async () => {
-        this.connection.setSessionType('stateless');
-      });
-
-      let created = false;
-      if (options?.deleteOnFailure ?? true) {
-        onFailure(async () => {
-          if (!created) return;
-          await deleteAppendStructure(this.connection, {
+    if (!source) throw new Error('Source code is required for update');
+    return answering(
+      () =>
+        updateAppendStructure(
+          this.connection,
+          {
             append_structure_name: name,
+            source_code: source,
             transport_request: config.transportRequest,
-          });
-        });
-      }
+          },
+          options?.lockHandle as string,
+        ),
+      this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      options?.analyse,
+    );
+  }
 
-      const lockHandle = await lockAppendStructure(this.connection, name);
-      this.lockTracker.track(name, lockHandle);
-      const releaseLock = onScopeEnd(async () => {
-        await unlockAppendStructure(this.connection, name, lockHandle);
-        this.lockTracker.untrack(name);
-      });
-
-      let updated = undefined as ReturnType<R['updated']>;
-      if (source) {
-        updated = await step(
-          answering(
-            () =>
-              updateAppendStructure(
-                this.connection,
-                {
-                  append_structure_name: name,
-                  source_code: source,
-                  transport_request: config.transportRequest,
-                },
-                lockHandle,
-              ),
-            this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
-            options?.analyse,
-          ),
-        );
-        created = true;
-
-        const ready = await this.read({ appendStructureName: name }, 'active', {
-          withLongPolling: true,
-        });
-        if (!ready.ok) {
-          this.logger?.warn?.(
-            'read with long polling failed after update:',
-            ready.getError().message,
-          );
-        }
-      }
-
-      this.connection.setSessionType('stateful');
-      await unlockAppendStructure(this.connection, name, lockHandle);
-      this.connection.setSessionType('stateless');
-      this.lockTracker.untrack(name);
-      releaseLock();
-
-      if (options?.activateOnUpdate) {
-        await step(this.activate({ appendStructureName: name }, options));
-
-        const ready = await this.read({ appendStructureName: name }, 'active', {
-          withLongPolling: true,
-        });
-        if (!ready.ok) {
-          this.logger?.warn?.(
-            'read with long polling failed after activation:',
-            ready.getError().message,
-          );
-        }
-      }
-
-      return updated;
-    });
+  /**
+   * Asks ADT whether the object can be deleted.
+   *
+   * Its own member because it is its own endpoint. `delete` no longer runs
+   * it: a consumer that wants the check runs this first and decides what a
+   * refusal means.
+   */
+  async checkDeletion<E extends IAdtError = IAdtError>(
+    config: Partial<IAppendStructureConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+    const name = this.name(config);
+    return answering(
+      () =>
+        checkDeletion(this.connection, {
+          append_structure_name: name,
+          transport_request: config.transportRequest,
+        }),
+      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
+    );
   }
 
   /**
@@ -397,32 +328,15 @@ export class AdtAppendStructure<
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     const name = this.name(config);
-
-    return chain(this.logger, async ({ step }) => {
-      await step(
-        answering(
-          () =>
-            checkDeletion(this.connection, {
-              append_structure_name: name,
-              transport_request: config.transportRequest,
-            }),
-          this.results.check as IResultStrategy<ReturnType<R['check']>>,
-          (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
-        ),
-      );
-
-      return step(
-        answering(
-          () =>
-            deleteAppendStructure(this.connection, {
-              append_structure_name: name,
-              transport_request: config.transportRequest,
-            }),
-          this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
-          options?.analyse,
-        ),
-      );
-    });
+    return answering(
+      () =>
+        deleteAppendStructure(this.connection, {
+          append_structure_name: name,
+          transport_request: config.transportRequest,
+        }),
+      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      options?.analyse,
+    );
   }
 
   /** Activate the append structure. */

@@ -46,7 +46,6 @@ import { answering } from '../../utils/adtResponse';
 import { requestOf } from '../../utils/requestTrace';
 import { AdtClass, AdtLocalTestClass } from '../class';
 import { getClassUnitTestResult, getClassUnitTestStatus } from '../class/run';
-import { chain } from '../shared/chain';
 import { startClassUnitTestRun } from './run';
 import {
   type IClassUnitTestDefinition,
@@ -152,53 +151,29 @@ export class AdtUnitTest<
    * nothing for an object already in the system. The test source is checked
    * whenever there is source to check.
    */
+  /**
+   * Validates the container class's name.
+   *
+   * One request, like every other member. The test code that will go into the
+   * class is validated with `AdtLocalTestClass.validate`, which the consumer
+   * calls when it wants that second verdict: a unit test is a class plus a
+   * `testclasses` include, and this library no longer decides in what order a
+   * consumer asks about the two.
+   */
   async validate<E extends IAdtError = IAdtError>(
     config: Partial<IUnitTestConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
     const name = this.name(config);
 
-    return chain(this.logger, async ({ step }) => {
-      // Which half of this runs depends on whether the container is there, and
-      // only two answers mean "it is not": an empty body, which is how ADT says
-      // absence on the systems measured, and a 404 from one that answers that
-      // way instead. Anything else is a fact about the *request* — routing a
-      // 500 into the create path would validate a NAME for a class that exists
-      // and report something nobody asked (caught in review, 2026-08-14) — so
-      // it is returned as the failure it is.
-      const container = await this.adtClass.read({ className: name });
-      const absent =
-        !container.ok && container.getError().response?.status === 404;
-      // Not `absent`, so `step` gets it: on success it is the source, and on
-      // any other failure it abandons the chain carrying what SAP said.
-      const source = absent ? '' : await step(Promise.resolve(container));
-      const exists = String(source) !== '';
-
-      let verdict = undefined as ReturnType<R['validation']>;
-      if (!exists) {
-        verdict = (await step(
-          this.adtClass.validate(
-            {
-              className: name,
-              packageName: config.packageName,
-              description: config.description,
-            },
-            options,
-          ),
-        )) as ReturnType<R['validation']>;
-      }
-
-      if (config.testClassSource !== undefined) {
-        verdict = (await step(
-          this.adtLocalTestClass.validate(
-            { className: name, testClassCode: config.testClassSource },
-            options,
-          ),
-        )) as ReturnType<R['validation']>;
-      }
-
-      return verdict;
-    });
+    return this.adtClass.validate(
+      {
+        className: name,
+        packageName: config.packageName,
+        description: config.description,
+      },
+      options,
+    ) as Promise<IAdtResponse<ReturnType<R['validation']>, E>>;
   }
 
   /**
@@ -212,69 +187,31 @@ export class AdtUnitTest<
    * is this implementation's business — and a failure there is still returned,
    * because it is why the tests are not what was asked for.
    */
+  /**
+   * Creates the container class.
+   *
+   * The class and nothing else. Writing the tests into it is
+   * `AdtLocalTestClass.update`, and activating it is `activate` — both calls
+   * the consumer makes, in the order it decides. That order is not free (the
+   * include cannot be locked before the class is active), which is exactly why
+   * it belongs to the caller rather than to a chain it cannot see into.
+   */
   async create<E extends IAdtError = IAdtError>(
     config: IUnitTestConfig,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     const name = this.name(config);
-    if (config.testClassSource === undefined) {
-      throw new Error('Test class source is required');
-    }
-    const source = config.testClassSource;
 
-    return chain(this.logger, async ({ step, onFailure }) => {
-      // The container class is made here and then activated and written to, so
-      // two steps can fail after it exists. `AdtClass.create`'s own rollback
-      // does not reach them — it covers its own chain, and these are this one's.
-      // `classMade`, not `created`: that name is the created value below.
-      let classMade = false;
-      if (options?.deleteOnFailure ?? true) {
-        onFailure(async () => {
-          if (!classMade) return;
-          this.logger?.warn?.(
-            'Deleting unit test container class after failure',
-          );
-          await this.adtClass.delete(
-            { className: name, transportRequest: config.transportRequest },
-            options,
-          );
-        });
-      }
-
-      this.logger?.info?.('Step 1: Creating container class', name);
-      const created = (await step(
-        this.adtClass.create(
-          {
-            className: name,
-            packageName: config.packageName as string,
-            description: config.description ?? `Unit tests ${name}`,
-            classTemplate: config.classTemplate,
-            transportRequest: config.transportRequest,
-          },
-          options,
-        ),
-      )) as ReturnType<R['created']>;
-
-      // Past the create, like every other handler's rollback flag.
-      classMade = true;
-
-      this.logger?.info?.('Step 2: Activating container class');
-      await step(this.adtClass.activate({ className: name }, options));
-
-      this.logger?.info?.('Step 3: Writing tests into the class');
-      await step(
-        this.adtLocalTestClass.update(
-          {
-            className: name,
-            testClassCode: source,
-            transportRequest: config.transportRequest,
-          },
-          { activateOnUpdate: options?.activateOnCreate ?? true },
-        ),
-      );
-
-      return created;
-    });
+    return this.adtClass.create(
+      {
+        className: name,
+        packageName: config.packageName as string,
+        description: config.description ?? `Unit tests ${name}`,
+        classTemplate: config.classTemplate,
+        transportRequest: config.transportRequest,
+      },
+      options,
+    ) as Promise<IAdtResponse<ReturnType<R['created']>, E>>;
   }
 
   /** Read the tests — the whole `testclasses` include of the container class. */

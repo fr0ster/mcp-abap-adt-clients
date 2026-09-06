@@ -35,7 +35,6 @@ import { getSystemInformation } from '../../utils/systemInfo';
 import { validationRefusal } from '../../utils/validationRefusal';
 import { AdtClass } from '../class/AdtClass';
 import { updateClass } from '../class/update';
-import { chain } from '../shared/chain';
 import type { LockRegistry } from '../shared/LockRegistry';
 import type { ObjectVersion } from '../shared/results';
 import type { IReadOptions } from '../shared/types';
@@ -284,138 +283,54 @@ export class AdtBehaviorImplementation<
     if (!config.behaviorDefinition) {
       throw new Error('behaviorDefinition is required for update');
     }
+
+    if (!source) {
+      throw new Error('Implementation code is required for update');
+    }
+    return answering(
+      () =>
+        updateBehaviorImplementation(
+          this.connection,
+          name,
+          source,
+          options?.lockHandle,
+          config.transportRequest,
+        ),
+      this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * Writes the class's own `source/main` — the generated shell that binds the
+   * class to its behavior definition.
+   *
+   * Its own member because it is its own endpoint. `create` makes the class and
+   * nothing else, so a consumer building a behavior implementation writes this
+   * once after the create and then writes the implementation with `update`.
+   */
+  async updateMain<E extends IAdtError = IAdtError>(
+    config: Partial<IBehaviorImplementationConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+    const name = this.name(config);
+    if (!config.behaviorDefinition) {
+      throw new Error('behaviorDefinition is required for updateMain');
+    }
     const behaviorDefinition = config.behaviorDefinition;
 
-    if (options?.lockHandle) {
-      if (!source) {
-        throw new Error('Implementation code is required for update');
-      }
-      const lockHandle = options.lockHandle;
-      this.logger?.info?.(
-        'Low-level update: performing update only (lockHandle provided)',
-      );
-      return chain(this.logger, async ({ step }) => {
-        await step(
-          answering(
-            () =>
-              updateClass(
-                this.connection,
-                name,
-                mainSourceFor(name, behaviorDefinition),
-                lockHandle,
-                config.transportRequest,
-              ),
-            this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
-            options?.analyse,
-          ),
-        );
-        return step(
-          answering(
-            () =>
-              updateBehaviorImplementation(
-                this.connection,
-                name,
-                source,
-                lockHandle,
-                config.transportRequest,
-              ),
-            this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
-            options?.analyse,
-          ),
-        );
-      });
-    }
-
-    return chain(this.logger, async ({ step, onScopeEnd }) => {
-      this.logger?.info?.('Step 1: Locking behavior implementation class');
-      const lockHandle = await step(this.class.lock({ className: name }));
-      const releaseLock = onScopeEnd(async () => {
-        await this.class.unlock({ className: name }, lockHandle);
-      });
-      this.logger?.info?.('Class locked, handle:', lockHandle);
-
-      // Checked without the source: the implementations include is not the
-      // full class source, so checking the class *with* it would report
-      // syntax errors about code the class does not contain.
-      this.logger?.info?.('Step 2: Checking inactive version');
-      await step(this.class.check({ className: name }, 'inactive', options));
-
-      this.logger?.info?.(
-        'Step 3: Updating main source with FOR BEHAVIOR OF clause',
-      );
-      await step(
-        answering(
-          () =>
-            updateClass(
-              this.connection,
-              name,
-              mainSourceFor(name, behaviorDefinition),
-              lockHandle,
-              config.transportRequest,
-            ),
-          this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
-          options?.analyse,
+    return answering(
+      () =>
+        updateClass(
+          this.connection,
+          name,
+          mainSourceFor(name, behaviorDefinition),
+          options?.lockHandle,
+          config.transportRequest,
         ),
-      );
-
-      let updated = undefined as ReturnType<R['updated']>;
-      if (source) {
-        this.logger?.info?.('Step 4: Updating implementations include');
-        updated = await step(
-          answering(
-            () =>
-              updateBehaviorImplementation(
-                this.connection,
-                name,
-                source,
-                lockHandle,
-                config.transportRequest,
-              ),
-            this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
-            options?.analyse,
-          ),
-        );
-
-        // The write produced the inactive version; the active one may not exist
-        // yet. A failure here is not the update's failure, so it is logged and
-        // the chain continues — the unlock still has to happen.
-        const ready = await this.read({ className: name }, 'inactive', {
-          withLongPolling: true,
-        });
-        if (!ready.ok) {
-          this.logger?.warn?.(
-            'read with long polling failed after update:',
-            ready.getError().message,
-          );
-        }
-      }
-
-      this.logger?.info?.('Step 5: Unlocking class');
-      await step(this.class.unlock({ className: name }, lockHandle));
-      // Unlocked as its own step, so the registration is discharged rather than
-      // run a second time when the scope unwinds.
-      releaseLock();
-
-      this.logger?.info?.('Step 6: Final check');
-      await step(this.class.check({ className: name }, 'inactive', options));
-
-      if (options?.activateOnUpdate) {
-        this.logger?.info?.('Step 7: Activating class');
-        await step(this.class.activate({ className: name }, options));
-
-        const ready = await this.read({ className: name }, 'active', {
-          withLongPolling: true,
-        });
-        if (!ready.ok) {
-          this.logger?.warn?.(
-            'read with long polling failed after activation:',
-            ready.getError().message,
-          );
-        }
-      }
-
-      return updated;
-    });
+      this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      options?.analyse,
+    );
   }
 
   /** Delete the implementation class — the class's own delete, checks and all. */

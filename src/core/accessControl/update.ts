@@ -3,7 +3,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { IUpdateAccessControlParams } from './types';
 
@@ -14,16 +14,13 @@ import type { IUpdateAccessControlParams } from './types';
 export async function updateAccessControl(
   connection: IAbapConnection,
   args: IUpdateAccessControlParams,
-  lockHandle: string,
+  lockHandle?: string,
 ): Promise<IAdtWireResponse> {
   const accessControlNameEncoded = encodeSapObjectName(
     args.access_control_name.toLowerCase(),
   );
 
-  const corrNrParam = args.transport_request
-    ? `&corrNr=${args.transport_request}`
-    : '';
-  const url = `/sap/bc/adt/acm/dcl/sources/${accessControlNameEncoded}/source/main?lockHandle=${encodeURIComponent(lockHandle)}${corrNrParam}`;
+  const url = `/sap/bc/adt/acm/dcl/sources/${accessControlNameEncoded}/source/main${writeQuery(lockHandle, args.transport_request)}`;
 
   const headers: Record<string, string> = {
     Accept: ACCEPT_SOURCE,

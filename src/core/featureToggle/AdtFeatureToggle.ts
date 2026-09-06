@@ -28,10 +28,8 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { activationRefusal } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
-import { beginCriticalSection } from '../../utils/criticalSection';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import { validationRefusal } from '../../utils/validationRefusal';
-import { chain } from '../shared/chain';
 import {
   createLockTracker,
   type LockRegistry,
@@ -174,42 +172,20 @@ export class AdtFeatureToggle<
     config: IFeatureToggleConfig,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
-    const name = this.name(config);
+    // Called for its guards: it throws when the name this member needs is
+    // missing, which is the one thing checked before the request goes out.
+    this.name(config);
     if (!config.packageName) {
       throw new Error('Package name is required');
     }
     if (!config.description) {
       throw new Error('Description is required');
     }
-
-    return chain(this.logger, async ({ step, onScopeEnd, onFailure }) => {
-      onScopeEnd(async () => {
-        this.connection.setSessionType('stateless');
-      });
-
-      let created = false;
-      if (options?.deleteOnFailure ?? true) {
-        onFailure(async () => {
-          if (!created) return;
-          this.logger?.warn?.('Deleting feature toggle after failure');
-          await deleteFeatureToggle(this.connection, this.deleteParams(config));
-        });
-      }
-
-      this.logger?.info?.('Creating feature toggle');
-      const value = await step(
-        answering(
-          () => createFeatureToggle(this.connection, this.createParams(config)),
-          this.results.created as IResultStrategy<ReturnType<R['created']>>,
-          options?.analyse,
-        ),
-      );
-      // Only past the step: a refused create leaves nothing to delete, and the
-      // cleanup above must not remove an object this call did not make.
-      created = true;
-      this.logger?.info?.('Feature toggle created');
-      return value;
-    });
+    return answering(
+      () => createFeatureToggle(this.connection, this.createParams(config)),
+      this.results.created as IResultStrategy<ReturnType<R['created']>>,
+      options?.analyse,
+    );
   }
 
   /** Read the object. */
@@ -255,133 +231,37 @@ export class AdtFeatureToggle<
     config: Partial<IFeatureToggleConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
-    const name = this.name(config);
-    const source = options?.sourceCode;
-
-    if (options?.lockHandle) {
-      const lockHandle = options.lockHandle;
-      this.logger?.info?.(
-        'Low-level update: performing update only (lockHandle provided)',
-      );
-      return answering(
-        () =>
-          updateFeatureToggle(
-            this.connection,
-            this.createParams(config as IFeatureToggleConfig),
-            lockHandle,
-          ),
-        this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
-        options?.analyse,
-      );
-    }
-
-    // A LOCK…UNLOCK window: a timeout in the middle releases the lock and
-    // leaves the work half done, so the connection is told this is critical.
-    const endCriticalSection = beginCriticalSection(this.connection);
-
-    return chain(this.logger, async ({ step, onScopeEnd }) => {
-      onScopeEnd(async () => {
-        endCriticalSection();
-      });
-
-      this.logger?.info?.('Step 1: Locking feature toggle');
-      this.connection.setSessionType('stateful');
-      // Registered FIRST so it unwinds LAST: on older BASIS a lock handle is
-      // only valid inside a stateful request, so going stateless before the
-      // unlock would break the unlock (#106); and if the lock itself throws,
-      // the session is still restored.
-      onScopeEnd(async () => {
-        this.connection.setSessionType('stateless');
-      });
-
-      const lockHandle = await lockFeatureToggle(this.connection, name);
-      this.lockTracker.track(name, lockHandle);
-      const releaseLock = onScopeEnd(async () => {
-        await unlockFeatureToggle(this.connection, name, lockHandle);
-        this.lockTracker.untrack(name);
-      });
-      this.logger?.info?.('Feature toggle locked, handle:', lockHandle);
-
-      // No check before the write: a toggle's own check run applies to the
-      // activated object, not to metadata it has not seen yet.
-
-      // Always written: the fields come from the config, not from a
-      // source string a caller may or may not have passed, so there is
-      // nothing to skip and nothing to leave undefined.
-      this.logger?.info?.('Step 3: Updating feature toggle');
-      const updated = await step(
-        answering(
-          () =>
-            updateFeatureToggle(
-              this.connection,
-              this.createParams(config as IFeatureToggleConfig),
-              lockHandle,
-            ),
-          this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
-          options?.analyse,
+    return answering(
+      () =>
+        updateFeatureToggle(
+          this.connection,
+          this.createParams(config as IFeatureToggleConfig),
+          options?.lockHandle,
         ),
-      );
-      this.logger?.info?.('Feature toggle updated');
+      this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      options?.analyse,
+    );
+  }
 
-      // The write produced the inactive version, and that is the one polled:
-      // the active one still holds the pre-update content, so waiting on it
-      // returns something the update cannot have changed. A failure here is not
-      // the update's failure, so it is logged and the chain continues — the
-      // unlock still has to happen.
-      const ready = await this.read(config, 'inactive', {
-        withLongPolling: true,
-      });
-      if (!ready.ok) {
-        this.logger?.warn?.(
-          'read with long polling failed after update:',
-          ready.getError().message,
-        );
-      }
-
-      this.logger?.info?.('Step 4: Unlocking feature toggle');
-      this.connection.setSessionType('stateful');
-      await unlockFeatureToggle(this.connection, name, lockHandle);
-      this.connection.setSessionType('stateless');
-      this.lockTracker.untrack(name);
-      // Unlocked as its own step, so the registration is discharged rather than
-      // run a second time when the scope unwinds.
-      releaseLock();
-      this.logger?.info?.('Feature toggle unlocked');
-
-      this.logger?.info?.('Step 5: Final check');
-      await step(
-        answering(
-          () => checkFeatureToggle(this.connection, name, 'inactive'),
-          this.results.check as IResultStrategy<ReturnType<R['check']>>,
-          options?.analyse,
-        ),
-      );
-
-      if (options?.activateOnUpdate) {
-        this.logger?.info?.('Step 6: Activating feature toggle');
-        await step(
-          answering(
-            () => activateFeatureToggle(this.connection, name),
-            this.results.activation as IResultStrategy<
-              ReturnType<R['activation']>
-            >,
-            (options?.analyse ?? activationRefusal) as IAnalyse<E>,
-          ),
-        );
-
-        const ready = await this.read(config, 'active', {
-          withLongPolling: true,
-        });
-        if (!ready.ok) {
-          this.logger?.warn?.(
-            'read with long polling failed after activation:',
-            ready.getError().message,
-          );
-        }
-      }
-
-      return updated;
-    });
+  /**
+   * Asks ADT whether the object can be deleted.
+   *
+   * Its own member because it is its own endpoint. `delete` no longer runs
+   * it: a consumer that wants the check runs this first and decides what a
+   * refusal means.
+   */
+  async checkDeletion<E extends IAdtError = IAdtError>(
+    config: Partial<IFeatureToggleConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+    // Called for its guards: it throws when the name this member needs is
+    // missing, which is the one thing checked before the request goes out.
+    this.name(config);
+    return answering(
+      () => checkDeletion(this.connection, this.deleteParams(config)),
+      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
+    );
   }
 
   /**
@@ -397,31 +277,14 @@ export class AdtFeatureToggle<
     config: Partial<IFeatureToggleConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
-    const name = this.name(config);
-
-    return chain(this.logger, async ({ step }) => {
-      this.logger?.info?.('Checking feature toggle for deletion');
-      await step(
-        answering(
-          () => checkDeletion(this.connection, this.deleteParams(config)),
-          this.results.check as IResultStrategy<ReturnType<R['check']>>,
-          (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
-        ),
-      );
-      this.logger?.info?.('Deletion check passed');
-
-      // No stateful session: this delete uses no lock.
-      this.logger?.info?.('Deleting feature toggle');
-      const value = await step(
-        answering(
-          () => deleteFeatureToggle(this.connection, this.deleteParams(config)),
-          this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
-          options?.analyse,
-        ),
-      );
-      this.logger?.info?.('Feature toggle deleted');
-      return value;
-    });
+    // Called for its guards: it throws when the name this member needs is
+    // missing, which is the one thing checked before the request goes out.
+    this.name(config);
+    return answering(
+      () => deleteFeatureToggle(this.connection, this.deleteParams(config)),
+      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      options?.analyse,
+    );
   }
 
   /** Activate the object. Needs no stateful session. */
@@ -511,7 +374,7 @@ export class AdtFeatureToggle<
   async switchOn(
     config: Partial<IFeatureToggleConfig>,
     opts: { transportRequest: string; userSpecific?: boolean },
-  ): Promise<IAdtResponse<IFeatureToggleRuntimeState>> {
+  ): Promise<IAdtResponse<undefined>> {
     return this.switchTo(config, opts, 'on');
   }
 
@@ -519,7 +382,7 @@ export class AdtFeatureToggle<
   async switchOff(
     config: Partial<IFeatureToggleConfig>,
     opts: { transportRequest: string; userSpecific?: boolean },
-  ): Promise<IAdtResponse<IFeatureToggleRuntimeState>> {
+  ): Promise<IAdtResponse<undefined>> {
     return this.switchTo(config, opts, 'off');
   }
 
@@ -527,25 +390,18 @@ export class AdtFeatureToggle<
     config: Partial<IFeatureToggleConfig>,
     opts: { transportRequest: string; userSpecific?: boolean },
     targetState: 'on' | 'off',
-  ): Promise<IAdtResponse<IFeatureToggleRuntimeState>> {
+  ): Promise<IAdtResponse<undefined>> {
     const name = this.name(config);
-
-    return chain(this.logger, async ({ step }) => {
-      await step(
-        answering(
-          () =>
-            toggleFeatureToggle(this.connection, {
-              feature_toggle_name: name,
-              state: targetState,
-              is_user_specific: Boolean(opts.userSpecific),
-              transport_request: opts.transportRequest,
-            }),
-          () => undefined,
-        ),
-      );
-
-      return step(this.getRuntimeState(config));
-    });
+    return answering(
+      () =>
+        toggleFeatureToggle(this.connection, {
+          feature_toggle_name: name,
+          state: targetState,
+          is_user_specific: Boolean(opts.userSpecific),
+          transport_request: opts.transportRequest,
+        }),
+      () => undefined,
+    );
   }
 
   /** What the toggle is set to right now, per client and per user. */

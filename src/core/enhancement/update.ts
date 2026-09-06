@@ -32,7 +32,10 @@ const debugEnabled = process.env.DEBUG_ADT_LIBS === 'true';
  */
 export async function update(
   connection: IAbapConnection,
-  args: IUpdateEnhancementParams,
+  // See the note in behaviorDefinition/update.ts: the handle is passed as given.
+  args: Omit<IUpdateEnhancementParams, 'lock_handle'> & {
+    lock_handle?: string;
+  },
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
   if (!args.enhancement_name) {
@@ -43,9 +46,6 @@ export async function update(
   }
   if (!args.source_code) {
     throw new Error('source_code is required');
-  }
-  if (!args.lock_handle) {
-    throw new Error('lock_handle is required');
   }
 
   if (!supportsSourceCode(args.enhancement_type)) {
@@ -59,7 +59,9 @@ export async function update(
 
   // Build URL with parameters
   const params = new URLSearchParams();
-  params.append('lockHandle', args.lock_handle);
+  if (args.lock_handle) {
+    params.append('lockHandle', args.lock_handle);
+  }
   if (args.transport_request) {
     params.append('corrNr', args.transport_request);
   }
@@ -130,7 +132,7 @@ export async function updateEnhancement(
   enhancementType: EnhancementType,
   enhancementName: string,
   sourceCode: string,
-  lockHandle: string,
+  lockHandle: string | undefined,
   transportRequest?: string,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {

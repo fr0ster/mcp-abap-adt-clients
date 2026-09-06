@@ -32,10 +32,8 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
 import { answering } from '../../utils/adtResponse';
-import { beginCriticalSection } from '../../utils/criticalSection';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import { validationRefusal } from '../../utils/validationRefusal';
-import { chain } from '../shared/chain';
 import {
   createLockTracker,
   type LockRegistry,
@@ -173,76 +171,28 @@ export class AdtPackage<
         'Responsible person is required: provide it in package config or in AdtClient options',
       );
     }
-
-    return chain(this.logger, async ({ step, onScopeEnd, onFailure }) => {
-      onScopeEnd(async () => {
-        this.connection.setSessionType('stateless');
-      });
-
-      let created = false;
-      if (options?.deleteOnFailure ?? true) {
-        onFailure(async () => {
-          if (!created) return;
-          this.logger?.warn?.('Deleting package after failure');
-          await deletePackage(this.connection, {
-            package_name: name,
-            transport_request: config.transportRequest,
-          });
-        });
-      }
-
-      this.logger?.info?.('Step 1: Validating package configuration');
-      await step(this.validate(config, options));
-
-      this.logger?.info?.('Step 2: Creating package');
-      const value = await step(
-        answering(
-          () =>
-            createPackage(this.connection, {
-              package_name: name,
-              super_package: config.superPackage as string,
-              description: config.description,
-              package_type: config.packageType,
-              software_component: config.softwareComponent,
-              transport_layer: config.transportLayer,
-              transport_request: config.transportRequest,
-              application_component: config.applicationComponent,
-              responsible: config.responsible ?? this.systemContext.responsible,
-              master_system: this.systemContext.masterSystem,
-              master_language:
-                config.masterLanguage?.trim() ||
-                this.systemContext.masterLanguage?.trim() ||
-                undefined,
-              record_changes: config.recordChanges ?? false,
-            }),
-          this.results.created as IResultStrategy<ReturnType<R['created']>>,
-          options?.analyse,
-        ),
-      );
-      created = true;
-      this.logger?.info?.('Package created');
-
-      // A readiness poll, not part of the answer.
-      const ready = await this.read({ packageName: name }, 'active', {
-        withLongPolling: true,
-      });
-      if (!ready.ok) {
-        this.logger?.warn?.(
-          'read with long polling failed after create:',
-          ready.getError().message,
-        );
-      }
-
-      // The check's own failure is returned, because the server's verdict on
-      // the object it just made is worth surfacing rather than discovering at
-      // the next operation. A check that cannot *run* is a different thing —
-      // the object is there — and that is the error strategy's call, not a
-      // reason to unmake it here.
-      this.logger?.info?.('Step 3: Checking package');
-      await step(this.check({ packageName: name }, 'active', options));
-
-      return value;
-    });
+    return answering(
+      () =>
+        createPackage(this.connection, {
+          package_name: name,
+          super_package: config.superPackage as string,
+          description: config.description,
+          package_type: config.packageType,
+          software_component: config.softwareComponent,
+          transport_layer: config.transportLayer,
+          transport_request: config.transportRequest,
+          application_component: config.applicationComponent,
+          responsible: config.responsible ?? this.systemContext.responsible,
+          master_system: this.systemContext.masterSystem,
+          master_language:
+            config.masterLanguage?.trim() ||
+            this.systemContext.masterLanguage?.trim() ||
+            undefined,
+          record_changes: config.recordChanges ?? false,
+        }),
+      this.results.created as IResultStrategy<ReturnType<R['created']>>,
+      options?.analyse,
+    );
   }
 
   /**
@@ -366,77 +316,35 @@ export class AdtPackage<
       record_changes: config.recordChanges ?? false,
     };
 
-    if (options?.lockHandle) {
-      this.logger?.info?.(
-        'Low-level update: performing update only (lockHandle provided)',
-      );
-      return answering(
-        () =>
-          updatePackage(this.connection, fields, options.lockHandle as string),
-        this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
-        options?.analyse,
-      );
-    }
+    return answering(
+      () =>
+        updatePackage(this.connection, fields, options?.lockHandle as string),
+      this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      options?.analyse,
+    );
+  }
 
-    // A LOCK…UNLOCK window: a timeout in the middle releases the lock and
-    // leaves the work half done.
-    const endCriticalSection = beginCriticalSection(this.connection);
-
-    return chain(this.logger, async ({ step, onScopeEnd }) => {
-      onScopeEnd(async () => {
-        endCriticalSection();
-      });
-
-      this.logger?.info?.('Step 1: Locking package');
-      this.connection.setSessionType('stateful');
-      // Registered FIRST so it unwinds LAST: stateful stays on until after the
-      // unlock (#106).
-      onScopeEnd(async () => {
-        this.connection.setSessionType('stateless');
-      });
-
-      const { lockHandle } = await lockPackage(this.connection, name);
-      this.lockTracker.track(name, lockHandle);
-      const releaseLock = onScopeEnd(async () => {
-        await unlockPackage(this.connection, name, lockHandle);
-        this.lockTracker.untrack(name);
-      });
-      this.logger?.info?.('Package locked, handle:', lockHandle);
-
-      if (options?.xmlContent) {
-        this.logger?.info?.('Step 2: Checking with update content');
-        await step(this.check({ packageName: name }, 'inactive', options));
-      }
-
-      this.logger?.info?.('Step 3: Updating package');
-      const updated = await step(
-        answering(
-          () => updatePackage(this.connection, fields, lockHandle),
-          this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
-          options?.analyse,
-        ),
-      );
-
-      const ready = await this.read({ packageName: name }, 'inactive', {
-        withLongPolling: true,
-      });
-      if (!ready.ok) {
-        this.logger?.warn?.(
-          'read with long polling failed after update:',
-          ready.getError().message,
-        );
-      }
-
-      this.logger?.info?.('Step 4: Unlocking package');
-      this.connection.setSessionType('stateful');
-      await unlockPackage(this.connection, name, lockHandle);
-      this.connection.setSessionType('stateless');
-      this.lockTracker.untrack(name);
-      releaseLock();
-
-      // No check or activate afterwards: a package has no source.
-      return updated;
-    });
+  /**
+   * Asks ADT whether the object can be deleted.
+   *
+   * Its own member because it is its own endpoint. `delete` no longer runs
+   * it: a consumer that wants the check runs this first and decides what a
+   * refusal means.
+   */
+  async checkDeletion<E extends IAdtError = IAdtError>(
+    config: Partial<IPackageConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+    const name = this.name(config);
+    return answering(
+      () =>
+        checkPackageDeletion(this.connection, {
+          package_name: name,
+          transport_request: config.transportRequest,
+        }),
+      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
+    );
   }
 
   /**
@@ -464,42 +372,20 @@ export class AdtPackage<
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     const name = this.name(config);
-
-    return chain(this.logger, async ({ step }) => {
-      this.logger?.info?.('Checking package for deletion');
-      await step(
-        answering(
-          () =>
-            checkPackageDeletion(this.connection, {
-              package_name: name,
-              transport_request: config.transportRequest,
-            }),
-          this.results.check as IResultStrategy<ReturnType<R['check']>>,
-          (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
-        ),
-      );
-      this.logger?.info?.('Deletion check passed');
-
-      this.logger?.info?.('Deleting package');
-      const value = await step(
-        answering(
-          () =>
-            deletePackage(this.connection, {
-              package_name: name,
-              transport_request: config.transportRequest,
-            }),
-          this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
-          // `isDeleted="false"` with PAK/058 arrives inside a 200, so the
-          // document decides here too — but it is a *deletion* result, whose
-          // verdict is `del:isDeleted`. `deletionRefusal` reads a check's
-          // `del:isDeletable`, found none, and reported every successful
-          // package delete as a refusal.
-          (options?.analyse ?? packageDeletionRefusal) as IAnalyse<E>,
-        ),
-      );
-      this.logger?.info?.('Package deleted');
-      return value;
-    });
+    return answering(
+      () =>
+        deletePackage(this.connection, {
+          package_name: name,
+          transport_request: config.transportRequest,
+        }),
+      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      // `isDeleted="false"` with PAK/058 arrives inside a 200, so the
+      // document decides here too — but it is a *deletion* result, whose
+      // verdict is `del:isDeleted`. `deletionRefusal` reads a check's
+      // `del:isDeletable`, found none, and reported every successful
+      // package delete as a refusal.
+      (options?.analyse ?? packageDeletionRefusal) as IAnalyse<E>,
+    );
   }
 
   /** Check the package. */

@@ -88,7 +88,7 @@ export async function updateClass(
   connection: IAbapConnection,
   className: string,
   sourceCode: string,
-  lockHandle: string,
+  lockHandle?: string,
   transportRequest?: string,
   sourceContentType?: string,
 ): Promise<IAdtWireResponse> {
@@ -96,14 +96,17 @@ export async function updateClass(
     throw new Error('source_code is required');
   }
 
-  if (!lockHandle) {
-    throw new Error('lockHandle is required');
-  }
-
+  // **No lock handle is not this library's verdict.** It used to throw here, and
+  // an update without a lock is a thing ADT judges: it answers its own refusal,
+  // naming what it wants, and that answer is what a caller should read. The
+  // parameter is simply left off the URL rather than sent empty.
   const encodedName = encodeSapObjectName(className).toLowerCase();
-  let url = `/sap/bc/adt/oo/classes/${encodedName}/source/main?lockHandle=${encodeURIComponent(lockHandle)}`;
+  let url = `/sap/bc/adt/oo/classes/${encodedName}/source/main`;
+  if (lockHandle) {
+    url += `?lockHandle=${encodeURIComponent(lockHandle)}`;
+  }
   if (transportRequest) {
-    url += `&corrNr=${transportRequest}`;
+    url += `${lockHandle ? '&' : '?'}corrNr=${transportRequest}`;
   }
 
   const contentType = sourceContentType || CT_SOURCE;

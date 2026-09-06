@@ -12,13 +12,9 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
 import { answering } from '../../utils/adtResponse';
-import { beginCriticalSection } from '../../utils/criticalSection';
-import { chain } from '../shared/chain';
 import { deleteObjectDirect } from '../shared/deleteLegacy';
 import { AdtFunctionGroup } from './AdtFunctionGroup';
-import { lockFunctionGroup } from './lock';
 import type { IFunctionGroupConfig, IFunctionGroupResults } from './types';
-import { unlockFunctionGroup } from './unlock';
 
 export class AdtFunctionGroupLegacy<
   R extends IFunctionGroupResults<
@@ -42,46 +38,17 @@ export class AdtFunctionGroupLegacy<
     }
     const name = config.functionGroupName;
 
-    const endCriticalSection = beginCriticalSection(this.connection);
-
-    return chain(this.logger, async ({ step, onScopeEnd }) => {
-      onScopeEnd(async () => {
-        endCriticalSection();
-      });
-
-      this.logger?.info?.('Locking function group for deletion');
-      this.connection.setSessionType('stateful');
-      onScopeEnd(async () => {
-        this.connection.setSessionType('stateless');
-      });
-
-      const lockHandle = await lockFunctionGroup(this.connection, name);
-      // Released on the way out only if the delete did not happen: a deleted
-      // object has nothing left to unlock.
-      let deleted = false;
-      onScopeEnd(async () => {
-        if (deleted) return;
-        await unlockFunctionGroup(this.connection, name, lockHandle);
-      });
-
-      this.logger?.info?.('Deleting function group (direct DELETE)');
-      const objectUrl = `/sap/bc/adt/functions/groups/${name.toLowerCase()}`;
-      const value = await step(
-        answering(
-          () =>
-            deleteObjectDirect(
-              this.connection,
-              objectUrl,
-              lockHandle,
-              config.transportRequest,
-            ),
-          this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
-          options?.analyse,
+    const objectUrl = `/sap/bc/adt/functions/groups/${name.toLowerCase()}`;
+    return answering(
+      () =>
+        deleteObjectDirect(
+          this.connection,
+          objectUrl,
+          options?.lockHandle,
+          config.transportRequest,
         ),
-      );
-      deleted = true;
-      this.logger?.info?.('Function group deleted');
-      return value;
-    });
+      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      options?.analyse,
+    );
   }
 }

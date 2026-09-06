@@ -40,30 +40,18 @@ import type {
   ILogger,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
-import { activationRefusal } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
-import { safeErrorMessage, safeStringify } from '../../utils/internalUtils';
+import { safeErrorMessage } from '../../utils/internalUtils';
 import { validationRefusal } from '../../utils/validationRefusal';
-import {
-  type ICapabilityContext,
-  LockCapability,
-  VersionsCapability,
-} from '../shared/capabilities';
-import { chain } from '../shared/chain';
-import {
-  createLockTracker,
-  type LockRegistry,
-  type LockTracker,
-} from '../shared/LockRegistry';
+import type { LockRegistry } from '../shared/LockRegistry';
 import type { ObjectVersion } from '../shared/results';
 import type { IReadOptions } from '../shared/types';
 import { AdtClassMemberBase } from './AdtClassMemberBase';
-import { activateClass } from './activation';
 import { checkClass, checkClassLocalTestClass } from './check';
 import { create as createClass } from './create';
-import { checkDeletion, deleteClass } from './delete';
+import { deleteClass } from './delete';
 import { lockClass } from './lock';
-import { getClassMetadata, getClassSource, getClassTransport } from './read';
+import { getClassSource } from './read';
 import {
   activateClassTestClasses,
   updateClassTestInclude,
@@ -72,11 +60,6 @@ import { classDocuments, type IClassConfig, type IClassResults } from './types';
 import { unlockClass } from './unlock';
 import { updateClass } from './update';
 import { validateClassName } from './validation';
-import {
-  type ClassIncludeType,
-  getClassIncludeVersions,
-  getClassVersionSource,
-} from './versions';
 
 export class AdtClass<
     R extends IClassResults<
@@ -167,65 +150,42 @@ export class AdtClass<
       throw new Error('Package name is required');
     }
 
-    const name = config.className;
-    return chain(this.logger, async ({ step, onScopeEnd, onFailure }) => {
-      this.connection.setSessionType('stateful');
-      // Registered before anything can fail, so the session is restored on every
-      // path — including the one where the create itself is refused, which used
-      // to reach a `catch` and now does not.
-      onScopeEnd(async () => {
-        this.connection.setSessionType('stateless');
-      });
-
-      let created = false;
-      if (options?.deleteOnFailure ?? true) {
-        onFailure(async () => {
-          if (!created) return;
-          this.logger?.warn?.('Deleting class after failure');
-          this.connection.setSessionType('stateful');
-          await deleteClass(this.connection, {
-            class_name: name,
+    // One member, one endpoint: this is the POST and nothing else. What used to
+    // follow it — a validate, a check, an activation — are members of their own,
+    // and the caller calls them in the order they want. Nothing is rolled back
+    // here either, because nothing after the POST can fail inside this call.
+    //
+    // The session mode is not touched. It used to be set stateful and put back,
+    // and a single request needs neither: whether the session is stateful is the
+    // caller's to decide, on the connection they hold, before the step that
+    // needs it. A library reaching into that decides for every other user of the
+    // same connection.
+    return answering(
+      () =>
+        createClass(
+          this.connection,
+          {
+            class_name: config.className as string,
+            package_name: config.packageName as string,
             transport_request: config.transportRequest,
-          });
-        });
-      }
-
-      this.logger?.info?.('Creating class');
-      const value = await step(
-        answering(
-          () =>
-            createClass(
-              this.connection,
-              {
-                class_name: name,
-                package_name: config.packageName as string,
-                transport_request: config.transportRequest,
-                description: config.description,
-                superclass: config.superclass,
-                final: config.final,
-                abstract: config.abstract,
-                create_protected: config.createProtected,
-                master_system:
-                  config.masterSystem ?? this.systemContext.masterSystem,
-                responsible:
-                  config.responsible ?? this.systemContext.responsible,
-                masterLanguage:
-                  config.masterLanguage ?? this.systemContext.masterLanguage,
-                template_xml: config.classTemplate,
-              },
-              this.logger,
-              this.contentTypes,
-            ),
-          this.results.created as IResultStrategy<ReturnType<R['created']>>,
-          options?.analyse,
+            description: config.description,
+            superclass: config.superclass,
+            final: config.final,
+            abstract: config.abstract,
+            create_protected: config.createProtected,
+            master_system:
+              config.masterSystem ?? this.systemContext.masterSystem,
+            responsible: config.responsible ?? this.systemContext.responsible,
+            masterLanguage:
+              config.masterLanguage ?? this.systemContext.masterLanguage,
+            template_xml: config.classTemplate,
+          },
+          this.logger,
+          this.contentTypes,
         ),
-      );
-      // Only past the step: a refused create leaves nothing to delete, and the
-      // cleanup above must not remove an object this call did not make.
-      created = true;
-      this.logger?.info?.('Class created');
-      return value;
-    });
+      this.results.created as IResultStrategy<ReturnType<R['created']>>,
+      options?.analyse,
+    );
   }
 
   /**
@@ -269,154 +229,34 @@ export class AdtClass<
     if (!config.className) {
       throw new Error('Class name is required');
     }
-    const name = config.className;
     const sourceCode = options?.sourceCode ?? config.sourceCode;
-
-    // Low-level mode: the caller holds the lock and owns the chain, so this is
-    // one request and nothing else.
-    if (options?.lockHandle) {
-      if (!sourceCode) {
-        throw new Error('Source code is required for update');
-      }
-      return answering(
-        () =>
-          updateClass(
-            this.connection,
-            name,
-            sourceCode,
-            options.lockHandle as string,
-            config.transportRequest,
-            this.contentTypes?.sourceArtifactContentType(),
-          ),
-        this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
-        options?.analyse,
-      );
+    if (sourceCode === undefined) {
+      throw new Error('Source code is required for update');
     }
 
-    // A LOCK…UNLOCK window: a timeout in the middle releases the lock and
-    // leaves the work half done, so the connection is told this is critical.
-    const endCriticalSection = beginCriticalSection(this.connection);
-
-    return chain(this.logger, async ({ step, onScopeEnd }) => {
-      onScopeEnd(async () => {
-        endCriticalSection();
-      });
-
-      this.logger?.info?.('Step 1: Locking class');
-      this.connection.setSessionType('stateful');
-      // Registered FIRST so it unwinds LAST. Order matters twice over: on older
-      // BASIS a lock handle is only valid inside a stateful request, so going
-      // stateless before the unlock would break the unlock (#106); and if the
-      // lock itself throws, the session is still restored.
-      onScopeEnd(async () => {
-        this.connection.setSessionType('stateless');
-      });
-
-      const lockHandle = await lockClass(this.connection, name);
-      this.lockTracker.track(name, lockHandle);
-      const releaseLock = onScopeEnd(async () => {
-        await unlockClass(this.connection, name, lockHandle);
-        this.lockTracker.untrack(name);
-      });
-      this.logger?.info?.('Class locked, handle:', lockHandle);
-
-      if (sourceCode) {
-        this.logger?.info?.(
-          'Step 2: Checking inactive version with update content',
-        );
-        await step(
-          answering(
-            () =>
-              checkClass(
-                this.connection,
-                name,
-                'inactive',
-                sourceCode,
-                this.contentTypes?.sourceArtifactContentType(),
-              ),
-            this.results.check as IResultStrategy<ReturnType<R['check']>>,
-            options?.analyse,
-          ),
-        );
-      }
-
-      let updated = undefined as ReturnType<R['updated']>;
-      if (sourceCode) {
-        this.logger?.info?.('Step 3: Updating class');
-        updated = await step(
-          answering(
-            () =>
-              updateClass(
-                this.connection,
-                name,
-                sourceCode,
-                lockHandle,
-                config.transportRequest,
-                this.contentTypes?.sourceArtifactContentType(),
-              ),
-            this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
-            options?.analyse,
-          ),
-        );
-
-        // The write produced the inactive version; the active one may not exist
-        // yet. A failure here is not the update's failure, so it is logged and
-        // the chain continues — the unlock still has to happen.
-        const ready = await this.read({ className: name }, 'inactive', {
-          withLongPolling: true,
-        });
-        if (!ready.ok) {
-          this.logger?.warn?.(
-            'read with long polling failed after update:',
-            ready.getError().message,
-          );
-        }
-      }
-
-      this.logger?.info?.('Step 4: Unlocking class');
-      this.connection.setSessionType('stateful');
-      await unlockClass(this.connection, name, lockHandle);
-      this.connection.setSessionType('stateless');
-      this.lockTracker.untrack(name);
-      // Unlocked as its own step, so the registration is discharged rather than
-      // run a second time when the scope unwinds.
-      releaseLock();
-      this.logger?.info?.('Class unlocked');
-
-      this.logger?.info?.('Step 5: Final check');
-      await step(
-        answering(
-          () => checkClass(this.connection, name, 'inactive'),
-          this.results.check as IResultStrategy<ReturnType<R['check']>>,
-          options?.analyse,
+    // **One member, one endpoint: the PUT.** This used to be a window — lock,
+    // check, PUT, unlock, check, and an activation on request — six requests
+    // behind one call. Every one of them is a member of its own: `lock`,
+    // `check`, `unlock`, `activate`, all declared and all callable. Composing
+    // them here made a library method out of a sequence that is the caller's,
+    // and hid from them which request failed.
+    //
+    // The lock handle is passed as given, including not at all. Whether an update
+    // without one is allowed is ADT's judgement, and it answers it — this library
+    // does not stand in front of the server with an opinion of its own.
+    return answering(
+      () =>
+        updateClass(
+          this.connection,
+          config.className as string,
+          sourceCode,
+          options?.lockHandle,
+          config.transportRequest,
+          this.contentTypes?.sourceArtifactContentType(),
         ),
-      );
-
-      if (options?.activateOnUpdate) {
-        this.logger?.info?.('Step 6: Activating class');
-        await step(
-          answering(
-            () => activateClass(this.connection, name),
-            this.results.activation as IResultStrategy<
-              ReturnType<R['activation']>
-            >,
-            (options?.analyse ?? activationRefusal) as IAnalyse<E>,
-          ),
-        );
-
-        const ready = await this.read({ className: name }, 'active', {
-          withLongPolling: true,
-        });
-        if (!ready.ok) {
-          this.logger?.warn?.(
-            'read with long polling failed after activation:',
-            ready.getError().message,
-          );
-        }
-      }
-
-      return updated;
-    });
+      this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      options?.analyse,
+    );
   }
 
   /**
@@ -429,42 +269,20 @@ export class AdtClass<
     if (!config.className) {
       throw new Error('Class name is required');
     }
-    const name = config.className;
 
-    return chain(this.logger, async ({ step, onScopeEnd }) => {
-      onScopeEnd(async () => {
-        this.connection.setSessionType('stateless');
-      });
-
-      this.logger?.info?.('Checking class for deletion');
-      await step(
-        answering(
-          () =>
-            checkDeletion(this.connection, {
-              class_name: name,
-              transport_request: config.transportRequest,
-            }),
-          this.results.check as IResultStrategy<ReturnType<R['check']>>,
-          options?.analyse,
-        ),
-      );
-
-      this.logger?.info?.('Deleting class');
-      this.connection.setSessionType('stateful');
-      const value = await step(
-        answering(
-          () =>
-            deleteClass(this.connection, {
-              class_name: name,
-              transport_request: config.transportRequest,
-            }),
-          this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
-          options?.analyse,
-        ),
-      );
-      this.logger?.info?.('Class deleted');
-      return value;
-    });
+    // One member, one endpoint. The deletion check that used to run first is a
+    // different endpoint and a different question — `getUtils().checkDeletionGroup`
+    // asks it, for one object or many — and a caller who wants it asks it. This
+    // is the delete, and it leaves the session mode alone.
+    return answering(
+      () =>
+        deleteClass(this.connection, {
+          class_name: config.className as string,
+          transport_request: config.transportRequest,
+        }),
+      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      options?.analyse,
+    );
   }
 
   /**

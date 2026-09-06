@@ -13,7 +13,7 @@ import {
   ACCEPT_SOURCE,
   ACCEPT_SOURCE_UTF8,
 } from '../../constants/contentTypes';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -27,7 +27,7 @@ export async function uploadFunctionIncludeSource(
   groupName: string,
   includeName: string,
   sourceCode: string,
-  lockHandle: string,
+  lockHandle: string | undefined,
   unicode: boolean,
   transportRequest?: string,
 ): Promise<IAdtWireResponse> {
@@ -37,16 +37,9 @@ export async function uploadFunctionIncludeSource(
   if (!includeName) {
     throw new Error('Include name is required');
   }
-  if (!lockHandle) {
-    throw new Error('lockHandle is required');
-  }
-
   const groupLower = encodeSapObjectName(groupName).toLowerCase();
   const encodedInclude = encodeSapObjectName(includeName.toUpperCase());
-  let url = `/sap/bc/adt/functions/groups/${groupLower}/includes/${encodedInclude}/source/main?lockHandle=${encodeURIComponent(lockHandle)}`;
-  if (transportRequest) {
-    url += `&corrNr=${encodeURIComponent(transportRequest)}`;
-  }
+  const url = `/sap/bc/adt/functions/groups/${groupLower}/includes/${encodedInclude}/source/main${writeQuery(lockHandle, transportRequest)}`;
 
   const contentType = unicode ? ACCEPT_SOURCE_UTF8 : ACCEPT_SOURCE;
 

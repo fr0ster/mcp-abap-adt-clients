@@ -7,7 +7,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -19,11 +19,10 @@ export async function updateDdl(
   connection: IAbapConnection,
   ddlName: string,
   ddlSource: string,
-  lockHandle: string,
+  lockHandle?: string,
   transportRequest?: string,
 ): Promise<IAdtWireResponse> {
-  const queryParams = `lockHandle=${encodeURIComponent(lockHandle)}${transportRequest ? `&corrNr=${transportRequest}` : ''}`;
-  const url = `/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(ddlName).toLowerCase()}/source/main?${queryParams}`;
+  const url = `/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(ddlName).toLowerCase()}/source/main${writeQuery(lockHandle, transportRequest)}`;
 
   const headers = {
     'Content-Type': CT_SOURCE,

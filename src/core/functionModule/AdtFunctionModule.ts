@@ -36,10 +36,8 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { activationRefusal } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
-import { beginCriticalSection } from '../../utils/criticalSection';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import { validationRefusal } from '../../utils/validationRefusal';
-import { chain } from '../shared/chain';
 import type { LockRegistry } from '../shared/LockRegistry';
 import type { ObjectVersion } from '../shared/results';
 import type { IReadOptions } from '../shared/types';
@@ -185,47 +183,19 @@ export class AdtFunctionModule<
     if (!config.description) {
       throw new Error('Description is required');
     }
-
-    return chain(this.logger, async ({ step, onScopeEnd, onFailure }) => {
-      onScopeEnd(async () => {
-        this.connection.setSessionType('stateless');
-      });
-
-      let created = false;
-      if (options?.deleteOnFailure ?? true) {
-        onFailure(async () => {
-          if (!created) return;
-          this.logger?.warn?.('Deleting function module after failure');
-          // No stateful needed — the delete uses no lock.
-          await deleteFunctionModule(this.connection, {
-            function_module_name: module,
-            function_group_name: group,
-            transport_request: config.transportRequest,
-          });
-        });
-      }
-
-      this.logger?.info?.('Creating function module');
-      const value = await step(
-        answering(
-          () =>
-            createFunctionModule(this.connection, {
-              functionGroupName: group,
-              functionModuleName: module,
-              transportRequest: config.transportRequest,
-              description: config.description as string,
-              masterSystem:
-                config.masterSystem ?? this.systemContext.masterSystem,
-              responsible: config.responsible ?? this.systemContext.responsible,
-            }),
-          this.results.created as IResultStrategy<ReturnType<R['created']>>,
-          options?.analyse,
-        ),
-      );
-      created = true;
-      this.logger?.info?.('Function module created');
-      return value;
-    });
+    return answering(
+      () =>
+        createFunctionModule(this.connection, {
+          functionGroupName: group,
+          functionModuleName: module,
+          transportRequest: config.transportRequest,
+          description: config.description as string,
+          masterSystem: config.masterSystem ?? this.systemContext.masterSystem,
+          responsible: config.responsible ?? this.systemContext.responsible,
+        }),
+      this.results.created as IResultStrategy<ReturnType<R['created']>>,
+      options?.analyse,
+    );
   }
 
   /** Read the module's source. */
@@ -295,146 +265,49 @@ export class AdtFunctionModule<
     const { group, module } = this.names(config);
     const source = options?.sourceCode || config.sourceCode;
 
-    if (options?.lockHandle) {
-      if (!source) {
-        throw new Error('Source code is required for update');
-      }
-      this.logger?.info?.(
-        'Low-level update: performing update only (lockHandle provided)',
-      );
-      return answering(
-        () =>
-          update(
-            this.connection,
-            {
-              functionModuleName: module,
-              functionGroupName: group,
-              sourceCode: source,
-              lockHandle: options.lockHandle as string,
-              transportRequest: config.transportRequest,
-            },
-            this.contentTypes,
-          ),
-        this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
-        options?.analyse,
-      );
+    if (!source) {
+      throw new Error('Source code is required for update');
     }
+    return answering(
+      () =>
+        update(
+          this.connection,
+          {
+            functionModuleName: module,
+            functionGroupName: group,
+            sourceCode: source,
+            lockHandle: options?.lockHandle as string,
+            transportRequest: config.transportRequest,
+          },
+          this.contentTypes,
+        ),
+      this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      options?.analyse,
+    );
+  }
 
-    // A LOCK…UNLOCK window: a timeout in the middle releases the lock and
-    // leaves the work half done.
-    const endCriticalSection = beginCriticalSection(this.connection);
-
-    return chain(this.logger, async ({ step, onScopeEnd }) => {
-      onScopeEnd(async () => {
-        endCriticalSection();
-      });
-
-      this.logger?.info?.('Step 1: Locking function module');
-      this.connection.setSessionType('stateful');
-      // Registered FIRST so it unwinds LAST: a handle is only valid inside a
-      // stateful request on older BASIS (#106).
-      onScopeEnd(async () => {
-        this.connection.setSessionType('stateless');
-      });
-
-      const lockHandle = await lockFunctionModule(
-        this.connection,
-        group,
-        module,
-      );
-      this.trackLock(group, module, lockHandle);
-      const releaseLock = onScopeEnd(async () => {
-        await unlockFunctionModule(this.connection, group, module, lockHandle);
-        this.untrackLock(group, module);
-      });
-      this.logger?.info?.('Function module locked, handle:', lockHandle);
-
-      if (source) {
-        this.logger?.info?.(
-          'Step 2: Checking inactive version with update content',
-        );
-        await step(
-          answering(
-            () =>
-              checkFunctionModule(
-                this.connection,
-                group,
-                module,
-                'inactive',
-                source,
-                this.contentTypes,
-              ),
-            this.results.check as IResultStrategy<ReturnType<R['check']>>,
-            options?.analyse,
-          ),
-        );
-      }
-
-      let updated = undefined as ReturnType<R['updated']>;
-      if (source) {
-        this.logger?.info?.('Step 3: Updating function module');
-        updated = await step(
-          answering(
-            () =>
-              update(
-                this.connection,
-                {
-                  functionGroupName: group,
-                  functionModuleName: module,
-                  sourceCode: source,
-                  lockHandle,
-                  transportRequest: config.transportRequest,
-                },
-                this.contentTypes,
-              ),
-            this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
-            options?.analyse,
-          ),
-        );
-        this.logger?.info?.('Function module updated');
-
-        // The write produced the inactive version; the active one may not exist
-        // yet. A failure here is not the update's failure, so it is logged and
-        // the chain continues — the unlock still has to happen.
-        const ready = await this.read(config, 'inactive', {
-          withLongPolling: true,
-        });
-        if (!ready.ok) {
-          this.logger?.warn?.(
-            'read with long polling failed after update:',
-            ready.getError().message,
-          );
-        }
-      }
-
-      this.logger?.info?.('Step 4: Unlocking function module');
-      this.connection.setSessionType('stateful');
-      await unlockFunctionModule(this.connection, group, module, lockHandle);
-      this.connection.setSessionType('stateless');
-      this.untrackLock(group, module);
-      releaseLock();
-      this.logger?.info?.('Function module unlocked');
-
-      this.logger?.info?.('Step 5: Final check');
-      await step(this.check(config, 'inactive', options));
-
-      if (options?.activateOnUpdate) {
-        this.logger?.info?.('Step 6: Activating function module');
-        await step(this.activate(config, options));
-
-        const ready = await this.read(config, 'active', {
-          withLongPolling: true,
-        });
-        if (!ready.ok) {
-          this.logger?.warn?.(
-            'read with long polling failed after activation:',
-            ready.getError().message,
-          );
-        }
-      }
-
-      return updated;
-    });
+  /**
+   * Asks ADT whether the object can be deleted.
+   *
+   * Its own member because it is its own endpoint. `delete` no longer runs
+   * it: a consumer that wants the check runs this first and decides what a
+   * refusal means.
+   */
+  async checkDeletion<E extends IAdtError = IAdtError>(
+    config: Partial<IFunctionModuleConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+    const { group, module } = this.names(config);
+    return answering(
+      () =>
+        checkDeletion(this.connection, {
+          function_module_name: module,
+          function_group_name: group,
+          transport_request: config.transportRequest,
+        }),
+      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
+    );
   }
 
   /**
@@ -447,40 +320,16 @@ export class AdtFunctionModule<
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     const { group, module } = this.names(config);
-
-    return chain(this.logger, async ({ step }) => {
-      this.logger?.info?.('Checking function module for deletion');
-      await step(
-        answering(
-          () =>
-            checkDeletion(this.connection, {
-              function_module_name: module,
-              function_group_name: group,
-              transport_request: config.transportRequest,
-            }),
-          this.results.check as IResultStrategy<ReturnType<R['check']>>,
-          (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
-        ),
-      );
-      this.logger?.info?.('Deletion check passed');
-
-      // No stateful session: this delete uses no lock.
-      this.logger?.info?.('Deleting function module');
-      const value = await step(
-        answering(
-          () =>
-            deleteFunctionModule(this.connection, {
-              function_module_name: module,
-              function_group_name: group,
-              transport_request: config.transportRequest,
-            }),
-          this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
-          options?.analyse,
-        ),
-      );
-      this.logger?.info?.('Function module deleted');
-      return value;
-    });
+    return answering(
+      () =>
+        deleteFunctionModule(this.connection, {
+          function_module_name: module,
+          function_group_name: group,
+          transport_request: config.transportRequest,
+        }),
+      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      options?.analyse,
+    );
   }
 
   /** Activate the function module. Needs no stateful session. */

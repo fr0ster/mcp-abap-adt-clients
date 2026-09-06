@@ -20,7 +20,7 @@ export async function updateBehaviorImplementation(
   connection: IAbapConnection,
   className: string,
   sourceCode: string,
-  lockHandle: string,
+  lockHandle?: string,
   transportRequest?: string,
 ): Promise<IAdtWireResponse> {
   if (!sourceCode) {

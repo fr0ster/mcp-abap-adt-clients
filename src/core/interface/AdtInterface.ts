@@ -35,10 +35,8 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { activationRefusal } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
-import { beginCriticalSection } from '../../utils/criticalSection';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import { validationRefusal } from '../../utils/validationRefusal';
-import { chain } from '../shared/chain';
 import {
   createLockTracker,
   type LockRegistry,
@@ -162,52 +160,25 @@ export class AdtInterface<
       throw new Error('Description is required');
     }
     const name = config.interfaceName;
-
-    return chain(this.logger, async ({ step, onScopeEnd, onFailure }) => {
-      onScopeEnd(async () => {
-        this.connection.setSessionType('stateless');
-      });
-
-      let created = false;
-      if (options?.deleteOnFailure ?? true) {
-        onFailure(async () => {
-          if (!created) return;
-          this.logger?.warn?.('Deleting interface after failure');
-          this.connection.setSessionType('stateful');
-          await deleteInterface(this.connection, {
-            interface_name: name,
-            transport_request: config.transportRequest,
-          });
-        });
-      }
-
-      this.logger?.info?.('Creating interface');
-      const value = await step(
-        answering(
-          () =>
-            createInterface(
-              this.connection,
-              {
-                interfaceName: name,
-                packageName: config.packageName as string,
-                transportRequest: config.transportRequest,
-                description: config.description as string,
-                masterSystem: this.systemContext.masterSystem,
-                responsible: this.systemContext.responsible,
-                masterLanguage:
-                  config.masterLanguage ?? this.systemContext.masterLanguage,
-              },
-              this.logger,
-            ),
-          this.results.created as IResultStrategy<ReturnType<R['created']>>,
-          options?.analyse,
+    return answering(
+      () =>
+        createInterface(
+          this.connection,
+          {
+            interfaceName: name,
+            packageName: config.packageName as string,
+            transportRequest: config.transportRequest,
+            description: config.description as string,
+            masterSystem: this.systemContext.masterSystem,
+            responsible: this.systemContext.responsible,
+            masterLanguage:
+              config.masterLanguage ?? this.systemContext.masterLanguage,
+          },
+          this.logger,
         ),
-      );
-      // Only past the step: a refused create leaves nothing to delete.
-      created = true;
-      this.logger?.info?.('Interface created');
-      return value;
-    });
+      this.results.created as IResultStrategy<ReturnType<R['created']>>,
+      options?.analyse,
+    );
   }
 
   /** Read the interface's source. */
@@ -273,156 +244,48 @@ export class AdtInterface<
     const name = config.interfaceName;
     const source = options?.sourceCode || config.sourceCode;
 
-    if (options?.lockHandle) {
-      if (!source) {
-        throw new Error('Source code is required for update');
-      }
-      this.logger?.info?.(
-        'Low-level update: performing update only (lockHandle provided)',
-      );
-      return answering(
-        () =>
-          upload(
-            this.connection,
-            name,
-            source,
-            options.lockHandle as string,
-            config.transportRequest,
-            this.contentTypes?.sourceArtifactContentType(),
-          ),
-        this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
-        options?.analyse,
-      );
+    if (!source) {
+      throw new Error('Source code is required for update');
     }
-
-    // A LOCK…UNLOCK window: a timeout in the middle releases the lock and
-    // leaves the work half done.
-    const endCriticalSection = beginCriticalSection(this.connection);
-
-    return chain(this.logger, async ({ step, onScopeEnd }) => {
-      onScopeEnd(async () => {
-        endCriticalSection();
-      });
-
-      this.logger?.info?.('Step 1: Locking interface');
-      this.connection.setSessionType('stateful');
-      // Registered FIRST so it unwinds LAST: a handle is only valid inside a
-      // stateful request on older BASIS (#106).
-      onScopeEnd(async () => {
-        this.connection.setSessionType('stateless');
-      });
-
-      const { lockHandle } = await lockInterface(this.connection, name);
-      this.lockTracker.track(name, lockHandle);
-      const releaseLock = onScopeEnd(async () => {
-        await unlockInterface(this.connection, name, lockHandle);
-        this.lockTracker.untrack(name);
-      });
-      this.logger?.info?.('Interface locked, handle:', lockHandle);
-
-      if (source) {
-        this.logger?.info?.(
-          'Step 2: Checking inactive version with update content',
-        );
-        await step(
-          answering(
-            () =>
-              checkInterface(
-                this.connection,
-                name,
-                'inactive',
-                source,
-                this.contentTypes?.sourceArtifactContentType(),
-              ),
-            this.results.check as IResultStrategy<ReturnType<R['check']>>,
-            options?.analyse,
-          ),
-        );
-      }
-
-      let updated = undefined as ReturnType<R['updated']>;
-      if (source) {
-        this.logger?.info?.('Step 3: Updating interface');
-        updated = await step(
-          answering(
-            () =>
-              upload(
-                this.connection,
-                name,
-                source,
-                lockHandle,
-                config.transportRequest,
-                this.contentTypes?.sourceArtifactContentType(),
-              ),
-            this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
-            options?.analyse,
-          ),
-        );
-        this.logger?.info?.('Interface updated');
-
-        // The write produced the inactive version; the active one may not exist
-        // yet. A failure here is not the update's failure, so it is logged and
-        // the chain continues — the unlock still has to happen.
-        const ready = await this.read({ interfaceName: name }, 'inactive', {
-          withLongPolling: true,
-        });
-        if (!ready.ok) {
-          this.logger?.warn?.(
-            'read with long polling failed after update:',
-            ready.getError().message,
-          );
-        }
-      }
-
-      this.logger?.info?.('Step 4: Unlocking interface');
-      this.connection.setSessionType('stateful');
-      await unlockInterface(this.connection, name, lockHandle);
-      this.connection.setSessionType('stateless');
-      this.lockTracker.untrack(name);
-      releaseLock();
-      this.logger?.info?.('Interface unlocked');
-
-      this.logger?.info?.('Step 5: Final check');
-      await step(
-        answering(
-          () =>
-            checkInterface(
-              this.connection,
-              name,
-              'inactive',
-              undefined,
-              this.contentTypes?.sourceArtifactContentType(),
-            ),
-          this.results.check as IResultStrategy<ReturnType<R['check']>>,
-          options?.analyse,
+    return answering(
+      () =>
+        upload(
+          this.connection,
+          name,
+          source,
+          options?.lockHandle as string,
+          config.transportRequest,
+          this.contentTypes?.sourceArtifactContentType(),
         ),
-      );
+      this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      options?.analyse,
+    );
+  }
 
-      if (options?.activateOnUpdate) {
-        this.logger?.info?.('Step 6: Activating interface');
-        await step(
-          answering(
-            () => activateInterface(this.connection, name),
-            this.results.activation as IResultStrategy<
-              ReturnType<R['activation']>
-            >,
-            (options?.analyse ?? activationRefusal) as IAnalyse<E>,
-          ),
-        );
-
-        const ready = await this.read({ interfaceName: name }, 'active', {
-          withLongPolling: true,
-        });
-        if (!ready.ok) {
-          this.logger?.warn?.(
-            'read with long polling failed after activation:',
-            ready.getError().message,
-          );
-        }
-      }
-
-      return updated;
-    });
+  /**
+   * Asks ADT whether the object can be deleted.
+   *
+   * Its own member because it is its own endpoint. `delete` no longer runs
+   * it: a consumer that wants the check runs this first and decides what a
+   * refusal means.
+   */
+  async checkDeletion<E extends IAdtError = IAdtError>(
+    config: Partial<IInterfaceConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+    if (!config.interfaceName) {
+      throw new Error('Interface name is required');
+    }
+    const name = config.interfaceName;
+    return answering(
+      () =>
+        checkDeletion(this.connection, {
+          interface_name: name,
+          transport_request: config.transportRequest,
+        }),
+      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
+    );
   }
 
   /**
@@ -438,42 +301,15 @@ export class AdtInterface<
       throw new Error('Interface name is required');
     }
     const name = config.interfaceName;
-
-    return chain(this.logger, async ({ step, onScopeEnd }) => {
-      onScopeEnd(async () => {
-        this.connection.setSessionType('stateless');
-      });
-
-      this.logger?.info?.('Checking interface for deletion');
-      await step(
-        answering(
-          () =>
-            checkDeletion(this.connection, {
-              interface_name: name,
-              transport_request: config.transportRequest,
-            }),
-          this.results.check as IResultStrategy<ReturnType<R['check']>>,
-          (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
-        ),
-      );
-      this.logger?.info?.('Deletion check passed');
-
-      this.logger?.info?.('Deleting interface');
-      this.connection.setSessionType('stateful');
-      const value = await step(
-        answering(
-          () =>
-            deleteInterface(this.connection, {
-              interface_name: name,
-              transport_request: config.transportRequest,
-            }),
-          this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
-          options?.analyse,
-        ),
-      );
-      this.logger?.info?.('Interface deleted');
-      return value;
-    });
+    return answering(
+      () =>
+        deleteInterface(this.connection, {
+          interface_name: name,
+          transport_request: config.transportRequest,
+        }),
+      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      options?.analyse,
+    );
   }
 
   /** Activate the interface. Needs no stateful session. */

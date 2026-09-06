@@ -17,6 +17,7 @@ import {
 import {
   encodeSapObjectName,
   limitDescription,
+  writeQuery,
 } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import {
@@ -211,7 +212,7 @@ function patchDataElementXml(
 export async function updateDataElement(
   connection: IAbapConnection,
   params: IUpdateDataElementParams,
-  lockHandle: string,
+  lockHandle?: string,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
   if (!params.data_element_name) {
@@ -264,10 +265,7 @@ export async function updateDataElement(
   }
 
   // 3. PUT
-  const corrNrParam = params.transport_request
-    ? `&corrNr=${params.transport_request}`
-    : '';
-  const url = `/sap/bc/adt/ddic/dataelements/${dataElementNameEncoded}?lockHandle=${encodeURIComponent(lockHandle)}${corrNrParam}`;
+  const url = `/sap/bc/adt/ddic/dataelements/${dataElementNameEncoded}${writeQuery(lockHandle, params.transport_request)}`;
 
   const headers: Record<string, string> = {
     Accept: ACCEPT_DATA_ELEMENT,
@@ -290,7 +288,7 @@ export async function updateDataElement(
 export async function updateDataElementInternal(
   connection: IAbapConnection,
   args: IUpdateDataElementParams,
-  lockHandle: string,
+  lockHandle: string | undefined,
   _username: string,
   _domainInfo: { dataType: string; length: number; decimals: number },
   logger?: ILogger,

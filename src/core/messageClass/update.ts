@@ -10,7 +10,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
 import { MESSAGE_CLASS_UPDATE_CONTENT_TYPE } from '../../constants/contentTypes';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import { getMessageClassSource } from './read';
 import { buildMessageClassXml, parseMessageClass } from './xml';
@@ -27,7 +27,7 @@ const BASE = '/sap/bc/adt/messageclass';
 export async function updateMessageClass(
   connection: IAbapConnection,
   name: string,
-  lockHandle: string,
+  lockHandle: string | undefined,
   description: string | undefined,
   transportRequest?: string,
 ): Promise<IAdtWireResponse> {
@@ -46,10 +46,7 @@ export async function updateMessageClass(
 
   // 4. PUT with lock handle
   const encoded = encodeSapObjectName(name.toLowerCase());
-  const corrNrParam = transportRequest?.trim()
-    ? `&corrNr=${encodeURIComponent(transportRequest)}`
-    : '';
-  const url = `${BASE}/${encoded}?lockHandle=${encodeURIComponent(lockHandle)}${corrNrParam}`;
+  const url = `${BASE}/${encoded}${writeQuery(lockHandle, transportRequest?.trim())}`;
 
   return connection.makeAdtRequest({
     url,

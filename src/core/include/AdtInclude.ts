@@ -28,7 +28,6 @@ import type {
 import { activationRefusal } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
 import { validationRefusal } from '../../utils/validationRefusal';
-import { chain } from '../shared/chain';
 import { activateInclude } from './activation';
 import { create } from './create';
 import { deleteInclude } from './delete';
@@ -70,6 +69,10 @@ export class AdtInclude<
 {
   constructor(
     private readonly connection: IAbapConnection,
+    // Part of the constructor shape every client in this library shares. It is
+    // unread here now that the members are single requests with nothing to
+    // narrate; removing it would make this one class take different arguments.
+    // biome-ignore lint/correctness/noUnusedPrivateClassMembers: uniform constructor
     private readonly logger?: ILogger,
     private readonly contentTypes?: IAdtContentTypes,
     // The one cast in this file, and it is on the default. See AdtClass.
@@ -131,54 +134,22 @@ export class AdtInclude<
     if (!config.packageName) {
       throw new Error('packageName is required to create an include');
     }
-
-    return chain(this.logger, async ({ step, onFailure }) => {
-      let created = false;
-      if (options?.deleteOnFailure ?? true) {
-        // The object exists from the create on, so a later failure leaves a
-        // half-made include behind unless the caller asked otherwise.
-        onFailure(async () => {
-          if (!created) return;
-          this.logger?.warn?.('Deleting include after a failed create', {
+    return answering(
+      () =>
+        create(
+          this.connection,
+          {
             includeName,
-          });
-          await this.delete(config);
-        });
-      }
-
-      const value = await step(
-        answering(
-          () =>
-            create(
-              this.connection,
-              {
-                includeName,
-                description: config.description,
-                packageName: config.packageName as string,
-                transportRequest: config.transportRequest,
-                masterLanguage: config.masterLanguage,
-              },
-              this.contentTypes,
-            ),
-          this.results.created as IResultStrategy<ReturnType<R['created']>>,
-          options?.analyse,
+            description: config.description,
+            packageName: config.packageName as string,
+            transportRequest: config.transportRequest,
+            masterLanguage: config.masterLanguage,
+          },
+          this.contentTypes,
         ),
-      );
-      created = true;
-
-      // `!== undefined`, not truthiness: `''` is a source, and an empty include
-      // is a legitimate object. Treating the empty string as "no source given"
-      // makes one valid value unreachable.
-      const sourceCode = options?.sourceCode ?? config.sourceCode;
-      if (sourceCode !== undefined) {
-        await step(this.writeSource(config, sourceCode, options));
-        if (options?.activateOnCreate) {
-          await step(this.activate(config, options));
-        }
-      }
-
-      return value;
-    });
+      this.results.created as IResultStrategy<ReturnType<R['created']>>,
+      options?.analyse,
+    );
   }
 
   /** Read the include's source. */
@@ -227,16 +198,20 @@ export class AdtInclude<
         'sourceCode is required to update an include — pass it in the config or in options',
       );
     }
+    const includeName = requireName(config);
 
-    if (!options?.activateOnUpdate) {
-      return this.writeSource(config, sourceCode, options);
-    }
-
-    return chain(this.logger, async ({ step }) => {
-      const written = await step(this.writeSource(config, sourceCode, options));
-      await step(this.activate(config, options));
-      return written;
-    });
+    return answering(
+      () =>
+        uploadIncludeSource(
+          this.connection,
+          includeName,
+          sourceCode,
+          options?.lockHandle,
+          config.transportRequest,
+        ),
+      this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      options?.analyse,
+    );
   }
 
   /**
@@ -258,32 +233,17 @@ export class AdtInclude<
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     const includeName = requireName(config);
 
-    return chain(this.logger, async ({ step, onScopeEnd }) => {
-      this.connection.setSessionType?.('stateful');
-      onScopeEnd(async () => {
-        this.connection.setSessionType?.('stateless');
-      });
-
-      const locked = await lockInclude(this.connection, includeName);
-      onScopeEnd(async () => {
-        await unlockInclude(this.connection, includeName, locked.lockHandle);
-      });
-      config.onLock?.(locked.lockHandle);
-
-      return step(
-        answering(
-          () =>
-            deleteInclude(
-              this.connection,
-              includeName,
-              locked.lockHandle,
-              config.transportRequest ?? locked.corrNr,
-            ),
-          this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
-          options?.analyse,
+    return answering(
+      () =>
+        deleteInclude(
+          this.connection,
+          includeName,
+          options?.lockHandle,
+          config.transportRequest,
         ),
-      );
-    });
+      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      options?.analyse,
+    );
   }
 
   /** Activate the include. */
@@ -326,72 +286,9 @@ export class AdtInclude<
     lockHandle: string,
   ): Promise<IAdtResponse<void>> {
     const includeName = requireName(config);
-    return chain(this.logger, async ({ step, onScopeEnd }) => {
-      onScopeEnd(async () => {
-        this.connection.setSessionType?.('stateless');
-      });
-      await step(
-        answering(
-          () => unlockInclude(this.connection, includeName, lockHandle),
-          () => undefined,
-        ),
-      );
-    });
-  }
-
-  /**
-   * lock → PUT source → unlock, with the handle always released.
-   *
-   * When the caller supplies `options.lockHandle` it owns the lock: this writes
-   * under it and does NOT unlock, because releasing somebody else's lock is how
-   * a caller's own next request starts failing.
-   */
-  private async writeSource<E extends IAdtError = IAdtError>(
-    config: Partial<IIncludeConfig>,
-    sourceCode: string,
-    options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
-    const includeName = requireName(config);
-    const borrowed = options?.lockHandle;
-
-    return chain(this.logger, async ({ step, onScopeEnd }) => {
-      let lockHandle = borrowed;
-      let corrNr: string | undefined;
-
-      if (!borrowed) {
-        this.connection.setSessionType?.('stateful');
-        onScopeEnd(async () => {
-          this.connection.setSessionType?.('stateless');
-        });
-        const locked = await lockInclude(this.connection, includeName);
-        lockHandle = locked.lockHandle;
-        corrNr = locked.corrNr;
-        config.onLock?.(lockHandle);
-        onScopeEnd(async () => {
-          // Audible when it fails: a lock left behind is what makes the next
-          // create for this name answer 403 with nothing appearing to hold it.
-          await unlockInclude(
-            this.connection,
-            includeName,
-            lockHandle as string,
-          );
-        });
-      }
-
-      return step(
-        answering(
-          () =>
-            uploadIncludeSource(
-              this.connection,
-              includeName,
-              sourceCode,
-              lockHandle as string,
-              config.transportRequest ?? corrNr,
-            ),
-          this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
-          options?.analyse,
-        ),
-      );
-    });
+    return answering(
+      () => unlockInclude(this.connection, includeName, lockHandle),
+      () => undefined,
+    );
   }
 }

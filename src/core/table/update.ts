@@ -7,7 +7,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { IUpdateTableParams } from './types';
 
@@ -17,7 +17,7 @@ import type { IUpdateTableParams } from './types';
 export async function updateTable(
   connection: IAbapConnection,
   params: IUpdateTableParams,
-  lockHandle: string,
+  lockHandle?: string,
 ): Promise<IAdtWireResponse> {
   if (!params.table_name) {
     throw new Error('table_name is required');
@@ -25,13 +25,8 @@ export async function updateTable(
   if (!params.ddl_code) {
     throw new Error('ddl_code is required');
   }
-  if (!lockHandle) {
-    throw new Error('lockHandle is required');
-  }
-
   const tableName = params.table_name.toUpperCase();
-  const queryParams = `lockHandle=${encodeURIComponent(lockHandle)}${params.transport_request ? `&corrNr=${params.transport_request}` : ''}`;
-  const url = `/sap/bc/adt/ddic/tables/${encodeSapObjectName(tableName).toLowerCase()}/source/main?${queryParams}`;
+  const url = `/sap/bc/adt/ddic/tables/${encodeSapObjectName(tableName).toLowerCase()}/source/main${writeQuery(lockHandle, params.transport_request)}`;
 
   const headers = {
     'Content-Type': CT_SOURCE,

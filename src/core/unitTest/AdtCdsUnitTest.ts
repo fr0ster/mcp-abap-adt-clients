@@ -32,7 +32,6 @@ import { validationRefusal } from '../../utils/validationRefusal';
 import { startClassUnitTestRunByObject } from '../class/run';
 import { validateClassName } from '../class/validation';
 import { AdtDdl } from '../ddl/AdtDdl';
-import { chain } from '../shared/chain';
 import { AdtUnitTest } from './AdtUnitTest';
 import { checkCdsTestDoublesAvailability } from './checkCdsTestDoublesAvailability';
 import {
@@ -152,7 +151,6 @@ export class AdtCdsUnitTest<
     }
 
     const name = config.className;
-    const source = config.testClassSource;
     // The validation endpoint requires `packagename`; without it the server
     // answers 400, so this cannot be left to the wire.
     if (!config.packageName) {
@@ -160,34 +158,17 @@ export class AdtCdsUnitTest<
     }
     const packageName = config.packageName;
 
-    return chain(this.logger, async ({ step }) => {
-      this.logger?.info?.('Validating CDS unit test class name:', name);
-      const named = await step(
-        answering(
-          () =>
-            validateClassName(
-              this.connection,
-              name,
-              packageName,
-              config.description || `CDS unit test for ${name}`,
-            ),
-          this.results.validation as IResultStrategy<
-            ReturnType<R['validation']>
-          >,
-          (options?.analyse ?? validationRefusal) as IAnalyse<E>,
+    return answering(
+      () =>
+        validateClassName(
+          this.connection,
+          name,
+          packageName,
+          config.description || `CDS unit test for ${name}`,
         ),
-      );
-
-      this.logger?.info?.('Validating CDS local test class code');
-      await step(
-        this.adtLocalTestClass.validate(
-          { className: name, testClassCode: source },
-          options,
-        ),
-      );
-
-      return named;
-    });
+      this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
+      (options?.analyse ?? validationRefusal) as IAnalyse<E>,
+    );
   }
 
   /**
@@ -205,45 +186,19 @@ export class AdtCdsUnitTest<
     }
 
     const name = config.className;
-    const source = config.testClassSource;
     this.className = name;
 
-    return chain(this.logger, async ({ step }) => {
-      this.logger?.info?.('Step 1: Creating global class with template');
-      const created = (await step(
-        this.adtClass.create(
-          {
-            className: name,
-            packageName: config.packageName as string,
-            description: config.description || `CDS unit test for ${name}`,
-            classTemplate: config.classTemplate,
-            transportRequest: config.transportRequest,
-            final: true,
-          },
-          options,
-        ),
-      )) as ReturnType<R['created']>;
-
-      // Activation is required before the testclasses include can be locked.
-      this.logger?.info?.('Step 1.5: Activating global class');
-      await step(this.adtClass.activate({ className: name }, options));
-
-      // An include is not created — it exists because its class does — so this
-      // is update, and adtLocalTestClass handles the locking internally.
-      this.logger?.info?.('Step 2: Writing test class into global class');
-      await step(
-        this.adtLocalTestClass.update(
-          {
-            className: name,
-            testClassCode: source,
-            transportRequest: config.transportRequest,
-          },
-          { activateOnUpdate: true },
-        ),
-      );
-
-      return created;
-    });
+    return this.adtClass.create(
+      {
+        className: name,
+        packageName: config.packageName as string,
+        description: config.description || `CDS unit test for ${name}`,
+        classTemplate: config.classTemplate,
+        transportRequest: config.transportRequest,
+        final: true,
+      },
+      options,
+    ) as Promise<IAdtResponse<ReturnType<R['created']>, E>>;
   }
 
   /**

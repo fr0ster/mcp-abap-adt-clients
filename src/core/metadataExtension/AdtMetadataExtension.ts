@@ -26,10 +26,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { activationRefusal } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
-import { beginCriticalSection } from '../../utils/criticalSection';
-import { deletionRefusal } from '../../utils/deletionCheck';
 import { validationRefusal } from '../../utils/validationRefusal';
-import { chain } from '../shared/chain';
 import {
   createLockTracker,
   type LockRegistry,
@@ -158,48 +155,20 @@ export class AdtMetadataExtension<
     if (!config.description) {
       throw new Error('Description is required');
     }
-
-    return chain(this.logger, async ({ step, onScopeEnd, onFailure }) => {
-      onScopeEnd(async () => {
-        this.connection.setSessionType('stateless');
-      });
-
-      let created = false;
-      if (options?.deleteOnFailure ?? true) {
-        onFailure(async () => {
-          if (!created) return;
-          this.logger?.warn?.('Deleting metadata extension after failure');
-          await deleteMetadataExtension(
-            this.connection,
-            name,
-            config.transportRequest,
-          );
-        });
-      }
-
-      this.logger?.info?.('Creating metadata extension');
-      const value = await step(
-        answering(
-          () =>
-            createMetadataExtension(this.connection, {
-              name,
-              description: config.description as string,
-              packageName: config.packageName as string,
-              transportRequest: config.transportRequest,
-              masterLanguage: config.masterLanguage,
-              masterSystem: this.systemContext.masterSystem,
-              responsible: this.systemContext.responsible,
-            }),
-          this.results.created as IResultStrategy<ReturnType<R['created']>>,
-          options?.analyse,
-        ),
-      );
-      // Only past the step: a refused create leaves nothing to delete, and the
-      // cleanup above must not remove an object this call did not make.
-      created = true;
-      this.logger?.info?.('Metadata extension created');
-      return value;
-    });
+    return answering(
+      () =>
+        createMetadataExtension(this.connection, {
+          name,
+          description: config.description as string,
+          packageName: config.packageName as string,
+          transportRequest: config.transportRequest,
+          masterLanguage: config.masterLanguage,
+          masterSystem: this.systemContext.masterSystem,
+          responsible: this.systemContext.responsible,
+        }),
+      this.results.created as IResultStrategy<ReturnType<R['created']>>,
+      options?.analyse,
+    );
   }
 
   /** Read the object. */
@@ -268,146 +237,21 @@ export class AdtMetadataExtension<
     const name = this.name(config);
     const source = options?.sourceCode || config.sourceCode;
 
-    if (options?.lockHandle) {
-      const lockHandle = options.lockHandle;
-      if (!source) {
-        throw new Error('Source code is required for update');
-      }
-      this.logger?.info?.(
-        'Low-level update: performing update only (lockHandle provided)',
-      );
-      return answering(
-        () =>
-          updateMetadataExtension(
-            this.connection,
-            name,
-            source as string,
-            lockHandle,
-            config.transportRequest,
-          ),
-        this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
-        options?.analyse,
-      );
+    if (!source) {
+      throw new Error('Source code is required for update');
     }
-
-    // A LOCK…UNLOCK window: a timeout in the middle releases the lock and
-    // leaves the work half done, so the connection is told this is critical.
-    const endCriticalSection = beginCriticalSection(this.connection);
-
-    return chain(this.logger, async ({ step, onScopeEnd }) => {
-      onScopeEnd(async () => {
-        endCriticalSection();
-      });
-
-      this.logger?.info?.('Step 1: Locking metadata extension');
-      this.connection.setSessionType('stateful');
-      // Registered FIRST so it unwinds LAST: on older BASIS a lock handle is
-      // only valid inside a stateful request, so going stateless before the
-      // unlock would break the unlock (#106); and if the lock itself throws,
-      // the session is still restored.
-      onScopeEnd(async () => {
-        this.connection.setSessionType('stateless');
-      });
-
-      const lockHandle = await lockMetadataExtension(this.connection, name);
-      this.lockTracker.track(name, lockHandle);
-      const releaseLock = onScopeEnd(async () => {
-        await unlockMetadataExtension(this.connection, name, lockHandle);
-        this.lockTracker.untrack(name);
-      });
-      this.logger?.info?.('Metadata extension locked, handle:', lockHandle);
-
-      if (source) {
-        this.logger?.info?.(
-          'Step 2: Checking inactive version with update content',
-        );
-        await step(
-          answering(
-            () =>
-              checkMetadataExtension(this.connection, name, 'inactive', source),
-            this.results.check as IResultStrategy<ReturnType<R['check']>>,
-            options?.analyse,
-          ),
-        );
-      }
-
-      let updated = undefined as ReturnType<R['updated']>;
-      if (source) {
-        this.logger?.info?.('Step 3: Updating metadata extension');
-        updated = await step(
-          answering(
-            () =>
-              updateMetadataExtension(
-                this.connection,
-                name,
-                source as string,
-                lockHandle,
-                config.transportRequest,
-              ),
-            this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
-            options?.analyse,
-          ),
-        );
-        this.logger?.info?.('Metadata extension updated');
-
-        // The write produced the inactive version; the active one may not exist
-        // yet. A failure here is not the update's failure, so it is logged and
-        // the chain continues — the unlock still has to happen.
-        const ready = await this.read(config, 'inactive', {
-          withLongPolling: true,
-        });
-        if (!ready.ok) {
-          this.logger?.warn?.(
-            'read with long polling failed after update:',
-            ready.getError().message,
-          );
-        }
-      }
-
-      this.logger?.info?.('Step 4: Unlocking metadata extension');
-      this.connection.setSessionType('stateful');
-      await unlockMetadataExtension(this.connection, name, lockHandle);
-      this.connection.setSessionType('stateless');
-      this.lockTracker.untrack(name);
-      // Unlocked as its own step, so the registration is discharged rather than
-      // run a second time when the scope unwinds.
-      releaseLock();
-      this.logger?.info?.('Metadata extension unlocked');
-
-      this.logger?.info?.('Step 5: Final check');
-      await step(
-        answering(
-          () => checkMetadataExtension(this.connection, name, 'inactive'),
-          this.results.check as IResultStrategy<ReturnType<R['check']>>,
-          options?.analyse,
+    return answering(
+      () =>
+        updateMetadataExtension(
+          this.connection,
+          name,
+          source as string,
+          options?.lockHandle,
+          config.transportRequest,
         ),
-      );
-
-      if (options?.activateOnUpdate) {
-        this.logger?.info?.('Step 6: Activating metadata extension');
-        await step(
-          answering(
-            () => activateMetadataExtension(this.connection, name),
-            this.results.activation as IResultStrategy<
-              ReturnType<R['activation']>
-            >,
-            (options?.analyse ?? activationRefusal) as IAnalyse<E>,
-          ),
-        );
-
-        const ready = await this.read(config, 'active', {
-          withLongPolling: true,
-        });
-        if (!ready.ok) {
-          this.logger?.warn?.(
-            'read with long polling failed after activation:',
-            ready.getError().message,
-          );
-        }
-      }
-
-      return updated;
-    });
+      this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      options?.analyse,
+    );
   }
 
   /** Delete the object. */
@@ -416,27 +260,12 @@ export class AdtMetadataExtension<
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     const name = this.name(config);
-
-    return chain(this.logger, async ({ step }) => {
-      // No deletion check: this endpoint has none. The DELETE is the only
-      // request there is, and its own answer is the verdict.
-      // No stateful session: this delete uses no lock.
-      this.logger?.info?.('Deleting metadata extension');
-      const value = await step(
-        answering(
-          () =>
-            deleteMetadataExtension(
-              this.connection,
-              name,
-              config.transportRequest,
-            ),
-          this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
-          options?.analyse,
-        ),
-      );
-      this.logger?.info?.('Metadata extension deleted');
-      return value;
-    });
+    return answering(
+      () =>
+        deleteMetadataExtension(this.connection, name, config.transportRequest),
+      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      options?.analyse,
+    );
   }
 
   /** Activate the object. Needs no stateful session. */

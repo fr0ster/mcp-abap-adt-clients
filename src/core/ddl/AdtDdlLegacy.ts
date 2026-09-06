@@ -11,14 +11,10 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
 import { answering } from '../../utils/adtResponse';
-import { beginCriticalSection } from '../../utils/criticalSection';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { chain } from '../shared/chain';
 import { deleteObjectDirect } from '../shared/deleteLegacy';
 import { AdtDdl } from './AdtDdl';
-import { lockDDLS } from './lock';
 import type { IDdlConfig, IDdlResults } from './types';
-import { unlockDDLS } from './unlock';
 
 export class AdtDdlLegacy<
   R extends IDdlResults<
@@ -42,46 +38,17 @@ export class AdtDdlLegacy<
     }
     const name = config.ddlName;
 
-    const endCriticalSection = beginCriticalSection(this.connection);
-
-    return chain(this.logger, async ({ step, onScopeEnd }) => {
-      onScopeEnd(async () => {
-        endCriticalSection();
-      });
-
-      this.logger?.info?.('Locking DDL source for deletion');
-      this.connection.setSessionType('stateful');
-      onScopeEnd(async () => {
-        this.connection.setSessionType('stateless');
-      });
-
-      const lockHandle = await lockDDLS(this.connection, name);
-      // Released on the way out only if the delete did not happen: a deleted
-      // object has nothing left to unlock.
-      let deleted = false;
-      onScopeEnd(async () => {
-        if (deleted) return;
-        await unlockDDLS(this.connection, name, lockHandle);
-      });
-
-      this.logger?.info?.('Deleting DDL source (direct DELETE)');
-      const objectUrl = `/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(name).toLowerCase()}`;
-      const value = await step(
-        answering(
-          () =>
-            deleteObjectDirect(
-              this.connection,
-              objectUrl,
-              lockHandle,
-              config.transportRequest,
-            ),
-          this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
-          options?.analyse,
+    const objectUrl = `/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(name).toLowerCase()}`;
+    return answering(
+      () =>
+        deleteObjectDirect(
+          this.connection,
+          objectUrl,
+          options?.lockHandle,
+          config.transportRequest,
         ),
-      );
-      deleted = true;
-      this.logger?.info?.('DDL source deleted');
-      return value;
-    });
+      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      options?.analyse,
+    );
   }
 }

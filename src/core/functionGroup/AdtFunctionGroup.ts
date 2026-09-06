@@ -14,7 +14,6 @@
  */
 
 import type {
-  AdtNoFailure,
   IAbapConnection,
   IAdtActivatable,
   IAdtCheckable,
@@ -30,19 +29,14 @@ import type {
   IAdtTransportAware,
   IAdtUpdatable,
   IAdtValidatable,
-  IAdtWireResponse,
   IAnalyse,
   ILogger,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
-import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces';
 import { activationRefusal } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
-import { beginCriticalSection } from '../../utils/criticalSection';
 import { deletionRefusal } from '../../utils/deletionCheck';
-import { requestOf } from '../../utils/requestTrace';
 import { validationRefusal } from '../../utils/validationRefusal';
-import { chain } from '../shared/chain';
 import {
   createLockTracker,
   type LockRegistry,
@@ -164,79 +158,27 @@ export class AdtFunctionGroup<
       throw new Error('Description is required');
     }
     const name = config.functionGroupName;
-
-    return chain(this.logger, async ({ step, onScopeEnd, onFailure }) => {
-      onScopeEnd(async () => {
-        this.connection.setSessionType('stateless');
-      });
-
-      let created = false;
-      if (options?.deleteOnFailure ?? true) {
-        onFailure(async () => {
-          if (!created) return;
-          this.logger?.warn?.('Deleting function group after failure');
-          // No stateful needed — the delete uses no lock.
-          await deleteFunctionGroup(this.connection, {
-            function_group_name: name,
-            transport_request: config.transportRequest,
-          });
-        });
-      }
-
-      this.logger?.info?.('Step 1: Validating function group configuration');
-      await step(this.validate(config, options));
-
-      this.logger?.info?.('Step 2: Creating function group');
-      const value = await step(
-        answering(
-          () =>
-            createFunctionGroup(
-              this.connection,
-              {
-                functionGroupName: name,
-                packageName: config.packageName as string,
-                transportRequest: config.transportRequest,
-                description: config.description as string,
-                masterSystem:
-                  config.masterSystem ?? this.systemContext.masterSystem,
-                responsible:
-                  config.responsible ?? this.systemContext.responsible,
-                masterLanguage:
-                  config.masterLanguage ?? this.systemContext.masterLanguage,
-              },
-              this.logger,
-              this.contentTypes,
-            ),
-          this.results.created as IResultStrategy<ReturnType<R['created']>>,
-          options?.analyse,
+    return answering(
+      () =>
+        createFunctionGroup(
+          this.connection,
+          {
+            functionGroupName: name,
+            packageName: config.packageName as string,
+            transportRequest: config.transportRequest,
+            description: config.description as string,
+            masterSystem:
+              config.masterSystem ?? this.systemContext.masterSystem,
+            responsible: config.responsible ?? this.systemContext.responsible,
+            masterLanguage:
+              config.masterLanguage ?? this.systemContext.masterLanguage,
+          },
+          this.logger,
+          this.contentTypes,
         ),
-      );
-      created = true;
-      this.logger?.info?.('Function group created');
-
-      // A readiness poll, not part of the answer: on cloud the object is not
-      // always readable the instant the create returns. Its failure is logged
-      // and the chain continues, because the create succeeded either way.
-      const ready = await this.read({ functionGroupName: name }, 'inactive', {
-        withLongPolling: true,
-      });
-      if (!ready.ok) {
-        this.logger?.warn?.(
-          'read with long polling failed after create:',
-          ready.getError().message,
-        );
-      }
-
-      this.logger?.info?.('Step 3: Checking created function group');
-      await step(this.check({ functionGroupName: name }, 'inactive', options));
-
-      if (options?.activateOnCreate) {
-        this.logger?.info?.('Step 4: Activating function group');
-        await step(this.activate({ functionGroupName: name }, options));
-      }
-
-      return value;
-    });
+      this.results.created as IResultStrategy<ReturnType<R['created']>>,
+      options?.analyse,
+    );
   }
 
   /**
@@ -335,106 +277,48 @@ export class AdtFunctionGroup<
     }
     const name = config.functionGroupName;
     const description = config.description;
-    const sessionId = this.connection.getSessionId?.() || '';
 
-    if (options?.lockHandle) {
-      this.logger?.info?.(
-        'Low-level update: performing update only (lockHandle provided)',
-      );
-      return answering(
-        () =>
-          updateFunctionGroup(
-            this.connection,
-            {
-              function_group_name: name,
-              description,
-              lock_handle: options.lockHandle as string,
-              transport_request: config.transportRequest,
-            },
-            this.contentTypes,
-          ),
-        this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
-        options?.analyse,
-      );
-    }
-
-    // A LOCK…UNLOCK window: a timeout in the middle releases the lock and
-    // leaves the work half done.
-    const endCriticalSection = beginCriticalSection(this.connection);
-
-    return chain(this.logger, async ({ step, onScopeEnd }) => {
-      onScopeEnd(async () => {
-        endCriticalSection();
-      });
-
-      this.logger?.info?.('Step 1: Locking function group');
-      this.connection.setSessionType('stateful');
-      // Registered FIRST so it unwinds LAST: a handle is only valid inside a
-      // stateful request on older BASIS (#106).
-      onScopeEnd(async () => {
-        this.connection.setSessionType('stateless');
-      });
-
-      const lockHandle = await lockFunctionGroup(
-        this.connection,
-        name,
-        sessionId,
-      );
-      this.lockTracker.track(name, lockHandle);
-      const releaseLock = onScopeEnd(async () => {
-        await unlockFunctionGroup(this.connection, name, lockHandle, sessionId);
-        this.lockTracker.untrack(name);
-      });
-      this.logger?.info?.('Function group locked, handle:', lockHandle);
-
-      this.logger?.info?.('Step 2: Updating function group metadata');
-      const updated = await step(
-        answering(
-          () =>
-            updateFunctionGroup(
-              this.connection,
-              {
-                function_group_name: name,
-                description,
-                transport_request: config.transportRequest,
-                lock_handle: lockHandle,
-              },
-              this.contentTypes,
-            ),
-          this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
-          options?.analyse,
+    return answering(
+      () =>
+        updateFunctionGroup(
+          this.connection,
+          {
+            function_group_name: name,
+            description,
+            lock_handle: options?.lockHandle as string,
+            transport_request: config.transportRequest,
+          },
+          this.contentTypes,
         ),
-      );
-      this.logger?.info?.('Function group updated');
+      this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      options?.analyse,
+    );
+  }
 
-      const ready = await this.read({ functionGroupName: name }, 'active', {
-        withLongPolling: true,
-      });
-      if (!ready.ok) {
-        this.logger?.warn?.(
-          'read with long polling failed after update:',
-          ready.getError().message,
-        );
-      }
-
-      this.logger?.info?.('Step 3: Unlocking function group');
-      this.connection.setSessionType('stateful');
-      await unlockFunctionGroup(this.connection, name, lockHandle, sessionId);
-      this.connection.setSessionType('stateless');
-      this.lockTracker.untrack(name);
-      releaseLock();
-      this.logger?.info?.('Function group unlocked');
-
-      this.logger?.info?.('Step 4: Final check');
-      await step(this.check({ functionGroupName: name }, 'inactive', options));
-
-      if (options?.activateOnUpdate) {
-        this.logger?.info?.('Step 5: Activating function group');
-        await step(this.activate({ functionGroupName: name }, options));
-      }
-
-      return updated;
-    });
+  /**
+   * Asks ADT whether the object can be deleted.
+   *
+   * Its own member because it is its own endpoint. `delete` no longer runs
+   * it: a consumer that wants the check runs this first and decides what a
+   * refusal means.
+   */
+  async checkDeletion<E extends IAdtError = IAdtError>(
+    config: Partial<IFunctionGroupConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+    if (!config.functionGroupName) {
+      throw new Error('Function group name is required');
+    }
+    const name = config.functionGroupName;
+    return answering(
+      () =>
+        checkDeletion(this.connection, {
+          function_group_name: name,
+          transport_request: config.transportRequest,
+        }),
+      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
+    );
   }
 
   /**
@@ -450,38 +334,15 @@ export class AdtFunctionGroup<
       throw new Error('Function group name is required');
     }
     const name = config.functionGroupName;
-
-    return chain(this.logger, async ({ step }) => {
-      this.logger?.info?.('Checking function group for deletion');
-      await step(
-        answering(
-          () =>
-            checkDeletion(this.connection, {
-              function_group_name: name,
-              transport_request: config.transportRequest,
-            }),
-          this.results.check as IResultStrategy<ReturnType<R['check']>>,
-          (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
-        ),
-      );
-      this.logger?.info?.('Deletion check passed');
-
-      // No stateful session: this delete uses no lock.
-      this.logger?.info?.('Deleting function group');
-      const value = await step(
-        answering(
-          () =>
-            deleteFunctionGroup(this.connection, {
-              function_group_name: name,
-              transport_request: config.transportRequest,
-            }),
-          this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
-          options?.analyse,
-        ),
-      );
-      this.logger?.info?.('Function group deleted');
-      return value;
-    });
+    return answering(
+      () =>
+        deleteFunctionGroup(this.connection, {
+          function_group_name: name,
+          transport_request: config.transportRequest,
+        }),
+      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      options?.analyse,
+    );
   }
 
   /** Activate the function group. Needs no stateful session. */

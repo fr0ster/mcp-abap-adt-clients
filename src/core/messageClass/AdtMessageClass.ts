@@ -26,11 +26,9 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
 import { answering } from '../../utils/adtResponse';
-import { beginCriticalSection } from '../../utils/criticalSection';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import { getTimeout } from '../../utils/timeouts';
 import { validationRefusal } from '../../utils/validationRefusal';
-import { chain } from '../shared/chain';
 import {
   createLockTracker,
   type LockRegistry,
@@ -212,70 +210,18 @@ export class AdtMessageClass<
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     const name = this.name(config);
 
-    if (options?.lockHandle) {
-      this.logger?.info?.(
-        'Low-level update: performing update only (lockHandle provided)',
-      );
-      return answering(
-        () =>
-          updateMessageClass(
-            this.connection,
-            name,
-            options.lockHandle as string,
-            config.description,
-            config.transportRequest,
-          ),
-        this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
-        options?.analyse,
-      );
-    }
-
-    // A LOCK…UNLOCK window: a timeout in the middle releases the lock and
-    // leaves the work half done.
-    const endCriticalSection = beginCriticalSection(this.connection);
-
-    return chain(this.logger, async ({ step, onScopeEnd }) => {
-      onScopeEnd(async () => {
-        endCriticalSection();
-      });
-
-      this.logger?.info?.('lock');
-      this.connection.setSessionType('stateful');
-      onScopeEnd(async () => {
-        this.connection.setSessionType('stateless');
-      });
-
-      const lockHandle = await lockMessageClass(this.connection, name);
-      this.lockTracker.track(name, lockHandle);
-      const releaseLock = onScopeEnd(async () => {
-        await unlockMessageClass(this.connection, name, lockHandle);
-        this.lockTracker.untrack(name);
-      });
-      this.logger?.info?.('locked');
-
-      this.logger?.info?.('update');
-      const updated = await step(
-        answering(
-          () =>
-            updateMessageClass(
-              this.connection,
-              name,
-              lockHandle,
-              config.description,
-              config.transportRequest,
-            ),
-          this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
-          options?.analyse,
+    return answering(
+      () =>
+        updateMessageClass(
+          this.connection,
+          name,
+          options?.lockHandle,
+          config.description,
+          config.transportRequest,
         ),
-      );
-
-      this.logger?.info?.('unlock');
-      await unlockMessageClass(this.connection, name, lockHandle);
-      this.lockTracker.untrack(name);
-      releaseLock();
-
-      return updated;
-    });
+      this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      options?.analyse,
+    );
   }
 
   /**
@@ -288,34 +234,37 @@ export class AdtMessageClass<
    * The check is read, not merely performed — ADT states a refusal inside a
    * 200.
    */
+  /**
+   * Asks ADT whether the message class can be deleted.
+   *
+   * Its own member because it is its own endpoint. `delete` no longer runs it:
+   * a consumer that wants the check runs this first and decides what a refusal
+   * means.
+   */
+  async checkDeletion<E extends IAdtError = IAdtError>(
+    config: Partial<IMessageClassConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+    const name = this.name(config);
+
+    return answering(
+      () => checkDeletion(this.connection, name),
+      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
+    );
+  }
+
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IMessageClassConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     const name = this.name(config);
 
-    return chain(this.logger, async ({ step }) => {
-      this.logger?.info?.('delete: check');
-      await step(
-        answering(
-          () => checkDeletion(this.connection, name),
-          this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
-          (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
-        ),
-      );
-
-      this.logger?.info?.('delete: delete');
-      const value = await step(
-        answering(
-          () =>
-            deleteMessageClass(this.connection, name, config.transportRequest),
-          this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
-          options?.analyse,
-        ),
-      );
-      this.logger?.info?.('deleted');
-      return value;
-    });
+    return answering(
+      () => deleteMessageClass(this.connection, name, config.transportRequest),
+      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      options?.analyse,
+    );
   }
 
   /** Lock the message class for modification. */

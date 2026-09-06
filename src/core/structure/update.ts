@@ -7,7 +7,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
 import { CT_SOURCE } from '../../constants/contentTypes';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { IUpdateStructureParams } from './types';
 
@@ -19,10 +19,10 @@ import type { IUpdateStructureParams } from './types';
 export async function upload(
   connection: IAbapConnection,
   params: IUpdateStructureParams,
-  lockHandle: string,
+  lockHandle?: string,
 ): Promise<IAdtWireResponse> {
   const structureNameEncoded = encodeSapObjectName(params.structureName);
-  const url = `/sap/bc/adt/ddic/structures/${structureNameEncoded}/source/main?lockHandle=${encodeURIComponent(lockHandle)}${params.transportRequest ? `&corrNr=${params.transportRequest}` : ''}`;
+  const url = `/sap/bc/adt/ddic/structures/${structureNameEncoded}/source/main${writeQuery(lockHandle, params.transportRequest)}`;
 
   const headers = {
     Accept: 'application/xml, application/json, text/plain, */*',

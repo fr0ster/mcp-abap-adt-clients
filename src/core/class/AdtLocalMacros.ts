@@ -29,7 +29,6 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { answering } from '../../utils/adtResponse';
 import { validationRefusal } from '../../utils/validationRefusal';
-import { chain } from '../shared/chain';
 import type { LockRegistry } from '../shared/LockRegistry';
 import type { ObjectVersion } from '../shared/results';
 import type { IReadOptions } from '../shared/types';
@@ -160,93 +159,19 @@ export class AdtLocalMacros<
     const name = config.className;
     const source = options?.sourceCode ?? config.macrosCode ?? '';
 
-    if (options?.lockHandle) {
-      this.logger?.info?.(
-        'Low-level update: performing update only (lockHandle provided)',
-      );
-      return answering(
-        () =>
-          updateClassMacros(
-            this.connection,
-            name,
-            source,
-            options.lockHandle as string,
-            config.transportRequest,
-            this.contentTypes?.sourceArtifactContentType(),
-          ),
-        this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
-        options?.analyse,
-      );
-    }
-
-    return chain(this.logger, async ({ step, onScopeEnd }) => {
-      this.logger?.info?.('Step 1: Locking parent class');
-      // Registered before the lock is taken, so the session is restored even if
-      // the lock itself is refused; and last to unwind, because on older BASIS
-      // a handle is only valid inside a stateful request (#106).
-      onScopeEnd(async () => {
-        this.connection.setSessionType('stateless');
-      });
-      const lockHandle = await this.lockCap.lockHandle({ className: name });
-      this.lockTracker.track(name, lockHandle);
-      const releaseLock = onScopeEnd(async () => {
-        await this.lockCap.release({ className: name }, lockHandle);
-        this.lockTracker.untrack(name);
-      });
-      this.logger?.info?.('Parent class locked, handle:', lockHandle);
-
-      // Empty source is a deletion — there is nothing to syntax-check, and ADT
-      // refuses an empty body on the check resource.
-      if (source !== '') {
-        this.logger?.info?.('Step 2: Checking macros code');
-        await step(
-          answering(
-            () =>
-              checkClassMacros(
-                this.connection,
-                name,
-                source,
-                'inactive',
-                this.contentTypes?.sourceArtifactContentType(),
-              ),
-            this.results.check as IResultStrategy<ReturnType<R['check']>>,
-            options?.analyse,
-          ),
-        );
-      }
-
-      this.logger?.info?.('Step 3: Updating macros');
-      const updated = await step(
-        answering(
-          () =>
-            updateClassMacros(
-              this.connection,
-              name,
-              source,
-              lockHandle,
-              config.transportRequest,
-              this.contentTypes?.sourceArtifactContentType(),
-            ),
-          this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
-          options?.analyse,
+    return answering(
+      () =>
+        updateClassMacros(
+          this.connection,
+          name,
+          source,
+          options?.lockHandle as string,
+          config.transportRequest,
+          this.contentTypes?.sourceArtifactContentType(),
         ),
-      );
-      this.logger?.info?.('Macros updated');
-
-      this.logger?.info?.('Step 4: Unlocking parent class');
-      await this.lockCap.release({ className: name }, lockHandle);
-      this.lockTracker.untrack(name);
-      // Unlocked as its own step, so the registration is discharged rather than
-      // run a second time when the scope unwinds.
-      releaseLock();
-
-      if (options?.activateOnUpdate) {
-        this.logger?.info?.('Step 5: Activating parent class');
-        await step(this.activate({ className: name }, options));
-      }
-
-      return updated;
-    });
+      this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      options?.analyse,
+    );
   }
 
   /**
