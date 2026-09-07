@@ -7,7 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [18.0.0] - 2026-09-06
 
-Requires `@mcp-abap-adt/interfaces@^37.0.0`.
+Requires `@mcp-abap-adt/interfaces@^37.0.1`.
 
 **Every member answers the contract, issues one request, and the reading is
 yours.** 17.0.0 moved `getUtils()` onto `IAdtResponse` and said the per-type
