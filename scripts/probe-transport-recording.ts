@@ -143,11 +143,12 @@ async function main(): Promise<void> {
   try {
     report('before', await requestContents(connection, logger, request));
 
+    // A create carries no source — it posts the class's metadata, and the text
+    // goes in with the `update` below, under a lock. This probe used to pass it
+    // here and the class arrived empty; `@mcp-abap-adt/interfaces@38.0.0`
+    // refuses the call, which is how the line was found rather than the object.
     process.stdout.write(`\ncreate ${className} in ${pkg} on ${request}\n`);
-    const created = await cls.create({
-      ...config,
-      sourceCode: source(className, 'created'),
-    });
+    const created = await cls.create(config);
     process.stdout.write(
       created.ok
         ? '  accepted\n'

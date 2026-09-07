@@ -30,6 +30,7 @@ import type {
   IAbapConnection,
   IAdtActivatable,
   IAdtCreatable,
+  IAdtCreateOptions,
   IAdtDeletable,
   IAdtLockable,
   IAdtMetadataReadable,
@@ -946,13 +947,29 @@ export class BaseTester<TConfig, TState = unknown> {
       // "leave this active", but it is this harness that acts on it now, with
       // an `activate` call of its own below — the option no longer reaches into
       // the library and asks it to run a second request.
-      const createOptions: IAdtOperationOptions = {
+      // No `sourceCode`: a create posts a metadata document and no create
+      // endpoint has a body for the source, so passing it wrote nothing and
+      // said nothing. `@mcp-abap-adt/interfaces@38.0.0` refuses it at the type,
+      // which is how this line was found. The source goes in through the
+      // update below, under the lock this harness takes.
+      const createOptions: IAdtCreateOptions = {
         timeout: options?.timeout,
-        sourceCode: options?.sourceCode,
         xmlContent: options?.xmlContent,
       };
+      // The source is stripped rather than cast away. `create` takes
+      // `Omit<TConfig, 'sourceCode'> & { sourceCode?: never }`, and a *generic*
+      // `TConfig` cannot satisfy that — the compiler has no way to know the
+      // concrete type lacks the field. A concrete caller writes
+      // `create({ className })` and needs none of this; a wrapper like this one
+      // has to say out loud what it is not sending, which is the right thing to
+      // say anyway.
+      const { sourceCode: _sourceIsNotCreates, ...createConfig } =
+        config as TConfig & { sourceCode?: unknown };
       expectResult(
-        await this.adtObject.create(config, createOptions),
+        await this.adtObject.create(
+          createConfig as Omit<TConfig, 'sourceCode'> & { sourceCode?: never },
+          createOptions,
+        ),
         'create',
       );
       this.objectCreated = true;
