@@ -18,6 +18,34 @@ the sequence around a write handed back to the consumer.
 
 ### Breaking
 
+- **BREAKING: no client-side deadline by default.** Every request this library
+  makes carried `timeout: 45000` — 436 of them — and `SAP_TIMEOUT_DEFAULT` now
+  defaults to `0`, which the HTTP clients here read as "do not abort".
+
+  Aborting a request the server is still executing costs more than it saves.
+  Measured on the cloud trial: `POST /deletion/delete` was aborted at 45 s, the
+  retry came back `400 … Session Timed Out or Not Found` **with a new session
+  cookie**, and everything after it ran in a session nobody asked for. Of 794
+  responses in that run, 30 carried `set-cookie` — 29 were `_action=LOCK`
+  binding a stateful session, and the 30th was that error.
+
+  The damage is not the failed request. Over HTTP a session is two layers: the
+  ICF one the cookie addresses, and the ABAP one beneath it that holds the
+  enqueue locks. An abort replaces the first and strands the second — the lock
+  handle dies, the lock does not, and nothing can reach it again. That is the
+  same effect already recorded here as "a session recycle does not clear it;
+  only the unlock does". RFC never shows it, having one ABAP session for the
+  connection's lifetime and no ICF layer to replace.
+
+  **A caller who wants a deadline still has one** — `IAdtOperationOptions.timeout`
+  per call, `SAP_TIMEOUT_DEFAULT` for a system-wide floor. What is gone is this
+  library choosing it for them, which is the rule it already follows for the
+  lock window and the operation sequence.
+
+  A request that genuinely hangs now waits for the server or for TCP. That is
+  the trade, made deliberately: the abort ended nothing server-side, it only
+  ended what this side knew.
+
 - **A write takes its source from `options.sourceCode` and nowhere else.**
   Sixteen `update`/`updateMetadata` implementations read
   `options?.sourceCode || config.sourceCode`, so one value had two channels and
