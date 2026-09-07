@@ -25,6 +25,7 @@
  * not exist yet.
  */
 
+import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 
 interface WireRequest {
@@ -43,19 +44,51 @@ interface WireResponse {
 }
 
 /** Header names whose value is a credential or a token, never written out. */
-const REDACT = new Set([
-  'authorization',
-  'x-csrf-token',
-  'cookie',
-  'set-cookie',
-]);
+const REDACT = new Set(['authorization', 'x-csrf-token']);
+
+/**
+ * Cookies as identity, never as value.
+ *
+ * `cookie` and `set-cookie` used to be redacted whole, which hid the one thing
+ * an `ICMENOSESSION` investigation needs: whether the failing request presented
+ * the session id the server had, or a stale one. The name is not a secret and
+ * the fingerprint is not reversible — eight hex of SHA-256 over a 40-character
+ * session id — so the identity can be followed across a log without the value
+ * ever appearing in it.
+ *
+ *   SAP_SESSIONID_E19_100=#3f9a1c4e; sap-usercontext=#b1d0e772
+ */
+function fingerprintCookies(value: string): string {
+  return value
+    .split(/;\s*/)
+    .filter(Boolean)
+    .map((pair) => {
+      const eq = pair.indexOf('=');
+      if (eq < 0) return pair;
+      const name = pair.slice(0, eq);
+      const raw = pair.slice(eq + 1);
+      // Attributes of a Set-Cookie carry no identity and no secret.
+      if (
+        /^(path|domain|expires|max-age|samesite|secure|httponly)$/i.test(name)
+      ) {
+        return pair;
+      }
+      const digest = createHash('sha256').update(raw).digest('hex').slice(0, 8);
+      return `${name}=#${digest}`;
+    })
+    .join('; ');
+}
 
 function headerLines(headers: unknown, indent = '  '): string {
   if (!headers || typeof headers !== 'object') return `${indent}(none)\n`;
   const entries = Object.entries(headers as Record<string, unknown>)
     .map(([k, v]) => [
       k,
-      REDACT.has(k.toLowerCase()) ? '<redacted>' : String(v),
+      REDACT.has(k.toLowerCase())
+        ? '<redacted>'
+        : /^(cookie|set-cookie)$/i.test(k)
+          ? fingerprintCookies(String(v))
+          : String(v),
     ])
     .sort(([a], [b]) => a.localeCompare(b));
   if (entries.length === 0) return `${indent}(none)\n`;
@@ -95,6 +128,9 @@ function bodyLine(data: unknown, limit = 1200): string {
  * copies them would have to be written twice and would break on the next field
  * either one gains.
  */
+/** Log files this process has already emptied — see below. */
+const truncated = new Set<string>();
+
 export function withWireLog<T extends object>(transport: T): T {
   const path = process.env.WIRE_LOG;
   if (!path) return transport;
@@ -106,6 +142,23 @@ export function withWireLog<T extends object>(transport: T): T {
       // A wire log that cannot be written must not take the run down with it.
     }
   };
+
+  // Empty the file once per process, not once per connection.
+  //
+  // This wrapper is applied per connection — 69 times in one full run — and the
+  // file was only appended to, so it kept every previous run and any `grep -c`
+  // over it counted their events as this run's. Measured: a file holding six
+  // runs reported the same four `ICMENOSESSION` responses to each of them, when
+  // all four belonged to the first. Three conclusions were drawn from that
+  // number, and reported, before the file itself was looked at.
+  if (!truncated.has(path)) {
+    try {
+      fs.writeFileSync(path, '');
+    } catch {
+      // A log that cannot be truncated is still better than no log.
+    }
+    truncated.add(path);
+  }
 
   write(`\n===== wire log opened ${new Date().toISOString()} =====\n`);
 
