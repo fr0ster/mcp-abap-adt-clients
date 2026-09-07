@@ -131,11 +131,14 @@ export class AdtTable<R extends ITableResults = typeof tableDocuments>
     }
     return answering(
       () =>
+        // No source here. `createTable` reads five fields — table name,
+        // package, transport, master and responsible — and `ddl_code` was not
+        // among them, so passing it read as if a create wrote the source, and
+        // it never did. The source is `update`'s, after `lock`.
         createTable(this.connection, {
           table_name: name,
           package_name: config.packageName as string,
           transport_request: config.transportRequest,
-          ddl_code: options?.sourceCode || config.ddlCode,
           masterSystem: this.systemContext.masterSystem,
           responsible: this.systemContext.responsible,
           masterLanguage:

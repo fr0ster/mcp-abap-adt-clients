@@ -143,12 +143,14 @@ export class AdtDdl<R extends IDdlResults = typeof ddlDocuments>
     }
     return answering(
       () =>
+        // No source here, for a table's reason: `createDdl` never read
+        // `ddl_source`. A create posts metadata; the source is a PUT to
+        // `…/source/main` under a lock.
         createDdl(this.connection, {
           ddl_name: name,
           package_name: config.packageName as string,
           transport_request: config.transportRequest,
           description: config.description,
-          ddl_source: options?.sourceCode || config.ddlSource,
           masterSystem: this.systemContext.masterSystem,
           responsible: this.systemContext.responsible,
           masterLanguage:

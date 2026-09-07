@@ -43,6 +43,17 @@ the sequence around a write handed back to the consumer.
   A write with no `options.sourceCode` is refused before the request, as it
   always was when neither channel carried one.
 
+  **Two more creates were handing a source to a function that ignores it.**
+  `getTable().create()` passed `ddl_code` and `getDdl().create()` passed
+  `ddl_source`; `createTable` reads five fields and `createDdl` seven, and
+  neither reads those. Same silence as the program's, found by looking for the
+  same expression. Both are gone from the call.
+
+  The type-specific channels that remain are the class includes and the DDL
+  configs — `testClassCode`, `localTypesCode`, `definitionsCode`, `macrosCode`,
+  `ddlCode`, `ddlSource` — which callers and tests do set, and which are a
+  separate decision from this one.
+
 - **A write states what it needs.** Every implementation of `IAdtUpdatable` and
   `IAdtMetadataUpdatable` now names its own config instead of inheriting a
   `Partial` the atom applied on everyone's behalf. For the 37 types whose write
