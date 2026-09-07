@@ -228,21 +228,42 @@ describe('AdtUnitTest (using AdtClient)', () => {
               packageName,
               transportRequest,
               description: `Test container class for ${testClassName}`,
-              sourceCode,
             });
             expect(createClassState).toBeDefined();
             testsLogger.info?.('Container class created');
-          } else {
-            // Update existing class source code
-            testsLogger.info?.('Updating existing class source code');
-            await client
-              .getClass()
-              .update(
-                { className: containerClass, transportRequest },
-                { sourceCode },
-              );
-            testsLogger.info?.('Existing class source updated');
           }
+
+          // The source is written either way, and it was not.
+          //
+          // `create` used to be handed `sourceCode` and ignores it — it makes an
+          // empty class, and interfaces 38.0.0 took the field off the member for
+          // exactly this reason. Only the `else` branch wrote the source, so on
+          // a system where the container class did not exist yet it was created
+          // empty and stayed empty, and the suite passed anyway because what it
+          // goes on to assert lives in the testclasses include. The write is
+          // unconditional now.
+          //
+          // Under a lock, and read: the old `else` branch did neither, so a
+          // refused write was invisible.
+          logTestStep('update (container source)', testsLogger);
+          const containerConfig = {
+            className: containerClass,
+            transportRequest,
+          };
+          const containerLock = expectResult(
+            await client.getClass().lock(containerConfig),
+            'lock container class',
+          );
+          const containerHandle = String(containerLock);
+          expectResult(
+            await client.getClass().update(containerConfig, {
+              sourceCode,
+              lockHandle: containerHandle,
+            }),
+            'write container class source',
+          );
+          await client.getClass().unlock(containerConfig, containerHandle);
+          testsLogger.info?.('Container class source written');
 
           // Step 3: Write the tests into the container class's include.
           // An include is not created — it exists because its class does.
