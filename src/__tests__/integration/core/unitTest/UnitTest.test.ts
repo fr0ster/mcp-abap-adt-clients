@@ -213,23 +213,31 @@ describe('AdtUnitTest (using AdtClient)', () => {
 
           // Step 1-2: Validate and create (only if class doesn't exist)
           if (!classExists) {
+            // `toBeDefined()` was the check on both of these, and a member
+            // answers `IAdtResponse` — an object on the refusal half too — so
+            // it was true whatever SAP said. `expectResult` reads the answer
+            // and fails with SAP's own sentence.
             logTestStep('validate', testsLogger);
-            const validateState = await client.getClass().validate({
-              className: containerClass,
-              packageName,
-              sourceCode,
-            });
-            expect(validateState).toBeDefined();
+            expectResult(
+              await client.getClass().validate({
+                className: containerClass,
+                packageName,
+                sourceCode,
+              }),
+              'validate the container class name',
+            );
             testsLogger.info?.('Container class validated');
 
             logTestStep('create', testsLogger);
-            const createClassState = await client.getClass().create({
-              className: containerClass,
-              packageName,
-              transportRequest,
-              description: `Test container class for ${testClassName}`,
-            });
-            expect(createClassState).toBeDefined();
+            expectResult(
+              await client.getClass().create({
+                className: containerClass,
+                packageName,
+                transportRequest,
+                description: `Test container class for ${testClassName}`,
+              }),
+              'create the container class',
+            );
             testsLogger.info?.('Container class created');
           }
 
@@ -267,22 +275,42 @@ describe('AdtUnitTest (using AdtClient)', () => {
 
           // Step 3: Write the tests into the container class's include.
           // An include is not created — it exists because its class does.
+          //
+          // Under the class's own lock: a class include is written with the
+          // *class's* handle, which is why this takes a second one rather than
+          // reusing nothing. Measured on the trial before this was fixed —
+          // `PUT …/includes/testclasses` with no handle is answered
+          // `400 ExceptionParameterNotFound: Parameter lockHandle could not be
+          // found`, and the suite passed anyway because the answer went unread.
           logTestStep('update (test class)', testsLogger);
-          const writeTestClassState = await client.getLocalTestClass().update({
-            className: containerClass,
-            testClassCode: testClassSource,
-            transportRequest,
-          });
-          expect(writeTestClassState).toBeDefined();
+          const includeLock = expectResult(
+            await client.getClass().lock(containerConfig),
+            'lock container class for its testclasses include',
+          );
+          const includeHandle = String(includeLock);
+          try {
+            expectResult(
+              await client
+                .getLocalTestClass()
+                .update(
+                  { className: containerClass, transportRequest },
+                  { sourceCode: testClassSource, lockHandle: includeHandle },
+                ),
+              'write the test class include',
+            );
+          } finally {
+            await client.getClass().unlock(containerConfig, includeHandle);
+          }
           testsLogger.info?.('Local test class written');
 
           // Step 4: Activate class
           logTestStep('activate', testsLogger);
-          const activateState = await client.getClass().activate({
-            className: containerClass,
-            transportRequest,
-          });
-          expect(activateState).toBeDefined();
+          expectResult(
+            await client
+              .getClass()
+              .activate({ className: containerClass, transportRequest }),
+            'activate the container class',
+          );
           testsLogger.info?.('Class activated');
 
           // Step 5: Read back the tests that were written into the class
