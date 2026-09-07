@@ -444,6 +444,17 @@ export class AdtServiceBinding<
     // be derived from the binding's own document, along with the service name
     // and version — by a read that made this member two requests. The read is
     // gone; so are the two fields, which the job no longer carries anywhere.
+    //
+    // Checked here, where the config makes it optional, so the params type
+    // below can require it: the demand belongs in one place, and a type is the
+    // place a caller sees it.
+    const serviceType = config.serviceType;
+    if (!serviceType) {
+      throw new Error(
+        `serviceType is required to publish or unpublish ${name}: it selects ` +
+          "the endpoint, 'odatav2' or 'odatav4'.",
+      );
+    }
     const desiredPublicationState = config.desiredPublicationState;
 
     return answering(
@@ -451,7 +462,7 @@ export class AdtServiceBinding<
         this.updateRequest({
           bindingName: name,
           desiredPublicationState,
-          serviceType: config.serviceType,
+          serviceType,
           // The contract has always offered this; it used to stop here.
           timeout: options?.timeout,
         }),
@@ -819,14 +830,9 @@ export class AdtServiceBinding<
     }
     // Not derived from the object any more — the read that derived it was the
     // second request. `ODATA_V4_*` and `ODATA_V2_*` binding variants map to the
-    // two service types, so a caller that knows its binding knows this.
+    // two service types, so a caller that knows its binding knows this, and the
+    // params type requires it rather than this function checking again.
     const serviceType = params.serviceType;
-    if (!serviceType) {
-      throw new Error(
-        `serviceType is required to publish or unpublish ${params.bindingName}: ` +
-          "it selects the endpoint, 'odatav2' or 'odatav4'.",
-      );
-    }
 
     this.logger?.info?.(
       `ServiceBinding ${params.desiredPublicationState}: ${params.bindingName}`,

@@ -251,6 +251,23 @@ the sequence around a write handed back to the consumer.
   `Accept` now carries v1 as well as v2, as Eclipse sends it; v2 alone is a 406
   on a system that serves only v1.
 
+- **The capability guard counts requests now, and found seven members that
+  make more than one.** Naming the right request proves it happened, not that it
+  happened alone — a member that reads the object and then writes it passed
+  every assertion the guard had. Two kinds turned up, both recorded as named
+  exceptions rather than quietly allowed:
+
+  - **read-modify-write**, which is ADT's shape and not a choice: a domain, a
+    data element, a table type, a package, a message class, an authorization
+    field and a function group *are* their document, and the endpoint takes it
+    whole, so changing one field is GET, patch, PUT. A caller holding the whole
+    document passes `options.xmlContent` and skips the read;
+  - **`getSystemInformation()`**, which decides cloud or on-premise and is
+    cached per client — a request, but not a step of the operation.
+
+  Everything else issues exactly what its capability names. The rule now fails
+  a build rather than a review.
+
 - **BREAKING: publishing takes the binding and the protocol, and nothing else.**
   `serviceType` is **required** — it selects the endpoint, `odatav2` or
   `odatav4`, and a caller holding a binding knows it from the variant. The

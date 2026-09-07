@@ -748,7 +748,9 @@ export const HANDLERS = {
       bindingName: 'ZGUARD_SRVB',
       serviceDefinitionName: 'ZGUARD_SRVD',
       serviceName: 'ZGUARD_SRV',
-      serviceType: 'ODataV4',
+      // Lowercase, because `GeneratedServiceType` is `'odatav2' | 'odatav4'`
+      // and it goes straight into the job's URL.
+      serviceType: 'odatav4',
       serviceVersion: '0001',
       bindingVariant: 'ODATA_V4_UI',
       desiredPublicationState: 'published',
@@ -757,6 +759,12 @@ export const HANDLERS = {
     },
     requests: {
       create: '/sap/bc/adt/businessservices/bindings',
+      // One POST to a job endpoint, and nothing before it: a binding's
+      // update *is* its publication.
+      update: {
+        method: 'POST',
+        path: '/sap/bc/adt/businessservices/odatav4/publishjobs',
+      },
       read: '/sap/bc/adt/businessservices/bindings/zguard_srvb',
       readMetadata: '/sap/bc/adt/businessservices/bindings/zguard_srvb',
       delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
@@ -1070,7 +1078,9 @@ export const HANDLERS = {
       bindingName: 'ZGUARD_SRVB',
       serviceDefinitionName: 'ZGUARD_SRVD',
       serviceName: 'ZGUARD_SRV',
-      serviceType: 'ODataV4',
+      // Lowercase, because `GeneratedServiceType` is `'odatav2' | 'odatav4'`
+      // and it goes straight into the job's URL.
+      serviceType: 'odatav4',
       serviceVersion: '0001',
       bindingVariant: 'ODATA_V4_UI',
       desiredPublicationState: 'published',
@@ -1079,6 +1089,12 @@ export const HANDLERS = {
     },
     requests: {
       create: '/sap/bc/adt/businessservices/bindings',
+      // One POST to a job endpoint, and nothing before it: a binding's
+      // update *is* its publication.
+      update: {
+        method: 'POST',
+        path: '/sap/bc/adt/businessservices/odatav4/publishjobs',
+      },
       read: '/sap/bc/adt/businessservices/bindings/zguard_srvb',
       readMetadata: '/sap/bc/adt/businessservices/bindings/zguard_srvb',
       delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],

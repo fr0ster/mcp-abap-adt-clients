@@ -200,6 +200,17 @@ const VERB_BY_HANDLER: Record<string, string> = {
   // — measured on the cloud trial — so asking it there would report a fact
   // about the address rather than about the request.
   'transport.checkDeletion': 'GET',
+  // A binding's `update` is its publication: one POST to a job endpoint, not a
+  // PUT on the object. Since 18.0.0 it is exactly that one request — it used to
+  // GET the binding first, to derive the service and to check the transition —
+  // and this entry is what keeps a second request from creeping back during the
+  // ordinary run. The live publish and unpublish are deliberately manual, in
+  // `integration/core/serviceBinding/publication.test.ts`: they take ~133
+  // seconds of server time each, which is no place for a suite that runs on
+  // every change. The shape is checked here instead, in milliseconds, against
+  // a stub.
+  'service.update': 'POST',
+  'serviceBinding.update': 'POST',
   // Its transport is checked through POST /cts/transportchecks rather than read
   // from the object.
   'service.readTransport': 'POST',
@@ -215,6 +226,44 @@ const VERB_BY_HANDLER: Record<string, string> = {
  * passing silently, and the assertion fails if one starts working and is left
  * here.
  */
+/**
+ * Members that legitimately issue more than the request their capability names.
+ *
+ * The list is short on purpose and each entry says why, because "one member,
+ * one request" is the rule this release established: an entry here is a
+ * documented exception, not a place to put a member that grew a second call.
+ */
+const EXTRA_REQUESTS: Record<string, string> = {
+  // A message is a row inside its class's document: the write is one PUT, but
+  // it needs two lock handles and a read-modify-write of XML this library
+  // assembles.
+  'messageClassMessage.create': 'read-modify-write of the class document',
+  'messageClassMessage.update': 'as create',
+  'messageClassMessage.delete': 'as create',
+
+  // **Read-modify-write, and ADT's shape rather than this library's choice.**
+  // These objects *are* their document, and the endpoint takes it whole: to
+  // change one field you fetch the XML, patch it and PUT it back. A caller who
+  // has the whole document can hand it over in `options.xmlContent`, which is
+  // the seam that exists for it; without one there is no single request that
+  // changes a domain's length.
+  'domain.updateMetadata': 'GET the document, patch it, PUT it back',
+  'dataElement.updateMetadata': 'as domain',
+  'tableType.updateMetadata': 'as domain',
+  'package.updateMetadata': 'as domain',
+  'messageClass.updateMetadata': 'as domain',
+  'authorizationField.updateMetadata': 'as domain',
+  'functionGroup.updateMetadata': 'as domain, plus its own check',
+
+  // **Not a step of the operation.** `getSystemInformation()` answers whether
+  // this is cloud or on-premise, which decides content types and which
+  // endpoints exist at all. It is asked once and cached on the client; the
+  // guard sees it because each of these tests builds a fresh one.
+  'behaviorImplementation.create': 'systeminformation, then the POST',
+  'service.create': 'as behaviorImplementation.create',
+  'serviceBinding.create': 'as behaviorImplementation.create',
+};
+
 const VERB_NOT_REACHED: Record<string, string> = {
   'tableType.updateMetadata':
     'read-modify-write: it GETs the table type first, and the generic body is not one to patch',
@@ -223,9 +272,6 @@ const VERB_NOT_REACHED: Record<string, string> = {
   'package.updateMetadata': 'read-modify-write over package XML',
   'transport.updateMetadata':
     'reads the request first; the generic body is not a tm:request',
-  'service.update':
-    'reads the binding first; the generic body is not a binding',
-  'serviceBinding.update': 'as service.update',
 };
 
 /** The content URI `getVersionSource` is handed, and must fetch. */
@@ -458,6 +504,24 @@ describe('capability guard — behaviour', () => {
               throw new Error(
                 `${name}.${method} never made ${resource.describe} — it made ${made.map((c) => `${c.method} ${c.path}`).join(', ') || 'nothing'}`,
               );
+            }
+
+            // **And nothing besides.** Naming the right request proves it
+            // happened, not that it happened alone — a member that reads the
+            // object first and then writes it passes every assertion above.
+            // That is exactly what `AdtServiceBinding.update` did until this
+            // release, and what 61 other members did before the chains came
+            // out, so the count is the invariant this whole change is about.
+            if (!(key in EXTRA_REQUESTS)) {
+              expect({
+                member: key,
+                issued: calls.map((c) => `${c.method} ${c.url.split('?')[0]}`),
+              }).toEqual({
+                member: key,
+                issued: calls
+                  .slice(0, resource.all.length)
+                  .map((c) => `${c.method} ${c.url.split('?')[0]}`),
+              });
             }
           });
         }

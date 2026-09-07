@@ -135,11 +135,14 @@ export interface IServiceBindingPublicationParams {
    */
   desiredPublicationState: DesiredPublicationState;
   /**
-   * Which endpoint the job goes to — `odatav2` or `odatav4`. **Required**: it
-   * is the one thing the URL needs that the binding's name does not give, and
-   * this package no longer reads the binding to find it out.
+   * Which endpoint the job goes to — `odatav2` or `odatav4`.
+   *
+   * Required, and required *in the type*: it is the one thing the URL needs
+   * that the binding's name does not give, and this package no longer reads the
+   * binding to find it out. Optional here with a throw in the implementation
+   * would be the same demand made twice, once where a caller cannot see it.
    */
-  serviceType?: GeneratedServiceType;
+  serviceType: GeneratedServiceType;
   /**
    * How long to wait for the publication job, in milliseconds.
    *

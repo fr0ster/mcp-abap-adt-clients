@@ -1,7 +1,15 @@
 /**
  * Publishing a service binding, and unpublishing it — two deliberate runs.
  *
- * **Not part of the full suite, and both cases ship `enabled: false`.** A
+ * **Deliberately manual, and deliberately out of the full suite** — both cases
+ * ship `enabled: false` for one reason: each direction costs ~133 seconds of
+ * server time, which is no place for a suite that runs on every change.
+ *
+ * What runs on every change instead is the *shape*: `capabilities/behaviour`
+ * drives `update` against a stub, in milliseconds, and asserts it issues one
+ * POST to a job endpoint and nothing else. So a returning hidden read fails the
+ * ordinary run; only the live outcome needs a person and two minutes.
+ * A
  * publication is the slowest thing this library asks of ADT: ~135s measured on a
  * trial, and one unpublish still unsettled after eleven minutes. ADT also
  * refuses to delete a binding whose endpoints are published, so a flow that
