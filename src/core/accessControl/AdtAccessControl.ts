@@ -65,7 +65,7 @@ export class AdtAccessControl<
     IAdtCreatable<IAccessControlConfig, ReturnType<R['created']>>,
     IAdtReadable<IAccessControlConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<IAccessControlConfig, ReturnType<R['metadata']>>,
-    IAdtUpdatable<IAccessControlConfig, ReturnType<R['updated']>>,
+    IAdtUpdatable<Partial<IAccessControlConfig>, ReturnType<R['updated']>>,
     IAdtDeletable<
       IAccessControlConfig,
       ReturnType<R['deletion']>,

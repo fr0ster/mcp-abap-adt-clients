@@ -137,8 +137,8 @@ export type TestableObject<TConfig> = IAdtCreatable<TConfig, unknown> &
   // to offer neither, which is a defect in that object rather than in a test.
   Partial<IAdtReadable<TConfig, unknown>> &
   Partial<IAdtMetadataReadable<TConfig, unknown>> &
-  Partial<IAdtUpdatable<TConfig, unknown>> &
-  Partial<IAdtMetadataUpdatable<TConfig, unknown>> &
+  Partial<IAdtUpdatable<Partial<TConfig>, unknown>> &
+  Partial<IAdtMetadataUpdatable<Partial<TConfig>, unknown>> &
   IAdtDeletable<TConfig, unknown, unknown> &
   IAdtValidatable<TConfig, unknown> &
   Partial<IAdtActivatable<TConfig, unknown>> &

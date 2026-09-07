@@ -52,7 +52,7 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
     IAdtCreatable<IIncludeConfig, ReturnType<R['created']>>,
     IAdtReadable<IIncludeConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<IIncludeConfig, ReturnType<R['metadata']>>,
-    IAdtUpdatable<IIncludeConfig, ReturnType<R['updated']>>,
+    IAdtUpdatable<Partial<IIncludeConfig>, ReturnType<R['updated']>>,
     IAdtDeletable<
       IIncludeConfig,
       ReturnType<R['deletion']>,

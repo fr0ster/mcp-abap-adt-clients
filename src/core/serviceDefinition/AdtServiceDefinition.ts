@@ -65,7 +65,7 @@ export class AdtServiceDefinition<
     IAdtCreatable<IServiceDefinitionConfig, ReturnType<R['created']>>,
     IAdtReadable<IServiceDefinitionConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<IServiceDefinitionConfig, ReturnType<R['metadata']>>,
-    IAdtUpdatable<IServiceDefinitionConfig, ReturnType<R['updated']>>,
+    IAdtUpdatable<Partial<IServiceDefinitionConfig>, ReturnType<R['updated']>>,
     IAdtDeletable<
       IServiceDefinitionConfig,
       ReturnType<R['deletion']>,

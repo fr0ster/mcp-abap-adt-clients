@@ -111,7 +111,7 @@ export class AdtServiceBinding<
     IAdtCreatable<IServiceBindingConfig, ReturnType<R['created']>>,
     IAdtReadable<IServiceBindingConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<IServiceBindingConfig, ReturnType<R['metadata']>>,
-    IAdtUpdatable<IServiceBindingConfig, ReturnType<R['updated']>>,
+    IAdtUpdatable<IServiceBindingPublicationConfig, ReturnType<R['updated']>>,
     IAdtDeletable<
       IServiceBindingConfig,
       ReturnType<R['deletion']>,

@@ -62,7 +62,10 @@ export class AdtDdicTableType<
 > implements
     IAdtCreatable<ITableTypeConfig, ReturnType<R['created']>>,
     IAdtMetadataReadable<ITableTypeConfig, ReturnType<R['metadata']>>,
-    IAdtMetadataUpdatable<ITableTypeConfig, ReturnType<R['metadataUpdated']>>,
+    IAdtMetadataUpdatable<
+      Partial<ITableTypeConfig>,
+      ReturnType<R['metadataUpdated']>
+    >,
     IAdtDeletable<
       ITableTypeConfig,
       ReturnType<R['deletion']>,

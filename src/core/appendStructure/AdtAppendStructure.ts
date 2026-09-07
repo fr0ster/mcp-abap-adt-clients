@@ -98,7 +98,7 @@ export class AdtAppendStructure<
     IAdtCreatable<IAppendStructureConfig, ReturnType<R['created']>>,
     IAdtReadable<IAppendStructureConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<IAppendStructureConfig, ReturnType<R['metadata']>>,
-    IAdtUpdatable<IAppendStructureConfig, ReturnType<R['updated']>>,
+    IAdtUpdatable<Partial<IAppendStructureConfig>, ReturnType<R['updated']>>,
     IAdtDeletable<
       IAppendStructureConfig,
       ReturnType<R['deletion']>,

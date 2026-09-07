@@ -80,7 +80,10 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
   implements
     IAdtCreatable<ITransportConfig, ReturnType<R['created']>>,
     IAdtMetadataReadable<ITransportConfig, ReturnType<R['metadata']>>,
-    IAdtMetadataUpdatable<ITransportConfig, ReturnType<R['metadataUpdated']>>,
+    IAdtMetadataUpdatable<
+      Partial<ITransportConfig>,
+      ReturnType<R['metadataUpdated']>
+    >,
     IAdtDeletable<
       ITransportConfig,
       ReturnType<R['deleted']>,

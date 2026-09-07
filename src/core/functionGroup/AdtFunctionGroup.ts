@@ -74,7 +74,7 @@ export class AdtFunctionGroup<
     IAdtCreatable<IFunctionGroupConfig, ReturnType<R['created']>>,
     IAdtMetadataReadable<IFunctionGroupConfig, ReturnType<R['metadata']>>,
     IAdtMetadataUpdatable<
-      IFunctionGroupConfig,
+      Partial<IFunctionGroupConfig>,
       ReturnType<R['metadataUpdated']>
     >,
     IAdtDeletable<

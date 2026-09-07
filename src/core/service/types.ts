@@ -142,6 +142,8 @@ export const serviceDocuments = {
  * is a demand made where the caller cannot see it.
  */
 export type IServiceBindingPublicationConfig = Partial<ISBC> & {
+  /** Which binding. Without it there is no object to publish. */
+  bindingName: string;
   /** `unchanged` is not one of them: there is no request that changes nothing. */
   desiredPublicationState: 'published' | 'unpublished';
   /** Selects the endpoint, `odatav2` or `odatav4`. */

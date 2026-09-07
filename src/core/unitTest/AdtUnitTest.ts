@@ -99,7 +99,7 @@ export class AdtUnitTest<R extends IUnitTestResults = typeof unitTestDocuments>
     IAdtCreatable<IUnitTestConfig, ReturnType<R['created']>>,
     IAdtReadable<IUnitTestConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<IUnitTestConfig, ReturnType<R['metadata']>>,
-    IAdtUpdatable<IUnitTestConfig, ReturnType<R['updated']>>,
+    IAdtUpdatable<Partial<IUnitTestConfig>, ReturnType<R['updated']>>,
     IAdtValidatable<IUnitTestConfig, ReturnType<R['validation']>>,
     IAdtLockable<IUnitTestConfig>,
     IAdtRunnable<

@@ -93,7 +93,7 @@ export class AdtScalarFunction<
     IAdtCreatable<IScalarFunctionConfig, ReturnType<R['created']>>,
     IAdtReadable<IScalarFunctionConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<IScalarFunctionConfig, ReturnType<R['metadata']>>,
-    IAdtUpdatable<IScalarFunctionConfig, ReturnType<R['updated']>>,
+    IAdtUpdatable<Partial<IScalarFunctionConfig>, ReturnType<R['updated']>>,
     IAdtDeletable<
       IScalarFunctionConfig,
       ReturnType<R['deletion']>,

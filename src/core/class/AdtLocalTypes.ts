@@ -60,7 +60,7 @@ export class AdtLocalTypes<R extends IClassResults = typeof classDocuments>
   implements
     IAdtReadable<ILocalTypesConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<ILocalTypesConfig, ReturnType<R['metadata']>>,
-    IAdtUpdatable<ILocalTypesConfig, ReturnType<R['updated']>>,
+    IAdtUpdatable<Partial<ILocalTypesConfig>, ReturnType<R['updated']>>,
     IAdtValidatable<ILocalTypesConfig, ReturnType<R['validation']>>,
     IAdtCheckable<ILocalTypesConfig, ReturnType<R['check']>>,
     IAdtActivatable<ILocalTypesConfig, ReturnType<R['activation']>>

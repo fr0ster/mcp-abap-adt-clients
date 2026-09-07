@@ -94,7 +94,7 @@ export class AdtTransformation<
     IAdtCreatable<ITransformationConfig, ReturnType<R['created']>>,
     IAdtReadable<ITransformationConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<ITransformationConfig, ReturnType<R['metadata']>>,
-    IAdtUpdatable<ITransformationConfig, ReturnType<R['updated']>>,
+    IAdtUpdatable<Partial<ITransformationConfig>, ReturnType<R['updated']>>,
     IAdtDeletable<
       ITransformationConfig,
       ReturnType<R['deletion']>,

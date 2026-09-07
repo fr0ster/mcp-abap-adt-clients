@@ -80,7 +80,7 @@ export class AdtMessageClassMessage<
     IAdtCreatable<IMessageClassMessageConfig, ReturnType<R['written']>>,
     IAdtReadable<IMessageClassMessageConfig, ReturnType<R['read']>>,
     IAdtMetadataReadable<IMessageClassMessageConfig, ReturnType<R['read']>>,
-    IAdtUpdatable<IMessageClassMessageConfig, ReturnType<R['written']>>
+    IAdtUpdatable<Partial<IMessageClassMessageConfig>, ReturnType<R['written']>>
 {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;

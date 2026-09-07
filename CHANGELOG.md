@@ -18,6 +18,17 @@ the sequence around a write handed back to the consumer.
 
 ### Breaking
 
+- **A write states what it needs.** Every implementation of `IAdtUpdatable` and
+  `IAdtMetadataUpdatable` now names its own config instead of inheriting a
+  `Partial` the atom applied on everyone's behalf. For the 37 types whose write
+  really is all-optional nothing changes but the spelling —
+  `IAdtUpdatable<Partial<IClassConfig>, …>` — and for the one where it is not,
+  the requirement is finally sayable: a service binding's `update` is its
+  publication job, and `IServiceBindingPublicationConfig` demands the binding
+  name and the protocol that selects the endpoint. Previously the class narrowed
+  the parameter and the interface let the bad call through anyway, because
+  method parameters are bivariant; it compiled and threw before the wire.
+
 - **One endpoint, one member — the operation chains are gone.** A member issues
   exactly one ADT request. `create` is the POST; `update` is the write and
   carries `options.lockHandle` as given; `delete` is the DELETE. None of them

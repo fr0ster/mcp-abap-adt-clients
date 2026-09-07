@@ -70,7 +70,7 @@ export class AdtFunctionInclude<
     IAdtCreatable<IFunctionIncludeConfig, ReturnType<R['created']>>,
     IAdtReadable<IFunctionIncludeConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<IFunctionIncludeConfig, ReturnType<R['metadata']>>,
-    IAdtUpdatable<IFunctionIncludeConfig, ReturnType<R['updated']>>,
+    IAdtUpdatable<Partial<IFunctionIncludeConfig>, ReturnType<R['updated']>>,
     IAdtDeletable<
       IFunctionIncludeConfig,
       ReturnType<R['deletion']>,

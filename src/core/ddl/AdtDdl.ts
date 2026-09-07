@@ -58,7 +58,7 @@ export class AdtDdl<R extends IDdlResults = typeof ddlDocuments>
     IAdtCreatable<IDdlConfig, ReturnType<R['created']>>,
     IAdtReadable<IDdlConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<IDdlConfig, ReturnType<R['metadata']>>,
-    IAdtUpdatable<IDdlConfig, ReturnType<R['updated']>>,
+    IAdtUpdatable<Partial<IDdlConfig>, ReturnType<R['updated']>>,
     IAdtDeletable<
       IDdlConfig,
       ReturnType<R['deletion']>,

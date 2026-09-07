@@ -70,7 +70,7 @@ export class AdtEnhancement<
     IAdtCreatable<IEnhancementConfig, ReturnType<R['created']>>,
     IAdtReadable<IEnhancementConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<IEnhancementConfig, ReturnType<R['metadata']>>,
-    IAdtUpdatable<IEnhancementConfig, ReturnType<R['updated']>>,
+    IAdtUpdatable<Partial<IEnhancementConfig>, ReturnType<R['updated']>>,
     IAdtDeletable<
       IEnhancementConfig,
       ReturnType<R['deletion']>,

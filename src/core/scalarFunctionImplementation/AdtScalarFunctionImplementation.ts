@@ -111,7 +111,7 @@ export class AdtScalarFunctionImplementation<
       ReturnType<R['metadata']>
     >,
     IAdtUpdatable<
-      IScalarFunctionImplementationConfig,
+      Partial<IScalarFunctionImplementationConfig>,
       ReturnType<R['updated']>
     >,
     IAdtDeletable<

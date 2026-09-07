@@ -71,7 +71,7 @@ export class AdtInterface<
     IAdtCreatable<IInterfaceConfig, ReturnType<R['created']>>,
     IAdtReadable<IInterfaceConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<IInterfaceConfig, ReturnType<R['metadata']>>,
-    IAdtUpdatable<IInterfaceConfig, ReturnType<R['updated']>>,
+    IAdtUpdatable<Partial<IInterfaceConfig>, ReturnType<R['updated']>>,
     IAdtDeletable<
       IInterfaceConfig,
       ReturnType<R['deletion']>,

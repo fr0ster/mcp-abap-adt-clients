@@ -66,7 +66,7 @@ type _UnitIsReadable = Satisfies<
 >;
 type _UnitIsUpdatable = Satisfies<
   UnitTestHandler,
-  IAdtUpdatable<IUnitTestConfig, string>
+  IAdtUpdatable<Partial<IUnitTestConfig>, string>
 >;
 // Not deletable, and the absence is the assertion. A unit test class's
 // `delete()` empties its `testclasses` include — `this.update({ testClassCode:

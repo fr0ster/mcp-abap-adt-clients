@@ -63,7 +63,7 @@ export class AdtLocalDefinitions<
   implements
     IAdtReadable<ILocalDefinitionsConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<ILocalDefinitionsConfig, ReturnType<R['metadata']>>,
-    IAdtUpdatable<ILocalDefinitionsConfig, ReturnType<R['updated']>>,
+    IAdtUpdatable<Partial<ILocalDefinitionsConfig>, ReturnType<R['updated']>>,
     IAdtValidatable<ILocalDefinitionsConfig, ReturnType<R['validation']>>,
     IAdtCheckable<ILocalDefinitionsConfig, ReturnType<R['check']>>,
     IAdtActivatable<ILocalDefinitionsConfig, ReturnType<R['activation']>>

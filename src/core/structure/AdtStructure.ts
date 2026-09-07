@@ -65,7 +65,7 @@ export class AdtStructure<
     IAdtCreatable<IStructureConfig, ReturnType<R['created']>>,
     IAdtReadable<IStructureConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<IStructureConfig, ReturnType<R['metadata']>>,
-    IAdtUpdatable<IStructureConfig, ReturnType<R['updated']>>,
+    IAdtUpdatable<Partial<IStructureConfig>, ReturnType<R['updated']>>,
     IAdtDeletable<
       IStructureConfig,
       ReturnType<R['deletion']>,

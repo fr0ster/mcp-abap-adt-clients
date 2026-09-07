@@ -71,7 +71,7 @@ export class AdtFunctionModule<
     IAdtCreatable<IFunctionModuleConfig, ReturnType<R['created']>>,
     IAdtReadable<IFunctionModuleConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<IFunctionModuleConfig, ReturnType<R['metadata']>>,
-    IAdtUpdatable<IFunctionModuleConfig, ReturnType<R['updated']>>,
+    IAdtUpdatable<Partial<IFunctionModuleConfig>, ReturnType<R['updated']>>,
     IAdtDeletable<
       IFunctionModuleConfig,
       ReturnType<R['deletion']>,

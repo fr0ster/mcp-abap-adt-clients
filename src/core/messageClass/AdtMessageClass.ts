@@ -56,7 +56,7 @@ export class AdtMessageClass<
     IAdtCreatable<IMessageClassConfig, ReturnType<R['created']>>,
     IAdtMetadataReadable<IMessageClassConfig, ReturnType<R['metadata']>>,
     IAdtMetadataUpdatable<
-      IMessageClassConfig,
+      Partial<IMessageClassConfig>,
       ReturnType<R['metadataUpdated']>
     >,
     IAdtDeletable<

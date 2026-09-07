@@ -64,7 +64,10 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
   implements
     IAdtCreatable<IPackageConfig, ReturnType<R['created']>>,
     IAdtMetadataReadable<IPackageConfig, ReturnType<R['metadata']>>,
-    IAdtMetadataUpdatable<IPackageConfig, ReturnType<R['metadataUpdated']>>,
+    IAdtMetadataUpdatable<
+      Partial<IPackageConfig>,
+      ReturnType<R['metadataUpdated']>
+    >,
     IAdtDeletable<
       IPackageConfig,
       ReturnType<R['deletion']>,

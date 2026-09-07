@@ -67,7 +67,7 @@ export class AdtFeatureToggle<
     IAdtCreatable<IFeatureToggleConfig, ReturnType<R['created']>>,
     IAdtReadable<IFeatureToggleConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<IFeatureToggleConfig, ReturnType<R['metadata']>>,
-    IAdtUpdatable<IFeatureToggleConfig, ReturnType<R['updated']>>,
+    IAdtUpdatable<Partial<IFeatureToggleConfig>, ReturnType<R['updated']>>,
     IAdtDeletable<
       IFeatureToggleConfig,
       ReturnType<R['deletion']>,

@@ -66,7 +66,7 @@ export class AdtBehaviorDefinition<
     IAdtCreatable<IBehaviorDefinitionConfig, ReturnType<R['created']>>,
     IAdtReadable<IBehaviorDefinitionConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<IBehaviorDefinitionConfig, ReturnType<R['metadata']>>,
-    IAdtUpdatable<IBehaviorDefinitionConfig, ReturnType<R['updated']>>,
+    IAdtUpdatable<Partial<IBehaviorDefinitionConfig>, ReturnType<R['updated']>>,
     IAdtDeletable<
       IBehaviorDefinitionConfig,
       ReturnType<R['deletion']>,

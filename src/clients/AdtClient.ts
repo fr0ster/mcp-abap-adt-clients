@@ -269,7 +269,7 @@ export type IClassContract<R extends IClassResults> = IAdtCreatable<
 > &
   IAdtReadable<IClassConfig, ReturnType<R['source']>> &
   IAdtMetadataReadable<IClassConfig, ReturnType<R['metadata']>> &
-  IAdtUpdatable<IClassConfig, ReturnType<R['updated']>> &
+  IAdtUpdatable<Partial<IClassConfig>, ReturnType<R['updated']>> &
   IAdtDeletable<
     IClassConfig,
     ReturnType<R['deletion']>,
@@ -287,7 +287,7 @@ export type IProgramContract<R extends IProgramResults> = IAdtCreatable<
 > &
   IAdtReadable<IProgramConfig, ReturnType<R['source']>> &
   IAdtMetadataReadable<IProgramConfig, ReturnType<R['metadata']>> &
-  IAdtUpdatable<IProgramConfig, ReturnType<R['updated']>> &
+  IAdtUpdatable<Partial<IProgramConfig>, ReturnType<R['updated']>> &
   IAdtDeletable<
     IProgramConfig,
     ReturnType<R['deletion']>,
@@ -305,7 +305,7 @@ export type IIncludeContract<R extends IIncludeResults> = IAdtCreatable<
 > &
   IAdtReadable<IIncludeConfig, ReturnType<R['source']>> &
   IAdtMetadataReadable<IIncludeConfig, ReturnType<R['metadata']>> &
-  IAdtUpdatable<IIncludeConfig, ReturnType<R['updated']>> &
+  IAdtUpdatable<Partial<IIncludeConfig>, ReturnType<R['updated']>> &
   IAdtDeletable<
     IIncludeConfig,
     ReturnType<R['deletion']>,
@@ -320,7 +320,7 @@ export type IInterfaceContract<R extends IInterfaceResults> = IAdtCreatable<
 > &
   IAdtReadable<IInterfaceConfig, ReturnType<R['source']>> &
   IAdtMetadataReadable<IInterfaceConfig, ReturnType<R['metadata']>> &
-  IAdtUpdatable<IInterfaceConfig, ReturnType<R['updated']>> &
+  IAdtUpdatable<Partial<IInterfaceConfig>, ReturnType<R['updated']>> &
   IAdtDeletable<
     IInterfaceConfig,
     ReturnType<R['deletion']>,
@@ -337,7 +337,10 @@ export type IDomainContract<R extends IDomainResults> = IAdtCreatable<
   ReturnType<R['created']>
 > &
   IAdtMetadataReadable<IDomainConfig, ReturnType<R['metadata']>> &
-  IAdtMetadataUpdatable<IDomainConfig, ReturnType<R['metadataUpdated']>> &
+  IAdtMetadataUpdatable<
+    Partial<IDomainConfig>,
+    ReturnType<R['metadataUpdated']>
+  > &
   IAdtDeletable<
     IDomainConfig,
     ReturnType<R['deletion']>,
@@ -353,7 +356,10 @@ export type IDataElementContract<R extends IDataElementResults> = IAdtCreatable<
   ReturnType<R['created']>
 > &
   IAdtMetadataReadable<IDataElementConfig, ReturnType<R['metadata']>> &
-  IAdtMetadataUpdatable<IDataElementConfig, ReturnType<R['metadataUpdated']>> &
+  IAdtMetadataUpdatable<
+    Partial<IDataElementConfig>,
+    ReturnType<R['metadataUpdated']>
+  > &
   IAdtDeletable<
     IDataElementConfig,
     ReturnType<R['deletion']>,
@@ -368,7 +374,7 @@ export type IAuthorizationFieldContract<R extends IAuthorizationFieldResults> =
   IAdtCreatable<IAuthorizationFieldConfig, ReturnType<R['created']>> &
     IAdtMetadataReadable<IAuthorizationFieldConfig, ReturnType<R['metadata']>> &
     IAdtMetadataUpdatable<
-      IAuthorizationFieldConfig,
+      Partial<IAuthorizationFieldConfig>,
       ReturnType<R['metadataUpdated']>
     > &
     IAdtDeletable<
@@ -386,7 +392,7 @@ export type IStructureContract<R extends IStructureResults> = IAdtCreatable<
 > &
   IAdtReadable<IStructureConfig, ReturnType<R['source']>> &
   IAdtMetadataReadable<IStructureConfig, ReturnType<R['metadata']>> &
-  IAdtUpdatable<IStructureConfig, ReturnType<R['updated']>> &
+  IAdtUpdatable<Partial<IStructureConfig>, ReturnType<R['updated']>> &
   IAdtDeletable<
     IStructureConfig,
     ReturnType<R['deletion']>,
@@ -404,7 +410,7 @@ export type ITableContract<R extends ITableResults> = IAdtCreatable<
 > &
   IAdtReadable<ITableConfig, ReturnType<R['source']>> &
   IAdtMetadataReadable<ITableConfig, ReturnType<R['metadata']>> &
-  IAdtUpdatable<ITableConfig, ReturnType<R['updated']>> &
+  IAdtUpdatable<Partial<ITableConfig>, ReturnType<R['updated']>> &
   IAdtDeletable<
     ITableConfig,
     ReturnType<R['deletion']>,
@@ -421,7 +427,10 @@ export type ITableTypeContract<R extends ITableTypeResults> = IAdtCreatable<
   ReturnType<R['created']>
 > &
   IAdtMetadataReadable<ITableTypeConfig, ReturnType<R['metadata']>> &
-  IAdtMetadataUpdatable<ITableTypeConfig, ReturnType<R['metadataUpdated']>> &
+  IAdtMetadataUpdatable<
+    Partial<ITableTypeConfig>,
+    ReturnType<R['metadataUpdated']>
+  > &
   IAdtDeletable<
     ITableTypeConfig,
     ReturnType<R['deletion']>,
@@ -439,7 +448,7 @@ export type IDdlContract<R extends IDdlResults> = IAdtCreatable<
 > &
   IAdtReadable<IDdlConfig, ReturnType<R['source']>> &
   IAdtMetadataReadable<IDdlConfig, ReturnType<R['metadata']>> &
-  IAdtUpdatable<IDdlConfig, ReturnType<R['updated']>> &
+  IAdtUpdatable<Partial<IDdlConfig>, ReturnType<R['updated']>> &
   IAdtDeletable<
     IDdlConfig,
     ReturnType<R['deletion']>,
@@ -455,7 +464,7 @@ export type IFunctionGroupContract<R extends IFunctionGroupResults> =
   IAdtCreatable<IFunctionGroupConfig, ReturnType<R['created']>> &
     IAdtMetadataReadable<IFunctionGroupConfig, ReturnType<R['metadata']>> &
     IAdtMetadataUpdatable<
-      IFunctionGroupConfig,
+      Partial<IFunctionGroupConfig>,
       ReturnType<R['metadataUpdated']>
     > &
     IAdtDeletable<
@@ -472,7 +481,7 @@ export type IFunctionModuleContract<R extends IFunctionModuleResults> =
   IAdtCreatable<IFunctionModuleConfig, ReturnType<R['created']>> &
     IAdtReadable<IFunctionModuleConfig, ReturnType<R['source']>> &
     IAdtMetadataReadable<IFunctionModuleConfig, ReturnType<R['metadata']>> &
-    IAdtUpdatable<IFunctionModuleConfig, ReturnType<R['updated']>> &
+    IAdtUpdatable<Partial<IFunctionModuleConfig>, ReturnType<R['updated']>> &
     IAdtDeletable<
       IFunctionModuleConfig,
       ReturnType<R['deletion']>,
@@ -488,9 +497,9 @@ export type IFunctionIncludeContract<R extends IFunctionIncludeResults> =
   IAdtCreatable<IFunctionIncludeConfig, ReturnType<R['created']>> &
     IAdtReadable<IFunctionIncludeConfig, ReturnType<R['source']>> &
     IAdtMetadataReadable<IFunctionIncludeConfig, ReturnType<R['metadata']>> &
-    IAdtUpdatable<IFunctionIncludeConfig, ReturnType<R['updated']>> &
+    IAdtUpdatable<Partial<IFunctionIncludeConfig>, ReturnType<R['updated']>> &
     IAdtMetadataUpdatable<
-      IFunctionIncludeConfig,
+      Partial<IFunctionIncludeConfig>,
       ReturnType<R['metadataUpdated']>
     > &
     IAdtDeletable<
@@ -508,7 +517,10 @@ export type IPackageContract<R extends IPackageResults> = IAdtCreatable<
   ReturnType<R['created']>
 > &
   IAdtMetadataReadable<IPackageConfig, ReturnType<R['metadata']>> &
-  IAdtMetadataUpdatable<IPackageConfig, ReturnType<R['metadataUpdated']>> &
+  IAdtMetadataUpdatable<
+    Partial<IPackageConfig>,
+    ReturnType<R['metadataUpdated']>
+  > &
   IAdtDeletable<
     IPackageConfig,
     ReturnType<R['deletion']>,
@@ -522,7 +534,7 @@ export type IMessageClassContract<R extends IMessageClassResults> =
   IAdtCreatable<IMessageClassConfig, ReturnType<R['created']>> &
     IAdtMetadataReadable<IMessageClassConfig, ReturnType<R['metadata']>> &
     IAdtMetadataUpdatable<
-      IMessageClassConfig,
+      Partial<IMessageClassConfig>,
       ReturnType<R['metadataUpdated']>
     > &
     IAdtDeletable<
@@ -536,12 +548,12 @@ export type IMessageClassMessageContract<
   R extends IMessageClassMessageResults,
 > = IAdtCreatable<IMessageClassMessageConfig, ReturnType<R['written']>> &
   IAdtReadable<IMessageClassMessageConfig, ReturnType<R['read']>> &
-  IAdtUpdatable<IMessageClassMessageConfig, ReturnType<R['written']>>;
+  IAdtUpdatable<Partial<IMessageClassMessageConfig>, ReturnType<R['written']>>;
 export type IAccessControlContract<R extends IAccessControlResults> =
   IAdtCreatable<IAccessControlConfig, ReturnType<R['created']>> &
     IAdtReadable<IAccessControlConfig, ReturnType<R['source']>> &
     IAdtMetadataReadable<IAccessControlConfig, ReturnType<R['metadata']>> &
-    IAdtUpdatable<IAccessControlConfig, ReturnType<R['updated']>> &
+    IAdtUpdatable<Partial<IAccessControlConfig>, ReturnType<R['updated']>> &
     IAdtDeletable<
       IAccessControlConfig,
       ReturnType<R['deletion']>,
@@ -557,7 +569,7 @@ export type ITransformationContract<R extends ITransformationResults> =
   IAdtCreatable<ITransformationConfig, ReturnType<R['created']>> &
     IAdtReadable<ITransformationConfig, ReturnType<R['source']>> &
     IAdtMetadataReadable<ITransformationConfig, ReturnType<R['metadata']>> &
-    IAdtUpdatable<ITransformationConfig, ReturnType<R['updated']>> &
+    IAdtUpdatable<Partial<ITransformationConfig>, ReturnType<R['updated']>> &
     IAdtDeletable<
       ITransformationConfig,
       ReturnType<R['deletion']>,
@@ -573,7 +585,7 @@ export type IServiceDefinitionContract<R extends IServiceDefinitionResults> =
   IAdtCreatable<IServiceDefinitionConfig, ReturnType<R['created']>> &
     IAdtReadable<IServiceDefinitionConfig, ReturnType<R['source']>> &
     IAdtMetadataReadable<IServiceDefinitionConfig, ReturnType<R['metadata']>> &
-    IAdtUpdatable<IServiceDefinitionConfig, ReturnType<R['updated']>> &
+    IAdtUpdatable<Partial<IServiceDefinitionConfig>, ReturnType<R['updated']>> &
     IAdtDeletable<
       IServiceDefinitionConfig,
       ReturnType<R['deletion']>,
@@ -589,7 +601,7 @@ export type IScalarFunctionContract<R extends IScalarFunctionResults> =
   IAdtCreatable<IScalarFunctionConfig, ReturnType<R['created']>> &
     IAdtReadable<IScalarFunctionConfig, ReturnType<R['source']>> &
     IAdtMetadataReadable<IScalarFunctionConfig, ReturnType<R['metadata']>> &
-    IAdtUpdatable<IScalarFunctionConfig, ReturnType<R['updated']>> &
+    IAdtUpdatable<Partial<IScalarFunctionConfig>, ReturnType<R['updated']>> &
     IAdtDeletable<
       IScalarFunctionConfig,
       ReturnType<R['deletion']>,
@@ -612,9 +624,12 @@ export type IScalarFunctionImplementationContract<
     IScalarFunctionImplementationConfig,
     ReturnType<R['metadata']>
   > &
-  IAdtUpdatable<IScalarFunctionImplementationConfig, ReturnType<R['updated']>> &
+  IAdtUpdatable<
+    Partial<IScalarFunctionImplementationConfig>,
+    ReturnType<R['updated']>
+  > &
   IAdtMetadataUpdatable<
-    IScalarFunctionImplementationConfig,
+    Partial<IScalarFunctionImplementationConfig>,
     ReturnType<R['metadataUpdated']>
   > &
   IAdtDeletable<
@@ -641,7 +656,7 @@ export type IAppendStructureContract<R extends IAppendStructureResults> =
   IAdtCreatable<IAppendStructureConfig, ReturnType<R['created']>> &
     IAdtReadable<IAppendStructureConfig, ReturnType<R['source']>> &
     IAdtMetadataReadable<IAppendStructureConfig, ReturnType<R['metadata']>> &
-    IAdtUpdatable<IAppendStructureConfig, ReturnType<R['updated']>> &
+    IAdtUpdatable<Partial<IAppendStructureConfig>, ReturnType<R['updated']>> &
     IAdtDeletable<
       IAppendStructureConfig,
       ReturnType<R['deletion']>,
@@ -657,7 +672,10 @@ export type IBehaviorDefinitionContract<R extends IBehaviorDefinitionResults> =
   IAdtCreatable<IBehaviorDefinitionConfig, ReturnType<R['created']>> &
     IAdtReadable<IBehaviorDefinitionConfig, ReturnType<R['source']>> &
     IAdtMetadataReadable<IBehaviorDefinitionConfig, ReturnType<R['metadata']>> &
-    IAdtUpdatable<IBehaviorDefinitionConfig, ReturnType<R['updated']>> &
+    IAdtUpdatable<
+      Partial<IBehaviorDefinitionConfig>,
+      ReturnType<R['updated']>
+    > &
     IAdtDeletable<
       IBehaviorDefinitionConfig,
       ReturnType<R['deletion']>,
@@ -676,7 +694,10 @@ export type IBehaviorImplementationContract<R extends IClassResults> =
       IBehaviorImplementationConfig,
       ReturnType<R['metadata']>
     > &
-    IAdtUpdatable<IBehaviorImplementationConfig, ReturnType<R['updated']>> &
+    IAdtUpdatable<
+      Partial<IBehaviorImplementationConfig>,
+      ReturnType<R['updated']>
+    > &
     IAdtDeletable<
       IBehaviorImplementationConfig,
       ReturnType<R['deletion']>,
@@ -698,7 +719,7 @@ export type IMetadataExtensionContract<R extends IMetadataExtensionResults> =
   IAdtCreatable<IMetadataExtensionConfig, ReturnType<R['created']>> &
     IAdtReadable<IMetadataExtensionConfig, ReturnType<R['source']>> &
     IAdtMetadataReadable<IMetadataExtensionConfig, ReturnType<R['metadata']>> &
-    IAdtUpdatable<IMetadataExtensionConfig, ReturnType<R['updated']>> &
+    IAdtUpdatable<Partial<IMetadataExtensionConfig>, ReturnType<R['updated']>> &
     IAdtDeletable<
       IMetadataExtensionConfig,
       ReturnType<R['deletion']>,
@@ -716,7 +737,7 @@ export type IEnhancementContract<R extends IEnhancementResults> = IAdtCreatable<
 > &
   IAdtReadable<IEnhancementConfig, ReturnType<R['source']>> &
   IAdtMetadataReadable<IEnhancementConfig, ReturnType<R['metadata']>> &
-  IAdtUpdatable<IEnhancementConfig, ReturnType<R['updated']>> &
+  IAdtUpdatable<Partial<IEnhancementConfig>, ReturnType<R['updated']>> &
   IAdtDeletable<
     IEnhancementConfig,
     ReturnType<R['deletion']>,
@@ -733,7 +754,10 @@ export type IRequestContract<R extends ITransportResults> = IAdtCreatable<
   ReturnType<R['created']>
 > &
   IAdtMetadataReadable<ITransportConfig, ReturnType<R['metadata']>> &
-  IAdtMetadataUpdatable<ITransportConfig, ReturnType<R['metadataUpdated']>> &
+  IAdtMetadataUpdatable<
+    Partial<ITransportConfig>,
+    ReturnType<R['metadataUpdated']>
+  > &
   IAdtDeletable<
     ITransportConfig,
     ReturnType<R['deleted']>,
@@ -745,7 +769,7 @@ export type ILocalTestClassContract<R extends IClassResults> = IAdtReadable<
   ReturnType<R['source']>
 > &
   IAdtMetadataReadable<ILocalTestClassConfig, ReturnType<R['metadata']>> &
-  IAdtUpdatable<ILocalTestClassConfig, ReturnType<R['updated']>> &
+  IAdtUpdatable<Partial<ILocalTestClassConfig>, ReturnType<R['updated']>> &
   IAdtValidatable<ILocalTestClassConfig, ReturnType<R['validation']>> &
   IAdtCheckable<ILocalTestClassConfig, ReturnType<R['check']>> &
   IAdtActivatable<ILocalTestClassConfig, ReturnType<R['activation']>> &
@@ -757,7 +781,7 @@ export type ILocalTypesContract<R extends IClassResults> = IAdtReadable<
   ReturnType<R['source']>
 > &
   IAdtMetadataReadable<ILocalTypesConfig, ReturnType<R['metadata']>> &
-  IAdtUpdatable<ILocalTypesConfig, ReturnType<R['updated']>> &
+  IAdtUpdatable<Partial<ILocalTypesConfig>, ReturnType<R['updated']>> &
   IAdtValidatable<ILocalTypesConfig, ReturnType<R['validation']>> &
   IAdtCheckable<ILocalTypesConfig, ReturnType<R['check']>> &
   IAdtActivatable<ILocalTypesConfig, ReturnType<R['activation']>> &
@@ -769,7 +793,7 @@ export type ILocalDefinitionsContract<R extends IClassResults> = IAdtReadable<
   ReturnType<R['source']>
 > &
   IAdtMetadataReadable<ILocalDefinitionsConfig, ReturnType<R['metadata']>> &
-  IAdtUpdatable<ILocalDefinitionsConfig, ReturnType<R['updated']>> &
+  IAdtUpdatable<Partial<ILocalDefinitionsConfig>, ReturnType<R['updated']>> &
   IAdtValidatable<ILocalDefinitionsConfig, ReturnType<R['validation']>> &
   IAdtCheckable<ILocalDefinitionsConfig, ReturnType<R['check']>> &
   IAdtActivatable<ILocalDefinitionsConfig, ReturnType<R['activation']>> &
@@ -781,7 +805,7 @@ export type ILocalMacrosContract<R extends IClassResults> = IAdtReadable<
   ReturnType<R['source']>
 > &
   IAdtMetadataReadable<ILocalMacrosConfig, ReturnType<R['metadata']>> &
-  IAdtUpdatable<ILocalMacrosConfig, ReturnType<R['updated']>> &
+  IAdtUpdatable<Partial<ILocalMacrosConfig>, ReturnType<R['updated']>> &
   IAdtValidatable<ILocalMacrosConfig, ReturnType<R['validation']>> &
   IAdtCheckable<ILocalMacrosConfig, ReturnType<R['check']>> &
   IAdtActivatable<ILocalMacrosConfig, ReturnType<R['activation']>> &
@@ -1801,9 +1825,9 @@ export class AdtClient {
   ): IAdtCreatable<IFeatureToggleConfig, ReturnType<R['created']>> &
     IAdtReadable<IFeatureToggleConfig, ReturnType<R['source']>> &
     IAdtMetadataReadable<IFeatureToggleConfig, ReturnType<R['metadata']>> &
-    IAdtUpdatable<IFeatureToggleConfig, ReturnType<R['updated']>> &
+    IAdtUpdatable<Partial<IFeatureToggleConfig>, ReturnType<R['updated']>> &
     IAdtMetadataUpdatable<
-      IFeatureToggleConfig,
+      Partial<IFeatureToggleConfig>,
       ReturnType<R['metadataUpdated']>
     > &
     IAdtDeletable<
@@ -1855,7 +1879,7 @@ export class AdtClient {
   ): IAdtCreatable<IUnitTestConfig, ReturnType<R['created']>> &
     IAdtReadable<IUnitTestConfig, ReturnType<R['source']>> &
     IAdtMetadataReadable<IUnitTestConfig, ReturnType<R['metadata']>> &
-    IAdtUpdatable<IUnitTestConfig, ReturnType<R['updated']>> &
+    IAdtUpdatable<Partial<IUnitTestConfig>, ReturnType<R['updated']>> &
     IAdtValidatable<IUnitTestConfig, ReturnType<R['validation']>> &
     IAdtLockable<IUnitTestConfig> &
     IAdtRunnable<
@@ -1887,7 +1911,7 @@ export class AdtClient {
   ): IAdtCreatable<ICdsUnitTestConfig, ReturnType<R['created']>> &
     IAdtReadable<ICdsUnitTestConfig, ReturnType<R['source']>> &
     IAdtMetadataReadable<ICdsUnitTestConfig, ReturnType<R['metadata']>> &
-    IAdtUpdatable<ICdsUnitTestConfig, ReturnType<R['updated']>> &
+    IAdtUpdatable<Partial<ICdsUnitTestConfig>, ReturnType<R['updated']>> &
     IAdtValidatable<ICdsUnitTestConfig, ReturnType<R['validation']>> &
     IAdtLockable<ICdsUnitTestConfig> &
     IAdtRunnable<

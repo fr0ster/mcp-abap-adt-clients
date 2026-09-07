@@ -69,7 +69,7 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
     IAdtCreatable<IClassConfig, ReturnType<R['created']>>,
     IAdtReadable<IClassConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<IClassConfig, ReturnType<R['metadata']>>,
-    IAdtUpdatable<IClassConfig, ReturnType<R['updated']>>,
+    IAdtUpdatable<Partial<IClassConfig>, ReturnType<R['updated']>>,
     IAdtDeletable<
       IClassConfig,
       ReturnType<R['deletion']>,

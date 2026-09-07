@@ -67,7 +67,7 @@ export class AdtMetadataExtension<
     IAdtCreatable<IMetadataExtensionConfig, ReturnType<R['created']>>,
     IAdtReadable<IMetadataExtensionConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<IMetadataExtensionConfig, ReturnType<R['metadata']>>,
-    IAdtUpdatable<IMetadataExtensionConfig, ReturnType<R['updated']>>,
+    IAdtUpdatable<Partial<IMetadataExtensionConfig>, ReturnType<R['updated']>>,
     IAdtDeletable<
       IMetadataExtensionConfig,
       ReturnType<R['deletion']>,

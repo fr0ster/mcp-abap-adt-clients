@@ -60,7 +60,7 @@ export class AdtLocalMacros<R extends IClassResults = typeof classDocuments>
   implements
     IAdtReadable<ILocalMacrosConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<ILocalMacrosConfig, ReturnType<R['metadata']>>,
-    IAdtUpdatable<ILocalMacrosConfig, ReturnType<R['updated']>>,
+    IAdtUpdatable<Partial<ILocalMacrosConfig>, ReturnType<R['updated']>>,
     IAdtValidatable<ILocalMacrosConfig, ReturnType<R['validation']>>,
     IAdtCheckable<ILocalMacrosConfig, ReturnType<R['check']>>,
     IAdtActivatable<ILocalMacrosConfig, ReturnType<R['activation']>>

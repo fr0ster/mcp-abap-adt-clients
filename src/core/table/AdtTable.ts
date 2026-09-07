@@ -58,7 +58,7 @@ export class AdtTable<R extends ITableResults = typeof tableDocuments>
     IAdtCreatable<ITableConfig, ReturnType<R['created']>>,
     IAdtReadable<ITableConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<ITableConfig, ReturnType<R['metadata']>>,
-    IAdtUpdatable<ITableConfig, ReturnType<R['updated']>>,
+    IAdtUpdatable<Partial<ITableConfig>, ReturnType<R['updated']>>,
     IAdtDeletable<
       ITableConfig,
       ReturnType<R['deletion']>,

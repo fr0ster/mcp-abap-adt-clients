@@ -75,7 +75,7 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
     IAdtCreatable<IProgramConfig, ReturnType<R['created']>>,
     IAdtReadable<IProgramConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<IProgramConfig, ReturnType<R['metadata']>>,
-    IAdtUpdatable<IProgramConfig, ReturnType<R['updated']>>,
+    IAdtUpdatable<Partial<IProgramConfig>, ReturnType<R['updated']>>,
     IAdtDeletable<
       IProgramConfig,
       ReturnType<R['deletion']>,

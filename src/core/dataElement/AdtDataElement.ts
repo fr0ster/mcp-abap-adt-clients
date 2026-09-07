@@ -59,7 +59,10 @@ export class AdtDataElement<
 > implements
     IAdtCreatable<IDataElementConfig, ReturnType<R['created']>>,
     IAdtMetadataReadable<IDataElementConfig, ReturnType<R['metadata']>>,
-    IAdtMetadataUpdatable<IDataElementConfig, ReturnType<R['metadataUpdated']>>,
+    IAdtMetadataUpdatable<
+      Partial<IDataElementConfig>,
+      ReturnType<R['metadataUpdated']>
+    >,
     IAdtDeletable<
       IDataElementConfig,
       ReturnType<R['deletion']>,

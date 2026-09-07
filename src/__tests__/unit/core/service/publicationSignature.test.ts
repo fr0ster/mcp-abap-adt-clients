@@ -61,6 +61,12 @@ async function _onlyTypeChecked(client: AdtClient): Promise<void> {
     desiredPublicationState: 'unchanged',
     serviceType: 'odatav4',
   }));
+
+  // @ts-expect-error bindingName says which object; there is nothing to publish without it
+  void (await bindings.update({
+    desiredPublicationState: 'published',
+    serviceType: 'odatav4',
+  }));
 }
 void _onlyTypeChecked;
 

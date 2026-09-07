@@ -58,7 +58,7 @@ export class AdtAuthorizationField<
     IAdtCreatable<IAuthorizationFieldConfig, ReturnType<R['created']>>,
     IAdtMetadataReadable<IAuthorizationFieldConfig, ReturnType<R['metadata']>>,
     IAdtMetadataUpdatable<
-      IAuthorizationFieldConfig,
+      Partial<IAuthorizationFieldConfig>,
       ReturnType<R['metadataUpdated']>
     >,
     IAdtDeletable<

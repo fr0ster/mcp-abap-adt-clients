@@ -60,7 +60,7 @@ export class AdtLocalTestClass<R extends IClassResults = typeof classDocuments>
   implements
     IAdtReadable<ILocalTestClassConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<ILocalTestClassConfig, ReturnType<R['metadata']>>,
-    IAdtUpdatable<ILocalTestClassConfig, ReturnType<R['updated']>>,
+    IAdtUpdatable<Partial<ILocalTestClassConfig>, ReturnType<R['updated']>>,
     IAdtValidatable<ILocalTestClassConfig, ReturnType<R['validation']>>,
     IAdtCheckable<ILocalTestClassConfig, ReturnType<R['check']>>,
     IAdtActivatable<ILocalTestClassConfig, ReturnType<R['activation']>>

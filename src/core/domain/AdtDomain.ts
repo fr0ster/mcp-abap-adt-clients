@@ -57,7 +57,10 @@ export class AdtDomain<R extends IDomainResults = typeof domainDocuments>
   implements
     IAdtCreatable<IDomainConfig, ReturnType<R['created']>>,
     IAdtMetadataReadable<IDomainConfig, ReturnType<R['metadata']>>,
-    IAdtMetadataUpdatable<IDomainConfig, ReturnType<R['metadataUpdated']>>,
+    IAdtMetadataUpdatable<
+      Partial<IDomainConfig>,
+      ReturnType<R['metadataUpdated']>
+    >,
     IAdtDeletable<
       IDomainConfig,
       ReturnType<R['deletion']>,
