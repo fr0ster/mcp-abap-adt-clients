@@ -19,6 +19,7 @@ import type {
   IAdtCheckable,
   IAdtContentTypes,
   IAdtCreatable,
+  IAdtCreateOptions,
   IAdtDeletable,
   IAdtError,
   IAdtLockable,
@@ -168,8 +169,8 @@ export class AdtFunctionModule<
 
   /** Create the function module. */
   async create<E extends IAdtError = IAdtError>(
-    config: IFunctionModuleConfig,
-    options?: IAdtOperationOptions<E>,
+    config: Omit<IFunctionModuleConfig, 'sourceCode'> & { sourceCode?: never },
+    options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     const { group, module } = this.names(config);
     if (!config.description) {

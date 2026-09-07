@@ -16,6 +16,7 @@ import type {
   IAdtActivatable,
   IAdtCheckable,
   IAdtCreatable,
+  IAdtCreateOptions,
   IAdtDeletable,
   IAdtError,
   IAdtLockable,
@@ -181,8 +182,10 @@ export class AdtBehaviorImplementation<
    * refers to does not exist until then.
    */
   async create<E extends IAdtError = IAdtError>(
-    config: IBehaviorImplementationConfig,
-    options?: IAdtOperationOptions<E>,
+    config: Omit<IBehaviorImplementationConfig, 'sourceCode'> & {
+      sourceCode?: never;
+    },
+    options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     const name = this.name(config);
     if (!config.packageName) {

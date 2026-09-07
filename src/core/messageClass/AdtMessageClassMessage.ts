@@ -29,6 +29,7 @@ import type {
   AdtNoFailure,
   IAbapConnection,
   IAdtCreatable,
+  IAdtCreateOptions,
   IAdtDeletable,
   IAdtError,
   IAdtMetadataReadable,
@@ -159,8 +160,10 @@ export class AdtMessageClassMessage<
 
   /** Create the message — the same write as `update`; ADT upserts. */
   async create<E extends IAdtError = IAdtError>(
-    config: IMessageClassMessageConfig,
-    options?: IAdtOperationOptions<E>,
+    config: Omit<IMessageClassMessageConfig, 'sourceCode'> & {
+      sourceCode?: never;
+    },
+    options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['written']>, E>> {
     return this.writeClass(config, false, options);
   }

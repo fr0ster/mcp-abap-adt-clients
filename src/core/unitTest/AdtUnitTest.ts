@@ -26,6 +26,7 @@ import type {
   AdtNoFailure,
   IAbapConnection,
   IAdtCreatable,
+  IAdtCreateOptions,
   IAdtDeletable,
   IAdtError,
   IAdtLockable,
@@ -195,8 +196,8 @@ export class AdtUnitTest<R extends IUnitTestResults = typeof unitTestDocuments>
    * it belongs to the caller rather than to a chain it cannot see into.
    */
   async create<E extends IAdtError = IAdtError>(
-    config: IUnitTestConfig,
-    options?: IAdtOperationOptions<E>,
+    config: Omit<IUnitTestConfig, 'sourceCode'> & { sourceCode?: never },
+    options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     const name = this.name(config);
 

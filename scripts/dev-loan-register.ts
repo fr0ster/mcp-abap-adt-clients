@@ -332,10 +332,19 @@ async function build(
   a: Artefact,
   pkg: string,
   request: string,
+  updateRequest?: string,
 ): Promise<boolean> {
   // biome-ignore lint/suspicious/noExplicitAny: two handler contracts, one flow
   const handler = handlerFor(client, a) as any;
   const config = configFor(a, pkg, request);
+  // The update goes to its own request when one was given. With a single
+  // request the object is already listed there after the create, so a listing
+  // that does not change afterwards is equally consistent with the update
+  // carrying the transport and with it dropping the value — the question this
+  // script exists to answer cannot be answered that way.
+  const updateConfig = updateRequest
+    ? configFor(a, pkg, updateRequest)
+    : config;
 
   // `create` makes the object and nothing else. Passing `sourceCode` to it is
   // accepted by the type and ignored on the wire: measured here, a class
@@ -359,11 +368,24 @@ async function build(
     return false;
   }
   const handle = String(lock.getResult().value ?? '');
-  const updated = await handler.update(config, {
-    sourceCode: a.source,
-    lockHandle: handle,
-  });
-  await handler.unlock(config, handle);
+  // The unlock is in a `finally`. A throw between the lock and the release
+  // leaves a real object locked on a real system, the lock survives a session
+  // recycle, and the next run's write is answered 403 with nothing visibly
+  // holding it — only the unlock clears it.
+  let updated: { ok: boolean; getError(): { message: string } };
+  try {
+    updated = await handler.update(updateConfig, {
+      sourceCode: a.source,
+      lockHandle: handle,
+    });
+  } finally {
+    const released = await handler.unlock(config, handle);
+    if (released && released.ok === false) {
+      say(
+        `  ${a.name.padEnd(24)} UNLOCK REFUSED: ${released.getError().message}`,
+      );
+    }
+  }
   if (!updated.ok) {
     say(`  ${a.name.padEnd(24)} UPDATE REFUSED: ${updated.getError().message}`);
     return false;
@@ -415,11 +437,17 @@ async function requestContents(
 async function main(): Promise<void> {
   const [pkg, request, ...rest] = process.argv.slice(2);
   if (!pkg || !request) {
-    say('usage: dev-loan-register.ts <package> <requestNumber> [--clean]');
+    say(
+      'usage: dev-loan-register.ts <package> <requestNumber> ' +
+        '[--update-request=<requestNumber>] [--clean]',
+    );
     process.exitCode = 1;
     return;
   }
   const clean = rest.includes('--clean');
+  const updateRequest = rest
+    .find((r) => r.startsWith('--update-request='))
+    ?.slice('--update-request='.length);
 
   const logger = createConnectionLogger();
   const connection = await createTestConnection(logger);
@@ -429,6 +457,16 @@ async function main(): Promise<void> {
     say(`\nrequest ${request} before: `);
     for (const o of await requestContents(connection, logger, request)) {
       say(`  ${o}`);
+    }
+    if (updateRequest) {
+      say(`\nrequest ${updateRequest} before (the updates go here):`);
+      for (const o of await requestContents(
+        connection,
+        logger,
+        updateRequest,
+      )) {
+        say(`  ${o}`);
+      }
     }
 
     if (clean) {
@@ -441,7 +479,7 @@ async function main(): Promise<void> {
 
     say(`\nbuilding into ${pkg} on ${request}, in dependency order:`);
     for (const a of ARTEFACTS) {
-      if (!(await build(client, a, pkg, request))) {
+      if (!(await build(client, a, pkg, request, updateRequest))) {
         say('\nstopped: a dependency did not come up.');
         process.exitCode = 1;
         return;
@@ -451,6 +489,27 @@ async function main(): Promise<void> {
     say(`\nrequest ${request} after:`);
     for (const o of await requestContents(connection, logger, request)) {
       say(`  ${o}`);
+    }
+    if (updateRequest) {
+      say(`\nrequest ${updateRequest} after (the updates went here):`);
+      for (const o of await requestContents(
+        connection,
+        logger,
+        updateRequest,
+      )) {
+        say(`  ${o}`);
+      }
+      say(
+        '\nCompare the two listings for ' +
+          `${updateRequest}. An object appearing in the second and not the ` +
+          'first is what shows the update carried its transport.',
+      );
+    } else {
+      say(
+        '\nThe update half is UNPROVEN in this run: creates and updates shared ' +
+          `${request}, so every object was already listed there before the ` +
+          'first update. Re-run with --update-request=<another request>.',
+      );
     }
 
     say('\nrunning ZCL_AC_LOAN_DEMO:');

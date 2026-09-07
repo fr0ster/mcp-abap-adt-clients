@@ -12,6 +12,7 @@ import type {
   IAdtActivatable,
   IAdtContentTypes,
   IAdtCreatable,
+  IAdtCreateOptions,
   IAdtDeletable,
   IAdtError,
   IAdtLockable,
@@ -122,8 +123,8 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
    * why the include is not what was asked for.
    */
   async create<E extends IAdtError = IAdtError>(
-    config: IIncludeConfig,
-    options?: IAdtOperationOptions<E>,
+    config: Omit<IIncludeConfig, 'sourceCode'> & { sourceCode?: never },
+    options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     const includeName = requireName(config);
     if (!config.packageName) {

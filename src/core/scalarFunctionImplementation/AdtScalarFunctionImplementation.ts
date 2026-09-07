@@ -18,6 +18,7 @@ import type {
   IAdtActivatable,
   IAdtCheckable,
   IAdtCreatable,
+  IAdtCreateOptions,
   IAdtDeletable,
   IAdtError,
   IAdtLockable,
@@ -196,8 +197,10 @@ export class AdtScalarFunctionImplementation<
 
   /** Create the object. */
   async create<E extends IAdtError = IAdtError>(
-    config: IScalarFunctionImplementationConfig,
-    options?: IAdtOperationOptions<E>,
+    config: Omit<IScalarFunctionImplementationConfig, 'sourceCode'> & {
+      sourceCode?: never;
+    },
+    options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     const name = this.name(config);
     if (!config.scalarFunctionName) {

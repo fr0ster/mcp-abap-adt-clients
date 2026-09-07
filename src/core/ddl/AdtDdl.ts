@@ -14,6 +14,7 @@ import type {
   IAdtActivatable,
   IAdtCheckable,
   IAdtCreatable,
+  IAdtCreateOptions,
   IAdtDeletable,
   IAdtError,
   IAdtLockable,
@@ -131,8 +132,8 @@ export class AdtDdl<R extends IDdlResults = typeof ddlDocuments>
 
   /** Create the object. */
   async create<E extends IAdtError = IAdtError>(
-    config: IDdlConfig,
-    options?: IAdtOperationOptions<E>,
+    config: Omit<IDdlConfig, 'sourceCode'> & { sourceCode?: never },
+    options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     const name = this.name(config);
     if (!config.packageName) {

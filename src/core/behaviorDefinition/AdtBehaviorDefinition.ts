@@ -9,6 +9,7 @@ import type {
   IAdtActivatable,
   IAdtCheckable,
   IAdtCreatable,
+  IAdtCreateOptions,
   IAdtDeletable,
   IAdtError,
   IAdtLockable,
@@ -153,8 +154,10 @@ export class AdtBehaviorDefinition<
 
   /** Create the object. */
   async create<E extends IAdtError = IAdtError>(
-    config: IBehaviorDefinitionConfig,
-    options?: IAdtOperationOptions<E>,
+    config: Omit<IBehaviorDefinitionConfig, 'sourceCode'> & {
+      sourceCode?: never;
+    },
+    options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     const name = this.name(config);
     if (!config.packageName) {

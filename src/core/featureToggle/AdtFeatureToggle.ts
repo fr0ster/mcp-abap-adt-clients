@@ -13,6 +13,7 @@ import type {
   IAdtActivatable,
   IAdtCheckable,
   IAdtCreatable,
+  IAdtCreateOptions,
   IAdtDeletable,
   IAdtError,
   IAdtLockable,
@@ -162,8 +163,8 @@ export class AdtFeatureToggle<
 
   /** Create the object. */
   async create<E extends IAdtError = IAdtError>(
-    config: IFeatureToggleConfig,
-    options?: IAdtOperationOptions<E>,
+    config: Omit<IFeatureToggleConfig, 'sourceCode'> & { sourceCode?: never },
+    options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     // Called for its guards: it throws when the name this member needs is
     // missing, which is the one thing checked before the request goes out.

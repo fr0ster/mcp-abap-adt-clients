@@ -18,6 +18,7 @@ import type {
   IAdtCheckable,
   IAdtContentTypes,
   IAdtCreatable,
+  IAdtCreateOptions,
   IAdtDeletable,
   IAdtError,
   IAdtLockable,
@@ -139,8 +140,8 @@ export class AdtInterface<
 
   /** Create the interface. */
   async create<E extends IAdtError = IAdtError>(
-    config: IInterfaceConfig,
-    options?: IAdtOperationOptions<E>,
+    config: Omit<IInterfaceConfig, 'sourceCode'> & { sourceCode?: never },
+    options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     if (!config.interfaceName) {
       throw new Error('Interface name is required');

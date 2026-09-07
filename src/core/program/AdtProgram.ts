@@ -23,6 +23,7 @@ import type {
   IAdtCheckable,
   IAdtContentTypes,
   IAdtCreatable,
+  IAdtCreateOptions,
   IAdtDeletable,
   IAdtError,
   IAdtLockable,
@@ -151,8 +152,8 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
 
   /** Create the program. */
   async create<E extends IAdtError = IAdtError>(
-    config: IProgramConfig,
-    options?: IAdtOperationOptions<E>,
+    config: Omit<IProgramConfig, 'sourceCode'> & { sourceCode?: never },
+    options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     if (!config.programName) {
       throw new Error('Program name is required');

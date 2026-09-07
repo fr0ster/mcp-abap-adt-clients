@@ -16,6 +16,7 @@ import type {
   IAdtCheckable,
   IAdtContentTypes,
   IAdtCreatable,
+  IAdtCreateOptions,
   IAdtDeletable,
   IAdtError,
   IAdtLockable,
@@ -198,8 +199,8 @@ export class AdtFunctionInclude<
 
   /** Create the include, and write and activate its source if any was given. */
   async create<E extends IAdtError = IAdtError>(
-    config: IFunctionIncludeConfig,
-    options?: IAdtOperationOptions<E>,
+    config: Omit<IFunctionIncludeConfig, 'sourceCode'> & { sourceCode?: never },
+    options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     // Called for its guards: it throws when the name this member needs is
     // missing, which is the one thing checked before the request goes out.

@@ -142,6 +142,17 @@ async function main(): Promise<void> {
 
   try {
     report('before', await requestContents(connection, logger, request));
+    if (updateRequest) {
+      // The second request's baseline, taken *before* anything runs. Without
+      // it "the class appears in the update's request" proves nothing: a
+      // transport entry outlives the object it names, so the class may already
+      // be listed there from a previous run and the claim would hold for a run
+      // in which `update` sent no transport at all.
+      report(
+        `before — ${updateRequest} (the update's own request)`,
+        await requestContents(connection, logger, updateRequest),
+      );
+    }
 
     // A create carries no source — it posts the class's metadata, and the text
     // goes in with the `update` below, under a lock. This probe used to pass it
@@ -200,8 +211,11 @@ async function main(): Promise<void> {
         await requestContents(connection, logger, updateRequest),
       );
       process.stdout.write(
-        `\n${className} appearing in ${updateRequest} is the observation that\n` +
-          'isolates the update: it was not in that request before this run.\n',
+        `\nCompare the two ${updateRequest} listings above. ${className}\n` +
+          'appearing in the second and not the first is the observation that\n' +
+          'isolates the update. If it is in both, this run proves nothing about\n' +
+          'the update — pick a request the class has never been written to, or\n' +
+          'a class name that request has never held.\n',
       );
     } else {
       process.stdout.write(

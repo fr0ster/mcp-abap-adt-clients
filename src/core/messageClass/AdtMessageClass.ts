@@ -12,6 +12,7 @@
 import type {
   IAbapConnection,
   IAdtCreatable,
+  IAdtCreateOptions,
   IAdtDeletable,
   IAdtError,
   IAdtLockable,
@@ -130,8 +131,8 @@ export class AdtMessageClass<
 
   /** Create the message class shell. No activation — message classes have none. */
   async create<E extends IAdtError = IAdtError>(
-    config: IMessageClassConfig,
-    options?: IAdtOperationOptions<E>,
+    config: Omit<IMessageClassConfig, 'sourceCode'> & { sourceCode?: never },
+    options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     const name = this.name(config);
     if (!config.packageName) {

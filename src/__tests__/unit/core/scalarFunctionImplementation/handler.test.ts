@@ -52,16 +52,13 @@ describe('AdtScalarFunctionImplementation handler', () => {
   it('create() is metadata-only (one POST, no lock/update)', async () => {
     const { conn, calls } = makeConn(() => ({ data: '' }));
     const h = new AdtScalarFunctionImplementation(conn);
-    await h.create(
-      {
-        implementationName: 'ZI',
-        scalarFunctionName: 'ZF',
-        packageName: 'ZP',
-        description: 'd',
-        sourceCode: 'x',
-      },
-      { sourceCode: 'y' },
-    );
+    // No source either way — the create is the POST of the metadata document.
+    await h.create({
+      implementationName: 'ZI',
+      scalarFunctionName: 'ZF',
+      packageName: 'ZP',
+      description: 'd',
+    });
     expect(calls).toHaveLength(1);
     expect(calls[0].method).toBe('POST');
     expect(calls[0].url).toBe('/sap/bc/adt/ddic/dsfi');

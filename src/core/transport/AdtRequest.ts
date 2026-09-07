@@ -25,6 +25,7 @@
 import type {
   IAbapConnection,
   IAdtCreatable,
+  IAdtCreateOptions,
   IAdtDeletable,
   IAdtError,
   IAdtMetadataReadable,
@@ -123,8 +124,8 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
    * before the POST — which is why this module has no `validate`.
    */
   async create<E extends IAdtError = IAdtError>(
-    config: ITransportConfig,
-    options?: IAdtOperationOptions<E>,
+    config: Omit<ITransportConfig, 'sourceCode'> & { sourceCode?: never },
+    options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     if (!config.description) {
       throw new Error('Transport request description is required');

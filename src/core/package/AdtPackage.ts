@@ -17,6 +17,7 @@ import type {
   IAbapConnection,
   IAdtCheckable,
   IAdtCreatable,
+  IAdtCreateOptions,
   IAdtDeletable,
   IAdtError,
   IAdtLockable,
@@ -148,8 +149,8 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
    * package before it is ever locked.
    */
   async create<E extends IAdtError = IAdtError>(
-    config: IPackageConfig,
-    options?: IAdtOperationOptions<E>,
+    config: Omit<IPackageConfig, 'sourceCode'> & { sourceCode?: never },
+    options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     const name = this.name(config);
     if (!config.superPackage) {

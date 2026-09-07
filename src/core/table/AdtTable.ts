@@ -14,6 +14,7 @@ import type {
   IAdtActivatable,
   IAdtCheckable,
   IAdtCreatable,
+  IAdtCreateOptions,
   IAdtDeletable,
   IAdtError,
   IAdtLockable,
@@ -122,8 +123,8 @@ export class AdtTable<R extends ITableResults = typeof tableDocuments>
 
   /** Create the object. */
   async create<E extends IAdtError = IAdtError>(
-    config: ITableConfig,
-    options?: IAdtOperationOptions<E>,
+    config: Omit<ITableConfig, 'sourceCode'> & { sourceCode?: never },
+    options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     const name = this.name(config);
     if (!config.packageName) {

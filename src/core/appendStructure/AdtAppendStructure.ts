@@ -13,6 +13,7 @@ import type {
   IAdtActivatable,
   IAdtCheckable,
   IAdtCreatable,
+  IAdtCreateOptions,
   IAdtDeletable,
   IAdtError,
   IAdtLockable,
@@ -161,8 +162,8 @@ export class AdtAppendStructure<
 
   /** Create the append structure. Metadata only — the fields come via update. */
   async create<E extends IAdtError = IAdtError>(
-    config: IAppendStructureConfig,
-    options?: IAdtOperationOptions<E>,
+    config: Omit<IAppendStructureConfig, 'sourceCode'> & { sourceCode?: never },
+    options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     const name = this.name(config);
     if (!config.baseObject) throw new Error('Base object is required');

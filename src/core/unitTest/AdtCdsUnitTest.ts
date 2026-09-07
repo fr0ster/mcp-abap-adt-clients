@@ -14,6 +14,7 @@
 import type {
   AdtNoFailure,
   IAbapConnection,
+  IAdtCreateOptions,
   IAdtError,
   IAdtOperationOptions,
   IAdtResponse,
@@ -167,8 +168,8 @@ export class AdtCdsUnitTest<
    * class and writing the tests into it is what the parent does.
    */
   override async create<E extends IAdtError = IAdtError>(
-    config: ICdsUnitTestConfig,
-    options?: IAdtOperationOptions<E>,
+    config: Omit<ICdsUnitTestConfig, 'sourceCode'> & { sourceCode?: never },
+    options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     if (!(config.className && config.classTemplate && config.testClassSource)) {
       return super.create(config, options);

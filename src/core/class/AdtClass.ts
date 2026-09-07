@@ -25,6 +25,7 @@ import type {
   IAdtCheckable,
   IAdtContentTypes,
   IAdtCreatable,
+  IAdtCreateOptions,
   IAdtDeletable,
   IAdtError,
   IAdtLockable,
@@ -132,8 +133,8 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
    * Create class with full operation chain
    */
   async create<E extends IAdtError = IAdtError>(
-    config: IClassConfig,
-    options?: IAdtOperationOptions<E>,
+    config: Omit<IClassConfig, 'sourceCode'> & { sourceCode?: never },
+    options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     if (!config.className) {
       throw new Error('Class name is required');

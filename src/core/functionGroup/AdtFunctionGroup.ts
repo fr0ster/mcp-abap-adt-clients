@@ -19,6 +19,7 @@ import type {
   IAdtCheckable,
   IAdtContentTypes,
   IAdtCreatable,
+  IAdtCreateOptions,
   IAdtDeletable,
   IAdtError,
   IAdtLockable,
@@ -140,8 +141,8 @@ export class AdtFunctionGroup<
 
   /** Create the function group. */
   async create<E extends IAdtError = IAdtError>(
-    config: IFunctionGroupConfig,
-    options?: IAdtOperationOptions<E>,
+    config: Omit<IFunctionGroupConfig, 'sourceCode'> & { sourceCode?: never },
+    options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     if (!config.functionGroupName) {
       throw new Error('Function group name is required');

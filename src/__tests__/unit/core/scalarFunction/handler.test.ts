@@ -34,15 +34,13 @@ describe('AdtScalarFunction handler', () => {
   it('create() only POSTs metadata — no lock/update even if sourceCode is given', async () => {
     const { conn, calls } = makeConn(() => ({ data: '' }));
     const sf = new AdtScalarFunction(conn);
-    await sf.create(
-      {
-        scalarFunctionName: 'ZOK_F',
-        packageName: 'ZPKG',
-        description: 'd',
-        sourceCode: 'X',
-      },
-      { sourceCode: 'Y' },
-    );
+    // No source either way: `create` posts the metadata document, and since
+    // interfaces 38.0.0 the signature says so rather than the comment.
+    await sf.create({
+      scalarFunctionName: 'ZOK_F',
+      packageName: 'ZPKG',
+      description: 'd',
+    });
     expect(calls).toHaveLength(1);
     expect(calls[0].method).toBe('POST');
     expect(calls[0].url).toBe('/sap/bc/adt/ddic/dsfd/sources');

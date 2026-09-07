@@ -10,6 +10,7 @@ import type {
   IAdtActivatable,
   IAdtCheckable,
   IAdtCreatable,
+  IAdtCreateOptions,
   IAdtDeletable,
   IAdtError,
   IAdtLockable,
@@ -165,8 +166,8 @@ export class AdtTransformation<
 
   /** Create the object. */
   async create<E extends IAdtError = IAdtError>(
-    config: ITransformationConfig,
-    options?: IAdtOperationOptions<E>,
+    config: Omit<ITransformationConfig, 'sourceCode'> & { sourceCode?: never },
+    options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     const name = this.name(config);
     if (!config.packageName) {

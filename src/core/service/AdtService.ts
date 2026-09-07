@@ -4,6 +4,7 @@ import type {
   IAdtActivatable,
   IAdtCheckable,
   IAdtCreatable,
+  IAdtCreateOptions,
   IAdtDeletable,
   IAdtError,
   IAdtLockable,
@@ -343,8 +344,8 @@ export class AdtServiceBinding<
    * reaches a caller only if it fails.
    */
   async create<E extends IAdtError = IAdtError>(
-    config: IServiceBindingConfig,
-    options?: IAdtOperationOptions<E>,
+    config: Omit<IServiceBindingConfig, 'sourceCode'> & { sourceCode?: never },
+    options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     const name = this.name(config);
     if (!config.packageName) throw new Error('packageName is required');
