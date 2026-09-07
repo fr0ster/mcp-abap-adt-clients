@@ -1919,7 +1919,7 @@ export class BaseTester<TConfig, TState = unknown> {
       params: {},
     };
 
-    this.raiseIfSetupFailed(testName, definition);
+    await this.raiseIfSetupFailed(testName, definition);
 
     if (this.shouldSkip()) {
       logTestStart(this.logger, testName, definition);
@@ -1986,9 +1986,37 @@ export class BaseTester<TConfig, TState = unknown> {
    * mistaken for "does not apply here".
    */
   // biome-ignore lint/suspicious/noExplicitAny: logTestStart's own parameter
-  private raiseIfSetupFailed(testName: string, definition: any): void {
+  private async raiseIfSetupFailed(
+    testName: string,
+    definition: any,
+  ): Promise<void> {
     if (!this.setupError) return;
     logTestStart(this.logger, testName, definition);
+
+    // A leftover object is removed here, before the throw, because there is no
+    // later chance: the cleanup this class runs lives at the end of a flow, and
+    // the flow is exactly what this throw prevents. `ensureObjectReady` sets
+    // `objectCreated` and says "post-test cleanup will delete it" — that was
+    // true of the skip path and false of this one, so the object survived and
+    // every following run failed the same way. Measured on the trial: a
+    // function include stayed through three runs, each reporting that cleanup
+    // would remove it.
+    if (this.objectCreated && this.config) {
+      const { shouldCleanup } = this.getCleanupSettings(
+        this.testCase?.params as ITestCaseParams | undefined,
+      );
+      if (shouldCleanup) {
+        try {
+          await this.cleanupExistingObject(this.config);
+        } catch (cleanupError) {
+          this.log(
+            LogLevel.WARN,
+            `Leftover object could not be removed: ${(cleanupError as Error).message}`,
+          );
+        }
+      }
+    }
+
     const error = new Error(
       `Test could not be set up: ${this.setupError}. The system was not in a ` +
         'state this test could run against, so nothing was verified.',
@@ -2005,7 +2033,7 @@ export class BaseTester<TConfig, TState = unknown> {
       params: {},
     };
 
-    this.raiseIfSetupFailed(testName, definition);
+    await this.raiseIfSetupFailed(testName, definition);
 
     if (this.shouldSkip()) {
       logTestStart(this.logger, testName, definition);

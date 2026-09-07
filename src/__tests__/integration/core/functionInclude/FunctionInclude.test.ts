@@ -141,7 +141,7 @@ describe('FunctionInclude (using AdtClient)', () => {
             return {
               success: false,
               objectExists: true,
-              reason: `⚠️ Function Include ${functionGroupName}/${includeName} already exists. Post-test cleanup will delete it.`,
+              reason: `⚠️ Function Include ${functionGroupName}/${includeName} already exists — this run is removing it, so the next one starts clean. Nothing was verified here.`,
             };
           }
           return { success: true };

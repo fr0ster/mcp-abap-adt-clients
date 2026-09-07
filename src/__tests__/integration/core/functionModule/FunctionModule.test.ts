@@ -144,7 +144,7 @@ describe('FunctionModule (using AdtClient)', () => {
             return {
               success: false,
               objectExists: true,
-              reason: `⚠️ Function Module ${functionGroupName}/${functionModuleName} already exists. Post-test cleanup will delete it.`,
+              reason: `⚠️ Function Module ${functionGroupName}/${functionModuleName} already exists — this run is removing it, so the next one starts clean. Nothing was verified here.`,
             };
           }
           return { success: true };
