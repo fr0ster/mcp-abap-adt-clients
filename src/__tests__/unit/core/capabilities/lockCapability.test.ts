@@ -36,12 +36,23 @@ const strategy: ILockStrategy<Cfg, State> = {
 };
 
 describe('LockCapability', () => {
-  it('lock sets stateful, acquires, answers the handle', async () => {
+  it('lock is stateful for the acquire and stateless after it', async () => {
     const ctx = fakeCtx();
     const cap = new LockCapability<Cfg, State>(() => ctx, strategy);
     const handle = expectResult(await cap.lock({ name: 'ZFOO' }), 'lock');
     expect(handle).toBe('H1');
-    expect(ctx.calls).toEqual(['session:stateful', 'acquire:ZFOO']);
+    // This used to end at `acquire`, leaving the session stateful for the whole
+    // window, so every write between lock and unlock ran inside it. Eclipse
+    // keeps its stateful session for LOCK and UNLOCK alone — measured on E19,
+    // its source PUT goes out stateless with only `lockHandle` and `corrNr` —
+    // and a request that runs inside the session leaves what it takes there:
+    // an activation sent that way strands `E_ABAP_GENPH` for the connection's
+    // lifetime.
+    expect(ctx.calls).toEqual([
+      'session:stateful',
+      'acquire:ZFOO',
+      'session:stateless',
+    ]);
   });
 
   it('unlock is stateful during release and restores stateless', async () => {

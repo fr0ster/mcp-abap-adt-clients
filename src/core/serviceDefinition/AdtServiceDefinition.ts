@@ -353,8 +353,10 @@ export class AdtServiceDefinition<
 
     return answering(
       async () => {
+        // Stateful for the LOCK request and no longer — see LockCapability.
         this.connection.setSessionType('stateful');
         const lockHandle = await lockServiceDefinition(this.connection, name);
+        this.connection.setSessionType('stateless');
         this.lockTracker.track(name, lockHandle);
         // The handle is the value, and the request does not keep the wire it
         // came on — so the answer is built around what the request produced.

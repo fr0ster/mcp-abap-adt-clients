@@ -47,7 +47,9 @@ const cases = [
 ];
 
 describe('LockCapability conformance across handlers', () => {
-  it.each(cases)('$name: lock sets stateful before the LOCK request', async ({
+  it.each(
+    cases,
+  )('$name: lock is stateful → LOCK → stateless, in order', async ({
     make,
     cfg,
   }) => {
@@ -60,10 +62,17 @@ describe('LockCapability conformance across handlers', () => {
     );
     expect(iSession).toBeGreaterThanOrEqual(0);
     expect(iRequest).toBeGreaterThan(iSession); // stateful BEFORE the request
-    // and the session is left stateful (the lock is held).
+
+    // and stateless again after it. This used to assert the opposite — that
+    // the session is "left stateful (the lock is held)" — which made every
+    // write in the window run inside the session. Eclipse holds its stateful
+    // session for LOCK and UNLOCK alone; measured on E19, its source PUT is
+    // stateless and carries only `lockHandle` and `corrNr`. What a request
+    // takes while it runs inside the session stays with that session, which
+    // is how an activation left `E_ABAP_GENPH` behind for hours.
     expect(
       conn.trace.filter((e: string) => e.startsWith('session:')).pop(),
-    ).toBe('session:stateful');
+    ).toBe('session:stateless');
   });
 
   it.each(
