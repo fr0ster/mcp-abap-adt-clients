@@ -71,7 +71,31 @@ test_settings:
 
 # Session persistence configuration
 session_config:
-  cleanup_session_after_test: true
+  # Off, because on it opens an ABAP session per test and never closes one.
+  #
+  # A run is meant to hold one session: `globalSetup` opens it, publishes the
+  # material, and every test file adopts it. With this on, `BaseTester` calls
+  # `recycleTestSession` in the cleanup step of every test that created an
+  # object — `endSession()` and then immediately `connect()`.
+  #
+  # The connector's own documentation says why that leaks: `disconnect()`
+  # "dispatches the logoff without awaiting it, so the request is still being
+  # assembled while the connection is already free to connect() again", and the
+  # live cookie is then merged over the snapshot, so "the goodbye for the old
+  # session arrives addressed to the new one". The old session survives to its
+  # 30-minute idle timeout.
+  #
+  # Measured on E19, 2026-09-07: with this on, a new session every 1-2 seconds
+  # for the length of the run, none released; turned off, one session for the
+  # whole run, and the same suites pass — 7 suites / 14 tests green.
+  #
+  # It was on to drop locks a failed step left behind, by ending the session
+  # holding them. That is the part which does not work: `E_ABAP_GENPH` locks
+  # were measured surviving both the run and the deletion of the object they
+  # name, so the sessions were being spent on something they do not achieve.
+  # Turn it back on only for a system where ending the session is measured to
+  # release them.
+  cleanup_session_after_test: false
 
 # Lock persistence configuration
 lock_config:

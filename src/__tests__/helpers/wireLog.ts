@@ -127,6 +127,9 @@ function bodyLine(data: unknown, limit = 1200): string {
  * different constructors, and both reach private fields, so anything that
  * copies them would have to be written twice and would break on the next field
  * either one gains.
+ *
+ * It only ever appends. Emptying the file belongs to `truncateWireLog`,
+ * called once per run from `globalSetup`.
  */
 export function withWireLog<T extends object>(transport: T): T {
   const path = process.env.WIRE_LOG;
@@ -139,26 +142,6 @@ export function withWireLog<T extends object>(transport: T): T {
       // A wire log that cannot be written must not take the run down with it.
     }
   };
-
-  // Empty the file once per process, not once per connection.
-  //
-  // This wrapper is applied per connection — 69 times in one full run — and the
-  // file was only appended to, so it kept every previous run and any `grep -c`
-  // over it counted their events as this run's. Measured: a file holding six
-  // runs reported the same four `ICMENOSESSION` responses to each of them, when
-  // all four belonged to the first. Three conclusions were drawn from that
-  // number, and reported, before the file itself was looked at.
-  // Emptied by `globalSetup`, once per run — not here.
-  //
-  // This used to truncate "once per process", which is once per *test file*
-  // under jest: the worker is recycled between them, each new process starts
-  // with an empty `truncated` set, and each wipes what the previous ones wrote.
-  // Measured: a full run left 2 connections and 4 KB where the previous one had
-  // 69 and 26 MB, and the evidence for that run was gone before anyone read it.
-  //
-  // That is the opposite of the fault it replaced — a file accumulating six
-  // runs — and it hides just as effectively. `globalSetup` runs once, which is
-  // the only place that can tell one run from the next.
 
   write(`\n===== wire log opened ${new Date().toISOString()} =====\n`);
 
