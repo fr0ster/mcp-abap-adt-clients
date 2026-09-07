@@ -54,6 +54,7 @@ import type {
   IGenerateServiceBindingParams,
   IReadServiceBindingParams,
   IServiceBindingConfig,
+  IServiceBindingPublicationConfig,
   IServiceBindingPublicationParams,
   IServiceGroupParams,
   IServiceResults,
@@ -433,7 +434,14 @@ export class AdtServiceBinding<
    * which it is not.
    */
   async update<E extends IAdtError = IAdtError>(
-    config: Partial<IServiceBindingConfig>,
+    // **Narrower than `IAdtUpdatable` gives every other type, on purpose.**
+    // A binding's update is its publication, and two of its fields are not
+    // optional in practice: without `serviceType` there is no endpoint, and
+    // `'unchanged'` is not a request. `Partial<IServiceBindingConfig>` admitted
+    // both and this member threw before the wire — a demand made where the
+    // caller could not see it. The parameter is contravariant, so the class
+    // still satisfies `IAdtUpdatable`.
+    config: IServiceBindingPublicationConfig,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     const name = this.name(config);

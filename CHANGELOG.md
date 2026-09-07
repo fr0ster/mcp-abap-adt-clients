@@ -283,6 +283,12 @@ the sequence around a write handed back to the consumer.
   );
   ```
 
+  **The signature says so.** `update` on a binding takes
+  `IServiceBindingPublicationConfig`, not `Partial<IServiceBindingConfig>`:
+  `serviceType` is required and `desiredPublicationState` is
+  `'published' | 'unpublished'`. Both calls that used to compile and then throw
+  before the wire now fail to compile, which is where a caller meets them.
+
   Mid-branch this member read the binding first and filled all three in from its
   own document. That read made one member two requests, and the state check it
   also did is the server's answer anyway. A caller who wants to decide

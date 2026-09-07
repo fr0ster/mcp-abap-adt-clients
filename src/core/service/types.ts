@@ -1,4 +1,8 @@
-import type { IResultStrategy } from '@mcp-abap-adt/interfaces';
+import type {
+  GeneratedServiceType as GST,
+  IResultStrategy,
+  IServiceBindingConfig as ISBC,
+} from '@mcp-abap-adt/interfaces';
 import {
   type DesiredPublicationState,
   type GeneratedServiceType,
@@ -127,6 +131,23 @@ export const serviceDocuments = {
  * **parameter**, not a method name. Two members that differ only by a value
  * they could have taken as an argument are two names for one endpoint.
  */
+/**
+ * What a caller must name to change a binding's publication, **in the signature
+ * they call**.
+ *
+ * `Partial<IServiceBindingConfig>` is what `IAdtUpdatable` gives every other
+ * type, and for a binding it is too loose in two ways a compiler could catch:
+ * `serviceType` is optional there, and `desiredPublicationState` still admits
+ * `'unchanged'`. Both compiled and then threw before reaching the wire, which
+ * is a demand made where the caller cannot see it.
+ */
+export type IServiceBindingPublicationConfig = Partial<ISBC> & {
+  /** `unchanged` is not one of them: there is no request that changes nothing. */
+  desiredPublicationState: 'published' | 'unpublished';
+  /** Selects the endpoint, `odatav2` or `odatav4`. */
+  serviceType: GST;
+};
+
 export interface IServiceBindingPublicationParams {
   bindingName: string;
   /**

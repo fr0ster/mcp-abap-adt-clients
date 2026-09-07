@@ -47,10 +47,19 @@ async function main(): Promise<void> {
     const lockHandle = String(locked.getResult().value);
     say(`locked: ${lockHandle}`);
     try {
-      const answer = await bindings.update({
-        bindingName,
-        desiredPublicationState: 'unpublished',
-      });
+      const answer = await bindings.update(
+        {
+          bindingName,
+          // Required since 18.0.0: it selects the endpoint. The library used to
+          // read the binding to find it out, which made one member two
+          // requests.
+          desiredPublicationState: 'unpublished',
+          serviceType: 'odatav4',
+        },
+        // The job takes ~133 seconds; the 120s default is under that, and this
+        // script exists precisely for a binding that would not let go.
+        { timeout: 300_000 },
+      );
       say(
         answer.ok
           ? 'unpublish answered a result'
