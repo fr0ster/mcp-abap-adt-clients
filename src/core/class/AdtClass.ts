@@ -347,10 +347,18 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
     if (!config.className) {
       throw new Error('Class name is required');
     }
-    // Stay stateful while the lock is held (see lock()); unlockTestClasses()
-    // restores stateless. Avoids 423 on older BASIS (#106).
+    // Stateful for the LOCK request alone.
+    //
+    // This used to say "stay stateful while the lock is held … avoids 423 on
+    // older BASIS (#106)", and read the issue wider than it is: what #106
+    // requires is that LOCK and UNLOCK themselves run stateful, which they
+    // still do. The window between them does not — Eclipse's stateful session
+    // carries those two requests and nothing else, and a request that runs
+    // inside the session leaves what it takes there.
     this.connection.setSessionType('stateful');
-    return await lockClass(this.connection, config.className);
+    const handle = await lockClass(this.connection, config.className);
+    this.connection.setSessionType('stateless');
+    return handle;
   }
 
   /**
@@ -424,6 +432,8 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
       this.logger?.info?.('Step 1: Locking parent class');
       this.connection.setSessionType('stateful');
       lockHandle = await lockClass(this.connection, config.className);
+      // Stateful for the LOCK request alone — see LockCapability.
+      this.connection.setSessionType('stateless');
       this.lockTracker.track(config.className, lockHandle);
       this.logger?.info?.('Parent class locked, handle:', lockHandle);
 

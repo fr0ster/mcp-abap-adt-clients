@@ -415,6 +415,8 @@ export class AdtEnhancement<
           this.enhancementType(config),
           name,
         );
+        // Stateful for the LOCK request alone — see LockCapability.
+        this.connection.setSessionType('stateless');
         this.lockedTypes.set(name, this.enhancementType(config));
         this.lockTracker.track(name, lockHandle);
         // The handle is the value, and the request does not keep the wire it

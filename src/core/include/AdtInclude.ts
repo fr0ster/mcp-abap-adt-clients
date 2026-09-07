@@ -277,6 +277,8 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
       async () => {
         this.connection.setSessionType?.('stateful');
         const { lockHandle } = await lockInclude(this.connection, includeName);
+        // Stateful for the LOCK request alone — see LockCapability.
+        this.connection.setSessionType('stateless');
         config.onLock?.(lockHandle);
         // The handle is the value, and the request does not keep the wire it
         // came on — so the answer is built around what the request produced.

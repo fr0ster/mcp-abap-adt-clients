@@ -507,15 +507,12 @@ export class AdtServiceBinding<
     // Stateful for the window: on older BASIS a handle is only valid inside a
     // stateful request. The caller returns to stateless via `unlock`.
     this.connection.setSessionType?.('stateful');
-    return answering(
-      async () => ({
-        data: await lockServiceBinding(this.connection, name),
-        status: 200,
-        statusText: 'OK',
-        headers: {},
-      }),
-      rawDocument,
-    );
+    return answering(async () => {
+      const data = await lockServiceBinding(this.connection, name);
+      // Stateful for the LOCK request alone — see LockCapability.
+      this.connection.setSessionType?.('stateless');
+      return { data, status: 200, statusText: 'OK', headers: {} };
+    }, rawDocument);
   }
 
   /**

@@ -257,6 +257,8 @@ export class AdtMessageClass<
       async () => {
         this.connection.setSessionType('stateful');
         const lockHandle = await lockMessageClass(this.connection, name);
+        // Stateful for the LOCK request alone — see LockCapability.
+        this.connection.setSessionType('stateless');
         this.lockTracker.track(name, lockHandle);
         // The handle is the value, and the request does not keep the wire it
         // came on — so the answer is built around what the request produced.
