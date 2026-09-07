@@ -31,7 +31,11 @@ import {
   type HandlerEntry,
 } from './manifest';
 
-type Recorded = { url: string; method: string };
+type Recorded = {
+  url: string;
+  method: string;
+  headers?: Record<string, string>;
+};
 
 /**
  * The URL as it would go on the wire.
@@ -119,7 +123,11 @@ function recordingClient(activationBody: string = ACTIVATION_OK) {
     makeAdtRequest: async (
       req: Recorded & { params?: Record<string, unknown> },
     ) => {
-      calls.push({ url: wireUrl(req), method: req.method });
+      calls.push({
+        url: wireUrl(req),
+        method: req.method,
+        headers: req.headers,
+      });
       return {
         status: 200,
         statusText: 'OK',
@@ -135,6 +143,56 @@ function recordingClient(activationBody: string = ACTIVATION_OK) {
   const client = new AdtClient(connection, createLibraryLogger());
   return { client, calls, sessionTypes };
 }
+
+/**
+ * Nobody builds a session type into a request.
+ *
+ * `x-sap-adt-sessiontype` is the connection's, written by the connection from
+ * its own mode. Five low-level functions used to put it in the headers
+ * themselves — `featureToggle`'s lock, unlock, update and source write, and
+ * `functionInclude`'s source write — and the guard below could not see it,
+ * because that guard asks who calls `setSessionType` and these called nobody.
+ *
+ * The cost was not a duplicate header. The connection's own mode was stateless
+ * while the request said stateful, so a write ran inside a session the
+ * connection did not know it was in — and what the server takes during such a
+ * request is held by that session, long after the object is gone.
+ */
+describe('the session type is the connection’s, never a request’s', () => {
+  it('no member puts x-sap-adt-sessiontype in its headers', async () => {
+    const offenders: string[] = [];
+
+    for (const [name, entry] of Object.entries(HANDLERS)) {
+      for (const atom of Object.keys(ATOM_METHODS) as Atom[]) {
+        for (const method of ATOM_METHODS[atom]) {
+          const { client, calls } = recordingClient();
+          const handler = entry.factory(client) as unknown as Record<
+            string,
+            unknown
+          >;
+          if (typeof handler[method] !== 'function') continue;
+          try {
+            await invoke(
+              handler,
+              method,
+              entry.config as Record<string, unknown>,
+            );
+          } catch {
+            // A member that refuses is fine here; what it sent is the subject.
+          }
+          for (const call of calls) {
+            const hit = Object.keys(call.headers ?? {}).find(
+              (h) => h.toLowerCase() === 'x-sap-adt-sessiontype',
+            );
+            if (hit) offenders.push(`${name}.${method} → ${call.url} [${hit}]`);
+          }
+        }
+      }
+    }
+
+    expect(offenders).toStrictEqual([]);
+  });
+});
 
 /**
  * The request each method must actually issue.
