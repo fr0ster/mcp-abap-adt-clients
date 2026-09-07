@@ -215,9 +215,11 @@ describe('Service binding publication (deliberate runs)', () => {
       {
         bindingName: c.bindingName,
         desiredPublicationState: desired,
+        // The binding and the protocol. The service name and version are read
+        // from config for the Eclipse report below, and deliberately not passed
+        // here: the job's URL carries no query string and its body names the
+        // target by type and name, so they would go nowhere.
         serviceType: c.serviceType,
-        serviceName: c.serviceName,
-        serviceVersion: c.serviceVersion,
       },
       { timeout: c.timeoutMs },
     );
