@@ -111,19 +111,7 @@ export class AdtServiceBinding<
     IAdtCreatable<IServiceBindingConfig, ReturnType<R['created']>>,
     IAdtReadable<IServiceBindingConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<IServiceBindingConfig, ReturnType<R['metadata']>>,
-    // `IAdtUpdatable` is missing on purpose, and only until the dependency
-    // moves. A binding's `update` *is* its publication job and needs the
-    // binding, the state and the protocol that selects the endpoint —
-    // `IServiceBindingPublicationConfig` says so, and `update` below takes it.
-    // But `@mcp-abap-adt/interfaces@36.0.0` applies `Partial` to the config
-    // inside the atom, so declaring it here would publish a contract that
-    // admits `update({})`: the class refuses that call, an atom-typed reference
-    // to the same object would not, because method parameters are bivariant.
-    //
-    // Claiming an atom this package cannot honour is worse than claiming none.
-    // The declaration returns with `interfaces@^37.0.0`, where the atom takes
-    // `TConfig` as given — see
-    // docs/superpowers/plans/2026-09-07-apply-on-interfaces-37-publish.md.
+    IAdtUpdatable<IServiceBindingPublicationConfig, ReturnType<R['updated']>>,
     IAdtDeletable<
       IServiceBindingConfig,
       ReturnType<R['deletion']>,
