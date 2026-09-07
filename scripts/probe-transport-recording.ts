@@ -14,13 +14,24 @@
  * the update.
  *
  *   npx ts-node scripts/probe-transport-recording.ts ZAC_TR_PKG E19K906816
- *   npx ts-node scripts/probe-transport-recording.ts ZAC_TR_PKG E19K906816 ZAC_TR_CLS02
+ *   npx ts-node scripts/probe-transport-recording.ts ZAC_TR_PKG E19K906816 --update-request=E19K906818
  *   npx ts-node scripts/probe-transport-recording.ts ZAC_TR_PKG E19K906816 ZAC_TR_CLS02 --keep
  *
+ * **`--update-request` is what makes the update half provable.** With one
+ * request the class is already in it after the create, so a list that does not
+ * change after the update is equally consistent with `update` passing the
+ * transport and with `update` dropping it on the floor — the probe's first
+ * version claimed the former and could not tell. Given a second request, the
+ * update is made against that one and *it* is what gets read back: the object
+ * appearing there is the only observation that isolates the update.
+ *
+ * Without it the probe still runs and still reports, but says plainly that the
+ * update half is unproven rather than implying otherwise.
+ *
  * `--keep` leaves the class behind for inspection in Eclipse. Without it the
- * class is removed at the end, and the removal is itself recorded in the same
- * request — which is the correct behaviour for a transported object and worth
- * seeing.
+ * class is removed at the end — on every path, including a failure part way
+ * through — and the removal is itself recorded, which is the correct behaviour
+ * for a transported object and worth seeing.
  */
 
 import * as fs from 'node:fs';
@@ -100,12 +111,16 @@ async function main(): Promise<void> {
   const className = rest.find((a) => !a.startsWith('--')) ?? DEFAULT_CLASS_NAME;
   if (!pkg || !request) {
     process.stdout.write(
-      'usage: probe-transport-recording.ts <package> <requestNumber> [--keep]\n',
+      'usage: probe-transport-recording.ts <package> <requestNumber> ' +
+        '[className] [--update-request=<requestNumber>] [--keep]\n',
     );
     process.exitCode = 1;
     return;
   }
   const keep = rest.includes('--keep');
+  const updateRequest = rest
+    .find((a) => a.startsWith('--update-request='))
+    ?.slice('--update-request='.length);
 
   const logger = createConnectionLogger();
   const connection = await createTestConnection(logger);
@@ -116,6 +131,14 @@ async function main(): Promise<void> {
     transportRequest: request,
     description: 'Transport recording probe',
   };
+
+  // Tracked so the `finally` can undo what this run actually did. Without
+  // them a throw between the create and the delete — a refused lock is one
+  // line away — left the class on the system, and a throw between lock and
+  // unlock left it locked as well, which is what makes the *next* run's create
+  // answer 403 with nothing visibly holding it.
+  let created_ok = false;
+  let held: string | undefined;
 
   try {
     report('before', await requestContents(connection, logger, request));
@@ -131,6 +154,7 @@ async function main(): Promise<void> {
         : `  REFUSED: ${created.getError().message}\n`,
     );
     if (!created.ok) return;
+    created_ok = true;
 
     report('after create', await requestContents(connection, logger, request));
 
@@ -139,12 +163,20 @@ async function main(): Promise<void> {
     const lock = await cls.lock(config);
     if (!lock.ok) throw new Error(`lock: ${lock.getError().message}`);
     const handle = String(lock.getResult()?.value ?? lock.getResult());
+    held = handle;
     process.stdout.write(`\nlock handle: ${handle.slice(0, 12)}…\n`);
 
-    const updated = await cls.update(config, {
-      sourceCode: source(className, 'updated'),
-      lockHandle: handle,
-    });
+    // The update goes to `updateRequest` when one was given. That is the whole
+    // point of the second request: against the create's request the object is
+    // already there, so an unchanged list afterwards says nothing about whether
+    // `update` carried the transport at all.
+    const updated = await cls.update(
+      { ...config, transportRequest: updateRequest ?? request },
+      {
+        sourceCode: source(className, 'updated'),
+        lockHandle: handle,
+      },
+    );
     process.stdout.write(
       updated.ok
         ? '  update accepted\n'
@@ -152,6 +184,7 @@ async function main(): Promise<void> {
     );
 
     await cls.unlock(config, handle);
+    held = undefined;
     const activated = await cls.activate(config);
     process.stdout.write(
       activated.ok
@@ -160,25 +193,58 @@ async function main(): Promise<void> {
     );
 
     report('after update', await requestContents(connection, logger, request));
+    if (updateRequest) {
+      report(
+        `after update — ${updateRequest} (the update's own request)`,
+        await requestContents(connection, logger, updateRequest),
+      );
+      process.stdout.write(
+        `\n${className} appearing in ${updateRequest} is the observation that\n` +
+          'isolates the update: it was not in that request before this run.\n',
+      );
+    } else {
+      process.stdout.write(
+        '\nThe update half is UNPROVEN in this run. The class was created into\n' +
+          `${request} and updated against the same one, so it was already there\n` +
+          'and an unchanged list is equally consistent with the update dropping\n' +
+          'the transport. Re-run with --update-request=<another request>.\n',
+      );
+    }
 
     if (keep) {
       process.stdout.write(`\n${className} left in place (--keep)\n`);
-      return;
+    }
+  } finally {
+    // Undo, on every path. A probe that leaves a locked class behind after a
+    // failure costs the next run its create, and the lock survives a session
+    // recycle — only the unlock clears it.
+    if (held) {
+      const released = await cls.unlock(config, held);
+      process.stdout.write(
+        released.ok
+          ? '\nlock released in cleanup\n'
+          : `\nlock could NOT be released: ${released.getError().message}\n`,
+      );
     }
 
-    process.stdout.write(`\ndelete ${className}\n`);
-    const check = await cls.checkDeletion(config);
-    process.stdout.write(
-      `  deletion check: ${check.ok ? 'ok' : check.getError().message}\n`,
-    );
-    const deleted = await cls.delete(config);
-    process.stdout.write(
-      deleted.ok
-        ? '  delete accepted\n'
-        : `  delete REFUSED: ${deleted.getError().message}\n`,
-    );
-    report('after delete', await requestContents(connection, logger, request));
-  } finally {
+    if (created_ok && !keep) {
+      process.stdout.write(`\ndelete ${className}\n`);
+      const check = await cls.checkDeletion(config);
+      process.stdout.write(
+        `  deletion check: ${check.ok ? 'ok' : check.getError().message}\n`,
+      );
+      const deleted = await cls.delete(config);
+      process.stdout.write(
+        deleted.ok
+          ? '  delete accepted\n'
+          : `  delete REFUSED: ${deleted.getError().message}\n`,
+      );
+      report(
+        'after delete',
+        await requestContents(connection, logger, request),
+      );
+    }
+
     await releaseTestConnection(connection);
   }
 }
