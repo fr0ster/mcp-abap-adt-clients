@@ -138,9 +138,16 @@ export class AdtLocalMacros<R extends IClassResults = typeof classDocuments>
   /**
    * Write the include.
    *
-   * With `options.lockHandle` the caller holds the class's lock and owns the
-   * chain, so this is one request. Without it, this locks the class, checks,
-   * writes and unlocks — and the unlock happens on every path out.
+   * **This never takes a lock and never releases one.** It is one PUT, and
+   * `options.lockHandle` is passed to it exactly as given — including not at
+   * all, in which case ADT answers `400 Parameter lockHandle could not be
+   * found` and that refusal is the result.
+   *
+   * The lock is the *class's*, not the include's: `getClass().lock()` is what
+   * takes it, and the same handle serves every include. This comment used to
+   * say the member locked, checked, wrote and unlocked; that chain came out
+   * when a member became one request, and a reader chasing an unreleased lock
+   * would have looked here and stopped.
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<ILocalMacrosConfig>,
@@ -164,6 +171,9 @@ export class AdtLocalMacros<R extends IClassResults = typeof classDocuments>
           this.connection,
           name,
           source,
+          // `as string` because the low-level writer types it required; the
+          // value may be absent, and whether an unlocked write is allowed is
+          // ADT's judgement, not this library's.
           options?.lockHandle as string,
           config.transportRequest,
           this.contentTypes?.sourceArtifactContentType(),
