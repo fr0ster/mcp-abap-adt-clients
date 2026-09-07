@@ -198,7 +198,17 @@ export const HANDLERS = {
       read: '/sap/bc/adt/programs/includes/zguard_inc/source/main',
       readMetadata: '/sap/bc/adt/programs/includes/zguard_inc',
       update: '/sap/bc/adt/programs/includes/zguard_inc/source/main',
-      delete: '/sap/bc/adt/programs/includes/zguard_inc',
+      // The manifest was wrong about ADT here, and the handler was written to
+      // match it: an include's delete went to `DELETE …/includes/<name>` with a
+      // `lockHandle`, on the belief that a deletion needs a lock. It does not —
+      // a lock is what an *update* needs, and an existing one blocks a delete.
+      // The endpoint answered `400 Parameter lockHandle could not be found` to
+      // every cleanup, because nothing locks an object in order to remove it.
+      // Measured on E19, no lock taken and no stateful session:
+      // `POST /deletion/check` → `del:isDeletable="true" adtcore:type="PROG/I"`,
+      // then `POST /deletion/delete` → `del:isDeleted="true"`. Same service as
+      // every other type, so the entry now says what they say.
+      delete: [{ method: 'POST', path: '/sap/bc/adt/deletion/delete' }],
       checkDeletion: { method: 'POST', path: '/sap/bc/adt/deletion/check' },
       validate: '/sap/bc/adt/includes/validation',
       activate: '/sap/bc/adt/activation',
