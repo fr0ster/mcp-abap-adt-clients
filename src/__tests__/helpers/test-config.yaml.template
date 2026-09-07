@@ -37,7 +37,7 @@
 # - Structures: ZAC_STRU01, ZAC_STRU02, etc.
 # - Views: ZAC_VIEW01, ZAC_VIEW02, etc.
 # - Scalar Functions: ZADT_SCALAR_FUNC, ZAC_DSFD01, etc.
-# - Service Definitions: ZAC_SRVD01, ZAC_SRVD02, etc.
+# - Service Definitions: ZAC_SHR_SRVD01, ZAC_SHR_SRVD02, etc.
 # - Service Bindings: ZAC_SRVB01, ZAC_SRVB02, etc.
 # - Packages: ZAC_PKG01, ZAC_PKG02, etc.
 #
@@ -361,6 +361,19 @@ shared_dependencies:
           expose ZAC_SHR_BIMP_DDLS;
         }
 
+    # Publishing is a change to the system, so it gets a service definition of
+    # its own rather than borrowing one. Two bindings contending for a single
+    # definition is the thing to avoid, and a publish run must not depend on an
+    # object another test creates and deletes.
+    - name: "ZAC_SHR_SRVD03"
+      description: "Shared service definition reserved for publish/unpublish"
+      available_in: ["onprem", "cloud"]
+      source: |
+        @EndUserText.label: 'Shared service definition for publishing'
+        define service ZAC_SHR_SRVD03 {
+          expose ZAC_SHR_CDSUT_DDLS;
+        }
+
   service_bindings:
     - name: "ZAC_SHR_SRVB01"
       description: "Shared service binding for read-only tests"
@@ -368,6 +381,26 @@ shared_dependencies:
       skip_activation: true
       service_definition: "ZAC_SHR_SRVD02"
       service_name: "ZAC_SHR_SRVD02"
+      service_version: "0001"
+      binding_type: "ODATA"
+      binding_version: "V4"
+      binding_variant: "ODATA_V4_WEB_API"
+
+    # The subject of publish_service_binding / unpublish_service_binding. Both
+    # are disabled by default and turned on for a deliberate run, so this sits
+    # unpublished the rest of the time.
+    #
+    # Unlike its neighbour it is activated, because a publish needs an active
+    # binding over an active definition — which is also why it takes SRVD03
+    # rather than SRVD02, the one carrying `skip_activation`. Untested as a
+    # default: the publish cases have never run from a clean setup, so if
+    # activation here turns out to need the same exemption, that is the
+    # measurement to record rather than a surprise.
+    - name: "ZAC_SHR_SRVB02"
+      description: "Shared service binding reserved for publish/unpublish tests"
+      available_in: ["onprem", "cloud"]
+      service_definition: "ZAC_SHR_SRVD03"
+      service_name: "ZAC_SHR_SRVD03"
       service_version: "0001"
       binding_type: "ODATA"
       binding_version: "V4"
@@ -1169,10 +1202,11 @@ create_service_definition:
       available_in: ["onprem", "cloud"]
       description: "Service definition reserved for AdtServiceDefinition tests"
       params:
-        # Its own name, not ZAC_SRVD01: this flow CREATES AND DELETES its
-        # subject, and ZAC_SRVD01 is the permanent dependency of
-        # create_service_binding below. Sharing one name makes the delete
-        # answer "Used by 1 other object", every run.
+        # Its own name: this flow CREATES AND DELETES its subject, while
+        # create_service_binding below depends on ZAC_SHR_SRVD01 permanently.
+        # Sharing one name makes the delete answer "Used by 1 other object",
+        # every run. ZAC_SRVD03 is unrelated to the shared ZAC_SHR_SRVD03 —
+        # different names, and only this one is created and removed per run.
         service_definition_name: "ZAC_SRVD03"  # Replace with your service definition name
         description: "AdtServiceDefinition workflow service definition"
         # package_name: "ZAC_PKG01"  # Uses environment.default_package if omitted
@@ -1386,8 +1420,19 @@ create_service_binding:
       description: "Service binding reserved for AdtServiceBinding tests"
       params:
         binding_name: "ZAC_SRVB01"  # Replace with your service binding name
-        service_definition_name: "ZAC_SRVD01"  # Existing SRVD name used by ServiceBinding integration test
-        service_name: "ZAC_SRVD01"  # Usually same as service_definition_name
+        # ZAC_SHR_SRVD01, not ZAC_SRVD01. The old name was called "existing" and
+        # nothing ever created it — shared:setup makes ZAC_SHR_SRVD01 and
+        # ZAC_SHR_SRVD02 — so the publish failed with "Service Definition
+        # ZAC_SRVD01 not yet active", which reads like a timing problem and is
+        # an absent object. Measured on E19: a ZAC_* search returns both shared
+        # definitions and no ZAC_SRVD01.
+        #
+        # SRVD01 is the free one on purpose: the shared binding ZAC_SHR_SRVB01
+        # takes SRVD02 (see shared_dependencies.service_bindings), so this test
+        # can publish its own binding without two bindings contending for one
+        # service definition.
+        service_definition_name: "ZAC_SHR_SRVD01"
+        service_name: "ZAC_SHR_SRVD01"  # Usually same as service_definition_name
         service_version: "0001"
         binding_variant: "ODATA_V4_WEB_API"
         # `unchanged`, and the full run must keep it that way.
@@ -2215,10 +2260,12 @@ publish_service_binding:
     - name: "publish_binding"
       enabled: false                # ← turn on for a deliberate publish run
       available_in: ["onprem", "cloud"]
-      description: "Publish ZAC_SRVB01 and leave it published for inspection"
+      description: "Publish ZAC_SHR_SRVB02 and leave it published for inspection"
       params:
-        binding_name: "ZAC_SRVB01"
-        service_name: "ZAC_SRVD01"
+        # The shared binding reserved for this, not the one the workflow test
+        # creates and deletes — publishing must not race another test's subject.
+        binding_name: "ZAC_SHR_SRVB02"
+        service_name: "ZAC_SHR_SRVD03"
         service_version: "0001"
         service_type: "odatav4"
         # How long the *request* waits before the client gives up.
@@ -2235,10 +2282,10 @@ unpublish_service_binding:
     - name: "unpublish_binding"
       enabled: false                # ← turn on for the deliberate unpublish run
       available_in: ["onprem", "cloud"]
-      description: "Unpublish ZAC_SRVB01 after it has been checked in Eclipse"
+      description: "Unpublish ZAC_SHR_SRVB02 after it has been checked in Eclipse"
       params:
-        binding_name: "ZAC_SRVB01"
-        service_name: "ZAC_SRVD01"
+        binding_name: "ZAC_SHR_SRVB02"
+        service_name: "ZAC_SHR_SRVD03"
         service_version: "0001"
         service_type: "odatav4"
         timeout_ms: 300000
