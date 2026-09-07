@@ -714,7 +714,7 @@ What this package exports is what it owns: the clients, the handler classes, the
 
 ### Honest capability types (since 8.0.0)
 
-`@mcp-abap-adt/interfaces` (`^17.1.0`) splits the fat `IAdtObject` contract into **capability atoms** — `IAdtCreatable`, `IAdtReadable`, `IAdtUpdatable`, `IAdtDeletable` (and `IAdtModifiable`/`IAdtCrud`, their composites), `IAdtValidatable`, `IAdtCheckable`, `IAdtActivatable`, `IAdtLockable`, `IAdtVersionable`, `IAdtTransportAware`, `IAdtSearchable` — each covering one slice of the lifecycle, plus one named composite, `IAdtSourceObject`. There is no composite for "everything but versions": a vocabulary states what an object supports, never what it lacks. Since interfaces 13.0.0 `IAdtObject` is itself assembled from the atoms, so the atoms are the definitions and the composite cannot drift from them.
+`@mcp-abap-adt/interfaces` (`^37.0.0`) splits the fat `IAdtObject` contract into **capability atoms** — `IAdtCreatable`, `IAdtReadable`, `IAdtUpdatable`, `IAdtDeletable` (and `IAdtModifiable`/`IAdtCrud`, their composites), `IAdtValidatable`, `IAdtCheckable`, `IAdtActivatable`, `IAdtLockable`, `IAdtVersionable`, `IAdtTransportAware`, `IAdtSearchable` — each covering one slice of the lifecycle, plus one named composite, `IAdtSourceObject`. There is no composite for "everything but versions": a vocabulary states what an object supports, never what it lacks. Since interfaces 13.0.0 `IAdtObject` is itself assembled from the atoms, so the atoms are the definitions and the composite cannot drift from them.
 
 Since **8.0.0**, each handler `implements` only the atoms it genuinely supports, and `AdtClient.getXxx()` return types are narrowed to match:
 

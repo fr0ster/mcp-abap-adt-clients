@@ -769,10 +769,18 @@ its own delete with `You are already editing ZAC_SRVB01`, and any later
 `403 ExceptionResourceNoAccess: User … is currently editing`. A session recycle
 does not clear it; only the unlock does.
 
-**`serviceType` is required; the service name and version are not taken at
-all.** The job is posted with no query string, to a body naming the target by
-type and name — captured from Eclipse, both directions — so there is nowhere for
-a service name or version to go. `serviceType` selects the endpoint,
+**`serviceType` is required — and since `@mcp-abap-adt/interfaces@37.0.0` the
+compiler says so.** `update` takes `IServiceBindingPublicationConfig`, which
+requires the binding, the state and the protocol; the write capability atoms
+take a config as given rather than flattening it to `Partial`, so the demand
+travels to a caller holding the binding through `IAdtUpdatable` and not only to
+one holding the class. Before that it was a runtime throw before the wire, which
+is a requirement stated where the caller cannot see it.
+
+**The service name and version are not taken at all.** The job is posted with no
+query string, to a body naming the target by type and name — captured from
+Eclipse, both directions — so there is nowhere for a service name or version to
+go. `serviceType` selects the endpoint,
 `odatav2` or `odatav4`, and a caller holding a binding knows it from the
 variant (`ODATA_V4_UI` → `odatav4`).
 

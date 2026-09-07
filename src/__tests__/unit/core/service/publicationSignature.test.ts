@@ -11,8 +11,13 @@
  * build if that call starts compiling again. There is no runtime half — the
  * point is what a consumer's editor tells them before they run anything.
  */
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtUpdatable,
+  ILogger,
+} from '@mcp-abap-adt/interfaces';
 import { AdtClient } from '../../../../clients/AdtClient';
+import type { IServiceBindingPublicationConfig } from '../../../../core/service/types';
 
 const connection = {
   setSessionType: () => {},
@@ -28,6 +33,22 @@ const connection = {
 const logger = { info: () => {} } as unknown as ILogger;
 
 /**
+ * The same demand, made through the contract rather than the class.
+ *
+ * Every other check in this file calls `AdtServiceBinding.update` directly, and
+ * a class can always narrow its own parameter. The consumer does not hold the
+ * class — they hold the atom, and TypeScript's method parameters are bivariant,
+ * so a narrowing the atom does not carry is a narrowing nobody outside this
+ * package is held to. Until `@mcp-abap-adt/interfaces@37.0.0` the atom widened
+ * this config back to `Partial` on the way out, and every assertion below was
+ * true of the implementation and false of the contract.
+ */
+type BindingPublication = IAdtUpdatable<
+  IServiceBindingPublicationConfig,
+  string
+>;
+
+/**
  * Never called — only compiled.
  *
  * The point of these three is what `tsc` says about them, and two of them throw
@@ -35,8 +56,22 @@ const logger = { info: () => {} } as unknown as ILogger;
  * the wire. Running them would be asserting the throw, which is the weaker of
  * the two guarantees and the one a consumer only meets after shipping.
  */
-async function _onlyTypeChecked(client: AdtClient): Promise<void> {
+async function _onlyTypeChecked(
+  client: AdtClient,
+  contract: BindingPublication,
+): Promise<void> {
   const bindings = client.getServiceBinding();
+
+  // Through the atom. If the installed contract ever applies `Partial` to the
+  // config again, this call compiles and the `@ts-expect-error` is what fails.
+  // @ts-expect-error the contract requires the binding, the state and the protocol
+  void (await contract.update({ desiredPublicationState: 'published' }));
+
+  void (await contract.update({
+    bindingName: 'ZAC_SRVB01',
+    desiredPublicationState: 'published',
+    serviceType: 'odatav4',
+  }));
 
   // The whole of it: the binding, the state, and the protocol that selects the
   // endpoint. ~133s on the systems measured, so the timeout is the caller's.
