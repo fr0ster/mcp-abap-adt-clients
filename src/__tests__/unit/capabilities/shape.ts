@@ -2,7 +2,7 @@
  * Check 1 — the declared type of every factory against what the manifest says
  * it can do, **in both directions**, at compile time.
  *
- * Not one assertion per pair: 37 factories × 10 atoms, and a forgotten line is
+ * Not one assertion per pair: 37 factories × 12 atoms, and a forgotten line is
  * a silent hole in the check that exists to close silent holes. This is a
  * mapped type over the full product whose `as` clause drops every pair that
  * agrees — so a disagreeing factory keeps its key, and the assertion at the
