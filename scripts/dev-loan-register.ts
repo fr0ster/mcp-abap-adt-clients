@@ -21,11 +21,19 @@
  * Usage:
  *
  *   npx ts-node scripts/dev-loan-register.ts ZAC_TR_PKG E19K906816
+ *   npx ts-node scripts/dev-loan-register.ts ZAC_TR_PKG E19K906816 --update-request=E19K906818
  *   npx ts-node scripts/dev-loan-register.ts ZAC_TR_PKG E19K906816 --clean
  *
  * Idempotent: an object that already exists is updated rather than created, so
- * a re-run is a second development cycle on the same five objects — which is
- * the part that matters for "does a *change* land on the request too".
+ * a re-run is a second development cycle on the same five objects.
+ *
+ * **A re-run alone does not show that the change landed on the request.** The
+ * creates put every object into that request already, so the listing afterwards
+ * looks the same whether `update` carried the transport or dropped it.
+ * `--update-request` is what separates them: the updates go to a second
+ * request, its contents are read before and after, and an object appearing in
+ * the second listing and not the first is the observation. Without the flag the
+ * script says so rather than implying a result.
  *
  * The run at the end is the point. Activation answering ok says the objects
  * compile; only executing them says the development works. The expected output
@@ -346,11 +354,13 @@ async function build(
     ? configFor(a, pkg, updateRequest)
     : config;
 
-  // `create` makes the object and nothing else. Passing `sourceCode` to it is
-  // accepted by the type and ignored on the wire: measured here, a class
-  // created with a full body came back as ADT's empty skeleton, and the demo
-  // then refused to run — "a class must implement IF_OO_ADT_CLASSRUN", because
-  // it did not. The source is a write, and a write needs a lock.
+  // `create` makes the object and nothing else. Passing `sourceCode` to it no
+  // longer compiles — interfaces 38.0.0 took the field off the member and the
+  // concrete handlers followed — but it used to, and it was ignored on the
+  // wire: measured here, a class created with a full body came back as ADT's
+  // empty skeleton, and the demo then refused to run, "a class must implement
+  // IF_OO_ADT_CLASSRUN", because it did not. The source is a write, and a
+  // write needs a lock.
   const created = await handler.create(config);
   let state = 'created';
   if (!created.ok) {
@@ -373,6 +383,7 @@ async function build(
   // recycle, and the next run's write is answered 403 with nothing visibly
   // holding it — only the unlock clears it.
   let updated: { ok: boolean; getError(): { message: string } };
+  let unlockRefused = '';
   try {
     updated = await handler.update(updateConfig, {
       sourceCode: a.source,
@@ -381,15 +392,19 @@ async function build(
   } finally {
     const released = await handler.unlock(config, handle);
     if (released && released.ok === false) {
-      say(
-        `  ${a.name.padEnd(24)} UNLOCK REFUSED: ${released.getError().message}`,
-      );
+      unlockRefused = released.getError().message;
+      say(`  ${a.name.padEnd(24)} UNLOCK REFUSED: ${unlockRefused}`);
     }
   }
   if (!updated.ok) {
     say(`  ${a.name.padEnd(24)} UPDATE REFUSED: ${updated.getError().message}`);
     return false;
   }
+  // A refused unlock ends the run. Printing it and carrying on let the script
+  // exit 0 having left an object locked, which is worse than a failure: the
+  // next run's write is answered 403 by an object nothing appears to hold, and
+  // the message that explained it has scrolled past.
+  if (unlockRefused) return false;
   say(`  ${a.name.padEnd(24)} ${state}, source written`);
 
   const activated = await handler.activate(config);
