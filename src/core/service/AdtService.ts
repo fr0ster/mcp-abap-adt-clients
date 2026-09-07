@@ -21,14 +21,12 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
 import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces';
-import { XMLParser } from 'fast-xml-parser';
 import {
   ACCEPT_CHECK_MESSAGES,
   ACCEPT_DELETION,
   ACCEPT_DELETION_CHECK,
   ACCEPT_PUBLICATION_JOB,
   ACCEPT_TRANSPORT_CHECK,
-  ACCEPT_VALIDATION,
   CT_CHECK_OBJECTS,
   CT_DELETION,
   CT_DELETION_CHECK,
@@ -149,14 +147,6 @@ export class AdtServiceBinding<
     this.systemContext = systemContext ?? {};
   }
 
-  private parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: '@_',
-  });
-  private asRecord(value: unknown): Record<string, unknown> {
-    return (value ?? {}) as Record<string, unknown>;
-  }
-
   /** The binding name, or the caller's mistake. */
   private name(config: Partial<IServiceBindingConfig>): string {
     if (!config.bindingName) {
@@ -218,59 +208,9 @@ export class AdtServiceBinding<
     return `<?xml version="1.0" encoding="UTF-8"?><del:deletionRequest xmlns:del="http://www.sap.com/adt/deletion" xmlns:adtcore="http://www.sap.com/adt/core"><del:object adtcore:uri="${bindingUri}"><del:transportNumber>${transportNumber}</del:transportNumber></del:object></del:deletionRequest>`;
   }
 
-  private parseServiceBindingState(response: IAdtWireResponse): {
-    published: boolean;
-    allowedAction?: string;
-    serviceType?: 'odatav2' | 'odatav4';
-    serviceName?: string;
-    serviceVersion?: string;
-  } {
-    const raw = typeof response.data === 'string' ? response.data : '';
-    if (!raw) {
-      return { published: false };
-    }
-
-    const parsed = this.asRecord(this.parser.parse(raw));
-    const root = this.asRecord(
-      parsed['srvb:serviceBinding'] ?? parsed.serviceBinding,
-    );
-    const publishedRaw = root['@_srvb:published'] ?? root['@_published'];
-    const allowedActionRaw =
-      root['@_srvb:allowedAction'] ?? root['@_allowedAction'];
-    const binding = this.asRecord(root['srvb:binding'] ?? root.binding);
-    const services = this.asRecord(root['srvb:services'] ?? root.services);
-    const content = this.asRecord(services['srvb:content'] ?? services.content);
-
-    const bindingType = String(
-      binding['@_srvb:type'] ?? binding['@_type'] ?? '',
-    ).toUpperCase();
-    const bindingVersion = String(
-      binding['@_srvb:version'] ?? binding['@_version'] ?? '',
-    ).toUpperCase();
-
-    let serviceType: 'odatav2' | 'odatav4' | undefined;
-    if (bindingType === 'ODATA') {
-      serviceType = bindingVersion === 'V4' ? 'odatav4' : 'odatav2';
-    }
-
-    return {
-      published: String(publishedRaw).toLowerCase() === 'true',
-      allowedAction: allowedActionRaw ? String(allowedActionRaw) : undefined,
-      serviceType,
-      serviceName: (services['@_srvb:name'] ?? services['@_name']) as
-        | string
-        | undefined,
-      serviceVersion: (content['@_srvb:version'] ?? content['@_version']) as
-        | string
-        | undefined,
-    };
-  }
-
   private async publishByServiceType(
     serviceType: 'odatav2' | 'odatav4',
     bindingName: string,
-    servicename: string,
-    serviceversion?: string,
     // **The caller's, when they give one.** A publication job is the slowest
     // thing this library asks for — measured at ~135s on a trial, and an
     // unpublish once not settled after eleven minutes — so the 120s
@@ -316,8 +256,6 @@ export class AdtServiceBinding<
   private async unpublishByServiceType(
     serviceType: 'odatav2' | 'odatav4',
     bindingName: string,
-    servicename: string,
-    serviceversion?: string,
     // **The caller's, when they give one.** A publication job is the slowest
     // thing this library asks for — measured at ~135s on a trial, and an
     // unpublish once not settled after eleven minutes — so the 120s
@@ -839,6 +777,23 @@ export class AdtServiceBinding<
     });
   }
 
+  /**
+   * The publication job, and nothing before it.
+   *
+   * **This used to read the binding first.** The read filled in the service
+   * name and version from the object's own document, short-circuited when the
+   * state was already the one asked for, and refused a transition ADT would
+   * have refused itself — four useful things, and one member issuing two
+   * requests, which is the rule this release is about.
+   *
+   * Three of the four went with the query string: the job is posted without
+   * `servicename` or `serviceversion`, so there is nothing left to derive.
+   * The fourth — "can it go from here to there?" — is the server's to answer,
+   * and it does: an invalid transition comes back as `SEVERITY` in the job's
+   * own document, read by `publicationRefusal`. A caller who wants to know
+   * beforehand calls `read` and looks at `srvb:allowedAction`, which is one
+   * request they can see.
+   */
   private async updateRequest(
     params: IServiceBindingPublicationParams,
   ): Promise<IAdtWireResponse> {
@@ -848,75 +803,44 @@ export class AdtServiceBinding<
     if (!params.desiredPublicationState) {
       throw new Error('desiredPublicationState is required');
     }
-    const readResponse = await this.readRequest({
-      bindingName: params.bindingName,
-      version: 'active',
-    });
-    const current = this.parseServiceBindingState(readResponse);
-    // The binding's own answer fills in what the caller did not say. This read
-    // already happens for the state check, so knowing which service is being
-    // published costs the server nothing extra.
-    const serviceType = params.serviceType ?? current.serviceType;
-    const serviceName = params.serviceName ?? current.serviceName;
-    const serviceVersion = params.serviceVersion ?? current.serviceVersion;
-    this.logger?.info?.(
-      `ServiceBinding update: ${params.bindingName} -> ${params.desiredPublicationState}`,
-      {
-        desiredPublicationState: params.desiredPublicationState,
-        currentPublished: current.published,
-        allowedAction: current.allowedAction,
-        serviceType: params.serviceType,
-        serviceName: params.serviceName,
-        serviceVersion: params.serviceVersion,
-      },
-    );
-
     if (params.desiredPublicationState === 'unchanged') {
-      return readResponse;
+      // A caller error rather than a request: `update` on a binding *is* the
+      // publication change, so asking it for no change is asking for nothing.
+      // `unchanged` stays a legitimate value on a binding's *config*, where it
+      // says a create should not publish.
+      throw new Error(
+        `Cannot update ${params.bindingName} to 'unchanged': a service ` +
+          "binding's update is its publication, and there is no request that " +
+          'changes nothing. Omit the call instead.',
+      );
     }
-
-    if (params.desiredPublicationState === 'published') {
-      if (current.published) {
-        return readResponse;
-      }
-      if (current.allowedAction !== 'PUBLISH') {
-        throw new Error(
-          `Invalid state transition: cannot publish service binding ${params.bindingName}. allowedAction=${current.allowedAction ?? 'UNKNOWN'}`,
-        );
-      }
-      if (!(serviceType && serviceName)) {
-        throw new Error(
-          `Cannot publish ${params.bindingName}: neither the caller nor the ` +
-            'binding names a service type and a service name.',
-        );
-      }
-      return this.publishByServiceType(
-        serviceType,
-        params.bindingName,
-        serviceName,
-        serviceVersion,
-        params.timeout,
+    // Not derived from the object any more — the read that derived it was the
+    // second request. `ODATA_V4_*` and `ODATA_V2_*` binding variants map to the
+    // two service types, so a caller that knows its binding knows this.
+    const serviceType = params.serviceType;
+    if (!serviceType) {
+      throw new Error(
+        `serviceType is required to publish or unpublish ${params.bindingName}: ` +
+          "it selects the endpoint, 'odatav2' or 'odatav4'.",
       );
     }
 
-    if (current.allowedAction !== 'UNPUBLISH') {
-      throw new Error(
-        `Invalid state transition: cannot unpublish service binding ${params.bindingName}. allowedAction=${current.allowedAction ?? 'UNKNOWN'}`,
-      );
-    }
-    if (!(serviceType && serviceName)) {
-      throw new Error(
-        `Cannot unpublish ${params.bindingName}: neither the caller nor the ` +
-          'binding names a service type and a service name.',
-      );
-    }
-    return this.unpublishByServiceType(
-      serviceType,
-      params.bindingName,
-      serviceName,
-      serviceVersion,
-      params.timeout,
+    this.logger?.info?.(
+      `ServiceBinding ${params.desiredPublicationState}: ${params.bindingName}`,
+      { serviceType, timeout: params.timeout },
     );
+
+    return params.desiredPublicationState === 'published'
+      ? this.publishByServiceType(
+          serviceType,
+          params.bindingName,
+          params.timeout,
+        )
+      : this.unpublishByServiceType(
+          serviceType,
+          params.bindingName,
+          params.timeout,
+        );
   }
 
   private async deleteRequest(

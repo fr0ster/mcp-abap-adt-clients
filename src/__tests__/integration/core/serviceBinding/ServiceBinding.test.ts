@@ -382,16 +382,26 @@ describe('ServiceBinding (using AdtClient)', () => {
           testsLogger,
         );
 
+        // **No `updateConfig` when nothing is to be published.** A binding's
+        // `update` *is* its publication — one POST to a job endpoint — so there
+        // is no request that changes nothing, and asking for `unchanged` is a
+        // caller error rather than a no-op. The flow then covers create, write,
+        // activate and delete; publication is `publication.test.ts`, two
+        // deliberate runs.
         await tester.flowTestAuto({
           activateOnCreate: true,
-          updateConfig: {
-            bindingName: config.bindingName,
-            packageName: testSubpackage,
-            serviceType: config.serviceType,
-            serviceName: config.serviceName,
-            serviceVersion: config.serviceVersion,
-            desiredPublicationState: updatePublicationState,
-          },
+          ...(updatePublicationState === 'unchanged'
+            ? {}
+            : {
+                updateConfig: {
+                  bindingName: config.bindingName,
+                  packageName: testSubpackage,
+                  serviceType: config.serviceType,
+                  serviceName: config.serviceName,
+                  serviceVersion: config.serviceVersion,
+                  desiredPublicationState: updatePublicationState,
+                },
+              }),
         });
       },
       getTimeout('long'),

@@ -21,6 +21,14 @@
  * **adt-clients issues one request and never polls an async job.** Waiting is
  * the consumer's, and a test is a consumer.
  *
+ * ## And the write is counted, not asserted
+ *
+ * `update` used to read the binding before posting the job — to derive the
+ * service name, to short-circuit when the state was already right, and to
+ * refuse a transition ADT refuses itself. One member, two endpoints. This file
+ * said the write was one request and did not count, so it would have passed
+ * either way; it counts now.
+ *
  * ## Running them
  *
  * ```bash
@@ -134,6 +142,14 @@ describe('Service binding publication (deliberate runs)', () => {
   let client: AdtClient;
   let baseUrl = '';
   let hasConfig = false;
+  /**
+   * Every request this test's client makes, in order.
+   *
+   * Recorded by wrapping `makeAdtRequest` on the connection: the claim being
+   * checked is *how many* requests a member issues, and only the wire can
+   * settle that.
+   */
+  const requests: { method: string; url: string }[] = [];
 
   beforeAll(async () => {
     try {
@@ -144,6 +160,14 @@ describe('Service binding publication (deliberate runs)', () => {
       );
       client = resolved;
       baseUrl = await connection.getBaseUrl();
+      const original = connection.makeAdtRequest.bind(connection);
+      connection.makeAdtRequest = (async (config: {
+        url: string;
+        method?: string;
+      }) => {
+        requests.push({ method: config.method ?? 'GET', url: config.url });
+        return original(config as never);
+      }) as typeof connection.makeAdtRequest;
       hasConfig = true;
     } catch (error) {
       hasConfig = skipUnlessConfigured(error, testsLogger);
@@ -184,6 +208,8 @@ describe('Service binding publication (deliberate runs)', () => {
       `${desired}: one request, up to ${Math.round(c.timeoutMs / 1000)}s`,
       testsLogger,
     );
+    // Counted on the wire, because "one request" is the claim under test.
+    const before_count = requests.length;
     const started = Date.now();
     const answer = await client.getServiceBinding().update(
       {
@@ -196,6 +222,19 @@ describe('Service binding publication (deliberate runs)', () => {
       { timeout: c.timeoutMs },
     );
     const spent = Math.round((Date.now() - started) / 1000);
+
+    const issued = requests.slice(before_count);
+    logTestStep(
+      `the write issued ${issued.length} request(s): ${issued.map((r) => `${r.method} ${r.url}`).join(', ')}`,
+      testsLogger,
+    );
+    expect(issued).toHaveLength(1);
+    expect(issued[0].method).toBe('POST');
+    expect(issued[0].url).toContain(
+      `/${desired === 'published' ? 'publish' : 'unpublish'}jobs`,
+    );
+    // No query string: Eclipse sends none, and the job answers `OK` without one.
+    expect(issued[0].url).not.toContain('?');
 
     if (answer.ok) {
       logTestStep(`the request answered after ${spent}s`, testsLogger);
