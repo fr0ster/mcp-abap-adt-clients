@@ -81,10 +81,10 @@ describe('AdtInclude', () => {
   describe('IAdtOperationOptions', () => {
     it('does NOT activate on create unless asked — the contract default is false', async () => {
       const { connection, calls } = createConnection();
-      await new AdtInclude(connection, logger).create({
-        ...BASE,
-        sourceCode: '" code',
-      });
+      // No source: `createInclude` reads the description, package, transport
+      // and master language, and nothing else. Passing it here said a create
+      // writes a source, which it does not.
+      await new AdtInclude(connection, logger).create({ ...BASE });
 
       expect(calls.some((c) => c.url.includes('/activation'))).toBe(false);
     });
@@ -194,7 +194,7 @@ describe('AdtInclude', () => {
     it('addresses /programs/includes, never /programs/programs', async () => {
       const { connection, calls } = createConnection();
       const include = new AdtInclude(connection, logger);
-      await include.create({ ...BASE, sourceCode: '" code' });
+      await include.create({ ...BASE });
       await include.readMetadata({ includeName: 'ZMY_INC' });
       await include.delete({ includeName: 'ZMY_INC' });
 
