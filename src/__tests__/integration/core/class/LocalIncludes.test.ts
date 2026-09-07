@@ -554,21 +554,15 @@ describe('Class local includes (using BaseTester)', () => {
     it(
       'should execute full workflow for macros include (on-premise only)',
       async () => {
-        if (isCloudSystem) {
-          const definition = getTestCaseDefinition(
-            'update_class_local_macros',
-            'local_macros',
-          );
-          const testName = 'Class - LocalMacros - full workflow';
-          logTestStart(testsLogger, testName, definition);
-          logTestSkip(
-            testsLogger,
-            testName,
-            'Macros are not supported in cloud systems (BTP ABAP Environment)',
-          );
-          logTestEnd(testsLogger, testName);
-          return;
-        }
+        // No cloud verdict is invented here. This test used to skip on cloud
+        // saying "Macros are not supported in cloud systems (BTP ABAP
+        // Environment)", which the system contradicts: ADT 3.60.3 against the
+        // trial answers `PUT …/oo/classes/<c>/includes/macros?lockHandle=…`
+        // with 200. Whether macros *compile* under the ABAP for Cloud language
+        // version is a different question, and the syntax check is what answers
+        // it — so the run asks and reports, rather than deciding beforehand.
+        // Availability stays a config matter (`available_in`), where a real
+        // refusal can be recorded with the reason the system gave.
 
         const testName = 'Class - LocalMacros - full workflow';
         if (!hasConfig || !localMacrosTester) {
