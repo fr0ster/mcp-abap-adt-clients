@@ -210,19 +210,6 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
   }
 
   /**
-   * Delete the include.
-   *
-   * The unlock afterwards is not tidiness. Measured on E19 (`RFCSAPRL 816`): a
-   * successful DELETE does not release the lock with the object — the editing
-   * registration on the name stays, and the next create for that name is
-   * answered 403 `ExceptionResourceNoAuthorization`, in the same session, on a
-   * name nothing else had touched.
-   *
-   * A refused unlock after a successful delete is logged, not returned: the
-   * object is gone, so it is not a failure of the delete — which is exactly
-   * what `chain` does with a cleanup that throws.
-   */
-  /**
    * Ask whether the object can be deleted now.
    *
    * The deletion service is asked by URI, and a standalone include has one of
@@ -243,6 +230,13 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
     );
   }
 
+  /**
+   * Delete the include.
+   *
+   * No lock, and `options.lockHandle` is deliberately not read: the deletion
+   * service takes an object URI, not a handle. Holding a lock over a delete
+   * does not help it through — it is what stops it.
+   */
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IIncludeConfig>,
     options?: IAdtOperationOptions<E>,
@@ -251,12 +245,7 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
 
     return answering(
       () =>
-        deleteInclude(
-          this.connection,
-          includeName,
-          options?.lockHandle,
-          config.transportRequest,
-        ),
+        deleteInclude(this.connection, includeName, config.transportRequest),
       this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
       options?.analyse,
     );
