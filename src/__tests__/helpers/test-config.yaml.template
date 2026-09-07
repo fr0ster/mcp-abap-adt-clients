@@ -133,6 +133,18 @@ shared_dependencies:
       datatype: "CHAR"
       length: 10
 
+  data_elements:
+    # The authorization field's update needs a data element, and it must be one
+    # this project owns: every `ZAC_DTEL*` in the config belongs to a flow that
+    # creates and deletes it, so pointing at one races that flow. SAP's own
+    # `CHAR10` is refused on ABAP Cloud — "Data Element CHAR10 is deprecated.
+    # Use own type declaration or own object instead." — which is what made the
+    # authorization field look unavailable there.
+    - name: "ZAC_SHR_AUTH_DTEL"
+      description: "Shared data element for the authorization field tests"
+      available_in: ["onprem", "cloud"]
+      domain_name: "ZAC_SHR_GA_DOM"
+
   structures:
     - name: "ZAC_SHR_STRU"
       description: "Shared structure used as a table type's row type"
@@ -1031,7 +1043,11 @@ create_authorization_field:
   test_cases:
     - name: "adt_authorization_field"
       enabled: true
-      available_in: ["onprem"]
+      # Measured on the cloud trial: validate 200, create 201, read 2285 bytes,
+      # update 200 — the type is fully available there. The onprem-only flag was
+      # never measured; what actually failed on cloud was this case's own
+      # fixture, `CHAR10`, which ABAP Cloud refuses as deprecated.
+      available_in: ["onprem", "cloud"]
       description: "Authorization field reserved for AdtAuthorizationField tests"
       params:
         authorization_field_name: "ZAC_AUTH01"
@@ -1044,8 +1060,13 @@ create_authorization_field:
         # domname: "CHAR10"
         # outputlen: "10"
         update_description: "AdtAuthorizationField workflow field (updated)"
-        update_domname: "CHAR10"
-        update_roll_name: "CHAR10"
+        # Not `CHAR10`: ABAP Cloud answers "Data Element CHAR10 is deprecated.
+        # Use own type declaration or own object instead." A field needs a data
+        # element — an empty one is answered "contains errors and therefore
+        # cannot be saved" — and it must be one this project owns, because every
+        # other `ZAC_DTEL*` here belongs to a flow that creates and deletes it.
+        update_domname: ""
+        update_roll_name: "ZAC_SHR_AUTH_DTEL"   # → shared_dependencies.data_elements
 
 # Create Interface
 create_interface:
