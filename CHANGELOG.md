@@ -251,11 +251,30 @@ the sequence around a write handed back to the consumer.
   `Accept` now carries v1 as well as v2, as Eclipse sends it; v2 alone is a 406
   on a system that serves only v1.
 
-- **Publishing no longer demands a service, version and protocol the binding
-  already states.** They are read from its own document — `srvb:services
-  srvb:name`, `srvb:content srvb:version`, `srvb:binding srvb:type` — and remain
-  accepted as an override. Requiring them let a caller publish under a version
-  that disagreed with the object.
+- **BREAKING: publishing takes the binding and the protocol, and nothing else.**
+  `serviceType` is **required** — it selects the endpoint, `odatav2` or
+  `odatav4`, and a caller holding a binding knows it from the variant. The
+  service name and version are **not accepted any more**: the job is posted with
+  no query string, to a body naming the target by type and name, so there is
+  nowhere for them to go.
+
+  ```typescript
+  await bindings.update(
+    { bindingName: 'ZAC_SRVB01', desiredPublicationState: 'published',
+      serviceType: 'odatav4' },
+    { timeout: 300_000 },
+  );
+  ```
+
+  Mid-branch this member read the binding first and filled all three in from its
+  own document. That read made one member two requests, and the state check it
+  also did is the server's answer anyway. A caller who wants to decide
+  beforehand reads the binding and looks at `srvb:allowedAction`.
+
+- **`desiredPublicationState: 'unchanged'` is refused by `update`.** A binding's
+  update *is* its publication, so there is no request that changes nothing. It
+  stays legitimate on a binding's *config*, where it says a create should not
+  publish.
 
 - **`AdtServiceBinding` gains `lock()` and `unlock()`**, and the manifest's
   claim that "ADT offers no lock for a service binding" is retired — measured

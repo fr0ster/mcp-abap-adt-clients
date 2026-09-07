@@ -115,13 +115,13 @@ export const serviceDocuments = {
  * shape is still being settled against measured ADT traffic, and a contract
  * moves to the contracts package once it does what it needs to, not before.
  *
- * The difference from `IUpdateServiceBindingParams` there is that only the
- * binding is required. Which service, which version and which protocol are
- * **properties of the binding** — it states all three in its own document
- * (`srvb:services srvb:name`, `srvb:content srvb:version`, `srvb:binding
- * srvb:type`) — so requiring them from the caller asked them to repeat what the
- * object already says, and let them pass a version that disagrees with it.
- * They remain accepted as an override.
+ * **The binding and the protocol, and nothing else.** The job is posted with no
+ * query string and a body that names the target by type and name, so the
+ * service name and version have nowhere to go — they were derived from the
+ * binding's own document by a read that made this member two requests, and both
+ * the read and the fields went. `serviceType` stays because it selects the
+ * endpoint (`odatav2` or `odatav4`), and a caller holding a binding knows it
+ * from the variant.
  *
  * There is no `publishODataV2` and no `publishODataV4`: the protocol is a
  * **parameter**, not a method name. Two members that differ only by a value
@@ -129,13 +129,17 @@ export const serviceDocuments = {
  */
 export interface IServiceBindingPublicationParams {
   bindingName: string;
+  /**
+   * `published` or `unpublished`. `unchanged` is refused: a binding's update
+   * *is* its publication, so there is no request that changes nothing.
+   */
   desiredPublicationState: DesiredPublicationState;
-  /** Overrides the binding's own `srvb:binding srvb:type`/`srvb:version`. */
+  /**
+   * Which endpoint the job goes to — `odatav2` or `odatav4`. **Required**: it
+   * is the one thing the URL needs that the binding's name does not give, and
+   * this package no longer reads the binding to find it out.
+   */
   serviceType?: GeneratedServiceType;
-  /** Overrides the binding's own `srvb:services srvb:name`. */
-  serviceName?: string;
-  /** Overrides the binding's own `srvb:content srvb:version`. */
-  serviceVersion?: string;
   /**
    * How long to wait for the publication job, in milliseconds.
    *

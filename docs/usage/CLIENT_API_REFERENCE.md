@@ -738,10 +738,17 @@ if (!locked.ok) throw new Error(locked.getError().message);
 const lockHandle = locked.getResult().value;
 
 try {
-  const answer = await bindings.update({
-    bindingName: 'ZAC_SRVB01',
-    desiredPublicationState: 'published',
-  });
+  const answer = await bindings.update(
+    {
+      bindingName: 'ZAC_SRVB01',
+      desiredPublicationState: 'published',
+      serviceType: 'odatav4',
+    },
+    // ~133 seconds on the systems measured, both directions. The 120s default
+    // is under that, so a caller that does not raise it will be told the
+    // request timed out while the job goes on to finish.
+    { timeout: 300_000 },
+  );
   if (!answer.ok) throw new Error(answer.getError().message);
 } finally {
   await bindings.unlock({ bindingName: 'ZAC_SRVB01' }, lockHandle);
@@ -762,11 +769,23 @@ its own delete with `You are already editing ZAC_SRVB01`, and any later
 `403 ExceptionResourceNoAccess: User … is currently editing`. A session recycle
 does not clear it; only the unlock does.
 
-**Which service, which version, which protocol.** You need name none of them.
-The binding states all three in its own document — `srvb:services srvb:name`,
-`srvb:content srvb:version`, `srvb:binding srvb:type` — and `update()` reads
-them from there. Pass them only to override, and note that a version that
-disagrees with the binding is a publish of something else.
+**`serviceType` is required; the service name and version are not taken at
+all.** The job is posted with no query string, to a body naming the target by
+type and name — captured from Eclipse, both directions — so there is nowhere for
+a service name or version to go. `serviceType` selects the endpoint,
+`odatav2` or `odatav4`, and a caller holding a binding knows it from the
+variant (`ODATA_V4_UI` → `odatav4`).
+
+This member used to read the binding first and fill all three in from its own
+document. That read made one member two requests, which is what this release
+exists to stop — and the state check it also did is the server's answer anyway:
+an invalid transition comes back as `SEVERITY` in the job's document. To decide
+beforehand, read the binding yourself and look at `srvb:allowedAction`.
+
+**`desiredPublicationState: 'unchanged'` is refused.** A binding's `update` *is*
+its publication, so there is no request that changes nothing — do not call it.
+The value stays legitimate on a binding's *config*, where it says a create
+should not publish.
 
 **Nothing here waits.** The job answers its own verdict — `<SEVERITY>OK` with a
 `<SHORT_TEXT>` — and `publicationRefusal` reads it, so a refused publish comes

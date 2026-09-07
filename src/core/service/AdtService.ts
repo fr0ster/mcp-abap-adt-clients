@@ -420,10 +420,17 @@ export class AdtServiceBinding<
   }
 
   /**
-   * Change the binding's publication state.
+   * Change the binding's publication state — one POST to a job endpoint.
    *
-   * That is the only thing an update does to a binding: publish it, withdraw
-   * it, or leave it as it is.
+   * That is the only thing an update does to a binding: publish it or withdraw
+   * it. `unchanged` is refused, because there is no request that changes
+   * nothing; a caller who wants no change does not call this.
+   *
+   * `config.serviceType` is **required** — it selects `odatav2` or `odatav4` —
+   * and `config.serviceName` / `config.serviceVersion` are not read here at
+   * all: the job carries neither. The job takes ~133 seconds on the systems
+   * measured, so pass `options.timeout` unless the 120s default is enough,
+   * which it is not.
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IServiceBindingConfig>,
@@ -433,12 +440,10 @@ export class AdtServiceBinding<
     if (!config.desiredPublicationState) {
       throw new Error('desiredPublicationState is required');
     }
-    // Which service, which version and which protocol are **properties of the
-    // binding**, and it states all three in its own document:
-    // `srvb:services srvb:name`, `srvb:content srvb:version` and
-    // `srvb:binding srvb:type`. Requiring them from the caller asked them to
-    // repeat what the object already says, and let them pass a version that
-    // disagrees with it. They stay accepted as an override.
+    // `serviceType` selects the endpoint and comes from the caller. It used to
+    // be derived from the binding's own document, along with the service name
+    // and version — by a read that made this member two requests. The read is
+    // gone; so are the two fields, which the job no longer carries anywhere.
     const desiredPublicationState = config.desiredPublicationState;
 
     return answering(
@@ -447,8 +452,6 @@ export class AdtServiceBinding<
           bindingName: name,
           desiredPublicationState,
           serviceType: config.serviceType,
-          serviceName: config.serviceName,
-          serviceVersion: config.serviceVersion,
           // The contract has always offered this; it used to stop here.
           timeout: options?.timeout,
         }),
