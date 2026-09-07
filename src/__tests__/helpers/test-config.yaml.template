@@ -849,7 +849,7 @@ update_class_local_macros:
     - name: "local_macros"
       enabled: true
       available_in: ["onprem", "legacy"]
-      description: "Update class macros include (on-premise only; not available in ABAP Cloud)"
+      description: "Update class macros include. On-prem only, and the reason is DEFINE, not the include: a cloud class has a writable macros include (PUT answers 200), but the ABAP for Cloud language version forbids DEFINE"
       params:
         class_name: "ZAC_CLS13"
         # package_name: "ZAC_PKG01"  # Uses environment.default_package if omitted

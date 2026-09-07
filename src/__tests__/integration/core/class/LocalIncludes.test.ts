@@ -554,15 +554,38 @@ describe('Class local includes (using BaseTester)', () => {
     it(
       'should execute full workflow for macros include (on-premise only)',
       async () => {
-        // No cloud verdict is invented here. This test used to skip on cloud
-        // saying "Macros are not supported in cloud systems (BTP ABAP
-        // Environment)", which the system contradicts: ADT 3.60.3 against the
-        // trial answers `PUT …/oo/classes/<c>/includes/macros?lockHandle=…`
-        // with 200. Whether macros *compile* under the ABAP for Cloud language
-        // version is a different question, and the syntax check is what answers
-        // it — so the run asks and reports, rather than deciding beforehand.
-        // Availability stays a config matter (`available_in`), where a real
-        // refusal can be recorded with the reason the system gave.
+        // Skipped on cloud — and the wording matters, because the obvious
+        // reason is the wrong one. **The macros include is not the problem.**
+        // ADT 3.60.3 against the trial answers
+        // `PUT …/oo/classes/<c>/includes/macros?lockHandle=…` with 200: a cloud
+        // class has that include and it can be written.
+        //
+        // What the ABAP for Cloud language version forbids is `DEFINE`, which
+        // is the only thing a macros include holds — and this case's own source
+        // is `DEFINE _local_noop. … END-OF-DEFINITION.`, so it cannot pass
+        // there no matter how the endpoint behaves.
+        //
+        // The previous wording, "Macros are not supported in cloud systems
+        // (BTP ABAP Environment)", named the wrong half: anyone checking it
+        // against the endpoint would have measured 200 and concluded the skip
+        // was wrong. It is not wrong; it was described wrongly.
+        if (isCloudSystem) {
+          const definition = getTestCaseDefinition(
+            'update_class_local_macros',
+            'local_macros',
+          );
+          const testName = 'Class - LocalMacros - full workflow';
+          logTestStart(testsLogger, testName, definition);
+          logTestSkip(
+            testsLogger,
+            testName,
+            'DEFINE is forbidden by the ABAP for Cloud language version; the ' +
+              'macros include itself is writable there — PUT …/includes/macros ' +
+              'answers 200',
+          );
+          logTestEnd(testsLogger, testName);
+          return;
+        }
 
         const testName = 'Class - LocalMacros - full workflow';
         if (!hasConfig || !localMacrosTester) {
