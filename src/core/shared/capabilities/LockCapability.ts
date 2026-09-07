@@ -50,9 +50,26 @@ export class LockCapability<TConfig, TReadResult = void>
     return answering(
       async () => {
         const ctx = this.getCtx();
-        // Stay stateful while the lock is held; the caller releases via unlock().
+        // Stateful for THIS request and no longer.
+        //
+        // It used to stay stateful for the whole lock window, so every write
+        // between lock and unlock ran inside the session. Eclipse does not:
+        // measured on E19, its stateful session carries `LOCK` and `UNLOCK` and
+        // nothing else — the source `PUT` goes out stateless on a session of
+        // its own, carrying only `lockHandle` and `corrNr`.
+        //
+        // The difference is not cosmetic. Anything the server takes during a
+        // request that runs inside the session is held by that session: an
+        // activation sent this way leaves its `E_ABAP_GENPH` on the generated
+        // program for as long as the connection lives, and a test run's
+        // connection lives for the whole run.
+        //
+        // #106 is preserved: what it requires is that LOCK and UNLOCK
+        // themselves run stateful, which they still do — see `release()`, whose
+        // note says exactly that.
         ctx.connection.setSessionType('stateful');
         const { lockHandle } = await this.strategy.acquire(ctx, name);
+        ctx.connection.setSessionType('stateless');
         // The handle is what the caller needs, and the strategy hands it over
         // without the wire it came on — so the answer is built around it.
         return { data: lockHandle, status: 200, statusText: 'OK', headers: {} };
@@ -65,8 +82,10 @@ export class LockCapability<TConfig, TReadResult = void>
   async lockHandle(config: Partial<TConfig>): Promise<string> {
     const ctx = this.getCtx();
     const name = this.strategy.nameOf(config);
+    // Same window as `lock()`: stateful for the acquire, stateless after it.
     ctx.connection.setSessionType('stateful');
     const { lockHandle } = await this.strategy.acquire(ctx, name);
+    ctx.connection.setSessionType('stateless');
     return lockHandle;
   }
 

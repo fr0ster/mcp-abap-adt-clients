@@ -292,14 +292,36 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
   }
 
   /** Unlock the include, and go back to stateless either way. */
+  /**
+   * Close the lock window, and the session mode with it.
+   *
+   * `lock()` sets stateful; only this puts it back. It did not, and the session
+   * stayed stateful for everything that followed — measured on E19, the four
+   * requests after an include's unlock all went out stateful: the read, the
+   * **activation**, the read after it, and the deletion. Every other type here
+   * pairs the two calls; this one set stateful and never cleared it.
+   *
+   * It matters beyond tidiness. An activation inside a stateful session leaves
+   * its `E_ABAP_GENPH` on the generated program held by that session, which
+   * lives as long as the connection — hours, in a test run — where the same
+   * activation sent statelessly leaves nothing behind. Eclipse holds a stateful
+   * session for the lock alone: its `LOCK` and `UNLOCK` are on one session and
+   * every other request, the source `PUT` included, goes stateless on a session
+   * of its own.
+   *
+   * Cleared after the request, not before: the unlock itself belongs to the
+   * window it is closing.
+   */
   async unlock(
     config: Partial<IIncludeConfig>,
     lockHandle: string,
   ): Promise<IAdtResponse<void>> {
     const includeName = requireName(config);
-    return answering(
+    const answer = await answering(
       () => unlockInclude(this.connection, includeName, lockHandle),
       () => undefined,
     );
+    this.connection.setSessionType?.('stateless');
+    return answer;
   }
 }
