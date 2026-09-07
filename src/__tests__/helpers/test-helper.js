@@ -42,9 +42,21 @@ async function writeAndActivate(handler, config, options, logger) {
     handle = raise(await handler.lock(config), 'lock');
   }
   try {
+    // `update` writes a source; a type that has none writes its document with
+    // `updateMetadata`, and since 18.0.0 it offers only that. A domain, a data
+    // element, a package, a table type, a function group and their neighbours
+    // are their own document. Written as a capability question rather than a
+    // list of type names, so a new document-only type needs nothing here.
+    const write =
+      typeof handler.update === 'function'
+        ? { call: handler.update.bind(handler), what: 'update' }
+        : {
+            call: handler.updateMetadata.bind(handler),
+            what: 'updateMetadata',
+          };
     raise(
-      await handler.update(config, { ...options, lockHandle: handle }),
-      'update',
+      await write.call(config, { ...options, lockHandle: handle }),
+      write.what,
     );
   } finally {
     if (handle && typeof handler.unlock === 'function') {
@@ -2081,7 +2093,10 @@ async function ensureSharedPackage(client, logger) {
   // package was re-created on every run and the "already exists" recovery below
   // was doing the real work.
   try {
-    const answer = await client.getPackage().read({ packageName });
+    // A package is its own document: `getPackage()` offers `readMetadata`
+    // and no `read`, since 18.0.0 named each member for the resource it
+    // addresses. This file is JavaScript, so `tsc` could not say so.
+    const answer = await client.getPackage().readMetadata({ packageName });
     if (answer.ok && String(answer.getResult().value ?? '').trim() !== '') {
       logger?.info?.(`Shared package ${packageName} already exists`);
       _sharedPackageReady = true;
@@ -2317,10 +2332,11 @@ async function ensureSharedDependency(client, type, name, logger) {
   // should accept as satisfied.
   const readShared = async () => {
     if (type === 'domains') {
-      return client.getDomain().read({ domainName: name });
+      // Document-only types: no `read`, only `readMetadata`.
+      return client.getDomain().readMetadata({ domainName: name });
     }
     if (type === 'data_elements') {
-      return client.getDataElement().read({ dataElementName: name });
+      return client.getDataElement().readMetadata({ dataElementName: name });
     }
     if (type === 'structures') {
       return client.getStructure().read({ structureName: name });
@@ -2347,7 +2363,9 @@ async function ensureSharedDependency(client, type, name, logger) {
       return client.getInterface().read({ interfaceName: name });
     }
     if (type === 'function_groups') {
-      return client.getFunctionGroup().read({ functionGroupName: name });
+      return client
+        .getFunctionGroup()
+        .readMetadata({ functionGroupName: name });
     }
     if (type === 'function_modules') {
       return client.getFunctionModule().read({
@@ -2798,7 +2816,7 @@ async function ensureSharedDependency(client, type, name, logger) {
         await new Promise((r) => setTimeout(r, 5000));
         const verify = await client
           .getFunctionGroup()
-          .read({ functionGroupName: name });
+          .readMetadata({ functionGroupName: name });
         const arrived =
           verify.ok && String(verify.getResult().value ?? '').trim() !== '';
         if (!arrived) throw createErr;
