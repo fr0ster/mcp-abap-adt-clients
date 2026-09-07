@@ -209,6 +209,40 @@ The concrete classes keep a `delete()` as the name for writing emptiness, but th
 contract the factory hands back does not declare it — writing the empty content
 through `update()` is the operation, and it is the one ADT offers.
 
+### Which class include is which
+
+The endpoint says `includes`, but these are sections of the global class, not
+objects of their own — and the four names ADT uses do not match the labels
+Eclipse shows, which is where a caller picks the wrong one.
+
+| this library | endpoint | what Eclipse calls it |
+|---|---|---|
+| `getLocalDefinitions()` | `…/oo/classes/<c>/includes/definitions` | **Class-relevant Local Types** — measured |
+| `getLocalTypes()` | `…/oo/classes/<c>/includes/implementations` | **Local Types** — measured |
+| `getLocalTestClass()` | `…/oo/classes/<c>/includes/testclasses` | Test Classes |
+| `getLocalMacros()` | `…/oo/classes/<c>/includes/macros` | Macros |
+
+The first two are the trap: "Local Types" in the Eclipse editor writes to
+`implementations`, and `definitions` is the one Eclipse calls *Class-relevant*
+Local Types. Both rows are from ADT 3.60.3 traffic against a cloud trial:
+
+```
+PUT /sap/bc/adt/oo/classes/zadt_bld_cls02/includes/implementations?lockHandle=4E23…   200   stateless
+PUT /sap/bc/adt/oo/classes/zadt_bld_cls02/includes/definitions?lockHandle=4E23…       200   stateless
+```
+
+The other two rows are the endpoint names, not captured traffic.
+
+Two things those two requests also settle: the write is **stateless**, and the
+`lockHandle` is the *class's* — the same handle serves every include, because
+what is locked is the class. Take it with `getClass().lock()`.
+
+**Not to be confused with `getInclude()`**, which is a `PROG/I` — an include of a
+report, a repository object in its own right at `/sap/bc/adt/programs/includes/`.
+It has nothing to do with classes, and a cloud system will not create one: its
+discovery collection declares an empty `<app:accept/>` and the type answers
+`403 S_DEVELOP`.
+
 ## `activate()` and what counts as a failure
 
 `activationExecuted="false"` does **not** mean the activation failed. It means
