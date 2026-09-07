@@ -10,7 +10,10 @@ import type {
 import { ACCEPT_SOURCE, ACCEPT_TRANSPORT } from '../../constants/contentTypes';
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
 import { orThrow } from '../../utils/adtResponse';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import {
+  encodeSapObjectName,
+  longPollingQuery,
+} from '../../utils/internalUtils';
 import { noopLogger } from '../../utils/noopLogger';
 import { getTimeout } from '../../utils/timeouts';
 import { AdtUtils } from '../shared/AdtUtils';
@@ -116,7 +119,10 @@ export async function getClassDefinitionsInclude(
 ): Promise<IAdtWireResponse> {
   const encodedName = encodeSapObjectName(className);
   const versionParam = version === 'inactive' ? 'workingArea' : 'active';
-  const url = `/sap/bc/adt/oo/classes/${encodedName}/includes/definitions?version=${versionParam}`;
+  const url = longPollingQuery(
+    `/sap/bc/adt/oo/classes/${encodedName}/includes/definitions?version=${versionParam}`,
+    options?.withLongPolling,
+  );
 
   return makeAdtRequestWithAcceptNegotiation(
     connection,
@@ -147,7 +153,10 @@ export async function getClassMacrosInclude(
 ): Promise<IAdtWireResponse> {
   const encodedName = encodeSapObjectName(className);
   const versionParam = version === 'inactive' ? 'workingArea' : 'active';
-  const url = `/sap/bc/adt/oo/classes/${encodedName}/includes/macros?version=${versionParam}`;
+  const url = longPollingQuery(
+    `/sap/bc/adt/oo/classes/${encodedName}/includes/macros?version=${versionParam}`,
+    options?.withLongPolling,
+  );
 
   return makeAdtRequestWithAcceptNegotiation(
     connection,
@@ -178,7 +187,10 @@ export async function getClassTestClassesInclude(
 ): Promise<IAdtWireResponse> {
   const encodedName = encodeSapObjectName(className);
   const versionParam = version === 'inactive' ? 'workingArea' : 'active';
-  const url = `/sap/bc/adt/oo/classes/${encodedName}/includes/testclasses?version=${versionParam}`;
+  const url = longPollingQuery(
+    `/sap/bc/adt/oo/classes/${encodedName}/includes/testclasses?version=${versionParam}`,
+    options?.withLongPolling,
+  );
 
   return makeAdtRequestWithAcceptNegotiation(
     connection,
@@ -209,7 +221,10 @@ export async function getClassImplementationsInclude(
 ): Promise<IAdtWireResponse> {
   const encodedName = encodeSapObjectName(className);
   const versionParam = version === 'inactive' ? 'workingArea' : 'active';
-  const url = `/sap/bc/adt/oo/classes/${encodedName}/includes/implementations?version=${versionParam}`;
+  const url = longPollingQuery(
+    `/sap/bc/adt/oo/classes/${encodedName}/includes/implementations?version=${versionParam}`,
+    options?.withLongPolling,
+  );
 
   return makeAdtRequestWithAcceptNegotiation(
     connection,

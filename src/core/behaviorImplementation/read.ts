@@ -72,11 +72,18 @@ export async function getBehaviorImplementationImplementations(
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
-  const { encodeSapObjectName } = await import('../../utils/internalUtils');
+  const { encodeSapObjectName, longPollingQuery } = await import(
+    '../../utils/internalUtils'
+  );
   const { getTimeout } = await import('../../utils/timeouts');
 
   const encodedName = encodeSapObjectName(className).toLowerCase();
-  const url = `/sap/bc/adt/oo/classes/${encodedName}/includes/implementations${version !== 'active' ? `?version=${version}` : ''}`;
+  // The version query is conditional here, so the base arrives both with and
+  // without a `?` — which is why appending is the helper's job, not a literal.
+  const url = longPollingQuery(
+    `/sap/bc/adt/oo/classes/${encodedName}/includes/implementations${version !== 'active' ? `?version=${version}` : ''}`,
+    options?.withLongPolling,
+  );
 
   return makeAdtRequestWithAcceptNegotiation(
     connection,
