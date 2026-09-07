@@ -172,7 +172,15 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
             description: config.description,
             programType: config.programType,
             application: config.application,
-            sourceCode: options?.sourceCode || config.sourceCode,
+            // No `sourceCode` here. `create` is the POST that makes the
+            // program, and it sends metadata only — the source is a PUT to
+            // `…/source/main` under a lock, which this member neither holds nor
+            // can obtain. Passing the field read as if it did something, and it
+            // never did: a program created with a body came back empty, and the
+            // only symptom was the object failing to do its job later. Writing
+            // the source is `update`'s, after `lock`. See
+            // fr0ster/mcp-abap-adt-interfaces#76 for taking the field off the
+            // create contract so the compiler says this instead of a comment.
             masterSystem: this.systemContext.masterSystem,
             responsible: this.systemContext.responsible,
             masterLanguage:
