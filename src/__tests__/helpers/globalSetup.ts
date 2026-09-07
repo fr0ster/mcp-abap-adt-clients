@@ -8,6 +8,7 @@
 
 const { loadTestEnv } = require('./test-helper');
 
+import * as fs from 'node:fs';
 import { ADT_SESSION_ERROR } from '@mcp-abap-adt/interfaces';
 import {
   createTestConnection,
@@ -142,6 +143,21 @@ export default async function globalSetup(globalConfig?: JestGlobalConfig) {
   // every file would adopt cookies the server has long since released and then
   // fail on a session that is not there.
   forgetSessionMaterial();
+
+  // And whatever a previous run wrote to the wire log. Once per run, here,
+  // because this is the only code that runs once: `withWireLog` is reached by
+  // every connection in every test file, and jest recycles the worker between
+  // files, so "once per process" there is once per file and each one wipes the
+  // last. Measured both ways — appending kept six runs in one file and made a
+  // count of the current run wrong; truncating per process left 2 connections
+  // where the run had 69.
+  if (process.env.WIRE_LOG) {
+    try {
+      fs.writeFileSync(process.env.WIRE_LOG, '');
+    } catch {
+      // A log that cannot be emptied is still better than no log.
+    }
+  }
 
   if (!process.env.SAP_URL) {
     say('[globalSetup] SAP_URL not configured — skipping preflight');

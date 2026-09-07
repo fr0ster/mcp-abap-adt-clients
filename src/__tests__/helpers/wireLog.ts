@@ -128,9 +128,6 @@ function bodyLine(data: unknown, limit = 1200): string {
  * copies them would have to be written twice and would break on the next field
  * either one gains.
  */
-/** Log files this process has already emptied — see below. */
-const truncated = new Set<string>();
-
 export function withWireLog<T extends object>(transport: T): T {
   const path = process.env.WIRE_LOG;
   if (!path) return transport;
@@ -151,14 +148,17 @@ export function withWireLog<T extends object>(transport: T): T {
   // runs reported the same four `ICMENOSESSION` responses to each of them, when
   // all four belonged to the first. Three conclusions were drawn from that
   // number, and reported, before the file itself was looked at.
-  if (!truncated.has(path)) {
-    try {
-      fs.writeFileSync(path, '');
-    } catch {
-      // A log that cannot be truncated is still better than no log.
-    }
-    truncated.add(path);
-  }
+  // Emptied by `globalSetup`, once per run — not here.
+  //
+  // This used to truncate "once per process", which is once per *test file*
+  // under jest: the worker is recycled between them, each new process starts
+  // with an empty `truncated` set, and each wipes what the previous ones wrote.
+  // Measured: a full run left 2 connections and 4 KB where the previous one had
+  // 69 and 26 MB, and the evidence for that run was gone before anyone read it.
+  //
+  // That is the opposite of the fault it replaced — a file accumulating six
+  // runs — and it hides just as effectively. `globalSetup` runs once, which is
+  // the only place that can tell one run from the next.
 
   write(`\n===== wire log opened ${new Date().toISOString()} =====\n`);
 
