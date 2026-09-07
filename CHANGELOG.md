@@ -363,6 +363,32 @@ the sequence around a write handed back to the consumer.
   consumer nothing the atoms did not, and it named two members that no longer
   exist.
 
+- **`AdtInclude.delete` takes no lock handle, and `deleteInclude` lost the
+  parameter.** A `PROG/I` include was the one type deleted with
+  `DELETE /programs/includes/<name>?lockHandle=…`, and the file said so: "requires
+  a lock, like every other ADT deletion". Both halves were wrong. A lock is what
+  an *update* needs; a deletion is `POST /deletion/check` then
+  `POST /deletion/delete`, which every other type here already used, and an
+  existing lock does not let a delete through — it blocks it.
+
+  So the endpoint answered `400 Parameter lockHandle could not be found` to every
+  caller that had none, which is every cleanup, since nothing locks an object in
+  order to remove it. `Include - Full workflow` failed that way on both
+  transports.
+
+  Measured on E19 against a leftover the broken suite had left behind — no lock
+  taken, no stateful session:
+
+  ```
+  POST /sap/bc/adt/deletion/check   -> del:isDeletable="true" adtcore:type="PROG/I"
+  POST /sap/bc/adt/deletion/delete  -> del:isDeleted="true"
+  ```
+
+  `options.lockHandle` is gone from the signature rather than ignored, so a
+  caller cannot pass one and believe it mattered. As everywhere else, `200` from
+  the deletion service means accepted — `del:isDeleted` in the body is the
+  verdict.
+
 - **`AdtRequest.create()` answers the created request**, not its document:
   `{ transportNumber, description, type, targetSystem, owner, uri, … }`. The
   low-level `createTransport` hands the document on and `parseCreatedTransport`
@@ -370,6 +396,30 @@ the sequence around a write handed back to the consumer.
   object in place of the response, so the reading had nothing to read.
 
 ### Fixed
+
+- **`withLongPolling` never reached the wire for five reads.** The four
+  class-include reads — `definitions`, `macros`, `testclasses`,
+  `implementations` — and `getBehaviorImplementationImplementations` took
+  `IReadOptions`, used it for `accept`, and never asked about long polling. A
+  caller set the option and nothing happened.
+
+  What they had in common is the separator. Their URL already carries
+  `?version=…`, so the `'?withLongPolling=true'` literal used elsewhere in that
+  layer could not be reused, and they dropped the option rather than joining it
+  correctly. `longPollingQuery(url, wanted)` now holds that decision in one
+  place.
+
+  The other 23 reads taking `IReadOptions` were never affected: they hand it to
+  `objectSourceWire`, `objectMetadataWire`, a local `buildQuery` or
+  `getClassTransport`, and all four read it. A count of 28 comes from grepping
+  bodies for the literal without following the delegation.
+
+  Pinned by ten unit tests asserting the whole URL, not merely that the
+  parameter appears in it — a second `?` is silently wrong, since SAP reads the
+  query up to it and ignores the rest. Unit coverage was necessary because the
+  integration suites cannot catch this: one full E19 run put 47 class-include
+  reads on the wire and not one asked for long polling, because no caller sets
+  it.
 
 - **A `deleteOnFailure` create deleted the object it had just made.** The
   rollback was registered with `chain`'s `onScopeEnd`, which runs on every path
