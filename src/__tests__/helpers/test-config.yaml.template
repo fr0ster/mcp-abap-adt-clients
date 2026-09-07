@@ -2186,3 +2186,59 @@ execute_program:
             max_size_for_trace_file: 30720
             amdp_trace: true
             max_time_for_tracing: 1800
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Service binding publication — TWO DELIBERATE RUNS, never the full suite.
+#
+# Publishing is the slowest thing this library asks of ADT: ~135s measured on a
+# trial, and one unpublish still unsettled after eleven minutes. ADT also
+# refuses to delete a binding whose endpoints are published, so a flow that
+# publishes cannot clean up after itself. That is why these are their own test
+# cases, `enabled: false` by default, and why the workflow flow above keeps
+# `desired_publication_state: "unchanged"`.
+#
+# To exercise publication:
+#   1. set publish_service_binding.enabled: true, run
+#      `npm test -- integration/core/serviceBinding/publication`
+#   2. check the binding in Eclipse ADT — the test prints what to look at
+#   3. set unpublish_service_binding.enabled: true (and publish back to false),
+#      run the same file again
+#
+# `timeout_ms` is passed to the member, not taken from SAP_TIMEOUT_LONG: since
+# 18.0.0 `update` honours `IAdtOperationOptions.timeout`, which it used to drop.
+publish_service_binding:
+  test_cases:
+    - name: "publish_binding"
+      enabled: false                # ← turn on for a deliberate publish run
+      available_in: ["onprem", "cloud"]
+      description: "Publish ZAC_SRVB01 and leave it published for inspection"
+      params:
+        binding_name: "ZAC_SRVB01"
+        service_name: "ZAC_SRVD01"
+        service_version: "0001"
+        service_type: "odatav4"
+        # How long the *request* waits before the client gives up.
+        timeout_ms: 300000
+        # How long the *test* keeps asking afterwards. The two are different
+        # things: a publication is a job, and it has been measured finishing
+        # after the client had already timed out — so a timeout is not an
+        # answer, it is the moment to start checking.
+        wait_minutes: 5
+        poll_seconds: 15
+
+unpublish_service_binding:
+  test_cases:
+    - name: "unpublish_binding"
+      enabled: false                # ← turn on for the deliberate unpublish run
+      available_in: ["onprem", "cloud"]
+      description: "Unpublish ZAC_SRVB01 after it has been checked in Eclipse"
+      params:
+        binding_name: "ZAC_SRVB01"
+        service_name: "ZAC_SRVD01"
+        service_version: "0001"
+        service_type: "odatav4"
+        timeout_ms: 300000
+        # Longer than the publish budget: unpublish has been the slower of the
+        # two, once still unsettled after eleven minutes.
+        wait_minutes: 12
+        poll_seconds: 15

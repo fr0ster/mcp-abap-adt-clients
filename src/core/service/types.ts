@@ -136,6 +136,16 @@ export interface IServiceBindingPublicationParams {
   serviceName?: string;
   /** Overrides the binding's own `srvb:content srvb:version`. */
   serviceVersion?: string;
+  /**
+   * How long to wait for the publication job, in milliseconds.
+   *
+   * A publication is the slowest request this library makes — ~135s measured on
+   * a trial, and one unpublish still unsettled after eleven minutes — so the
+   * 120s `SAP_TIMEOUT_LONG` default is a floor. `IAdtOperationOptions.timeout`
+   * has carried this all along and `update` used to drop it, which left a
+   * caller no way to wait longer than the library had decided to.
+   */
+  timeout?: number;
 }
 
 /**

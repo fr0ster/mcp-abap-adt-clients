@@ -26,6 +26,7 @@ import {
   ACCEPT_CHECK_MESSAGES,
   ACCEPT_DELETION,
   ACCEPT_DELETION_CHECK,
+  ACCEPT_PUBLICATION_JOB,
   ACCEPT_TRANSPORT_CHECK,
   ACCEPT_VALIDATION,
   CT_CHECK_OBJECTS,
@@ -270,20 +271,45 @@ export class AdtServiceBinding<
     bindingName: string,
     servicename: string,
     serviceversion?: string,
+    // **The caller's, when they give one.** A publication job is the slowest
+    // thing this library asks for — measured at ~135s on a trial, and an
+    // unpublish once not settled after eleven minutes — so the 120s
+    // `SAP_TIMEOUT_LONG` default is a floor, not a ceiling. The contract has
+    // carried `IAdtOperationOptions.timeout` all along; this member used to
+    // drop it, which left a caller no way to wait longer than the library had
+    // decided to.
+    timeout?: number,
   ): Promise<IAdtWireResponse> {
-    const bindingUri = `/sap/bc/adt/businessservices/bindings/${AdtServiceBinding.encodeName(bindingName)}`;
-    const xml = `<?xml version="1.0" encoding="UTF-8"?><adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core"><adtcore:objectReference adtcore:uri="${bindingUri}" adtcore:name="${bindingName.toUpperCase()}"/></adtcore:objectReferences>`;
+    // **The document Eclipse sends**, captured on the cloud trial: the target is
+    // named by *type* — `SCGR`, a service group — and by name, with no
+    // `adtcore:uri`. This library used to send the binding's URI instead, and
+    // the server accepted it; "the server accepted it" and "this is what the
+    // request is" are different claims, and only one of them was measured.
+    const xml = `<?xml version="1.0" encoding="UTF-8"?><adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core">
+  <adtcore:objectReference adtcore:type="SCGR" adtcore:name="${bindingName.toUpperCase()}"/>
+</adtcore:objectReferences>`;
 
-    const publishQs = buildQueryString({ servicename, serviceversion });
+    // **No query string.** `servicename` and `serviceversion` used to be
+    // appended here; Eclipse sends neither, and the job answers `SEVERITY OK`
+    // without them. They stay on the params because they still override what
+    // the binding's own document says when this member reads it.
     return this.connection.makeAdtRequest({
-      url: `/sap/bc/adt/businessservices/${serviceType}/publishjobs?${publishQs}`,
+      url: `/sap/bc/adt/businessservices/${serviceType}/publishjobs`,
       method: 'POST',
-      timeout: getTimeout('long'),
+      // Measured at ~133s in both directions, so the 120s `SAP_TIMEOUT_LONG`
+      // default could never have been enough. A caller who knows their system
+      // passes their own.
+      timeout: timeout ?? getTimeout('long'),
       data: xml,
       headers: {
-        Accept: ACCEPT_VALIDATION,
+        Accept: ACCEPT_PUBLICATION_JOB,
         'Content-Type': 'application/xml',
       },
+      // `sap-cancel-on-close: true` is what Eclipse adds and this does not, on
+      // purpose. It tells the server to abandon the job when the connection
+      // goes, and this library's caller is far likelier to give up before 133
+      // seconds than an editor is — measured here: the client timed out at 120s
+      // and the binding was published anyway, which is the outcome to keep.
     });
   }
 
@@ -292,20 +318,45 @@ export class AdtServiceBinding<
     bindingName: string,
     servicename: string,
     serviceversion?: string,
+    // **The caller's, when they give one.** A publication job is the slowest
+    // thing this library asks for — measured at ~135s on a trial, and an
+    // unpublish once not settled after eleven minutes — so the 120s
+    // `SAP_TIMEOUT_LONG` default is a floor, not a ceiling. The contract has
+    // carried `IAdtOperationOptions.timeout` all along; this member used to
+    // drop it, which left a caller no way to wait longer than the library had
+    // decided to.
+    timeout?: number,
   ): Promise<IAdtWireResponse> {
-    const bindingUri = `/sap/bc/adt/businessservices/bindings/${AdtServiceBinding.encodeName(bindingName)}`;
-    const xml = `<?xml version="1.0" encoding="UTF-8"?><adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core"><adtcore:objectReference adtcore:uri="${bindingUri}" adtcore:name="${bindingName.toUpperCase()}"/></adtcore:objectReferences>`;
+    // **The document Eclipse sends**, captured on the cloud trial: the target is
+    // named by *type* — `SCGR`, a service group — and by name, with no
+    // `adtcore:uri`. This library used to send the binding's URI instead, and
+    // the server accepted it; "the server accepted it" and "this is what the
+    // request is" are different claims, and only one of them was measured.
+    const xml = `<?xml version="1.0" encoding="UTF-8"?><adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core">
+  <adtcore:objectReference adtcore:type="SCGR" adtcore:name="${bindingName.toUpperCase()}"/>
+</adtcore:objectReferences>`;
 
-    const unpublishQs = buildQueryString({ servicename, serviceversion });
+    // **No query string.** `servicename` and `serviceversion` used to be appended
+    // here; Eclipse sends neither, and the job answers `SEVERITY OK` without
+    // them. They stay on the params because they still override what the
+    // binding's own document says when this member reads it.
     return this.connection.makeAdtRequest({
-      url: `/sap/bc/adt/businessservices/${serviceType}/unpublishjobs?${unpublishQs}`,
+      url: `/sap/bc/adt/businessservices/${serviceType}/unpublishjobs`,
       method: 'POST',
-      timeout: getTimeout('long'),
+      // Measured at ~133s in both directions, so the 120s `SAP_TIMEOUT_LONG`
+      // default could never have been enough. A caller who knows their system
+      // passes their own.
+      timeout: timeout ?? getTimeout('long'),
       data: xml,
       headers: {
-        Accept: ACCEPT_VALIDATION,
+        Accept: ACCEPT_PUBLICATION_JOB,
         'Content-Type': 'application/xml',
       },
+      // `sap-cancel-on-close: true` is what Eclipse adds and this does not, on
+      // purpose. It tells the server to abandon the job when the connection
+      // goes, and this library's caller is far likelier to give up before 133
+      // seconds than an editor is — measured here: the client timed out at 120s
+      // and the binding was published anyway, which is the outcome to keep.
     });
   }
 
@@ -460,6 +511,8 @@ export class AdtServiceBinding<
           serviceType: config.serviceType,
           serviceName: config.serviceName,
           serviceVersion: config.serviceVersion,
+          // The contract has always offered this; it used to stop here.
+          timeout: options?.timeout,
         }),
       this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
       // A publication change IS this member's write: `update` on a binding
@@ -842,6 +895,7 @@ export class AdtServiceBinding<
         params.bindingName,
         serviceName,
         serviceVersion,
+        params.timeout,
       );
     }
 
@@ -861,6 +915,7 @@ export class AdtServiceBinding<
       params.bindingName,
       serviceName,
       serviceVersion,
+      params.timeout,
     );
   }
 

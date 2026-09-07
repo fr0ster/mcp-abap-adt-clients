@@ -41,6 +41,19 @@ export const CT_ACTIVATION = 'application/vnd.sap.adt.activation+xml';
 // Validation
 export const ACCEPT_VALIDATION = 'application/vnd.sap.as+xml';
 
+/**
+ * What a publication job answers, asked for the way Eclipse asks.
+ *
+ * Measured on the cloud trial, both directions: the response comes back as
+ * `application/vnd.sap.as+xml; charset=utf-8; dataname=com.sap.adt.StatusMessage`
+ * and carries `<SEVERITY>` and `<SHORT_TEXT>`. Eclipse names that `dataname` in
+ * its `Accept`; this library asked for the bare media type and got the same
+ * answer, but asking for what you intend to read is the difference between
+ * working and happening to work.
+ */
+export const ACCEPT_PUBLICATION_JOB =
+  'application/xml, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.StatusMessage';
+
 // Transport
 export const ACCEPT_TRANSPORT =
   'application/vnd.sap.adt.transportorganizer.v1+xml';
