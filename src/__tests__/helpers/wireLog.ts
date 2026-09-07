@@ -19,10 +19,18 @@
  * At `full` the file runs to hundreds of megabytes over a whole suite. That is
  * the point of it, but it is worth knowing before starting one.
  *
- * It wraps the transport rather than the connection on purpose. By the time a
- * request reaches `send()` every header is on it — CSRF, cookies, session type,
- * connection id — which is exactly the set worth comparing. Above that they do
- * not exist yet.
+ * It wraps the transport rather than the connection on purpose: everything the
+ * *connection* adds is on the request by the time it reaches `send()` — the
+ * session type, the connection id, the request id, the CSRF token.
+ *
+ * **What it does not show, and this has misled a reading already.** The
+ * transport dresses the request inside `send()`, after this wrapper has seen
+ * it, so the cookies and the load-balancer affinity headers
+ * (`sap-adt-saplb: fetch`, `saplb`, `saplb-options`) — and, on cloud,
+ * `x-sap-security-session` — never appear here. A full run's log contains zero
+ * `Cookie` lines, which is the giveaway: every request obviously carries them.
+ * Counting a transport-level header in this file and finding none means the
+ * file cannot see it, not that it was not sent.
  */
 
 import { createHash } from 'node:crypto';
