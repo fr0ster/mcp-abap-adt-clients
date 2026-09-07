@@ -554,38 +554,15 @@ describe('Class local includes (using BaseTester)', () => {
     it(
       'should execute full workflow for macros include (on-premise only)',
       async () => {
-        // Skipped on cloud — and the wording matters, because the obvious
-        // reason is the wrong one. **The macros include is not the problem.**
-        // ADT 3.60.3 against the trial answers
-        // `PUT …/oo/classes/<c>/includes/macros?lockHandle=…` with 200: a cloud
-        // class has that include and it can be written.
-        //
-        // What the ABAP for Cloud language version forbids is `DEFINE`, which
-        // is the only thing a macros include holds — and this case's own source
-        // is `DEFINE _local_noop. … END-OF-DEFINITION.`, so it cannot pass
-        // there no matter how the endpoint behaves.
-        //
-        // The previous wording, "Macros are not supported in cloud systems
-        // (BTP ABAP Environment)", named the wrong half: anyone checking it
-        // against the endpoint would have measured 200 and concluded the skip
-        // was wrong. It is not wrong; it was described wrongly.
-        if (isCloudSystem) {
-          const definition = getTestCaseDefinition(
-            'update_class_local_macros',
-            'local_macros',
-          );
-          const testName = 'Class - LocalMacros - full workflow';
-          logTestStart(testsLogger, testName, definition);
-          logTestSkip(
-            testsLogger,
-            testName,
-            'DEFINE is forbidden by the ABAP for Cloud language version; the ' +
-              'macros include itself is writable there — PUT …/includes/macros ' +
-              'answers 200',
-          );
-          logTestEnd(testsLogger, testName);
-          return;
-        }
+        // No environment branch here. `available_in` decides and
+        // `skip_reason` explains, both in test-config.yaml, and
+        // `localMacrosTester.shouldSkip()` below is what reads them. This case
+        // used to carry its own `if (isCloudSystem)` saying "Macros are not
+        // supported in cloud systems" — a second source of truth, and a wrong
+        // one: a cloud class has a writable macros include, ADT 3.60.3 against
+        // the trial answers `PUT …/includes/macros` with 200. What the ABAP for
+        // Cloud language version forbids is `DEFINE`, which is what this case's
+        // source contains, and that sentence now lives in the config.
 
         const testName = 'Class - LocalMacros - full workflow';
         if (!hasConfig || !localMacrosTester) {
@@ -612,7 +589,10 @@ describe('Class local includes (using BaseTester)', () => {
         const existing = await client
           .getLocalMacros()
           .read({ className: config.className }, 'active');
-        if (!existing) {
+        // `read` answers `IAdtResponse`, an object on both halves, so
+        // `if (!existing)` was never true and this skip never fired. The
+        // question is whether the read succeeded.
+        if (!existing.ok) {
           const definition = getTestCaseDefinition(
             'update_class_local_macros',
             'local_macros',

@@ -1623,7 +1623,14 @@ export class BaseTester<TConfig, TState = unknown> {
           : this.isLegacySystem
             ? 'legacy'
             : 'on-premise';
-        this.skipReason = `Test not available for ${envName} environment (check available_in in test-config.yaml)`;
+        // `available_in` decides; `skip_reason` explains. A generic sentence
+        // sends the next reader to the flag and no further, which is how
+        // "not available on cloud" survived next to an endpoint that answers
+        // 200 — the flag was right and the reason was never written down.
+        this.skipReason =
+          typeof tc?.skip_reason === 'string' && tc.skip_reason.length > 0
+            ? tc.skip_reason
+            : `Test not available for ${envName} environment (check available_in in test-config.yaml)`;
         this.log(LogLevel.WARN, `beforeEach: ${this.skipReason}`);
         this.testCase = null;
         this.configResolver = null;

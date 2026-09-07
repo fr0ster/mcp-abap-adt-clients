@@ -849,6 +849,7 @@ update_class_local_macros:
     - name: "local_macros"
       enabled: true
       available_in: ["onprem", "legacy"]
+      skip_reason: "DEFINE is forbidden by the ABAP for Cloud language version; the macros include itself is writable there — PUT .../includes/macros answers 200"
       description: "Update class macros include. On-prem only, and the reason is DEFINE, not the include: a cloud class has a writable macros include (PUT answers 200), but the ABAP for Cloud language version forbids DEFINE"
       params:
         class_name: "ZAC_CLS13"
@@ -1467,7 +1468,10 @@ create_function_include:
   test_cases:
     - name: "adt_function_include"
       enabled: true
-      available_in: ["onprem"]
+      # Measured on the cloud trial with ADT 3.60.3: LOCK then
+      # PUT .../functions/groups/<g>/includes/<i>/source/main?lockHandle=...
+      # both answer 200. The previous onprem-only flag was never measured.
+      available_in: ["onprem", "cloud"]
       description: "Function include reserved for AdtFunctionInclude tests"
       params:
         function_group_name: "ZAC_SHR_FUGR"  # → shared_dependencies.function_groups
