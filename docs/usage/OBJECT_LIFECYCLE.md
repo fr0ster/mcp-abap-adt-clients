@@ -174,7 +174,7 @@ try {
     { className },
     { sourceCode: mainSourceFor(className, behaviorDefinition), lockHandle },
   );
-  await bimpl.update({ className, sourceCode }, { lockHandle });
+  await bimpl.update({ className }, { sourceCode, lockHandle });
 } finally {
   await cls.unlock({ className }, lockHandle);
 }

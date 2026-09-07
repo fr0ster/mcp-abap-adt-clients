@@ -260,7 +260,12 @@ export class AdtBehaviorDefinition<
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     const name = this.name(config);
-    const source = options?.sourceCode || config.sourceCode;
+    // The source is the caller's, through `options.sourceCode`. This used to
+    // fall back to `config.sourceCode` — two channels for one value, where the
+    // contract documents one. `config.sourceCode` is `check`'s alone now: a
+    // syntax check compiles a source that is not on the server yet, so it has
+    // nowhere else to arrive.
+    const source = options?.sourceCode;
 
     if (!source) {
       throw new Error('Source code is required for update');

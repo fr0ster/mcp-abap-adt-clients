@@ -68,8 +68,9 @@ import {
  * binding it to its behavior definition.
  *
  * Exported because writing it is the caller's: a behavior implementation *is* a
- * class, so the shell goes in with `getClass().update({ className, sourceCode })`
- * like any other class source. There used to be an `updateMain()` member here
+ * class, so the shell goes in with
+ * `getClass().update({ className }, { sourceCode })` like any other class
+ * source. There used to be an `updateMain()` member here
  * that composed this text and wrote it; it was a second `update` on a type
  * whose two resources are both sources, which is not the shape the atoms name.
  */
@@ -290,8 +291,11 @@ export class AdtBehaviorImplementation<
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     const name = this.name(config);
-    const source =
-      options?.sourceCode || config.implementationCode || config.sourceCode;
+    // The source is the caller's, through `options.sourceCode`. This used to
+    // read `config.implementationCode` and `config.sourceCode` as well — three
+    // channels for one value, of which the contract documents one, and nothing
+    // in this repository ever set either config field.
+    const source = options?.sourceCode;
     // No `behaviorDefinition` guard: this writes the implementation include and
     // never reads the definition's name. It was required here while `update`
     // also wrote the generated shell, which does mention it — the guard outlived

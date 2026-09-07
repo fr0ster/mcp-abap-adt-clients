@@ -214,8 +214,11 @@ await include.delete({ includeName: 'ZMY_INCLUDE' });
 
 Contract notes:
 - **Activation is a call, not an option.** `activate()` is its own member and
-  runs when you call it. `options.sourceCode` wins over the config's, and
-  `options.lockHandle` is passed to the write as given — including not at all,
+  runs when you call it. **A write takes its source from `options.sourceCode`
+  and nowhere else** — the config's field used to serve as a second channel for
+  the same value and no longer does; it belongs to `check`, which compiles a
+  source that is not on the server yet. `options.lockHandle` is passed to the
+  write as given — including not at all,
   in which case ADT decides whether an unlocked write is allowed and says so in
   the answer.
 - **An empty source is a source.** `sourceCode: ''` clears an include; only

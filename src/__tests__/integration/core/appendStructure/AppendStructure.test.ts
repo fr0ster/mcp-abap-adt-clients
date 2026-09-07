@@ -263,12 +263,8 @@ describe('AppendStructure (TABL/DS) integration', () => {
             try {
               expectResult(
                 await as.update(
-                  {
-                    appendStructureName,
-                    transportRequest,
-                    sourceCode: source,
-                  },
-                  { lockHandle: appendLock },
+                  { appendStructureName, transportRequest },
+                  { sourceCode: source, lockHandle: appendLock },
                 ),
                 'update append structure',
               );

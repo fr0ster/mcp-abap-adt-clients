@@ -256,7 +256,12 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
       throw new Error('Program name is required');
     }
     const name = config.programName;
-    const source = options?.sourceCode || config.sourceCode;
+    // The source is the caller's, through `options.sourceCode`. This used to
+    // fall back to `config.sourceCode` — two channels for one value, where the
+    // contract documents one. `config.sourceCode` is `check`'s alone now: a
+    // syntax check compiles a source that is not on the server yet, so it has
+    // nowhere else to arrive.
+    const source = options?.sourceCode;
     const sessionId = this.connection.getSessionId?.() || '';
 
     if (!source) {

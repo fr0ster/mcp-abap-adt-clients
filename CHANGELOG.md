@@ -18,6 +18,31 @@ the sequence around a write handed back to the consumer.
 
 ### Breaking
 
+- **A write takes its source from `options.sourceCode` and nowhere else.**
+  Sixteen `update`/`updateMetadata` implementations read
+  `options?.sourceCode || config.sourceCode`, so one value had two channels and
+  the contract documented one. `AdtProgram.create` had the same expression and
+  handed the result to a function that ignores it — the POST carries metadata
+  only — and `AdtBehaviorImplementation.update` had three channels, of which
+  nothing in this repository ever set two.
+
+  `config.sourceCode` stays on the config types, because `check` needs it and
+  has nowhere else to get it: a syntax check compiles a source that is not on
+  the server yet. Its meaning is now single — the source being checked, not a
+  second way to write.
+
+  ```typescript
+  // before — either worked
+  await cls.update({ className, sourceCode }, { lockHandle });
+  await cls.update({ className }, { sourceCode, lockHandle });
+
+  // now — the second one
+  await cls.update({ className }, { sourceCode, lockHandle });
+  ```
+
+  A write with no `options.sourceCode` is refused before the request, as it
+  always was when neither channel carried one.
+
 - **A write states what it needs.** Every implementation of `IAdtUpdatable` and
   `IAdtMetadataUpdatable` now names its own config instead of inheriting a
   `Partial` the atom applied on everyone's behalf. For the 37 types whose write

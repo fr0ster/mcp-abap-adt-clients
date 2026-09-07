@@ -121,8 +121,8 @@ describe('AdtScalarFunction handler', () => {
 
     const sf = new AdtScalarFunction(conn);
     await sf.update(
-      { scalarFunctionName: 'ZOK_SF', sourceCode: 'new source' },
-      { lockHandle: 'LOCK_HANDLE_42' },
+      { scalarFunctionName: 'ZOK_SF' },
+      { sourceCode: 'new source', lockHandle: 'LOCK_HANDLE_42' },
     );
 
     expect(calls).toHaveLength(1);

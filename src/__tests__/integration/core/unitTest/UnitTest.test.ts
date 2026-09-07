@@ -238,7 +238,7 @@ describe('AdtUnitTest (using AdtClient)', () => {
             await client
               .getClass()
               .update(
-                { className: containerClass, sourceCode, transportRequest },
+                { className: containerClass, transportRequest },
                 { sourceCode },
               );
             testsLogger.info?.('Existing class source updated');

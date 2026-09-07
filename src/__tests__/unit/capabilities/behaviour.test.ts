@@ -354,6 +354,18 @@ async function invoke(
     case 'check':
       await fn.call(handler, config, 'inactive');
       return;
+    case 'update':
+    case 'updateMetadata':
+      // The source travels in the options, which is the only channel now: the
+      // fallback to `config.sourceCode` is gone, so a write with neither is
+      // refused before the request — correctly, and not what this guard is
+      // measuring. `xmlContent` for the same reason on the document writes.
+      await fn.call(handler, config, {
+        sourceCode: String(config.sourceCode ?? '" guard'),
+        xmlContent: String(config.xmlContent ?? '<guard/>'),
+        lockHandle: 'GUARD-LOCK',
+      });
+      return;
     default:
       await fn.call(handler, config);
   }

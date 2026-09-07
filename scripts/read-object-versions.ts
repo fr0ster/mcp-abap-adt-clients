@@ -414,14 +414,12 @@ async function run(): Promise<void> {
       );
     }
     try {
-      await client.getClass().update(
-        {
-          className: options.objectName,
-          transportRequest,
-          sourceCode: updatedSource,
-        },
-        { sourceCode: updatedSource },
-      );
+      await client
+        .getClass()
+        .update(
+          { className: options.objectName, transportRequest },
+          { sourceCode: updatedSource },
+        );
     } catch (error) {
       logHttpError(error, 'Update');
       throw error;
@@ -471,14 +469,12 @@ async function run(): Promise<void> {
   } finally {
     if (updateSucceeded && originalSource) {
       testsLogger.info?.('Restoring original source...');
-      await client.getClass().update(
-        {
-          className: options.objectName,
-          transportRequest,
-          sourceCode: originalSource,
-        },
-        { sourceCode: originalSource },
-      );
+      await client
+        .getClass()
+        .update(
+          { className: options.objectName, transportRequest },
+          { sourceCode: originalSource },
+        );
       await client.getClass().activate({ className: options.objectName });
       const restored = await readSource(client, connection, 'active');
       const restoredOk = restored === originalSource;

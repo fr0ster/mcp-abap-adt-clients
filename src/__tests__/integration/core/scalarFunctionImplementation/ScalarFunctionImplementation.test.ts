@@ -227,12 +227,8 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
           try {
             expectResult(
               await sf.update(
-                {
-                  scalarFunctionName: funcName,
-                  transportRequest,
-                  sourceCode: sigSource,
-                },
-                { lockHandle: funcLock },
+                { scalarFunctionName: funcName, transportRequest },
+                { sourceCode: sigSource, lockHandle: funcLock },
               ),
               'update scalar function',
             );
@@ -256,8 +252,8 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
             'lock AMDP class',
           );
           await cls.update(
-            { className: amdpName, transportRequest, sourceCode: amdpSource },
-            { lockHandle: amdpLock },
+            { className: amdpName, transportRequest },
+            { sourceCode: amdpSource, lockHandle: amdpLock },
           );
           await cls.unlock({ className: amdpName }, amdpLock);
 
@@ -292,12 +288,8 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
           try {
             expectResult(
               await dsfi.update(
-                {
-                  implementationName: implName,
-                  transportRequest,
-                  sourceCode: implSource,
-                },
-                { lockHandle: implLock },
+                { implementationName: implName, transportRequest },
+                { sourceCode: implSource, lockHandle: implLock },
               ),
               'update DSFI source',
             );

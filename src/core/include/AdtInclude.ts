@@ -187,7 +187,12 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     // Absence, not emptiness: clearing an include to empty is a real edit, and
     // a truthiness check made it impossible to express.
-    const sourceCode = options?.sourceCode ?? config.sourceCode;
+    // The source is the caller's, through `options.sourceCode`. This used to
+    // fall back to `config.sourceCode` — two channels for one value, where the
+    // contract documents one. `config.sourceCode` is `check`'s alone now: a
+    // syntax check compiles a source that is not on the server yet, so it has
+    // nowhere else to arrive.
+    const sourceCode = options?.sourceCode;
     if (sourceCode === undefined) {
       throw new Error(
         'sourceCode is required to update an include — pass it in the config or in options',

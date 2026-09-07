@@ -102,10 +102,10 @@ describe('AdtInclude', () => {
 
     it('does not activate on update unless activateOnUpdate says so', async () => {
       const { connection, calls } = createConnection();
-      await new AdtInclude(connection, logger).update({
-        includeName: 'ZMY_INC',
-        sourceCode: '" code',
-      });
+      await new AdtInclude(connection, logger).update(
+        { includeName: 'ZMY_INC' },
+        { sourceCode: '" code' },
+      );
 
       expect(calls.some((c) => c.url.includes('/activation'))).toBe(false);
     });
@@ -134,10 +134,10 @@ describe('AdtInclude', () => {
   describe('an empty source is a value, not an absence', () => {
     it('clears an include to empty instead of refusing the edit', async () => {
       const { connection, calls } = createConnection();
-      await new AdtInclude(connection, logger).update({
-        includeName: 'ZMY_INC',
-        sourceCode: '',
-      });
+      await new AdtInclude(connection, logger).update(
+        { includeName: 'ZMY_INC' },
+        { sourceCode: '' },
+      );
 
       const put = calls.find((c) => c.method === 'PUT');
       expect(put).toBeDefined();
