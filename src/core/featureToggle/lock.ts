@@ -15,7 +15,10 @@ export async function lockFeatureToggle(
     timeout: getTimeout('default'),
     params: { _action: 'LOCK', accessMode: 'MODIFY' },
     headers: {
-      'X-sap-adt-sessiontype': 'stateful',
+      // No `X-sap-adt-sessiontype` here: `setSessionType('stateful')` in the
+      // handler is what puts it on this request, the same as every other type.
+      // Setting it here as well meant the header could appear on a request the
+      // connection did not consider stateful.
       Accept:
         'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.Result2,' +
         'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.Result',

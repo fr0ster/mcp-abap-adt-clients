@@ -16,6 +16,9 @@ export async function unlockFeatureToggle(
     url: `/sap/bc/adt/sfw/featuretoggles/${encoded}`,
     timeout: getTimeout('default'),
     params: { _action: 'UNLOCK', lockHandle },
-    headers: { 'X-sap-adt-sessiontype': 'stateful' },
+    // No `X-sap-adt-sessiontype` here: `setSessionType('stateful')` in the
+    // handler is what puts it on this request, the same as every other type.
+    // Setting it here as well meant the header could appear on a request the
+    // connection did not consider stateful.
   });
 }
