@@ -32,6 +32,7 @@ const PARAM_TO_TYPE: Record<string, string> = {
   access_control_name: 'access_controls',
   function_group_name: 'function_groups',
   function_module_name: 'function_modules',
+  include_name: 'function_group_includes',
   program_name: 'programs',
   class_name: 'classes',
   interface_name: 'interfaces',
@@ -63,6 +64,7 @@ const ALL_SECTIONS = [
   'interfaces',
   'function_groups',
   'function_modules',
+  'function_group_includes',
   'programs',
 ];
 

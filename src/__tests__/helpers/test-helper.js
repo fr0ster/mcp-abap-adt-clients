@@ -518,6 +518,14 @@ function resolveStandardObject(
       yamlKey: 'function_modules',
       paramSuffix: 'function_module_name',
     },
+    functionInclude: {
+      yamlKey: 'function_group_includes',
+      paramSuffix: 'include_name',
+    },
+    function_include: {
+      yamlKey: 'function_group_includes',
+      paramSuffix: 'include_name',
+    },
     program: { yamlKey: 'programs', paramSuffix: 'program_name' },
     package: { yamlKey: 'packages', paramSuffix: 'package_name' },
     view: { yamlKey: 'views', paramSuffix: 'ddl_name' },
@@ -2268,6 +2276,22 @@ async function updateAndActivateShared(
       ),
       `shared functionmodule update ${name}`,
     );
+  } else if (type === 'function_group_includes') {
+    // The include is written under the *group's* lock, which the handler takes
+    // for itself — the same shape as every other source-bearing type here.
+    mustSucceed(
+      await writeAndActivate(
+        client.getFunctionInclude(),
+        {
+          functionGroupName: depConfig.function_group,
+          includeName: name,
+          sourceCode: depConfig.source,
+          transportRequest,
+        },
+        { sourceCode: depConfig.source },
+      ),
+      `shared functioninclude update ${name}`,
+    );
   } else if (type === 'service_definitions') {
     mustSucceed(
       await writeAndActivate(
@@ -2371,6 +2395,12 @@ async function ensureSharedDependency(client, type, name, logger) {
       return client.getFunctionModule().read({
         functionModuleName: name,
         functionGroupName: depConfig.function_group,
+      });
+    }
+    if (type === 'function_group_includes') {
+      return client.getFunctionInclude().read({
+        functionGroupName: depConfig.function_group,
+        includeName: name,
       });
     }
     if (type === 'service_definitions') {
@@ -2848,6 +2878,37 @@ async function ensureSharedDependency(client, type, name, logger) {
           `shared functionmodule update ${name}`,
         );
         logger?.info?.(`Shared function module ${name} activated`);
+      }
+    } else if (type === 'function_group_includes') {
+      // `create` takes no source since 18.0.0 — it makes the include, and the
+      // body is the write that follows. Same two steps as the function module
+      // above.
+      mustSucceed(
+        await client.getFunctionInclude().create({
+          functionGroupName: depConfig.function_group,
+          includeName: name,
+          description:
+            depConfig.description || 'Shared test function group include',
+          transportRequest,
+        }),
+        `shared functioninclude create ${name}`,
+      );
+      if (depConfig.source) {
+        logger?.info?.(`Activating shared function include ${name}...`);
+        mustSucceed(
+          await writeAndActivate(
+            client.getFunctionInclude(),
+            {
+              functionGroupName: depConfig.function_group,
+              includeName: name,
+              sourceCode: depConfig.source,
+              transportRequest,
+            },
+            { sourceCode: depConfig.source },
+          ),
+          `shared functioninclude update ${name}`,
+        );
+        logger?.info?.(`Shared function include ${name} activated`);
       }
     } else if (type === 'service_definitions') {
       mustSucceed(

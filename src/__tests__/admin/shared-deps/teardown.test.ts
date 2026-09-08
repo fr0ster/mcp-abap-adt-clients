@@ -143,7 +143,36 @@ describe('Admin: Teardown shared dependencies', () => {
         return false;
       };
 
-      // 0. Function modules (before function groups)
+      // 0. Function group includes (before their group, like the modules)
+      const functionIncludes = sharedConfig.function_group_includes || [];
+      for (const item of functionIncludes) {
+        if (shouldSkip(item, 'function_include')) {
+          results.push({
+            type: 'function_group_includes',
+            name: item.name,
+            status: 'skipped',
+          });
+          continue;
+        }
+        const status = await safeDelete(
+          `function_include ${item.name}`,
+          async () => {
+            await client.getFunctionInclude().delete({
+              functionGroupName: item.function_group,
+              includeName: item.name,
+              transportRequest,
+            });
+          },
+          testsLogger,
+        );
+        results.push({
+          type: 'function_group_includes',
+          name: item.name,
+          status,
+        });
+      }
+
+      // 0b. Function modules (before function groups)
       const functionModules = sharedConfig.function_modules || [];
       for (const item of functionModules) {
         if (shouldSkip(item, 'function_module')) {

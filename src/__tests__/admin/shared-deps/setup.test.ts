@@ -158,6 +158,10 @@ describe('Admin: Setup shared dependencies', () => {
         { type: 'interfaces', label: 'Interfaces' },
         { type: 'function_groups', label: 'Function groups' },
         { type: 'function_modules', label: 'Function modules' },
+        {
+          type: 'function_group_includes',
+          label: 'Function group includes',
+        },
         { type: 'programs', label: 'Programs' },
       ];
 

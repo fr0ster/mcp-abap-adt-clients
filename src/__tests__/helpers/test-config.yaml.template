@@ -377,6 +377,24 @@ shared_dependencies:
           ev_output = |Result: { iv_input }|.
         ENDFUNCTION.
 
+
+  # Includes of a shared function group.
+  #
+  # An include's name is derived — `L<GROUP>` plus a suffix — so it carries the
+  # group's `SHR` whether or not the include itself is shared. What makes this
+  # one shared is that it is declared here and nothing deletes it: the
+  # `create_function_include` workflow owns `LZAC_SHR_FUGRZ03` and takes that
+  # one apart every run, while the read-only tests read this one.
+  function_group_includes:
+    - name: "LZAC_SHR_FUGRZ02"
+      function_group: "ZAC_SHR_FUGR"
+      description: "Shared function group include for read-only tests"
+      available_in: ["onprem", "cloud"]
+      source: |
+        *&---------------------------------------------------------------------*
+        *& Include LZAC_SHR_FUGRZ02
+        *&---------------------------------------------------------------------*
+        DATA: gv_adt_shr_include TYPE string VALUE 'AdtFunctionInclude shared'.
   service_definitions:
     - name: "ZAC_SHR_SRVD01"
       description: "Shared service definition for read-only tests"
@@ -1565,17 +1583,21 @@ create_function_include:
       description: "Function include reserved for AdtFunctionInclude tests"
       params:
         function_group_name: "ZAC_SHR_FUGR"  # → shared_dependencies.function_groups
-        include_name: "LZAC_SHR_FUGRZ01"      # FUGR include names follow L<fugr>Znn pattern
+        # Z03, not Z02. This case creates the include and deletes it again, and
+        # Z02 is the shared one declared in shared_dependencies — pointing both
+        # at the same name means every run destroys the shared object, and the
+        # read-only test that wants it skips itself as "does not exist".
+        include_name: "LZAC_SHR_FUGRZ03"      # FUGR include names follow L<fugr>Znn pattern
         description: "AdtFunctionInclude workflow include"
         # transport_request: ""
         source_code: |
           *&---------------------------------------------------------------------*
-          *& Include LZAC_SHR_FUGRZ01
+          *& Include LZAC_SHR_FUGRZ03
           *&---------------------------------------------------------------------*
           DATA: gv_adt_fi_test TYPE string VALUE 'AdtFunctionInclude test'.
         update_source_code: |
           *&---------------------------------------------------------------------*
-          *& Include LZAC_SHR_FUGRZ01 (updated)
+          *& Include LZAC_SHR_FUGRZ03 (updated)
           *&---------------------------------------------------------------------*
           DATA: gv_adt_fi_test TYPE string VALUE 'AdtFunctionInclude updated'.
 

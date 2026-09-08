@@ -31,7 +31,7 @@ import {
   createLibraryLogger,
   createTestsLogger,
 } from '../../../helpers/testLogger';
-import { logTestSkip } from '../../../helpers/testProgressLogger';
+import { logTestSkip, logTestStep } from '../../../helpers/testProgressLogger';
 
 const {
   resolvePackageName,
@@ -40,6 +40,7 @@ const {
   getTimeout,
   ensureSharedPackage,
   ensureSharedDependency,
+  getSharedDependenciesConfig,
 } = require('../../../helpers/test-helper');
 
 const envPath =
@@ -265,39 +266,56 @@ describe('FunctionInclude (using AdtClient)', () => {
           );
           return;
         }
-        const testCase = tester.getTestCaseDefinition();
-        const functionGroupName = testCase?.params?.function_group_name;
-        const includeName = testCase?.params?.include_name;
-        if (!functionGroupName || !includeName) {
+        // **The shared include, not the flow's own.** This used to read
+        // `params.include_name` — the same object the flow above creates and
+        // deletes — so by the time it ran the include was gone, and the test
+        // logged SKIP and passed. It did that on every full run: the assertion
+        // below had never once executed.
+        //
+        // It reads `shared_dependencies.function_group_includes` now. That one
+        // is created by `npm run shared:setup` and deleted by nothing, so
+        // absence is a real failure rather than the normal case.
+        const shared = getSharedDependenciesConfig()?.function_group_includes;
+        const sharedInclude = Array.isArray(shared) ? shared[0] : undefined;
+        if (!sharedInclude?.name || !sharedInclude?.function_group) {
           logTestSkip(
             testsLogger,
             'FunctionInclude - read source',
-            'function_group_name / include_name not configured',
+            'shared_dependencies.function_group_includes is not configured',
           );
           return;
         }
+        const functionGroupName = String(sharedInclude.function_group);
+        const includeName = String(sharedInclude.name);
 
         // There is no `readSource()` any more: `read()` is the source, as the
         // contract says of an object that has one. The cast this used to need
         // went with it.
+        logTestStep(
+          `read shared include ${functionGroupName}/${includeName}`,
+          testsLogger,
+        );
         const answer = await client
           .getFunctionInclude()
           .read({ functionGroupName, includeName });
 
-        // The flow test above creates this include and deletes it again, so by
-        // the time this runs it is usually gone — and ADT says so with an
-        // exception document, which is a refusal. That is the answer, not a
-        // reason to fail; what would be a defect is a *populated* source for an
-        // include nobody has.
-        if (!answer.ok) {
-          logTestSkip(
-            testsLogger,
-            'FunctionInclude - read source',
-            `include is not there: ${answer.getError().message}`,
-          );
-          return;
-        }
-        expect(typeof answer.getResult().value).toBe('string');
+        // No skip-on-absence branch any more. A shared dependency that is not
+        // there is a broken environment — `npm run shared:setup` fixes it — and
+        // reporting that as a pass is what hid this test for as long as it
+        // existed.
+        const source = expectResult(
+          answer,
+          `read shared include ${includeName}`,
+        );
+        expect(typeof source).toBe('string');
+        expect(String(source).trim()).not.toBe('');
+        // Printed, so a run says what this asserted. A test that passes while
+        // printing nothing is indistinguishable from one that skipped, which is
+        // exactly what this test used to be.
+        logTestStep(
+          `read shared include: ${String(source).length} characters`,
+          testsLogger,
+        );
       },
       getTimeout('test'),
     );
