@@ -35,6 +35,7 @@ import { activationRefusal } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import { validationRefusal } from '../../utils/validationRefusal';
+import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import {
   createLockTracker,
   type LockRegistry,
@@ -326,10 +327,9 @@ export class AdtDdl<R extends IDdlResults = typeof ddlDocuments>
 
     return answering(
       async () => {
-        this.connection.setSessionType('stateful');
-        const lockHandle = await lockDDLS(this.connection, name);
-        // Stateful for the LOCK request alone — see LockCapability.
-        this.connection.setSessionType('stateless');
+        const lockHandle = await inStatefulSession(this.connection, () =>
+          lockDDLS(this.connection, name),
+        );
         this.lockTracker.track(name, lockHandle);
         // The handle is the value, and the request does not keep the wire it
         // came on — so the answer is built around what the request produced.

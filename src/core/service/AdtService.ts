@@ -45,6 +45,7 @@ import { nothing, rawDocument } from '../../utils/resultStrategy';
 import { getSystemInformation } from '../../utils/systemInfo';
 import { getTimeout } from '../../utils/timeouts';
 import { validationRefusal } from '../../utils/validationRefusal';
+import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import { lockServiceBinding, unlockServiceBinding } from './lock';
 import type {
   IActivateServiceBindingParams,
@@ -504,13 +505,14 @@ export class AdtServiceBinding<
     config: Partial<IServiceBindingConfig>,
   ): Promise<IAdtResponse<string>> {
     const name = this.name(config);
-    // Stateful for the window: on older BASIS a handle is only valid inside a
-    // stateful request. The caller returns to stateless via `unlock`.
-    this.connection.setSessionType?.('stateful');
+    // Stateful for the LOCK request alone: on older BASIS a handle is only
+    // issued inside a stateful request. The switch used to sit outside
+    // `answering`, so a refused LOCK returned through the failure path with the
+    // connection still stateful — and this connection is shared.
     return answering(async () => {
-      const data = await lockServiceBinding(this.connection, name);
-      // Stateful for the LOCK request alone — see LockCapability.
-      this.connection.setSessionType?.('stateless');
+      const data = await inStatefulSession(this.connection, () =>
+        lockServiceBinding(this.connection, name),
+      );
       return { data, status: 200, statusText: 'OK', headers: {} };
     }, rawDocument);
   }

@@ -39,6 +39,7 @@ import { activationRefusal } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import { validationRefusal } from '../../utils/validationRefusal';
+import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import {
   createLockTracker,
   type LockRegistry,
@@ -386,10 +387,9 @@ export class AdtInterface<
 
     return answering(
       async () => {
-        this.connection.setSessionType('stateful');
-        const { lockHandle } = await lockInterface(this.connection, name);
-        // Stateful for the LOCK request alone — see LockCapability.
-        this.connection.setSessionType('stateless');
+        const { lockHandle } = await inStatefulSession(this.connection, () =>
+          lockInterface(this.connection, name),
+        );
         this.lockTracker.track(name, lockHandle);
         // The handle is the value, and the request does not keep the wire it
         // came on — so the answer is built around what the request produced.
@@ -417,9 +417,9 @@ export class AdtInterface<
     return answering(
       async () => {
         // UNLOCK must run stateful (older BASIS #106); stateless after.
-        this.connection.setSessionType('stateful');
-        const result = await unlockInterface(this.connection, name, lockHandle);
-        this.connection.setSessionType('stateless');
+        const result = await inStatefulSession(this.connection, () =>
+          unlockInterface(this.connection, name, lockHandle),
+        );
         this.lockTracker.untrack(name);
         return result;
       },

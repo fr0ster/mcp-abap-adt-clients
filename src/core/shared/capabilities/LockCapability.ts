@@ -13,22 +13,26 @@ import type { ICapabilityContext, ILockStrategy } from './types';
  * unlock is a TARGET, not implemented here, and is left to the per-endpoint
  * probe + adaptation rule of the full-migration plan.
  *
- * DELIBERATELY byte-identical to the current handlers, including the failure
- * path: if `acquire`/`release` throws, the session is left as-is (stateful) and
- * the error propagates — exactly as today. Failure/abandonment handling is
- * DISTRIBUTED and this capability owns none of it:
- *   - the consumer largely owns lock/unlock atomicity (it decides when to lock
- *     and unlock);
- *   - adt-clients' `LockRegistry.unlockAll()` is a disposal safety net that
- *     raw-releases abandoned locks — deliberately WITHOUT toggling the session,
- *     because `unlockAll()` manages the session once for the whole batch;
- *   - the operation chain's create/update catch blocks also call
- *     setSessionType('stateless').
- * Adding a try/finally here would change behaviour and relocate responsibility
- * across those layers, so the atom-level "restore stateless on failure"
- * contract is deferred to the behavioural-conformance work (same bucket as
- * activate/check error unification), where all three layers are reconciled
- * rather than double-cleaned.
+ * **The restore runs in a `finally`, and it has to.** This used to be written
+ * success-only — set stateful, call, set stateless — on the argument that
+ * failure handling was distributed: the consumer owns lock/unlock atomicity,
+ * `LockRegistry.unlockAll()` is a disposal safety net, and the operation
+ * chain's create/update catch blocks also called `setSessionType('stateless')`.
+ *
+ * That third layer no longer exists. This release unwound the chains — every
+ * member is one request now — so nothing downstream restores the session, and
+ * a refused `LOCK` left the connection stateful for whoever held it next. The
+ * connection is shared: one caller's failed acquire silently changed the
+ * session type for every other user of it, and the next unrelated request went
+ * out inside a session it never asked for.
+ *
+ * The other two layers do not cover this either. The consumer cannot restore
+ * what it did not set — this capability sets the session type, so this
+ * capability puts it back — and `unlockAll()` manages the session once for a
+ * whole batch, deliberately not per lock.
+ *
+ * `finally` and not `catch`: the error still propagates untouched, which is the
+ * part of the old behaviour worth keeping.
  */
 export class LockCapability<TConfig, TReadResult = void>
   implements IAdtLockable<TConfig>
@@ -68,8 +72,13 @@ export class LockCapability<TConfig, TReadResult = void>
         // themselves run stateful, which they still do — see `release()`, whose
         // note says exactly that.
         ctx.connection.setSessionType('stateful');
-        const { lockHandle } = await this.strategy.acquire(ctx, name);
-        ctx.connection.setSessionType('stateless');
+        let lockHandle: string;
+        try {
+          ({ lockHandle } = await this.strategy.acquire(ctx, name));
+        } finally {
+          // A refused acquire must not leave the shared connection stateful.
+          ctx.connection.setSessionType('stateless');
+        }
         // The handle is what the caller needs, and the strategy hands it over
         // without the wire it came on — so the answer is built around it.
         return { data: lockHandle, status: 200, statusText: 'OK', headers: {} };
@@ -84,9 +93,12 @@ export class LockCapability<TConfig, TReadResult = void>
     const name = this.strategy.nameOf(config);
     // Same window as `lock()`: stateful for the acquire, stateless after it.
     ctx.connection.setSessionType('stateful');
-    const { lockHandle } = await this.strategy.acquire(ctx, name);
-    ctx.connection.setSessionType('stateless');
-    return lockHandle;
+    try {
+      const { lockHandle } = await this.strategy.acquire(ctx, name);
+      return lockHandle;
+    } finally {
+      ctx.connection.setSessionType('stateless');
+    }
   }
 
   async unlock(
@@ -105,7 +117,10 @@ export class LockCapability<TConfig, TReadResult = void>
     const name = this.strategy.nameOf(config);
     // UNLOCK must run stateful (older BASIS #106); restore stateless after.
     ctx.connection.setSessionType('stateful');
-    await this.strategy.release(ctx, name, lockHandle);
-    ctx.connection.setSessionType('stateless');
+    try {
+      await this.strategy.release(ctx, name, lockHandle);
+    } finally {
+      ctx.connection.setSessionType('stateless');
+    }
   }
 }

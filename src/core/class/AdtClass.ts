@@ -1,4 +1,5 @@
 import { beginCriticalSection } from '../../utils/criticalSection';
+import { inStatefulSession } from '../shared/capabilities/statefulSession';
 
 /**
  * AdtClass - High-level CRUD operations for Class objects
@@ -355,10 +356,12 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
     // still do. The window between them does not — Eclipse's stateful session
     // carries those two requests and nothing else, and a request that runs
     // inside the session leaves what it takes there.
-    this.connection.setSessionType('stateful');
-    const handle = await lockClass(this.connection, config.className);
-    this.connection.setSessionType('stateless');
-    return handle;
+    // Bound before the closure: `config.className` is a mutable property, so
+    // the guard above does not narrow it inside a callback.
+    const className = config.className;
+    return await inStatefulSession(this.connection, () =>
+      lockClass(this.connection, className),
+    );
   }
 
   /**
@@ -372,14 +375,10 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
     if (!config.className) {
       throw new Error('Class name is required');
     }
-    this.connection.setSessionType('stateful');
-    const result = await unlockClass(
-      this.connection,
-      config.className,
-      lockHandle,
+    const className = config.className;
+    return await inStatefulSession(this.connection, () =>
+      unlockClass(this.connection, className, lockHandle),
     );
-    this.connection.setSessionType('stateless');
-    return result;
   }
 
   /**
@@ -417,6 +416,9 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
     if (!config.testClassCode) {
       throw new Error('Test class code is required');
     }
+    // Bound once: the guard above narrows the property here, but not inside the
+    // callbacks below — a mutable property is re-widened in a closure.
+    const className = config.className;
 
     let lockHandle: string | undefined;
 
@@ -430,10 +432,9 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
       // 1. Lock parent class (stateful only for lock)
       // Lock handle from parent class is sufficient for updating testclasses include
       this.logger?.info?.('Step 1: Locking parent class');
-      this.connection.setSessionType('stateful');
-      lockHandle = await lockClass(this.connection, config.className);
-      // Stateful for the LOCK request alone — see LockCapability.
-      this.connection.setSessionType('stateless');
+      lockHandle = await inStatefulSession(this.connection, () =>
+        lockClass(this.connection, className),
+      );
       this.lockTracker.track(config.className, lockHandle);
       this.logger?.info?.('Parent class locked, handle:', lockHandle);
 
@@ -450,10 +451,11 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
 
       // 3. Unlock parent class (switch to stateless after unlock)
       this.logger?.info?.('Step 3: Unlocking parent class');
-      this.connection.setSessionType('stateful');
-      await unlockClass(this.connection, config.className, lockHandle);
-      this.connection.setSessionType('stateless');
-      this.lockTracker.untrack(config.className);
+      const handleToRelease = lockHandle;
+      await inStatefulSession(this.connection, () =>
+        unlockClass(this.connection, className, handleToRelease),
+      );
+      this.lockTracker.untrack(className);
       lockHandle = undefined;
 
       return response;
@@ -462,10 +464,11 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
       if (lockHandle) {
         try {
           this.logger?.warn?.('Unlocking parent class after error');
-          this.connection.setSessionType('stateful');
-          await unlockClass(this.connection, config.className, lockHandle);
-          this.connection.setSessionType('stateless');
-          this.lockTracker.untrack(config.className);
+          const handleToRelease = lockHandle;
+          await inStatefulSession(this.connection, () =>
+            unlockClass(this.connection, className, handleToRelease),
+          );
+          this.lockTracker.untrack(className);
         } catch (unlockError) {
           this.logger?.warn?.(
             'Failed to unlock parent class after error:',

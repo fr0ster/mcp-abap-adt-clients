@@ -37,6 +37,7 @@ import { activationRefusal } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import { validationRefusal } from '../../utils/validationRefusal';
+import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import type { LockRegistry } from '../shared/LockRegistry';
 import type { ObjectVersion } from '../shared/results';
 import type { IReadOptions } from '../shared/types';
@@ -424,15 +425,9 @@ export class AdtFunctionInclude<
 
     return answering(
       async () => {
-        this.connection.setSessionType('stateful');
-        const lockHandle = await lockFunctionInclude(
-          this.connection,
-          group,
-          include,
-          this.logger,
+        const lockHandle = await inStatefulSession(this.connection, () =>
+          lockFunctionInclude(this.connection, group, include, this.logger),
         );
-        // Stateful for the LOCK request alone — see LockCapability.
-        this.connection.setSessionType('stateless');
         this.trackLock(group, include, lockHandle);
         // The handle is the value, and the request does not keep the wire it
         // came on — so the answer is built around what the request produced.
@@ -457,14 +452,9 @@ export class AdtFunctionInclude<
     return answering(
       async () => {
         // UNLOCK must run stateful (older BASIS #106); stateless after.
-        this.connection.setSessionType('stateful');
-        const result = await unlockFunctionInclude(
-          this.connection,
-          group,
-          include,
-          lockHandle,
+        const result = await inStatefulSession(this.connection, () =>
+          unlockFunctionInclude(this.connection, group, include, lockHandle),
         );
-        this.connection.setSessionType('stateless');
         this.untrackLock(group, include);
         return result;
       },

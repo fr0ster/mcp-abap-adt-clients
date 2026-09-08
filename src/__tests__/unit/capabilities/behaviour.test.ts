@@ -651,3 +651,71 @@ describe('capability guard — a member leaves the session alone', () => {
     }
   }
 });
+
+/**
+ * A lock window that fails still puts the session back.
+ *
+ * The guard above asks that ordinary members never touch `setSessionType`.
+ * `lock` and `unlock` are exempt there — they *are* the session — and that
+ * exemption is exactly where the defect lived: all three methods of
+ * `LockCapability`, and the same pattern hand-written in twenty-six handlers,
+ * set stateful, ran the request, and set stateless **as the last statement of
+ * the success path**. A refused `LOCK` — an object someone else holds, an
+ * expired session, a dropped connection — jumped over the restore.
+ *
+ * The connection is shared, so the cost is not confined to the caller that
+ * failed: the next unrelated request goes out inside a session nobody asked
+ * for, and what the server takes during it is held until that session ends.
+ *
+ * This asserts the invariant rather than the implementation, so it holds for
+ * whichever way a handler spells its cleanup — `inStatefulSession`, a bare
+ * `finally`, or `chain`'s `onScopeEnd`.
+ */
+describe('capability guard — a failed lock window restores the session', () => {
+  /** Every request is refused, which is the whole point. */
+  function refusingClient() {
+    const sessionTypes: string[] = [];
+    const connection = {
+      connect: async () => {},
+      getBaseUrl: async () => 'https://example',
+      getSessionId: () => null,
+      setSessionType: (type: string) => {
+        sessionTypes.push(type);
+      },
+      makeAdtRequest: async () => {
+        throw new Error('guard: the server refused this request');
+      },
+    } as unknown as IAbapConnection;
+    const client = new AdtClient(connection, createLibraryLogger());
+    return { client, sessionTypes };
+  }
+
+  for (const [name, entry] of Object.entries(
+    HANDLERS as Record<string, HandlerEntry>,
+  )) {
+    if (!entry.capabilities.includes('lockable')) continue;
+    for (const method of ['lock', 'unlock']) {
+      it(`${name}.${method} leaves the session stateless when the request fails`, async () => {
+        const { client, sessionTypes } = refusingClient();
+        const handler = entry.factory(client) as unknown as Record<
+          string,
+          unknown
+        >;
+        try {
+          await invoke(handler, method, entry.config);
+        } catch {
+          // Whether the refusal arrives as an answer or a throw is another
+          // test's subject. Either way the session must be back.
+        }
+
+        // The invariant is "never left stateful", and only that. A member that
+        // switched nothing asked the server nothing, or was refused before the
+        // wire; a member that only ever sets stateless is making a different
+        // choice, right or wrong, and this guard is not about that choice. What
+        // must not happen is going stateful and stopping there.
+        if (!sessionTypes.includes('stateful')) return;
+        expect(sessionTypes[sessionTypes.length - 1]).toBe('stateless');
+      });
+    }
+  }
+});

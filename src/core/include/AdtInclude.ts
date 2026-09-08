@@ -31,6 +31,7 @@ import { activationRefusal } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import { validationRefusal } from '../../utils/validationRefusal';
+import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import { checkDeletionByUri } from '../shared/deletionCheckByUri';
 import { activateInclude } from './activation';
 import { create } from './create';
@@ -275,10 +276,9 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
     const includeName = requireName(config);
     return answering(
       async () => {
-        this.connection.setSessionType?.('stateful');
-        const { lockHandle } = await lockInclude(this.connection, includeName);
-        // Stateful for the LOCK request alone — see LockCapability.
-        this.connection.setSessionType('stateless');
+        const { lockHandle } = await inStatefulSession(this.connection, () =>
+          lockInclude(this.connection, includeName),
+        );
         config.onLock?.(lockHandle);
         // The handle is the value, and the request does not keep the wire it
         // came on — so the answer is built around what the request produced.
