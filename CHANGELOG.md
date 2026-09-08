@@ -5,6 +5,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [18.0.1] - 2026-09-08
+
+**Documentation only — 18.0.0 shipped without the migration note it owed.**
+
+This repository's rule for a breaking release is a note saying what a consumer
+on the old contract must now do. 18.0.0 is forty-odd breaking entries listed in
+the order they were made, which is the wrong order for someone holding 17.x code
+that has stopped compiling.
+
+### Documentation
+
+- **`docs/usage/MIGRATION-18.0.md`** (new): organised by what a consumer has to
+  change, with the 17.x call beside its replacement — the write sequence is
+  theirs now, every member answers instead of throwing, eight types have no
+  source and answer `readMetadata`, `delete` no longer asks permission for you,
+  a write states what it needs, timeouts and the session, and the smaller
+  removals as a table. It ends with the three questions that resolve almost
+  every compile error.
+- `README.md` carries the notice, and `docs/README.md` the link.
+
+### Packaging
+
+- **`docs/usage` now ships in the package** (+172 KB on a 3.0 MB tarball). The
+  migration note is no use to a consumer if reading it means leaving their
+  editor for GitHub, and the same holds for the API reference and the object
+  lifecycle beside it. The rest of `docs/` — architecture, development,
+  discovery dumps — is for contributors and stays on GitHub.
+
+### Upgrading
+
+Nothing to do. Patch over 18.0.0: no source, no declaration, no behaviour.
+
 ## [18.0.0] - 2026-09-08
 
 Requires `@mcp-abap-adt/interfaces@^39.0.0`.
