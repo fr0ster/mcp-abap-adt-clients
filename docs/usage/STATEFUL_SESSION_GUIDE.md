@@ -13,9 +13,12 @@ This guide explains how `@mcp-abap-adt/adt-clients` manages ADT sessions for CRU
   the session back to stateless before returning. The window between `lock` and
   `unlock` is *not* stateful — the write inside it goes out stateless, carrying
   the handle in `options.lockHandle`.
-- This is Eclipse's model, measured: of 792 requests in a full run, exactly four
-  carry `x-sap-adt-sessiontype: stateful` — two `LOCK`s and two `UNLOCK`s. The
-  source `PUT`, the activation and every read are stateless.
+- This is Eclipse's model, measured at two scales. A full run against the cloud
+  trial: 803 requests, of which exactly 100 carry `x-sap-adt-sessiontype:
+  stateful` — the 50 `LOCK`s and the 50 `UNLOCK`s, and nothing else. A probe
+  doing two write windows on one class: 12 requests and 4 such headers, again
+  the locks and the unlocks alone. The ratio is what the rule predicts, and the
+  source `PUT`, the activation and every read are stateless at both scales.
 - **A lock the server takes during activation outlives the `unlock`.** Activation
   generates, and generation takes `E_ABAP_GENPH` on the generated program; that
   one belongs to the ABAP session, not to the object, and is released when the
