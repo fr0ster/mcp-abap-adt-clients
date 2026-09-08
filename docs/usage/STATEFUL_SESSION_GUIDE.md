@@ -19,6 +19,13 @@ This guide explains how `@mcp-abap-adt/adt-clients` manages ADT sessions for CRU
   doing two write windows on one class: 12 requests and 4 such headers, again
   the locks and the unlocks alone. The ratio is what the rule predicts, and the
   source `PUT`, the activation and every read are stateless at both scales.
+- **A refused `lock` leaves the session stateless, not stateful.** The switch is
+  in a `finally`, so an object someone else holds, an expired session or a
+  dropped connection restores the session on the way out. This matters because
+  the connection is shared: before 18.0.0 a failed acquire left it stateful, and
+  the next unrelated request — a read, an activation, anything — went out inside
+  a session nobody had asked for, holding whatever the server took during it
+  until that session ended.
 - **A lock the server takes during activation outlives the `unlock`.** Activation
   generates, and generation takes `E_ABAP_GENPH` on the generated program; that
   one belongs to the ABAP session, not to the object, and is released when the
