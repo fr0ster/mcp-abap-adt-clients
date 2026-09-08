@@ -2225,6 +2225,32 @@ runtime_gateway_errors:
       params:
         max_results: 10
 
+# ATC check runs (AdtRuntimeClient.getAtc())
+atc_run:
+  test_cases:
+    - name: "adt_atc_run"
+      enabled: true
+      description: "Run ATC over the deliberately dirty shared class and read the worklist"
+      # No `available_in`: ATC exists on every system this library targets, and
+      # `getEnvironmentType()` answers "onprem" everywhere anyway — it defaults
+      # to it and nothing ever refines it — so a ["cloud"] filter here would
+      # skip the test on the very system it was measured on.
+      #
+      # What IS system-specific is the expectation below, and this file is
+      # per-machine (only the template is in git). A system whose nominated
+      # variant reports something else changes these two values rather than
+      # disabling the case.
+      params:
+        class_name: "ZAC_SHR_ATC_DIRTY"
+        # SLIN's "No exception handling after the CATCH statement." — the empty
+        # CATCH cx_root in that class. Measured on the trial, 2026-09-08:
+        # FINDING_STATS "0,1,0" for this one finding at priority 2, which is
+        # also what says position 2 of the triple is priority 2.
+        expected_message_id: "0245"
+        expected_priority: 2
+        poll_timeout_ms: 300000
+        poll_interval_ms: 3000
+
 # Profiler traces operations (AdtRuntimeClient)
 profiler_traces:
   test_cases:

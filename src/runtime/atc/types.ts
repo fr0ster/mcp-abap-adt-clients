@@ -47,10 +47,12 @@ export type IAtcRunResult =
        * `FINDING_STATS` as the server sent it — a comma-separated triple, for
        * example `"0,0,1"`.
        *
-       * Not parsed into named counts. Which position is which severity has been
-       * seen once, in a worklist with a single finding at priority 3, which fits
-       * several orderings; inventing `{ errors, warnings, infos }` would publish
-       * two guesses to save a caller one `split(',')`.
+       * Not parsed into named counts, though the ordering is now measured
+       * twice: one priority-3 finding read `"0,0,1"`, one priority-2 finding
+       * read `"0,1,0"` (BTP trial, 2026-09-08 — see the ATC integration test).
+       * Both fit `(priority 1, priority 2, priority 3)` and nothing else fits
+       * both. What is still unseen is a non-zero first position, so naming the
+       * fields would publish one guess to save a caller one `split(',')`.
        */
       findingStats: string;
     };
