@@ -295,9 +295,11 @@ async function main(): Promise<void> {
    * Is there a variant by this name — yes, no, or the system did not say?
    *
    * Three values and not a boolean, because the third one decides whether this
-   * probe is allowed to write at all. `absent` has to cover an empty 200 as
-   * well as a 404: ADT answers absence with an empty body on the measured
-   * systems, and treating that as "present" would refuse every creation.
+   * probe is allowed to write at all. `absent` covers both spellings of it:
+   * measured 2026-09-08, this resource answers a missing name with **404**
+   * (`GET /atc/checkvariants/zac_shr_atc_var` → 404, 551 bytes), unlike the
+   * source endpoints elsewhere in ADT that answer absence with an empty 200 —
+   * so both are accepted here rather than one of them guessed.
    * Anything else — a dropped socket, a 403, a 500 — is `unknown`, and a probe
    * that cannot see whether a name is taken cannot promise to clean up after
    * itself.
