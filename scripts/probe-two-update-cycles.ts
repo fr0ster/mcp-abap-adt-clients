@@ -110,6 +110,26 @@ async function step<T>(
   }
 }
 
+/**
+ * What an activation actually said.
+ *
+ * A 200 is not the verdict and neither is the absence of a throw:
+ * `activationExecuted="false"` means ADT decided there was nothing to do, and
+ * only a `<msg type="E">` is a refusal. `activate` answers the document as it
+ * arrived, so both are readable here rather than guessed at.
+ */
+function readActivation(document: unknown): string {
+  const xml = String(document);
+  const flag = (name: string): string =>
+    new RegExp(`${name}="([^"]*)"`).exec(xml)?.[1] ?? '?';
+  const messages = xml.match(/<[a-z]*:?msg\b/gi)?.length ?? 0;
+  const errors = xml.match(/type="E"/g)?.length ?? 0;
+  return (
+    `check=${flag('checkExecuted')} activation=${flag('activationExecuted')} ` +
+    `generation=${flag('generationExecuted')} msgs=${messages} errors=${errors}`
+  );
+}
+
 /** The class body, differing only in the constant, so a read-back is decisive. */
 function sourceFor(className: string, revision: number): string {
   const lower = className.toLowerCase();
@@ -197,12 +217,34 @@ async function runCycle(
     `  unlock   ${unlocked.record.ok ? '✓' : '✗'} ${unlocked.record.ms}ms  ${unlocked.record.detail}`,
   );
 
-  const activated = await step(`activate #${revision}`, () =>
-    cls.activate({ className }),
+  const activated = await step(
+    `activate #${revision}`,
+    () => cls.activate({ className }),
+    readActivation,
   );
   steps.push(activated.record);
   say(
     `  activate ${activated.record.ok ? '✓' : '✗'} ${activated.record.ms}ms  ${activated.record.detail}`,
+  );
+
+  // **Did this write land?** The read-back at the end of the run can only ever
+  // show the last revision, so on its own it is consistent with the first write
+  // never having happened — the second would overwrite either way. Asking after
+  // each cycle is what makes both changes evidence rather than one change and an
+  // assumption.
+  const seen = await step(
+    `verify #${revision}`,
+    () => cls.read({ className }, 'active'),
+    (source) =>
+      `active carries revision ${/rv_revision\s*=\s*(\d+)/.exec(String(source))?.[1] ?? '(none)'}`,
+  );
+  steps.push(seen.record);
+  const landed = seen.record.detail.endsWith(`revision ${revision}`);
+  // A read that succeeded while carrying the wrong revision is a failure of
+  // this step, not a success — the summary must not show it green.
+  seen.record.ok = seen.record.ok && landed;
+  say(
+    `  verify   ${landed ? '✓' : '✗'} ${seen.record.ms}ms  ${seen.record.detail}`,
   );
 
   return handle;
