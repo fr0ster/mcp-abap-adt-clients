@@ -10,10 +10,13 @@
  * about the URL, with authorisation never reached.
  *
  * A live run cannot be relied on to produce a 400, a 409 and a dropped socket
- * on demand, so the rule is tested where it can be: on its own.
+ * on demand, so the rule is tested where it can be: on its own. It lives in
+ * its own module for the same reason — importing the probe to reach it pulled
+ * in dotenv, a logger and a connection factory, and printed a real dependency
+ * error into a run that is supposed to touch nothing.
  */
 
-import { classifyCreateOutcome } from '../../../../scripts/probe-atc-checkvariant';
+import { classifyCreateOutcome } from '../../../../scripts/lib/atcCreateOutcome';
 
 describe('classifyCreateOutcome', () => {
   it('reports a creation whenever the object is there afterwards', () => {

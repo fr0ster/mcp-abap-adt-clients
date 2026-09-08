@@ -76,6 +76,7 @@ import { createConnectionLogger } from '../src/__tests__/helpers/testLogger';
 import { AdtRuntimeClient } from '../src/clients/AdtRuntimeClient';
 import { inStatefulSession } from '../src/core/shared/capabilities/statefulSession';
 import { orThrow } from '../src/utils/adtResponse';
+import { classifyCreateOutcome } from './lib/atcCreateOutcome';
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../.env');
 if (fs.existsSync(envPath)) {
@@ -244,58 +245,6 @@ class Recorder {
 function parseSystemCheckVariant(body: string): string | null {
   const match = body.match(/name="systemCheckVariant"[^>]*value="([^"]+)"/);
   return match ? match[1] : null;
-}
-
-/**
- * Statuses that say creation is not on offer here at all.
- *
- * Deliberately short, and deliberately without 401 or 403. Question 3 asks
- * whether a check variant can be created; `405` and `501` answer it — the
- * resource does not implement the verb, so nobody creates one this way.
- *
- * An authorization-shaped refusal does NOT answer it, however much it looks
- * like the answer. The 403 measured here named `S_ABPLNGVS`, which is the ABAP
- * language version and not a role: an unresolvable version is reported as an
- * authorization failure, and the payload this probe sent was a copy of a
- * SAP-owned variant carrying neither our package nor our language version. So
- * that 403 may be about the request. A `401` is weaker still — an expired
- * session says nothing about what its owner may do.
- *
- * And a complaint about the request answers nothing either: the first attempt
- * here was `400 "Parameter corrNr could not be found"`, about the URL, with
- * authorisation never reached.
- *
- * Everything but this pair therefore leaves the question open, with the body on
- * disk for a human to read. An open question is cheap; a wrong answer to it
- * ends the enquiry.
- */
-const REFUSES_CREATION = new Set([405, 501]);
-
-/**
- * What a creation attempt settled, from the status and what the system shows
- * afterwards.
- *
- * Exported and pure so the rule can be tested without a SAP system: the danger
- * it guards against is a confident wrong answer, and that is exactly the kind
- * a live run cannot be relied on to produce on demand.
- */
-export function classifyCreateOutcome(
-  status: number | null,
-  presenceAfter: 'present' | 'absent' | 'unknown',
-): 'yes' | 'no' | 'unknown' {
-  // The object is there. Whatever was said about it, this run made one.
-  if (presenceAfter === 'present') return 'yes';
-  // Nothing to see, and the server refused the operation itself.
-  if (
-    presenceAfter === 'absent' &&
-    status !== null &&
-    REFUSES_CREATION.has(status)
-  ) {
-    return 'no';
-  }
-  // Everything else: a complaint about the request, a server fault, a lost
-  // response, or a read that could not say. None of them answers the question.
-  return 'unknown';
 }
 
 /**
@@ -792,74 +741,83 @@ async function main(): Promise<void> {
       }
     }
   } finally {
-    // Everything below runs whatever happened above, in this order: undo,
-    // record, judge, hang up.
+    // Undo, record, judge — then hang up, whatever any of that did.
     //
-    // The cleanup used to sit on the success path, so an error anywhere
-    // between the POST that created a variant and this point skipped it — the
-    // run that failed, the one worth repeating, was exactly the one that left
-    // something behind.
-    if (createdVariant) {
-      try {
-        await removeCreatedVariant(createdVariant);
-      } catch (error) {
-        leftBehind.push(createdVariant);
-        rec.note(
-          'cleanup-failed',
-          'Was everything this probe created removed?',
-          `Removing ${createdVariant} threw: ${String(error)}`,
+    // The logout used to be the last statement of this block rather than its
+    // `finally`, so a failure while writing the evidence — a full disk, an
+    // output directory pulled out from under the run — skipped it and left an
+    // ABAP session standing. Recording what happened must not cost the session
+    // it happened in.
+    try {
+      // Everything below runs whatever happened above, in this order: undo,
+      // record, judge, hang up.
+      //
+      // The cleanup used to sit on the success path, so an error anywhere
+      // between the POST that created a variant and this point skipped it — the
+      // run that failed, the one worth repeating, was exactly the one that left
+      // something behind.
+      if (createdVariant) {
+        try {
+          await removeCreatedVariant(createdVariant);
+        } catch (error) {
+          leftBehind.push(createdVariant);
+          rec.note(
+            'cleanup-failed',
+            'Was everything this probe created removed?',
+            `Removing ${createdVariant} threw: ${String(error)}`,
+          );
+        }
+      }
+
+      rec.flush({
+        probe: 'atc-checkvariant',
+        system: sapConfig.url,
+        startedAt: new Date().toISOString(),
+        args,
+        answered,
+        createStatus,
+        checksSeen: checkNames.length,
+        variantsSeen: variantCount,
+        fallbackRun,
+        leftBehind,
+      });
+
+      // What this run was asked to settle. `--read-only` does not ask questions 3
+      // and 4, so counting their `null` against it made the documented mode
+      // impossible to pass: it exited 1 having answered everything it was for.
+      const required: Array<keyof typeof answered> = args.readOnly
+        ? ['documentShape', 'checksListed']
+        : ['documentShape', 'checksListed', 'mayCreate', 'runAcceptedVariant'];
+      const unanswered = required.filter((key) => answered[key] === 'unknown');
+      logger.info(
+        required.map((key) => `${key}: ${answered[key]}`).join(', ') +
+          ` (checks seen ${checkNames.length}, variants seen ${variantCount})`,
+      );
+      if (leftBehind.length > 0) {
+        logger.error(
+          `LEFT BEHIND in ${sapConfig.url}: ${leftBehind.join(', ')} — this probe created ` +
+            'them and could not remove them. Delete them before the next run, which ' +
+            'would otherwise collide with the same name.',
+        );
+        process.exitCode = 1;
+      }
+      if (unanswered.length > 0) {
+        logger.warn(
+          `Unanswered: ${unanswered.join(', ')} — read the raw bodies before designing anything on top of this.`,
+        );
+        process.exitCode = 1;
+      } else if (leftBehind.length === 0) {
+        logger.info(
+          args.readOnly
+            ? 'Both read-only questions answered, nothing left behind.'
+            : 'All four questions answered, nothing left behind.',
         );
       }
+    } finally {
+      // The pool is shared with every test run, and a session left standing is
+      // felt by whoever runs next.
+      await releaseTestConnection(connection);
     }
-
-    rec.flush({
-      probe: 'atc-checkvariant',
-      system: sapConfig.url,
-      startedAt: new Date().toISOString(),
-      args,
-      answered,
-      createStatus,
-      checksSeen: checkNames.length,
-      variantsSeen: variantCount,
-      fallbackRun,
-      leftBehind,
-    });
-
-    // What this run was asked to settle. `--read-only` does not ask questions 3
-    // and 4, so counting their `null` against it made the documented mode
-    // impossible to pass: it exited 1 having answered everything it was for.
-    const required: Array<keyof typeof answered> = args.readOnly
-      ? ['documentShape', 'checksListed']
-      : ['documentShape', 'checksListed', 'mayCreate', 'runAcceptedVariant'];
-    const unanswered = required.filter((key) => answered[key] === 'unknown');
-    logger.info(
-      required.map((key) => `${key}: ${answered[key]}`).join(', ') +
-        ` (checks seen ${checkNames.length}, variants seen ${variantCount})`,
-    );
-    if (leftBehind.length > 0) {
-      logger.error(
-        `LEFT BEHIND in ${sapConfig.url}: ${leftBehind.join(', ')} — this probe created ` +
-          'them and could not remove them. Delete them before the next run, which ' +
-          'would otherwise collide with the same name.',
-      );
-      process.exitCode = 1;
-    }
-    if (unanswered.length > 0) {
-      logger.warn(
-        `Unanswered: ${unanswered.join(', ')} — read the raw bodies before designing anything on top of this.`,
-      );
-      process.exitCode = 1;
-    } else if (leftBehind.length === 0) {
-      logger.info(
-        args.readOnly
-          ? 'Both read-only questions answered, nothing left behind.'
-          : 'All four questions answered, nothing left behind.',
-      );
-    }
-
-    // Last: the pool is shared with every test run, and a session left
-    // standing is felt by whoever runs next.
-    await releaseTestConnection(connection);
   }
 
   logger.info(`Evidence written to ${outDir}`);
