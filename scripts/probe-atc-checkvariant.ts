@@ -46,6 +46,8 @@
  *   --name=NAME      The variant to create. Default `ZAC_SHR_ATC_VAR`.
  *   --dirty=NAME     The class to run against. Default `ZAC_SHR_ATC_DIRTY`.
  *   --read-only      Ask questions 1 and 2 only: no POST, no lock, no DELETE.
+ *                    The verdict then judges those two alone, so the mode can
+ *                    succeed; a full run still needs all four.
  *
  * Writes `DIR/manifest.json` (every step, machine-readable) and one raw body
  * file per step. Read the raw files — the manifest is an index, not a summary.
@@ -240,6 +242,25 @@ function parseSystemCheckVariant(body: string): string | null {
   return match ? match[1] : null;
 }
 
+/**
+ * The checks a form template names.
+ *
+ * This is what answers "which checks exist here": `/atc/checks` does not list
+ * on the measured system, and a list of *variants* answers a different
+ * question entirely — a variant is a selection of checks, not a check.
+ * Measured 2026-09-08: the trial's form template carries 172 of these across
+ * 36 categories, e.g. `SLIN_VERS`, `SYCM_CHECK_ABAP_LANGU_VERSION`.
+ */
+function parseCheckNames(body: string): string[] {
+  return [
+    ...new Set(
+      [...body.matchAll(/<chko:checkObject[^>]*adtcore:name="([^"]+)"/g)].map(
+        (m) => m[1],
+      ),
+    ),
+  ];
+}
+
 /** The lock handle, from the same envelope every other lock in this repo reads. */
 function parseLockHandle(body: string): string | null {
   const match = body.match(/<LOCK_HANDLE>([^<]+)<\/LOCK_HANDLE>/);
@@ -365,6 +386,9 @@ async function main(): Promise<void> {
 
   /** The document the creation payload is derived from, kept as it was read. */
   let systemVariantDocument = '';
+  /** Counts, so the manifest carries evidence rather than a boolean. */
+  let checkNames: string[] = [];
+  let variantCount = 0;
 
   try {
     await connection.connect();
@@ -403,9 +427,9 @@ async function main(): Promise<void> {
       answered.documentShape = doc.status === 200 && doc.body.length > 0;
       systemVariantDocument = doc.body;
 
-      await rec.call(
+      const formTemplate = await rec.call(
         'formtemplate',
-        'Does ADT publish the variant document shape itself?',
+        'Does ADT publish the variant document shape, and the checks it offers?',
         {
           method: 'GET',
           url: `${CHKV}/formtemplate?chkvName=${encodeURIComponent(systemVariant)}`,
@@ -414,6 +438,14 @@ async function main(): Promise<void> {
           headers: { Accept: 'application/xml' },
         },
       );
+      checkNames = parseCheckNames(formTemplate.body);
+      if (checkNames.length > 0) {
+        logger.info(
+          `Form template names ${checkNames.length} checks, e.g. ${checkNames
+            .slice(0, 3)
+            .join(', ')}`,
+        );
+      }
     }
 
     // The collection listing, which is also the answer to "does a Z variant
@@ -451,9 +483,17 @@ async function main(): Promise<void> {
       },
     );
 
+    variantCount = (variants.body.match(/<nameditem:name>/g) ?? []).length;
+
+    // Checks, and only checks. The variants listing above answers "which
+    // selections of checks exist", which is a different question and was
+    // briefly allowed to satisfy this one — on a system where `/atc/checks`
+    // fails, that reported the checks question as answered while holding no
+    // list of checks at all, which is the one conclusion this probe must not
+    // reach by accident.
     answered.checksListed =
       (checks.status === 200 && checks.body.length > 0) ||
-      (variants.status === 200 && variants.body.length > 0);
+      checkNames.length > 0;
 
     if (args.readOnly) {
       rec.note(
@@ -641,12 +681,20 @@ async function main(): Promise<void> {
       startedAt: new Date().toISOString(),
       args,
       answered,
+      checksSeen: checkNames.length,
+      variantsSeen: variantCount,
       leftBehind,
     });
 
-    const unanswered = Object.entries(answered)
-      .filter(([, v]) => v === false || v === null)
-      .map(([k]) => k);
+    // What this run was asked to settle. `--read-only` does not ask questions 3
+    // and 4, so counting their `null` against it made the documented mode
+    // impossible to pass: it exited 1 having answered everything it was for.
+    const required: Array<keyof typeof answered> = args.readOnly
+      ? ['documentShape', 'checksListed']
+      : ['documentShape', 'checksListed', 'mayCreate', 'runAcceptedVariant'];
+    const unanswered = required.filter(
+      (key) => answered[key] === false || answered[key] === null,
+    );
     if (leftBehind.length > 0) {
       logger.error(
         `LEFT BEHIND in ${sapConfig.url}: ${leftBehind.join(', ')} — this probe created ` +
@@ -661,7 +709,11 @@ async function main(): Promise<void> {
       );
       process.exitCode = 1;
     } else if (leftBehind.length === 0) {
-      logger.info('All four questions answered, nothing left behind.');
+      logger.info(
+        args.readOnly
+          ? 'Both read-only questions answered, nothing left behind.'
+          : 'All four questions answered, nothing left behind.',
+      );
     }
 
     // Last: the pool is shared with every test run, and a session left
