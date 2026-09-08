@@ -63,23 +63,37 @@ export function classifyCreateOutcome(
 /**
  * What a failed check run settled about the variant it was given.
  *
- * The same distinction the creation rule makes, for the same reason: an
- * exception is not a verdict. `atc.run` rejecting can mean SAP looked at the
- * request and refused it — an answer — or that no answer exists at all: a
- * timeout after the server accepted the run, a dropped connection, an expired
- * session, a fault inside the implementation reading the reply. Calling those
- * "the variant was rejected" is the confident wrong answer this probe keeps
- * being caught giving.
+ * Two things have to hold before this says `no`, and neither is enough alone.
  *
- * `origin` is the contract's own judgement and the one worth trusting:
+ * **It must be a verdict.** `origin` is the contract's own judgement:
  * `refusal` is "SAP answered, about this object, and said no"; `connection` is
- * "no usable answer exists". A 5xx is kept out of the first: a server fault is
- * not a statement about the variant.
+ * "no usable answer exists" — a timeout after the server accepted the run, a
+ * dropped socket, an expired session. A 5xx is kept out too: a server fault is
+ * not a statement about anything. An exception thrown by the implementation
+ * reading the reply says even less.
+ *
+ * **And it must be about the variant.** One `run()` is not one request: the
+ * client resolves a check variant, creates a worklist with it, and only then
+ * submits the run against the target objects. A refusal can therefore come
+ * from the target URI, from authorization, or from the worklist — and reading
+ * any of them as "the variant was rejected" answers a question nobody asked.
+ * The only evidence tying a refusal to the variant is SAP naming it, so that
+ * is what is required; everything else leaves the question open.
+ *
+ * This is deliberately hard to satisfy. An open question costs a re-run on a
+ * system that can create variants; a wrong `no` ends the enquiry with the
+ * wrong conclusion recorded as measured.
  */
 export function classifyRunOutcome(
   origin: 'connection' | 'refusal' | 'thrown',
   status: number | undefined,
+  message: string,
+  variant: string,
 ): 'no' | 'unknown' {
   if (origin !== 'refusal') return 'unknown';
-  return status !== undefined && status >= 500 ? 'unknown' : 'no';
+  if (status !== undefined && status >= 500) return 'unknown';
+  if (!variant) return 'unknown';
+  return message.toLowerCase().includes(variant.toLowerCase())
+    ? 'no'
+    : 'unknown';
 }

@@ -715,6 +715,8 @@ async function main(): Promise<void> {
           const verdict = classifyRunOutcome(
             failure.origin as 'connection' | 'refusal' | 'thrown',
             failure.status,
+            failure.message,
+            variantForRun,
           );
           // Only about the variant the question is about, and only when the
           // failure was a verdict rather than a silence.
@@ -728,9 +730,11 @@ async function main(): Promise<void> {
               `origin=${failure.origin} status=${failure.status ?? 'none'}\n` +
               `${failure.message}\n\n` +
               (verdict === 'no'
-                ? 'SAP answered about this request and refused it — that is an answer.'
-                : 'No usable answer: this says the attempt did not complete, not ' +
-                  'that the variant is unusable. Question 4 stays open.'),
+                ? 'SAP refused, naming the variant — that is an answer about it.'
+                : 'Not an answer about the variant. One run() resolves a variant, ' +
+                  'creates a worklist and submits the run, so a refusal may be ' +
+                  'about the target or authorization; and a transport failure is ' +
+                  'not a refusal at all. Question 4 stays open.'),
           );
         }
 

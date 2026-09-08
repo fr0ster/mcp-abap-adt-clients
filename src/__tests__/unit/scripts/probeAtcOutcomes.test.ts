@@ -70,29 +70,74 @@ describe('classifyCreateOutcome', () => {
 });
 
 describe('classifyRunOutcome', () => {
-  it('reports a rejection when SAP looked at the request and refused it', () => {
-    expect(classifyRunOutcome('refusal', 400)).toBe('no');
-    expect(classifyRunOutcome('refusal', 403)).toBe('no');
-    expect(classifyRunOutcome('refusal', 404)).toBe('no');
-    // A refusal whose strategy did not keep the response is still a refusal:
-    // `origin` is the contract's own judgement, not an inference from a number.
-    expect(classifyRunOutcome('refusal', undefined)).toBe('no');
+  const NAMED =
+    'Check variant ZAC_SHR_ATC_VAR does not exist or cannot be used';
+  const NOT_NAMED =
+    'Resource /sap/bc/adt/oo/classes/ZAC_SHR_ATC_DIRTY does not exist';
+
+  it('reports a rejection only when SAP refused and named the variant', () => {
+    expect(classifyRunOutcome('refusal', 400, NAMED, 'ZAC_SHR_ATC_VAR')).toBe(
+      'no',
+    );
+    // Case is the server's business, not the caller's.
+    expect(
+      classifyRunOutcome(
+        'refusal',
+        404,
+        NAMED.toLowerCase(),
+        'zac_shr_atc_var',
+      ),
+    ).toBe('no');
+    // A refusal whose strategy kept no response is still a refusal.
+    expect(
+      classifyRunOutcome('refusal', undefined, NAMED, 'ZAC_SHR_ATC_VAR'),
+    ).toBe('no');
+  });
+
+  it('does not blame the variant for a refusal about something else', () => {
+    // One run() resolves a variant, creates a worklist, then submits the run:
+    // this refusal is about the target object, and the variant was never judged.
+    expect(
+      classifyRunOutcome('refusal', 404, NOT_NAMED, 'ZAC_SHR_ATC_VAR'),
+    ).toBe('unknown');
+    expect(
+      classifyRunOutcome(
+        'refusal',
+        403,
+        'You are not authorized (S_DEVELOP)',
+        'ZAC_SHR_ATC_VAR',
+      ),
+    ).toBe('unknown');
   });
 
   it('does not read a server fault as a statement about the variant', () => {
-    expect(classifyRunOutcome('refusal', 500)).toBe('unknown');
-    expect(classifyRunOutcome('refusal', 503)).toBe('unknown');
+    expect(classifyRunOutcome('refusal', 500, NAMED, 'ZAC_SHR_ATC_VAR')).toBe(
+      'unknown',
+    );
+    expect(classifyRunOutcome('refusal', 503, NAMED, 'ZAC_SHR_ATC_VAR')).toBe(
+      'unknown',
+    );
   });
 
   it('leaves the question open when no usable answer arrived', () => {
     // A timeout after the server accepted the run, a dropped socket, an expired
     // session — the run may well have been accepted.
-    expect(classifyRunOutcome('connection', undefined)).toBe('unknown');
-    expect(classifyRunOutcome('connection', 504)).toBe('unknown');
+    expect(
+      classifyRunOutcome('connection', undefined, NAMED, 'ZAC_SHR_ATC_VAR'),
+    ).toBe('unknown');
+    expect(
+      classifyRunOutcome('connection', 504, NAMED, 'ZAC_SHR_ATC_VAR'),
+    ).toBe('unknown');
   });
 
   it('leaves the question open when the implementation threw', () => {
     // Its own reading failed; the variant was never judged.
-    expect(classifyRunOutcome('thrown', undefined)).toBe('unknown');
+    expect(
+      classifyRunOutcome('thrown', undefined, NAMED, 'ZAC_SHR_ATC_VAR'),
+    ).toBe('unknown');
+  });
+
+  it('leaves the question open when there is no variant name to match', () => {
+    expect(classifyRunOutcome('refusal', 400, NAMED, '')).toBe('unknown');
   });
 });
