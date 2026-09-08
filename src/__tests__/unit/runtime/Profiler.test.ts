@@ -1,6 +1,7 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { Profiler } from '../../../runtime/traces/ProfilerDomain';
 import { compareRecordedAt } from '../../../runtime/traces/traceParsing';
+import { expectResult } from '../../helpers/contract';
 
 describe('Profiler', () => {
   // Real documents rather than empty bodies, so these cases test the
@@ -40,46 +41,6 @@ describe('Profiler', () => {
     } as any;
   }
 
-  it("readWith() hands the caller the body and keeps the caller's type", async () => {
-    // The consumer's own reader is not sent back to an untyped response, and
-    // this library forms no second opinion about the document.
-    const connection = createConnectionMock();
-    const profiler = new Profiler(connection, createLogger());
-
-    const mine: { length: number } = await profiler.readWith(
-      (data) => ({ length: String(data).length }),
-      'T1',
-      'hitlist',
-    );
-
-    expect(mine.length).toBeGreaterThan(0);
-    expect(connection.makeAdtRequest).toHaveBeenCalledWith(
-      expect.objectContaining({
-        url: expect.stringContaining(
-          '/sap/bc/adt/runtime/traces/abaptraces/T1/hitlist',
-        ),
-      }),
-    );
-  });
-
-  it('readWith() sends the same request read() does', async () => {
-    // One request path behind both, so they cannot drift on URL or options.
-    const a = createConnectionMock();
-    const b = createConnectionMock();
-    await new Profiler(a, createLogger()).read('T1', 'statements', {
-      withDetails: true,
-    });
-    await new Profiler(b, createLogger()).readWith(
-      (data) => data,
-      'T1',
-      'statements',
-      { withDetails: true },
-    );
-
-    const urlOf = (mock: any) => mock.makeAdtRequest.mock.calls[0][0].url;
-    expect(urlOf(b)).toBe(urlOf(a));
-  });
-
   it('list() gives a caller what latestTraceId() used to, and no less', async () => {
     // `latestTraceId()` is gone: it sat on this class where nobody holding
     // `IProfiler` could reach it. A consumer picks the newest from `list()`
@@ -95,7 +56,10 @@ describe('Profiler', () => {
         .mockResolvedValue({ status: 200, data: feed, headers: {} }),
     } as unknown as IAbapConnection;
 
-    const entries = await new Profiler(connection, createLogger()).list();
+    const entries = expectResult(
+      await new Profiler(connection, createLogger()).list(),
+      'entries',
+    );
     // Exactly the snippet the CHANGELOG and the reference publish, guard and
     // all — so the documented migration is what is under test here.
     const newest = entries.length
@@ -118,7 +82,10 @@ describe('Profiler', () => {
       }),
     } as unknown as IAbapConnection;
 
-    const entries = await new Profiler(connection, createLogger()).list();
+    const entries = expectResult(
+      await new Profiler(connection, createLogger()).list(),
+      'entries',
+    );
     expect(entries).toEqual([]);
 
     const newest = entries.length

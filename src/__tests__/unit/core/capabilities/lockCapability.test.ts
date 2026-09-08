@@ -3,6 +3,7 @@ import type {
   ICapabilityContext,
   ILockStrategy,
 } from '../../../../core/shared/capabilities/types';
+import { expectResult } from '../../../helpers/contract';
 
 type Cfg = { name?: string };
 
@@ -35,26 +36,39 @@ const strategy: ILockStrategy<Cfg, State> = {
 };
 
 describe('LockCapability', () => {
-  it('lock sets stateful, acquires, returns the handle', async () => {
+  it('lock is stateful for the acquire and stateless after it', async () => {
     const ctx = fakeCtx();
     const cap = new LockCapability<Cfg, State>(() => ctx, strategy);
-    const handle = await cap.lock({ name: 'ZFOO' });
+    const handle = expectResult(await cap.lock({ name: 'ZFOO' }), 'lock');
     expect(handle).toBe('H1');
-    expect(ctx.calls).toEqual(['session:stateful', 'acquire:ZFOO']);
+    // This used to end at `acquire`, leaving the session stateful for the whole
+    // window, so every write between lock and unlock ran inside it. Eclipse
+    // keeps its stateful session for LOCK and UNLOCK alone — measured on E19,
+    // its source PUT goes out stateless with only `lockHandle` and `corrNr` —
+    // and a request that runs inside the session leaves what it takes there:
+    // an activation sent that way strands `E_ABAP_GENPH` for the connection's
+    // lifetime.
+    expect(ctx.calls).toEqual([
+      'session:stateful',
+      'acquire:ZFOO',
+      'session:stateless',
+    ]);
   });
 
-  it('unlock is stateful during release, restores stateless, returns state', async () => {
+  it('unlock is stateful during release and restores stateless', async () => {
     const ctx = fakeCtx();
     const cap = new LockCapability<Cfg, State>(() => ctx, strategy);
-    const state = await cap.unlock({ name: 'ZFOO' }, 'H1');
+    // Nothing to read from an unlock, and the contract says so — what it
+    // answers is that it happened. The order of the session toggles is the
+    // whole claim, and it is what #106 measured.
+    expectResult(await cap.unlock({ name: 'ZFOO' }, 'H1'), 'unlock');
+
     // stateful BEFORE the UNLOCK (older BASIS), stateless AFTER.
     expect(ctx.calls).toEqual([
       'session:stateful',
       'release:ZFOO:H1',
       'session:stateless',
     ]);
-    // the ADT unlock response is preserved in state.
-    expect(state.unlockResult).toBe('R:ZFOO');
   });
 
   it('lock rethrows a missing name from the strategy', async () => {

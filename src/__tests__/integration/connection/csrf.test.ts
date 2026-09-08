@@ -29,6 +29,7 @@ import {
   createConnectionLogger,
   createTestsLogger,
 } from '../../helpers/testLogger';
+import { logTestSkip } from '../../helpers/testProgressLogger';
 
 const envPath =
   process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
@@ -78,7 +79,10 @@ describe('CSRF Token diagnostics', () => {
   });
 
   it('should fetch CSRF token from available endpoints', async () => {
-    if (!hasConfig) return;
+    if (!hasConfig) {
+      logTestSkip(testsLogger, 'CSRF token', 'No SAP configuration');
+      return;
+    }
 
     // CSRF tokens are an HTTP concept — not applicable over RFC transport
     const config = getConfig();

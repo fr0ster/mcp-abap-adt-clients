@@ -6,28 +6,60 @@ This guide explains how `@mcp-abap-adt/adt-clients` manages ADT sessions for CRU
 
 - `AdtClient` and `Adt*` objects operate through `IAbapConnection`.
 - The connection maintains the ADT session (`sap-adt-connection-id`).
-- Lock/unlock operations return a `lockHandle` used by update/delete flows.
+- `lock` returns the `lockHandle`; `update` and `delete` carry it in
+  `options.lockHandle`, and `unlock` gives it back.
+- **Only `lock` and `unlock` change the session type**, and each covers its own
+  request and nothing more: `lock` sets stateful, acquires the handle, and puts
+  the session back to stateless before returning. The window between `lock` and
+  `unlock` is *not* stateful — the write inside it goes out stateless, carrying
+  the handle in `options.lockHandle`.
+- This is Eclipse's model, measured at two scales. A full run against the cloud
+  trial: 803 requests, of which exactly 100 carry `x-sap-adt-sessiontype:
+  stateful` — the 50 `LOCK`s and the 50 `UNLOCK`s, and nothing else. A probe
+  doing two write windows on one class: 12 requests and 4 such headers, again
+  the locks and the unlocks alone. The ratio is what the rule predicts, and the
+  source `PUT`, the activation and every read are stateless at both scales.
+- **A lock the server takes during activation outlives the `unlock`.** Activation
+  generates, and generation takes `E_ABAP_GENPH` on the generated program; that
+  one belongs to the ABAP session, not to the object, and is released when the
+  session ends — measured on E19, visible in SM12 for exactly as long as the
+  session lives. Nothing in this library can release it earlier.
 - Tests and helpers track locks in `.locks/active-locks.json`.
 
 ## Workflow Example
 
+Every member is one request, so the window is yours to open and close:
+
 ```typescript
 const client = new AdtClient(connection);
+const cls = client.getClass();
+const config = { className: 'ZCL_TEST' };
 
-await client.getClass().create({
-  className: 'ZCL_TEST',
-  packageName: 'ZPKG',
-  description: 'Test',
-}, { activateOnCreate: true });
+// The POST that makes the class shell. Nothing else.
+await cls.create({ ...config, packageName: 'ZPKG', description: 'Test' });
 
-await client.getClass().update({
-  className: 'ZCL_TEST',
-}, { sourceCode: updatedCode, activateOnUpdate: true });
+const locked = await cls.lock(config);          // stateful from here
+if (!locked.ok) throw new Error(locked.getError().message);
+const lockHandle = locked.getResult().value;
+
+try {
+  await cls.update(config, { sourceCode: updatedCode, lockHandle });
+} finally {
+  await cls.unlock(config, lockHandle);          // stateless again
+}
+
+await cls.activate(config);
 ```
+
+Passing no `lockHandle` is allowed. Whether a write without a lock is accepted
+is ADT's judgement about that object on that system, and its refusal comes back
+in the answer rather than as an exception this library invented.
 
 ## Cleanup Guidance
 
-- Always unlock or delete objects after failures.
+- Always unlock or delete objects after failures — the `try/finally` above is
+  the shape, because a handle left held makes the next create answer 403 with
+  nothing appearing to hold it.
 - Use the lock registry helpers to recover stale locks.
 
 ## The session belongs to the caller, not to this library

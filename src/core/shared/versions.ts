@@ -1,9 +1,7 @@
-import {
-  AdtObjectErrorCodes,
-  AdtOperationError,
-  type IObjectVersion,
-} from '@mcp-abap-adt/interfaces';
+import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
+import { AdtOperationError } from '../../utils/adtErrors';
+import type { ObjectVersion } from './results';
 
 const parser = new XMLParser({
   ignoreAttributes: false,
@@ -13,7 +11,7 @@ const parser = new XMLParser({
 });
 
 /** Parse an ADT versions Atom feed into a list of versions. Pure — no endpoints. */
-export function parseVersionsFeed(xml: string): IObjectVersion[] {
+export function parseVersionsFeed(xml: string): ObjectVersion[] {
   const root = parser.parse(xml) as Record<string, any>;
   const feed = root['atom:feed'] ?? root.feed;
   if (!feed) return [];

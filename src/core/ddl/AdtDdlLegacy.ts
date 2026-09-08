@@ -1,68 +1,44 @@
-import { beginCriticalSection } from '../../utils/criticalSection';
 /**
- * AdtDdlLegacy - View handler for legacy SAP systems (BASIS < 7.50)
+ * AdtDdlLegacy - DDL source handler for legacy SAP systems (BASIS < 7.50)
  *
  * Overrides delete() to use direct DELETE instead of /sap/bc/adt/deletion/ API.
  */
 
-import {
-  encodeSapObjectName,
-  safeErrorMessage,
-} from '../../utils/internalUtils';
+import type {
+  IAdtError,
+  IAdtOperationOptions,
+  IAdtResponse,
+  IResultStrategy,
+} from '@mcp-abap-adt/interfaces';
+import { answering } from '../../utils/adtResponse';
+import { encodeSapObjectName } from '../../utils/internalUtils';
 import { deleteObjectDirect } from '../shared/deleteLegacy';
 import { AdtDdl } from './AdtDdl';
-import { lockDDLS } from './lock';
-import type { IDdlConfig, IDdlState } from './types';
-import { unlockDDLS } from './unlock';
+import type { ddlDocuments, IDdlConfig, IDdlResults } from './types';
 
-export class AdtDdlLegacy extends AdtDdl {
-  override async delete(config: Partial<IDdlConfig>): Promise<IDdlState> {
+export class AdtDdlLegacy<
+  R extends IDdlResults = typeof ddlDocuments,
+> extends AdtDdl<R> {
+  override async delete<E extends IAdtError = IAdtError>(
+    config: Partial<IDdlConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     if (!config.ddlName) {
-      throw new Error('View name is required');
+      throw new Error('DDL name is required');
     }
+    const name = config.ddlName;
 
-    const state: IDdlState = { errors: [] };
-    let lockHandle: string | undefined;
-
-    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
-
-    // the lock but leaves the work half-done.
-
-    const endCriticalSection = beginCriticalSection(this.connection);
-
-    try {
-      this.logger?.info?.('Locking view for deletion');
-      this.connection.setSessionType('stateful');
-      lockHandle = await lockDDLS(this.connection, config.ddlName);
-
-      this.logger?.info?.('Deleting view (direct DELETE)');
-      const objectUrl = `/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(config.ddlName).toLowerCase()}`;
-      state.deleteResult = await deleteObjectDirect(
-        this.connection,
-        objectUrl,
-        lockHandle,
-        config.transportRequest,
-      );
-      this.logger?.info?.('View deleted');
-
-      return state;
-    } catch (error: unknown) {
-      this.logger?.error?.('Delete failed:', safeErrorMessage(error));
-      if (lockHandle) {
-        try {
-          await unlockDDLS(this.connection, config.ddlName, lockHandle);
-        } catch (unlockError: unknown) {
-          this.logger?.error?.(
-            'Unlock after delete failure also failed:',
-            safeErrorMessage(unlockError),
-          );
-        }
-      }
-      throw error;
-    } finally {
-      this.connection.setSessionType('stateless');
-
-      endCriticalSection();
-    }
+    const objectUrl = `/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(name).toLowerCase()}`;
+    return answering(
+      () =>
+        deleteObjectDirect(
+          this.connection,
+          objectUrl,
+          options?.lockHandle,
+          config.transportRequest,
+        ),
+      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      options?.analyse,
+    );
   }
 }

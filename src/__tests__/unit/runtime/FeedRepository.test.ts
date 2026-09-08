@@ -1,5 +1,6 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { FeedRepository } from '../../../runtime/feeds/FeedRepository';
+import { expectResult } from '../../helpers/contract';
 
 const MOCK_ATOM = `<?xml version="1.0" encoding="utf-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
@@ -81,7 +82,10 @@ describe('FeedRepository', () => {
     });
     const repo = new FeedRepository(connection, createLogger());
 
-    const entries = await repo.byUrl('/sap/bc/adt/runtime/dumps');
+    const entries = expectResult(
+      await repo.byUrl('/sap/bc/adt/runtime/dumps'),
+      'feed entries',
+    );
 
     expect(entries).toHaveLength(1);
     expect(entries[0]).toEqual({
@@ -103,8 +107,12 @@ describe('FeedRepository', () => {
     });
     const repo = new FeedRepository(connection, createLogger());
 
-    const entries = await repo.byUrl('/sap/bc/adt/runtime/dumps');
+    const entries = expectResult(
+      await repo.byUrl('/sap/bc/adt/runtime/dumps'),
+      'an empty feed',
+    );
 
+    // An empty feed is an answer, not a failure.
     expect(entries).toEqual([]);
   });
 

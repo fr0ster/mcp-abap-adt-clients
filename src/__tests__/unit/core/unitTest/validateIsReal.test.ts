@@ -1,17 +1,15 @@
 /**
- * `validate()` checks what is about to be born, and it issues requests.
+ * `validate()` issues a request, and it is one request.
  *
- * It used to return what its own comment called "a mock success response", and
- * a later attempt validated the wrong thing — a **name** check against a class
- * that already existed, which is meaningless: `validateClassName` takes a
- * package and a description, parameters that only mean anything before an
- * object exists.
+ * It used to return what its own comment called "a mock success response". The
+ * fix made it real but grew it into a fork — read the class, then validate the
+ * name or check the code depending on what was found — and 18.0.0 removed the
+ * fork rather than the honesty: `validate` is the container class's name
+ * validation, always, and the test source is checked with
+ * `getLocalTestClass().validate()` when the consumer wants that second verdict.
  *
- * So validation forks on what is about to be created:
- *
- * - the container class does not exist yet → validate the **name**;
- * - it does → confirm it is there, by reading it;
- * - source was given → check the **code**, whichever branch was taken.
+ * What survives from the old file is the part that mattered: the answer is the
+ * server's, a refusal is a refusal, and a caller error costs no request.
  */
 
 import type {
@@ -20,6 +18,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { AdtCdsUnitTest } from '../../../../core/unitTest/AdtCdsUnitTest';
 import { AdtUnitTest } from '../../../../core/unitTest/AdtUnitTest';
+import { expectFailure, expectResult } from '../../../helpers/contract';
 import { createLibraryLogger } from '../../../helpers/testLogger';
 
 type Call = { url: string; method: string; data?: unknown };
@@ -59,49 +58,8 @@ describe('AdtUnitTest.validate()', () => {
     expect(calls).toHaveLength(0);
   });
 
-  it('confirms an existing container by reading it, and reports what came back', async () => {
+  it('validates the container class name — one request, whatever exists', async () => {
     const { conn, calls } = makeConn((r) => {
-      expect(r.method).toBe('GET');
-      expect(r.url).toBe('/sap/bc/adt/oo/classes/ZCL_CONTAINER/source/main');
-      return { status: 200, data: 'CLASS zcl_container DEFINITION.' };
-    });
-    const h = new AdtUnitTest(conn, createLibraryLogger());
-
-    const state = await h.validate({ className: 'ZCL_CONTAINER' });
-
-    expect(calls).toHaveLength(1);
-    expect(state.errors).toEqual([]);
-    expect(state.readResult?.data).toBe('CLASS zcl_container DEFINITION.');
-  });
-
-  it('checks the test source too, when there is source to check', async () => {
-    const { conn, calls } = makeConn((r, i) => {
-      if (i === 0) return { status: 200, data: 'CLASS zcl_container.' };
-      expect(r.method).toBe('POST');
-      expect(r.url).toContain('/sap/bc/adt/checkruns');
-      expect(String(r.data)).toContain(
-        '/sap/bc/adt/oo/classes/zcl_container/includes/testclasses',
-      );
-      return { status: 200, data: '<code-ok/>' };
-    });
-    const h = new AdtUnitTest(conn, createLibraryLogger());
-
-    const state = await h.validate({
-      className: 'ZCL_CONTAINER',
-      testClassSource: 'CLASS ltcl_test DEFINITION FOR TESTING.',
-    });
-
-    expect(calls).toHaveLength(2);
-    expect(state.checkResult?.data).toBe('<code-ok/>');
-  });
-
-  it('validates the NAME when the container does not exist yet — the create path', async () => {
-    const { conn, calls } = makeConn((r, i) => {
-      if (i === 0) {
-        return Object.assign(new Error('not found'), {
-          response: { status: 404, statusText: 'Not Found', data: '' },
-        });
-      }
       expect(r.method).toBe('POST');
       expect(r.url).toContain('/sap/bc/adt/oo/validation/objectname');
       expect(r.url).toContain('objname=ZCL_NEW_TESTS');
@@ -109,66 +67,65 @@ describe('AdtUnitTest.validate()', () => {
     });
     const h = new AdtUnitTest(conn, createLibraryLogger());
 
-    const state = await h.validate({
-      className: 'ZCL_NEW_TESTS',
-      packageName: 'ZPKG',
-      description: 'tests',
-    });
+    const verdict = expectResult(
+      await h.validate({
+        className: 'ZCL_NEW_TESTS',
+        packageName: 'ZPKG',
+        description: 'tests',
+      }),
+      'validation',
+    );
 
-    expect(calls).toHaveLength(2);
-    expect(state.validationResponse?.data).toBe('<name-ok/>');
+    // No probing read first. Whether the class is already there is something
+    // the server answers, and it answers it in this document.
+    expect(calls).toHaveLength(1);
+    expect(verdict).toBe('<name-ok/>');
   });
-  it('a read that fails for any other reason is reported, not treated as absence', async () => {
-    // A 500 is a fact about the request, not about the class. Routing it into
-    // the create path would validate a NAME for a class that exists and report
-    // something nobody asked — caught in review, 2026-08-14.
+
+  it('a refusal is reported as one, not swallowed', async () => {
     const { conn, calls } = makeConn(() =>
       Object.assign(new Error('server error'), {
-        response: {
-          status: 500,
-          statusText: 'Internal Server Error',
-          data: '',
-        },
+        response: { status: 500, statusText: 'Server Error', data: '' },
       }),
     );
     const h = new AdtUnitTest(conn, createLibraryLogger());
 
-    await expect(h.validate({ className: 'ZCL_CONTAINER' })).rejects.toThrow(
-      /server error/i,
+    const failure = expectFailure(
+      await h.validate({
+        className: 'ZCL_CONTAINER',
+        packageName: 'ZPKG',
+        description: 'tests',
+      }),
+      'validate against a server that failed',
     );
+
+    expect(failure.response?.status).toBe(500);
     expect(calls).toHaveLength(1);
   });
 });
 
 describe('AdtCdsUnitTest.validate()', () => {
-  it('issues both the name validation and the local-test-class check, in order', async () => {
-    const { conn, calls } = makeConn((r, i) => {
-      if (i === 0) {
-        expect(r.method).toBe('POST');
-        expect(r.url).toContain('/sap/bc/adt/oo/validation/objectname');
-        expect(r.url).toContain('objname=ZCL_CDS_DUMMY');
-        return { status: 200, data: '<name-ok/>' };
-      }
+  it('validates the generated class name — the name check alone', async () => {
+    const { conn, calls } = makeConn((r) => {
       expect(r.method).toBe('POST');
-      expect(r.url).toContain('/sap/bc/adt/checkruns');
-      expect(String(r.data)).toContain(
-        '/sap/bc/adt/oo/classes/zcl_cds_dummy/includes/testclasses',
-      );
-      return { status: 200, data: '<code-ok/>' };
+      expect(r.url).toContain('/sap/bc/adt/oo/validation/objectname');
+      expect(r.url).toContain('objname=ZCL_CDS_DUMMY');
+      return { status: 200, data: '<name-ok/>' };
     });
     const h = new AdtCdsUnitTest(conn, createLibraryLogger());
 
-    const state = await h.validate({
-      className: 'ZCL_CDS_DUMMY',
-      packageName: 'ZPKG',
-      classTemplate: '<template/>',
-      testClassSource: 'CLASS ltcl_test DEFINITION FOR TESTING.',
-    });
+    const verdict = expectResult(
+      await h.validate({
+        className: 'ZCL_CDS_DUMMY',
+        packageName: 'ZPKG',
+        classTemplate: '<template/>',
+        testClassSource: 'CLASS ltcl_test DEFINITION FOR TESTING.',
+      }),
+      'validation',
+    );
 
-    expect(calls).toHaveLength(2);
-    expect(state.errors).toEqual([]);
-    expect(state.validationResponse?.data).toBe('<name-ok/>');
-    expect(state.testClassState?.validationResponse?.data).toBe('<code-ok/>');
+    expect(calls).toHaveLength(1);
+    expect(verdict).toBe('<name-ok/>');
   });
 
   it('a name the server rejects produces an error, not an empty success (one request)', async () => {
@@ -183,8 +140,8 @@ describe('AdtCdsUnitTest.validate()', () => {
     );
     const h = new AdtCdsUnitTest(conn, createLibraryLogger());
 
-    await expect(
-      h.validate({
+    const failure = expectFailure(
+      await h.validate({
         className: 'BOGUS NAME',
         // Required since the endpoint was measured to demand it. Without it the
         // handler's own guard throws first and this test would pass while
@@ -194,7 +151,13 @@ describe('AdtCdsUnitTest.validate()', () => {
         classTemplate: '<template/>',
         testClassSource: 'CLASS ltcl_test DEFINITION FOR TESTING.',
       }),
-    ).rejects.toMatchObject({ code: 'ADT_VALIDATION_FAILED', status: 400 });
+      'validate a name the server rejects',
+    );
+
+    // The status is on `response`, where the answer it came on is — not on
+    // invented fields beside the message.
+    expect(failure.response?.status).toBe(400);
+    expect(failure.message).toContain('invalid object name');
     expect(calls).toHaveLength(1);
   });
 
@@ -220,17 +183,20 @@ describe('AdtCdsUnitTest.validate()', () => {
     expect(calls).toHaveLength(0);
   });
 
-  it('falls back to the parent check when no class is being generated', async () => {
+  it('falls back to the parent when no class is being generated', async () => {
     const { conn, calls } = makeConn((r) => {
-      expect(r.method).toBe('GET');
-      expect(r.url).toBe('/sap/bc/adt/oo/classes/ZCL_CONTAINER/source/main');
-      return { status: 200, data: 'CLASS zcl_container DEFINITION.' };
+      expect(r.method).toBe('POST');
+      expect(r.url).toContain('/sap/bc/adt/oo/validation/objectname');
+      return { status: 200, data: '<name-ok/>' };
     });
     const h = new AdtCdsUnitTest(conn, createLibraryLogger());
 
-    const state = await h.validate({ className: 'ZCL_CONTAINER' });
+    const verdict = expectResult(
+      await h.validate({ className: 'ZCL_CONTAINER', packageName: 'ZPKG' }),
+      'validation',
+    );
 
     expect(calls).toHaveLength(1);
-    expect(state.errors).toEqual([]);
+    expect(verdict).toBe('<name-ok/>');
   });
 });

@@ -10,24 +10,19 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
+  IRuntimeDumpReadOptions,
+  IRuntimeDumpsListOptions,
 } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 
-export interface IRuntimeDumpsListOptions {
-  query?: string;
-  inlinecount?: 'allpages' | 'none';
-  top?: number;
-  skip?: number;
-  orderby?: string;
-  from?: string; // YYYYMMDDHHMMSS
-  to?: string; // YYYYMMDDHHMMSS
-}
-
-export type IRuntimeDumpReadView = 'default' | 'summary' | 'formatted';
-
-export interface IRuntimeDumpReadOptions {
-  view?: IRuntimeDumpReadView;
-}
+// Declared once, in the contract; re-exported so importers here are unchanged.
+// Declared once, in the contract; re-exported so importers here are unchanged.
+// Declared once, in the contract; re-exported so importers here are unchanged.
+export type {
+  IRuntimeDumpReadOptions,
+  IRuntimeDumpReadView,
+  IRuntimeDumpsListOptions,
+} from '@mcp-abap-adt/interfaces';
 
 function normalizeDumpId(dumpId: string): string {
   const normalized = dumpId?.trim();

@@ -31,15 +31,22 @@ describe('AdtServiceDefinition.create is metadata-only', () => {
     const { conn, calls } = fakeConn();
     const handler = new AdtServiceDefinition(conn, logger);
 
-    await handler.create(
-      {
-        serviceDefinitionName: 'ZMETA_ONLY',
-        packageName: 'ZPKG',
-        description: 'meta only',
-        sourceCode: UNIQUE_SOURCE,
-      },
-      { sourceCode: UNIQUE_SOURCE },
-    );
+    // The source can no longer be handed to `create` at all — the signature
+    // refuses it, on the class as well as through the contract. The two calls
+    // below are the compile-time half of this test; the runtime half still
+    // asserts the POST body, because a member could always fetch a source from
+    // somewhere else and put it in.
+    const config = {
+      serviceDefinitionName: 'ZMETA_ONLY',
+      packageName: 'ZPKG',
+      description: 'meta only',
+    };
+    await handler.create(config);
+
+    // @ts-expect-error a create carries no source: the POST has no body for it
+    void (() => handler.create({ ...config, sourceCode: UNIQUE_SOURCE }));
+    // @ts-expect-error nor through the options
+    void (() => handler.create(config, { sourceCode: UNIQUE_SOURCE }));
 
     const posts = calls.filter((c) => c.method === 'POST');
     expect(posts.length).toBeGreaterThan(0);

@@ -19,7 +19,10 @@ export async function unlockInterface(
   interfaceName: string,
   lockHandle: string,
 ): Promise<IAdtWireResponse> {
-  const url = `/sap/bc/adt/oo/interfaces/${encodeSapObjectName(interfaceName)}?_action=UNLOCK&lockHandle=${encodeURIComponent(lockHandle)}`;
+  // Lower-cased like `lock.ts` does. ADT accepts either, but a lock taken at
+  // one spelling and released at another cannot be paired by URL — which is
+  // how an unreleased lock hides from anyone reading a wire log.
+  const url = `/sap/bc/adt/oo/interfaces/${encodeSapObjectName(interfaceName).toLowerCase()}?_action=UNLOCK&lockHandle=${encodeURIComponent(lockHandle)}`;
 
   try {
     const response = await connection.makeAdtRequest({

@@ -17,6 +17,7 @@ import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
 import type { AdtSourceObjectType } from '../../../core/shared/types';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
+import { expectResult } from '../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -119,18 +120,19 @@ describe('Shared - readSource', () => {
     testsLogger.info?.(`📋 Object: ${className} (class)`);
     testsLogger.info?.('📖 Reading source code...');
 
-    const result = await withAcceptHandling(
-      client.getUtils().readObjectSource('class', className),
-    );
+    // The contract, not the status: ADT answers a refusal inside a 200, so a
+    // status check passes whether or not the read worked.
+    const source = expectResult(
+      await withAcceptHandling(
+        client.getUtils().readObjectSource('class', className),
+      ),
+      'read class source',
+    ) as string;
 
-    expect(result.status).toBe(200);
-    expect(result.data).toBeDefined();
-    expect(typeof result.data).toBe('string');
+    expect(typeof source).toBe('string');
 
     testsLogger.info?.('✅ Source code retrieved');
-    testsLogger.info?.(
-      `📊 Source length: ${result.data?.length || 0} characters`,
-    );
+    testsLogger.info?.(`📊 Source length: ${source.length} characters`);
   }, 15000);
 
   it('should read class source code (inactive version)', async () => {
@@ -158,13 +160,15 @@ describe('Shared - readSource', () => {
       return;
     }
     logTestStep('read class source code (inactive version)', testsLogger);
-    const result = await withAcceptHandling(
-      client
-        .getUtils()
-        .readObjectSource('class', className, undefined, 'inactive'),
-    );
-    expect(result.status).toBe(200);
-    expect(result.data).toBeDefined();
+    const source = expectResult(
+      await withAcceptHandling(
+        client
+          .getUtils()
+          .readObjectSource('class', className, undefined, 'inactive'),
+      ),
+      'read class source (inactive)',
+    ) as string;
+    expect(typeof source).toBe('string');
   }, 15000);
 
   it('should read class source code (active and inactive versions)', async () => {
@@ -197,28 +201,30 @@ describe('Shared - readSource', () => {
     );
 
     logTestStep('read class source (active)', testsLogger);
-    const activeResult = await withAcceptHandling(
-      client
-        .getUtils()
-        .readObjectSource('class', className, undefined, 'active'),
-    );
-    expect(activeResult.status).toBe(200);
-    expect(activeResult.data).toBeDefined();
+    const activeSource = expectResult(
+      await withAcceptHandling(
+        client
+          .getUtils()
+          .readObjectSource('class', className, undefined, 'active'),
+      ),
+      'read class source (active)',
+    ) as string;
     logTestStep(
-      `active source length: ${activeResult.data?.length || 0} characters`,
+      `active source length: ${activeSource.length} characters`,
       testsLogger,
     );
 
     logTestStep('read class source (inactive)', testsLogger);
-    const inactiveResult = await withAcceptHandling(
-      client
-        .getUtils()
-        .readObjectSource('class', className, undefined, 'inactive'),
-    );
-    expect(inactiveResult.status).toBe(200);
-    expect(inactiveResult.data).toBeDefined();
+    const inactiveSource = expectResult(
+      await withAcceptHandling(
+        client
+          .getUtils()
+          .readObjectSource('class', className, undefined, 'inactive'),
+      ),
+      'read class source (inactive)',
+    ) as string;
     logTestStep(
-      `inactive source length: ${inactiveResult.data?.length || 0} characters`,
+      `inactive source length: ${inactiveSource.length} characters`,
       testsLogger,
     );
   }, 15000);

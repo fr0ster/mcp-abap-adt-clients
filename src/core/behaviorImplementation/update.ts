@@ -7,7 +7,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -20,22 +20,15 @@ export async function updateBehaviorImplementation(
   connection: IAbapConnection,
   className: string,
   sourceCode: string,
-  lockHandle: string,
+  lockHandle?: string,
   transportRequest?: string,
 ): Promise<IAdtWireResponse> {
   if (!sourceCode) {
     throw new Error('sourceCode is required');
   }
 
-  if (!lockHandle) {
-    throw new Error('lockHandle is required');
-  }
-
   const encodedName = encodeSapObjectName(className).toLowerCase();
-  let url = `/sap/bc/adt/oo/classes/${encodedName}/includes/implementations?lockHandle=${encodeURIComponent(lockHandle)}`;
-  if (transportRequest) {
-    url += `&corrNr=${transportRequest}`;
-  }
+  const url = `/sap/bc/adt/oo/classes/${encodedName}/includes/implementations${writeQuery(lockHandle, transportRequest)}`;
 
   const headers = {
     'Content-Type': CT_SOURCE,

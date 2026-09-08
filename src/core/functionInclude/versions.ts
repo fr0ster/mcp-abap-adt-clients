@@ -1,6 +1,7 @@
-import type { IAbapConnection, IObjectVersion } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
+import type { ObjectVersion } from '../shared/results';
 import { parseVersionsFeed, throwVersionsError } from '../shared/versions';
 import type { IFunctionIncludeConfig } from './types';
 
@@ -10,7 +11,7 @@ const ACCEPT_VERSION_FEED = 'application/atom+xml;type=feed';
 export async function getFunctionIncludeVersions(
   connection: IAbapConnection,
   config: Partial<IFunctionIncludeConfig>,
-): Promise<IObjectVersion[]> {
+): Promise<ObjectVersion[]> {
   if (!config.functionGroupName)
     throw new Error('functionGroupName is required');
   if (!config.includeName) throw new Error('includeName is required');

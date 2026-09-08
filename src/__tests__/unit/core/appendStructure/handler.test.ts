@@ -2,7 +2,9 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
+import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
 import { AdtAppendStructure } from '../../../../core/appendStructure/AdtAppendStructure';
+import { expectFailure, expectResult } from '../../../helpers/contract';
 
 function makeConn(handler: (r: any) => Partial<IAdtWireResponse> | Error) {
   const sessionTypes: string[] = [];
@@ -54,63 +56,58 @@ describe('AdtAppendStructure handler', () => {
     expect(calls[0].url).toBe('/sap/bc/adt/ddic/structures');
   });
 
-  it('public unlock() resets to stateless even when unlock throws', async () => {
+  it('public unlock() resets to stateless even when the unlock is refused', async () => {
     const { conn, sessionTypes } = makeConn((r) =>
       r.url.includes('_action=UNLOCK')
         ? new Error('unlock boom')
         : { data: '' },
     );
     const as = new AdtAppendStructure(conn);
-    await expect(
-      as.unlock({ appendStructureName: 'ZOK_S' }, 'LH1'),
-    ).rejects.toThrow('unlock boom');
+
+    const failure = expectFailure(
+      await as.unlock({ appendStructureName: 'ZOK_S' }, 'LH1'),
+      'unlock the server refused',
+    );
+
+    expect(failure.message).toContain('unlock boom');
+    // The session is what this case is about: a refused unlock that left the
+    // client stateful poisons every later request on it.
     expect(sessionTypes[sessionTypes.length - 1]).toBe('stateless');
   });
 
-  it('validate() maps 501 to validationSupported:false', async () => {
+  it('validate() names 501 as unsupported, not as a bad name', async () => {
     const { conn } = makeConn(() =>
       Object.assign(new Error('nope'), { response: { status: 501 } }),
     );
     const as = new AdtAppendStructure(conn);
-    const state = await as.validate({ appendStructureName: 'ZOK_S' });
-    expect(state.validationSupported).toBe(false);
+    // A system with no validation resource has not looked at the name. The
+    // shipped `analyse` says so with a code, so a consumer branches on that
+    // rather than on a status they would have to dig out themselves.
+    const failure = expectFailure(
+      await as.validate({ appendStructureName: 'ZOK_S' }),
+      'validate where the resource is absent',
+    );
+    expect(failure.code).toBe(AdtObjectErrorCodes.UNSUPPORTED_OPERATION);
+    expect(failure.message).toContain('501');
   });
 
-  it('update() happy path: lock→check→PUT→long-poll-read→unlock→check→read, ends stateless', async () => {
-    const LOCK_HANDLE = 'LOCK_HANDLE_42';
-    const lockXml = `<?xml version="1.0" encoding="utf-8"?>
-<asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
-  <asx:values>
-    <DATA>
-      <LOCK_HANDLE>${LOCK_HANDLE}</LOCK_HANDLE>
-    </DATA>
-  </asx:values>
-</asx:abap>`;
-
-    const { conn, sessionTypes, calls } = makeConn((r) => {
-      if (r.url.includes('_action=LOCK')) return { data: lockXml };
-      if (r.url.includes('checkruns')) return { data: '' };
-      if (r.method === 'PUT') return { data: '' };
-      if (r.url.includes('_action=UNLOCK')) return { data: '' };
-      if (r.method === 'GET') return { data: 'source code' };
-      return { data: '' };
-    });
+  it('update() is the PUT, and it carries the handle it was given', async () => {
+    const { conn, sessionTypes, calls } = makeConn(() => ({ data: '' }));
 
     const as = new AdtAppendStructure(conn);
-    await as.update({ appendStructureName: 'ZOK_X', sourceCode: 'new source' });
-
-    const putCall = calls.find((c) => c.method === 'PUT');
-    expect(putCall).toBeDefined();
-    expect(putCall?.url).toContain('/source/main');
-
-    const longPollCall = calls.find(
-      (c) =>
-        c.method === 'GET' &&
-        c.url.includes('version=active') &&
-        c.url.includes('withLongPolling=true'),
+    await as.update(
+      { appendStructureName: 'ZOK_X' },
+      { sourceCode: 'new source', lockHandle: 'LOCK_HANDLE_42' },
     );
-    expect(longPollCall).toBeDefined();
 
-    expect(sessionTypes[sessionTypes.length - 1]).toBe('stateless');
+    // One request, and it is the write. No lock, no check, no readiness poll:
+    // those are calls the consumer makes when it wants them.
+    expect(calls).toHaveLength(1);
+    expect(calls[0].method).toBe('PUT');
+    expect(calls[0].url).toContain('/source/main');
+    expect(calls[0].url).toContain('lockHandle=LOCK_HANDLE_42');
+
+    // And the session is the consumer's: the member did not touch it.
+    expect(sessionTypes).toEqual([]);
   });
 });

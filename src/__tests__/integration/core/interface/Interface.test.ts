@@ -15,13 +15,11 @@ import * as path from 'node:path';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type {
-  IInterfaceConfig,
-  IInterfaceState,
-} from '../../../../core/interface';
+import type { IInterfaceConfig } from '../../../../core/interface';
 import { getInterface } from '../../../../core/interface/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -69,7 +67,7 @@ describe('Interface (using AdtClient)', () => {
   let hasConfig = false;
   let isCloudSystem = false;
   let isLegacy = false;
-  let tester: BaseTester<IInterfaceConfig, IInterfaceState>;
+  let tester: BaseTester<IInterfaceConfig>;
 
   beforeAll(async () => {
     try {
@@ -222,8 +220,8 @@ describe('Interface (using AdtClient)', () => {
           const resultState = await tester.readTest({
             interfaceName: standardInterfaceName,
           });
-          expect(resultState?.readResult).toBeDefined();
-          const interfaceConfig = resultState?.readResult;
+          expect(resultState).toBeDefined();
+          const interfaceConfig = resultState;
           if (
             interfaceConfig &&
             typeof interfaceConfig === 'object' &&

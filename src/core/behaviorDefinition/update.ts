@@ -7,7 +7,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { IUpdateBehaviorDefinitionParams } from './types';
 
@@ -49,20 +49,18 @@ import type { IUpdateBehaviorDefinitionParams } from './types';
  */
 export async function update(
   connection: IAbapConnection,
-  params: IUpdateBehaviorDefinitionParams,
+  // The handle is accepted as given, including not at all. The params type in
+  // the interfaces package still requires one; whether a write without a lock
+  // is allowed is ADT's judgement, so this function does not add its own.
+  params: Omit<IUpdateBehaviorDefinitionParams, 'lockHandle'> & {
+    lockHandle?: string;
+  },
 ): Promise<IAdtWireResponse> {
   if (!params.sourceCode) {
     throw new Error('sourceCode is required');
   }
 
-  if (!params.lockHandle) {
-    throw new Error('lockHandle is required');
-  }
-
-  let url = `/sap/bc/adt/bo/behaviordefinitions/${encodeSapObjectName(params.name).toLowerCase()}/source/main?lockHandle=${encodeURIComponent(params.lockHandle)}`;
-  if (params.transportRequest) {
-    url += `&corrNr=${params.transportRequest}`;
-  }
+  const url = `/sap/bc/adt/bo/behaviordefinitions/${encodeSapObjectName(params.name).toLowerCase()}/source/main${writeQuery(params.lockHandle, params.transportRequest)}`;
 
   const headers = {
     'Content-Type': CT_SOURCE,

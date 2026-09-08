@@ -12,10 +12,13 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type {
   IAbapConnection,
+  IAdtResponse,
   ISessionLifecycleAware,
 } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
+import type { ObjectVersion } from '../../../../core/shared/results';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -23,6 +26,7 @@ import {
   skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
 import { createTestsLogger } from '../../../helpers/testLogger';
+import { logTestSkip } from '../../../helpers/testProgressLogger';
 
 const envPath =
   process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../../.env');
@@ -54,7 +58,10 @@ describe('Object version history', () => {
     if (connection) await releaseTestConnection(connection);
   });
 
-  const cases: Array<{ label: string; list: () => Promise<any[]> }> = [
+  const cases: Array<{
+    label: string;
+    list: () => Promise<IAdtResponse<ObjectVersion[]>>;
+  }> = [
     {
       label: 'table',
       list: () => client.getTable().getVersions({ tableName: 'ZAC_SHR_BTABL' }),
@@ -79,8 +86,11 @@ describe('Object version history', () => {
 
   for (const tc of cases) {
     it(`lists versions and fetches a version's source for ${tc.label}`, async () => {
-      if (!hasConfig) return;
-      const versions = await tc.list();
+      if (!hasConfig) {
+        logTestSkip(logger, `versions - ${tc.label}`, 'No SAP configuration');
+        return;
+      }
+      const versions = expectResult(await tc.list(), `${tc.label} versions`);
       expect(Array.isArray(versions)).toBe(true);
       expect(versions.length).toBeGreaterThan(0);
       const v = versions[0];
@@ -89,7 +99,10 @@ describe('Object version history', () => {
       expect(v.contentUri.length).toBeGreaterThan(0);
 
       // getVersionSource is the same opaque-URI fetch on every handler.
-      const src = await client.getTable().getVersionSource(v.contentUri);
+      const src = expectResult(
+        await client.getTable().getVersionSource(v.contentUri),
+        'src',
+      );
       expect(typeof src).toBe('string');
       expect(src.length).toBeGreaterThan(0);
     }, 60000);

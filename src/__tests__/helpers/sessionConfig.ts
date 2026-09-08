@@ -281,6 +281,16 @@ export function getTargetSystem(): 'onprem' | 'cloud' {
 }
 
 /**
+ * Whether each test file works on a session of its own.
+ *
+ * Read at the call rather than once, so a probe can set it for one file without
+ * the module having been imported at a different moment deciding for it.
+ */
+function perFileSession(): boolean {
+  return process.env.PER_FILE_SESSION === '1';
+}
+
+/**
  * The one place a test gets a connection.
  *
  * Every test used to build its own with `createAbapConnection(config, logger)`,
@@ -307,7 +317,12 @@ export async function createTestConnection(
       ? new SharedCloudConnector(
           config,
           credential,
-          new CloudHttpTransport(materialOf(credential), logger, wire),
+          // Wrapped like the on-prem transports are. Without this `WIRE_LOG`
+          // was silently a no-op against a cloud system — the flag was set, the
+          // file stayed empty, and the run looked like it had nothing to say.
+          withWireLog(
+            new CloudHttpTransport(materialOf(credential), logger, wire),
+          ),
           logger,
         )
       : new SharedOnPremConnector(
@@ -323,7 +338,21 @@ export async function createTestConnection(
   //
   // No material means nobody published any — a single file run on its own —
   // and opening one is then the right thing.
-  const shared = readSessionMaterial();
+  // `PER_FILE_SESSION=1` opts out: the file opens its own session and closes it
+  // in `afterAll`, instead of joining the run's.
+  //
+  // An experiment, not a default. What it is for: `E_ABAP_GENPH` is released
+  // when the session that took it ends, so a run on one session carries every
+  // activation's lock until the very end — and past it, since the teardown's
+  // goodbye is dispatched rather than awaited. A session per file would end
+  // them file by file.
+  //
+  // What it costs is the reason it is not the default: sixty-nine sessions
+  // where there was one, against a pool this suite has already exhausted twice.
+  // Each has to close for that to stay bounded, which is exactly what this
+  // measures. HTTP only — an RFC conversation IS its session, and adopts
+  // nothing.
+  const shared = perFileSession() ? null : readSessionMaterial();
   if (shared) connection.adoptSession(shared);
 
   // Still connect(): adopting the cookies does not make the connection
@@ -416,8 +445,9 @@ export async function releaseTestConnection(
 ): Promise<void> {
   if (!connection) return;
   // Material on disk means the run owns the session, and `globalTeardown` is
-  // the one place that knows the run is over.
-  if (readSessionMaterial()) return;
+  // the one place that knows the run is over — unless this file opened its own,
+  // in which case it is the one place that knows to close it.
+  if (!perFileSession() && readSessionMaterial()) return;
   await endSession(connection);
 }
 

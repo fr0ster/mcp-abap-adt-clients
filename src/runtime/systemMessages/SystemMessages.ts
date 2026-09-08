@@ -6,25 +6,34 @@
 
 import type {
   IAbapConnection,
-  IAdtWireResponse,
+  IAdtResponse,
   IFeedQueryOptions,
   ILogger,
   ISystemMessages,
 } from '@mcp-abap-adt/interfaces';
+import { answering } from '../../utils/adtResponse';
+import { rawDocument } from '../../utils/resultStrategy';
 import { getSystemMessage, listSystemMessages } from './read';
 
-export class SystemMessages implements ISystemMessages {
+/** The messages this system is showing. Both members answer their document. */
+export class SystemMessages implements ISystemMessages<string, string> {
   readonly kind = 'systemMessages' as const;
   constructor(
     private readonly connection: IAbapConnection,
     private readonly logger: ILogger,
   ) {}
 
-  async list(options?: IFeedQueryOptions): Promise<IAdtWireResponse> {
-    return listSystemMessages(this.connection, options);
+  async list(options?: IFeedQueryOptions): Promise<IAdtResponse<string>> {
+    return answering(
+      () => listSystemMessages(this.connection, options),
+      rawDocument,
+    );
   }
 
-  async getById(messageId: string): Promise<IAdtWireResponse> {
-    return getSystemMessage(this.connection, messageId);
+  async getById(messageId: string): Promise<IAdtResponse<string>> {
+    return answering(
+      () => getSystemMessage(this.connection, messageId),
+      rawDocument,
+    );
   }
 }

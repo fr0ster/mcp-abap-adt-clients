@@ -2,7 +2,11 @@
  * Get Inactive Objects - retrieve list of objects not yet activated
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+  IResultStrategy,
+} from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
 import { getTimeout } from '../../utils/timeouts';
 import type { IInactiveObjectsResponse, IObjectReference } from './types';
@@ -30,13 +34,19 @@ const xmlParser = new XMLParser({
  * await activateObjectsGroup(connection, result.objects);
  * ```
  */
-export async function getInactiveObjects(
+/**
+ * The request, and only the request.
+ *
+ * Split from the reading below so the reading can be injected: this is one GET
+ * with one answer, which is exactly the shape an `IResultStrategy` types. The
+ * `includeRawXml` flag it used to take is gone with the split — a consumer who
+ * wants the document passes `rawDocument` as the strategy, which is the same
+ * removal `getWhereUsedList`'s flag got in this release.
+ */
+export async function fetchInactiveObjects(
   connection: IAbapConnection,
-  options?: {
-    includeRawXml?: boolean;
-  },
-): Promise<IInactiveObjectsResponse> {
-  const response = await connection.makeAdtRequest({
+): Promise<IAdtWireResponse> {
+  return connection.makeAdtRequest({
     method: 'GET',
     url: `/sap/bc/adt/activation/inactiveobjects`,
     timeout: getTimeout('default'),
@@ -45,7 +55,12 @@ export async function getInactiveObjects(
         'application/vnd.sap.adt.inactivectsobjects.v1+xml, application/xml;q=0.8',
     },
   });
+}
 
+/** The shipped reading of that answer. */
+export const inactiveObjects: IResultStrategy<IInactiveObjectsResponse> = (
+  response,
+) => {
   const xml = response.data;
   const parsed = xmlParser.parse(xml);
 
@@ -54,7 +69,7 @@ export async function getInactiveObjects(
   // Parse XML response
   const root = parsed['ioc:inactiveObjects'];
   if (!root) {
-    return { objects, xmlStr: options?.includeRawXml ? xml : undefined };
+    return { objects };
   }
 
   const entries = Array.isArray(root['ioc:entry'])
@@ -78,6 +93,5 @@ export async function getInactiveObjects(
 
   return {
     objects,
-    xmlStr: options?.includeRawXml ? xml : undefined,
   };
-}
+};

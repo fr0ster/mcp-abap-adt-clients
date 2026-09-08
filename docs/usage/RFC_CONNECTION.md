@@ -185,7 +185,7 @@ RFC returns base64 lock handles that may contain spaces, `+`, `=`. All lock hand
 
 ## Known limitation: package update
 
-`AdtPackage.update()` does not work over RFC. Everything else on a package does
+`AdtPackage.updateMetadata()` does not work over RFC. Everything else on a package does
 — create, lock, unlock, delete — and every other object type updates normally.
 The save is refused with `400 ExceptionResourceAlreadyExists`, `PAK/058`, and
 the cause sits below the ADT lock, in the package framework's own state rather

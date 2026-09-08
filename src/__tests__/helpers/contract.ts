@@ -10,11 +10,7 @@
  * These two exist so the failure message is the server's own sentence.
  */
 
-import type {
-  IAdtError,
-  IAdtResponse,
-  IAdtResult,
-} from '@mcp-abap-adt/interfaces';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
 
 /**
  * The value, failing the test with what SAP said when there is none.
@@ -22,10 +18,7 @@ import type {
  * @param answer the contract a member answered with
  * @param what a label for the call, so a failure names it — e.g. `'discovery'`
  */
-export function expectResult<T>(
-  answer: IAdtResponse<IAdtResult<T>>,
-  what: string,
-): T {
+export function expectResult<T>(answer: IAdtResponse<T>, what: string): T {
   if (!answer.ok) {
     const failure = answer.getError();
     throw new Error(
@@ -44,7 +37,7 @@ export function expectResult<T>(
  * longer catches it now that failures come back instead of flying past.
  */
 export function expectFailure<T>(
-  answer: IAdtResponse<IAdtResult<T>>,
+  answer: IAdtResponse<T>,
   what: string,
 ): IAdtError {
   if (answer.ok) {

@@ -27,6 +27,7 @@ import {
 import { refuseWhileRunOwnsSession } from '../src/__tests__/helpers/sharedSession';
 import { createConnectionLogger } from '../src/__tests__/helpers/testLogger';
 import { AdtRuntimeClient } from '../src/clients/AdtRuntimeClient';
+import { resultOf } from './resultOf';
 
 const envPath =
   process.env.MCP_ENV_PATH || path.resolve(__dirname, '..', '.env');
@@ -41,7 +42,7 @@ async function main() {
   const connection = await createTestConnection(logger);
   try {
     const profiler = new AdtRuntimeClient(connection, logger).getProfiler();
-    const entries = await profiler.list();
+    const entries = resultOf(await profiler.list());
 
     // biome-ignore lint/suspicious/noConsole: a probe reports to whoever ran it
     console.log(`\n${entries.length} trace(s) in the feed\n`);

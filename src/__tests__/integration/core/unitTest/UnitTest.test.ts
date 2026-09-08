@@ -21,6 +21,8 @@ import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IUnitTestConfig } from '../../../../core/unitTest';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { expectResult } from '../../../helpers/contract';
+import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -190,10 +192,14 @@ describe('AdtUnitTest (using AdtClient)', () => {
           // Step 0: Check if class already exists
           let classExists = false;
           try {
-            const existingClass = await client
-              .getClass()
-              .read({ className: containerClass });
-            if (existingClass?.readResult) {
+            // `expectResult` failed the setup for a container class that is
+            // simply not there — which is the state this flow wants — and
+            // `if (existingClass)` was true either way. The answer decides.
+            const existingClass = presenceOf(
+              await client.getClass().read({ className: containerClass }),
+              `class ${containerClass}`,
+            );
+            if (existingClass.present === true) {
               classExists = true;
               testsLogger.info?.(
                 `Class ${containerClass} already exists, will reuse`,
@@ -207,80 +213,133 @@ describe('AdtUnitTest (using AdtClient)', () => {
 
           // Step 1-2: Validate and create (only if class doesn't exist)
           if (!classExists) {
+            // `toBeDefined()` was the check on both of these, and a member
+            // answers `IAdtResponse` — an object on the refusal half too — so
+            // it was true whatever SAP said. `expectResult` reads the answer
+            // and fails with SAP's own sentence.
             logTestStep('validate', testsLogger);
-            const validateState = await client.getClass().validate({
-              className: containerClass,
-              packageName,
-              sourceCode,
-            });
-            expect(validateState).toBeDefined();
+            expectResult(
+              await client.getClass().validate({
+                className: containerClass,
+                packageName,
+                sourceCode,
+              }),
+              'validate the container class name',
+            );
             testsLogger.info?.('Container class validated');
 
             logTestStep('create', testsLogger);
-            const createClassState = await client.getClass().create({
-              className: containerClass,
-              packageName,
-              transportRequest,
-              description: `Test container class for ${testClassName}`,
-              sourceCode,
-            });
-            expect(createClassState).toBeDefined();
+            expectResult(
+              await client.getClass().create({
+                className: containerClass,
+                packageName,
+                transportRequest,
+                description: `Test container class for ${testClassName}`,
+              }),
+              'create the container class',
+            );
             testsLogger.info?.('Container class created');
-          } else {
-            // Update existing class source code
-            testsLogger.info?.('Updating existing class source code');
-            await client
-              .getClass()
-              .update(
-                { className: containerClass, sourceCode, transportRequest },
-                { sourceCode },
-              );
-            testsLogger.info?.('Existing class source updated');
           }
+
+          // The source is written either way, and it was not.
+          //
+          // `create` used to be handed `sourceCode` and ignores it — it makes an
+          // empty class, and interfaces 38.0.0 took the field off the member for
+          // exactly this reason. Only the `else` branch wrote the source, so on
+          // a system where the container class did not exist yet it was created
+          // empty and stayed empty, and the suite passed anyway because what it
+          // goes on to assert lives in the testclasses include. The write is
+          // unconditional now.
+          //
+          // Under a lock, and read: the old `else` branch did neither, so a
+          // refused write was invisible.
+          logTestStep('update (container source)', testsLogger);
+          const containerConfig = {
+            className: containerClass,
+            transportRequest,
+          };
+          const containerLock = expectResult(
+            await client.getClass().lock(containerConfig),
+            'lock container class',
+          );
+          const containerHandle = String(containerLock);
+          expectResult(
+            await client.getClass().update(containerConfig, {
+              sourceCode,
+              lockHandle: containerHandle,
+            }),
+            'write container class source',
+          );
+          await client.getClass().unlock(containerConfig, containerHandle);
+          testsLogger.info?.('Container class source written');
 
           // Step 3: Write the tests into the container class's include.
           // An include is not created — it exists because its class does.
+          //
+          // Under the class's own lock: a class include is written with the
+          // *class's* handle, which is why this takes a second one rather than
+          // reusing nothing. Measured on the trial before this was fixed —
+          // `PUT …/includes/testclasses` with no handle is answered
+          // `400 ExceptionParameterNotFound: Parameter lockHandle could not be
+          // found`, and the suite passed anyway because the answer went unread.
           logTestStep('update (test class)', testsLogger);
-          const writeTestClassState = await client.getLocalTestClass().update({
-            className: containerClass,
-            testClassCode: testClassSource,
-            transportRequest,
-          });
-          expect(writeTestClassState).toBeDefined();
+          const includeLock = expectResult(
+            await client.getClass().lock(containerConfig),
+            'lock container class for its testclasses include',
+          );
+          const includeHandle = String(includeLock);
+          try {
+            expectResult(
+              await client
+                .getLocalTestClass()
+                .update(
+                  { className: containerClass, transportRequest },
+                  { sourceCode: testClassSource, lockHandle: includeHandle },
+                ),
+              'write the test class include',
+            );
+          } finally {
+            await client.getClass().unlock(containerConfig, includeHandle);
+          }
           testsLogger.info?.('Local test class written');
 
           // Step 4: Activate class
           logTestStep('activate', testsLogger);
-          const activateState = await client.getClass().activate({
-            className: containerClass,
-            transportRequest,
-          });
-          expect(activateState).toBeDefined();
+          expectResult(
+            await client
+              .getClass()
+              .activate({ className: containerClass, transportRequest }),
+            'activate the container class',
+          );
           testsLogger.info?.('Class activated');
 
           // Step 5: Read back the tests that were written into the class
           logTestStep('read (unit test)', testsLogger);
           const unitTest = client.getUnitTest();
-          const readState = await unitTest.read(
-            { className: containerClass },
-            'active',
+          const readState = expectResult(
+            await unitTest.read({ className: containerClass }, 'active'),
+            'readState',
           );
           expect(readState).toBeDefined();
-          expect(readState?.readResult).toBeDefined();
           testsLogger.info?.('Tests read back from the container class');
 
-          const metadataState = await unitTest.readMetadata({
-            className: containerClass,
-          });
+          const metadataState = expectResult(
+            await unitTest.readMetadata({
+              className: containerClass,
+            }),
+            'metadataState',
+          );
           expect(metadataState).toBeDefined();
-          expect(metadataState.metadataResult).toBeDefined();
 
           // Step 6: Run the tests. Needs no create and no update — they are in
           // the class already, which is the whole point of the two being apart.
           logTestStep('run (unit test)', testsLogger);
-          const runId = await unitTest.run(
-            [{ containerClass, testClass: testClassName }],
-            unitTestOptions,
+          const runId = expectResult(
+            await unitTest.run(
+              [{ containerClass, testClass: testClassName }],
+              unitTestOptions,
+            ),
+            'start unit test run',
           );
           expect(runId).toBeDefined();
           testsLogger.info?.('Unit test run started, run ID:', runId);
@@ -288,16 +347,18 @@ describe('AdtUnitTest (using AdtClient)', () => {
           // Step 7: Ask about the run — a different concern from running it,
           // and since interfaces 16.0.0 a different interface as well.
           logTestStep('getStatus (run)', testsLogger);
-          const statusResponse = await unitTest.getStatus(
-            runId,
-            unitTestStatus.with_long_polling ?? true,
+          const statusResponse = expectResult(
+            await unitTest.getStatus(
+              runId,
+              unitTestStatus.with_long_polling ?? true,
+            ),
+            'statusResponse',
           );
           expect(statusResponse).toBeDefined();
-          expect(statusResponse.data).toBeDefined();
 
           // Log detailed status information
-          if (statusResponse.data) {
-            const status = statusResponse.data;
+          if (statusResponse) {
+            const status = statusResponse;
             if (typeof status === 'string') {
               // Try to parse XML if it's a string
               try {
@@ -333,16 +394,18 @@ describe('AdtUnitTest (using AdtClient)', () => {
 
           // Step 8: Fetch the result document
           logTestStep('getResult (run)', testsLogger);
-          const resultResponse = await unitTest.getResult(runId, {
-            withNavigationUris: unitTestResult.with_navigation_uris || false,
-            format: unitTestResult.format || 'abapunit',
-          });
+          const resultResponse = expectResult(
+            await unitTest.getResult(runId, {
+              withNavigationUris: unitTestResult.with_navigation_uris || false,
+              format: unitTestResult.format || 'abapunit',
+            }),
+            'resultResponse',
+          );
           expect(resultResponse).toBeDefined();
-          expect(resultResponse.data).toBeDefined();
 
           // Log detailed result information
-          if (resultResponse.data) {
-            const result = resultResponse.data;
+          if (resultResponse) {
+            const result = resultResponse;
             if (typeof result === 'string') {
               // Try to parse XML if it's a string
               try {

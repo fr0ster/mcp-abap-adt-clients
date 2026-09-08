@@ -4,12 +4,16 @@
  * Requires a valid lockHandle (acquired via lockAuthorizationField).
  */
 
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+  ILogger,
+} from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_AUTHORIZATION_FIELD,
   CT_AUTHORIZATION_FIELD,
 } from '../../constants/contentTypes';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { ICreateAuthorizationFieldParams } from './types';
 import { buildAuthorizationFieldXml } from './xmlBuilder';
@@ -24,23 +28,16 @@ const debugEnabled = process.env.DEBUG_ADT_LIBS === 'true';
 export async function updateAuthorizationField(
   connection: IAbapConnection,
   params: ICreateAuthorizationFieldParams,
-  lockHandle: string,
+  lockHandle?: string,
   logger?: ILogger,
-): Promise<void> {
+): Promise<IAdtWireResponse> {
   if (!params.authorization_field_name) {
     throw new Error('authorization_field_name is required');
   }
-  if (!lockHandle) {
-    throw new Error('lockHandle is required for update');
-  }
-
   const encoded = encodeSapObjectName(
     params.authorization_field_name.toUpperCase(),
   );
-  const corrNr = params.transport_request
-    ? `&corrNr=${encodeURIComponent(params.transport_request)}`
-    : '';
-  const url = `/sap/bc/adt/aps/iam/auth/${encoded}?lockHandle=${encodeURIComponent(lockHandle)}${corrNr}`;
+  const url = `/sap/bc/adt/aps/iam/auth/${encoded}${writeQuery(lockHandle, params.transport_request)}`;
 
   const xmlBody = buildAuthorizationFieldXml(params);
 
@@ -49,7 +46,7 @@ export async function updateAuthorizationField(
     logger?.debug?.(xmlBody);
   }
 
-  await connection.makeAdtRequest({
+  return connection.makeAdtRequest({
     url,
     method: 'PUT',
     timeout: getTimeout('default'),

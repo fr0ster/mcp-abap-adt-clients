@@ -7,7 +7,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -34,16 +34,12 @@ export async function updateClassWithCheck(
   connection: IAbapConnection,
   className: string,
   sourceCode: string,
-  lockHandle: string,
+  lockHandle?: string,
   transportRequest?: string,
   sourceContentType?: string,
 ): Promise<IAdtWireResponse> {
   if (!sourceCode) {
     throw new Error('source_code is required');
-  }
-
-  if (!lockHandle) {
-    throw new Error('lockHandle is required');
   }
 
   // Import check function
@@ -88,7 +84,7 @@ export async function updateClass(
   connection: IAbapConnection,
   className: string,
   sourceCode: string,
-  lockHandle: string,
+  lockHandle?: string,
   transportRequest?: string,
   sourceContentType?: string,
 ): Promise<IAdtWireResponse> {
@@ -96,15 +92,12 @@ export async function updateClass(
     throw new Error('source_code is required');
   }
 
-  if (!lockHandle) {
-    throw new Error('lockHandle is required');
-  }
-
+  // **No lock handle is not this library's verdict.** It used to throw here, and
+  // an update without a lock is a thing ADT judges: it answers its own refusal,
+  // naming what it wants, and that answer is what a caller should read. The
+  // parameter is simply left off the URL rather than sent empty.
   const encodedName = encodeSapObjectName(className).toLowerCase();
-  let url = `/sap/bc/adt/oo/classes/${encodedName}/source/main?lockHandle=${encodeURIComponent(lockHandle)}`;
-  if (transportRequest) {
-    url += `&corrNr=${transportRequest}`;
-  }
+  const url = `/sap/bc/adt/oo/classes/${encodedName}/source/main${writeQuery(lockHandle, transportRequest)}`;
 
   const contentType = sourceContentType || CT_SOURCE;
   const headers = {
@@ -131,7 +124,7 @@ export async function updateClassImplementations(
   connection: IAbapConnection,
   className: string,
   implementationCode: string,
-  lockHandle: string,
+  lockHandle?: string,
   transportRequest?: string,
   sourceContentType?: string,
 ): Promise<IAdtWireResponse> {
@@ -139,15 +132,8 @@ export async function updateClassImplementations(
     throw new Error('implementationCode is required');
   }
 
-  if (!lockHandle) {
-    throw new Error('lockHandle is required');
-  }
-
   const encodedName = encodeSapObjectName(className).toLowerCase();
-  let url = `/sap/bc/adt/oo/classes/${encodedName}/includes/implementations?lockHandle=${encodeURIComponent(lockHandle)}`;
-  if (transportRequest) {
-    url += `&corrNr=${transportRequest}`;
-  }
+  const url = `/sap/bc/adt/oo/classes/${encodedName}/includes/implementations${writeQuery(lockHandle, transportRequest)}`;
 
   const contentType = sourceContentType || CT_SOURCE;
   const headers = {

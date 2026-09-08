@@ -18,6 +18,7 @@ import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -117,28 +118,32 @@ describe('Master language on create (#105)', () => {
 
         // 2. Round-trip: the persisted master language must match — but only
         //    when the configured language is installed on the system (else SAP
-        //    normalizes it). Metadata of a freshly created inactive object may
-        //    not be immediately readable, so retry a few times; if it stays
-        //    unreadable, the wire assertion above already proves the feature.
-        let persisted: string | undefined;
-        for (let attempt = 0; attempt < 8 && !persisted; attempt++) {
-          try {
-            const meta = await cls.readMetadata({ className });
-            persisted = masterLangOf(String(meta.metadataResult?.data ?? ''));
-          } catch {
-            /* not ready yet */
-          }
-          if (!persisted) {
-            await new Promise((r) => setTimeout(r, 2000));
-          }
-        }
-        if (persisted !== undefined) {
-          expect(persisted).toBe(expectedLang);
-        } else {
-          console.warn(
-            `Could not read back metadata for ${className} — persistence check skipped (wire language was "${sentLang}")`,
-          );
-        }
+        //    normalizes it).
+        //
+        //    **Give it a version first.** This used to retry the read eight
+        //    times over sixteen seconds, believing a freshly created object was
+        //    "not immediately readable". It is not a timing problem. A bare
+        //    POST makes a repository entry with no version of anything in it —
+        //    no source, no active version, no inactive one — and a read of that
+        //    refuses with `400 ExceptionResourceWrongData`, "Resource  ZAC_…:
+        //    wrong input data for processing", however the version is asked
+        //    for. A version is what makes it readable, and either one will do:
+        //    writing the source is enough (a class reads at
+        //    `version=inactive` while still under its lock), and activating the
+        //    empty shell works too. This test has no source to write, so it
+        //    activates.
+        //
+        //    So all eight attempts failed on every run, this assertion never
+        //    ran, and the run paid sixteen seconds for the privilege.
+        const activated = await cls.activate({ className });
+        expect(activated.ok).toBe(true);
+
+        const meta = expectResult(
+          await cls.readMetadata({ className }),
+          'meta',
+        );
+        const persisted = masterLangOf(String(meta ?? ''));
+        expect(persisted).toBe(expectedLang);
       } finally {
         try {
           await cls.delete({ className });

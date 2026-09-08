@@ -15,18 +15,19 @@
 
 import {
   AdtObjectErrorCodes,
-  AdtOperationError,
   type IAbapConnection,
+  type IAdtResponse,
   type IAdtRunnable,
   type IAdtWireResponse,
   type IAtcFindings,
   type IAtcRunOptions,
-  type IAtcRunResult,
-  type IAtcRunStatus,
   type IAtcRunStatusReadable,
   type IAtcRunTarget,
   type ILogger,
 } from '@mcp-abap-adt/interfaces';
+import { AdtOperationError } from '../../utils/adtErrors';
+import { answering, answeringValue } from '../../utils/adtResponse';
+import { rawDocument } from '../../utils/resultStrategy';
 import {
   parseRunStatus,
   parseSystemCheckVariant,
@@ -40,6 +41,7 @@ import {
   getAtcWorklist,
   startAtcRun,
 } from './run';
+import type { IAtcRunResult, IAtcRunStatus } from './types';
 
 /** The default cap on results, and the only value anyone has run with. */
 const DEFAULT_MAXIMUM_VERDICTS = 100;
@@ -64,8 +66,8 @@ function header(
 export class AdtAtc
   implements
     IAdtRunnable<IAtcRunTarget, IAtcRunResult, IAtcRunOptions>,
-    IAtcRunStatusReadable,
-    IAtcFindings
+    IAtcRunStatusReadable<IAtcRunStatus>,
+    IAtcFindings<string>
 {
   constructor(
     private readonly connection: IAbapConnection,
@@ -75,7 +77,7 @@ export class AdtAtc
   async run(
     target: IAtcRunTarget,
     options?: IAtcRunOptions,
-  ): Promise<IAtcRunResult> {
+  ): Promise<IAdtResponse<IAtcRunResult>> {
     // `options` is optional in the contract, so every read of it is guarded.
     // A caller writing `run(target)` is doing what the interface allows.
     const wait = options?.wait ?? false;
@@ -93,44 +95,55 @@ export class AdtAtc
       buildAtcObjectUri(o.objectType, o.objectName),
     );
 
-    const response = await startAtcRun(
-      this.connection,
-      worklistId,
-      uris,
-      maximumVerdicts,
-      wait,
+    // The two shapes are read out of the same answer; which one depends on
+    // `wait`, which the caller chose. Both are readings, so both sit in the
+    // reading half — a run the server refused comes back as the failure half,
+    // while an answer this library cannot read throws, which is the whole
+    // reason `answering` runs the reading outside its own catch.
+    return answering(
+      () =>
+        startAtcRun(this.connection, worklistId, uris, maximumVerdicts, wait),
+      (answer) =>
+        wait
+          ? this.readWaitingRun(answer, worklistId)
+          : this.readStartedRun(answer, worklistId),
     );
-
-    return wait
-      ? this.readWaitingRun(response, worklistId)
-      : this.readStartedRun(response, worklistId);
   }
 
-  async getRunStatus(runId: string): Promise<IAtcRunStatus> {
-    const response = await getAtcRunStatus(this.connection, runId);
-    const parsed = parseRunStatus(response.data);
-
-    const status = parsed.status;
-    if (!status) {
-      const error = new AdtOperationError(
-        `ATC run ${runId}: the run resource carried no runs:status. IAtcRunStatus.status is not optional, and resolving with undefined through it would be a lie the type cannot catch.`,
-      );
-      error.code = 'ATC_RUN_STATUS_MISSING';
-      throw error;
-    }
-
-    return {
-      status,
-      // Exact and case-normalised. A substring test would accept `unfinished`
-      // and `not_finished`, opening the worklist on a run that had not run.
-      isFinished: status.trim().toLowerCase() === 'finished',
-      worklistId: parsed.worklistId,
-      resultId: parsed.resultId,
-    };
+  async getRunStatus(runId: string): Promise<IAdtResponse<IAtcRunStatus>> {
+    return answering(
+      () => getAtcRunStatus(this.connection, runId),
+      (answer) => {
+        const parsed = parseRunStatus(answer.data);
+        const status = parsed.status;
+        if (!status) {
+          // A reading that cannot read is this library's own failure, and it
+          // throws: `IAtcRunStatus.status` is not optional, and resolving with
+          // undefined through it would be a lie the type cannot catch.
+          const error = new AdtOperationError(
+            `ATC run ${runId}: the run resource carried no runs:status.`,
+          );
+          error.code = 'ATC_RUN_STATUS_MISSING';
+          throw error;
+        }
+        return {
+          status,
+          // Exact and case-normalised. A substring test would accept
+          // `unfinished` and `not_finished`, opening the worklist on a run
+          // that had not run.
+          isFinished: status.trim().toLowerCase() === 'finished',
+          worklistId: parsed.worklistId,
+          resultId: parsed.resultId,
+        };
+      },
+    );
   }
 
-  async getFindings(worklistId: string): Promise<IAdtWireResponse> {
-    return getAtcWorklist(this.connection, worklistId);
+  async getFindings(worklistId: string): Promise<IAdtResponse<string>> {
+    return answering(
+      () => getAtcWorklist(this.connection, worklistId),
+      rawDocument,
+    );
   }
 
   // ---------------------------------------------------------------- private

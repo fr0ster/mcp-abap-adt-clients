@@ -1,6 +1,7 @@
-import type { IAbapConnection, IObjectVersion } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
+import type { ObjectVersion } from '../shared/results';
 import { parseVersionsFeed, throwVersionsError } from '../shared/versions';
 
 const ACCEPT_VERSION_FEED = 'application/atom+xml;type=feed';
@@ -17,7 +18,7 @@ export async function getClassIncludeVersions(
   connection: IAbapConnection,
   className: string,
   includeType: ClassIncludeType,
-): Promise<IObjectVersion[]> {
+): Promise<ObjectVersion[]> {
   if (!className) throw new Error('className is required');
   const encodedName = encodeSapObjectName(className);
   const url = `/sap/bc/adt/oo/classes/${encodedName}/includes/${includeType}/versions`;

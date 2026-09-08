@@ -14,19 +14,16 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type {
   IAbapConnection,
-  IAdtObject,
   ILogger,
   ISessionLifecycleAware,
 } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type {
-  IDataElementConfig,
-  IDataElementState,
-} from '../../../../core/dataElement';
+import type { IDataElementConfig } from '../../../../core/dataElement';
 import { getDataElement } from '../../../../core/dataElement/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -377,10 +374,7 @@ describe('DataElement (using AdtClient)', () => {
           // getDataElement() declares no IAdtVersionable (no
           // getVersions/getVersionSource); BaseTester's generic type still
           // requires the full interface — cast through it.
-          client.getDataElement() as unknown as IAdtObject<
-            IDataElementConfig,
-            IDataElementState
-          >,
+          client.getDataElement(),
           'DataElement',
           'create_data_element',
           'adt_data_element',
@@ -475,10 +469,7 @@ describe('DataElement (using AdtClient)', () => {
           const tester = new BaseTester(
             // getDataElement() declares no IAdtVersionable (no
             // getVersions/getVersionSource); cast through the full interface.
-            client.getDataElement() as unknown as IAdtObject<
-              IDataElementConfig,
-              IDataElementState
-            >,
+            client.getDataElement(),
             'DataElement',
             'create_data_element',
             'adt_data_element',
@@ -491,9 +482,9 @@ describe('DataElement (using AdtClient)', () => {
           });
 
           expect(resultState).toBeDefined();
-          expect(resultState?.readResult).toBeDefined();
+          expect(resultState).toBeDefined();
           // DataElement read returns data element config - check if dataElementName is present
-          const dataElementConfig = resultState?.readResult;
+          const dataElementConfig = resultState;
           if (
             dataElementConfig &&
             typeof dataElementConfig === 'object' &&

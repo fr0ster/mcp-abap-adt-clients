@@ -26,6 +26,7 @@ import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -91,11 +92,14 @@ describe('Class local includes (using BaseTester)', () => {
     config: ParentClassConfig,
   ): Promise<{ success: boolean; reason?: string; created?: boolean }> {
     try {
-      const existing = await client
-        .getClass()
-        .read({ className: config.className });
-      if (existing) {
-        await client.getClass().readMetadata({ className: config.className });
+      // The answer decides: `if (existing)` was true for an answer object
+      // either way, so this reported "the class is already there" for a class
+      // that was not, and never created it.
+      const existing = presenceOf(
+        await client.getClass().read({ className: config.className }),
+        `class ${config.className}`,
+      );
+      if (existing.present === true) {
         return { success: true, created: false };
       }
 
@@ -116,12 +120,12 @@ describe('Class local includes (using BaseTester)', () => {
     }
   }
 
-  let definitionsTester: BaseTester<any, any>;
-  let localTypesTester: BaseTester<any, any>;
-  let localTestClassTester: BaseTester<any, any>;
-  let localMacrosTester: BaseTester<any, any>;
+  let definitionsTester: BaseTester<any>;
+  let localTypesTester: BaseTester<any>;
+  let localTestClassTester: BaseTester<any>;
+  let localMacrosTester: BaseTester<any>;
   const parentClassCreatedMap = new Map<
-    BaseTester<any, any>,
+    BaseTester<any>,
     { created: boolean; className: string | null }
   >();
 
@@ -169,7 +173,7 @@ describe('Class local includes (using BaseTester)', () => {
       );
 
       const setupCommon = (
-        tester: BaseTester<any, any>,
+        tester: BaseTester<any>,
         testDescription: string,
         codeField: string,
         options?: { skipEnsureParentClass?: () => boolean },
@@ -550,21 +554,15 @@ describe('Class local includes (using BaseTester)', () => {
     it(
       'should execute full workflow for macros include (on-premise only)',
       async () => {
-        if (isCloudSystem) {
-          const definition = getTestCaseDefinition(
-            'update_class_local_macros',
-            'local_macros',
-          );
-          const testName = 'Class - LocalMacros - full workflow';
-          logTestStart(testsLogger, testName, definition);
-          logTestSkip(
-            testsLogger,
-            testName,
-            'Macros are not supported in cloud systems (BTP ABAP Environment)',
-          );
-          logTestEnd(testsLogger, testName);
-          return;
-        }
+        // No environment branch here. `available_in` decides and
+        // `skip_reason` explains, both in test-config.yaml, and
+        // `localMacrosTester.shouldSkip()` below is what reads them. This case
+        // used to carry its own `if (isCloudSystem)` saying "Macros are not
+        // supported in cloud systems" — a second source of truth, and a wrong
+        // one: a cloud class has a writable macros include, ADT 3.60.3 against
+        // the trial answers `PUT …/includes/macros` with 200. What the ABAP for
+        // Cloud language version forbids is `DEFINE`, which is what this case's
+        // source contains, and that sentence now lives in the config.
 
         const testName = 'Class - LocalMacros - full workflow';
         if (!hasConfig || !localMacrosTester) {
@@ -591,7 +589,10 @@ describe('Class local includes (using BaseTester)', () => {
         const existing = await client
           .getLocalMacros()
           .read({ className: config.className }, 'active');
-        if (!existing) {
+        // `read` answers `IAdtResponse`, an object on both halves, so
+        // `if (!existing)` was never true and this skip never fired. The
+        // question is whether the read succeeded.
+        if (!existing.ok) {
           const definition = getTestCaseDefinition(
             'update_class_local_macros',
             'local_macros',

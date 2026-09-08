@@ -6,25 +6,44 @@
 
 import type {
   IAbapConnection,
-  IAdtWireResponse,
+  IAdtResponse,
   IFeedQueryOptions,
   IGatewayErrorLog,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
+import { answering } from '../../utils/adtResponse';
+import { rawDocument } from '../../utils/resultStrategy';
 import { getGatewayError, listGatewayErrors } from './read';
 
-export class GatewayErrorLog implements IGatewayErrorLog {
+/**
+ * The gateway error log.
+ *
+ * Both members answer their document. The shapes in `./types` are what a
+ * consumer parses it into — this package has measured them but does not impose
+ * them, because a caller reading one error out of a list wants the list, not
+ * every field of every entry.
+ */
+export class GatewayErrorLog implements IGatewayErrorLog<string, string> {
   readonly kind = 'gatewayErrorLog' as const;
   constructor(
     private readonly connection: IAbapConnection,
     private readonly logger: ILogger,
   ) {}
 
-  async list(options?: IFeedQueryOptions): Promise<IAdtWireResponse> {
-    return listGatewayErrors(this.connection, options);
+  async list(options?: IFeedQueryOptions): Promise<IAdtResponse<string>> {
+    return answering(
+      () => listGatewayErrors(this.connection, options),
+      rawDocument,
+    );
   }
 
-  async getById(errorType: string, errorId: string): Promise<IAdtWireResponse> {
-    return getGatewayError(this.connection, errorType, errorId);
+  async getById(
+    errorType: string,
+    errorId: string,
+  ): Promise<IAdtResponse<string>> {
+    return answering(
+      () => getGatewayError(this.connection, errorType, errorId),
+      rawDocument,
+    );
   }
 }

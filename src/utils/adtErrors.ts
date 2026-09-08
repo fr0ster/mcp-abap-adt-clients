@@ -235,3 +235,27 @@ export class TransportSearchConfigurationMissing extends Error {
     this.name = 'TransportSearchConfigurationMissing';
   }
 }
+
+/**
+ * An operation this library could not carry out, carrying ADT's own code.
+ *
+ * It left `@mcp-abap-adt/interfaces` in 29.0.0 with everything else that emits
+ * code — a contract says what a thing is, a class is one way of being it. It is
+ * kept for the few places that still **throw**: a caller error, or a condition
+ * discovered before any request went out. Everything a server said comes back
+ * as a returned failure instead, where `code` is `IAdtError.code`.
+ */
+export class AdtOperationError extends Error {
+  /** ADT error code, e.g. `AdtObjectErrorCodes.UNSUPPORTED_OPERATION`. */
+  code?: string;
+  /** HTTP status, where one was involved. */
+  status?: number;
+  statusText?: string;
+  /** Whatever was caught, kept for a caller that wants to look. */
+  originalError?: unknown;
+
+  constructor(message: string) {
+    super(message);
+    this.name = 'AdtOperationError';
+  }
+}

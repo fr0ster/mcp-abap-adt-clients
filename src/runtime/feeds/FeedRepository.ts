@@ -5,8 +5,14 @@
  * and gateway error feeds with Atom XML parsing.
  */
 
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtResponse,
+  ILogger,
+  IResultStrategy,
+} from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
+import { answering } from '../../utils/adtResponse';
 import type { IRuntimeAnalysisObject } from '../types';
 import { fetchFeed, getFeeds, getFeedVariants } from './read';
 import type {
@@ -270,17 +276,80 @@ function parseGatewayErrorDetail(xml: string): IGatewayErrorDetail {
   };
 }
 
-export class FeedRepository implements IFeedRepository, IRuntimeAnalysisObject {
+/**
+ * One strategy per member of a feed repository.
+ *
+ * `IFeedRepository<TFeeds, TVariants, TEntries, TSystemMessages,
+ * TGatewayErrors, TGatewayErrorDetail>` is generic in all six since 30.0.0, and
+ * this fills them in. The defaults are the parsed shapes — a feed is an Atom
+ * document whose entries are the point, and every caller of these was parsing
+ * it — while `rawDocument` for any member gives the document back.
+ */
+export interface IFeedResults<
+  TFeeds = IFeedDescriptor[],
+  TVariants = IFeedVariant[],
+  TEntries = IFeedEntry[],
+  TSystemMessages = ISystemMessageEntry[],
+  TGatewayErrors = IGatewayErrorEntry[],
+  TGatewayErrorDetail = IGatewayErrorDetail,
+> {
+  readonly feeds: IResultStrategy<TFeeds>;
+  readonly variants: IResultStrategy<TVariants>;
+  readonly entries: IResultStrategy<TEntries>;
+  readonly systemMessages: IResultStrategy<TSystemMessages>;
+  readonly gatewayErrors: IResultStrategy<TGatewayErrors>;
+  readonly gatewayErrorDetail: IResultStrategy<TGatewayErrorDetail>;
+}
+
+/**
+ * The shipped default: each feed read as its entries.
+ *
+ * `satisfies`, never an annotation — see `classDocuments` for why.
+ */
+export const feedResults = {
+  feeds: (answer) => parseFeedDescriptors(answer.data),
+  variants: (answer) => parseFeedVariants(answer.data),
+  entries: (answer) => parseAtomFeed(answer.data),
+  systemMessages: (answer) => parseSystemMessages(answer.data),
+  gatewayErrors: (answer) => parseGatewayErrors(answer.data),
+  gatewayErrorDetail: (answer) => parseGatewayErrorDetail(answer.data),
+} satisfies IFeedResults;
+
+export class FeedRepository<
+  R extends IFeedResults<
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown,
+    unknown
+  > = IFeedResults,
+> implements
+    IFeedRepository<
+      ReturnType<R['feeds']>,
+      ReturnType<R['variants']>,
+      ReturnType<R['entries']>,
+      ReturnType<R['systemMessages']>,
+      ReturnType<R['gatewayErrors']>,
+      ReturnType<R['gatewayErrorDetail']>
+    >,
+    IRuntimeAnalysisObject
+{
   readonly kind = 'feedRepository' as const;
 
   constructor(
     private readonly connection: IAbapConnection,
     private readonly logger: ILogger,
+    // The one cast in this file, and it is on the default. See AdtClass.
+    private readonly results: R = feedResults as unknown as R,
   ) {}
 
-  async list(): Promise<IFeedDescriptor[]> {
-    const response = await getFeeds(this.connection);
-    return parseFeedDescriptors(response.data);
+  /** The feeds this system offers. */
+  async list(): Promise<IAdtResponse<ReturnType<R['feeds']>>> {
+    return answering(
+      () => getFeeds(this.connection),
+      this.results.feeds as IResultStrategy<ReturnType<R['feeds']>>,
+    );
   }
 
   /**
@@ -289,69 +358,93 @@ export class FeedRepository implements IFeedRepository, IRuntimeAnalysisObject {
    * Required, because the endpoint requires it: without a category
    * `/sap/bc/adt/feeds/variants` answers `400 ExceptionParameterNotFound`,
    * "Parameter category could not be found." Everything that called this before
-   * was getting that 400.
-   *
-   * The parameter was optional here for one release, with a `throw` behind it,
-   * only because `IFeedRepository` declared no parameter and a required one
-   * would not have satisfied it. `@mcp-abap-adt/interfaces@26.0.0` fixed the
-   * contract, so the workaround goes with it.
+   * `@mcp-abap-adt/interfaces@26.0.0` fixed the contract was getting that 400.
    */
-  async variants(category: string): Promise<IFeedVariant[]> {
-    // The compiler rejects a missing category since interfaces 26.0.0;
-    // JavaScript callers reach here anyway, so it says so rather than sending a
-    // request the server answers with 400 — the same shape `Profiler.read()`
-    // uses for a view that does not exist.
+  async variants(
+    category: string,
+  ): Promise<IAdtResponse<ReturnType<R['variants']>>> {
+    // The compiler rejects a missing category; JavaScript callers reach here
+    // anyway, so it says so rather than sending a request the server answers
+    // with 400.
     if (!category) {
       throw new Error(
         'FeedRepository.variants() requires a category — /sap/bc/adt/feeds/variants ' +
           'answers 400 ExceptionParameterNotFound without one.',
       );
     }
-    const response = await getFeedVariants(this.connection, category);
-    return parseFeedVariants(response.data);
+    return answering(
+      () => getFeedVariants(this.connection, category),
+      this.results.variants as IResultStrategy<ReturnType<R['variants']>>,
+    );
   }
 
-  async dumps(options?: IFeedQueryOptions): Promise<IFeedEntry[]> {
+  /** The runtime dumps feed. */
+  async dumps(
+    options?: IFeedQueryOptions,
+  ): Promise<IAdtResponse<ReturnType<R['entries']>>> {
     return this.byUrl(FEED_URLS.dumps, options);
   }
 
+  /** The system-messages feed. */
   async systemMessages(
     options?: IFeedQueryOptions,
-  ): Promise<ISystemMessageEntry[]> {
-    const response = await fetchFeed(
-      this.connection,
-      FEED_URLS.systemMessages,
-      options,
+  ): Promise<IAdtResponse<ReturnType<R['systemMessages']>>> {
+    return answering(
+      () => fetchFeed(this.connection, FEED_URLS.systemMessages, options),
+      this.results.systemMessages as IResultStrategy<
+        ReturnType<R['systemMessages']>
+      >,
     );
-    return parseSystemMessages(response.data);
-  }
-
-  async gatewayErrors(
-    options?: IFeedQueryOptions,
-  ): Promise<IGatewayErrorEntry[]> {
-    const response = await fetchFeed(
-      this.connection,
-      FEED_URLS.gatewayErrors,
-      options,
-      'username',
-    );
-    return parseGatewayErrors(response.data);
-  }
-
-  async gatewayErrorDetail(feedUrl: string): Promise<IGatewayErrorDetail> {
-    const response = await fetchFeed(this.connection, feedUrl);
-    return parseGatewayErrorDetail(response.data);
   }
 
   /**
-   * Fetch and parse any feed URL as generic IFeedEntry array.
-   * Internal helper — not part of IFeedRepository.
+   * The gateway-error feed.
+   *
+   * Filtered by `username`, not `user`: this feed names the parameter
+   * differently from the others.
+   */
+  async gatewayErrors(
+    options?: IFeedQueryOptions,
+  ): Promise<IAdtResponse<ReturnType<R['gatewayErrors']>>> {
+    return answering(
+      () =>
+        fetchFeed(
+          this.connection,
+          FEED_URLS.gatewayErrors,
+          options,
+          'username',
+        ),
+      this.results.gatewayErrors as IResultStrategy<
+        ReturnType<R['gatewayErrors']>
+      >,
+    );
+  }
+
+  /** One gateway error, in full. */
+  async gatewayErrorDetail(
+    feedUrl: string,
+  ): Promise<IAdtResponse<ReturnType<R['gatewayErrorDetail']>>> {
+    return answering(
+      () => fetchFeed(this.connection, feedUrl),
+      this.results.gatewayErrorDetail as IResultStrategy<
+        ReturnType<R['gatewayErrorDetail']>
+      >,
+    );
+  }
+
+  /**
+   * Any feed URL, read as entries.
+   *
+   * Not part of `IFeedRepository`: a caller who has a feed's URL from `list()`
+   * can read it without this package naming that feed.
    */
   async byUrl(
     feedUrl: string,
     options?: IFeedQueryOptions,
-  ): Promise<IFeedEntry[]> {
-    const response = await fetchFeed(this.connection, feedUrl, options);
-    return parseAtomFeed(response.data);
+  ): Promise<IAdtResponse<ReturnType<R['entries']>>> {
+    return answering(
+      () => fetchFeed(this.connection, feedUrl, options),
+      this.results.entries as IResultStrategy<ReturnType<R['entries']>>,
+    );
   }
 }

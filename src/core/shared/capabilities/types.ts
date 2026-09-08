@@ -1,8 +1,5 @@
-import type {
-  IAbapConnection,
-  ILogger,
-  IObjectVersion,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type { ObjectVersion } from '../results';
 
 /** The connection + logger every capability implementation needs. */
 export interface ICapabilityContext {
@@ -25,17 +22,18 @@ export interface INormalizedLock {
  * endpoint knowledge — there is no centralized lifecycle-URI resolver
  * (buildObjectUri is for group operations only).
  *
- * `release` returns the handler's OWN state shape (e.g. `{ unlockResult,
- * errors: [] }`), not void — the current handlers put the ADT unlock response
- * into `state.unlockResult`, and dropping it would change observable behaviour.
- * The capability owns only the session toggling around it.
+ * `release` is typed by the handler (`TReadResult`), and since 31.0.0 most
+ * handlers make it `void`: `unlock` answers `IAdtResponse<void>`, so what ADT
+ * said on the way out is no longer a shape anyone reads. The parameter stays
+ * for a handler that genuinely wants the release's answer. The capability owns
+ * only the session toggling around it.
  */
 export interface ILockStrategy<TConfig, TReadResult> {
   /** Extract the object name from config, or throw if missing. */
   nameOf(config: Partial<TConfig>): string;
   /** POST _action=LOCK, return the normalized handle. */
   acquire(ctx: ICapabilityContext, name: string): Promise<INormalizedLock>;
-  /** POST _action=UNLOCK with the handle; build and return the handler state. */
+  /** POST _action=UNLOCK with the handle; answer whatever the handler wants of it. */
   release(
     ctx: ICapabilityContext,
     name: string,
@@ -46,7 +44,7 @@ export interface ILockStrategy<TConfig, TReadResult> {
 /** Per-handler strategy for VersionsCapability. */
 export interface IVersionsStrategy<TConfig> {
   nameOf(config: Partial<TConfig>): string;
-  list(ctx: ICapabilityContext, name: string): Promise<IObjectVersion[]>;
+  list(ctx: ICapabilityContext, name: string): Promise<ObjectVersion[]>;
   /** GET the content URI, return the source text. */
   source(ctx: ICapabilityContext, contentUri: string): Promise<string>;
 }

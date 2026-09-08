@@ -20,6 +20,7 @@ import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -191,34 +192,50 @@ describe('ScalarFunction (DSFD/SCF) integration', () => {
 
           if (configuredSource) {
             // ── 3a) Full flow: update source + activate ──
-            await sf.update(
-              {
-                scalarFunctionName,
-                transportRequest,
-                sourceCode: configuredSource,
-              },
-              { activateOnUpdate: true },
+            const sfLock = expectResult(
+              await sf.lock({ scalarFunctionName }),
+              'lock scalar function',
+            );
+            try {
+              expectResult(
+                await sf.update(
+                  { scalarFunctionName, transportRequest },
+                  { sourceCode: configuredSource, lockHandle: sfLock },
+                ),
+                'update scalar function',
+              );
+            } finally {
+              await sf.unlock({ scalarFunctionName }, sfLock);
+            }
+            expectResult(
+              await sf.activate({ scalarFunctionName }),
+              'activate scalar function',
             );
 
             // ── 4a) Read active ──
-            const readState = await sf.read({ scalarFunctionName }, 'active');
-            expect(readState).toBeDefined();
-            expect(readState?.readResult).toBeDefined();
-            expect((readState?.readResult as any)?.status).toBe(200);
+            const readState = expectResult(
+              await sf.read({ scalarFunctionName }, 'active'),
+              'readState',
+            );
+            expect(typeof readState).toBe('string');
           } else {
             // ── 3b) Metadata-only validation: read the inactive object back ──
-            const readState = await sf.read({ scalarFunctionName }, 'inactive');
-            expect(readState).toBeDefined();
-            expect(readState?.readResult).toBeDefined();
-            expect((readState?.readResult as any)?.status).toBe(200);
+            const readState = expectResult(
+              await sf.read({ scalarFunctionName }, 'inactive'),
+              'readState',
+            );
+            expect(typeof readState).toBe('string');
           }
 
           // ── 5) Delete ──
-          const deleteState = await sf.delete({
-            scalarFunctionName,
-            transportRequest,
-          });
-          expect(deleteState.deleteResult).toBeDefined();
+          const deleteState = expectResult(
+            await sf.delete({
+              scalarFunctionName,
+              transportRequest,
+            }),
+            'deleteState',
+          );
+          expect(deleteState).toBeDefined();
 
           logTestSuccess(testsLogger, TEST_LABEL);
         } catch (error) {
@@ -238,80 +255,17 @@ describe('ScalarFunction (DSFD/SCF) integration', () => {
     );
   });
 
-  describe('Read standard object', () => {
-    it(
-      'should read standard scalar function (if configured)',
-      async () => {
-        const TEST_LABEL = 'ScalarFunction - read standard object';
-
-        const {
-          getTestCaseDefinition,
-        } = require('../../../helpers/test-helper');
-        const testCase = getTestCaseDefinition(
-          'read_scalar_function',
-          'read_standard_scalar_function',
-        );
-
-        if (!testCase) {
-          logTestStart(testsLogger, TEST_LABEL, {
-            name: 'read_standard',
-            params: {},
-          });
-          logTestSkip(
-            testsLogger,
-            TEST_LABEL,
-            'Test case not defined in test-config.yaml',
-          );
-          return;
-        }
-
-        const scalarFunctionName: string | undefined =
-          testCase.params?.scalar_function_name;
-
-        if (!scalarFunctionName) {
-          logTestStart(testsLogger, TEST_LABEL, {
-            name: 'read_standard',
-            params: {},
-          });
-          logTestSkip(
-            testsLogger,
-            TEST_LABEL,
-            'scalar_function_name not configured',
-          );
-          return;
-        }
-
-        logTestStart(testsLogger, TEST_LABEL, {
-          name: scalarFunctionName,
-          params: { scalar_function_name: scalarFunctionName },
-        });
-
-        if (!hasConfig) {
-          logTestSkip(testsLogger, TEST_LABEL, 'No SAP configuration');
-          return;
-        }
-
-        try {
-          const sf = client.getScalarFunction();
-          const resultState = await sf.read({ scalarFunctionName }, 'active');
-          if (!resultState) {
-            logTestSkip(
-              testsLogger,
-              TEST_LABEL,
-              `Scalar function ${scalarFunctionName} not found in system`,
-            );
-            return;
-          }
-          expect(resultState.readResult).toBeDefined();
-          logTestSuccess(testsLogger, TEST_LABEL);
-        } catch (error) {
-          logTestError(testsLogger, TEST_LABEL, error);
-          throw error;
-        } finally {
-          logTestEnd(testsLogger, TEST_LABEL);
-        }
-      },
-      getTimeout('test'),
-    );
-  });
+  // `Read standard object` was here, and it had never run: it asked for a
+  // config section (`read_scalar_function`) that exists in neither the working
+  // config nor the template, so it logged SKIP and the suite went green having
+  // read nothing. Adding the section made it run, and it failed — there is
+  // nothing for it to read.
+  //
+  // A DSFD has no SAP-delivered example to name, and no shared one exists: the
+  // only `ZADT_SCALAR_FUNC` is the subject the flow above creates and deletes,
+  // so pointing the case at it races that flow rather than covering anything.
+  // The read is exercised by that flow — create, read, update, activate,
+  // delete — so removing a test that cannot run loses no coverage. Worth
+  // restoring if a shared scalar function is ever added to
+  // `shared_dependencies`.
 });

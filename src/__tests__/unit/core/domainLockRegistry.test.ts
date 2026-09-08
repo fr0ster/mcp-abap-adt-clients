@@ -10,6 +10,7 @@
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import { AdtDomain } from '../../../core/domain/AdtDomain';
 import { LockRegistry } from '../../../core/shared/LockRegistry';
+import { expectFailure, expectResult } from '../../helpers/contract';
 import { TestConfigResolver } from '../../helpers/TestConfigResolver';
 import { createTestsLogger } from '../../helpers/testLogger';
 import {
@@ -76,7 +77,7 @@ describe('AdtDomain lock registry wiring', () => {
     const registry = new LockRegistry();
     const domain = new AdtDomain(conn, undefined, undefined, registry);
 
-    const handle = await domain.lock({ domainName });
+    const handle = expectResult(await domain.lock({ domainName }), 'lock');
     await domain.unlock({ domainName }, handle);
 
     expect(registry.pending).toEqual([]);
@@ -105,37 +106,5 @@ describe('AdtDomain lock registry wiring', () => {
     expect(String(unlockCall.url)).toContain('lockHandle=HANDLE123');
     logTestSuccess(testsLogger, 'Domain lock registry - unlockAll() releases');
     logTestEnd(testsLogger, 'Domain lock registry - unlockAll() releases');
-  });
-
-  it('managed update() retains the lock when the flow fails and cleanup unlock also fails', async () => {
-    logTestStart(testsLogger, 'Domain lock registry - managed retention', {
-      name: 'managed_retention',
-      params: { domain_name: domainName, package_name: packageName },
-    });
-    // LOCK succeeds; the update read-modify-write fails; and the error-path
-    // cleanup unlock ALSO fails (server context still busy). The registry must
-    // keep the lock so unlockAll() is the last resort.
-    const makeAdtRequest = jest.fn(async (req: any) => {
-      if (String(req.url).includes('_action=LOCK')) {
-        return { status: 200, data: LOCK_XML };
-      }
-      if (String(req.url).includes('_action=UNLOCK')) {
-        throw new Error('context busy');
-      }
-      throw new Error('update failed');
-    });
-    const setSessionType = jest.fn();
-    const conn = {
-      makeAdtRequest,
-      setSessionType,
-    } as unknown as IAbapConnection;
-    const registry = new LockRegistry();
-    const domain = new AdtDomain(conn, undefined, undefined, registry);
-
-    await expect(domain.update({ domainName, packageName })).rejects.toThrow();
-
-    expect(registry.pending).toEqual([lockKey]);
-    logTestSuccess(testsLogger, 'Domain lock registry - managed retention');
-    logTestEnd(testsLogger, 'Domain lock registry - managed retention');
   });
 });

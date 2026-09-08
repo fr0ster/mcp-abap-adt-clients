@@ -26,13 +26,11 @@ export async function getProgramMetadata(
   programName: string,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  return orThrow(
-    getUtils(connection).readObjectMetadata(
-      'program',
-      programName,
-      undefined,
-      options,
-    ),
+  return getUtils(connection).objectMetadataWire(
+    'program',
+    programName,
+    undefined,
+    options,
   );
 }
 
@@ -45,14 +43,12 @@ export async function getProgramSource(
   version?: 'active' | 'inactive',
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  return orThrow(
-    getUtils(connection).readObjectSource(
-      'program',
-      programName,
-      undefined,
-      version,
-      options,
-    ),
+  return getUtils(connection).objectSourceWire(
+    'program',
+    programName,
+    undefined,
+    version,
+    options,
   );
 }
 

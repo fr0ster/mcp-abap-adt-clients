@@ -11,14 +11,14 @@
  * on the other.
  */
 
+import { XMLParser } from 'fast-xml-parser';
 import type {
   ITransportTree,
   ITransportTreeLink,
   ITransportTreeNode,
   ITransportTreeRequest,
   ITransportTreeTask,
-} from '@mcp-abap-adt/interfaces';
-import { XMLParser } from 'fast-xml-parser';
+} from './types';
 
 const xmlParser = new XMLParser({
   ignoreAttributes: false,

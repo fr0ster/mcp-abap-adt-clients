@@ -16,6 +16,7 @@ import { CT_TABLE_TYPE } from '../../constants/contentTypes';
 import {
   encodeSapObjectName,
   limitDescription,
+  writeQuery,
 } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import {
@@ -72,20 +73,15 @@ function patchTableTypeXml(
 export async function updateTableType(
   connection: IAbapConnection,
   params: IUpdateTableTypeParams,
-  lockHandle: string,
+  lockHandle?: string,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
   if (!params.tabletype_name) {
     throw new Error('tabletype_name is required');
   }
-  if (!lockHandle) {
-    throw new Error('lockHandle is required');
-  }
-
   const tableTypeName = params.tabletype_name.toUpperCase();
   const encodedName = encodeSapObjectName(tableTypeName).toLowerCase();
-  const queryParams = `lockHandle=${encodeURIComponent(lockHandle)}${params.transport_request ? `&corrNr=${params.transport_request}` : ''}`;
-  const url = `/sap/bc/adt/ddic/tabletypes/${encodedName}?${queryParams}`;
+  const url = `/sap/bc/adt/ddic/tabletypes/${encodedName}${writeQuery(lockHandle, params.transport_request)}`;
 
   // 1. GET current XML
   const { getTableTypeMetadata } = await import('./read');

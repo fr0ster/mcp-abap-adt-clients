@@ -1,16 +1,21 @@
+/**
+ * The runtime client's factories: what each accessor builds, and that it
+ * builds it once.
+ *
+ * `getDebugger()` and `getMemorySnapshots()` were asserted here until
+ * interfaces@31.0.0. `IDebugger` and `IMemorySnapshots` left the contracts
+ * package for a research branch — how a debug session is meant to work over
+ * ADT is not measured yet — and the accessors left with them.
+ */
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import { AdtRuntimeClient } from '../../../clients/AdtRuntimeClient';
 import { ApplicationLog } from '../../../runtime/applicationLog/ApplicationLog';
 import { AdtAtc } from '../../../runtime/atc/AdtAtc';
 import { AtcLog } from '../../../runtime/atc/AtcLog';
 import { DdicActivation } from '../../../runtime/ddic/DdicActivation';
-import { AbapDebugger } from '../../../runtime/debugger/AbapDebugger';
-import { AmdpDebugger } from '../../../runtime/debugger/AmdpDebugger';
-import { Debugger } from '../../../runtime/debugger/Debugger';
 import { RuntimeDumps } from '../../../runtime/dumps/RuntimeDumps';
 import { FeedRepository } from '../../../runtime/feeds/FeedRepository';
 import { GatewayErrorLog } from '../../../runtime/gatewayErrorLog/GatewayErrorLog';
-import { MemorySnapshots } from '../../../runtime/memory/MemorySnapshots';
 import { SystemMessages } from '../../../runtime/systemMessages/SystemMessages';
 import { CrossTrace } from '../../../runtime/traces/CrossTraceDomain';
 import { Profiler } from '../../../runtime/traces/ProfilerDomain';
@@ -48,11 +53,6 @@ describe('AdtRuntimeClient factory pattern', () => {
   it('getSt05Trace() returns an St05Trace instance', () => {
     const { client } = createRuntimeClient();
     expect(client.getSt05Trace()).toBeInstanceOf(St05Trace);
-  });
-
-  it('getDebugger() returns a Debugger instance', () => {
-    const { client } = createRuntimeClient();
-    expect(client.getDebugger()).toBeInstanceOf(Debugger);
   });
 
   it('getApplicationLog() returns an ApplicationLog instance', () => {
@@ -116,11 +116,6 @@ describe('AdtRuntimeClient factory pattern', () => {
       expect(client.getSt05Trace()).toBe(client.getSt05Trace());
     });
 
-    it('getDebugger() returns the same instance on repeated calls', () => {
-      const { client } = createRuntimeClient();
-      expect(client.getDebugger()).toBe(client.getDebugger());
-    });
-
     it('getApplicationLog() returns the same instance on repeated calls', () => {
       const { client } = createRuntimeClient();
       expect(client.getApplicationLog()).toBe(client.getApplicationLog());
@@ -162,70 +157,12 @@ describe('AdtRuntimeClient factory pattern', () => {
     });
   });
 
-  describe('composite debugger', () => {
-    it('getDebugger().getAbap() returns an AbapDebugger instance', () => {
-      const { client } = createRuntimeClient();
-      const dbg = client.getDebugger();
-      expect(dbg.getAbap()).toBeInstanceOf(AbapDebugger);
-    });
-
-    it('getDebugger().getAmdp() returns an AmdpDebugger instance', () => {
-      const { client } = createRuntimeClient();
-      const dbg = client.getDebugger();
-      expect(dbg.getAmdp()).toBeInstanceOf(AmdpDebugger);
-    });
-
-    it('getDebugger().getMemorySnapshots() returns a MemorySnapshots instance', () => {
-      const { client } = createRuntimeClient();
-      const dbg = client.getDebugger();
-      expect(dbg.getMemorySnapshots()).toBeInstanceOf(MemorySnapshots);
-    });
-
-    it('getDebugger() sub-factories cache their instances', () => {
-      const { client } = createRuntimeClient();
-      const dbg = client.getDebugger();
-      expect(dbg.getAbap()).toBe(dbg.getAbap());
-      expect(dbg.getAmdp()).toBe(dbg.getAmdp());
-      expect(dbg.getMemorySnapshots()).toBe(dbg.getMemorySnapshots());
-    });
-
-    it('getDebugger() has kind "debugger"', () => {
-      const { client } = createRuntimeClient();
-      expect(client.getDebugger().kind).toBe('debugger');
-    });
-
-    it('getDebugger().getAbap() has kind "abapDebugger"', () => {
-      const { client } = createRuntimeClient();
-      expect(client.getDebugger().getAbap().kind).toBe('abapDebugger');
-    });
-
-    it('getDebugger().getAmdp() has kind "amdpDebugger"', () => {
-      const { client } = createRuntimeClient();
-      expect(client.getDebugger().getAmdp().kind).toBe('amdpDebugger');
-    });
-
-    it('getDebugger().getMemorySnapshots() has kind "memorySnapshots"', () => {
-      const { client } = createRuntimeClient();
-      expect(client.getDebugger().getMemorySnapshots().kind).toBe(
-        'memorySnapshots',
-      );
-    });
-  });
-
   describe('domain object methods', () => {
     it('profiler has expected methods', () => {
       const { client } = createRuntimeClient();
       const p = client.getProfiler();
       expect(typeof p.list).toBe('function');
       expect(typeof p.read).toBe('function');
-    });
-
-    it('abap debugger has expected methods', () => {
-      const { client } = createRuntimeClient();
-      const d = client.getDebugger().getAbap();
-      expect(typeof d.launch).toBe('function');
-      expect(typeof d.stop).toBe('function');
-      expect(typeof d.getCallStack).toBe('function');
     });
 
     // The three capabilities the narrowed return type promises, and nothing

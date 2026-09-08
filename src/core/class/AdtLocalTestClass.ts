@@ -1,33 +1,95 @@
 /**
- * AdtLocalTestClass - High-level CRUD operations for Local Test Classes
+ * The testclasses include of a class.
  *
- * Local test classes are defined in the testclasses include of an ABAP class.
- * All operations require the parent class to be locked.
+ * ADT addresses the include, not one test class inside it — which is why the
+ * config carries no field naming one — and it is written under the **class's**
+ * lock. What that means for the atoms this handler declares is that `delete` is
+ * a write of an empty include, and `activate` activates the class. Both say so
+ * in their own comment rather than pretending the include is an object of its
+ * own.
  */
 
 import type {
-  HttpError,
+  IAbapConnection,
+  IAdtActivatable,
+  IAdtCheckable,
+  IAdtContentTypes,
+  IAdtDeletable,
+  IAdtError,
+  IAdtMetadataReadable,
   IAdtOperationOptions,
+  IAdtReadable,
+  IAdtResponse,
+  IAdtSystemContext,
+  IAdtUpdatable,
+  IAdtValidatable,
+  IAnalyse,
   ILocalTestClassConfig,
-  IObjectVersion,
+  ILogger,
+  IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
-import { safeErrorMessage } from '../../utils/internalUtils';
+import { answering } from '../../utils/adtResponse';
+import { withCallTimeout } from '../../utils/callTimeout';
+import { validationRefusal } from '../../utils/validationRefusal';
+import type { LockRegistry } from '../shared/LockRegistry';
+import type { ObjectVersion } from '../shared/results';
 import type { IReadOptions } from '../shared/types';
 import { AdtClassMemberBase } from './AdtClassMemberBase';
 import { checkClassLocalTestClass } from './check';
+import { getClassTestClassesInclude } from './read';
 import { updateClassTestInclude } from './testclasses';
-import type { IClassState } from './types';
+import { classDocuments, type IClassResults } from './types';
 
 // Types defined in @mcp-abap-adt/interfaces
 export type { ILocalTestClassConfig } from '@mcp-abap-adt/interfaces';
 
-export class AdtLocalTestClass extends AdtClassMemberBase {
+/**
+ * Not `IAdtDeletable`, and that is the honest shape rather than an omission.
+ *
+ * Removing this is a write of its parent: `delete()` below is
+ * `update()` with empty content, which is what ADT offers — there is no
+ * resource to DELETE and none to ask about. Measured beside it: the deletion
+ * service resolves a *message class*, `adtcore:type="MSAG/N"`, and knows
+ * nothing of the rows inside it; the same holds for a class and its includes.
+ *
+ * So the atom that carries `delete` and `checkDeletion` does not apply, and
+ * `delete()` stays as the convenience it always was — a name for writing
+ * emptiness — rather than a claim that this is a deletable object.
+ */
+export class AdtLocalTestClass<R extends IClassResults = typeof classDocuments>
+  extends AdtClassMemberBase<R>
+  implements
+    IAdtReadable<ILocalTestClassConfig, ReturnType<R['source']>>,
+    IAdtMetadataReadable<ILocalTestClassConfig, ReturnType<R['metadata']>>,
+    IAdtUpdatable<Partial<ILocalTestClassConfig>, ReturnType<R['updated']>>,
+    IAdtValidatable<ILocalTestClassConfig, ReturnType<R['validation']>>,
+    IAdtCheckable<ILocalTestClassConfig, ReturnType<R['check']>>,
+    IAdtActivatable<ILocalTestClassConfig, ReturnType<R['activation']>>
+{
   public readonly objectType: string = 'LocalTestClass';
 
-  /**
-   * Validate local test class code
-   */
-  async validate(config: Partial<ILocalTestClassConfig>): Promise<IClassState> {
+  constructor(
+    connection: IAbapConnection,
+    logger?: ILogger,
+    systemContext?: IAdtSystemContext,
+    contentTypes?: IAdtContentTypes,
+    lockRegistry?: LockRegistry,
+    // See AdtClass: the one cast is on the default, never on a member.
+    protected readonly results: R = classDocuments as unknown as R,
+  ) {
+    super(connection, logger, systemContext, contentTypes, lockRegistry);
+  }
+
+  /** Syntax-check the source a caller is about to write. */
+  async validate<E extends IAdtError = IAdtError>(
+    config: Partial<ILocalTestClassConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    // Nothing was asked of the server yet, so there is no answer to describe:
+    // a missing required argument is the caller's mistake and it throws.
     if (!config.className) {
       throw new Error('Class name is required for validation');
     }
@@ -35,73 +97,77 @@ export class AdtLocalTestClass extends AdtClassMemberBase {
       throw new Error('Test class code is required for validation');
     }
 
-    const checkResponse = await checkClassLocalTestClass(
-      this.connection,
-      config.className,
-      config.testClassCode,
-      'inactive',
-      this.contentTypes?.sourceArtifactContentType(),
+    return answering(
+      () =>
+        checkClassLocalTestClass(
+          connection,
+          config.className as string,
+          config.testClassCode as string,
+          'inactive',
+          this.contentTypes?.sourceArtifactContentType(),
+        ),
+      this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
+      (options?.analyse ?? validationRefusal) as IAnalyse<E>,
     );
-
-    return {
-      validationResponse: checkResponse,
-      errors: [],
-    };
   }
 
-  /**
-   * Read local test class code
-   */
-  async read(
+  /** Read the include's source. */
+  async read<E extends IAdtError = IAdtError>(
     config: Partial<ILocalTestClassConfig>,
     version: 'active' | 'inactive' = 'active',
-    options?: IReadOptions,
-  ): Promise<IClassState | undefined> {
+    options?: IReadOptions & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     if (!config.className) {
       throw new Error('Class name is required');
     }
 
-    try {
-      const { getClassTestClassesInclude } = await import('./read');
-      const response = await getClassTestClassesInclude(
-        this.connection,
-        config.className,
-        version,
-        this.logger,
-        options,
-      );
-      return {
-        readResult: response,
-        errors: [],
-      };
-    } catch (error: unknown) {
-      const e = error as HttpError;
-      if (e.response?.status === 404) {
-        return undefined;
-      }
-      this.logger?.error(
-        'Read LocalTestClass failed:',
-        safeErrorMessage(error),
-      );
-      throw error;
-    }
+    // No 404 special case any more: ADT answers a read for an include that was
+    // never written with 200 and an empty body, so absence was never a status
+    // to branch on, and whether an empty body *is* absence is the caller's
+    // reading — supplied through `analyse`.
+    return answering(
+      () =>
+        getClassTestClassesInclude(
+          connection,
+          config.className as string,
+          version,
+          this.logger,
+          options,
+        ),
+      this.results.source as IResultStrategy<ReturnType<R['source']>>,
+      options?.analyse,
+    );
   }
 
   /**
-   * Update local test class with full operation chain
-   * Requires parent class to be locked
-   * If options.lockHandle is provided, performs only low-level update without lock/check/unlock chain
+   * Write the include.
+   *
+   * **This never takes a lock and never releases one.** It is one PUT, and
+   * `options.lockHandle` is passed to it exactly as given — including not at
+   * all, in which case ADT answers `400 Parameter lockHandle could not be
+   * found` and that refusal is the result.
+   *
+   * The lock is the *class's*, not the include's: `getClass().lock()` is what
+   * takes it, and the same handle serves every include. This comment used to
+   * say the member locked, checked, wrote and unlocked; that chain came out
+   * when a member became one request, and a reader chasing an unreleased lock
+   * would have looked here and stopped.
    */
-  async update(
+  async update<E extends IAdtError = IAdtError>(
     config: Partial<ILocalTestClassConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IClassState> {
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     if (!config.className) {
       throw new Error('Class name is required');
     }
-    // An empty string is source: writing it is how a test class is removed
-    // (see delete()). Only its absence is an error, so this asks whether the
-    // caller gave source at all rather than whether the source is truthy.
+    // An empty string is source: writing it is how the include is emptied
+    // (see delete()). Only its absence is an error.
     if (
       config.testClassCode === undefined &&
       options?.sourceCode === undefined
@@ -109,138 +175,53 @@ export class AdtLocalTestClass extends AdtClassMemberBase {
       throw new Error('Test class code is required');
     }
 
-    // Low-level mode: if lockHandle is provided, perform only update operation
-    if (options?.lockHandle) {
-      const codeToUpdate = options?.sourceCode ?? config.testClassCode ?? '';
+    const name = config.className;
+    const source = options?.sourceCode ?? config.testClassCode ?? '';
 
-      this.logger?.info?.(
-        'Low-level update: performing update only (lockHandle provided)',
-      );
-      const updateResponse = await updateClassTestInclude(
-        this.connection,
-        config.className,
-        codeToUpdate,
-        options.lockHandle,
-        config.transportRequest,
-        this.contentTypes?.sourceArtifactContentType(),
-      );
-      this.logger?.info?.('Test class updated (low-level)');
-      return {
-        updateResult: updateResponse,
-        errors: [],
-      };
-    }
-
-    let parentLockHandle: string | undefined;
-    const state: IClassState = {
-      errors: [],
-    };
-
-    try {
-      // 1. Lock parent class (stateful only for lock)
-      // Lock handle from parent class is sufficient for updating testclasses include
-      this.logger?.info?.('Step 1: Locking parent class');
-      parentLockHandle = await this.lock({ className: config.className });
-      state.lockHandle = parentLockHandle;
-      this.logger?.info?.('Parent class locked, handle:', parentLockHandle);
-
-      // 2. Check test class code. Empty source is a deletion — there is nothing
-      // to syntax-check, and ADT rejects an empty body on the check resource.
-      const codeToCheck = options?.sourceCode ?? config.testClassCode ?? '';
-      if (codeToCheck !== '') {
-        this.logger?.info?.('Step 2: Checking test class code');
-        const checkResponse = await checkClassLocalTestClass(
-          this.connection,
-          config.className,
-          codeToCheck,
-          'inactive',
+    return answering(
+      () =>
+        updateClassTestInclude(
+          connection,
+          name,
+          source,
+          // `as string` because the low-level writer types it required; the
+          // value may be absent, and whether an unlocked write is allowed is
+          // ADT's judgement, not this library's.
+          options?.lockHandle as string,
+          config.transportRequest,
           this.contentTypes?.sourceArtifactContentType(),
-        );
-        state.checkResult = checkResponse;
-        this.logger?.info?.('Test class check passed');
-      }
-
-      // 3. Update test classes (uses parent class lock handle)
-      this.logger?.info?.('Step 3: Updating test class');
-      const updateResponse = await updateClassTestInclude(
-        this.connection,
-        config.className,
-        codeToCheck,
-        parentLockHandle,
-        config.transportRequest,
-        this.contentTypes?.sourceArtifactContentType(),
-      );
-      state.updateResult = updateResponse;
-      this.logger?.info?.('Test class updated');
-
-      // 4. Unlock parent class (obligatory stateless after unlock)
-      if (parentLockHandle) {
-        this.logger?.info?.('Step 4: Unlocking parent class');
-        const unlockState = await super.unlock(
-          { className: config.className },
-          parentLockHandle,
-        );
-        state.unlockResult = unlockState.unlockResult;
-        parentLockHandle = undefined;
-      }
-
-      // 5. Activate parent class (if requested)
-      if (options?.activateOnUpdate) {
-        this.logger?.info?.('Step 5: Activating parent class');
-        const activateState = await this.activate({
-          className: config.className,
-        });
-        state.activateResult = activateState.activateResult;
-        this.logger?.info?.('Parent class activated');
-      }
-
-      return state;
-    } catch (error: unknown) {
-      // Cleanup on error
-      if (parentLockHandle) {
-        try {
-          this.logger?.warn?.('Unlocking parent class during error cleanup');
-          await super.unlock({ className: config.className }, parentLockHandle);
-        } catch (unlockError) {
-          this.logger?.warn?.(
-            'Failed to unlock parent class after error:',
-            safeErrorMessage(unlockError),
-          );
-        }
-      }
-
-      this.logger?.error(
-        'Update LocalTestClass failed:',
-        safeErrorMessage(error),
-      );
-      throw error;
-    }
+        ),
+      this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      options?.analyse,
+    );
   }
 
   /**
-   * Delete local test class
-   * Performs update with empty code to remove the test class
+   * Empty the include.
+   *
+   * There is no DELETE for a class include: ADT removes test class source by writing
+   * the include empty, so this answers what that write answered.
    */
-  async delete(config: Partial<ILocalTestClassConfig>): Promise<IClassState> {
+  async delete<E extends IAdtError = IAdtError>(
+    config: Partial<ILocalTestClassConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
 
-    // Delete by updating with empty code
-    return await this.update({
-      ...config,
-      testClassCode: '',
-    });
+    return await this.update({ ...config, testClassCode: '' }, options);
   }
 
-  /**
-   * Check local test class code
-   * Override to use local test class specific check function
-   */
-  async check(
+  /** Syntax-check the include. */
+  async check<E extends IAdtError = IAdtError>(
     config: Partial<ILocalTestClassConfig>,
     status: string = 'inactive',
-  ): Promise<IClassState> {
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     if (!config.className) {
       throw new Error('Class name is required');
     }
@@ -248,24 +229,34 @@ export class AdtLocalTestClass extends AdtClassMemberBase {
       throw new Error('Test class code is required');
     }
 
-    const checkResponse = await checkClassLocalTestClass(
-      this.connection,
-      config.className,
-      config.testClassCode,
-      status as 'active' | 'inactive',
-      this.contentTypes?.sourceArtifactContentType(),
+    return answering(
+      () =>
+        checkClassLocalTestClass(
+          connection,
+          config.className as string,
+          config.testClassCode as string,
+          status === 'active' ? 'active' : 'inactive',
+          this.contentTypes?.sourceArtifactContentType(),
+        ),
+      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      options?.analyse,
     );
-
-    return {
-      checkResult: checkResponse,
-      errors: [],
-    };
   }
 
-  getVersions(
-    config: Partial<{ className: string }>,
-  ): Promise<IObjectVersion[]> {
+  /** Version history of this include. */
+  async getVersions(
+    config: Partial<ILocalTestClassConfig>,
+  ): Promise<IAdtResponse<ObjectVersion[]>> {
     if (!config.className) throw new Error('className is required');
-    return this.getIncludeVersions(config.className, 'testclasses');
+    const name = config.className;
+    return answering(
+      async () => ({
+        data: await this.getIncludeVersions(name, 'testclasses'),
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+      }),
+      (answer) => answer.data as ObjectVersion[],
+    );
   }
 }

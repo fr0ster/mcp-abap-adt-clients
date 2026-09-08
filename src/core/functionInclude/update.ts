@@ -6,12 +6,16 @@
  * with ?lockHandle=...).
  */
 
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+  ILogger,
+} from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_FUNCTION_INCLUDE,
   CT_FUNCTION_INCLUDE,
 } from '../../constants/contentTypes';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { ICreateFunctionIncludeParams } from './types';
 import { buildFunctionIncludeXml } from './xmlBuilder';
@@ -24,27 +28,21 @@ const debugEnabled = process.env.DEBUG_ADT_LIBS === 'true';
 export async function updateFunctionInclude(
   connection: IAbapConnection,
   params: ICreateFunctionIncludeParams,
-  lockHandle: string,
+  lockHandle?: string,
   logger?: ILogger,
-): Promise<void> {
+): Promise<IAdtWireResponse> {
   if (!params.function_group_name) {
     throw new Error('function_group_name is required');
   }
   if (!params.include_name) {
     throw new Error('include_name is required');
   }
-  if (!lockHandle) {
-    throw new Error('lockHandle is required for update');
-  }
 
   const groupLower = encodeSapObjectName(
     params.function_group_name,
   ).toLowerCase();
   const encodedInclude = encodeSapObjectName(params.include_name.toUpperCase());
-  const corrNr = params.transport_request
-    ? `&corrNr=${encodeURIComponent(params.transport_request)}`
-    : '';
-  const url = `/sap/bc/adt/functions/groups/${groupLower}/includes/${encodedInclude}?lockHandle=${encodeURIComponent(lockHandle)}${corrNr}`;
+  const url = `/sap/bc/adt/functions/groups/${groupLower}/includes/${encodedInclude}${writeQuery(lockHandle, params.transport_request)}`;
 
   const xmlBody = buildFunctionIncludeXml(params);
 
@@ -53,7 +51,10 @@ export async function updateFunctionInclude(
     logger?.debug?.(xmlBody);
   }
 
-  await connection.makeAdtRequest({
+  // The answer is returned rather than discarded: what a write becomes is the
+  // consumer's result strategy to decide, and a function that swallowed it left
+  // that strategy nothing to read.
+  return connection.makeAdtRequest({
     url,
     method: 'PUT',
     timeout: getTimeout('default'),

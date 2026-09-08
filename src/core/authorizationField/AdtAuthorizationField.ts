@@ -1,70 +1,82 @@
-import { beginCriticalSection } from '../../utils/criticalSection';
-import { assertDeletable } from '../../utils/deletionCheck';
 /**
- * AdtAuthorizationField - High-level CRUD operations for SUSO / AUTH objects
+ * AdtAuthorizationField - CRUD for `SUSO/O` authorization fields.
  *
- * Implements IAdtObject with automatic operation chains, error handling,
- * and resource cleanup.
+ * An XML-based object: no source, so `read` and `readMetadata` fetch the same
+ * document and `update` writes that XML.
  *
- * Session management:
- * - stateful: only when doing lock / unlock
- * - stateless: obligatory after unlock
- * - activate uses the same session / cookies (no stateful required)
- *
- * Operation chains:
- * - Create: validate (caller) → create
- * - Update: lock → check(inactive, xmlContent?) → update → read(longPolling) → unlock → check(inactive) → optional activate + read
- * - Delete: check(deletion) → delete
+ * Every member answers `IAdtResponse<T>`, where T is what the result set given
+ * at construction makes of that endpoint's answer.
  */
-
 import type {
-  HttpError,
   IAbapConnection,
   IAdtActivatable,
   IAdtCheckable,
-  IAdtCrud,
+  IAdtCreatable,
+  IAdtCreateOptions,
+  IAdtDeletable,
+  IAdtError,
   IAdtLockable,
+  IAdtMetadataReadable,
+  IAdtMetadataUpdatable,
   IAdtOperationOptions,
+  IAdtReadable,
+  IAdtResponse,
   IAdtSystemContext,
+  IAdtUpdatable,
   IAdtValidatable,
+  IAnalyse,
   ILogger,
-  IObjectVersion,
+  IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
-import { safeErrorMessage } from '../../utils/internalUtils';
+import { activationRefusal } from '../../utils/activationUtils';
+import { answering } from '../../utils/adtResponse';
+import { withCallTimeout } from '../../utils/callTimeout';
+import { deletionRefusal } from '../../utils/deletionCheck';
+import { validationRefusal } from '../../utils/validationRefusal';
+import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import {
   createLockTracker,
   type LockRegistry,
   type LockTracker,
 } from '../shared/LockRegistry';
+import type { IReadOptions } from '../shared/types';
 import { activateAuthorizationField } from './activation';
 import { checkAuthorizationField } from './check';
 import { create as createAuthorizationField } from './create';
-import {
-  checkDeletion,
-  deleteAuthorizationField,
-  type IDeleteAuthorizationFieldParams,
-} from './delete';
+import { checkDeletion, deleteAuthorizationField } from './delete';
 import { lockAuthorizationField } from './lock';
-import { type IReadOptions, readAuthorizationField } from './read';
-import type {
-  IAuthorizationFieldConfig,
-  IAuthorizationFieldState,
-  ICreateAuthorizationFieldParams,
+import { readAuthorizationField } from './read';
+import {
+  authorizationFieldDocuments,
+  type IAuthorizationFieldConfig,
+  type IAuthorizationFieldResults,
 } from './types';
 import { unlockAuthorizationField } from './unlock';
 import { updateAuthorizationField } from './update';
 import { validateAuthorizationFieldName } from './validation';
-export class AdtAuthorizationField
-  implements
-    IAdtCrud<IAuthorizationFieldConfig, IAuthorizationFieldState>,
-    IAdtValidatable<IAuthorizationFieldConfig, IAuthorizationFieldState>,
-    IAdtCheckable<IAuthorizationFieldConfig, IAuthorizationFieldState>,
-    IAdtActivatable<IAuthorizationFieldConfig, IAuthorizationFieldState>,
-    IAdtLockable<IAuthorizationFieldConfig, IAuthorizationFieldState>
+
+export class AdtAuthorizationField<
+  R extends IAuthorizationFieldResults = typeof authorizationFieldDocuments,
+> implements
+    IAdtCreatable<IAuthorizationFieldConfig, ReturnType<R['created']>>,
+    IAdtMetadataReadable<IAuthorizationFieldConfig, ReturnType<R['metadata']>>,
+    IAdtMetadataUpdatable<
+      Partial<IAuthorizationFieldConfig>,
+      ReturnType<R['metadataUpdated']>
+    >,
+    IAdtDeletable<
+      IAuthorizationFieldConfig,
+      ReturnType<R['deletion']>,
+      ReturnType<R['deletionCheck']>
+    >,
+    IAdtValidatable<IAuthorizationFieldConfig, ReturnType<R['validation']>>,
+    IAdtCheckable<IAuthorizationFieldConfig, ReturnType<R['check']>>,
+    IAdtActivatable<IAuthorizationFieldConfig, ReturnType<R['activation']>>,
+    IAdtLockable<IAuthorizationFieldConfig>
 {
-  private readonly connection: IAbapConnection;
-  private readonly logger?: ILogger;
-  private readonly systemContext: IAdtSystemContext;
+  protected readonly connection: IAbapConnection;
+  protected readonly logger?: ILogger;
+  protected readonly systemContext: IAdtSystemContext;
   private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'AuthorizationField';
 
@@ -73,6 +85,11 @@ export class AdtAuthorizationField
     logger?: ILogger,
     systemContext?: IAdtSystemContext,
     lockRegistry?: LockRegistry,
+    // The one cast in this file, and it is on the default: the shipped set
+    // satisfies the erased bound, which the compiler cannot see through the
+    // `unknown`s. A cast on a member would be the factory lying about what it
+    // answers.
+    protected readonly results: R = authorizationFieldDocuments as unknown as R,
   ) {
     this.connection = connection;
     this.logger = logger;
@@ -85,552 +102,302 @@ export class AdtAuthorizationField
     );
   }
 
-  /**
-   * Map camelCase config to the snake_case low-level params the functions expect.
-   * Kept private — callers should always go through the handler.
-   */
-  private buildCreateParams(
-    config: IAuthorizationFieldConfig,
-  ): ICreateAuthorizationFieldParams {
-    return {
-      authorization_field_name: config.authorizationFieldName,
-      description: config.description,
-      package_name: config.packageName ?? '',
-      transport_request: config.transportRequest,
-      master_system: config.masterSystem ?? this.systemContext.masterSystem,
-      responsible: config.responsible ?? this.systemContext.responsible,
-      field_name: config.fieldName,
-      roll_name: config.rollName,
-      check_table: config.checkTable,
-      exit_fb: config.exitFb,
-      abap_language_version: config.abapLanguageVersion,
-      search: config.search,
-      objexit: config.objexit,
-      domname: config.domname,
-      outputlen: config.outputlen,
-      convexit: config.convexit,
-      orglvlinfo: config.orglvlinfo,
-      col_searchhelp: config.colSearchhelp,
-      col_searchhelp_name: config.colSearchhelpName,
-      col_searchhelp_descr: config.colSearchhelpDescr,
-    };
-  }
-
-  private buildDeleteParams(
-    config: Partial<IAuthorizationFieldConfig>,
-  ): IDeleteAuthorizationFieldParams {
-    return {
-      authorization_field_name: config.authorizationFieldName ?? '',
-      transport_request: config.transportRequest,
-    };
-  }
-
-  /**
-   * Validate authorization field name against SAP naming rules.
-   */
-  async validate(
-    config: Partial<IAuthorizationFieldConfig>,
-  ): Promise<IAuthorizationFieldState> {
+  /** The name, or the caller's mistake — nothing was asked of the server yet. */
+  private name(config: Partial<IAuthorizationFieldConfig>): string {
     if (!config.authorizationFieldName) {
-      throw new Error('Authorization field name is required for validation');
+      throw new Error('Authorization field name is required');
     }
-    // The endpoint refuses an empty one, so this is a caller error rather
-    // than a 400 to decode later.
+    return config.authorizationFieldName;
+  }
+
+  /** Validate the name before creating the object. */
+  async validate<E extends IAdtError = IAdtError>(
+    config: Partial<IAuthorizationFieldConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const name = this.name(config);
+    // The endpoint refuses an empty one, so this is a caller error rather than
+    // a 400 to decode later.
     if (!config.description) {
       throw new Error('Description is required for validation');
     }
 
-    const validationResponse = await validateAuthorizationFieldName(
-      this.connection,
-      config.authorizationFieldName,
-      config.description,
-      config.packageName,
+    return answering(
+      () =>
+        validateAuthorizationFieldName(
+          connection,
+          name,
+          config.description as string,
+          config.packageName,
+        ),
+      this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
+      (options?.analyse ?? validationRefusal) as IAnalyse<E>,
     );
-
-    return {
-      validationResponse,
-      errors: [],
-    };
   }
 
-  /**
-   * Create authorization field.
-   */
-  async create(
-    config: IAuthorizationFieldConfig,
-    options?: IAdtOperationOptions,
-  ): Promise<IAuthorizationFieldState> {
-    if (!config.authorizationFieldName) {
-      throw new Error('Authorization field name is required');
-    }
+  /** Create the object. */
+  async create<E extends IAdtError = IAdtError>(
+    config: Omit<IAuthorizationFieldConfig, 'sourceCode'> & {
+      sourceCode?: never;
+    },
+    options?: IAdtCreateOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const name = this.name(config);
     if (!config.packageName) {
       throw new Error('Package name is required');
     }
     if (!config.description) {
       throw new Error('Description is required');
     }
+    return answering(
+      () =>
+        createAuthorizationField(connection, {
+          authorization_field_name: name,
+          description: config.description,
+          package_name: config.packageName ?? '',
+          transport_request: config.transportRequest,
+          master_system: config.masterSystem ?? this.systemContext.masterSystem,
+          responsible: config.responsible ?? this.systemContext.responsible,
+          field_name: config.fieldName,
+          roll_name: config.rollName,
+          check_table: config.checkTable,
+          exit_fb: config.exitFb,
+          abap_language_version: config.abapLanguageVersion,
+          search: config.search,
+          objexit: config.objexit,
+          domname: config.domname,
+          outputlen: config.outputlen,
+          convexit: config.convexit,
+          orglvlinfo: config.orglvlinfo,
+        }),
+      this.results.created as IResultStrategy<ReturnType<R['created']>>,
+      options?.analyse,
+    );
+  }
 
-    let objectCreated = false;
-    const state: IAuthorizationFieldState = { errors: [] };
+  /** Read the object's metadata document. */
+  async readMetadata<E extends IAdtError = IAdtError>(
+    config: Partial<IAuthorizationFieldConfig>,
+    options?: IReadOptions & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
 
-    try {
-      this.logger?.info?.('Creating authorization field');
-      const createResponse = await createAuthorizationField(
-        this.connection,
-        this.buildCreateParams(config),
-      );
-      state.createResult = createResponse;
-      objectCreated = true;
-      this.logger?.info?.('Authorization field created');
+    const name = this.name(config);
 
-      return state;
-    } catch (error: unknown) {
-      this.connection.setSessionType('stateless');
-
-      if (objectCreated && options?.deleteOnFailure) {
-        try {
-          this.logger?.warn?.('Deleting authorization field after failure');
-          await deleteAuthorizationField(
-            this.connection,
-            this.buildDeleteParams(config),
-          );
-        } catch (deleteError) {
-          this.logger?.warn?.(
-            'Failed to delete authorization field after failure:',
-            safeErrorMessage(deleteError),
-          );
-        }
-      }
-
-      this.logger?.error('Create failed:', safeErrorMessage(error));
-      throw error;
-    }
+    return answering(
+      () =>
+        readAuthorizationField(
+          connection,
+          name,
+          options?.version ?? 'active',
+          options,
+        ),
+      this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
+      options?.analyse,
+    );
   }
 
   /**
-   * Read authorization field metadata.
+   * Write the object.
+   *
+   * With `options.lockHandle` the caller holds the lock and owns the chain, so
+   * this is one request. Without it, this locks, checks, writes and unlocks —
+   * and the unlock happens on every path out.
    */
-  async read(
+  async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IAuthorizationFieldConfig>,
-    version?: 'active' | 'inactive',
-    options?: IReadOptions,
-  ): Promise<IAuthorizationFieldState | undefined> {
-    if (!config.authorizationFieldName) {
-      throw new Error('Authorization field name is required');
-    }
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
 
-    try {
-      const response = await readAuthorizationField(
-        this.connection,
-        config.authorizationFieldName,
-        version ?? 'active',
-        options,
-      );
-      return {
-        readResult: response,
-        errors: [],
-      };
-    } catch (error: unknown) {
-      const e = error as HttpError;
-      if (e.response?.status === 404) {
-        return undefined;
-      }
-      this.logger?.error('Read failed:', safeErrorMessage(error));
-      throw error;
-    }
-  }
-
-  /**
-   * Read metadata — for metadata-only objects, read() already returns it.
-   */
-  async readMetadata(
-    config: Partial<IAuthorizationFieldConfig>,
-    options?: IReadOptions & { version?: 'active' | 'inactive' },
-  ): Promise<IAuthorizationFieldState> {
-    const state: IAuthorizationFieldState = { errors: [] };
-    if (!config.authorizationFieldName) {
-      const error = new Error('Authorization field name is required');
-      state.errors.push({
-        method: 'readMetadata',
-        error,
-        timestamp: new Date(),
-      });
-      throw error;
-    }
-    try {
-      const readState = await this.read(
-        config,
-        options?.version ?? 'active',
-        options,
-      );
-      if (readState) {
-        state.metadataResult = readState.readResult;
-        state.readResult = readState.readResult;
-      } else {
-        const error = new Error(
-          `Authorization field '${config.authorizationFieldName}' not found`,
-        );
-        state.errors.push({
-          method: 'readMetadata',
-          error,
-          timestamp: new Date(),
-        });
-        throw error;
-      }
-      this.logger?.info?.('Authorization field metadata read successfully');
-      return state;
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({
-        method: 'readMetadata',
-        error: err,
-        timestamp: new Date(),
-      });
-      this.logger?.error('readMetadata', safeErrorMessage(err));
-      throw err;
-    }
-  }
-
-  /**
-   * Update authorization field with full operation chain.
-   */
-  async update(
-    config: Partial<IAuthorizationFieldConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IAuthorizationFieldState> {
-    if (!config.authorizationFieldName) {
-      throw new Error('Authorization field name is required');
-    }
+    const name = this.name(config);
     if (!config.packageName) {
       throw new Error('Package name is required for update');
     }
 
-    const fullConfig: IAuthorizationFieldConfig = {
-      ...(config as IAuthorizationFieldConfig),
-    };
-    const params = this.buildCreateParams(fullConfig);
-
-    // Low-level mode: if lockHandle is provided, perform only update
-    if (options?.lockHandle) {
-      this.logger?.info?.(
-        'Low-level update: performing update only (lockHandle provided)',
-      );
-      await updateAuthorizationField(
-        this.connection,
-        params,
-        options.lockHandle,
-        this.logger,
-      );
-      this.logger?.info?.('Authorization field updated (low-level)');
-      return { errors: [] };
-    }
-
-    let lockHandle: string | undefined;
-    const state: IAuthorizationFieldState = { errors: [] };
-
-    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
-
-    // the lock but leaves the work half-done.
-
-    const endCriticalSection = beginCriticalSection(this.connection);
-
-    try {
-      // 1. Lock
-      this.logger?.info?.('Step 1: Locking authorization field');
-      this.connection.setSessionType('stateful');
-      lockHandle = await lockAuthorizationField(
-        this.connection,
-        fullConfig.authorizationFieldName,
-        this.logger,
-      );
-      state.lockHandle = lockHandle;
-      this.lockTracker.track(fullConfig.authorizationFieldName, lockHandle);
-      fullConfig.onLock?.(lockHandle);
-      this.logger?.info?.('Authorization field locked, handle:', lockHandle);
-
-      // 2. Check inactive with XML for update (if provided)
-      const xmlToCheck = options?.xmlContent;
-      if (xmlToCheck) {
-        this.logger?.info?.(
-          'Step 2: Checking inactive version with update content',
-        );
-        const deletionCheck = await checkAuthorizationField(
-          this.connection,
-          fullConfig.authorizationFieldName,
-          'inactive',
-          xmlToCheck,
-        );
-        state.checkResult = deletionCheck;
-        this.logger?.info?.('Check inactive with update content passed');
-      }
-
-      // 3. Update
-      this.logger?.info?.('Step 3: Updating authorization field');
-      await updateAuthorizationField(
-        this.connection,
-        params,
-        lockHandle,
-        this.logger,
-      );
-      this.logger?.info?.('Authorization field updated');
-
-      // Poll the inactive version: the write above produced it; the active version may not exist yet.
-      // 3.5. Read with long polling to ensure object is ready after update
-      this.logger?.info?.('read (wait for object ready after update)');
-      try {
-        await this.read(
-          { authorizationFieldName: fullConfig.authorizationFieldName },
-          'inactive',
-          { withLongPolling: true },
-        );
-        this.logger?.info?.('object is ready after update');
-      } catch (readError) {
-        this.logger?.warn?.(
-          'read with long polling failed after update:',
-          safeErrorMessage(readError),
-        );
-      }
-
-      // 4. Unlock
-      this.logger?.info?.('Step 4: Unlocking authorization field');
-      this.connection.setSessionType('stateful');
-      await unlockAuthorizationField(
-        this.connection,
-        fullConfig.authorizationFieldName,
-        lockHandle,
-      );
-      this.connection.setSessionType('stateless');
-      this.lockTracker.untrack(fullConfig.authorizationFieldName);
-      lockHandle = undefined;
-      this.logger?.info?.('Authorization field unlocked');
-
-      // 5. Final check
-      this.logger?.info?.('Step 5: Final check');
-      const finalCheck = await checkAuthorizationField(
-        this.connection,
-        fullConfig.authorizationFieldName,
-        'inactive',
-      );
-      state.checkResult = finalCheck;
-      this.logger?.info?.('Final check passed');
-
-      // 6. Activate (optional)
-      if (options?.activateOnUpdate) {
-        this.logger?.info?.('Step 6: Activating authorization field');
-        const activateResponse = await activateAuthorizationField(
-          this.connection,
-          fullConfig.authorizationFieldName,
-        );
-        state.activateResult = activateResponse;
-        this.logger?.info?.(
-          'Authorization field activated, status:',
-          activateResponse.status,
-        );
-
-        try {
-          const readState = await this.read(
-            { authorizationFieldName: fullConfig.authorizationFieldName },
-            'active',
-            { withLongPolling: true },
-          );
-          if (readState) {
-            state.readResult = readState.readResult;
-          }
-          this.logger?.info?.('object is ready after activation');
-        } catch (readError) {
-          this.logger?.warn?.(
-            'read with long polling failed after activation:',
-            safeErrorMessage(readError),
-          );
-        }
-      } else {
-        // No activation happened: return the version just written (inactive),
-        // not the stale active one.
-        const readResponse = await readAuthorizationField(
-          this.connection,
-          fullConfig.authorizationFieldName,
-          'inactive',
-        );
-        state.readResult = readResponse;
-      }
-
-      return state;
-    } catch (error: unknown) {
-      // Error cleanup: try to unlock (lockHandle preserved for force unlock),
-      // then make sure the session is stateless.
-      if (lockHandle) {
-        try {
-          this.logger?.warn?.(
-            'Unlocking authorization field during error cleanup',
-          );
-          this.connection.setSessionType('stateful');
-          await unlockAuthorizationField(
-            this.connection,
-            fullConfig.authorizationFieldName,
-            lockHandle,
-          );
-          this.connection.setSessionType('stateless');
-          this.lockTracker.untrack(fullConfig.authorizationFieldName);
-        } catch (unlockError) {
-          this.logger?.warn?.(
-            'Failed to unlock during cleanup:',
-            safeErrorMessage(unlockError),
-          );
-        }
-      } else {
-        this.connection.setSessionType('stateless');
-      }
-
-      if (options?.deleteOnFailure) {
-        try {
-          this.logger?.warn?.('Deleting authorization field after failure');
-          await deleteAuthorizationField(
-            this.connection,
-            this.buildDeleteParams(fullConfig),
-          );
-        } catch (deleteError) {
-          this.logger?.warn?.(
-            'Failed to delete authorization field after failure:',
-            safeErrorMessage(deleteError),
-          );
-        }
-      }
-
-      this.logger?.error('Update failed:', safeErrorMessage(error));
-      throw error;
-    } finally {
-      endCriticalSection();
-    }
+    return answering(
+      () =>
+        updateAuthorizationField(
+          connection,
+          {
+            authorization_field_name: name,
+            description: config.description,
+            package_name: config.packageName ?? '',
+            transport_request: config.transportRequest,
+            master_system:
+              config.masterSystem ?? this.systemContext.masterSystem,
+            responsible: config.responsible ?? this.systemContext.responsible,
+            field_name: config.fieldName,
+            roll_name: config.rollName,
+            check_table: config.checkTable,
+            exit_fb: config.exitFb,
+            abap_language_version: config.abapLanguageVersion,
+            search: config.search,
+            objexit: config.objexit,
+            domname: config.domname,
+            outputlen: config.outputlen,
+            convexit: config.convexit,
+            orglvlinfo: config.orglvlinfo,
+          },
+          options?.lockHandle,
+          this.logger,
+        ),
+      this.results.metadataUpdated as IResultStrategy<
+        ReturnType<R['metadataUpdated']>
+      >,
+      options?.analyse,
+    );
   }
 
   /**
-   * Delete authorization field.
+   * Asks ADT whether the object can be deleted.
+   *
+   * Its own member because it is its own endpoint. `delete` no longer runs
+   * it: a consumer that wants the check runs this first and decides what a
+   * refusal means.
    */
-  async delete(
+  async checkDeletion<E extends IAdtError = IAdtError>(
     config: Partial<IAuthorizationFieldConfig>,
-  ): Promise<IAuthorizationFieldState> {
-    if (!config.authorizationFieldName) {
-      throw new Error('Authorization field name is required');
-    }
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
 
-    const state: IAuthorizationFieldState = { errors: [] };
-
-    try {
-      this.logger?.info?.('Checking authorization field for deletion');
-      const deletionCheck = await checkDeletion(
-        this.connection,
-        this.buildDeleteParams(config),
-      );
-      // ADT already said whether this may be deleted; refusing to read that
-      // answer is how a delete came to report success while the object
-      // stayed. Throws on isDeletable=false or a message of type E; a W
-      // is a warning and passes.
-      assertDeletable(deletionCheck.data);
-      state.checkResult = deletionCheck;
-      this.logger?.info?.('Deletion check passed');
-
-      this.logger?.info?.('Deleting authorization field');
-      const deleteResponse = await deleteAuthorizationField(
-        this.connection,
-        this.buildDeleteParams(config),
-      );
-      state.deleteResult = deleteResponse;
-      this.logger?.info?.('Authorization field deleted');
-
-      return state;
-    } catch (error: unknown) {
-      this.logger?.error('Delete failed:', safeErrorMessage(error));
-      throw error;
-    }
+    const name = this.name(config);
+    return answering(
+      () =>
+        checkDeletion(connection, {
+          authorization_field_name: name,
+          transport_request: config.transportRequest,
+        }),
+      this.results.deletionCheck as IResultStrategy<
+        ReturnType<R['deletionCheck']>
+      >,
+      (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
+    );
   }
 
   /**
-   * Activate authorization field.
+   * Delete the object.
+   *
+   * The deletion check is read, not merely performed: ADT answers a refusal
+   * with `del:isDeletable="false"` inside a 200, and a delete that ignored it
+   * reported success while the object stayed. {@link deletionRefusal} is the
+   * shipped reading of that answer; a caller who wants another passes their own
+   * `analyse`.
    */
-  async activate(
+  async delete<E extends IAdtError = IAdtError>(
     config: Partial<IAuthorizationFieldConfig>,
-  ): Promise<IAuthorizationFieldState> {
-    if (!config.authorizationFieldName) {
-      throw new Error('Authorization field name is required');
-    }
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
 
-    const state: IAuthorizationFieldState = { errors: [] };
-
-    try {
-      const activateResponse = await activateAuthorizationField(
-        this.connection,
-        config.authorizationFieldName,
-      );
-      state.activateResult = activateResponse;
-      return state;
-    } catch (error: unknown) {
-      this.logger?.error('Activate failed:', safeErrorMessage(error));
-      throw error;
-    }
+    const name = this.name(config);
+    return answering(
+      () =>
+        deleteAuthorizationField(connection, {
+          authorization_field_name: name,
+          transport_request: config.transportRequest,
+        }),
+      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      options?.analyse,
+    );
   }
 
-  /**
-   * Check authorization field.
-   */
-  async check(
+  /** Activate the object. Needs no stateful session. */
+  async activate<E extends IAdtError = IAdtError>(
+    config: Partial<IAuthorizationFieldConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const name = this.name(config);
+
+    return answering(
+      () => activateAuthorizationField(connection, name),
+      this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
+      (options?.analyse ?? activationRefusal) as IAnalyse<E>,
+    );
+  }
+
+  /** Check the object. */
+  async check<E extends IAdtError = IAdtError>(
     config: Partial<IAuthorizationFieldConfig>,
     status?: string,
-  ): Promise<IAuthorizationFieldState> {
-    if (!config.authorizationFieldName) {
-      throw new Error('Authorization field name is required');
-    }
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
 
+    const name = this.name(config);
     const version: 'active' | 'inactive' =
       status === 'active' ? 'active' : 'inactive';
 
-    const deletionCheck = await checkAuthorizationField(
-      this.connection,
-      config.authorizationFieldName,
-      version,
+    return answering(
+      () => checkAuthorizationField(connection, name, version),
+      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      options?.analyse,
     );
-    return {
-      checkResult: deletionCheck,
-      errors: [],
-    };
   }
 
-  /**
-   * Lock authorization field for modification.
-   */
-  async lock(config: Partial<IAuthorizationFieldConfig>): Promise<string> {
-    if (!config.authorizationFieldName) {
-      throw new Error('Authorization field name is required');
-    }
+  /** Lock the object for modification. */
+  async lock(
+    config: Partial<IAuthorizationFieldConfig>,
+  ): Promise<IAdtResponse<string>> {
+    const name = this.name(config);
 
-    this.connection.setSessionType('stateful');
-    const lockHandle = await lockAuthorizationField(
-      this.connection,
-      config.authorizationFieldName,
-      this.logger,
+    return answering(
+      async () => {
+        const lockHandle = await inStatefulSession(this.connection, () =>
+          lockAuthorizationField(this.connection, name),
+        );
+        this.lockTracker.track(name, lockHandle);
+        // The handle is the value, and the request does not keep the wire it
+        // came on — so the answer is built around what the request produced.
+        return {
+          data: lockHandle,
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+        };
+      },
+      (answer) => String(answer.data),
     );
-    this.lockTracker.track(config.authorizationFieldName, lockHandle);
-    return lockHandle;
   }
 
-  /**
-   * Unlock authorization field.
-   */
+  /** Unlock the object. */
   async unlock(
     config: Partial<IAuthorizationFieldConfig>,
     lockHandle: string,
-  ): Promise<IAuthorizationFieldState> {
-    if (!config.authorizationFieldName) {
-      throw new Error('Authorization field name is required');
-    }
+  ): Promise<IAdtResponse<void>> {
+    const name = this.name(config);
 
-    this.connection.setSessionType('stateful');
-    await unlockAuthorizationField(
-      this.connection,
-      config.authorizationFieldName,
-      lockHandle,
+    return answering(
+      async () => {
+        // UNLOCK must run stateful (older BASIS #106); stateless after.
+        this.connection.setSessionType('stateful');
+        try {
+          return await unlockAuthorizationField(
+            this.connection,
+            name,
+            lockHandle,
+          );
+        } finally {
+          this.connection.setSessionType('stateless');
+          this.lockTracker.untrack(name);
+        }
+      },
+      () => undefined,
     );
-    this.connection.setSessionType('stateless');
-    this.lockTracker.untrack(config.authorizationFieldName);
-    return { errors: [] };
   }
 }

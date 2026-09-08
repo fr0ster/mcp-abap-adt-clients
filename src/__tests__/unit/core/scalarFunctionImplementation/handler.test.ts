@@ -2,7 +2,9 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
+import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
 import { AdtScalarFunctionImplementation } from '../../../../core/scalarFunctionImplementation/AdtScalarFunctionImplementation';
+import { expectFailure } from '../../../helpers/contract';
 
 function makeConn(handler: (r: any) => Partial<IAdtWireResponse> | Error) {
   const sessionTypes: string[] = [];
@@ -50,86 +52,93 @@ describe('AdtScalarFunctionImplementation handler', () => {
   it('create() is metadata-only (one POST, no lock/update)', async () => {
     const { conn, calls } = makeConn(() => ({ data: '' }));
     const h = new AdtScalarFunctionImplementation(conn);
-    await h.create(
-      {
-        implementationName: 'ZI',
-        scalarFunctionName: 'ZF',
-        packageName: 'ZP',
-        description: 'd',
-        sourceCode: 'x',
-      },
-      { sourceCode: 'y' },
-    );
+    // No source either way — the create is the POST of the metadata document.
+    await h.create({
+      implementationName: 'ZI',
+      scalarFunctionName: 'ZF',
+      packageName: 'ZP',
+      description: 'd',
+    });
     expect(calls).toHaveLength(1);
     expect(calls[0].method).toBe('POST');
     expect(calls[0].url).toBe('/sap/bc/adt/ddic/dsfi');
   });
 
-  it('update() happy path: lock → PUT /source/main → unlock; no long-poll GET; ends stateless', async () => {
-    const { conn, calls, sessionTypes } = makeConn((r) => {
-      if (r.url.includes('_action=LOCK')) return { data: LOCK_XML };
-      return { data: '' };
-    });
+  it('update() is the PUT on /source/main, with the handle it was given', async () => {
+    const { conn, calls, sessionTypes } = makeConn(() => ({ data: '' }));
     const h = new AdtScalarFunctionImplementation(conn);
-    await h.update({
-      implementationName: 'ZI',
-      scalarFunctionName: 'ZF',
-      sourceCode: 'src',
-    });
-    const put = calls.find((c) => c.method === 'PUT');
-    expect(put?.url).toContain('/sap/bc/adt/ddic/dsfi/zi/source/main');
-    expect(put?.headers?.['Content-Type']).toBe('application/json');
-    // No long-poll GET should be present
-    const longPoll = calls.find(
-      (c) => c.method === 'GET' && c.url.includes('withLongPolling=true'),
+    await h.update(
+      { implementationName: 'ZI', scalarFunctionName: 'ZF' },
+      { sourceCode: 'src', lockHandle: 'LOCK_HANDLE_42' },
     );
-    expect(longPoll).toBeUndefined();
-    expect(sessionTypes[sessionTypes.length - 1]).toBe('stateless');
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].method).toBe('PUT');
+    expect(calls[0].url).toContain('/sap/bc/adt/ddic/dsfi/zi/source/main');
+    expect(calls[0].url).toContain('lockHandle=LOCK_HANDLE_42');
+    // A DSFI's source is JSON, unlike every neighbouring type's.
+    expect(calls[0].headers?.['Content-Type']).toBe('application/json');
+    expect(sessionTypes).toEqual([]);
   });
 
-  it('updateMetadata() happy path: lock → PUT /dsfi/{name} (blues) → unlock; ends stateless', async () => {
-    const { conn, calls, sessionTypes } = makeConn((r) => {
-      if (r.url.includes('_action=LOCK')) return { data: LOCK_XML };
-      return { data: '' };
-    });
+  it('updateMetadata() is the PUT on the object itself, in blues v2', async () => {
+    const { conn, calls, sessionTypes } = makeConn(() => ({ data: '' }));
     const h = new AdtScalarFunctionImplementation(conn);
-    await h.updateMetadata({
-      implementationName: 'ZI',
-      sourceCode: '<blues/>',
-    });
-    const put = calls.find((c) => c.method === 'PUT');
-    expect(put?.url).toMatch(/\/sap\/bc\/adt\/ddic\/dsfi\/zi\?lockHandle=/);
-    expect(put?.url).not.toContain('/source/main');
-    expect(put?.headers?.['Content-Type']).toBe(
+    await h.updateMetadata(
+      { implementationName: 'ZI' },
+      { sourceCode: '<blues/>', lockHandle: 'LOCK_HANDLE_42' },
+    );
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].url).toMatch(/\/sap\/bc\/adt\/ddic\/dsfi\/zi\?lockHandle=/);
+    expect(calls[0].url).not.toContain('/source/main');
+    expect(calls[0].headers?.['Content-Type']).toBe(
       'application/vnd.sap.adt.blues.v2+xml; charset=utf-8',
     );
-    expect(sessionTypes[sessionTypes.length - 1]).toBe('stateless');
+    expect(sessionTypes).toEqual([]);
   });
 
-  it('read() returns undefined on 404', async () => {
+  it('read() answers a failure on 404', async () => {
     const { conn } = makeConn(() =>
       Object.assign(new Error('nf'), { response: { status: 404 } }),
     );
     const h = new AdtScalarFunctionImplementation(conn);
-    expect(await h.read({ implementationName: 'ZI' })).toBeUndefined();
+    // `undefined` used to be the answer, and it read like an empty object.
+    expect(
+      expectFailure(
+        await h.read({ implementationName: 'ZI' }),
+        'read an implementation that is not there',
+      ).origin,
+    ).toBe('connection');
   });
 
-  it('validate() maps 405 → validationSupported:false; public unlock resets stateless on throw', async () => {
+  it('validate() names 405 as unsupported; public unlock resets stateless on throw', async () => {
     const v = makeConn(() =>
       Object.assign(new Error('no'), { response: { status: 405 } }),
     );
     const hv = new AdtScalarFunctionImplementation(v.conn);
+    // Some systems have no validation resource. That is not a verdict about
+    // the name, and reporting it as one told a caller their name was rejected
+    // by a system that never looked at it.
     expect(
-      (await hv.validate({ implementationName: 'ZI' })).validationSupported,
-    ).toBe(false);
+      expectFailure(
+        await hv.validate({ implementationName: 'ZI' }),
+        'validate where the resource is absent',
+      ).code,
+    ).toBe(AdtObjectErrorCodes.UNSUPPORTED_OPERATION);
 
     const u = makeConn((r) =>
       r.url.includes('_action=UNLOCK') ? new Error('boom') : { data: '' },
     );
     const hu = new AdtScalarFunctionImplementation(u.conn);
-    await expect(
-      hu.unlock({ implementationName: 'ZI' }, 'LH1'),
-    ).rejects.toThrow('boom');
+    expect(
+      expectFailure(
+        await hu.unlock({ implementationName: 'ZI' }, 'LH1'),
+        'unlock the server refused',
+      ).message,
+    ).toContain('boom');
+    // A refused unlock that left the client stateful poisons every later
+    // request on the same connection.
     expect(u.sessionTypes[u.sessionTypes.length - 1]).toBe('stateless');
   });
 });

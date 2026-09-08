@@ -15,13 +15,11 @@ import * as path from 'node:path';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type {
-  ITableTypeConfig,
-  ITableTypeState,
-} from '../../../../core/tabletype';
+import type { ITableTypeConfig } from '../../../../core/tabletype';
 import { getTableType } from '../../../../core/tabletype/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -69,7 +67,7 @@ describe('TableType (using AdtClient)', () => {
   let hasConfig = false;
   let isLegacy = false;
   let isCloudSystem = false;
-  let tester: BaseTester<ITableTypeConfig, ITableTypeState>;
+  let tester: BaseTester<ITableTypeConfig>;
 
   beforeAll(async () => {
     try {
@@ -232,8 +230,8 @@ describe('TableType (using AdtClient)', () => {
           const resultState = await tester.readTest({
             tableTypeName: standardTableTypeName,
           });
-          expect(resultState?.readResult).toBeDefined();
-          const tableTypeConfig = resultState?.readResult;
+          expect(resultState).toBeDefined();
+          const tableTypeConfig = resultState;
           if (
             tableTypeConfig &&
             typeof tableTypeConfig === 'object' &&

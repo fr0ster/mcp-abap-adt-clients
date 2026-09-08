@@ -16,14 +16,22 @@
  * Three of those are writes, which is what makes it sharp: a caller believed an
  * object existed that did not, and that one was deleted that was not.
  *
- * These cases assert the throw AND the message, because a throw carrying the
+ * These cases assert the failure AND the message, because a failure carrying the
  * library's own guess would pass the first half while losing the only part worth
  * having — `XYZ`, the user actually holding the lock.
+ *
+ * It comes back rather than flying past: since `interfaces@31.0.0` a member
+ * answers the failure half where it used to throw, so a caller who forgot to
+ * check gets a type error instead of an exception in production.
  */
 
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtResponse,
+  ILogger,
+} from '@mcp-abap-adt/interfaces';
 import { AdtClient } from '../../../clients/AdtClient';
-import { AdtSAPError } from '../../../utils/adtErrors';
+import { expectFailure, expectResult } from '../../helpers/contract';
 
 const HOLDER = 'Object ZNOPE is locked by user XYZ';
 
@@ -62,15 +70,8 @@ function refusingConnection() {
   return { connection, sent };
 }
 
-const refusalFrom = async (call: Promise<unknown>) =>
-  call.then(
-    (value) => {
-      throw new Error(
-        `expected a refusal, got a result: ${JSON.stringify(value)?.slice(0, 120)}`,
-      );
-    },
-    (error: unknown) => error,
-  );
+const refusalFrom = async (call: Promise<IAdtResponse<unknown>>) =>
+  expectFailure(await call, 'a call SAP refused inside a 200');
 
 describe('a refusal carried by a 2xx is not a result', () => {
   it.each([
@@ -90,15 +91,16 @@ describe('a refusal carried by a 2xx is not a result', () => {
   ])('class.%s raises what SAP said', async (_name, call) => {
     const { connection } = refusingConnection();
 
-    const error = await refusalFrom(call(new AdtClient(connection, logger)));
+    const refusal = await refusalFrom(call(new AdtClient(connection, logger)));
 
-    expect(error).toBeInstanceOf(AdtSAPError);
-    // The server's own words, including who holds the lock. A throw carrying
+    // `refusal`, not `connection`: the two have different remedies, and this is
+    // the server answering rather than the server being unreachable.
+    expect(refusal.origin).toBe('refusal');
+    // The server's own words, including who holds the lock. A message carrying
     // "may be locked by another user" would satisfy a weaker assertion and tell
     // the caller nothing they can act on.
-    expect((error as Error).message).toContain(HOLDER);
-    const refusal = error as AdtSAPError;
-    expect(refusal.document).toBe(REFUSAL);
+    expect(refusal.message).toContain(HOLDER);
+    expect(refusal.response?.data).toBe(REFUSAL);
 
     // Enough for the consumer to do their own analysis and decide: what the
     // server said, how it classified it, the response it came on, and WHICH
@@ -139,11 +141,17 @@ describe('a refusal carried by a 2xx is not a result', () => {
       })),
     } as unknown as IAbapConnection;
 
-    const state = await new AdtClient(connection, logger)
-      .getClass()
-      .read({ className: 'ZREAL' });
+    // A real document, and the read succeeds carrying it. The point of the
+    // file is the other direction — an exception document inside a 200 — and
+    // this is the case that must keep passing while that one fails.
+    const source = expectResult(
+      await new AdtClient(connection, logger)
+        .getClass()
+        .read({ className: 'ZREAL' }),
+      'read a class that is really there',
+    );
 
-    expect(state?.errors).toEqual([]);
+    expect(source).toContain('class:abapClass');
   });
 });
 

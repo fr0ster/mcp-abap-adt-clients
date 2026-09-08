@@ -2,7 +2,7 @@
  * Check 1 — the declared type of every factory against what the manifest says
  * it can do, **in both directions**, at compile time.
  *
- * Not one assertion per pair: 37 factories × 10 atoms, and a forgotten line is
+ * Not one assertion per pair: 37 factories × 12 atoms, and a forgotten line is
  * a silent hole in the check that exists to close silent holes. This is a
  * mapped type over the full product whose `as` clause drops every pair that
  * agrees — so a disagreeing factory keeps its key, and the assertion at the
@@ -28,6 +28,8 @@ import type {
   IAdtCreatable,
   IAdtDeletable,
   IAdtLockable,
+  IAdtMetadataReadable,
+  IAdtMetadataUpdatable,
   IAdtReadable,
   IAdtTransportAware,
   IAdtUpdatable,
@@ -75,28 +77,33 @@ type OffersAtom<T, A extends string> = A extends 'creatable'
   ? Offers<T, IAdtCreatable<any, any>>
   : A extends 'readable'
     ? Offers<T, IAdtReadable<any, any>>
-    : A extends 'updatable'
-      ? Offers<T, IAdtUpdatable<any, any>>
-      : A extends 'deletable'
-        ? Offers<T, IAdtDeletable<any, any>>
-        : A extends 'validatable'
-          ? Offers<T, IAdtValidatable<any, any>>
-          : A extends 'checkable'
-            ? Offers<T, IAdtCheckable<any, any>>
-            : A extends 'activatable'
-              ? Offers<T, IAdtActivatable<any, any>>
-              : A extends 'lockable'
-                ? Offers<T, IAdtLockable<any, any>>
-                : A extends 'versionable'
-                  ? Offers<T, IAdtVersionable<any>>
-                  : A extends 'transportAware'
-                    ? Offers<T, IAdtTransportAware<any, any>>
-                    : // An atom this chain does not know resolves to `never`,
-                      // and `never extends true` is vacuously true — so it would
-                      // drop out of the product and be checked by nothing at
-                      // all. `AtomsAreAllMapped` below refuses to compile if a
-                      // new atom is added to the manifest without a line here.
-                      never;
+    : A extends 'metadataReadable'
+      ? Offers<T, IAdtMetadataReadable<any, any>>
+      : A extends 'updatable'
+        ? Offers<T, IAdtUpdatable<any, any>>
+        : A extends 'metadataUpdatable'
+          ? Offers<T, IAdtMetadataUpdatable<any, any>>
+          : A extends 'deletable'
+            ? Offers<T, IAdtDeletable<any, any>>
+            : A extends 'validatable'
+              ? Offers<T, IAdtValidatable<any, any>>
+              : A extends 'checkable'
+                ? Offers<T, IAdtCheckable<any, any>>
+                : A extends 'activatable'
+                  ? Offers<T, IAdtActivatable<any, any>>
+                  : A extends 'lockable'
+                    ? Offers<T, IAdtLockable<any>>
+                    : A extends 'versionable'
+                      ? Offers<T, IAdtVersionable<any, any, any>>
+                      : A extends 'transportAware'
+                        ? Offers<T, IAdtTransportAware<any, any>>
+                        : // An atom this chain does not know resolves to
+                          // `never`, and `never extends true` is vacuously true
+                          // — so it would drop out of the product and be checked
+                          // by nothing at all. `everyAtomIsMapped` below refuses
+                          // to compile if a new atom is added to the manifest
+                          // without a line here.
+                          never;
 
 /**
  * Every atom in the manifest has a line in the chain above.
@@ -140,7 +147,7 @@ type Disagreements = {
  * The earlier version claimed the first was the second — caught in review,
  * 2026-08-14, by running the failure and reading the log.
  */
-type Offenders = {
+export type Offenders = {
   [H in keyof Disagreements]: {
     [A in keyof Disagreements[H]]: `${H & string}.${A & string} — ${Disagreements[H][A] & string}`;
   }[keyof Disagreements[H]];

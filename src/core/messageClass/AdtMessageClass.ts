@@ -1,35 +1,39 @@
-import { beginCriticalSection } from '../../utils/criticalSection';
-import { assertDeletable } from '../../utils/deletionCheck';
 /**
- * AdtMessageClass — High-level CRUD operations for Message Class (MSAG/N) objects.
+ * AdtMessageClass - CRUD for `MSAG/N` message classes.
  *
- * Implements IAdtObject<IMessageClassConfig, IMessageClassState>.
+ * The class is a shell — name, description, package. The messages inside it are
+ * written through `AdtMessageClassMessage`. There is no activation: a message
+ * class is not an activatable object.
  *
- * Session management:
- * - stateful: only during lock → update/delete → unlock chains
- * - stateless: mandatory after unlock
- *
- * What a message class does not have, and therefore has no method for: it is
- * not activated, has no syntax check, no version history, and no transport of
- * its own — it travels in its package's.
- *
- * transport: config.transportRequest is sent as corrNr on create/update and as
- * <del:transportNumber> on delete (transportable packages); local packages send none.
+ * Every member answers `IAdtResponse<T>`, where T is what the result set given
+ * at construction makes of that endpoint's answer.
  */
 
 import type {
-  HttpError,
   IAbapConnection,
-  IAdtCrud,
+  IAdtCreatable,
+  IAdtCreateOptions,
+  IAdtDeletable,
+  IAdtError,
   IAdtLockable,
+  IAdtMetadataReadable,
+  IAdtMetadataUpdatable,
   IAdtOperationOptions,
+  IAdtReadable,
+  IAdtResponse,
   IAdtSystemContext,
+  IAdtUpdatable,
   IAdtValidatable,
+  IAnalyse,
   ILogger,
-  IObjectVersion,
+  IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
-import { safeErrorMessage } from '../../utils/internalUtils';
+import { answering } from '../../utils/adtResponse';
+import { withCallTimeout } from '../../utils/callTimeout';
+import { deletionRefusal } from '../../utils/deletionCheck';
 import { getTimeout } from '../../utils/timeouts';
+import { validationRefusal } from '../../utils/validationRefusal';
+import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import {
   createLockTracker,
   type LockRegistry,
@@ -39,18 +43,32 @@ import { createMessageClass } from './create';
 import { checkDeletion, deleteMessageClass } from './delete';
 import { lockMessageClass } from './lock';
 import { getMessageClassSource } from './read';
-import type { IMessageClassConfig, IMessageClassState } from './types';
+import {
+  type IMessageClassConfig,
+  type IMessageClassResults,
+  messageClassDocuments,
+} from './types';
 import { unlockMessageClass } from './unlock';
 import { updateMessageClass } from './update';
-import { parseMessageClass } from './xml';
 
 const VALIDATE_BASE = '/sap/bc/adt/messageclass/validation';
 
-export class AdtMessageClass
-  implements
-    IAdtCrud<IMessageClassConfig, IMessageClassState>,
-    IAdtValidatable<IMessageClassConfig, IMessageClassState>,
-    IAdtLockable<IMessageClassConfig, IMessageClassState>
+export class AdtMessageClass<
+  R extends IMessageClassResults = typeof messageClassDocuments,
+> implements
+    IAdtCreatable<IMessageClassConfig, ReturnType<R['created']>>,
+    IAdtMetadataReadable<IMessageClassConfig, ReturnType<R['metadata']>>,
+    IAdtMetadataUpdatable<
+      Partial<IMessageClassConfig>,
+      ReturnType<R['metadataUpdated']>
+    >,
+    IAdtDeletable<
+      IMessageClassConfig,
+      ReturnType<R['deletion']>,
+      ReturnType<R['deletionCheck']>
+    >,
+    IAdtValidatable<IMessageClassConfig, ReturnType<R['validation']>>,
+    IAdtLockable<IMessageClassConfig>
 {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
@@ -63,6 +81,8 @@ export class AdtMessageClass
     logger?: ILogger,
     systemContext?: IAdtSystemContext,
     lockRegistry?: LockRegistry,
+    // The one cast in this file, and it is on the default. See AdtClass.
+    private readonly results: R = messageClassDocuments as unknown as R,
   ) {
     this.connection = connection;
     this.logger = logger;
@@ -75,43 +95,54 @@ export class AdtMessageClass
     );
   }
 
-  /**
-   * Validate name + description via the ADT validation endpoint.
-   */
-  async validate(
-    config: Partial<IMessageClassConfig>,
-  ): Promise<IMessageClassState> {
+  /** The name, or the caller's mistake. */
+  private name(config: Partial<IMessageClassConfig>): string {
     if (!config.name) {
-      throw new Error('Message class name is required for validation');
+      throw new Error('Message class name is required');
     }
+    return config.name;
+  }
 
-    const params = new URLSearchParams({ objname: config.name });
+  /**
+   * Validate name and description.
+   *
+   * POST with the params in the query string and an empty body — that is what
+   * Eclipse sends, and what the other types' validation endpoints take.
+   */
+  async validate<E extends IAdtError = IAdtError>(
+    config: Partial<IMessageClassConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const name = this.name(config);
+    const params = new URLSearchParams({ objname: name });
     if (config.description) {
       params.set('description', config.description);
     }
 
-    // POST with the params in the query string (empty body) — matches Eclipse ADT
-    // and the other object types' validation (accessControl, transformation, …).
-    const response = await this.connection.makeAdtRequest({
-      url: `${VALIDATE_BASE}?${params.toString()}`,
-      method: 'POST',
-      timeout: getTimeout('default'),
-    });
-
-    return { validationResponse: response, errors: [] };
+    return answering(
+      () =>
+        connection.makeAdtRequest({
+          url: `${VALIDATE_BASE}?${params.toString()}`,
+          method: 'POST',
+          timeout: getTimeout('default'),
+        }),
+      this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
+      (options?.analyse ?? validationRefusal) as IAnalyse<E>,
+    );
   }
 
-  /**
-   * Create a new message class (shell with name/description/package).
-   * No activation is needed — message classes are not activated.
-   */
-  async create(
-    config: IMessageClassConfig,
-    _options?: IAdtOperationOptions,
-  ): Promise<IMessageClassState> {
-    if (!config.name) {
-      throw new Error('Message class name is required');
-    }
+  /** Create the message class shell. No activation — message classes have none. */
+  async create<E extends IAdtError = IAdtError>(
+    config: Omit<IMessageClassConfig, 'sourceCode'> & { sourceCode?: never },
+    options?: IAdtCreateOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const name = this.name(config);
     if (!config.packageName) {
       throw new Error('Package name is required');
     }
@@ -119,223 +150,165 @@ export class AdtMessageClass
       throw new Error('Description is required');
     }
 
-    try {
-      this.logger?.info?.('Creating message class');
-      const createResult = await createMessageClass(this.connection, {
-        name: config.name,
-        description: config.description,
-        package_name: config.packageName,
-        // config → global systemContext → 'EN', like class/domain/package.
-        master_language:
-          config.masterLanguage?.trim() ||
-          this.systemContext.masterLanguage?.trim() ||
-          'EN',
-        // sent as ?corrNr= for a transportable package; empty for local
-        transport_request: config.transportRequest,
-      });
-      this.logger?.info?.('Message class created');
-      return { createResult, errors: [] };
-    } catch (error: unknown) {
-      // Defensive reset: create never sets stateful, but this guard ensures the
-      // session is always left stateless if the caller had set it before this call.
-      this.connection.setSessionType('stateless');
-      this.logger?.error('Create failed:', safeErrorMessage(error));
-      throw error;
-    }
+    this.logger?.info?.('Creating message class');
+    return answering(
+      () =>
+        createMessageClass(connection, {
+          name,
+          description: config.description as string,
+          package_name: config.packageName as string,
+          // config → global systemContext → 'EN', like class/domain/package.
+          master_language:
+            config.masterLanguage?.trim() ||
+            this.systemContext.masterLanguage?.trim() ||
+            'EN',
+          // sent as ?corrNr= for a transportable package; empty for local
+          transport_request: config.transportRequest,
+        }),
+      this.results.created as IResultStrategy<ReturnType<R['created']>>,
+      options?.analyse,
+    );
   }
 
-  /**
-   * Read message class metadata and messages.
-   * Returns undefined on 404 (object does not exist).
-   */
-  async read(
-    config: Partial<IMessageClassConfig>,
-    _version?: 'active' | 'inactive',
-    options?: { withLongPolling?: boolean },
-  ): Promise<IMessageClassState | undefined> {
-    if (!config.name) {
-      throw new Error('Message class name is required');
-    }
-
-    try {
-      const readResult = await getMessageClassSource(
-        this.connection,
-        config.name,
-        options,
-      );
-      const messageClass = parseMessageClass(String(readResult.data));
-      return { readResult, messageClass, errors: [] };
-    } catch (error: unknown) {
-      const e = error as HttpError;
-      if (e.response?.status === 404) {
-        return undefined;
-      }
-      this.logger?.error('Read failed:', safeErrorMessage(error));
-      throw error;
-    }
-  }
-
-  /**
-   * Update a message class.
-   * Full operation chain: stateful → lock → read current → rebuild XML → PUT → unlock → stateless.
-   * On failure: unlock if locked, then stateless.
-   */
-  async update(
-    config: Partial<IMessageClassConfig>,
-    _options?: IAdtOperationOptions,
-  ): Promise<IMessageClassState> {
-    if (!config.name) {
-      throw new Error('Message class name is required');
-    }
-
-    let lockHandle: string | undefined;
-
-    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
-
-    // the lock but leaves the work half-done.
-
-    const endCriticalSection = beginCriticalSection(this.connection);
-
-    try {
-      this.logger?.info?.('lock');
-      this.connection.setSessionType('stateful');
-      lockHandle = await lockMessageClass(this.connection, config.name);
-      this.lockTracker.track(config.name, lockHandle);
-      this.logger?.info?.('locked');
-
-      this.logger?.info?.('update');
-      const updateResult = await updateMessageClass(
-        this.connection,
-        config.name,
-        lockHandle,
-        config.description,
-        config.transportRequest,
-      );
-      this.logger?.info?.('updated');
-
-      this.logger?.info?.('unlock');
-      const unlockResult = await unlockMessageClass(
-        this.connection,
-        config.name,
-        lockHandle,
-      );
-      this.connection.setSessionType('stateless');
-      this.lockTracker.untrack(config.name);
-      lockHandle = undefined;
-      this.logger?.info?.('unlocked');
-
-      return { updateResult, unlockResult, errors: [] };
-    } catch (error: unknown) {
-      // Unlock + stateless cleanup on any failure inside the lock chain
-      if (lockHandle) {
-        try {
-          this.logger?.warn?.('Unlocking message class during error cleanup');
-          await unlockMessageClass(this.connection, config.name, lockHandle);
-          this.lockTracker.untrack(config.name);
-        } catch (unlockError) {
-          this.logger?.warn?.(
-            'Failed to unlock during cleanup:',
-            safeErrorMessage(unlockError),
-          );
-        }
-      }
-      this.connection.setSessionType('stateless');
-      this.logger?.error('Update failed:', safeErrorMessage(error));
-      throw error;
-    } finally {
-      endCriticalSection();
-    }
-  }
-
-  /**
-   * Delete a message class.
-   * Operation chain: check(deletion) → delete via the stateless ADT deletion
-   * service (/deletion/check + /deletion/delete). No lock, no direct DELETE.
-   */
-  async delete(
-    config: Partial<IMessageClassConfig>,
-  ): Promise<IMessageClassState> {
-    if (!config.name) {
-      throw new Error('Message class name is required');
-    }
-
-    try {
-      // Stateless deletion service (check → delete) — no lock. A stateful
-      // lock + direct DELETE leaves a lingering message-editing enqueue that
-      // blocks a same-name re-create, so it is not used. See delete.ts.
-      this.logger?.info?.('delete: check');
-      const deletionCheck = await checkDeletion(this.connection, config.name);
-      // ADT already said whether this may be deleted; refusing to read that
-      // answer is how a delete came to report success while the object
-      // stayed. Throws on isDeletable=false or a message of type E; a W
-      // is a warning and passes.
-      assertDeletable(deletionCheck.data);
-
-      this.logger?.info?.('delete: delete');
-      const deleteResult = await deleteMessageClass(
-        this.connection,
-        config.name,
-        config.transportRequest,
-      );
-      this.logger?.info?.('deleted');
-
-      return { deleteResult, errors: [] };
-    } catch (error: unknown) {
-      this.logger?.error('Delete failed:', safeErrorMessage(error));
-      throw error;
-    }
-  }
-
-  /**
-   * Read message class metadata.
-   * Message classes have no separate metadata endpoint — delegates to read().
-   */
+  /** The same document `read` fetches — there is no metadata resource. */
   async readMetadata(
     config: Partial<IMessageClassConfig>,
-    options?: { withLongPolling?: boolean; version?: 'active' | 'inactive' },
-  ): Promise<IMessageClassState> {
-    if (!config.name) {
-      throw new Error('Message class name is required');
-    }
-    const state = await this.read(config, options?.version, {
-      withLongPolling: options?.withLongPolling,
-    });
-    if (!state) {
-      throw new Error(`Message class '${config.name}' not found`);
-    }
-    return { ...state, metadataResult: state.readResult };
+    options?: {
+      withLongPolling?: boolean;
+      version?: 'active' | 'inactive';
+    } & IAdtOperationOptions,
+  ): Promise<IAdtResponse<ReturnType<R['metadata']>>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const name = this.name(config);
+
+    return answering(
+      () => getMessageClassSource(connection, name, options),
+      this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
+      options?.analyse,
+    );
+  }
+
+  /** Update the message class's own metadata: lock → PUT → unlock. */
+  async updateMetadata<E extends IAdtError = IAdtError>(
+    config: Partial<IMessageClassConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const name = this.name(config);
+
+    return answering(
+      () =>
+        updateMessageClass(
+          connection,
+          name,
+          options?.lockHandle,
+          config.description,
+          config.transportRequest,
+        ),
+      this.results.metadataUpdated as IResultStrategy<
+        ReturnType<R['metadataUpdated']>
+      >,
+      options?.analyse,
+    );
   }
 
   /**
-   * Lock message class for modification (low-level — use when managing lock externally).
+   * Delete the message class.
+   *
+   * The stateless deletion service (check → delete), no lock: a stateful lock
+   * plus a direct DELETE leaves a lingering message-editing enqueue that blocks
+   * a same-name re-create. See delete.ts.
+   *
+   * The check is read, not merely performed — ADT states a refusal inside a
+   * 200.
    */
-  async lock(config: Partial<IMessageClassConfig>): Promise<string> {
-    if (!config.name) {
-      throw new Error('Message class name is required');
-    }
-    this.connection.setSessionType('stateful');
-    const lockHandle = await lockMessageClass(this.connection, config.name);
-    this.lockTracker.track(config.name, lockHandle);
-    return lockHandle;
+  /**
+   * Asks ADT whether the message class can be deleted.
+   *
+   * Its own member because it is its own endpoint. `delete` no longer runs it:
+   * a consumer that wants the check runs this first and decides what a refusal
+   * means.
+   */
+  async checkDeletion<E extends IAdtError = IAdtError>(
+    config: Partial<IMessageClassConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const name = this.name(config);
+
+    return answering(
+      () => checkDeletion(connection, name),
+      this.results.deletionCheck as IResultStrategy<
+        ReturnType<R['deletionCheck']>
+      >,
+      (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
+    );
   }
 
-  /**
-   * Unlock message class (low-level).
-   */
+  async delete<E extends IAdtError = IAdtError>(
+    config: Partial<IMessageClassConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const name = this.name(config);
+
+    return answering(
+      () => deleteMessageClass(connection, name, config.transportRequest),
+      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      options?.analyse,
+    );
+  }
+
+  /** Lock the message class for modification. */
+  async lock(
+    config: Partial<IMessageClassConfig>,
+  ): Promise<IAdtResponse<string>> {
+    const name = this.name(config);
+
+    return answering(
+      async () => {
+        const lockHandle = await inStatefulSession(this.connection, () =>
+          lockMessageClass(this.connection, name),
+        );
+        this.lockTracker.track(name, lockHandle);
+        // The handle is the value, and the request does not keep the wire it
+        // came on — so the answer is built around what the request produced.
+        return {
+          data: lockHandle,
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+        };
+      },
+      (answer) => String(answer.data),
+    );
+  }
+
+  /** Unlock the message class. */
   async unlock(
     config: Partial<IMessageClassConfig>,
     lockHandle: string,
-  ): Promise<IMessageClassState> {
-    if (!config.name) {
-      throw new Error('Message class name is required');
-    }
-    const unlockResult = await unlockMessageClass(
-      this.connection,
-      config.name,
-      lockHandle,
+  ): Promise<IAdtResponse<void>> {
+    const name = this.name(config);
+
+    return answering(
+      async () => {
+        try {
+          return await unlockMessageClass(this.connection, name, lockHandle);
+        } finally {
+          this.connection.setSessionType('stateless');
+          this.lockTracker.untrack(name);
+        }
+      },
+      () => undefined,
     );
-    this.connection.setSessionType('stateless');
-    this.lockTracker.untrack(config.name);
-    return { unlockResult, errors: [] };
   }
 }

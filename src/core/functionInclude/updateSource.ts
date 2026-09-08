@@ -5,12 +5,15 @@
  * Does NOT lock/unlock — assumes the object is already locked.
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_SOURCE,
   ACCEPT_SOURCE_UTF8,
 } from '../../constants/contentTypes';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -24,30 +27,26 @@ export async function uploadFunctionIncludeSource(
   groupName: string,
   includeName: string,
   sourceCode: string,
-  lockHandle: string,
+  lockHandle: string | undefined,
   unicode: boolean,
   transportRequest?: string,
-): Promise<void> {
+): Promise<IAdtWireResponse> {
   if (!groupName) {
     throw new Error('Function group name is required');
   }
   if (!includeName) {
     throw new Error('Include name is required');
   }
-  if (!lockHandle) {
-    throw new Error('lockHandle is required');
-  }
-
   const groupLower = encodeSapObjectName(groupName).toLowerCase();
   const encodedInclude = encodeSapObjectName(includeName.toUpperCase());
-  let url = `/sap/bc/adt/functions/groups/${groupLower}/includes/${encodedInclude}/source/main?lockHandle=${encodeURIComponent(lockHandle)}`;
-  if (transportRequest) {
-    url += `&corrNr=${encodeURIComponent(transportRequest)}`;
-  }
+  const url = `/sap/bc/adt/functions/groups/${groupLower}/includes/${encodedInclude}/source/main${writeQuery(lockHandle, transportRequest)}`;
 
   const contentType = unicode ? ACCEPT_SOURCE_UTF8 : ACCEPT_SOURCE;
 
-  await connection.makeAdtRequest({
+  // The answer is returned rather than discarded: what a write becomes is the
+  // consumer's result strategy to decide, and a function that swallowed it left
+  // that strategy nothing to read.
+  return connection.makeAdtRequest({
     url,
     method: 'PUT',
     timeout: getTimeout('default'),
@@ -55,7 +54,15 @@ export async function uploadFunctionIncludeSource(
     headers: {
       'Content-Type': contentType,
       Accept: ACCEPT_SOURCE,
-      'X-sap-adt-sessiontype': 'stateful',
+      // No `X-sap-adt-sessiontype` here. A write is stateless — Eclipse sends
+      // it that way, carrying only `lockHandle` and `corrNr` — and the header
+      // was set on the request while the connection's own mode was stateless,
+      // so the connector never knew: measured on the trial, this PUT went out
+      // labelled stateful without the `sap-adt-request-id` the connector adds
+      // in that mode. What the server takes during a request that runs inside
+      // the session is held by that session, which is what
+      // `stateful covers the lock request, not the window` removed everywhere
+      // else.
     },
   });
 }

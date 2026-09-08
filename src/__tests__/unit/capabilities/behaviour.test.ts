@@ -18,6 +18,7 @@
 
 import type {
   IAbapConnection,
+  IAdtResponse,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
 import { AdtClient } from '../../../clients/AdtClient';
@@ -30,7 +31,13 @@ import {
   type HandlerEntry,
 } from './manifest';
 
-type Recorded = { url: string; method: string };
+type Recorded = {
+  url: string;
+  method: string;
+  headers?: Record<string, string>;
+  /** What deadline the request actually carried, if any. */
+  timeout?: number;
+};
 
 /**
  * The URL as it would go on the wire.
@@ -107,15 +114,23 @@ function bodyFor(url: string, activationBody: string): string {
 
 function recordingClient(activationBody: string = ACTIVATION_OK) {
   const calls: Recorded[] = [];
+  const sessionTypes: string[] = [];
   const connection = {
     connect: async () => {},
     getBaseUrl: async () => 'https://example',
     getSessionId: () => null,
-    setSessionType: () => {},
+    setSessionType: (type: string) => {
+      sessionTypes.push(type);
+    },
     makeAdtRequest: async (
       req: Recorded & { params?: Record<string, unknown> },
     ) => {
-      calls.push({ url: wireUrl(req), method: req.method });
+      calls.push({
+        url: wireUrl(req),
+        method: req.method,
+        headers: req.headers,
+        timeout: (req as { timeout?: number }).timeout,
+      });
       return {
         status: 200,
         statusText: 'OK',
@@ -129,8 +144,58 @@ function recordingClient(activationBody: string = ACTIVATION_OK) {
   // can answer that — a connection without isConnected() is taken at its word,
   // which is what this stub is.
   const client = new AdtClient(connection, createLibraryLogger());
-  return { client, calls };
+  return { client, calls, sessionTypes };
 }
+
+/**
+ * Nobody builds a session type into a request.
+ *
+ * `x-sap-adt-sessiontype` is the connection's, written by the connection from
+ * its own mode. Five low-level functions used to put it in the headers
+ * themselves — `featureToggle`'s lock, unlock, update and source write, and
+ * `functionInclude`'s source write — and the guard below could not see it,
+ * because that guard asks who calls `setSessionType` and these called nobody.
+ *
+ * The cost was not a duplicate header. The connection's own mode was stateless
+ * while the request said stateful, so a write ran inside a session the
+ * connection did not know it was in — and what the server takes during such a
+ * request is held by that session, long after the object is gone.
+ */
+describe('the session type is the connection’s, never a request’s', () => {
+  it('no member puts x-sap-adt-sessiontype in its headers', async () => {
+    const offenders: string[] = [];
+
+    for (const [name, entry] of Object.entries(HANDLERS)) {
+      for (const atom of Object.keys(ATOM_METHODS) as Atom[]) {
+        for (const method of ATOM_METHODS[atom]) {
+          const { client, calls } = recordingClient();
+          const handler = entry.factory(client) as unknown as Record<
+            string,
+            unknown
+          >;
+          if (typeof handler[method] !== 'function') continue;
+          try {
+            await invoke(
+              handler,
+              method,
+              entry.config as Record<string, unknown>,
+            );
+          } catch {
+            // A member that refuses is fine here; what it sent is the subject.
+          }
+          for (const call of calls) {
+            const hit = Object.keys(call.headers ?? {}).find(
+              (h) => h.toLowerCase() === 'x-sap-adt-sessiontype',
+            );
+            if (hit) offenders.push(`${name}.${method} → ${call.url} [${hit}]`);
+          }
+        }
+      }
+    }
+
+    expect(offenders).toStrictEqual([]);
+  });
+});
 
 /**
  * The request each method must actually issue.
@@ -149,12 +214,16 @@ const ATOM_VERB: Record<string, string | { method: string; url: RegExp }> = {
   read: 'GET',
   readMetadata: 'GET',
   update: 'PUT',
+  updateMetadata: 'PUT',
   // Not every object is deleted by a DELETE on its own URI: ADT has a deletion
   // service — POST /deletion/check then POST /deletion/delete — and the handlers
   // that carry external references go through it. Both count, and nothing else
   // does. (The spec's flat "delete → DELETE" is an over-generalisation; found by
   // this assertion the first time it ran.)
   delete: { method: 'DELETE', url: /.*/ },
+  // The approval ADT wants before a delete: `POST /deletion/check`, everywhere
+  // it is offered, because the deletion service is asked about a URI.
+  checkDeletion: 'POST',
   validate: 'POST',
   check: 'POST',
   activate: 'POST',
@@ -187,10 +256,22 @@ const VERB_BY_HANDLER: Record<string, string> = {
   'messageClassMessage.delete': 'PUT',
   // A function include's name is validated the same way, against its group.
   'functionInclude.validate': 'GET',
-  // A service binding's validation starts with a GET on the bindingtypes
-  // discovery endpoint; a transport check POSTs after it.
-  'service.validate': 'GET',
-  'serviceBinding.validate': 'GET',
+  // A transport request's deletion check is a GET on the request itself. The
+  // deletion service answers `No URI-Mapping defined for URI …` for a transport
+  // — measured on the cloud trial — so asking it there would report a fact
+  // about the address rather than about the request.
+  'transport.checkDeletion': 'GET',
+  // A binding's `update` is its publication: one POST to a job endpoint, not a
+  // PUT on the object. Since 18.0.0 it is exactly that one request — it used to
+  // GET the binding first, to derive the service and to check the transition —
+  // and this entry is what keeps a second request from creeping back during the
+  // ordinary run. The live publish and unpublish are deliberately manual, in
+  // `integration/core/serviceBinding/publication.test.ts`: they take ~133
+  // seconds of server time each, which is no place for a suite that runs on
+  // every change. The shape is checked here instead, in milliseconds, against
+  // a stub.
+  'service.update': 'POST',
+  'serviceBinding.update': 'POST',
   // Its transport is checked through POST /cts/transportchecks rather than read
   // from the object.
   'service.readTransport': 'POST',
@@ -206,44 +287,56 @@ const VERB_BY_HANDLER: Record<string, string> = {
  * passing silently, and the assertion fails if one starts working and is left
  * here.
  */
+/**
+ * Members that legitimately issue more than the request their capability names.
+ *
+ * The list is short on purpose and each entry says why, because "one member,
+ * one request" is the rule this release established: an entry here is a
+ * documented exception, not a place to put a member that grew a second call.
+ */
+const EXTRA_REQUESTS: Record<string, string> = {
+  // A message is a row inside its class's document: the write is one PUT, but
+  // it needs two lock handles and a read-modify-write of XML this library
+  // assembles.
+  'messageClassMessage.create': 'read-modify-write of the class document',
+  'messageClassMessage.update': 'as create',
+  'messageClassMessage.delete': 'as create',
+
+  // **Read-modify-write, and ADT's shape rather than this library's choice.**
+  // These objects *are* their document, and the endpoint takes it whole: to
+  // change one field you fetch the XML, patch it and PUT it back. A caller who
+  // has the whole document can hand it over in `options.xmlContent`, which is
+  // the seam that exists for it; without one there is no single request that
+  // changes a domain's length.
+  'domain.updateMetadata': 'GET the document, patch it, PUT it back',
+  'dataElement.updateMetadata': 'as domain',
+  'tableType.updateMetadata': 'as domain',
+  'package.updateMetadata': 'as domain',
+  'messageClass.updateMetadata': 'as domain',
+  'authorizationField.updateMetadata': 'as domain',
+  'functionGroup.updateMetadata': 'as domain, plus its own check',
+
+  // **Not a step of the operation.** `getSystemInformation()` answers whether
+  // this is cloud or on-premise, which decides content types and which
+  // endpoints exist at all. It is asked once and cached on the client; the
+  // guard sees it because each of these tests builds a fresh one.
+  'behaviorImplementation.create': 'systeminformation, then the POST',
+  'service.create': 'as behaviorImplementation.create',
+  'serviceBinding.create': 'as behaviorImplementation.create',
+};
+
 const VERB_NOT_REACHED: Record<string, string> = {
-  'dataElement.update':
+  'tableType.updateMetadata':
+    'read-modify-write: it GETs the table type first, and the generic body is not one to patch',
+  'dataElement.updateMetadata':
     'read-modify-write; the generic body has no doma/dtel structure to patch',
-  'ddl.update': 'read-modify-write over DDL source metadata',
-  'metadataExtension.update': 'read-modify-write over DDLX metadata',
-  'structure.update': 'read-modify-write over DDIC structure XML',
-  'table.update': 'read-modify-write over DDIC table XML',
-  'tableType.update': 'read-modify-write over DDIC table-type XML',
-  'package.update': 'read-modify-write over package XML',
-  'featureToggle.update':
-    'reads the toggle collection first; the generic body carries no toggle',
-  'transport.update':
+  'package.updateMetadata': 'read-modify-write over package XML',
+  'transport.updateMetadata':
     'reads the request first; the generic body is not a tm:request',
-  'service.update':
-    'reads the binding first; the generic body is not a binding',
-  'serviceBinding.update': 'as service.update',
-  'service.create':
-    'asks the bindingtypes discovery endpoint first and refuses when the generic body lists no variant',
-  'serviceBinding.create': 'as service.create',
 };
 
 /** The content URI `getVersionSource` is handed, and must fetch. */
 const VERSION_CONTENT_URI = '/sap/bc/adt/guard/versions/1';
-
-/**
- * Where a method addresses a resource that is neither the object nor one of the
- * shared services — verified by reading the handler, like the verb deviations.
- */
-const RESOURCE_BY_HANDLER: Record<string, string> = {
-  // A binding's variant is validated against the discovery endpoint that lists
-  // the variants this system offers — a sibling of the binding, not an
-  // ancestor of it.
-  'service.validate': '/sap/bc/adt/businessservices/bindings/bindingtypes',
-  'serviceBinding.validate':
-    '/sap/bc/adt/businessservices/bindings/bindingtypes',
-  // Creating a message writes the class it lives in.
-  'messageClassMessage.create': '/sap/bc/adt/messageclass/zguard_msg',
-};
 
 /**
  * Which resource the matching request has to have addressed.
@@ -257,7 +350,6 @@ const RESOURCE_BY_HANDLER: Record<string, string> = {
  * one deletion service — and those are named here once rather than per handler.
  */
 function expectedResource(
-  key: string,
   entry: HandlerEntry,
   method: string,
   defaultVerb: string,
@@ -323,8 +415,87 @@ async function invoke(
     case 'check':
       await fn.call(handler, config, 'inactive');
       return;
+    case 'update':
+    case 'updateMetadata':
+      // The source travels in the options, which is the only channel now: the
+      // fallback to `config.sourceCode` is gone, so a write with neither is
+      // refused before the request — correctly, and not what this guard is
+      // measuring. `xmlContent` for the same reason on the document writes.
+      await fn.call(handler, config, {
+        sourceCode: String(config.sourceCode ?? '" guard'),
+        xmlContent: String(config.xmlContent ?? '<guard/>'),
+        lockHandle: 'GUARD-LOCK',
+      });
+      return;
     default:
       await fn.call(handler, config);
+  }
+}
+
+/**
+ * `invoke`, with an options bag merged in.
+ *
+ * The members take options in their second or third position depending on the
+ * member, which is why this mirrors `invoke`'s switch rather than trying to be
+ * clever about arity.
+ */
+/** Where the options bag sits for a given member, 1-based. */
+const OPTIONS_POSITION: Record<string, number> = {
+  check: 3,
+  read: 3,
+  update: 2,
+  updateMetadata: 2,
+};
+
+/**
+ * Whether a member has anywhere to put an options bag.
+ *
+ * A member that declares none makes no per-call promise, so the guard has
+ * nothing to check on it. Read from the function's arity rather than kept as a
+ * list, so a member that gains or loses the parameter is covered without anyone
+ * remembering to edit this file.
+ */
+function takesOptions(
+  handler: Record<string, unknown>,
+  method: string,
+): boolean {
+  const fn = handler[method] as ((...args: unknown[]) => unknown) | undefined;
+  if (typeof fn !== 'function') return false;
+  if (method === 'unlock' || method === 'getVersionSource') return false;
+  return fn.length >= (OPTIONS_POSITION[method] ?? 2);
+}
+
+async function invokeWithOptions(
+  handler: Record<string, unknown>,
+  method: string,
+  config: Record<string, unknown>,
+  options: Record<string, unknown>,
+): Promise<void> {
+  const fn = handler[method] as (...args: unknown[]) => Promise<unknown>;
+  switch (method) {
+    case 'unlock':
+      await fn.call(handler, config, 'GUARD-LOCK');
+      return;
+    case 'getVersionSource':
+      await fn.call(handler, VERSION_CONTENT_URI);
+      return;
+    case 'check':
+      await fn.call(handler, config, 'inactive', options);
+      return;
+    case 'read':
+      await fn.call(handler, config, undefined, options);
+      return;
+    case 'update':
+    case 'updateMetadata':
+      await fn.call(handler, config, {
+        ...options,
+        sourceCode: String(config.sourceCode ?? '" guard'),
+        xmlContent: String(config.xmlContent ?? '<guard/>'),
+        lockHandle: 'GUARD-LOCK',
+      });
+      return;
+    default:
+      await fn.call(handler, config, options);
   }
 }
 
@@ -356,12 +527,15 @@ describe('capability guard — activation reports failure', () => {
       >;
       const activate = handler.activate as (
         c: unknown,
-      ) => Promise<{ errors?: unknown[] }>;
+      ) => Promise<IAdtResponse<unknown>>;
 
+      // The failure half, or a throw. Either reaches the caller; what must not
+      // happen is a success — which is what `errors: []` was, and why this
+      // assertion exists at all. ADT answers a refused activation with 200 and
+      // a `<msg type="E">`, so nothing below the contract can tell.
       let reached = false;
       try {
-        const state = await activate.call(handler, entry.config);
-        reached = (state?.errors?.length ?? 0) > 0;
+        reached = !(await activate.call(handler, entry.config)).ok;
       } catch {
         reached = true;
       }
@@ -437,7 +611,7 @@ describe('capability guard — behaviour', () => {
 
             // And on the right resource. A verb on the wrong URL is still the
             // wrong request — the whole point of naming a capability.
-            const resource = expectedResource(key, entry, method, verb);
+            const resource = expectedResource(entry, method, verb);
             const made = calls
               .filter(
                 (c) =>
@@ -471,9 +645,203 @@ describe('capability guard — behaviour', () => {
                 `${name}.${method} never made ${resource.describe} — it made ${made.map((c) => `${c.method} ${c.path}`).join(', ') || 'nothing'}`,
               );
             }
+
+            // **And nothing besides.** Naming the right request proves it
+            // happened, not that it happened alone — a member that reads the
+            // object first and then writes it passes every assertion above.
+            // That is exactly what `AdtServiceBinding.update` did until this
+            // release, and what 61 other members did before the chains came
+            // out, so the count is the invariant this whole change is about.
+            if (!(key in EXTRA_REQUESTS)) {
+              expect({
+                member: key,
+                issued: calls.map((c) => `${c.method} ${c.url.split('?')[0]}`),
+              }).toEqual({
+                member: key,
+                issued: calls
+                  .slice(0, resource.all.length)
+                  .map((c) => `${c.method} ${c.url.split('?')[0]}`),
+              });
+            }
           });
         }
       }
     });
+  }
+});
+
+/**
+ * A member does not touch the session.
+ *
+ * Statefulness belongs to the lock window, and since 18.0.0 a lock window is
+ * something the consumer opens: it calls `lock`, then the write, then `unlock`,
+ * and it is the one that knows whether those three belong to the same session.
+ * A member that flipped the connection to stateful and back would take that
+ * decision away — and worse, would reset it under a *different* handler that
+ * happens to hold a lock on the same connection. That was the E19 incident, and
+ * this is the assertion that keeps its cause from coming back.
+ *
+ * `lock` and `unlock` are exempt on purpose: they are the session, not a
+ * request that happens inside one.
+ */
+describe('capability guard — a member leaves the session alone', () => {
+  for (const [name, entry] of Object.entries(
+    HANDLERS as Record<string, HandlerEntry>,
+  )) {
+    for (const atom of entry.capabilities) {
+      for (const method of ATOM_METHODS[atom as Atom]) {
+        if (method === 'lock' || method === 'unlock') continue;
+        // The one exception in the library, and it is named rather than
+        // skipped: a message is a row inside its class's document, so writing
+        // one takes two lock handles and a read-modify-write of XML this
+        // library assembles. Its session handling is the write's own.
+        const exempt =
+          name === 'messageClassMessage' &&
+          (method === 'create' || method === 'update' || method === 'delete');
+        it(`${name}.${method} ${exempt ? 'owns its session window' : 'never calls setSessionType'}`, async () => {
+          const { client, sessionTypes } = recordingClient();
+          const handler = entry.factory(client) as unknown as Record<
+            string,
+            unknown
+          >;
+          try {
+            await invoke(handler, method, entry.config);
+          } catch {
+            // What the member answered is another test's subject. Even a
+            // refusal must not have moved the session on its way out.
+          }
+          if (exempt) {
+            expect(sessionTypes.length).toBeGreaterThan(0);
+            expect(sessionTypes[sessionTypes.length - 1]).toBe('stateless');
+            return;
+          }
+          expect(sessionTypes).toEqual([]);
+        });
+      }
+    }
+  }
+});
+
+/**
+ * A lock window that fails still puts the session back.
+ *
+ * The guard above asks that ordinary members never touch `setSessionType`.
+ * `lock` and `unlock` are exempt there — they *are* the session — and that
+ * exemption is exactly where the defect lived: all three methods of
+ * `LockCapability`, and the same pattern hand-written in twenty-six handlers,
+ * set stateful, ran the request, and set stateless **as the last statement of
+ * the success path**. A refused `LOCK` — an object someone else holds, an
+ * expired session, a dropped connection — jumped over the restore.
+ *
+ * The connection is shared, so the cost is not confined to the caller that
+ * failed: the next unrelated request goes out inside a session nobody asked
+ * for, and what the server takes during it is held until that session ends.
+ *
+ * This asserts the invariant rather than the implementation, so it holds for
+ * whichever way a handler spells its cleanup — `inStatefulSession`, a bare
+ * `finally`, or `chain`'s `onScopeEnd`.
+ */
+describe('capability guard — a failed lock window restores the session', () => {
+  /** Every request is refused, which is the whole point. */
+  function refusingClient() {
+    const sessionTypes: string[] = [];
+    const connection = {
+      connect: async () => {},
+      getBaseUrl: async () => 'https://example',
+      getSessionId: () => null,
+      setSessionType: (type: string) => {
+        sessionTypes.push(type);
+      },
+      makeAdtRequest: async () => {
+        throw new Error('guard: the server refused this request');
+      },
+    } as unknown as IAbapConnection;
+    const client = new AdtClient(connection, createLibraryLogger());
+    return { client, sessionTypes };
+  }
+
+  for (const [name, entry] of Object.entries(
+    HANDLERS as Record<string, HandlerEntry>,
+  )) {
+    if (!entry.capabilities.includes('lockable')) continue;
+    for (const method of ['lock', 'unlock']) {
+      it(`${name}.${method} leaves the session stateless when the request fails`, async () => {
+        const { client, sessionTypes } = refusingClient();
+        const handler = entry.factory(client) as unknown as Record<
+          string,
+          unknown
+        >;
+        try {
+          await invoke(handler, method, entry.config);
+        } catch {
+          // Whether the refusal arrives as an answer or a throw is another
+          // test's subject. Either way the session must be back.
+        }
+
+        // The invariant is "never left stateful", and only that. A member that
+        // switched nothing asked the server nothing, or was refused before the
+        // wire; a member that only ever sets stateless is making a different
+        // choice, right or wrong, and this guard is not about that choice. What
+        // must not happen is going stateful and stopping there.
+        if (!sessionTypes.includes('stateful')) return;
+        expect(sessionTypes[sessionTypes.length - 1]).toBe('stateless');
+      });
+    }
+  }
+});
+
+/**
+ * The caller's deadline reaches the wire.
+ *
+ * Since 18.0.0 this library sends no client-side timeout of its own —
+ * `SAP_TIMEOUT_DEFAULT` defaults to `0` — and the CHANGELOG and the API
+ * reference both tell a caller that `IAdtOperationOptions.timeout` is how they
+ * ask for one. That was untrue for every member but the service binding's
+ * publication: the low-level functions end in
+ * `makeAdtRequest({ …, timeout: getTimeout('default') })` at 444 places, and
+ * none of them could see the option. So a caller who wanted a deadline had a
+ * documented parameter that did nothing, and the only real control was a
+ * process-wide environment variable.
+ *
+ * This asserts the promise rather than the mechanism: whatever a member does
+ * internally, a request it issues carries the number the caller passed.
+ */
+describe('capability guard — options.timeout reaches the wire', () => {
+  const DEADLINE = 4321;
+
+  for (const [name, entry] of Object.entries(
+    HANDLERS as Record<string, HandlerEntry>,
+  )) {
+    for (const atom of entry.capabilities) {
+      for (const method of ATOM_METHODS[atom as Atom]) {
+        // `lock` and `unlock` take no options bag — the lock window's shape is
+        // the caller's own sequence, and neither member has one to read.
+        if (method === 'lock' || method === 'unlock') continue;
+
+        it(`${name}.${method} carries the caller's timeout`, async () => {
+          const { client, calls } = recordingClient();
+          const handler = entry.factory(client) as unknown as Record<
+            string,
+            unknown
+          >;
+          // A member with no options parameter promises nothing per call.
+          if (!takesOptions(handler, method)) return;
+          try {
+            await invokeWithOptions(handler, method, entry.config, {
+              timeout: DEADLINE,
+            });
+          } catch {
+            // A member that refuses before the wire issued no request, and the
+            // check below is about requests that were issued.
+          }
+
+          const issued = calls.filter((c) => c.timeout !== undefined);
+          if (calls.length === 0) return;
+          expect(issued.map((c) => c.timeout)).toEqual(
+            calls.map(() => DEADLINE),
+          );
+        });
+      }
+    }
   }
 });

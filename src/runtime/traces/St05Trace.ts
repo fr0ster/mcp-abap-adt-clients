@@ -1,12 +1,14 @@
 import type {
   IAbapConnection,
-  IAdtWireResponse,
+  IAdtResponse,
   ILogger,
   ISt05Trace,
 } from '@mcp-abap-adt/interfaces';
+import { answering } from '../../utils/adtResponse';
+import { rawDocument } from '../../utils/resultStrategy';
 import { getSt05TraceDirectory, getSt05TraceState } from './st05';
 
-export class St05Trace implements ISt05Trace {
+export class St05Trace implements ISt05Trace<string, string> {
   readonly kind = 'st05Trace' as const;
 
   constructor(
@@ -14,11 +16,11 @@ export class St05Trace implements ISt05Trace {
     private readonly logger: ILogger,
   ) {}
 
-  async getState(): Promise<IAdtWireResponse> {
-    return getSt05TraceState(this.connection);
+  async getState(): Promise<IAdtResponse<string>> {
+    return answering(() => getSt05TraceState(this.connection), rawDocument);
   }
 
-  async getDirectory(): Promise<IAdtWireResponse> {
-    return getSt05TraceDirectory(this.connection);
+  async getDirectory(): Promise<IAdtResponse<string>> {
+    return answering(() => getSt05TraceDirectory(this.connection), rawDocument);
   }
 }

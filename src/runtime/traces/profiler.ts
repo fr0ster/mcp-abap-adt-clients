@@ -11,6 +11,10 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
+  IProfilerTraceDbAccessesOptions,
+  IProfilerTraceHitListOptions,
+  IProfilerTraceParameters,
+  IProfilerTraceStatementsOptions,
 } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
 import {
@@ -21,37 +25,16 @@ import {
 } from '../../constants/contentTypes';
 import { getTimeout } from '../../utils/timeouts';
 
-export interface IProfilerTraceParameters {
-  allMiscAbapStatements?: boolean;
-  allProceduralUnits?: boolean;
-  allInternalTableEvents?: boolean;
-  allDynproEvents?: boolean;
-  description?: string;
-  aggregate?: boolean;
-  explicitOnOff?: boolean;
-  withRfcTracing?: boolean;
-  allSystemKernelEvents?: boolean;
-  sqlTrace?: boolean;
-  allDbEvents?: boolean;
-  maxSizeForTraceFile?: number;
-  amdpTrace?: boolean;
-  maxTimeForTracing?: number;
-}
-
-export interface IProfilerTraceHitListOptions {
-  withSystemEvents?: boolean;
-}
-
-export interface IProfilerTraceStatementsOptions {
-  id?: number;
-  withDetails?: boolean;
-  autoDrillDownThreshold?: number;
-  withSystemEvents?: boolean;
-}
-
-export interface IProfilerTraceDbAccessesOptions {
-  withSystemEvents?: boolean;
-}
+// Declared once, in the contract; re-exported so importers here are unchanged.
+// Declared once, in the contract; re-exported so importers here are unchanged.
+// Declared once, in the contract; re-exported so importers here are unchanged.
+// Declared once, in the contract; re-exported so importers here are unchanged.
+export type {
+  IProfilerTraceDbAccessesOptions,
+  IProfilerTraceHitListOptions,
+  IProfilerTraceParameters,
+  IProfilerTraceStatementsOptions,
+} from '@mcp-abap-adt/interfaces';
 
 export const DEFAULT_PROFILER_TRACE_PARAMETERS: Omit<
   IProfilerTraceParameters,

@@ -9,14 +9,16 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
   ILogger,
-  IRepositoryNodeChild,
-  IRepositoryNodeContents,
-  IRepositoryObjectNode,
   XmlNode,
 } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
 import { AdtParseError, throwIfSapError } from '../../utils/adtErrors';
 import { getTimeout } from '../../utils/timeouts';
+import type {
+  IRepositoryNodeChild,
+  IRepositoryNodeContents,
+  IRepositoryObjectNode,
+} from './utilResults';
 
 /**
  * Fetch node structure from ADT repository

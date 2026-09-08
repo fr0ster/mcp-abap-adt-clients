@@ -2,7 +2,6 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
-import { assertActivationSucceeded } from '../../utils/activationUtils';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
@@ -42,8 +41,6 @@ export async function activateAccessControl(
     data: xmlBody,
     headers,
   });
-
-  assertActivationSucceeded('Access control', response.data);
 
   return response;
 }

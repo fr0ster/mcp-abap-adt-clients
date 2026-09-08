@@ -190,6 +190,27 @@ function isScopeResourceUnavailable(error: unknown): boolean {
 }
 
 /**
+ * The two things every where-used call needs before it can ask anything.
+ *
+ * Exported and called by the contract members **before** `answering`, not only
+ * from inside these functions: a guard that throws inside the request is caught
+ * by `answering` and classified `origin: 'connection'` — which tells a caller to
+ * check a network that was never reached, over a parameter they left empty. A
+ * caller error is not a verdict about a server.
+ */
+export function assertWhereUsedTarget(params: {
+  object_name?: string;
+  object_type?: string;
+}): void {
+  if (!params.object_name) {
+    throw new Error('Object name is required');
+  }
+  if (!params.object_type) {
+    throw new Error('Object type is required');
+  }
+}
+
+/**
  * Get where-used scope configuration (Step 1 of 2)
  *
  * Returns available object types for where-used search.
@@ -221,12 +242,7 @@ export async function getWhereUsedScope(
   connection: IAbapConnection,
   params: IGetWhereUsedScopeParams,
 ): Promise<IAdtWireResponse> {
-  if (!params.object_name) {
-    throw new Error('Object name is required');
-  }
-  if (!params.object_type) {
-    throw new Error('Object type is required');
-  }
+  assertWhereUsedTarget(params);
 
   const objectUri = buildObjectUri(params.object_name, params.object_type);
   const scopeUrl = `/sap/bc/adt/repository/informationsystem/usageReferences/scope?uri=${encodeURIComponent(objectUri)}`;
@@ -263,12 +279,7 @@ export async function getWhereUsed(
   connection: IAbapConnection,
   params: IGetWhereUsedParams,
 ): Promise<IAdtWireResponse> {
-  if (!params.object_name) {
-    throw new Error('Object name is required');
-  }
-  if (!params.object_type) {
-    throw new Error('Object type is required');
-  }
+  assertWhereUsedTarget(params);
 
   const objectUri = buildObjectUri(params.object_name, params.object_type);
 
@@ -346,12 +357,7 @@ export async function getWhereUsedList(
   connection: IAbapConnection,
   params: IGetWhereUsedListParams,
 ): Promise<IWhereUsedListResult> {
-  if (!params.object_name) {
-    throw new Error('Object name is required');
-  }
-  if (!params.object_type) {
-    throw new Error('Object type is required');
-  }
+  assertWhereUsedTarget(params);
 
   let scopeXml: string | undefined;
   // Set when the /usageReferences/scope sub-resource is unavailable and we fell
@@ -422,7 +428,6 @@ export async function getWhereUsedList(
       totalReferences: 0,
       resultDescription: '',
       references: [],
-      rawXml: params.includeRawXml ? xml : undefined,
     };
   }
 
@@ -494,6 +499,5 @@ export async function getWhereUsedList(
         : numberOfResults,
     resultDescription,
     references: resultRefs,
-    rawXml: params.includeRawXml ? xml : undefined,
   };
 }

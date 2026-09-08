@@ -19,6 +19,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import { AdtRuntimeClient } from '../../../../clients/AdtRuntimeClient';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestConnection,
   releaseTestConnection,
@@ -107,10 +108,11 @@ describe('GatewayErrorLog (using AdtRuntimeClient)', () => {
 
       try {
         logTestStep('list gateway error log entries', testsLogger);
-        const response = await runtime.getGatewayErrorLog().list();
-        expect(response.status).toBeGreaterThanOrEqual(200);
-        expect(response.status).toBeLessThan(300);
-        expect(response.data).toBeDefined();
+        const response = expectResult(
+          await runtime.getGatewayErrorLog().list(),
+          'response',
+        );
+        expect(response).toBeDefined();
 
         logTestSuccess(testsLogger, testName);
       } catch (error) {
@@ -166,12 +168,11 @@ describe('GatewayErrorLog (using AdtRuntimeClient)', () => {
           'list gateway error log entries with maxResults: 10',
           testsLogger,
         );
-        const response = await runtime
-          .getGatewayErrorLog()
-          .list({ maxResults: 10 });
-        expect(response.status).toBeGreaterThanOrEqual(200);
-        expect(response.status).toBeLessThan(300);
-        expect(response.data).toBeDefined();
+        const response = expectResult(
+          await runtime.getGatewayErrorLog().list({ maxResults: 10 }),
+          'response',
+        );
+        expect(response).toBeDefined();
 
         logTestSuccess(testsLogger, testName);
       } catch (error) {

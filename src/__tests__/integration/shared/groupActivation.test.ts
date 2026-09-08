@@ -21,6 +21,7 @@ import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
 import { orThrow } from '../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
+import { expectResult } from '../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -374,20 +375,16 @@ describe('Group Activation (Shared)', () => {
           );
         } else {
           logTestStep(currentStep, testsLogger);
-          await client.getDomain().create(
-            {
-              domainName: domainName,
-              packageName: packageName,
-              description:
-                testCase.params.description ||
-                `Test domain for group activation`,
-              datatype: testCase.params.domain_datatype || 'CHAR',
-              length: testCase.params.domain_length || 10,
-              decimals: testCase.params.domain_decimals || 0,
-              transportRequest: transportRequest,
-            },
-            { activateOnCreate: false },
-          );
+          await client.getDomain().create({
+            domainName: domainName,
+            packageName: packageName,
+            description:
+              testCase.params.description || `Test domain for group activation`,
+            datatype: testCase.params.domain_datatype || 'CHAR',
+            length: testCase.params.domain_length || 10,
+            decimals: testCase.params.domain_decimals || 0,
+            transportRequest: transportRequest,
+          });
           domainCreated = true;
           await new Promise((resolve) =>
             setTimeout(resolve, getOperationDelay('create', testCase)),
@@ -430,19 +427,16 @@ describe('Group Activation (Shared)', () => {
           );
         } else {
           logTestStep(currentStep, testsLogger);
-          await client.getDataElement().create(
-            {
-              dataElementName: dataElementName,
-              packageName: packageName,
-              description:
-                testCase.params.description ||
-                `Test data element for group activation`,
-              typeKind: testCase.params.data_element_type_kind || 'domain',
-              typeName: domainName, // Reference to domain
-              transportRequest: transportRequest,
-            },
-            { activateOnCreate: false },
-          );
+          await client.getDataElement().create({
+            dataElementName: dataElementName,
+            packageName: packageName,
+            description:
+              testCase.params.description ||
+              `Test data element for group activation`,
+            typeKind: testCase.params.data_element_type_kind || 'domain',
+            typeName: domainName, // Reference to domain
+            transportRequest: transportRequest,
+          });
           dataElementCreated = true;
           await new Promise((resolve) =>
             setTimeout(resolve, getOperationDelay('create', testCase)),
@@ -488,17 +482,14 @@ define structure ${structureName} {
  mandt : abap.clnt;
  test_field : ${dataElementName};
 }`;
-        await client.getStructure().create(
-          {
-            structureName: structureName,
-            packageName: packageName,
-            description:
-              testCase.params.description ||
-              `Test structure for group activation`,
-            transportRequest: transportRequest,
-          },
-          { activateOnCreate: false },
-        );
+        await client.getStructure().create({
+          structureName: structureName,
+          packageName: packageName,
+          description:
+            testCase.params.description ||
+            `Test structure for group activation`,
+          transportRequest: transportRequest,
+        });
         structureCreated = true;
         await new Promise((resolve) =>
           setTimeout(resolve, getOperationDelay('create', testCase)),
@@ -508,9 +499,10 @@ define structure ${structureName} {
         currentStep = 'update structure';
         logTestStep(currentStep, testsLogger);
         const structureHandler = client.getStructure();
-        const structureLockHandle = await structureHandler.lock({
-          structureName,
-        });
+        const structureLockHandle = expectResult(
+          await structureHandler.lock({ structureName }),
+          'lock structure',
+        );
         try {
           await structureHandler.update(
             {
@@ -518,7 +510,7 @@ define structure ${structureName} {
               ddlCode: structureDdlCode,
               transportRequest: transportRequest,
             },
-            { activateOnUpdate: false, lockHandle: structureLockHandle },
+            { lockHandle: structureLockHandle },
           );
         } finally {
           await structureHandler.unlock({ structureName }, structureLockHandle);
@@ -537,11 +529,16 @@ define structure ${structureName} {
         ];
 
         // Step 4: Group activation - activate all objects together
-        const activationResult = await orThrow(
-          client.getUtils().activateObjectsGroup(objectsToActivate, false),
+        // The document, not a status: group activation answers `chkl:messages`
+        // inside a 200 whether or not it worked, so the status was never the
+        // verdict — and a refusal now comes back as the failure half instead.
+        const activationResult = expectResult(
+          await client
+            .getUtils()
+            .activateObjectsGroup(objectsToActivate, false),
+          'group activation',
         );
-        expect(activationResult).toBeDefined();
-        expect(activationResult.status).toBe(200);
+        expect(typeof activationResult).toBe('string');
         testsLogger.info?.('✅ Group activation completed successfully');
 
         // Wait a bit for activation to fully complete

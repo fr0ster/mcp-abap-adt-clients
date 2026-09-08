@@ -71,7 +71,7 @@ describe('AdtRequest.update()', () => {
   it('issues exactly GET then PUT, both to the item URL, with the new description in the PUT body', async () => {
     const { connection, calls } = connectionOver(() => TRANSPORT_ITEM_XML);
 
-    await new AdtRequest(connection).update({
+    await new AdtRequest(connection).updateMetadata({
       transportNumber: 'TRLK900438',
       description: 'New description',
     });
@@ -93,7 +93,7 @@ describe('AdtRequest.update()', () => {
   it('touches neither the collection nor the search-configuration endpoint', async () => {
     const { connection, calls } = connectionOver(() => TRANSPORT_ITEM_XML);
 
-    await new AdtRequest(connection).update({
+    await new AdtRequest(connection).updateMetadata({
       transportNumber: 'TRLK900438',
       description: 'New description',
     });
@@ -108,7 +108,9 @@ describe('AdtRequest.update()', () => {
     const { connection, calls } = connectionOver(() => TRANSPORT_ITEM_XML);
 
     await expect(
-      new AdtRequest(connection).update({ transportNumber: 'TRLK900438' }),
+      new AdtRequest(connection).updateMetadata({
+        transportNumber: 'TRLK900438',
+      }),
     ).rejects.toThrow(/description/i);
 
     expect(calls).toHaveLength(0);
@@ -118,7 +120,9 @@ describe('AdtRequest.update()', () => {
     const { connection, calls } = connectionOver(() => TRANSPORT_ITEM_XML);
 
     await expect(
-      new AdtRequest(connection).update({ description: 'New description' }),
+      new AdtRequest(connection).updateMetadata({
+        description: 'New description',
+      }),
     ).rejects.toThrow(/transport request number/i);
 
     expect(calls).toHaveLength(0);

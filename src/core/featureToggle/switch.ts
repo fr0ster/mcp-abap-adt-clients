@@ -1,4 +1,7 @@
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 import { CT_FEATURE_TOGGLE_TOGGLE_PARAMETERS } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -7,7 +10,7 @@ import type { IToggleFeatureToggleParams } from './types';
 export async function toggleFeatureToggle(
   connection: IAbapConnection,
   params: IToggleFeatureToggleParams,
-): Promise<void> {
+): Promise<IAdtWireResponse> {
   const encoded = encodeSapObjectName(params.feature_toggle_name.toLowerCase());
   const body: { TOGGLE_PARAMETERS: Record<string, unknown> } = {
     TOGGLE_PARAMETERS: {
@@ -18,7 +21,7 @@ export async function toggleFeatureToggle(
   if (params.transport_request) {
     body.TOGGLE_PARAMETERS.TRANSPORT_REQUEST = params.transport_request;
   }
-  await connection.makeAdtRequest({
+  return connection.makeAdtRequest({
     method: 'POST',
     url: `/sap/bc/adt/sfw/featuretoggles/${encoded}/toggle`,
     timeout: getTimeout('default'),

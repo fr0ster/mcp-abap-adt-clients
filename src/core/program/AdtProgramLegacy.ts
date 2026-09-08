@@ -1,70 +1,48 @@
-import { beginCriticalSection } from '../../utils/criticalSection';
 /**
  * AdtProgramLegacy - Program handler for legacy SAP systems (BASIS < 7.50)
  *
  * Overrides delete() to use direct DELETE instead of /sap/bc/adt/deletion/ API.
  */
 
-import {
-  encodeSapObjectName,
-  safeErrorMessage,
-} from '../../utils/internalUtils';
+import type {
+  IAdtError,
+  IAdtOperationOptions,
+  IAdtResponse,
+  IResultStrategy,
+} from '@mcp-abap-adt/interfaces';
+import { answering } from '../../utils/adtResponse';
+import { encodeSapObjectName } from '../../utils/internalUtils';
 import { deleteObjectDirect } from '../shared/deleteLegacy';
 import { AdtProgram } from './AdtProgram';
-import { lockProgram } from './lock';
-import type { IProgramConfig, IProgramState } from './types';
-import { unlockProgram } from './unlock';
+import type {
+  IProgramConfig,
+  IProgramResults,
+  programDocuments,
+} from './types';
 
-export class AdtProgramLegacy extends AdtProgram {
-  override async delete(
+export class AdtProgramLegacy<
+  R extends IProgramResults = typeof programDocuments,
+> extends AdtProgram<R> {
+  override async delete<E extends IAdtError = IAdtError>(
     config: Partial<IProgramConfig>,
-  ): Promise<IProgramState> {
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     if (!config.programName) {
       throw new Error('Program name is required');
     }
+    const name = config.programName;
 
-    const state: IProgramState = { errors: [] };
-    let lockHandle: string | undefined;
-
-    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
-
-    // the lock but leaves the work half-done.
-
-    const endCriticalSection = beginCriticalSection(this.connection);
-
-    try {
-      this.logger?.info?.('Locking program for deletion');
-      this.connection.setSessionType('stateful');
-      lockHandle = await lockProgram(this.connection, config.programName);
-
-      this.logger?.info?.('Deleting program (direct DELETE)');
-      const objectUrl = `/sap/bc/adt/programs/programs/${encodeSapObjectName(config.programName).toLowerCase()}`;
-      state.deleteResult = await deleteObjectDirect(
-        this.connection,
-        objectUrl,
-        lockHandle,
-        config.transportRequest,
-      );
-      this.logger?.info?.('Program deleted');
-
-      return state;
-    } catch (error: unknown) {
-      this.logger?.error?.('Delete failed:', safeErrorMessage(error));
-      if (lockHandle) {
-        try {
-          await unlockProgram(this.connection, config.programName, lockHandle);
-        } catch (unlockError: unknown) {
-          this.logger?.error?.(
-            'Unlock after delete failure also failed:',
-            safeErrorMessage(unlockError),
-          );
-        }
-      }
-      throw error;
-    } finally {
-      this.connection.setSessionType('stateless');
-
-      endCriticalSection();
-    }
+    const objectUrl = `/sap/bc/adt/programs/programs/${encodeSapObjectName(name).toLowerCase()}`;
+    return answering(
+      () =>
+        deleteObjectDirect(
+          this.connection,
+          objectUrl,
+          options?.lockHandle,
+          config.transportRequest,
+        ),
+      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      options?.analyse,
+    );
   }
 }

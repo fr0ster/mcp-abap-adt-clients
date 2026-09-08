@@ -1,7 +1,5 @@
-import {
-  AdtObjectErrorCodes,
-  AdtOperationError,
-} from '@mcp-abap-adt/interfaces';
+import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
+import { AdtOperationError } from '../../utils/adtErrors';
 
 /** Throw a typed "operation not supported for this object type" error. */
 export function throwUnsupportedOperation(

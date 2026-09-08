@@ -22,6 +22,7 @@ import {
 } from '../src/__tests__/helpers/sessionConfig';
 import { createConnectionLogger } from '../src/__tests__/helpers/testLogger';
 import { AdtRuntimeClient } from '../src/clients/AdtRuntimeClient';
+import { resultOf } from './resultOf';
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../.env');
 if (fs.existsSync(envPath)) {
@@ -72,8 +73,8 @@ async function main() {
       console.error(
         `Gateway Error Log (user=${options.user || 'all'}, max=${options.maxResults})`,
       );
-      const response = await gw.list(options);
-      const xml = String(response.data);
+      const response = resultOf(await gw.list(options));
+      const xml = response;
       printXml(xml);
       return;
     }
@@ -87,8 +88,8 @@ async function main() {
     }
 
     console.error(`Gateway Error: ${errorType} / ${errorId}`);
-    const response = await gw.getById(errorType, errorId);
-    printXml(String(response.data));
+    const response = resultOf(await gw.getById(errorType, errorId));
+    printXml(response);
   } finally {
     // In `finally`, and the session given back rather than left to time out.
     // A small pool is easy to exhaust — two concurrent sessions is the measured

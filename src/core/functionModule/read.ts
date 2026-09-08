@@ -27,13 +27,11 @@ export async function getFunctionMetadata(
   functionGroup: string,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  return orThrow(
-    getUtils(connection).readObjectMetadata(
-      'functionmodule',
-      functionName,
-      functionGroup,
-      options,
-    ),
+  return getUtils(connection).objectMetadataWire(
+    'functionmodule',
+    functionName,
+    functionGroup,
+    options,
   );
 }
 
@@ -51,14 +49,12 @@ export async function getFunctionSource(
   version?: 'active' | 'inactive',
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  return orThrow(
-    getUtils(connection).readObjectSource(
-      'functionmodule',
-      functionName,
-      functionGroup,
-      version,
-      options,
-    ),
+  return getUtils(connection).objectSourceWire(
+    'functionmodule',
+    functionName,
+    functionGroup,
+    version,
+    options,
   );
 }
 

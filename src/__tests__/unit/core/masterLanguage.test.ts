@@ -90,6 +90,34 @@ describe('masterLanguage on create', () => {
   });
 
   describe('ServiceBinding honours the global systemContext override', () => {
+    /**
+     * A catalogue the create's first step accepts.
+     *
+     * `create()` asks the system which binding variants it offers before
+     * posting anything — a POST for a variant the system does not have answers
+     * something a caller cannot act on. The generic mock above answers every
+     * request with an empty body, which reads as "this system offers none", so
+     * these two cases need a catalogue that lists ODATA V4.
+     */
+    const BINDING_TYPES =
+      '<nameditem:namedItemList xmlns:nameditem="http://www.sap.com/adt/nameditems">' +
+      '<nameditem:namedItem><nameditem:name>ODATA</nameditem:name>' +
+      '<nameditem:description>1</nameditem:description>' +
+      '<nameditem:data>ODATA V4</nameditem:data></nameditem:namedItem>' +
+      '</nameditem:namedItemList>';
+
+    function bindingConnection(): IAbapConnection {
+      return {
+        makeAdtRequest: jest.fn(async (request: { url?: string }) =>
+          String(request?.url ?? '').includes('bindingtypes')
+            ? { status: 200, data: BINDING_TYPES }
+            : { status: 201, data: '' },
+        ),
+        setSessionType: jest.fn(),
+        getSessionId: jest.fn().mockReturnValue('sess'),
+      } as unknown as IAbapConnection;
+    }
+
     function bindingBody(connection: IAbapConnection): string {
       const call = (connection.makeAdtRequest as jest.Mock).mock.calls.find(
         (c) => String(c[0]?.data).includes('srvb:serviceBinding'),
@@ -108,20 +136,23 @@ describe('masterLanguage on create', () => {
     } as never;
 
     it('uses systemContext.masterLanguage (global option) when params omit it', async () => {
-      const c = mockConnection();
+      const c = bindingConnection();
       const binding = new AdtServiceBinding(c, undefined, {
         masterLanguage: 'FR',
       });
-      await binding.createServiceBinding(baseParams);
+      // `createServiceBinding` is gone: it and `create` were one request under
+      // two names, and the pair existed only because the second answered the
+      // envelope. `create` is the member now.
+      await binding.create(baseParams);
       expect(bindingBody(c)).toContain('adtcore:masterLanguage="FR"');
     });
 
     it('explicit params.masterLanguage overrides the global option', async () => {
-      const c = mockConnection();
+      const c = bindingConnection();
       const binding = new AdtServiceBinding(c, undefined, {
         masterLanguage: 'FR',
       });
-      await binding.createServiceBinding({
+      await binding.create({
         ...(baseParams as object),
         masterLanguage: 'ZH',
       } as never);

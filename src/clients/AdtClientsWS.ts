@@ -6,7 +6,6 @@ import type {
   IWebSocketMessageHandler,
   IWebSocketTransport,
 } from '@mcp-abap-adt/interfaces';
-import { DebuggerSessionClient } from './DebuggerSessionClient';
 
 export interface IAdtClientsWSRequestOptions {
   correlationId?: string;
@@ -63,10 +62,6 @@ export class AdtClientsWS {
 
   onEvent(handler: IWebSocketMessageHandler<unknown>): void {
     this.eventHandlers.push(handler);
-  }
-
-  getDebuggerSessionClient(): DebuggerSessionClient {
-    return new DebuggerSessionClient(this);
   }
 
   async request<TPayload = unknown, TResponse = unknown>(

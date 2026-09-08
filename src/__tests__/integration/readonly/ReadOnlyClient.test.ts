@@ -1,3 +1,7 @@
+import type {
+  IAdtMetadataReadable,
+  IAdtReadable,
+} from '@mcp-abap-adt/interfaces';
 /**
  * Integration test for AdtClient read operations
  * Tests read/readMetadata for all object types
@@ -16,6 +20,7 @@ import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
+import { expectResult } from '../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -109,7 +114,16 @@ describe('AdtClient read operations', () => {
     testName: string,
     objectType: string,
     buildConfig: (name: string, group?: string) => any,
-    getAdtObject: () => any,
+    // **Typed, not `any`.** Held as `any`, this hid four calls to `read()` on
+    // types that no longer have one — a domain, a data element, a function
+    // group and a package are their own document, so reading them is
+    // `readMetadata`. `tsc` said nothing and the full run failed on all four
+    // at once. The shape below is what those handlers actually offer: either
+    // member, and the reader below asks for the one that is there.
+    getAdtObject: () =>
+      | (Partial<IAdtReadable<any, unknown>> &
+          Partial<IAdtMetadataReadable<any, unknown>>)
+      | undefined,
     handlerName?: string,
     testCaseName?: string,
   ) {
@@ -171,57 +185,67 @@ describe('AdtClient read operations', () => {
 
       try {
         const adtObject = getAdtObject();
+        if (!adtObject) throw new Error(`${testName}: no client`);
+        // A type with a source reads it; a type that *is* its document reads
+        // that. Which one this is, is a property of the type, so the test asks
+        // rather than assuming — the same choice `BaseTester` makes.
+        const readVersion = (version: 'active' | 'inactive') =>
+          adtObject.read
+            ? adtObject.read(params, version)
+            : // biome-ignore lint/style/noNonNullAssertion: one of the two is always there
+              adtObject.readMetadata!(params, { version });
+
+        const readMetadata = (version: 'active' | 'inactive') => {
+          if (!adtObject.readMetadata) {
+            throw new Error(
+              `${testName}: the handler offers no readMetadata() — every ADT ` +
+                'object has a document of its own.',
+            );
+          }
+          return adtObject.readMetadata(params, { version });
+        };
+
         logTestStep('read active', testsLogger);
-        const readActiveState = await adtObject.read(params, 'active');
+        const readActiveState = expectResult(
+          await readVersion('active'),
+          'readActiveState',
+        );
         expect(readActiveState).toBeDefined();
-        expect(readActiveState?.readResult).toBeDefined();
         logTestStep(
-          `active length: ${getDataLength(readActiveState?.readResult?.data)}`,
+          `active length: ${getDataLength(readActiveState)}`,
           testsLogger,
         );
 
         logTestStep('read inactive', testsLogger);
-        const readInactiveState = await adtObject.read(params, 'inactive');
+        const readInactiveState = expectResult(
+          await readVersion('inactive'),
+          'readInactiveState',
+        );
         expect(readInactiveState).toBeDefined();
-        expect(readInactiveState?.readResult).toBeDefined();
         logTestStep(
-          `inactive length: ${getDataLength(readInactiveState?.readResult?.data)}`,
+          `inactive length: ${getDataLength(readInactiveState)}`,
           testsLogger,
         );
 
         logTestStep('read metadata (active)', testsLogger);
-        const metadataActiveState = await adtObject.readMetadata(params, {
-          version: 'active',
-        });
+        const metadataActiveState = expectResult(
+          await readMetadata('active'),
+          'metadataActiveState',
+        );
         expect(metadataActiveState).toBeDefined();
-        expect(
-          metadataActiveState?.metadataResult ||
-            metadataActiveState?.readResult,
-        ).toBeDefined();
-        const metadataActiveResult =
-          metadataActiveState?.metadataResult ||
-          metadataActiveState?.readResult;
         logTestStep(
-          `metadata active length: ${getDataLength(metadataActiveResult?.data)}`,
+          `metadata active length: ${getDataLength(metadataActiveState)}`,
           testsLogger,
         );
 
         logTestStep('read metadata (inactive)', testsLogger);
-        const metadataInactiveState = await adtObject.readMetadata(params, {
-          version: 'inactive',
-        });
+        const metadataInactiveState = expectResult(
+          await readMetadata('inactive'),
+          'metadataInactiveState',
+        );
         expect(metadataInactiveState).toBeDefined();
-        expect(
-          metadataInactiveState?.metadataResult ||
-            metadataInactiveState?.readResult,
-        ).toBeDefined();
-        const metadataInactiveResult =
-          metadataInactiveState?.metadataResult ||
-          metadataInactiveState?.readResult;
         logTestStep(
-          `metadata inactive length: ${getDataLength(
-            metadataInactiveResult?.data,
-          )}`,
+          `metadata inactive length: ${getDataLength(metadataInactiveState)}`,
           testsLogger,
         );
 
@@ -388,69 +412,51 @@ describe('AdtClient read operations', () => {
           try {
             const viewClient = client.getDdl();
             logTestStep('read active (cloud view)', testsLogger);
-            const readActiveState = await viewClient.read(
-              { ddlName },
-              'active',
+            const readActiveState = expectResult(
+              await viewClient.read({ ddlName }, 'active'),
+              'readActiveState',
             );
             expect(readActiveState).toBeDefined();
-            expect(readActiveState?.readResult).toBeDefined();
             logTestStep(
-              `active length: ${getDataLength(
-                readActiveState?.readResult?.data,
-              )}`,
+              `active length: ${getDataLength(readActiveState)}`,
               testsLogger,
             );
 
             logTestStep('read inactive (cloud view)', testsLogger);
-            const readInactiveState = await viewClient.read(
-              { ddlName },
-              'inactive',
+            const readInactiveState = expectResult(
+              await viewClient.read({ ddlName }, 'inactive'),
+              'readInactiveState',
             );
             expect(readInactiveState).toBeDefined();
-            expect(readInactiveState?.readResult).toBeDefined();
             logTestStep(
-              `inactive length: ${getDataLength(
-                readInactiveState?.readResult?.data,
-              )}`,
+              `inactive length: ${getDataLength(readInactiveState)}`,
               testsLogger,
             );
 
             logTestStep('read metadata (active, cloud view)', testsLogger);
-            const metadataActiveState = await viewClient.readMetadata(
-              { ddlName },
-              { version: 'active' },
+            const metadataActiveState = expectResult(
+              await viewClient.readMetadata({ ddlName }, { version: 'active' }),
+              'metadataActiveState',
             );
             expect(metadataActiveState).toBeDefined();
-            expect(
-              metadataActiveState?.metadataResult ||
-                metadataActiveState?.readResult,
-            ).toBeDefined();
-            const metadataActiveResult =
-              metadataActiveState?.metadataResult ||
-              metadataActiveState?.readResult;
             logTestStep(
-              `metadata active length: ${getDataLength(
-                metadataActiveResult?.data,
-              )}`,
+              `metadata active length: ${getDataLength(metadataActiveState)}`,
               testsLogger,
             );
 
             logTestStep('read metadata (inactive, cloud view)', testsLogger);
-            const metadataInactiveState = await viewClient.readMetadata(
-              { ddlName },
-              { version: 'inactive' },
+            const metadataInactiveState = expectResult(
+              await viewClient.readMetadata(
+                { ddlName },
+                { version: 'inactive' },
+              ),
+              'metadataInactiveState',
             );
             expect(metadataInactiveState).toBeDefined();
-            expect(
-              metadataInactiveState?.metadataResult ||
-                metadataInactiveState?.readResult,
-            ).toBeDefined();
-            const metadataInactiveResult =
-              metadataInactiveState?.metadataResult ||
-              metadataInactiveState?.readResult;
+            expect(metadataInactiveState).toBeDefined();
             logTestStep(
               `metadata inactive length: ${getDataLength(
-                metadataInactiveResult?.data,
+                metadataInactiveState,
               )}`,
               testsLogger,
             );
@@ -491,69 +497,54 @@ describe('AdtClient read operations', () => {
           try {
             const tableClient = client.getTable();
             logTestStep('read active', testsLogger);
-            const readActiveState = await tableClient.read(
-              { tableName },
-              'active',
+            const readActiveState = expectResult(
+              await tableClient.read({ tableName }, 'active'),
+              'readActiveState',
             );
             expect(readActiveState).toBeDefined();
-            expect(readActiveState?.readResult).toBeDefined();
             logTestStep(
-              `active length: ${getDataLength(
-                readActiveState?.readResult?.data,
-              )}`,
+              `active length: ${getDataLength(readActiveState)}`,
               testsLogger,
             );
 
             logTestStep('read inactive', testsLogger);
-            const readInactiveState = await tableClient.read(
-              { tableName },
-              'inactive',
+            const readInactiveState = expectResult(
+              await tableClient.read({ tableName }, 'inactive'),
+              'readInactiveState',
             );
             expect(readInactiveState).toBeDefined();
-            expect(readInactiveState?.readResult).toBeDefined();
             logTestStep(
-              `inactive length: ${getDataLength(
-                readInactiveState?.readResult?.data,
-              )}`,
+              `inactive length: ${getDataLength(readInactiveState)}`,
               testsLogger,
             );
 
             logTestStep('read metadata (active)', testsLogger);
-            const metadataActiveState = await tableClient.readMetadata(
-              { tableName },
-              { version: 'active' },
+            const metadataActiveState = expectResult(
+              await tableClient.readMetadata(
+                { tableName },
+                { version: 'active' },
+              ),
+              'metadataActiveState',
             );
             expect(metadataActiveState).toBeDefined();
-            expect(
-              metadataActiveState?.metadataResult ||
-                metadataActiveState?.readResult,
-            ).toBeDefined();
-            const metadataActiveResult =
-              metadataActiveState?.metadataResult ||
-              metadataActiveState?.readResult;
             logTestStep(
-              `metadata active length: ${getDataLength(
-                metadataActiveResult?.data,
-              )}`,
+              `metadata active length: ${getDataLength(metadataActiveState)}`,
               testsLogger,
             );
 
             logTestStep('read metadata (inactive)', testsLogger);
-            const metadataInactiveState = await tableClient.readMetadata(
-              { tableName },
-              { version: 'inactive' },
+            const metadataInactiveState = expectResult(
+              await tableClient.readMetadata(
+                { tableName },
+                { version: 'inactive' },
+              ),
+              'metadataInactiveState',
             );
             expect(metadataInactiveState).toBeDefined();
-            expect(
-              metadataInactiveState?.metadataResult ||
-                metadataInactiveState?.readResult,
-            ).toBeDefined();
-            const metadataInactiveResult =
-              metadataInactiveState?.metadataResult ||
-              metadataInactiveState?.readResult;
+            expect(metadataInactiveState).toBeDefined();
             logTestStep(
               `metadata inactive length: ${getDataLength(
-                metadataInactiveResult?.data,
+                metadataInactiveState,
               )}`,
               testsLogger,
             );
@@ -692,42 +683,41 @@ describe('AdtClient read operations', () => {
         try {
           const requestClient = client.getRequest();
           logTestStep('read active', testsLogger);
-          const readActiveState = await requestClient.read({
-            transportNumber: transportRequest,
-          });
+          const readActiveState = expectResult(
+            await requestClient.readMetadata({
+              transportNumber: transportRequest,
+            }),
+            'readActiveState',
+          );
           expect(readActiveState).toBeDefined();
-          expect(readActiveState?.readResult).toBeDefined();
           logTestStep(
-            `active length: ${getDataLength(
-              readActiveState?.readResult?.data,
-            )}`,
+            `active length: ${getDataLength(readActiveState)}`,
             testsLogger,
           );
 
           logTestStep('read inactive', testsLogger);
-          const readInactiveState = await requestClient.read(
-            {
+          const readInactiveState = expectResult(
+            await requestClient.readMetadata({
               transportNumber: transportRequest,
-            },
-            'inactive',
+            }),
+            'readInactiveState',
           );
           expect(readInactiveState).toBeDefined();
-          expect(readInactiveState?.readResult).toBeDefined();
           logTestStep(
-            `inactive length: ${getDataLength(
-              readInactiveState?.readResult?.data,
-            )}`,
+            `inactive length: ${getDataLength(readInactiveState)}`,
             testsLogger,
           );
 
           logTestStep('read metadata', testsLogger);
-          const metadataState = await requestClient.readMetadata({
-            transportNumber: transportRequest,
-          });
+          const metadataState = expectResult(
+            await requestClient.readMetadata({
+              transportNumber: transportRequest,
+            }),
+            'metadataState',
+          );
           expect(metadataState).toBeDefined();
-          expect(metadataState?.readResult).toBeDefined();
           logTestStep(
-            `metadata length: ${getDataLength(metadataState?.readResult?.data)}`,
+            `metadata length: ${getDataLength(metadataState)}`,
             testsLogger,
           );
 

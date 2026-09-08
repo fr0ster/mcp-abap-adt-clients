@@ -31,6 +31,7 @@ export {
   AdtContentTypesBase,
   AdtContentTypesModern,
 } from './core/shared/contentTypes';
+export { parseCreatedTransport } from './core/transport/parseCreatedTransport';
 export { parseTransportTree } from './core/transport/parseTransportTree';
 /**
  * The refusal a 2xx can carry.

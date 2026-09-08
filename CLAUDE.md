@@ -26,7 +26,17 @@ npm run format          # Format code with Biome
 
 # Test (requires .env with SAP credentials + src/__tests__/helpers/test-config.yaml)
 # IMPORTANT: Always save full log first, then analyze. Never pipe through grep/tail/head.
-npm test 2>&1 | tee test-run.log                  # Run all tests, save log
+#
+# RUNNING FROM AN LLM CLI: use `npm run test:detached`. A full run is ~27 minutes,
+# and an agent CLI supervises what its tool calls start — it stops long background
+# commands when it judges the machine short of memory, judging from the whole
+# machine rather than from this run. Measured: three runs killed that way in one
+# session while jest held 338 MB and 11 GB were free, with no OOM entry in the
+# kernel log at all. `test:detached` reparents the run to init, so it finishes on
+# its own and there is nothing left to stop. Read `test-run.log` afterwards.
+npm run test:detached                             # RECOMMENDED from an agent; writes test-run.log
+npm run test:detached -- integration/core/class   # …one directory
+npm test 2>&1 | tee test-run.log                  # Interactive shell: fine, you are watching it
 npm test -- integration/class 2>&1 | tee test-run.log   # Tests for specific object type
 npm test -- e2e 2>&1 | tee test-run.log            # End-to-end tests (excluded from default run)
 npm run shared:setup 2>&1 | tee shared-setup.log   # Create shared dependencies
@@ -66,16 +76,22 @@ All clients accept `IAbapConnection` + `ILogger`. Optional: `options.enableAccep
 
 ### Design Patterns
 
-**Factory + Handler Pattern**: `AdtClient` creates object-specific handlers that manage operation chains automatically.
+**Factory pattern**: `AdtClient` creates object-specific implementations of the capability contracts in `@mcp-abap-adt/interfaces`.
 
-**Operation Chains**: Handlers orchestrate multi-step operations:
-- Create: validate → create → check → lock → update → unlock → activate
-- Update: lock → check → update → unlock → activate
-- Delete: check(deletion) → delete
+**One endpoint, one member**: every member issues exactly one ADT request. `create` is the POST; `update` is the write and carries `options.lockHandle` as given; `delete` is the DELETE; `checkDeletion` is the approval ADT wants first; `lock`/`unlock` are the lock window. Nothing composes them for the caller.
 
-Error handling in chains: automatic unlock + `setSessionType('stateless')` on any failure. `lockHandle` is always preserved for cleanup.
+A multi-step operation is therefore the consumer's sequence, in the order it chooses:
 
-**Session Management**: Handlers toggle between stateful (during lock) and stateless modes automatically via `connection.setSessionType()`.
+```typescript
+const handle = (await cls.lock(config)).getResult().value;
+await cls.update(config, { sourceCode, lockHandle: handle });
+await cls.unlock(config, handle);
+await cls.activate(config);
+```
+
+The one exception is `AdtMessageClassMessage`, where a message is a row inside its class's document: the write is one PUT, but it needs two lock handles and a read-modify-write of XML this library assembles.
+
+**Session Management**: `lock` sets stateful and `unlock` restores stateless. No other member touches `connection.setSessionType()` — asserted by `src/__tests__/unit/capabilities/behaviour.test.ts`.
 
 **Interface-Only Communication**: All code depends on `IAbapConnection` interface, not concrete implementations. `@mcp-abap-adt/connection` (dev dependency) provides the concrete implementation, used only in tests.
 

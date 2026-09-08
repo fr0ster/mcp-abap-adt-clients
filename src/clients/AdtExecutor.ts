@@ -1,9 +1,4 @@
-import type {
-  IAbapConnection,
-  IClassExecutor,
-  ILogger,
-  IProgramExecutor,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import { ClassExecutor, ProgramExecutor } from '../executors';
 import { withRefusalDetection } from '../utils/refusalAware';
 
@@ -19,11 +14,11 @@ export class AdtExecutor {
     this.logger = logger;
   }
 
-  getClassExecutor(): IClassExecutor {
+  getClassExecutor(): ClassExecutor {
     return new ClassExecutor(this.connection, this.logger);
   }
 
-  getProgramExecutor(): IProgramExecutor {
+  getProgramExecutor(): ProgramExecutor {
     return new ProgramExecutor(this.connection, this.logger);
   }
 }

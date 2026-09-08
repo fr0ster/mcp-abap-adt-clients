@@ -7,7 +7,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -27,7 +27,7 @@ export async function updateClassLocalTypes(
   connection: IAbapConnection,
   className: string,
   localTypesSource: string,
-  lockHandle: string,
+  lockHandle?: string,
   transportRequest?: string,
   sourceContentType?: string,
 ): Promise<IAdtWireResponse> {
@@ -59,7 +59,7 @@ export async function updateClassDefinitions(
   connection: IAbapConnection,
   className: string,
   definitionsSource: string,
-  lockHandle: string,
+  lockHandle?: string,
   transportRequest?: string,
   sourceContentType?: string,
 ): Promise<IAdtWireResponse> {
@@ -92,7 +92,7 @@ export async function updateClassMacros(
   connection: IAbapConnection,
   className: string,
   macrosSource: string,
-  lockHandle: string,
+  lockHandle?: string,
   transportRequest?: string,
   sourceContentType?: string,
 ): Promise<IAdtWireResponse> {
@@ -123,7 +123,7 @@ async function updateClassInclude(
   className: string,
   includeSource: string,
   includeType: 'implementations' | 'definitions' | 'macros',
-  lockHandle: string,
+  lockHandle?: string,
   transportRequest?: string,
   sourceContentType?: string,
 ): Promise<IAdtWireResponse> {
@@ -133,15 +133,8 @@ async function updateClassInclude(
     throw new Error(`${includeType} source code is required`);
   }
 
-  if (!lockHandle) {
-    throw new Error(`lockHandle is required to update ${includeType}`);
-  }
-
   const encodedName = encodeSapObjectName(className).toLowerCase();
-  let url = `/sap/bc/adt/oo/classes/${encodedName}/includes/${includeType}?lockHandle=${encodeURIComponent(lockHandle)}`;
-  if (transportRequest) {
-    url += `&corrNr=${transportRequest}`;
-  }
+  const url = `/sap/bc/adt/oo/classes/${encodedName}/includes/${includeType}${writeQuery(lockHandle, transportRequest)}`;
 
   const contentType = sourceContentType || CT_SOURCE;
   const headers = {

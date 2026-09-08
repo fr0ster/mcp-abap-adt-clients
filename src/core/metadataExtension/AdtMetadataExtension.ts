@@ -1,38 +1,45 @@
-import { beginCriticalSection } from '../../utils/criticalSection';
 /**
- * AdtMetadataExtension - High-level CRUD operations for Metadata Extension (DDLX) objects
+ * AdtMetadataExtension - CRUD for `DDLX/EX` metadata extensions.
  *
- * Implements IAdtObject interface with automatic operation chains,
- * error handling, and resource cleanup.
- *
- * Uses low-level functions directly (not Builder classes).
- *
- * Session management:
- * - stateful: only when doing lock/update/unlock operations
- * - stateless: obligatory after unlock
- * - If no lock/unlock, no stateful needed
- * - activate uses same session/cookies (no stateful needed)
- *
- * Operation chains:
- * - Create: validate → create → check → lock → check(inactive) → update → unlock → check → activate
- * - Update: lock → check(inactive) → update → unlock → check → activate
- * - Delete: check(deletion) → delete
+ * Every member answers `IAdtResponse<T>`, where T is what the result set given
+ * at construction makes of that endpoint's answer.
  */
-
 import type {
-  HttpError,
   IAbapConnection,
+  IAdtActivatable,
+  IAdtCheckable,
+  IAdtCreatable,
+  IAdtCreateOptions,
+  IAdtDeletable,
+  IAdtError,
+  IAdtLockable,
+  IAdtMetadataReadable,
   IAdtOperationOptions,
-  IAdtSourceObject,
+  IAdtReadable,
+  IAdtResponse,
   IAdtSystemContext,
+  IAdtTransportAware,
+  IAdtUpdatable,
+  IAdtValidatable,
+  IAdtVersionable,
+  IAnalyse,
   ILogger,
+  IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
-import { safeErrorMessage } from '../../utils/internalUtils';
+import { activationRefusal } from '../../utils/activationUtils';
+import { answering } from '../../utils/adtResponse';
+import { withCallTimeout } from '../../utils/callTimeout';
+import { deletionRefusal } from '../../utils/deletionCheck';
+import { encodeSapObjectName } from '../../utils/internalUtils';
+import { validationRefusal } from '../../utils/validationRefusal';
+import { inStatefulSession } from '../shared/capabilities/statefulSession';
+import { checkDeletionByUri } from '../shared/deletionCheckByUri';
 import {
   createLockTracker,
   type LockRegistry,
   type LockTracker,
 } from '../shared/LockRegistry';
+import type { ObjectVersion } from '../shared/results';
 import type { IReadOptions } from '../shared/types';
 import { activateMetadataExtension } from './activate';
 import { checkMetadataExtension } from './check';
@@ -44,24 +51,41 @@ import {
   readMetadataExtension,
   readMetadataExtensionSource,
 } from './read';
-import type {
-  IMetadataExtensionConfig,
-  IMetadataExtensionState,
+import {
+  type IMetadataExtensionConfig,
+  type IMetadataExtensionResults,
+  metadataExtensionDocuments,
 } from './types';
 import { unlockMetadataExtension } from './unlock';
 import { updateMetadataExtension } from './update';
 import { validateMetadataExtension } from './validation';
-
 import {
   getMetadataExtensionVersionSource,
   getMetadataExtensionVersions,
 } from './versions';
-export class AdtMetadataExtension
-  implements IAdtSourceObject<IMetadataExtensionConfig, IMetadataExtensionState>
+
+export class AdtMetadataExtension<
+  R extends IMetadataExtensionResults = typeof metadataExtensionDocuments,
+> implements
+    IAdtCreatable<IMetadataExtensionConfig, ReturnType<R['created']>>,
+    IAdtReadable<IMetadataExtensionConfig, ReturnType<R['source']>>,
+    IAdtMetadataReadable<IMetadataExtensionConfig, ReturnType<R['metadata']>>,
+    IAdtUpdatable<Partial<IMetadataExtensionConfig>, ReturnType<R['updated']>>,
+    IAdtDeletable<
+      IMetadataExtensionConfig,
+      ReturnType<R['deletion']>,
+      ReturnType<R['deletionCheck']>
+    >,
+    IAdtValidatable<IMetadataExtensionConfig, ReturnType<R['validation']>>,
+    IAdtCheckable<IMetadataExtensionConfig, ReturnType<R['check']>>,
+    IAdtActivatable<IMetadataExtensionConfig, ReturnType<R['activation']>>,
+    IAdtLockable<IMetadataExtensionConfig>,
+    IAdtTransportAware<IMetadataExtensionConfig, ReturnType<R['transport']>>,
+    IAdtVersionable<IMetadataExtensionConfig, ObjectVersion[], string>
 {
-  private readonly connection: IAbapConnection;
-  private readonly logger?: ILogger;
-  private readonly systemContext: IAdtSystemContext;
+  protected readonly connection: IAbapConnection;
+  protected readonly logger?: ILogger;
+  protected readonly systemContext: IAdtSystemContext;
   private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'MetadataExtension';
 
@@ -70,6 +94,11 @@ export class AdtMetadataExtension
     logger?: ILogger,
     systemContext?: IAdtSystemContext,
     lockRegistry?: LockRegistry,
+    // The one cast in this file, and it is on the default: the shipped set
+    // satisfies the erased bound, which the compiler cannot see through the
+    // `unknown`s. A cast on a member would be the factory lying about what it
+    // answers.
+    protected readonly results: R = metadataExtensionDocuments as unknown as R,
   ) {
     this.connection = connection;
     this.logger = logger;
@@ -82,566 +111,332 @@ export class AdtMetadataExtension
     );
   }
 
-  /**
-   * Validate metadata extension configuration before creation
-   */
-  async validate(
-    config: Partial<IMetadataExtensionConfig>,
-  ): Promise<IMetadataExtensionState> {
-    const state: IMetadataExtensionState = { errors: [] };
+  /** The name, or the caller's mistake — nothing was asked of the server yet. */
+  private name(config: Partial<IMetadataExtensionConfig>): string {
     if (!config.name) {
-      const error = new Error(
-        'Metadata extension name is required for validation',
-      );
-      state.errors.push({ method: 'validate', error, timestamp: new Date() });
-      throw error;
+      throw new Error('Name is required');
     }
-    if (!config.packageName) {
-      const error = new Error('Package name is required for validation');
-      state.errors.push({ method: 'validate', error, timestamp: new Date() });
-      throw error;
-    }
-
-    const response = await validateMetadataExtension(this.connection, {
-      name: config.name,
-      description: config.description || config.name,
-      packageName: config.packageName,
-    });
-    state.validationResponse = response;
-    return state;
+    return config.name;
   }
 
-  /**
-   * Create metadata extension with full operation chain
-   */
-  async create(
-    config: IMetadataExtensionConfig,
-    _options?: IAdtOperationOptions,
-  ): Promise<IMetadataExtensionState> {
-    const state: IMetadataExtensionState = { errors: [] };
-    if (!config.name) {
-      const error = new Error('Metadata extension name is required');
-      state.errors.push({ method: 'create', error, timestamp: new Date() });
-      throw error;
-    }
+  /** Validate the name before creating the object. */
+  async validate<E extends IAdtError = IAdtError>(
+    config: Partial<IMetadataExtensionConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const name = this.name(config);
     if (!config.packageName) {
-      const error = new Error('Package name is required');
-      state.errors.push({ method: 'create', error, timestamp: new Date() });
-      throw error;
+      throw new Error('Package name is required for validation');
+    }
+
+    return answering(
+      () =>
+        validateMetadataExtension(connection, {
+          name,
+          description: config.description ?? name,
+          packageName: config.packageName as string,
+        }),
+      this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
+      (options?.analyse ?? validationRefusal) as IAnalyse<E>,
+    );
+  }
+
+  /** Create the object. */
+  async create<E extends IAdtError = IAdtError>(
+    config: Omit<IMetadataExtensionConfig, 'sourceCode'> & {
+      sourceCode?: never;
+    },
+    options?: IAdtCreateOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const name = this.name(config);
+    if (!config.packageName) {
+      throw new Error('Package name is required');
     }
     if (!config.description) {
-      const error = new Error('Description is required');
-      state.errors.push({ method: 'create', error, timestamp: new Date() });
-      throw error;
+      throw new Error('Description is required');
     }
-
-    try {
-      // Create metadata extension
-      this.logger?.info?.('Creating metadata extension');
-      const createResponse = await createMetadataExtension(this.connection, {
-        name: config.name,
-        packageName: config.packageName,
-        transportRequest: config.transportRequest,
-        description: config.description,
-        masterLanguage:
-          config.masterLanguage ?? this.systemContext.masterLanguage,
-        masterSystem: config.masterSystem ?? this.systemContext.masterSystem,
-        responsible: config.responsible ?? this.systemContext.responsible,
-      });
-      state.createResult = createResponse;
-      this.logger?.info?.('Metadata extension created');
-
-      return state;
-    } catch (error: unknown) {
-      this.logger?.error('Create failed:', safeErrorMessage(error));
-      throw error;
-    }
+    return answering(
+      () =>
+        createMetadataExtension(connection, {
+          name,
+          description: config.description as string,
+          packageName: config.packageName as string,
+          transportRequest: config.transportRequest,
+          masterLanguage: config.masterLanguage,
+          masterSystem: this.systemContext.masterSystem,
+          responsible: this.systemContext.responsible,
+        }),
+      this.results.created as IResultStrategy<ReturnType<R['created']>>,
+      options?.analyse,
+    );
   }
 
-  /**
-   * Read metadata extension
-   */
-  async read(
+  /** Read the object. */
+  async read<E extends IAdtError = IAdtError>(
     config: Partial<IMetadataExtensionConfig>,
     version?: 'active' | 'inactive',
-    options?: IReadOptions,
-  ): Promise<IMetadataExtensionState | undefined> {
-    const state: IMetadataExtensionState = { errors: [] };
-    if (!config.name) {
-      const error = new Error('Metadata extension name is required');
-      state.errors.push({ method: 'read', error, timestamp: new Date() });
-      throw error;
-    }
+    options?: IReadOptions & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
 
-    try {
-      const response = await readMetadataExtensionSource(
-        this.connection,
-        config.name,
-        version,
-        options,
-        this.logger,
-      );
-      const _sourceCode =
-        typeof response.data === 'string'
-          ? response.data
-          : JSON.stringify(response.data);
+    const name = this.name(config);
 
-      return {
-        readResult: response,
-        errors: [],
-      };
-    } catch (error: unknown) {
-      const e = error as HttpError;
-      if (e.response?.status === 404) {
-        return state;
-      }
-      const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({ method: 'read', error: err, timestamp: new Date() });
-      this.logger?.error('read', safeErrorMessage(err));
-      throw err;
-    }
+    // No 404 special case: ADT answers a read for a missing object with 200 and
+    // an empty body, so absence was never a status to branch on — and whether
+    // an empty body *is* absence is the caller's reading, through `analyse`.
+    return answering(
+      () =>
+        readMetadataExtensionSource(
+          connection,
+          name,
+          version ?? 'active',
+          options,
+        ),
+      this.results.source as IResultStrategy<ReturnType<R['source']>>,
+      options?.analyse,
+    );
+  }
+
+  /** Read the object's metadata document. */
+  async readMetadata<E extends IAdtError = IAdtError>(
+    config: Partial<IMetadataExtensionConfig>,
+    options?: IReadOptions & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const name = this.name(config);
+
+    return answering(
+      () => readMetadataExtension(connection, name, options),
+      this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
+      options?.analyse,
+    );
+  }
+
+  /** The transport request the object belongs to. */
+  async readTransport<E extends IAdtError = IAdtError>(
+    config: Partial<IMetadataExtensionConfig>,
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const name = this.name(config);
+
+    return answering(
+      () => getMetadataExtensionTransport(connection, name, options),
+      this.results.transport as IResultStrategy<ReturnType<R['transport']>>,
+      options?.analyse,
+    );
   }
 
   /**
-   * Read metadata extension metadata (object characteristics: package, responsible, description, etc.)
+   * Write the object.
+   *
+   * With `options.lockHandle` the caller holds the lock and owns the chain, so
+   * this is one request. Without it, this locks, checks, writes and unlocks —
+   * and the unlock happens on every path out.
    */
-  async readMetadata(
+  async update<E extends IAdtError = IAdtError>(
     config: Partial<IMetadataExtensionConfig>,
-    options?: IReadOptions,
-  ): Promise<IMetadataExtensionState> {
-    const state: IMetadataExtensionState = { errors: [] };
-    if (!config.name) {
-      const error = new Error('Metadata extension name is required');
-      state.errors.push({
-        method: 'readMetadata',
-        error,
-        timestamp: new Date(),
-      });
-      throw error;
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const name = this.name(config);
+    // The source is the caller's, through `options.sourceCode`. This used to
+    // fall back to `config.sourceCode` — two channels for one value, where the
+    // contract documents one. `config.sourceCode` is `check`'s alone now: a
+    // syntax check compiles a source that is not on the server yet, so it has
+    // nowhere else to arrive.
+    const source = options?.sourceCode;
+
+    if (!source) {
+      throw new Error('Source code is required for update');
     }
-    try {
-      const response = await readMetadataExtension(
-        this.connection,
-        config.name,
-        options,
-        this.logger,
-      );
-      state.metadataResult = response;
-      this.logger?.info?.('Metadata extension metadata read successfully');
-      return state;
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({
-        method: 'readMetadata',
-        error: err,
-        timestamp: new Date(),
-      });
-      this.logger?.error('readMetadata', safeErrorMessage(err));
-      throw err;
-    }
-  }
-
-  /**
-   * Read transport request information for the metadata extension
-   */
-  async readTransport(
-    config: Partial<IMetadataExtensionConfig>,
-    options?: { withLongPolling?: boolean },
-  ): Promise<IMetadataExtensionState> {
-    const state: IMetadataExtensionState = { errors: [] };
-    if (!config.name) {
-      const error = new Error('Metadata extension name is required');
-      state.errors.push({
-        method: 'readTransport',
-        error,
-        timestamp: new Date(),
-      });
-      throw error;
-    }
-    try {
-      const response = await getMetadataExtensionTransport(
-        this.connection,
-        config.name,
-        options?.withLongPolling !== undefined
-          ? { withLongPolling: options.withLongPolling }
-          : undefined,
-      );
-      state.transportResult = response;
-      this.logger?.info?.(
-        'Metadata extension transport request read successfully',
-      );
-      return state;
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({
-        method: 'readTransport',
-        error: err,
-        timestamp: new Date(),
-      });
-      this.logger?.error('readTransport', safeErrorMessage(err));
-      throw err;
-    }
-  }
-
-  /**
-   * Update metadata extension with full operation chain
-   * Always starts with lock
-   * If options.lockHandle is provided, performs only low-level update without lock/check/unlock chain
-   */
-  async update(
-    config: Partial<IMetadataExtensionConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IMetadataExtensionState> {
-    const state: IMetadataExtensionState = { errors: [] };
-    if (!config.name) {
-      const error = new Error('Metadata extension name is required');
-      state.errors.push({ method: 'update', error, timestamp: new Date() });
-      throw error;
-    }
-
-    // Low-level mode: if lockHandle is provided, perform only update operation
-    if (options?.lockHandle) {
-      const codeToUpdate = options?.sourceCode || config.sourceCode;
-      if (!codeToUpdate) {
-        throw new Error('Source code is required for update');
-      }
-
-      this.logger?.info?.(
-        'Low-level update: performing update only (lockHandle provided)',
-      );
-      const updateResponse = await updateMetadataExtension(
-        this.connection,
-        config.name,
-        codeToUpdate,
-        options.lockHandle,
-        config.transportRequest,
-      );
-      this.logger?.info?.('Metadata extension updated (low-level)');
-      return {
-        updateResult: updateResponse,
-        errors: [],
-      };
-    }
-
-    let lockHandle: string | undefined;
-
-    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
-
-    // the lock but leaves the work half-done.
-
-    const endCriticalSection = beginCriticalSection(this.connection);
-
-    try {
-      // 1. Lock (update always starts with lock, stateful ONLY before lock)
-      this.logger?.info?.('Step 1: Locking metadata extension');
-      this.connection.setSessionType('stateful');
-      lockHandle = await lockMetadataExtension(this.connection, config.name);
-      this.lockTracker.track(config.name, lockHandle);
-      this.logger?.info?.('Metadata extension locked, handle:', lockHandle);
-
-      // 2. Check inactive with code for update (from options or config)
-      const codeToCheck = options?.sourceCode || config.sourceCode;
-      if (codeToCheck) {
-        this.logger?.info?.(
-          'Step 2: Checking inactive version with update content',
-        );
-        await checkMetadataExtension(
-          this.connection,
-          config.name,
-          'inactive',
-          codeToCheck,
-        );
-        this.logger?.info?.('Check inactive with update content passed');
-      }
-
-      // 3. Update
-      if (codeToCheck && lockHandle) {
-        this.logger?.info?.('Step 3: Updating metadata extension');
-        await updateMetadataExtension(
-          this.connection,
-          config.name,
-          codeToCheck,
-          lockHandle,
+    return answering(
+      () =>
+        updateMetadataExtension(
+          connection,
+          name,
+          source as string,
+          options?.lockHandle,
           config.transportRequest,
-        );
-        this.logger?.info?.('Metadata extension updated');
-
-        // 3.5. Read with long polling (wait for object to be ready after update)
-        this.logger?.info?.('read (wait for object ready after update)');
-        try {
-          await this.read({ name: config.name }, 'active', {
-            withLongPolling: true,
-          });
-          this.logger?.info?.('object is ready after update');
-        } catch (readError) {
-          this.logger?.warn?.(
-            'read with long polling failed (object may not be ready yet):',
-            safeErrorMessage(readError),
-          );
-          // Continue anyway - unlock might still work
-        }
-      }
-
-      // 4. Unlock (obligatory stateless after unlock)
-      if (lockHandle) {
-        this.logger?.info?.('Step 4: Unlocking metadata extension');
-        this.connection.setSessionType('stateful');
-        await unlockMetadataExtension(this.connection, config.name, lockHandle);
-        this.connection.setSessionType('stateless');
-        this.lockTracker.untrack(config.name);
-        lockHandle = undefined;
-        this.logger?.info?.('Metadata extension unlocked');
-      }
-
-      // 5. Final check (no stateful needed)
-      this.logger?.info?.('Step 5: Final check');
-      await checkMetadataExtension(this.connection, config.name, 'inactive');
-      this.logger?.info?.('Final check passed');
-
-      // 6. Activate (if requested, no stateful needed - uses same session/cookies)
-      if (options?.activateOnUpdate) {
-        this.logger?.info?.('Step 6: Activating metadata extension');
-        const activateResponse = await activateMetadataExtension(
-          this.connection,
-          config.name,
-        );
-        this.logger?.info?.(
-          'Metadata extension activated, status:',
-          activateResponse.status,
-        );
-
-        // 6.5. Read with long polling (wait for object to be ready after activation)
-        this.logger?.info?.('read (wait for object ready after activation)');
-        try {
-          await this.read({ name: config.name }, 'active', {
-            withLongPolling: true,
-          });
-          this.logger?.info?.('object is ready after activation');
-        } catch (readError) {
-          this.logger?.warn?.(
-            'read with long polling failed (object may not be ready yet):',
-            safeErrorMessage(readError),
-          );
-          // Continue anyway - return activation response
-        }
-
-        return {
-          activateResult: activateResponse,
-          errors: [],
-        };
-      }
-
-      // Read and return result (no stateful needed)
-      const readResponse = await readMetadataExtensionSource(
-        this.connection,
-        config.name,
-      );
-      const _sourceCode =
-        typeof readResponse.data === 'string'
-          ? readResponse.data
-          : JSON.stringify(readResponse.data);
-
-      return {
-        readResult: readResponse,
-        errors: [],
-      };
-    } catch (error: unknown) {
-      // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
-      if (lockHandle) {
-        try {
-          this.logger?.warn?.(
-            'Unlocking metadata extension during error cleanup',
-          );
-          this.connection.setSessionType('stateful');
-          await unlockMetadataExtension(
-            this.connection,
-            config.name,
-            lockHandle,
-          );
-          this.connection.setSessionType('stateless');
-          this.lockTracker.untrack(config.name);
-        } catch (unlockError) {
-          this.logger?.warn?.(
-            'Failed to unlock during cleanup:',
-            safeErrorMessage(unlockError),
-          );
-        }
-      } else {
-        // Ensure stateless if lock failed
-        this.connection.setSessionType('stateless');
-      }
-
-      if (options?.deleteOnFailure) {
-        try {
-          this.logger?.warn?.('Deleting metadata extension after failure');
-          // No stateful needed - delete doesn't use lock/unlock
-          await deleteMetadataExtension(
-            this.connection,
-            config.name,
-            config.transportRequest,
-          );
-        } catch (deleteError) {
-          this.logger?.warn?.(
-            'Failed to delete metadata extension after failure:',
-            safeErrorMessage(deleteError),
-          );
-        }
-      }
-
-      this.logger?.error('Update failed:', safeErrorMessage(error));
-      throw error;
-    } finally {
-      endCriticalSection();
-    }
+        ),
+      this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      options?.analyse,
+    );
   }
 
+  /** Delete the object. */
   /**
-   * Delete metadata extension
+   * Ask whether the object can be deleted now.
+   *
+   * Its delete is a DELETE on its own URL rather than the deletion service, but
+   * the question is the service's either way: it is asked about an address.
    */
-  async delete(
+  async checkDeletion<E extends IAdtError = IAdtError>(
     config: Partial<IMetadataExtensionConfig>,
-  ): Promise<IMetadataExtensionState> {
-    const state: IMetadataExtensionState = { errors: [] };
-    if (!config.name) {
-      const error = new Error('Metadata extension name is required');
-      state.errors.push({ method: 'delete', error, timestamp: new Date() });
-      throw error;
-    }
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
 
-    try {
-      // Delete (no stateful needed - no lock/unlock, no deletion check for metadata extensions)
-      this.logger?.info?.('Deleting metadata extension');
-      const result = await deleteMetadataExtension(
-        this.connection,
-        config.name,
-        config.transportRequest,
-      );
-      this.logger?.info?.('Metadata extension deleted');
+    const name = this.name(config);
 
-      return {
-        deleteResult: result,
-        errors: [],
-      };
-    } catch (error: unknown) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({
-        method: 'delete',
-        error: err,
-        timestamp: new Date(),
-      });
-      this.logger?.error('Delete', safeErrorMessage(err));
-      throw err;
-    }
+    return answering(
+      () =>
+        checkDeletionByUri(
+          connection,
+          `/sap/bc/adt/ddic/ddlx/sources/${encodeSapObjectName(name).toLowerCase()}`,
+        ),
+      this.results.deletionCheck as IResultStrategy<
+        ReturnType<R['deletionCheck']>
+      >,
+      (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
+    );
   }
 
-  /**
-   * Activate metadata extension
-   * No stateful needed - uses same session/cookies
-   */
-  async activate(
+  async delete<E extends IAdtError = IAdtError>(
     config: Partial<IMetadataExtensionConfig>,
-  ): Promise<IMetadataExtensionState> {
-    const state: IMetadataExtensionState = { errors: [] };
-    if (!config.name) {
-      const error = new Error('Metadata extension name is required');
-      state.errors.push({ method: 'activate', error, timestamp: new Date() });
-      throw error;
-    }
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
 
-    try {
-      const result = await activateMetadataExtension(
-        this.connection,
-        config.name,
-      );
-      return {
-        activateResult: result,
-        errors: [],
-      };
-    } catch (error: unknown) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({
-        method: 'activate',
-        error: err,
-        timestamp: new Date(),
-      });
-      this.logger?.error('Activate', safeErrorMessage(err));
-      throw err;
-    }
+    const name = this.name(config);
+    return answering(
+      () => deleteMetadataExtension(connection, name, config.transportRequest),
+      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      options?.analyse,
+    );
   }
 
-  /**
-   * Check metadata extension
-   */
-  async check(
+  /** Activate the object. Needs no stateful session. */
+  async activate<E extends IAdtError = IAdtError>(
+    config: Partial<IMetadataExtensionConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const name = this.name(config);
+
+    return answering(
+      () => activateMetadataExtension(connection, name),
+      this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
+      (options?.analyse ?? activationRefusal) as IAnalyse<E>,
+    );
+  }
+
+  /** Check the object. */
+  async check<E extends IAdtError = IAdtError>(
     config: Partial<IMetadataExtensionConfig>,
     status?: string,
-  ): Promise<IMetadataExtensionState> {
-    const state: IMetadataExtensionState = { errors: [] };
-    if (!config.name) {
-      const error = new Error('Metadata extension name is required');
-      state.errors.push({ method: 'check', error, timestamp: new Date() });
-      throw error;
-    }
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
 
-    // Map status to version
+    const name = this.name(config);
     const version: 'active' | 'inactive' =
       status === 'active' ? 'active' : 'inactive';
-    const result = await checkMetadataExtension(
-      this.connection,
-      config.name,
-      version,
+
+    return answering(
+      () => checkMetadataExtension(connection, name, version),
+      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      options?.analyse,
     );
-    state.checkResult = result;
-    return state;
   }
 
-  /**
-   * Lock metadata extension for modification
-   */
-  async lock(config: Partial<IMetadataExtensionConfig>): Promise<string> {
-    if (!config.name) {
-      throw new Error('Metadata extension name is required');
-    }
+  /** Lock the object for modification. */
+  async lock(
+    config: Partial<IMetadataExtensionConfig>,
+  ): Promise<IAdtResponse<string>> {
+    const name = this.name(config);
 
-    this.connection.setSessionType('stateful');
-    const lockHandle = await lockMetadataExtension(
-      this.connection,
-      config.name,
+    return answering(
+      async () => {
+        const lockHandle = await inStatefulSession(this.connection, () =>
+          lockMetadataExtension(this.connection, name),
+        );
+        this.lockTracker.track(name, lockHandle);
+        // The handle is the value, and the request does not keep the wire it
+        // came on — so the answer is built around what the request produced.
+        return {
+          data: lockHandle,
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+        };
+      },
+      (answer) => String(answer.data),
     );
-    this.lockTracker.track(config.name, lockHandle);
-    return lockHandle;
   }
 
-  /**
-   * Unlock metadata extension
-   */
+  /** Unlock the object. */
   async unlock(
     config: Partial<IMetadataExtensionConfig>,
     lockHandle: string,
-  ): Promise<IMetadataExtensionState> {
-    if (!config.name) {
-      throw new Error('Metadata extension name is required');
-    }
+  ): Promise<IAdtResponse<void>> {
+    const name = this.name(config);
 
-    this.connection.setSessionType('stateful');
-    const result = await unlockMetadataExtension(
-      this.connection,
-      config.name,
-      lockHandle,
+    return answering(
+      async () => {
+        // UNLOCK must run stateful (older BASIS #106); stateless after.
+        this.connection.setSessionType('stateful');
+        try {
+          return await unlockMetadataExtension(
+            this.connection,
+            name,
+            lockHandle,
+          );
+        } finally {
+          this.connection.setSessionType('stateless');
+          this.lockTracker.untrack(name);
+        }
+      },
+      () => undefined,
     );
-    this.connection.setSessionType('stateless');
-    this.lockTracker.untrack(config.name);
-    return {
-      unlockResult: result,
-      errors: [],
-    };
   }
 
-  getVersions(config: Partial<IMetadataExtensionConfig>) {
-    return getMetadataExtensionVersions(this.connection, config);
+  /** Version history of the object's source. */
+  async getVersions(
+    config: Partial<IMetadataExtensionConfig>,
+  ): Promise<IAdtResponse<ObjectVersion[]>> {
+    return answering(
+      async () => ({
+        data: await getMetadataExtensionVersions(this.connection, config),
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+      }),
+      (answer) => answer.data as ObjectVersion[],
+    );
   }
 
-  getVersionSource(contentUri: string) {
-    return getMetadataExtensionVersionSource(this.connection, contentUri);
+  /** The source of one version, by the `contentUri` an entry carries. */
+  async getVersionSource(contentUri: string): Promise<IAdtResponse<string>> {
+    return answering(
+      async () => ({
+        data: await getMetadataExtensionVersionSource(
+          this.connection,
+          contentUri,
+        ),
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+      }),
+      (answer) => String(answer.data),
+    );
   }
 }

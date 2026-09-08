@@ -8,6 +8,7 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { writeQuery } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -22,14 +23,10 @@ import { getTimeout } from '../../utils/timeouts';
 export async function deleteObjectDirect(
   connection: IAbapConnection,
   objectUrl: string,
-  lockHandle: string,
+  lockHandle: string | undefined,
   transportRequest?: string,
 ) {
-  const params = [`lockHandle=${encodeURIComponent(lockHandle)}`];
-  if (transportRequest?.trim()) {
-    params.push(`corrNr=${transportRequest}`);
-  }
-  const url = `${objectUrl}?${params.join('&')}`;
+  const url = `${objectUrl}${writeQuery(lockHandle, transportRequest?.trim())}`;
 
   return connection.makeAdtRequest({
     url,

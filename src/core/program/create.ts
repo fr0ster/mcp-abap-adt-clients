@@ -7,15 +7,8 @@ import type {
   IAdtContentTypes,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
-import {
-  ACCEPT_SOURCE,
-  CT_PROGRAM,
-  CT_SOURCE,
-} from '../../constants/contentTypes';
-import {
-  encodeSapObjectName,
-  limitDescription,
-} from '../../utils/internalUtils';
+import { CT_PROGRAM } from '../../constants/contentTypes';
+import { limitDescription } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { ICreateProgramParams } from './types';
 
@@ -118,34 +111,6 @@ export async function create(
     method: 'POST',
     timeout: getTimeout('default'),
     data: metadataXml,
-    headers,
-  });
-}
-
-/**
- * Upload program source code
- */
-async function _uploadProgramSource(
-  connection: IAbapConnection,
-  programName: string,
-  sourceCode: string,
-  lockHandle: string,
-  _sessionId: string,
-  transportRequest?: string,
-): Promise<IAdtWireResponse> {
-  const queryParams = `lockHandle=${encodeURIComponent(lockHandle)}${transportRequest ? `&corrNr=${transportRequest}` : ''}`;
-  const url = `/sap/bc/adt/programs/programs/${encodeSapObjectName(programName).toLowerCase()}/source/main?${queryParams}`;
-
-  const headers = {
-    Accept: ACCEPT_SOURCE,
-    'Content-Type': CT_SOURCE,
-  };
-
-  return connection.makeAdtRequest({
-    url,
-    method: 'PUT',
-    timeout: getTimeout('default'),
-    data: sourceCode,
     headers,
   });
 }

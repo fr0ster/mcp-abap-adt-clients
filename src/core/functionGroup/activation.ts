@@ -6,7 +6,6 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
-import { assertActivationSucceeded } from '../../utils/activationUtils';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 
 /**
@@ -36,6 +35,5 @@ export async function activateFunctionGroup(
       Accept: 'application/xml',
     },
   });
-  assertActivationSucceeded('Function group', response.data);
   return response;
 }

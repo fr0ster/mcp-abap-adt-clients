@@ -15,10 +15,11 @@ import * as path from 'node:path';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type { ITableConfig, ITableState } from '../../../../core/table';
+import type { ITableConfig } from '../../../../core/table';
 import { getTable } from '../../../../core/table/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -66,7 +67,7 @@ describe('Table (using AdtClient)', () => {
   let hasConfig = false;
   let isLegacy = false;
   let isCloudSystem = false;
-  let tester: BaseTester<ITableConfig, ITableState>;
+  let tester: BaseTester<ITableConfig>;
 
   beforeAll(async () => {
     try {
@@ -223,8 +224,8 @@ describe('Table (using AdtClient)', () => {
           const resultState = await tester.readTest({
             tableName: standardTableName,
           });
-          expect(resultState?.readResult).toBeDefined();
-          const tableConfig = resultState?.readResult;
+          expect(resultState).toBeDefined();
+          const tableConfig = resultState;
           if (
             tableConfig &&
             typeof tableConfig === 'object' &&

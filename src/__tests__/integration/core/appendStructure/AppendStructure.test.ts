@@ -20,6 +20,7 @@ import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -172,14 +173,16 @@ describe('AppendStructure (TABL/DS) integration', () => {
             // undefined, but getTable().read() returns { readResult: undefined }.
             // Check readResult for the table case to detect a missing base.
             if (baseKey === 'base_table') {
-              const baseState = await client
-                .getTable()
-                .read({ tableName: baseObject });
-              baseExists = !!baseState?.readResult;
+              const baseState = expectResult(
+                await client.getTable().read({ tableName: baseObject }),
+                'baseState',
+              );
+              baseExists = !!baseState;
             } else {
-              const baseState = await client
-                .getStructure()
-                .read({ structureName: baseObject });
+              const baseState = expectResult(
+                await client.getStructure().read({ structureName: baseObject }),
+                'baseState',
+              );
               baseExists = !!baseState;
             }
           } catch (baseError) {
@@ -250,9 +253,27 @@ describe('AppendStructure (TABL/DS) integration', () => {
               .replaceAll('{base}', baseObject)
               .replaceAll('{append}', appendStructureName);
 
-            await as.update(
-              { appendStructureName, transportRequest, sourceCode: source },
-              { activateOnUpdate: true },
+            // The lock window is the caller's since 18.0.0: `update` is the
+            // PUT and takes the handle it is given, so the three calls are
+            // here, in the order this test decides.
+            const appendLock = expectResult(
+              await as.lock({ appendStructureName }),
+              'lock append structure',
+            );
+            try {
+              expectResult(
+                await as.update(
+                  { appendStructureName, transportRequest },
+                  { sourceCode: source, lockHandle: appendLock },
+                ),
+                'update append structure',
+              );
+            } finally {
+              await as.unlock({ appendStructureName }, appendLock);
+            }
+            expectResult(
+              await as.activate({ appendStructureName }),
+              'activate append structure',
             );
 
             // ── 4) Read back — the CONTENT, not the status ──
@@ -265,24 +286,25 @@ describe('AppendStructure (TABL/DS) integration', () => {
             //   }
             //
             // Assert the field actually arrived.
-            const readState = await as.read({ appendStructureName }, 'active');
-            expect(readState).toBeDefined();
-            expect(readState?.readResult).toBeDefined();
-            expect((readState?.readResult as any)?.status).toBe(200);
-
-            const writtenSource = String(
-              (readState?.readResult as { data?: unknown })?.data ?? '',
+            const writtenSource = expectResult(
+              await as.read({ appendStructureName }, 'active'),
+              'read append structure source',
             );
+            expect(typeof writtenSource).toBe('string');
+
             const fieldName = /^\s*(zz_\w+)\s*:/m.exec(source)?.[1];
             expect(fieldName).toBeDefined();
             expect(writtenSource).toContain(fieldName as string);
 
             // ── 5) Delete ──
-            const deleteState = await as.delete({
-              appendStructureName,
-              transportRequest,
-            });
-            expect(deleteState.deleteResult).toBeDefined();
+            const deleteState = expectResult(
+              await as.delete({
+                appendStructureName,
+                transportRequest,
+              }),
+              'deleteState',
+            );
+            expect(deleteState).toBeDefined();
 
             logTestSuccess(testsLogger, TEST_LABEL);
           } catch (error) {

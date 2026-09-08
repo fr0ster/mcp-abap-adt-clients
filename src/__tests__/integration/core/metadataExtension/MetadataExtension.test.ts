@@ -15,10 +15,7 @@ import * as path from 'node:path';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type {
-  IMetadataExtensionConfig,
-  IMetadataExtensionState,
-} from '../../../../core/metadataExtension';
+import type { IMetadataExtensionConfig } from '../../../../core/metadataExtension';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
 import {
@@ -59,7 +56,7 @@ describe('MetadataExtension (using AdtClient)', () => {
   let client: AdtClient;
   let hasConfig = false;
   let isLegacy = false;
-  let tester: BaseTester<IMetadataExtensionConfig, IMetadataExtensionState>;
+  let tester: BaseTester<IMetadataExtensionConfig>;
 
   function generateDefaultSourceCode(
     extName: string,

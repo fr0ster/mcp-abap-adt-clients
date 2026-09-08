@@ -103,9 +103,7 @@ describe('checkDeletionGroup', () => {
     if (!response.ok) {
       throw new Error(`expected a result: ${response.getError().message}`);
     }
-    expect(String(response.getResult().value?.data)).toContain(
-      'isDeletable="false"',
-    );
+    expect(response.getResult().value).toContain('isDeletable="false"');
   });
 });
 

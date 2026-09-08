@@ -1,7 +1,6 @@
 import type {
   IAbapConnection,
-  IAbapTraceEntry,
-  IAbapTraceViews,
+  IAdtResponse,
   IAdtWireResponse,
   ILogger,
   IProfiler,
@@ -13,6 +12,7 @@ import type {
   ViewArgs,
   ViewResult,
 } from '@mcp-abap-adt/interfaces';
+import { answering, answeringValue } from '../../utils/adtResponse';
 import {
   buildTraceParametersXml,
   createTraceParameters,
@@ -35,8 +35,9 @@ import {
   parseStatements,
   parseTraceEntries,
 } from './traceParsing';
+import type { IAbapTraceEntry, IAbapTraceViews } from './types';
 
-export class Profiler implements IProfiler {
+export class Profiler implements IProfiler<IAbapTraceEntry, IAbapTraceViews> {
   readonly kind = 'profiler' as const;
 
   constructor(
@@ -54,8 +55,13 @@ export class Profiler implements IProfiler {
    * a few identifying fields measured on two systems that agreed; there is
    * nothing in it to read a second way.
    */
-  async list(options?: IProfilerListOptions): Promise<IAbapTraceEntry[]> {
-    return parseTraceEntries(await listTraceFiles(this.connection, options));
+  async list(
+    options?: IProfilerListOptions,
+  ): Promise<IAdtResponse<IAbapTraceEntry[]>> {
+    return answering(
+      () => listTraceFiles(this.connection, options),
+      (answer) => parseTraceEntries(answer),
+    );
   }
 
   /**
@@ -72,16 +78,18 @@ export class Profiler implements IProfiler {
    * What a missing id does is not measured — a `404` would reject here, and a
    * caller that must tolerate one has to catch until somebody measures a repeat.
    */
-  async delete(traceId: string): Promise<void> {
-    await deleteTrace(this.connection, traceId);
+  async delete(traceId: string): Promise<IAdtResponse<void>> {
+    return answering(
+      () => deleteTrace(this.connection, traceId),
+      () => undefined,
+    );
   }
 
   /**
    * The raw response for a view, before anything is made of it.
    *
-   * Shared by {@link read} and {@link readWith}, so the two differ in exactly
-   * one thing — who turns the document into a value — and cannot drift apart on
-   * which URL or which options they send.
+   * One place that knows which URL and which options a view sends, so nothing
+   * built on top of it can drift from what {@link read} asks for.
    */
   private async viewResponse<K extends keyof IAbapTraceViews>(
     traceId: string,
@@ -114,47 +122,45 @@ export class Profiler implements IProfiler {
   }
 
   /**
-   * What is inside one trace, read the plain way.
+   * What is inside one trace.
    *
    * The mapping is deliberately plain: document onto the view's type, nothing
    * more. No filtering, no reshaping — those belong to the server, which has
-   * endpoints for them, and to the caller, which has {@link readWith}.
+   * endpoints for them. A `readWith(parse, …)` sat beside this until 31.0.0,
+   * making how far the answer was read a property of which method was called;
+   * a consumer who wants another reading implements `IProfiler`, which is
+   * generic in what its views answer for exactly that reason.
    */
   async read<K extends keyof IAbapTraceViews>(
     traceId: string,
     view: K,
     ...args: ViewArgs<IAbapTraceViews, K>
-  ): Promise<ViewResult<IAbapTraceViews, K>> {
+  ): Promise<IAdtResponse<ViewResult<IAbapTraceViews, K>>> {
     const [options] = args;
-    const response = await this.viewResponse(traceId, view, options);
-    switch (view) {
-      case 'hitlist':
-        return parseHitList(response) as ViewResult<IAbapTraceViews, K>;
-      case 'statements':
-        return parseStatements(response) as ViewResult<IAbapTraceViews, K>;
-      case 'dbAccesses':
-        return parseDbAccesses(response) as ViewResult<IAbapTraceViews, K>;
-      default:
-        throw new Error(`Unknown trace view: ${String(view)}`);
+    // Before the request, not inside it: a view this family does not have is a
+    // caller error, and classified inside `answering` it would come back as
+    // `origin: 'connection'` — advice to check the network over a name the
+    // compiler already refuses.
+    if (view !== 'hitlist' && view !== 'statements' && view !== 'dbAccesses') {
+      throw new Error(`Unknown trace view: ${String(view)}`);
     }
-  }
 
-  /**
-   * The same read, parsed by the caller.
-   *
-   * `parse` receives the response body exactly as it arrived. A consumer whose
-   * system answers in a shape the default mapping does not fit passes its own
-   * reader and keeps a type — it is not sent back to an untyped response, and
-   * this library does not grow a second opinion about somebody else's XML.
-   */
-  async readWith<K extends keyof IAbapTraceViews, T>(
-    parse: (data: unknown) => T,
-    traceId: string,
-    view: K,
-    ...args: ViewArgs<IAbapTraceViews, K>
-  ): Promise<T> {
-    const [options] = args;
-    return parse((await this.viewResponse(traceId, view, options)).data);
+    return answering(
+      () => this.viewResponse(traceId, view, options),
+      (answer) => {
+        switch (view) {
+          case 'hitlist':
+            return parseHitList(answer) as ViewResult<IAbapTraceViews, K>;
+          case 'statements':
+            return parseStatements(answer) as ViewResult<IAbapTraceViews, K>;
+          case 'dbAccesses':
+            return parseDbAccesses(answer) as ViewResult<IAbapTraceViews, K>;
+          default:
+            // Unreachable through the typed surface; reachable from JavaScript.
+            throw new Error(`Unknown trace view: ${String(view)}`);
+        }
+      },
+    );
   }
 
   buildParametersXml(options?: IProfilerTraceParameters): string {

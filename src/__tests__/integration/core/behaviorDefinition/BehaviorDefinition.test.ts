@@ -11,10 +11,7 @@ import * as path from 'node:path';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type {
-  IBehaviorDefinitionConfig,
-  IBehaviorDefinitionState,
-} from '../../../../core/behaviorDefinition';
+import type { IBehaviorDefinitionConfig } from '../../../../core/behaviorDefinition';
 import { read as readBdef } from '../../../../core/behaviorDefinition/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
@@ -59,7 +56,7 @@ describe('BehaviorDefinition (using AdtClient)', () => {
   let hasConfig = false;
   let isLegacy = false;
   let systemContext: Awaited<ReturnType<typeof resolveSystemContext>>;
-  let tester: BaseTester<IBehaviorDefinitionConfig, IBehaviorDefinitionState>;
+  let tester: BaseTester<IBehaviorDefinitionConfig>;
 
   beforeAll(async () => {
     try {

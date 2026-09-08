@@ -2,21 +2,19 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { activateObjectInSession } from '../../../utils/activationUtils';
 
 /**
- * Regression guard for the false-success masking bug (issue #78).
+ * The writer hands the answer over. It does not judge it.
  *
  * ADT `/sap/bc/adt/activation` returns HTTP 200 even when activation fails on a
- * syntax error, carrying `<msg type="E">` in the body.
- * `activateObjectInSession` must throw on that, while preserving success for
- * empty / unrecognized bodies.
+ * syntax error, carrying `<msg type="E">` in the body — the false success of
+ * issue #78. This function used to throw a plain `Error` for that, which
+ * `recogniseFailure` classified `origin: 'connection'`: a caller sent to check
+ * a network that had worked. The verdict is `activationRefusal`'s, pinned in
+ * `activationRefusal.test.ts`, and every `activate` member defaults to it.
  *
- * The signal is the `E` message alone. `activationExecuted="false"` says only
- * that ADT did no work, which is also what an already-active class reports — so
- * it cannot distinguish a failure and must not be treated as one. The locked
- * object this file once claimed to cover is answered with HTTP 403 and never
- * reaches the body parser; the fixture below is kept for its `E` message, not
- * for the lock scenario in its wording.
+ * So what is left here is that the answer arrives whole, whatever it says —
+ * because a strategy that is handed nothing cannot name anything.
  */
-describe('activateObjectInSession — failed activation must not masquerade as success', () => {
+describe('activateObjectInSession hands the answer on, whatever it says', () => {
   const OBJECT_URI = '/sap/bc/adt/ddic/domains/zd_mask_test';
   const OBJECT_NAME = 'ZD_MASK_TEST';
 
@@ -66,18 +64,19 @@ describe('activateObjectInSession — failed activation must not masquerade as s
     expect(res.status).toBe(200);
   });
 
-  it('throws on an error message even when the flag is false', async () => {
+  it('returns the refusal document rather than throwing it away', async () => {
     const connection = connectionReturning(ERROR_MESSAGE_XML);
-    await expect(
-      activateObjectInSession(connection, OBJECT_URI, OBJECT_NAME),
-    ).rejects.toThrow(/ZD_MASK_TEST/);
-  });
 
-  it('surfaces the error-severity message text in the thrown error', async () => {
-    const connection = connectionReturning(ERROR_MESSAGE_XML);
-    await expect(
-      activateObjectInSession(connection, OBJECT_URI, OBJECT_NAME),
-    ).rejects.toThrow(/locked by user OTHERUSER/);
+    const res = await activateObjectInSession(
+      connection,
+      OBJECT_URI,
+      OBJECT_NAME,
+    );
+
+    // Whole, including the sentence a caller acts on. A throw here would leave
+    // `analyse` with nothing to read and the message with nowhere to go.
+    expect(res.status).toBe(200);
+    expect(String(res.data)).toContain('locked by user OTHERUSER');
   });
 
   it('resolves when activationExecuted="true"', async () => {

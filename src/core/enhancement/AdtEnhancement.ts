@@ -1,45 +1,50 @@
-import { beginCriticalSection } from '../../utils/criticalSection';
-import { assertDeletable } from '../../utils/deletionCheck';
 /**
- * AdtEnhancement - High-level CRUD operations for Enhancement objects
+ * AdtEnhancement - CRUD for enhancement implementations and spots.
  *
- * Implements IAdtObject interface with automatic operation chains,
- * error handling, and resource cleanup.
+ * Every request needs the **type** as well as the name: the URI differs per
+ * enhancement type (`enhoxh`, `enhoxhb`, `enhoxhh`, `enhsxs`, `enhsxsb`), so
+ * a config without one cannot be turned into a request at all.
  *
- * Uses low-level functions directly (not Builder classes).
- *
- * Supports multiple enhancement types:
- * - enhoxh: Enhancement Implementation (ENHO)
- * - enhoxhb: BAdI Implementation
- * - enhoxhh: Source Code Plugin (has source code)
- * - enhsxs: Enhancement Spot (ENHS)
- * - enhsxsb: BAdI Enhancement Spot
- *
- * Session management:
- * - stateful: only when doing lock/update/unlock operations
- * - stateless: obligatory after unlock
- * - If no lock/unlock, no stateful needed
- * - activate uses same session/cookies (no stateful needed)
- *
- * Operation chains:
- * - Create: validate → create → check → lock → check(inactive) → update → unlock → check → activate
- * - Update: lock → check(inactive) → update → unlock → check → activate
- * - Delete: check(deletion) → delete
+ * Every member answers `IAdtResponse<T>`, where T is what the result set given
+ * at construction makes of that endpoint's answer.
  */
-
 import type {
-  HttpError,
   IAbapConnection,
+  IAdtActivatable,
+  IAdtCheckable,
+  IAdtCreatable,
+  IAdtCreateOptions,
+  IAdtDeletable,
+  IAdtError,
+  IAdtLockable,
+  IAdtMetadataReadable,
   IAdtOperationOptions,
-  IAdtSourceObject,
+  IAdtReadable,
+  IAdtResponse,
   IAdtSystemContext,
+  IAdtTransportAware,
+  IAdtUpdatable,
+  IAdtValidatable,
+  IAdtVersionable,
+  IAnalyse,
   ILogger,
+  IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
-import { safeErrorMessage } from '../../utils/internalUtils';
-import type { LockRegistry } from '../shared/LockRegistry';
+import { activationRefusal } from '../../utils/activationUtils';
+import { answering } from '../../utils/adtResponse';
+import { withCallTimeout } from '../../utils/callTimeout';
+import { deletionRefusal } from '../../utils/deletionCheck';
+import { validationRefusal } from '../../utils/validationRefusal';
+import { inStatefulSession } from '../shared/capabilities/statefulSession';
+import {
+  createLockTracker,
+  type LockRegistry,
+  type LockTracker,
+} from '../shared/LockRegistry';
+import type { ObjectVersion } from '../shared/results';
 import type { IReadOptions } from '../shared/types';
 import { activateEnhancement } from './activation';
-import { check as checkEnhancement } from './check';
+import { check as checkEnhancementSource } from './check';
 import { create as createEnhancement } from './create';
 import { checkDeletion, deleteEnhancement } from './delete';
 import { lockEnhancement } from './lock';
@@ -50,25 +55,43 @@ import {
 } from './read';
 import {
   type EnhancementType,
+  enhancementDocuments,
   type IEnhancementConfig,
-  type IEnhancementState,
-  supportsSourceCode,
+  type IEnhancementResults,
 } from './types';
 import { unlockEnhancement } from './unlock';
-import { update } from './update';
-import { validate } from './validation';
-
+import { updateEnhancement } from './update';
+import { validate as validateEnhancement } from './validation';
 import {
   getEnhancementVersionSource,
   getEnhancementVersions,
 } from './versions';
-export class AdtEnhancement
-  implements IAdtSourceObject<IEnhancementConfig, IEnhancementState>
+
+export class AdtEnhancement<
+  R extends IEnhancementResults = typeof enhancementDocuments,
+> implements
+    IAdtCreatable<IEnhancementConfig, ReturnType<R['created']>>,
+    IAdtReadable<IEnhancementConfig, ReturnType<R['source']>>,
+    IAdtMetadataReadable<IEnhancementConfig, ReturnType<R['metadata']>>,
+    IAdtUpdatable<Partial<IEnhancementConfig>, ReturnType<R['updated']>>,
+    IAdtDeletable<
+      IEnhancementConfig,
+      ReturnType<R['deletion']>,
+      ReturnType<R['deletionCheck']>
+    >,
+    IAdtValidatable<IEnhancementConfig, ReturnType<R['validation']>>,
+    IAdtCheckable<IEnhancementConfig, ReturnType<R['check']>>,
+    IAdtActivatable<IEnhancementConfig, ReturnType<R['activation']>>,
+    IAdtLockable<IEnhancementConfig>,
+    IAdtTransportAware<IEnhancementConfig, ReturnType<R['transport']>>,
+    IAdtVersionable<IEnhancementConfig, ObjectVersion[], string>
 {
-  private readonly connection: IAbapConnection;
-  private readonly logger?: ILogger;
-  private readonly systemContext: IAdtSystemContext;
-  private readonly lockRegistry?: LockRegistry;
+  protected readonly connection: IAbapConnection;
+  protected readonly logger?: ILogger;
+  protected readonly systemContext: IAdtSystemContext;
+  private readonly lockTracker: LockTracker;
+  /** The enhancement type each held lock was taken with. */
+  private readonly lockedTypes = new Map<string, EnhancementType>();
   public readonly objectType: string = 'Enhancement';
 
   constructor(
@@ -76,795 +99,413 @@ export class AdtEnhancement
     logger?: ILogger,
     systemContext?: IAdtSystemContext,
     lockRegistry?: LockRegistry,
+    // The one cast in this file, and it is on the default: the shipped set
+    // satisfies the erased bound, which the compiler cannot see through the
+    // `unknown`s. A cast on a member would be the factory lying about what it
+    // answers.
+    protected readonly results: R = enhancementDocuments as unknown as R,
   ) {
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};
-    this.lockRegistry = lockRegistry;
-  }
-
-  /** Registry key for a held enhancement lock (e.g. `Enhancement/ZFOO`). */
-  private lockKey(name: string): string {
-    return `${this.objectType}/${name.toUpperCase()}`;
-  }
-
-  /**
-   * Record a held lock. Enhancement unlock needs the enhancement type, so the
-   * unlock thunk captures it alongside the name and handle.
-   */
-  private trackLock(
-    type: EnhancementType | undefined,
-    name: string | undefined,
-    lockHandle: string,
-  ): void {
-    if (!type || !name) return;
-    // Raw unlock — LockRegistry.unlockAll() manages the session for the batch.
-    this.lockRegistry?.track(this.lockKey(name), () =>
-      unlockEnhancement(this.connection, type, name, lockHandle),
+    this.lockTracker = createLockTracker(
+      lockRegistry,
+      this.objectType,
+      (name, lockHandle) =>
+        unlockEnhancement(
+          this.connection,
+          this.lockedTypes.get(name) as EnhancementType,
+          name,
+          lockHandle,
+        ),
     );
   }
 
-  /** Drop a lock from the registry after a clean unlock. */
-  private untrackLock(name: string | undefined): void {
-    if (!name) return;
-    this.lockRegistry?.untrack(this.lockKey(name));
-  }
-
   /**
-   * Validate enhancement configuration before creation
+   * The enhancement type, or the caller's mistake.
+   *
+   * Every URI in this module is built from it, so a config without one cannot
+   * be turned into a request at all — which is a caller error, not something
+   * to discover from a 404.
    */
-  async validate(
+  private enhancementType(
     config: Partial<IEnhancementConfig>,
-  ): Promise<IEnhancementState> {
-    const state: IEnhancementState = { errors: [] };
-
-    if (!config.enhancementName) {
-      const error = new Error('Enhancement name is required for validation');
-      state.errors.push({ method: 'validate', error, timestamp: new Date() });
-      throw error;
-    }
-    if (!config.enhancementType) {
-      const error = new Error('Enhancement type is required for validation');
-      state.errors.push({ method: 'validate', error, timestamp: new Date() });
-      throw error;
-    }
-
-    try {
-      const response = await validate(
-        this.connection,
-        config.enhancementType,
-        config.enhancementName,
-        config.packageName,
-        config.description,
-      );
-      state.validationResponse = response;
-      state.enhancementType = config.enhancementType;
-      return state;
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({
-        method: 'validate',
-        error: err,
-        timestamp: new Date(),
-      });
-      this.logger?.error('Validate failed:', safeErrorMessage(err));
-      throw err;
-    }
-  }
-
-  /**
-   * Create enhancement with full operation chain
-   */
-  async create(
-    config: IEnhancementConfig,
-    options?: IAdtOperationOptions,
-  ): Promise<IEnhancementState> {
-    const state: IEnhancementState = {
-      errors: [],
-      enhancementType: config.enhancementType,
-    };
-
-    if (!config.enhancementName) {
-      throw new Error('Enhancement name is required');
-    }
+  ): EnhancementType {
     if (!config.enhancementType) {
       throw new Error('Enhancement type is required');
     }
+    return config.enhancementType;
+  }
+
+  /** The name, or the caller's mistake — nothing was asked of the server yet. */
+  private name(config: Partial<IEnhancementConfig>): string {
+    if (!config.enhancementName) {
+      throw new Error('Enhancement name is required');
+    }
+    return config.enhancementName;
+  }
+
+  /** Validate the name before creating the object. */
+  async validate<E extends IAdtError = IAdtError>(
+    config: Partial<IEnhancementConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const name = this.name(config);
+    const type = this.enhancementType(config);
+
+    return answering(
+      () =>
+        validateEnhancement(
+          connection,
+          type,
+          name,
+          config.packageName,
+          config.description,
+        ),
+      this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
+      (options?.analyse ?? validationRefusal) as IAnalyse<E>,
+    );
+  }
+
+  /** Create the object. */
+  async create<E extends IAdtError = IAdtError>(
+    config: Omit<IEnhancementConfig, 'sourceCode'> & { sourceCode?: never },
+    options?: IAdtCreateOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const name = this.name(config);
+    const type = this.enhancementType(config);
     if (!config.packageName) {
       throw new Error('Package name is required');
     }
-
-    let objectCreated = false;
-
-    try {
-      // Create enhancement
-      this.logger?.info?.('Creating enhancement');
-      const createResponse = await createEnhancement(
-        this.connection,
-        {
-          enhancement_name: config.enhancementName,
-          enhancement_type: config.enhancementType,
-          package_name: config.packageName,
-          description: config.description,
-          transport_request: config.transportRequest,
-          enhancement_spot: config.enhancementSpot,
-          badi_definition: config.badiDefinition,
-          masterSystem: this.systemContext.masterSystem,
-          responsible: this.systemContext.responsible,
-          masterLanguage:
-            config.masterLanguage ?? this.systemContext.masterLanguage,
-        },
-        this.logger,
-      );
-      state.createResult = createResponse;
-      objectCreated = true;
-      this.logger?.info?.('Enhancement created');
-
-      return state;
-    } catch (error: unknown) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({
-        method: 'create',
-        error: err,
-        timestamp: new Date(),
-      });
-
-      // Cleanup on error - ensure stateless
-      this.connection.setSessionType('stateless');
-
-      if (objectCreated && options?.deleteOnFailure) {
-        try {
-          this.logger?.warn?.('Deleting enhancement after failure');
-          await deleteEnhancement(this.connection, {
-            enhancement_name: config.enhancementName,
-            enhancement_type: config.enhancementType,
-            transport_request: config.transportRequest,
-          });
-        } catch (deleteError) {
-          this.logger?.warn?.(
-            'Failed to delete enhancement after failure:',
-            safeErrorMessage(deleteError),
-          );
-        }
-      }
-
-      this.logger?.error('Create failed:', safeErrorMessage(err));
-      throw err;
-    }
-  }
-
-  /**
-   * Read enhancement
-   */
-  async read(
-    config: Partial<IEnhancementConfig>,
-    version?: 'active' | 'inactive',
-    options?: IReadOptions,
-  ): Promise<IEnhancementState | undefined> {
-    const state: IEnhancementState = {
-      errors: [],
-      enhancementType: config.enhancementType,
-    };
-
-    if (!config.enhancementName) {
-      const error = new Error('Enhancement name is required');
-      state.errors.push({ method: 'read', error, timestamp: new Date() });
-      throw error;
-    }
-    if (!config.enhancementType) {
-      const error = new Error('Enhancement type is required');
-      state.errors.push({ method: 'read', error, timestamp: new Date() });
-      throw error;
-    }
-
-    try {
-      // For enhoxhh, read source code; for others, read metadata
-      if (supportsSourceCode(config.enhancementType)) {
-        const response = await getEnhancementSource(
-          this.connection,
-          config.enhancementType,
-          config.enhancementName,
-          version,
-          options,
-          this.logger,
-        );
-        state.readResult = response;
-        state.sourceCode = response.data;
-      } else {
-        const response = await getEnhancementMetadata(
-          this.connection,
-          config.enhancementType,
-          config.enhancementName,
-          options,
-          this.logger,
-        );
-        state.readResult = response;
-      }
-      return state;
-    } catch (error: unknown) {
-      const e = error as HttpError;
-      if (e.response?.status === 404) {
-        return undefined;
-      }
-      const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({ method: 'read', error: err, timestamp: new Date() });
-      this.logger?.error('Read failed:', safeErrorMessage(err));
-      throw err;
-    }
-  }
-
-  /**
-   * Read enhancement metadata (object characteristics: package, responsible, description, etc.)
-   */
-  async readMetadata(
-    config: Partial<IEnhancementConfig>,
-    options?: IReadOptions,
-  ): Promise<IEnhancementState> {
-    const state: IEnhancementState = {
-      errors: [],
-      enhancementType: config.enhancementType,
-    };
-
-    if (!config.enhancementName) {
-      const error = new Error('Enhancement name is required');
-      state.errors.push({
-        method: 'readMetadata',
-        error,
-        timestamp: new Date(),
-      });
-      throw error;
-    }
-    if (!config.enhancementType) {
-      const error = new Error('Enhancement type is required');
-      state.errors.push({
-        method: 'readMetadata',
-        error,
-        timestamp: new Date(),
-      });
-      throw error;
-    }
-
-    try {
-      const response = await getEnhancementMetadata(
-        this.connection,
-        config.enhancementType,
-        config.enhancementName,
-        options,
-        this.logger,
-      );
-      state.metadataResult = response;
-      this.logger?.info?.('Enhancement metadata read successfully');
-      return state;
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({
-        method: 'readMetadata',
-        error: err,
-        timestamp: new Date(),
-      });
-      this.logger?.error('Read metadata failed:', safeErrorMessage(err));
-      throw err;
-    }
-  }
-
-  /**
-   * Read transport request information for the enhancement
-   */
-  async readTransport(
-    config: Partial<IEnhancementConfig>,
-    options?: { withLongPolling?: boolean },
-  ): Promise<IEnhancementState> {
-    const state: IEnhancementState = {
-      errors: [],
-      enhancementType: config.enhancementType,
-    };
-
-    if (!config.enhancementName) {
-      const error = new Error('Enhancement name is required');
-      state.errors.push({
-        method: 'readTransport',
-        error,
-        timestamp: new Date(),
-      });
-      throw error;
-    }
-    if (!config.enhancementType) {
-      const error = new Error('Enhancement type is required');
-      state.errors.push({
-        method: 'readTransport',
-        error,
-        timestamp: new Date(),
-      });
-      throw error;
-    }
-
-    try {
-      const response = await getEnhancementTransport(
-        this.connection,
-        config.enhancementType,
-        config.enhancementName,
-        options,
-      );
-      state.transportResult = response;
-      this.logger?.info?.('Enhancement transport request read successfully');
-      return state;
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({
-        method: 'readTransport',
-        error: err,
-        timestamp: new Date(),
-      });
-      this.logger?.error('Read transport failed:', safeErrorMessage(err));
-      throw err;
-    }
-  }
-
-  /**
-   * Update enhancement with full operation chain
-   * Always starts with lock
-   * Only available for enhoxhh (Source Code Plugin) type
-   * If options.lockHandle is provided, performs only low-level update without lock/check/unlock chain
-   */
-  async update(
-    config: Partial<IEnhancementConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IEnhancementState> {
-    const state: IEnhancementState = {
-      errors: [],
-      enhancementType: config.enhancementType,
-    };
-
-    if (!config.enhancementName) {
-      const error = new Error('Enhancement name is required');
-      state.errors.push({ method: 'update', error, timestamp: new Date() });
-      throw error;
-    }
-    if (!config.enhancementType) {
-      const error = new Error('Enhancement type is required');
-      state.errors.push({ method: 'update', error, timestamp: new Date() });
-      throw error;
-    }
-
-    if (!supportsSourceCode(config.enhancementType)) {
-      const error = new Error(
-        `Enhancement type '${config.enhancementType}' does not support source code update. Only 'enhoxhh' supports source code.`,
-      );
-      state.errors.push({ method: 'update', error, timestamp: new Date() });
-      throw error;
-    }
-
-    // Low-level mode: if lockHandle is provided, perform only update operation
-    if (options?.lockHandle) {
-      const codeToUpdate = options?.sourceCode || config.sourceCode;
-      if (!codeToUpdate) {
-        throw new Error('Source code is required for update');
-      }
-
-      this.logger?.info?.(
-        'Low-level update: performing update only (lockHandle provided)',
-      );
-      const updateResponse = await update(
-        this.connection,
-        {
-          enhancement_name: config.enhancementName,
-          enhancement_type: config.enhancementType,
-          source_code: codeToUpdate,
-          lock_handle: options.lockHandle,
-          transport_request: config.transportRequest,
-        },
-        this.logger,
-      );
-      this.logger?.info?.('Enhancement updated (low-level)');
-      return {
-        updateResult: updateResponse,
-        errors: [],
-        enhancementType: config.enhancementType,
-      };
-    }
-
-    let lockHandle: string | undefined;
-
-    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
-
-    // the lock but leaves the work half-done.
-
-    const endCriticalSection = beginCriticalSection(this.connection);
-
-    try {
-      // 1. Lock (update always starts with lock, stateful ONLY before lock)
-      this.logger?.info?.('Step 1: Locking enhancement');
-      this.connection.setSessionType('stateful');
-      lockHandle = await lockEnhancement(
-        this.connection,
-        config.enhancementType,
-        config.enhancementName,
-      );
-      state.lockHandle = lockHandle;
-      this.trackLock(
-        config.enhancementType,
-        config.enhancementName,
-        lockHandle,
-      );
-      this.logger?.info?.('Enhancement locked, handle:', lockHandle);
-
-      // 2. Check inactive with code for update (from options or config)
-      const codeToCheck = options?.sourceCode || config.sourceCode;
-      if (codeToCheck) {
-        this.logger?.info?.(
-          'Step 2: Checking inactive version with update content',
-        );
-        const checkInactiveResponse = await checkEnhancement(
-          this.connection,
-          config.enhancementType,
-          config.enhancementName,
-          'inactive',
-          codeToCheck,
-        );
-        state.checkResult = checkInactiveResponse;
-        this.logger?.info?.('Check inactive with update content passed');
-      }
-
-      // 3. Update
-      if (codeToCheck && lockHandle) {
-        this.logger?.info?.('Step 3: Updating enhancement');
-        const updateResponse = await update(
-          this.connection,
+    return answering(
+      () =>
+        createEnhancement(
+          connection,
           {
-            enhancement_name: config.enhancementName,
-            enhancement_type: config.enhancementType,
-            source_code: codeToCheck,
-            lock_handle: lockHandle,
+            enhancement_name: name,
+            enhancement_type: type,
+            package_name: config.packageName as string,
+            description: config.description,
             transport_request: config.transportRequest,
+            enhancement_spot: config.enhancementSpot,
+            badi_definition: config.badiDefinition,
+            masterSystem: this.systemContext.masterSystem,
+            responsible: this.systemContext.responsible,
+            masterLanguage:
+              config.masterLanguage ?? this.systemContext.masterLanguage,
           },
           this.logger,
-        );
-        state.updateResult = updateResponse;
-        this.logger?.info?.('Enhancement updated');
-
-        // Poll the inactive version: the write above produced it; the active version may not exist yet.
-        // 3.5. Read with long polling (wait for object to be ready after update)
-        this.logger?.info?.('read (wait for object ready after update)');
-        try {
-          await this.read(
-            {
-              enhancementName: config.enhancementName,
-              enhancementType: config.enhancementType,
-            },
-            'inactive',
-            { withLongPolling: true },
-          );
-          this.logger?.info?.('object is ready after update');
-        } catch (readError) {
-          this.logger?.warn?.(
-            'read with long polling failed (object may not be ready yet):',
-            safeErrorMessage(readError),
-          );
-        }
-      }
-
-      // 4. Unlock (obligatory stateless after unlock)
-      if (lockHandle) {
-        this.logger?.info?.('Step 4: Unlocking enhancement');
-        this.connection.setSessionType('stateful');
-        const unlockResponse = await unlockEnhancement(
-          this.connection,
-          config.enhancementType,
-          config.enhancementName,
-          lockHandle,
-        );
-        state.unlockResult = unlockResponse;
-        this.connection.setSessionType('stateless');
-        this.untrackLock(config.enhancementName);
-        lockHandle = undefined;
-        this.logger?.info?.('Enhancement unlocked');
-      }
-
-      // 5. Final check (no stateful needed)
-      this.logger?.info?.('Step 5: Final check');
-      const finalCheckResponse = await checkEnhancement(
-        this.connection,
-        config.enhancementType,
-        config.enhancementName,
-        'inactive',
-      );
-      state.checkResult = finalCheckResponse;
-      this.logger?.info?.('Final check passed');
-
-      // 6. Activate (if requested, no stateful needed - uses same session/cookies)
-      if (options?.activateOnUpdate) {
-        this.logger?.info?.('Step 6: Activating enhancement');
-        const activateResponse = await activateEnhancement(
-          this.connection,
-          config.enhancementType,
-          config.enhancementName,
-        );
-        state.activateResult = activateResponse;
-        this.logger?.info?.(
-          'Enhancement activated, status:',
-          activateResponse.status,
-        );
-
-        // 6.5. Read with long polling (wait for object to be ready after activation)
-        this.logger?.info?.('read (wait for object ready after activation)');
-        try {
-          await this.read(
-            {
-              enhancementName: config.enhancementName,
-              enhancementType: config.enhancementType,
-            },
-            'active',
-            { withLongPolling: true },
-          );
-          this.logger?.info?.('object is ready after activation');
-        } catch (readError) {
-          this.logger?.warn?.(
-            'read with long polling failed (object may not be ready yet):',
-            safeErrorMessage(readError),
-          );
-        }
-
-        return state;
-      }
-
-      // Read and return result (no stateful needed).
-      // No activation happened: return the version just written (inactive,
-      // i.e. workingArea in the enhancement URI dialect), not the stale active
-      // one. getEnhancementSource defaults to 'active', so pass it explicitly.
-      const readResponse = await getEnhancementSource(
-        this.connection,
-        config.enhancementType,
-        config.enhancementName,
-        'inactive',
-      );
-      state.readResult = readResponse;
-
-      return state;
-    } catch (error: unknown) {
-      // Cleanup on error - unlock if locked
-      if (lockHandle && config.enhancementType && config.enhancementName) {
-        try {
-          this.logger?.warn?.('Unlocking enhancement during error cleanup');
-          this.connection.setSessionType('stateful');
-          await unlockEnhancement(
-            this.connection,
-            config.enhancementType,
-            config.enhancementName,
-            lockHandle,
-          );
-          this.connection.setSessionType('stateless');
-          this.untrackLock(config.enhancementName);
-        } catch (unlockError) {
-          this.logger?.warn?.(
-            'Failed to unlock during cleanup:',
-            safeErrorMessage(unlockError),
-          );
-        }
-      } else {
-        this.connection.setSessionType('stateless');
-      }
-
-      if (
-        options?.deleteOnFailure &&
-        config.enhancementName &&
-        config.enhancementType
-      ) {
-        try {
-          this.logger?.warn?.('Deleting enhancement after failure');
-          await deleteEnhancement(this.connection, {
-            enhancement_name: config.enhancementName,
-            enhancement_type: config.enhancementType,
-            transport_request: config.transportRequest,
-          });
-        } catch (deleteError) {
-          this.logger?.warn?.(
-            'Failed to delete enhancement after failure:',
-            safeErrorMessage(deleteError),
-          );
-        }
-      }
-
-      this.logger?.error('Update failed:', safeErrorMessage(error));
-      throw error;
-    } finally {
-      endCriticalSection();
-    }
+        ),
+      this.results.created as IResultStrategy<ReturnType<R['created']>>,
+      options?.analyse,
+    );
   }
 
-  /**
-   * Delete enhancement
-   */
-  async delete(
+  /** Read the object. */
+  async read<E extends IAdtError = IAdtError>(
     config: Partial<IEnhancementConfig>,
-  ): Promise<IEnhancementState> {
-    const state: IEnhancementState = {
-      errors: [],
-      enhancementType: config.enhancementType,
-    };
+    version?: 'active' | 'inactive',
+    options?: IReadOptions & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
 
-    if (!config.enhancementName) {
-      const error = new Error('Enhancement name is required');
-      state.errors.push({ method: 'delete', error, timestamp: new Date() });
-      throw error;
-    }
-    if (!config.enhancementType) {
-      const error = new Error('Enhancement type is required');
-      state.errors.push({ method: 'delete', error, timestamp: new Date() });
-      throw error;
-    }
+    const name = this.name(config);
 
-    try {
-      // Check for deletion (no stateful needed)
-      this.logger?.info?.('Checking enhancement for deletion');
-      const deletionCheck = await checkDeletion(this.connection, {
-        enhancement_name: config.enhancementName,
-        enhancement_type: config.enhancementType,
-      });
-      // ADT already said whether this may be deleted; refusing to read that
-      // answer is how a delete came to report success while the object
-      // stayed. Throws on isDeletable=false or a message of type E; a W
-      // is a warning and passes.
-      assertDeletable(deletionCheck.data);
-      this.logger?.info?.('Deletion check passed');
-
-      // Delete (no stateful needed - no lock/unlock)
-      this.logger?.info?.('Deleting enhancement');
-      const result = await deleteEnhancement(this.connection, {
-        enhancement_name: config.enhancementName,
-        enhancement_type: config.enhancementType,
-        transport_request: config.transportRequest,
-      });
-      state.deleteResult = result;
-      this.logger?.info?.('Enhancement deleted');
-
-      return state;
-    } catch (error: unknown) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({
-        method: 'delete',
-        error: err,
-        timestamp: new Date(),
-      });
-      this.logger?.error('Delete failed:', safeErrorMessage(err));
-      throw err;
-    }
+    // No 404 special case: ADT answers a read for a missing object with 200 and
+    // an empty body, so absence was never a status to branch on — and whether
+    // an empty body *is* absence is the caller's reading, through `analyse`.
+    return answering(
+      () =>
+        getEnhancementSource(
+          connection,
+          this.enhancementType(config),
+          name,
+          version ?? 'active',
+          options,
+        ),
+      this.results.source as IResultStrategy<ReturnType<R['source']>>,
+      options?.analyse,
+    );
   }
 
-  /**
-   * Activate enhancement
-   * No stateful needed - uses same session/cookies
-   */
-  async activate(
+  /** Read the object's metadata document. */
+  async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IEnhancementConfig>,
-  ): Promise<IEnhancementState> {
-    const state: IEnhancementState = {
-      errors: [],
-      enhancementType: config.enhancementType,
-    };
+    options?: IReadOptions & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
 
-    if (!config.enhancementName) {
-      const error = new Error('Enhancement name is required');
-      state.errors.push({ method: 'activate', error, timestamp: new Date() });
-      throw error;
-    }
-    if (!config.enhancementType) {
-      const error = new Error('Enhancement type is required');
-      state.errors.push({ method: 'activate', error, timestamp: new Date() });
-      throw error;
-    }
+    const name = this.name(config);
 
-    try {
-      const result = await activateEnhancement(
-        this.connection,
-        config.enhancementType,
-        config.enhancementName,
-      );
-      state.activateResult = result;
-      return state;
-    } catch (error: unknown) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({
-        method: 'activate',
-        error: err,
-        timestamp: new Date(),
-      });
-      this.logger?.error('Activate failed:', safeErrorMessage(err));
-      throw err;
-    }
+    return answering(
+      () =>
+        getEnhancementMetadata(
+          connection,
+          this.enhancementType(config),
+          name,
+          options,
+          this.logger,
+        ),
+      this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
+      options?.analyse,
+    );
+  }
+
+  /** The transport request the object belongs to. */
+  async readTransport<E extends IAdtError = IAdtError>(
+    config: Partial<IEnhancementConfig>,
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const name = this.name(config);
+
+    return answering(
+      () =>
+        getEnhancementTransport(
+          connection,
+          this.enhancementType(config),
+          name,
+          options?.withLongPolling !== undefined
+            ? { withLongPolling: options.withLongPolling }
+            : undefined,
+        ),
+      this.results.transport as IResultStrategy<ReturnType<R['transport']>>,
+      options?.analyse,
+    );
   }
 
   /**
-   * Check enhancement
+   * Write the object.
+   *
+   * With `options.lockHandle` the caller holds the lock and owns the chain, so
+   * this is one request. Without it, this locks, checks, writes and unlocks —
+   * and the unlock happens on every path out.
    */
-  async check(
+  async update<E extends IAdtError = IAdtError>(
+    config: Partial<IEnhancementConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const name = this.name(config);
+    const type = this.enhancementType(config);
+    // The source is the caller's, through `options.sourceCode`. This used to
+    // fall back to `config.sourceCode` — two channels for one value, where the
+    // contract documents one. `config.sourceCode` is `check`'s alone now: a
+    // syntax check compiles a source that is not on the server yet, so it has
+    // nowhere else to arrive.
+    const source = options?.sourceCode;
+
+    if (!source) {
+      throw new Error('Source code is required for update');
+    }
+    return answering(
+      () =>
+        updateEnhancement(
+          connection,
+          type,
+          name,
+          source as string,
+          options?.lockHandle,
+          config.transportRequest,
+          this.logger,
+        ),
+      this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * Asks ADT whether the object can be deleted.
+   *
+   * Its own member because it is its own endpoint. `delete` no longer runs
+   * it: a consumer that wants the check runs this first and decides what a
+   * refusal means.
+   */
+  async checkDeletion<E extends IAdtError = IAdtError>(
+    config: Partial<IEnhancementConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const name = this.name(config);
+    return answering(
+      () =>
+        checkDeletion(connection, {
+          enhancement_name: name,
+          enhancement_type: this.enhancementType(config),
+          transport_request: config.transportRequest,
+        }),
+      this.results.deletionCheck as IResultStrategy<
+        ReturnType<R['deletionCheck']>
+      >,
+      (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
+    );
+  }
+
+  /**
+   * Delete the object.
+   *
+   * The deletion check is read, not merely performed: ADT answers a refusal
+   * with `del:isDeletable="false"` inside a 200, and a delete that ignored it
+   * reported success while the object stayed. {@link deletionRefusal} is the
+   * shipped reading of that answer; a caller who wants another passes their own
+   * `analyse`.
+   */
+  async delete<E extends IAdtError = IAdtError>(
+    config: Partial<IEnhancementConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const name = this.name(config);
+    return answering(
+      () =>
+        deleteEnhancement(connection, {
+          enhancement_name: name,
+          enhancement_type: this.enhancementType(config),
+          transport_request: config.transportRequest,
+        }),
+      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      options?.analyse,
+    );
+  }
+
+  /** Activate the object. Needs no stateful session. */
+  async activate<E extends IAdtError = IAdtError>(
+    config: Partial<IEnhancementConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const name = this.name(config);
+
+    return answering(
+      () => activateEnhancement(connection, this.enhancementType(config), name),
+      this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
+      (options?.analyse ?? activationRefusal) as IAnalyse<E>,
+    );
+  }
+
+  /** Check the object. */
+  async check<E extends IAdtError = IAdtError>(
     config: Partial<IEnhancementConfig>,
     status?: string,
-  ): Promise<IEnhancementState> {
-    const state: IEnhancementState = {
-      errors: [],
-      enhancementType: config.enhancementType,
-    };
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
 
-    if (!config.enhancementName) {
-      const error = new Error('Enhancement name is required');
-      state.errors.push({ method: 'check', error, timestamp: new Date() });
-      throw error;
-    }
-    if (!config.enhancementType) {
-      const error = new Error('Enhancement type is required');
-      state.errors.push({ method: 'check', error, timestamp: new Date() });
-      throw error;
-    }
+    const name = this.name(config);
+    const version: 'active' | 'inactive' =
+      status === 'active' ? 'active' : 'inactive';
 
-    try {
-      const version: 'active' | 'inactive' =
-        status === 'active' ? 'active' : 'inactive';
-      const response = await checkEnhancement(
-        this.connection,
-        config.enhancementType,
-        config.enhancementName,
-        version,
-      );
-      state.checkResult = response;
-      return state;
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({ method: 'check', error: err, timestamp: new Date() });
-      this.logger?.error('Check failed:', safeErrorMessage(err));
-      throw err;
-    }
-  }
-
-  /**
-   * Lock enhancement for modification
-   */
-  async lock(config: Partial<IEnhancementConfig>): Promise<string> {
-    if (!config.enhancementName || !config.enhancementType) {
-      throw new Error('Enhancement name and type are required');
-    }
-
-    this.connection.setSessionType('stateful');
-    const lockHandle = await lockEnhancement(
-      this.connection,
-      config.enhancementType,
-      config.enhancementName,
+    return answering(
+      () =>
+        checkEnhancementSource(
+          connection,
+          this.enhancementType(config),
+          name,
+          version,
+          config.sourceCode,
+        ),
+      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      options?.analyse,
     );
-    this.trackLock(config.enhancementType, config.enhancementName, lockHandle);
-    return lockHandle;
   }
 
-  /**
-   * Unlock enhancement
-   */
+  /** Lock the object for modification. */
+  async lock(
+    config: Partial<IEnhancementConfig>,
+  ): Promise<IAdtResponse<string>> {
+    const name = this.name(config);
+
+    return answering(
+      async () => {
+        const lockHandle = await inStatefulSession(this.connection, () =>
+          lockEnhancement(this.connection, this.enhancementType(config), name),
+        );
+        this.lockedTypes.set(name, this.enhancementType(config));
+        this.lockTracker.track(name, lockHandle);
+        // The handle is the value, and the request does not keep the wire it
+        // came on — so the answer is built around what the request produced.
+        return {
+          data: lockHandle,
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+        };
+      },
+      (answer) => String(answer.data),
+    );
+  }
+
+  /** Unlock the object. */
   async unlock(
     config: Partial<IEnhancementConfig>,
     lockHandle: string,
-  ): Promise<IEnhancementState> {
-    if (!config.enhancementName || !config.enhancementType) {
-      throw new Error('Enhancement name and type are required');
-    }
+  ): Promise<IAdtResponse<void>> {
+    const name = this.name(config);
 
-    this.connection.setSessionType('stateful');
-    const result = await unlockEnhancement(
-      this.connection,
-      config.enhancementType,
-      config.enhancementName,
-      lockHandle,
+    return answering(
+      async () => {
+        // UNLOCK must run stateful (older BASIS #106); stateless after.
+        this.connection.setSessionType('stateful');
+        try {
+          return await unlockEnhancement(
+            this.connection,
+            this.enhancementType(config),
+            name,
+            lockHandle,
+          );
+        } finally {
+          this.connection.setSessionType('stateless');
+          this.lockTracker.untrack(name);
+        }
+      },
+      () => undefined,
     );
-    this.connection.setSessionType('stateless');
-    this.untrackLock(config.enhancementName);
-    return {
-      unlockResult: result,
-      errors: [],
-      enhancementType: config.enhancementType,
-    };
   }
 
-  getVersions(config: Partial<IEnhancementConfig>) {
-    return getEnhancementVersions(this.connection, config);
+  /** Version history of the object's source. */
+  async getVersions(
+    config: Partial<IEnhancementConfig>,
+  ): Promise<IAdtResponse<ObjectVersion[]>> {
+    return answering(
+      async () => ({
+        data: await getEnhancementVersions(this.connection, config),
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+      }),
+      (answer) => answer.data as ObjectVersion[],
+    );
   }
 
-  getVersionSource(contentUri: string) {
-    return getEnhancementVersionSource(this.connection, contentUri);
+  /** The source of one version, by the `contentUri` an entry carries. */
+  async getVersionSource(contentUri: string): Promise<IAdtResponse<string>> {
+    return answering(
+      async () => ({
+        data: await getEnhancementVersionSource(this.connection, contentUri),
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+      }),
+      (answer) => String(answer.data),
+    );
   }
 }

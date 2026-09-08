@@ -1,8 +1,6 @@
 import type {
   IAbapConnection,
   IAbapGitPullArgs,
-  IAbapGitPullResult,
-  IAbapGitRepoStatus,
 } from '@mcp-abap-adt/interfaces';
 import {
   CT_ABAPGIT_REPO_V3,
@@ -12,11 +10,12 @@ import { getTimeout } from '../../utils/timeouts';
 import { getErrorLog } from './getErrorLog';
 import { listRepos } from './listRepos';
 import { pollUntilTerminal } from './poll';
+import type { IAbapGitPullResult, IAbapGitRepoStatus } from './types';
 import { buildPullBody } from './xmlBuilder';
 
 export async function pullRepo(
   connection: IAbapConnection,
-  args: IAbapGitPullArgs,
+  args: IAbapGitPullArgs<IAbapGitRepoStatus>,
   contentTypeVersion: 'v3' | 'v4' = 'v3',
 ): Promise<IAbapGitPullResult> {
   const repos = await listRepos(connection);

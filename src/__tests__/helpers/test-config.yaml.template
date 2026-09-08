@@ -37,7 +37,7 @@
 # - Structures: ZAC_STRU01, ZAC_STRU02, etc.
 # - Views: ZAC_VIEW01, ZAC_VIEW02, etc.
 # - Scalar Functions: ZADT_SCALAR_FUNC, ZAC_DSFD01, etc.
-# - Service Definitions: ZAC_SRVD01, ZAC_SRVD02, etc.
+# - Service Definitions: ZAC_SHR_SRVD01, ZAC_SHR_SRVD02, etc.
 # - Service Bindings: ZAC_SRVB01, ZAC_SRVB02, etc.
 # - Packages: ZAC_PKG01, ZAC_PKG02, etc.
 #
@@ -71,7 +71,31 @@ test_settings:
 
 # Session persistence configuration
 session_config:
-  cleanup_session_after_test: true
+  # Off, because on it opens an ABAP session per test and never closes one.
+  #
+  # A run is meant to hold one session: `globalSetup` opens it, publishes the
+  # material, and every test file adopts it. With this on, `BaseTester` calls
+  # `recycleTestSession` in the cleanup step of every test that created an
+  # object — `endSession()` and then immediately `connect()`.
+  #
+  # The connector's own documentation says why that leaks: `disconnect()`
+  # "dispatches the logoff without awaiting it, so the request is still being
+  # assembled while the connection is already free to connect() again", and the
+  # live cookie is then merged over the snapshot, so "the goodbye for the old
+  # session arrives addressed to the new one". The old session survives to its
+  # 30-minute idle timeout.
+  #
+  # Measured on E19, 2026-09-07: with this on, a new session every 1-2 seconds
+  # for the length of the run, none released; turned off, one session for the
+  # whole run, and the same suites pass — 7 suites / 14 tests green.
+  #
+  # It was on to drop locks a failed step left behind, by ending the session
+  # holding them. That is the part which does not work: `E_ABAP_GENPH` locks
+  # were measured surviving both the run and the deletion of the object they
+  # name, so the sessions were being spent on something they do not achieve.
+  # Turn it back on only for a system where ending the session is measured to
+  # release them.
+  cleanup_session_after_test: false
 
 # Lock persistence configuration
 lock_config:
@@ -108,6 +132,18 @@ shared_dependencies:
       description: "Shared domain — base of the group-activation chain"
       datatype: "CHAR"
       length: 10
+
+  data_elements:
+    # The authorization field's update needs a data element, and it must be one
+    # this project owns: every `ZAC_DTEL*` in the config belongs to a flow that
+    # creates and deletes it, so pointing at one races that flow. SAP's own
+    # `CHAR10` is refused on ABAP Cloud — "Data Element CHAR10 is deprecated.
+    # Use own type declaration or own object instead." — which is what made the
+    # authorization field look unavailable there.
+    - name: "ZAC_SHR_AUTH_DTEL"
+      description: "Shared data element for the authorization field tests"
+      available_in: ["onprem", "cloud"]
+      domain_name: "ZAC_SHR_GA_DOM"
 
   structures:
     - name: "ZAC_SHR_STRU"
@@ -341,6 +377,24 @@ shared_dependencies:
           ev_output = |Result: { iv_input }|.
         ENDFUNCTION.
 
+
+  # Includes of a shared function group.
+  #
+  # An include's name is derived — `L<GROUP>` plus a suffix — so it carries the
+  # group's `SHR` whether or not the include itself is shared. What makes this
+  # one shared is that it is declared here and nothing deletes it: the
+  # `create_function_include` workflow owns `LZAC_SHR_FUGRZ03` and takes that
+  # one apart every run, while the read-only tests read this one.
+  function_group_includes:
+    - name: "LZAC_SHR_FUGRZ02"
+      function_group: "ZAC_SHR_FUGR"
+      description: "Shared function group include for read-only tests"
+      available_in: ["onprem", "cloud"]
+      source: |
+        *&---------------------------------------------------------------------*
+        *& Include LZAC_SHR_FUGRZ02
+        *&---------------------------------------------------------------------*
+        DATA: gv_adt_shr_include TYPE string VALUE 'AdtFunctionInclude shared'.
   service_definitions:
     - name: "ZAC_SHR_SRVD01"
       description: "Shared service definition for read-only tests"
@@ -361,6 +415,19 @@ shared_dependencies:
           expose ZAC_SHR_BIMP_DDLS;
         }
 
+    # Publishing is a change to the system, so it gets a service definition of
+    # its own rather than borrowing one. Two bindings contending for a single
+    # definition is the thing to avoid, and a publish run must not depend on an
+    # object another test creates and deletes.
+    - name: "ZAC_SHR_SRVD03"
+      description: "Shared service definition reserved for publish/unpublish"
+      available_in: ["onprem", "cloud"]
+      source: |
+        @EndUserText.label: 'Shared service definition for publishing'
+        define service ZAC_SHR_SRVD03 {
+          expose ZAC_SHR_CDSUT_DDLS;
+        }
+
   service_bindings:
     - name: "ZAC_SHR_SRVB01"
       description: "Shared service binding for read-only tests"
@@ -368,6 +435,26 @@ shared_dependencies:
       skip_activation: true
       service_definition: "ZAC_SHR_SRVD02"
       service_name: "ZAC_SHR_SRVD02"
+      service_version: "0001"
+      binding_type: "ODATA"
+      binding_version: "V4"
+      binding_variant: "ODATA_V4_WEB_API"
+
+    # The subject of publish_service_binding / unpublish_service_binding. Both
+    # are disabled by default and turned on for a deliberate run, so this sits
+    # unpublished the rest of the time.
+    #
+    # Unlike its neighbour it is activated, because a publish needs an active
+    # binding over an active definition — which is also why it takes SRVD03
+    # rather than SRVD02, the one carrying `skip_activation`. Untested as a
+    # default: the publish cases have never run from a clean setup, so if
+    # activation here turns out to need the same exemption, that is the
+    # measurement to record rather than a surprise.
+    - name: "ZAC_SHR_SRVB02"
+      description: "Shared service binding reserved for publish/unpublish tests"
+      available_in: ["onprem", "cloud"]
+      service_definition: "ZAC_SHR_SRVD03"
+      service_name: "ZAC_SHR_SRVD03"
       service_version: "0001"
       binding_type: "ODATA"
       binding_version: "V4"
@@ -849,7 +936,8 @@ update_class_local_macros:
     - name: "local_macros"
       enabled: true
       available_in: ["onprem", "legacy"]
-      description: "Update class macros include (on-premise only; not available in ABAP Cloud)"
+      skip_reason: "DEFINE is forbidden by the ABAP for Cloud language version; the macros include itself is writable there — PUT .../includes/macros answers 200"
+      description: "Update class macros include. On-prem only, and the reason is DEFINE, not the include: a cloud class has a writable macros include (PUT answers 200), but the ABAP for Cloud language version forbids DEFINE"
       params:
         class_name: "ZAC_CLS13"
         # package_name: "ZAC_PKG01"  # Uses environment.default_package if omitted
@@ -973,7 +1061,11 @@ create_authorization_field:
   test_cases:
     - name: "adt_authorization_field"
       enabled: true
-      available_in: ["onprem"]
+      # Measured on the cloud trial: validate 200, create 201, read 2285 bytes,
+      # update 200 — the type is fully available there. The onprem-only flag was
+      # never measured; what actually failed on cloud was this case's own
+      # fixture, `CHAR10`, which ABAP Cloud refuses as deprecated.
+      available_in: ["onprem", "cloud"]
       description: "Authorization field reserved for AdtAuthorizationField tests"
       params:
         authorization_field_name: "ZAC_AUTH01"
@@ -986,8 +1078,13 @@ create_authorization_field:
         # domname: "CHAR10"
         # outputlen: "10"
         update_description: "AdtAuthorizationField workflow field (updated)"
-        update_domname: "CHAR10"
-        update_roll_name: "CHAR10"
+        # Not `CHAR10`: ABAP Cloud answers "Data Element CHAR10 is deprecated.
+        # Use own type declaration or own object instead." A field needs a data
+        # element — an empty one is answered "contains errors and therefore
+        # cannot be saved" — and it must be one this project owns, because every
+        # other `ZAC_DTEL*` here belongs to a flow that creates and deletes it.
+        update_domname: ""
+        update_roll_name: "ZAC_SHR_AUTH_DTEL"   # → shared_dependencies.data_elements
 
 # Create Interface
 create_interface:
@@ -1168,13 +1265,18 @@ create_service_definition:
       available_in: ["onprem", "cloud"]
       description: "Service definition reserved for AdtServiceDefinition tests"
       params:
-        service_definition_name: "ZAC_SRVD01"  # Replace with your service definition name
+        # Its own name: this flow CREATES AND DELETES its subject, while
+        # create_service_binding below depends on ZAC_SHR_SRVD01 permanently.
+        # Sharing one name makes the delete answer "Used by 1 other object",
+        # every run. ZAC_SRVD03 is unrelated to the shared ZAC_SHR_SRVD03 —
+        # different names, and only this one is created and removed per run.
+        service_definition_name: "ZAC_SRVD03"  # Replace with your service definition name
         description: "AdtServiceDefinition workflow service definition"
         # package_name: "ZAC_PKG01"  # Uses environment.default_package if omitted
         # transport_request: ""  # Uses environment.default_transport if omitted
         source_code: |
           @EndUserText.label: 'AdtServiceDefinition workflow service definition'
-          define service ZAC_SRVD01 {
+          define service ZAC_SRVD03 {
             expose ZAC_SHR_CDSUT_DDLS;
           }
 
@@ -1381,11 +1483,37 @@ create_service_binding:
       description: "Service binding reserved for AdtServiceBinding tests"
       params:
         binding_name: "ZAC_SRVB01"  # Replace with your service binding name
-        service_definition_name: "ZAC_SRVD01"  # Existing SRVD name used by ServiceBinding integration test
-        service_name: "ZAC_SRVD01"  # Usually same as service_definition_name
+        # ZAC_SHR_SRVD01, not ZAC_SRVD01. The old name was called "existing" and
+        # nothing ever created it — shared:setup makes ZAC_SHR_SRVD01 and
+        # ZAC_SHR_SRVD02 — so the publish failed with "Service Definition
+        # ZAC_SRVD01 not yet active", which reads like a timing problem and is
+        # an absent object. Measured on E19: a ZAC_* search returns both shared
+        # definitions and no ZAC_SRVD01.
+        #
+        # SRVD01 is the free one on purpose: the shared binding ZAC_SHR_SRVB01
+        # takes SRVD02 (see shared_dependencies.service_bindings), so this test
+        # can publish its own binding without two bindings contending for one
+        # service definition.
+        service_definition_name: "ZAC_SHR_SRVD01"
+        service_name: "ZAC_SHR_SRVD01"  # Usually same as service_definition_name
         service_version: "0001"
         binding_variant: "ODATA_V4_WEB_API"
-        desired_publication_state: "published"  # published | unpublished | unchanged
+        # `unchanged`, and the full run must keep it that way.
+        #
+        # The flow creates a *fresh* binding, and a fresh binding is not
+        # published: asking to unpublish it is a transition ADT refuses
+        # (`Invalid state transition: cannot unpublish … allowedAction=PUBLISH`),
+        # and asking to publish it costs ~135s and leaves an object the flow
+        # cannot delete — ADT refuses to delete a binding with published
+        # endpoints, and one unpublish was measured still not settled after
+        # eleven minutes.
+        #
+        # **Publishing is exercised by two deliberate runs, not by the full
+        # one.** Set this to `published` and run
+        # `npm test -- integration/core/serviceBinding`, then set it to
+        # `unpublished` and run it again, preparing the system by hand if the
+        # first run did not settle.
+        desired_publication_state: "unchanged"  # published | unpublished | unchanged
         description: "AdtServiceBinding workflow service binding"
         # software_component: "HOME"  # Optional; if omitted, inherited from parent package metadata
         package_type: "development"
@@ -1448,21 +1576,28 @@ create_function_include:
   test_cases:
     - name: "adt_function_include"
       enabled: true
-      available_in: ["onprem"]
+      # Measured on the cloud trial with ADT 3.60.3: LOCK then
+      # PUT .../functions/groups/<g>/includes/<i>/source/main?lockHandle=...
+      # both answer 200. The previous onprem-only flag was never measured.
+      available_in: ["onprem", "cloud"]
       description: "Function include reserved for AdtFunctionInclude tests"
       params:
         function_group_name: "ZAC_SHR_FUGR"  # → shared_dependencies.function_groups
-        include_name: "LZAC_SHR_FUGRZ01"      # FUGR include names follow L<fugr>Znn pattern
+        # Z03, not Z02. This case creates the include and deletes it again, and
+        # Z02 is the shared one declared in shared_dependencies — pointing both
+        # at the same name means every run destroys the shared object, and the
+        # read-only test that wants it skips itself as "does not exist".
+        include_name: "LZAC_SHR_FUGRZ03"      # FUGR include names follow L<fugr>Znn pattern
         description: "AdtFunctionInclude workflow include"
         # transport_request: ""
         source_code: |
           *&---------------------------------------------------------------------*
-          *& Include LZAC_SHR_FUGRZ01
+          *& Include LZAC_SHR_FUGRZ03
           *&---------------------------------------------------------------------*
           DATA: gv_adt_fi_test TYPE string VALUE 'AdtFunctionInclude test'.
         update_source_code: |
           *&---------------------------------------------------------------------*
-          *& Include LZAC_SHR_FUGRZ01 (updated)
+          *& Include LZAC_SHR_FUGRZ03 (updated)
           *&---------------------------------------------------------------------*
           DATA: gv_adt_fi_test TYPE string VALUE 'AdtFunctionInclude updated'.
 
@@ -2167,3 +2302,61 @@ execute_program:
             max_size_for_trace_file: 30720
             amdp_trace: true
             max_time_for_tracing: 1800
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Service binding publication — TWO DELIBERATE RUNS, never the full suite.
+#
+# Publishing is the slowest thing this library asks of ADT: ~135s measured on a
+# trial, and one unpublish still unsettled after eleven minutes. ADT also
+# refuses to delete a binding whose endpoints are published, so a flow that
+# publishes cannot clean up after itself. That is why these are their own test
+# cases, `enabled: false` by default, and why the workflow flow above keeps
+# `desired_publication_state: "unchanged"`.
+#
+# To exercise publication:
+#   1. set publish_service_binding.enabled: true, run
+#      `npm test -- integration/core/serviceBinding/publication`
+#   2. check the binding in Eclipse ADT — the test prints what to look at
+#   3. set unpublish_service_binding.enabled: true (and publish back to false),
+#      run the same file again
+#
+# `timeout_ms` is passed to the member, not taken from SAP_TIMEOUT_LONG: since
+# 18.0.0 `update` honours `IAdtOperationOptions.timeout`, which it used to drop.
+publish_service_binding:
+  test_cases:
+    - name: "publish_binding"
+      enabled: false                # ← turn on for a deliberate publish run
+      available_in: ["onprem", "cloud"]
+      description: "Publish ZAC_SHR_SRVB02 and leave it published for inspection"
+      params:
+        # The shared binding reserved for this, not the one the workflow test
+        # creates and deletes — publishing must not race another test's subject.
+        binding_name: "ZAC_SHR_SRVB02"
+        service_name: "ZAC_SHR_SRVD03"
+        service_version: "0001"
+        service_type: "odatav4"
+        # How long the *request* waits before the client gives up.
+        timeout_ms: 300000
+        # How long the *test* keeps asking afterwards. The two are different
+        # things: a publication is a job, and it has been measured finishing
+        # after the client had already timed out — so a timeout is not an
+        # answer, it is the moment to start checking.
+        wait_minutes: 5
+        poll_seconds: 15
+
+unpublish_service_binding:
+  test_cases:
+    - name: "unpublish_binding"
+      enabled: false                # ← turn on for the deliberate unpublish run
+      available_in: ["onprem", "cloud"]
+      description: "Unpublish ZAC_SHR_SRVB02 after it has been checked in Eclipse"
+      params:
+        binding_name: "ZAC_SHR_SRVB02"
+        service_name: "ZAC_SHR_SRVD03"
+        service_version: "0001"
+        service_type: "odatav4"
+        timeout_ms: 300000
+        # Longer than the publish budget: unpublish has been the slower of the
+        # two, once still unsettled after eleven minutes.
+        wait_minutes: 12
+        poll_seconds: 15

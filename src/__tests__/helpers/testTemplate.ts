@@ -25,7 +25,6 @@ import * as path from 'node:path';
 import type {
   IAbapConnection,
   IIncludeConfig,
-  IIncludeState,
   ISessionLifecycleAware,
 } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
@@ -117,7 +116,7 @@ describe('ObjectType (using AdtClient)', () => {
   let crudHasConfig = false;
   let isCloudSystem = false;
   let systemContext: Awaited<ReturnType<typeof resolveSystemContext>>;
-  let tester: BaseTester<IIncludeConfig, IIncludeState>;
+  let tester: BaseTester<IIncludeConfig>;
 
   beforeAll(async () => {
     try {
@@ -133,7 +132,7 @@ describe('ObjectType (using AdtClient)', () => {
       client = resolved;
       crudHasConfig = true;
 
-      tester = new BaseTester<IIncludeConfig, IIncludeState>(
+      tester = new BaseTester<IIncludeConfig>(
         client.getInclude(), // the handler under test
         'ObjectType', // log prefix
         'create_include', // section in test-config.yaml

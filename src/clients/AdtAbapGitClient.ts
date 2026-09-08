@@ -13,23 +13,27 @@
 
 import type {
   IAbapConnection,
-  IAbapGitErrorLogEntry,
   IAbapGitExternalRepoCredentials,
-  IAbapGitExternalRepoInfo,
   IAbapGitLinkArgs,
   IAbapGitPullArgs,
-  IAbapGitPullResult,
-  IAbapGitRepoStatus,
   IAbapGitUnlinkArgs,
   IAdtAbapGitClient,
   IAdtAbapGitClientOptions,
+  IAdtResponse,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
+import { answeringValue, failed, succeeded } from '../utils/adtResponse';
 import { checkExternalRepo } from './abapGit/checkExternalRepo';
 import { getErrorLog } from './abapGit/getErrorLog';
 import { linkRepo } from './abapGit/link';
 import { listRepos as listReposLowLevel } from './abapGit/listRepos';
 import { pullRepo } from './abapGit/pull';
+import type {
+  IAbapGitErrorLogEntry,
+  IAbapGitExternalRepoInfo,
+  IAbapGitPullResult,
+  IAbapGitRepoStatus,
+} from './abapGit/types';
 import { unlinkRepo } from './abapGit/unlink';
 
 function toPublicRepoStatus(r: {
@@ -54,7 +58,16 @@ function toPublicRepoStatus(r: {
   };
 }
 
-export class AdtAbapGitClient implements IAdtAbapGitClient {
+export class AdtAbapGitClient
+  implements
+    IAdtAbapGitClient<
+      IAbapGitRepoStatus[],
+      IAbapGitRepoStatus | undefined,
+      IAbapGitErrorLogEntry[],
+      IAbapGitPullResult,
+      IAbapGitExternalRepoInfo
+    >
+{
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
   private readonly contentTypeVersion: 'v3' | 'v4';
@@ -69,42 +82,79 @@ export class AdtAbapGitClient implements IAdtAbapGitClient {
     this.contentTypeVersion = options?.contentTypeVersion ?? 'v3';
   }
 
-  async link(args: IAbapGitLinkArgs): Promise<void> {
+  /** Link a package to a repository. ADT answers nothing worth reading. */
+  async link(args: IAbapGitLinkArgs): Promise<IAdtResponse<void>> {
     this.logger?.debug?.(
       `AdtAbapGitClient.link: package=${args.package} url=${args.url}`,
     );
-    await linkRepo(this.connection, args, this.contentTypeVersion);
+    return answeringValue(async () => {
+      await linkRepo(this.connection, args, this.contentTypeVersion);
+    });
   }
 
-  async pull(args: IAbapGitPullArgs): Promise<IAbapGitPullResult> {
+  /**
+   * Pull a linked repository, and wait for the server to finish.
+   *
+   * The wait is client-side: aborting or timing out stops this loop only, and
+   * the server-side job may still be running. A caller that aborted must poll
+   * `getRepo(package)` until the status is no longer `R` before pulling or
+   * unlinking again.
+   */
+  async pull(
+    args: IAbapGitPullArgs<IAbapGitRepoStatus>,
+  ): Promise<IAdtResponse<IAbapGitPullResult>> {
     this.logger?.debug?.(`AdtAbapGitClient.pull: package=${args.package}`);
-    return pullRepo(this.connection, args, this.contentTypeVersion);
-  }
-
-  async unlink(args: IAbapGitUnlinkArgs): Promise<void> {
-    this.logger?.debug?.(`AdtAbapGitClient.unlink: package=${args.package}`);
-    await unlinkRepo(this.connection, args);
-  }
-
-  async listRepos(): Promise<IAbapGitRepoStatus[]> {
-    const rows = await listReposLowLevel(this.connection);
-    return rows.map(toPublicRepoStatus);
-  }
-
-  async getRepo(packageName: string): Promise<IAbapGitRepoStatus | undefined> {
-    const repos = await this.listRepos();
-    return repos.find(
-      (r) => r.package.toUpperCase() === packageName.toUpperCase(),
+    return answeringValue(() =>
+      pullRepo(this.connection, args, this.contentTypeVersion),
     );
   }
 
-  async getErrorLog(packageName: string): Promise<IAbapGitErrorLogEntry[]> {
-    return getErrorLog(this.connection, packageName);
+  /** Unlink a package from its repository. */
+  async unlink(args: IAbapGitUnlinkArgs): Promise<IAdtResponse<void>> {
+    this.logger?.debug?.(`AdtAbapGitClient.unlink: package=${args.package}`);
+    return answeringValue(async () => {
+      await unlinkRepo(this.connection, args);
+    });
   }
 
+  /** Every repository this system has linked. */
+  async listRepos(): Promise<IAdtResponse<IAbapGitRepoStatus[]>> {
+    return answeringValue(async () =>
+      (await listReposLowLevel(this.connection)).map(toPublicRepoStatus),
+    );
+  }
+
+  /**
+   * One repository, by the package it is linked to.
+   *
+   * `undefined` when nothing is linked to that package — the listing is the
+   * only resource, so absence is a row that is not there rather than a status.
+   */
+  async getRepo(
+    packageName: string,
+  ): Promise<IAdtResponse<IAbapGitRepoStatus | undefined>> {
+    const repos = await this.listRepos();
+    if (!repos.ok) return failed(repos.getError());
+    return succeeded(
+      repos
+        .getResult()
+        .value.find(
+          (r) => r.package.toUpperCase() === packageName.toUpperCase(),
+        ),
+    );
+  }
+
+  /** What the last pull of that package logged. */
+  async getErrorLog(
+    packageName: string,
+  ): Promise<IAdtResponse<IAbapGitErrorLogEntry[]>> {
+    return answeringValue(() => getErrorLog(this.connection, packageName));
+  }
+
+  /** What an external repository offers, before linking anything to it. */
   async checkExternalRepo(
     args: IAbapGitExternalRepoCredentials,
-  ): Promise<IAbapGitExternalRepoInfo> {
-    return checkExternalRepo(this.connection, args);
+  ): Promise<IAdtResponse<IAbapGitExternalRepoInfo>> {
+    return answeringValue(() => checkExternalRepo(this.connection, args));
   }
 }

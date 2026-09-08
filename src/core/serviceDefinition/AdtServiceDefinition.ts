@@ -1,46 +1,43 @@
-import type { CheckRunVersion } from '../../utils/checkRun';
-import { beginCriticalSection } from '../../utils/criticalSection';
-import { assertDeletable } from '../../utils/deletionCheck';
 /**
- * AdtServiceDefinition - High-level CRUD operations for Service Definition (SRVD/SRV) objects
+ * AdtServiceDefinition - CRUD for `SRVD/SRV` service definitions.
  *
- * Implements IAdtObject interface with automatic operation chains,
- * error handling, and resource cleanup.
- *
- * Uses low-level functions directly (not Builder classes).
- *
- * Session management:
- * - stateful: only when doing lock/update/unlock operations
- * - stateless: obligatory after unlock
- * - If no lock/unlock, no stateful needed
- * - activate uses same session/cookies (no stateful needed)
- *
- * Operation chains:
- * - Create: create (POST metadata only — creates an empty source; the source
- *   code is written by a subsequent update(), mirroring what Eclipse ADT does)
- * - Update: lock → check(inactive) → update → unlock → check → activate
- * - Delete: check(deletion) → delete
+ * Every member answers `IAdtResponse<T>`, where T is what the result set given
+ * at construction makes of that endpoint's answer.
  */
-
 import type {
-  HttpError,
   IAbapConnection,
+  IAdtActivatable,
+  IAdtCheckable,
+  IAdtCreatable,
+  IAdtCreateOptions,
+  IAdtDeletable,
+  IAdtError,
+  IAdtLockable,
+  IAdtMetadataReadable,
   IAdtOperationOptions,
-  IAdtSourceObject,
+  IAdtReadable,
+  IAdtResponse,
   IAdtSystemContext,
+  IAdtTransportAware,
+  IAdtUpdatable,
+  IAdtValidatable,
+  IAdtVersionable,
+  IAnalyse,
   ILogger,
+  IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
-import { safeErrorMessage } from '../../utils/internalUtils';
-import {
-  type ICapabilityContext,
-  LockCapability,
-  VersionsCapability,
-} from '../shared/capabilities';
+import { activationRefusal } from '../../utils/activationUtils';
+import { answering } from '../../utils/adtResponse';
+import { withCallTimeout } from '../../utils/callTimeout';
+import { deletionRefusal } from '../../utils/deletionCheck';
+import { validationRefusal } from '../../utils/validationRefusal';
+import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import {
   createLockTracker,
   type LockRegistry,
   type LockTracker,
 } from '../shared/LockRegistry';
+import type { ObjectVersion } from '../shared/results';
 import type { IReadOptions } from '../shared/types';
 import { activateServiceDefinition } from './activation';
 import { checkServiceDefinition } from './check';
@@ -52,80 +49,54 @@ import {
   getServiceDefinitionSource,
   getServiceDefinitionTransport,
 } from './read';
-import type {
-  IServiceDefinitionConfig,
-  IServiceDefinitionState,
+import {
+  type IServiceDefinitionConfig,
+  type IServiceDefinitionResults,
+  serviceDefinitionDocuments,
 } from './types';
 import { unlockServiceDefinition } from './unlock';
 import { updateServiceDefinition } from './update';
 import { validateServiceDefinitionName } from './validation';
-
 import {
   getServiceDefinitionVersionSource,
   getServiceDefinitionVersions,
 } from './versions';
-export class AdtServiceDefinition
-  implements IAdtSourceObject<IServiceDefinitionConfig, IServiceDefinitionState>
+
+export class AdtServiceDefinition<
+  R extends IServiceDefinitionResults = typeof serviceDefinitionDocuments,
+> implements
+    IAdtCreatable<IServiceDefinitionConfig, ReturnType<R['created']>>,
+    IAdtReadable<IServiceDefinitionConfig, ReturnType<R['source']>>,
+    IAdtMetadataReadable<IServiceDefinitionConfig, ReturnType<R['metadata']>>,
+    IAdtUpdatable<Partial<IServiceDefinitionConfig>, ReturnType<R['updated']>>,
+    IAdtDeletable<
+      IServiceDefinitionConfig,
+      ReturnType<R['deletion']>,
+      ReturnType<R['deletionCheck']>
+    >,
+    IAdtValidatable<IServiceDefinitionConfig, ReturnType<R['validation']>>,
+    IAdtCheckable<IServiceDefinitionConfig, ReturnType<R['check']>>,
+    IAdtActivatable<IServiceDefinitionConfig, ReturnType<R['activation']>>,
+    IAdtLockable<IServiceDefinitionConfig>,
+    IAdtTransportAware<IServiceDefinitionConfig, ReturnType<R['transport']>>,
+    IAdtVersionable<IServiceDefinitionConfig, ObjectVersion[], string>
 {
-  private readonly connection: IAbapConnection;
-  private readonly logger?: ILogger;
-  private readonly systemContext: IAdtSystemContext;
+  protected readonly connection: IAbapConnection;
+  protected readonly logger?: ILogger;
+  protected readonly systemContext: IAdtSystemContext;
   private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'ServiceDefinition';
-
-  // LAZY thunk (not a getter that snapshots): captures `this` but reads
-  // this.connection/this.logger only when invoked, after the constructor has
-  // run — so building the capabilities below as class fields is safe.
-  private readonly capCtx = (): ICapabilityContext => ({
-    connection: this.connection,
-    logger: this.logger,
-  });
-
-  private readonly lockCap = new LockCapability<
-    IServiceDefinitionConfig,
-    IServiceDefinitionState
-  >(this.capCtx, {
-    nameOf: (c) => {
-      if (!c.serviceDefinitionName)
-        throw new Error('Service definition name is required');
-      return c.serviceDefinitionName;
-    },
-    acquire: async (ctx, name) => ({
-      lockHandle: await lockServiceDefinition(ctx.connection, name),
-    }),
-    release: async (ctx, name, handle) => {
-      const result = await unlockServiceDefinition(
-        ctx.connection,
-        name,
-        handle,
-      );
-      return { unlockResult: result, errors: [] };
-    },
-  });
-
-  private readonly versionsCap =
-    new VersionsCapability<IServiceDefinitionConfig>(this.capCtx, {
-      nameOf: (c) => {
-        if (!c.serviceDefinitionName)
-          throw new Error('serviceDefinitionName is required');
-        return c.serviceDefinitionName;
-      },
-      // NOTE: getServiceDefinitionVersions takes a config, not a bare name —
-      // the strategy re-wraps. (getClassIncludeVersions, by contrast, takes a
-      // name; the two low-level shapes differ and the strategy absorbs that.)
-      list: (ctx, name) =>
-        getServiceDefinitionVersions(ctx.connection, {
-          serviceDefinitionName: name,
-        }),
-      source: (ctx, uri) =>
-        getServiceDefinitionVersionSource(ctx.connection, uri),
-    });
 
   constructor(
     connection: IAbapConnection,
     logger?: ILogger,
     systemContext?: IAdtSystemContext,
     lockRegistry?: LockRegistry,
+    // The one cast in this file, and it is on the default: the shipped set
+    // satisfies the erased bound, which the compiler cannot see through the
+    // `unknown`s. A cast on a member would be the factory lying about what it
+    // answers.
+    protected readonly results: R = serviceDefinitionDocuments as unknown as R,
   ) {
     this.connection = connection;
     this.logger = logger;
@@ -138,554 +109,344 @@ export class AdtServiceDefinition
     );
   }
 
-  /**
-   * Validate service definition configuration before creation
-   */
-  async validate(
-    config: Partial<IServiceDefinitionConfig>,
-  ): Promise<IServiceDefinitionState> {
-    const state: IServiceDefinitionState = { errors: [] };
+  /** The name, or the caller's mistake — nothing was asked of the server yet. */
+  private name(config: Partial<IServiceDefinitionConfig>): string {
     if (!config.serviceDefinitionName) {
-      const error = new Error(
-        'Service definition name is required for validation',
-      );
-      state.errors.push({ method: 'validate', error, timestamp: new Date() });
-      throw error;
+      throw new Error('Service definition name is required');
     }
-
-    try {
-      const response = await validateServiceDefinitionName(
-        this.connection,
-        config.serviceDefinitionName,
-        config.description,
-      );
-      state.validationResponse = response;
-      return state;
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({
-        method: 'validate',
-        error: err,
-        timestamp: new Date(),
-      });
-      this.logger?.error('validate', safeErrorMessage(err));
-      throw err;
-    }
+    return config.serviceDefinitionName;
   }
 
-  /**
-   * Create service definition with full operation chain
-   */
-  async create(
-    config: IServiceDefinitionConfig,
-    _options?: IAdtOperationOptions,
-  ): Promise<IServiceDefinitionState> {
-    const state: IServiceDefinitionState = { errors: [] };
-    if (!config.serviceDefinitionName) {
-      const error = new Error('Service definition name is required');
-      state.errors.push({ method: 'create', error, timestamp: new Date() });
-      throw error;
-    }
+  /** Validate the name before creating the object. */
+  async validate<E extends IAdtError = IAdtError>(
+    config: Partial<IServiceDefinitionConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const name = this.name(config);
+
+    return answering(
+      () => validateServiceDefinitionName(connection, name, config.description),
+      this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
+      (options?.analyse ?? validationRefusal) as IAnalyse<E>,
+    );
+  }
+
+  /** Create the object. */
+  async create<E extends IAdtError = IAdtError>(
+    config: Omit<IServiceDefinitionConfig, 'sourceCode'> & {
+      sourceCode?: never;
+    },
+    options?: IAdtCreateOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const name = this.name(config);
     if (!config.packageName) {
       throw new Error('Package name is required');
     }
-    if (!config.description) {
-      throw new Error('Description is required');
-    }
-
-    try {
-      // Create service definition
-      this.logger?.info?.('Creating service definition');
-      const createResponse = await createServiceDefinition(this.connection, {
-        service_definition_name: config.serviceDefinitionName,
-        package_name: config.packageName,
-        transport_request: config.transportRequest,
-        description: config.description,
-        masterSystem: this.systemContext.masterSystem,
-        responsible: this.systemContext.responsible,
-        masterLanguage:
-          config.masterLanguage ?? this.systemContext.masterLanguage,
-      });
-      state.createResult = createResponse;
-      this.logger?.info?.('Service definition created');
-
-      return state;
-    } catch (error: unknown) {
-      this.logger?.error('Create failed:', safeErrorMessage(error));
-      throw error;
-    }
+    return answering(
+      () =>
+        createServiceDefinition(connection, {
+          service_definition_name: name,
+          description: config.description,
+          package_name: config.packageName as string,
+          transport_request: config.transportRequest,
+          masterSystem: this.systemContext.masterSystem,
+          responsible: this.systemContext.responsible,
+          masterLanguage:
+            config.masterLanguage ?? this.systemContext.masterLanguage,
+        }),
+      this.results.created as IResultStrategy<ReturnType<R['created']>>,
+      options?.analyse,
+    );
   }
 
-  /**
-   * Read service definition
-   */
-  async read(
+  /** Read the object. */
+  async read<E extends IAdtError = IAdtError>(
     config: Partial<IServiceDefinitionConfig>,
     version?: 'active' | 'inactive',
-    options?: IReadOptions,
-  ): Promise<IServiceDefinitionState | undefined> {
-    const state: IServiceDefinitionState = { errors: [] };
-    if (!config.serviceDefinitionName) {
-      const error = new Error('Service definition name is required');
-      state.errors.push({ method: 'read', error, timestamp: new Date() });
-      throw error;
-    }
+    options?: IReadOptions & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
 
-    try {
-      const response = await getServiceDefinitionSource(
-        this.connection,
-        config.serviceDefinitionName,
-        version,
-        options,
-        this.logger,
-      );
-      state.readResult = response;
-      return state;
-    } catch (error: unknown) {
-      const e = error as HttpError;
-      if (e.response?.status === 404) {
-        return undefined;
-      }
-      throw error;
-    }
+    const name = this.name(config);
+
+    // No 404 special case: ADT answers a read for a missing object with 200 and
+    // an empty body, so absence was never a status to branch on — and whether
+    // an empty body *is* absence is the caller's reading, through `analyse`.
+    return answering(
+      () =>
+        getServiceDefinitionSource(
+          connection,
+          name,
+          version ?? 'active',
+          options,
+        ),
+      this.results.source as IResultStrategy<ReturnType<R['source']>>,
+      options?.analyse,
+    );
+  }
+
+  /** Read the object's metadata document. */
+  async readMetadata<E extends IAdtError = IAdtError>(
+    config: Partial<IServiceDefinitionConfig>,
+    options?: IReadOptions & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const name = this.name(config);
+
+    return answering(
+      () =>
+        getServiceDefinition(
+          connection,
+          name,
+          options?.version ?? 'active',
+          options,
+        ),
+      this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
+      options?.analyse,
+    );
+  }
+
+  /** The transport request the object belongs to. */
+  async readTransport<E extends IAdtError = IAdtError>(
+    config: Partial<IServiceDefinitionConfig>,
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const name = this.name(config);
+
+    return answering(
+      () => getServiceDefinitionTransport(connection, name, options),
+      this.results.transport as IResultStrategy<ReturnType<R['transport']>>,
+      options?.analyse,
+    );
   }
 
   /**
-   * Read service definition metadata (object characteristics: package, responsible, description, etc.)
+   * Write the object.
+   *
+   * With `options.lockHandle` the caller holds the lock and owns the chain, so
+   * this is one request. Without it, this locks, checks, writes and unlocks —
+   * and the unlock happens on every path out.
    */
-  async readMetadata(
+  async update<E extends IAdtError = IAdtError>(
     config: Partial<IServiceDefinitionConfig>,
-    options?: IReadOptions,
-  ): Promise<IServiceDefinitionState> {
-    const state: IServiceDefinitionState = { errors: [] };
-    if (!config.serviceDefinitionName) {
-      const error = new Error('Service definition name is required');
-      state.errors.push({
-        method: 'readMetadata',
-        error,
-        timestamp: new Date(),
-      });
-      throw error;
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const name = this.name(config);
+    // The source is the caller's, through `options.sourceCode`. This used to
+    // fall back to `config.sourceCode` — two channels for one value, where the
+    // contract documents one. `config.sourceCode` is `check`'s alone now: a
+    // syntax check compiles a source that is not on the server yet, so it has
+    // nowhere else to arrive.
+    const source = options?.sourceCode;
+
+    if (!source) {
+      throw new Error('Source code is required for update');
     }
-    try {
-      const response = await getServiceDefinition(
-        this.connection,
-        config.serviceDefinitionName,
-        'inactive',
-        options,
-        this.logger,
-      );
-      state.metadataResult = response;
-      this.logger?.info?.('Service definition metadata read successfully');
-      return state;
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({
-        method: 'readMetadata',
-        error: err,
-        timestamp: new Date(),
-      });
-      this.logger?.error('readMetadata', safeErrorMessage(err));
-      throw err;
-    }
-  }
-
-  /**
-   * Read transport request information for the service definition
-   */
-  async readTransport(
-    config: Partial<IServiceDefinitionConfig>,
-    options?: { withLongPolling?: boolean },
-  ): Promise<IServiceDefinitionState> {
-    const state: IServiceDefinitionState = { errors: [] };
-    if (!config.serviceDefinitionName) {
-      const error = new Error('Service definition name is required');
-      state.errors.push({
-        method: 'readTransport',
-        error,
-        timestamp: new Date(),
-      });
-      throw error;
-    }
-    try {
-      const response = await getServiceDefinitionTransport(
-        this.connection,
-        config.serviceDefinitionName,
-        options?.withLongPolling !== undefined
-          ? { withLongPolling: options.withLongPolling }
-          : undefined,
-      );
-      state.transportResult = response;
-      this.logger?.info?.(
-        'Service definition transport request read successfully',
-      );
-      return state;
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({
-        method: 'readTransport',
-        error: err,
-        timestamp: new Date(),
-      });
-      this.logger?.error('readTransport', safeErrorMessage(err));
-      throw err;
-    }
-  }
-
-  /**
-   * Update service definition with full operation chain
-   * Always starts with lock
-   * If options.lockHandle is provided, performs only low-level update without lock/check/unlock chain
-   */
-  async update(
-    config: Partial<IServiceDefinitionConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IServiceDefinitionState> {
-    const state: IServiceDefinitionState = { errors: [] };
-    if (!config.serviceDefinitionName) {
-      const error = new Error('Service definition name is required');
-      state.errors.push({ method: 'update', error, timestamp: new Date() });
-      throw error;
-    }
-
-    // Low-level mode: if lockHandle is provided, perform only update operation
-    if (options?.lockHandle) {
-      const codeToUpdate = options?.sourceCode || config.sourceCode;
-      if (!codeToUpdate) {
-        throw new Error('Source code is required for update');
-      }
-
-      this.logger?.info?.(
-        'Low-level update: performing update only (lockHandle provided)',
-      );
-      const updateResponse = await updateServiceDefinition(
-        this.connection,
-        {
-          service_definition_name: config.serviceDefinitionName,
-          source_code: codeToUpdate,
-          transport_request: config.transportRequest,
-        },
-        options.lockHandle,
-      );
-      this.logger?.info?.('Service definition updated (low-level)');
-      return {
-        updateResult: updateResponse,
-        errors: [],
-      };
-    }
-
-    let lockHandle: string | undefined;
-
-    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
-
-    // the lock but leaves the work half-done.
-
-    const endCriticalSection = beginCriticalSection(this.connection);
-
-    try {
-      // 1. Lock (update always starts with lock, stateful ONLY before lock)
-      this.logger?.info?.('Step 1: Locking service definition');
-      this.connection.setSessionType('stateful');
-      lockHandle = await lockServiceDefinition(
-        this.connection,
-        config.serviceDefinitionName,
-      );
-      this.lockTracker.track(config.serviceDefinitionName, lockHandle);
-      this.logger?.info?.('Service definition locked, handle:', lockHandle);
-
-      // 2. Check inactive with code for update (from options or config)
-      const codeToCheck = options?.sourceCode || config.sourceCode;
-      if (codeToCheck) {
-        this.logger?.info?.(
-          'Step 2: Checking inactive version with update content',
-        );
-        await checkServiceDefinition(
-          this.connection,
-          config.serviceDefinitionName,
-          'inactive',
-          codeToCheck,
-        );
-        this.logger?.info?.('Check inactive with update content passed');
-      }
-
-      // 3. Update
-      if (codeToCheck && lockHandle) {
-        this.logger?.info?.('Step 3: Updating service definition');
-        await updateServiceDefinition(
-          this.connection,
+    return answering(
+      () =>
+        updateServiceDefinition(
+          connection,
           {
-            service_definition_name: config.serviceDefinitionName,
-            source_code: codeToCheck,
+            service_definition_name: name,
+            source_code: source as string,
             transport_request: config.transportRequest,
           },
-          lockHandle,
-        );
-        this.logger?.info?.('Service definition updated');
-
-        // 3.5. Read with long polling (wait for object to be ready after update)
-        // Poll the inactive version: the write above produced it; the active version may not exist yet.
-        this.logger?.info?.('read (wait for object ready after update)');
-        try {
-          await this.read(
-            { serviceDefinitionName: config.serviceDefinitionName },
-            'inactive',
-            { withLongPolling: true },
-          );
-          this.logger?.info?.('object is ready after update');
-        } catch (readError) {
-          this.logger?.warn?.(
-            'read with long polling failed (object may not be ready yet):',
-            safeErrorMessage(readError),
-          );
-          // Continue anyway - unlock might still work
-        }
-      }
-
-      // 4. Unlock (obligatory stateless after unlock)
-      if (lockHandle) {
-        this.logger?.info?.('Step 4: Unlocking service definition');
-        this.connection.setSessionType('stateful');
-        await unlockServiceDefinition(
-          this.connection,
-          config.serviceDefinitionName,
-          lockHandle,
-        );
-        this.connection.setSessionType('stateless');
-        this.lockTracker.untrack(config.serviceDefinitionName);
-        lockHandle = undefined;
-        this.logger?.info?.('Service definition unlocked');
-      }
-
-      // 5. Final check (no stateful needed)
-      this.logger?.info?.('Step 5: Final check');
-      await checkServiceDefinition(
-        this.connection,
-        config.serviceDefinitionName,
-        'inactive',
-      );
-      this.logger?.info?.('Final check passed');
-
-      // 6. Activate (if requested, no stateful needed - uses same session/cookies)
-      if (options?.activateOnUpdate) {
-        this.logger?.info?.('Step 6: Activating service definition');
-        const activateResponse = await activateServiceDefinition(
-          this.connection,
-          config.serviceDefinitionName,
-        );
-        this.logger?.info?.(
-          'Service definition activated, status:',
-          activateResponse.status,
-        );
-
-        // 6.5. Read with long polling (wait for object to be ready after activation)
-        this.logger?.info?.('read (wait for object ready after activation)');
-        try {
-          await this.read(
-            { serviceDefinitionName: config.serviceDefinitionName },
-            'active',
-            { withLongPolling: true },
-          );
-          this.logger?.info?.('object is ready after activation');
-        } catch (readError) {
-          this.logger?.warn?.(
-            'read with long polling failed (object may not be ready yet):',
-            safeErrorMessage(readError),
-          );
-          // Continue anyway - return activation response
-        }
-
-        return {
-          activateResult: activateResponse,
-          errors: [],
-        };
-      }
-
-      // Read and return result (no stateful needed)
-      const readResponse = await getServiceDefinitionSource(
-        this.connection,
-        config.serviceDefinitionName,
-      );
-      const _sourceCode =
-        typeof readResponse.data === 'string'
-          ? readResponse.data
-          : JSON.stringify(readResponse.data);
-
-      return {
-        readResult: readResponse,
-        errors: [],
-      };
-    } catch (error: unknown) {
-      // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
-      if (lockHandle) {
-        try {
-          this.logger?.warn?.(
-            'Unlocking service definition during error cleanup',
-          );
-          this.connection.setSessionType('stateful');
-          await unlockServiceDefinition(
-            this.connection,
-            config.serviceDefinitionName,
-            lockHandle,
-          );
-          this.connection.setSessionType('stateless');
-          this.lockTracker.untrack(config.serviceDefinitionName);
-        } catch (unlockError) {
-          this.logger?.warn?.(
-            'Failed to unlock during cleanup:',
-            safeErrorMessage(unlockError),
-          );
-        }
-      } else {
-        // Ensure stateless if lock failed
-        this.connection.setSessionType('stateless');
-      }
-
-      if (options?.deleteOnFailure) {
-        try {
-          this.logger?.warn?.('Deleting service definition after failure');
-          // No stateful needed - delete doesn't use lock/unlock
-          await deleteServiceDefinition(this.connection, {
-            service_definition_name: config.serviceDefinitionName,
-            transport_request: config.transportRequest,
-          });
-        } catch (deleteError) {
-          this.logger?.warn?.(
-            'Failed to delete service definition after failure:',
-            safeErrorMessage(deleteError),
-          );
-        }
-      }
-
-      this.logger?.error('Update failed:', safeErrorMessage(error));
-      throw error;
-    } finally {
-      endCriticalSection();
-    }
+          options?.lockHandle,
+        ),
+      this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      options?.analyse,
+    );
   }
 
   /**
-   * Delete service definition
+   * Asks ADT whether the object can be deleted.
+   *
+   * Its own member because it is its own endpoint. `delete` no longer runs
+   * it: a consumer that wants the check runs this first and decides what a
+   * refusal means.
    */
-  async delete(
+  async checkDeletion<E extends IAdtError = IAdtError>(
     config: Partial<IServiceDefinitionConfig>,
-  ): Promise<IServiceDefinitionState> {
-    const state: IServiceDefinitionState = { errors: [] };
-    if (!config.serviceDefinitionName) {
-      const error = new Error('Service definition name is required');
-      state.errors.push({ method: 'delete', error, timestamp: new Date() });
-      throw error;
-    }
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
 
-    try {
-      // Check for deletion (no stateful needed)
-      this.logger?.info?.('Checking service definition for deletion');
-      const deletionCheck = await checkDeletion(this.connection, {
-        service_definition_name: config.serviceDefinitionName,
-        transport_request: config.transportRequest,
-      });
-      // ADT already said whether this may be deleted; refusing to read that
-      // answer is how a delete came to report success while the object
-      // stayed. Throws on isDeletable=false or a message of type E; a W
-      // is a warning and passes.
-      assertDeletable(deletionCheck.data);
-      this.logger?.info?.('Deletion check passed');
-
-      // Delete (no stateful needed - no lock/unlock)
-      this.logger?.info?.('Deleting service definition');
-      const result = await deleteServiceDefinition(this.connection, {
-        service_definition_name: config.serviceDefinitionName,
-        transport_request: config.transportRequest,
-      });
-      this.logger?.info?.('Service definition deleted');
-
-      return {
-        deleteResult: result,
-        errors: [],
-      };
-    } catch (error: unknown) {
-      this.logger?.error('Delete failed:', safeErrorMessage(error));
-      throw error;
-    }
+    const name = this.name(config);
+    return answering(
+      () =>
+        checkDeletion(connection, {
+          service_definition_name: name,
+          transport_request: config.transportRequest,
+        }),
+      this.results.deletionCheck as IResultStrategy<
+        ReturnType<R['deletionCheck']>
+      >,
+      (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
+    );
   }
 
   /**
-   * Activate service definition
-   * No stateful needed - uses same session/cookies
+   * Delete the object.
+   *
+   * The deletion check is read, not merely performed: ADT answers a refusal
+   * with `del:isDeletable="false"` inside a 200, and a delete that ignored it
+   * reported success while the object stayed. {@link deletionRefusal} is the
+   * shipped reading of that answer; a caller who wants another passes their own
+   * `analyse`.
    */
-  async activate(
+  async delete<E extends IAdtError = IAdtError>(
     config: Partial<IServiceDefinitionConfig>,
-  ): Promise<IServiceDefinitionState> {
-    const state: IServiceDefinitionState = { errors: [] };
-    if (!config.serviceDefinitionName) {
-      const error = new Error('Service definition name is required');
-      state.errors.push({ method: 'activate', error, timestamp: new Date() });
-      throw error;
-    }
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
 
-    try {
-      const result = await activateServiceDefinition(
-        this.connection,
-        config.serviceDefinitionName,
-      );
-      state.activateResult = result;
-      return state;
-    } catch (error: unknown) {
-      this.logger?.error('Activate failed:', safeErrorMessage(error));
-      throw error;
-    }
+    const name = this.name(config);
+    return answering(
+      () =>
+        deleteServiceDefinition(connection, {
+          service_definition_name: name,
+          transport_request: config.transportRequest,
+        }),
+      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      options?.analyse,
+    );
   }
 
-  /**
-   * Check service definition
-   */
-  async check(
+  /** Activate the object. Needs no stateful session. */
+  async activate<E extends IAdtError = IAdtError>(
+    config: Partial<IServiceDefinitionConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const name = this.name(config);
+
+    return answering(
+      () => activateServiceDefinition(connection, name),
+      this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
+      (options?.analyse ?? activationRefusal) as IAnalyse<E>,
+    );
+  }
+
+  /** Check the object. */
+  async check<E extends IAdtError = IAdtError>(
     config: Partial<IServiceDefinitionConfig>,
     status?: string,
-  ): Promise<IServiceDefinitionState> {
-    const state: IServiceDefinitionState = { errors: [] };
-    if (!config.serviceDefinitionName) {
-      const error = new Error('Service definition name is required');
-      state.errors.push({ method: 'check', error, timestamp: new Date() });
-      throw error;
-    }
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
 
-    // Map status to version
-    const version: CheckRunVersion =
+    const name = this.name(config);
+    const version: 'active' | 'inactive' =
       status === 'active' ? 'active' : 'inactive';
-    state.checkResult = await checkServiceDefinition(
-      this.connection,
-      config.serviceDefinitionName,
-      version,
+
+    return answering(
+      () =>
+        checkServiceDefinition(connection, name, version, config.sourceCode),
+      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      options?.analyse,
     );
-    return state;
   }
 
-  /**
-   * Lock service definition for modification
-   */
-  async lock(config: Partial<IServiceDefinitionConfig>): Promise<string> {
-    const lockHandle = await this.lockCap.lock(config);
-    this.lockTracker.track(config.serviceDefinitionName as string, lockHandle);
-    return lockHandle;
+  /** Lock the object for modification. */
+  async lock(
+    config: Partial<IServiceDefinitionConfig>,
+  ): Promise<IAdtResponse<string>> {
+    const name = this.name(config);
+
+    return answering(
+      async () => {
+        // Stateful for the LOCK request and no longer — see LockCapability.
+        const lockHandle = await inStatefulSession(this.connection, () =>
+          lockServiceDefinition(this.connection, name),
+        );
+        this.lockTracker.track(name, lockHandle);
+        // The handle is the value, and the request does not keep the wire it
+        // came on — so the answer is built around what the request produced.
+        return {
+          data: lockHandle,
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+        };
+      },
+      (answer) => String(answer.data),
+    );
   }
 
-  /**
-   * Unlock service definition
-   */
+  /** Unlock the object. */
   async unlock(
     config: Partial<IServiceDefinitionConfig>,
     lockHandle: string,
-  ): Promise<IServiceDefinitionState> {
-    const state = await this.lockCap.unlock(config, lockHandle);
-    this.lockTracker.untrack(config.serviceDefinitionName as string);
-    return state;
+  ): Promise<IAdtResponse<void>> {
+    const name = this.name(config);
+
+    return answering(
+      async () => {
+        // UNLOCK must run stateful (older BASIS #106); stateless after.
+        this.connection.setSessionType('stateful');
+        try {
+          return await unlockServiceDefinition(
+            this.connection,
+            name,
+            lockHandle,
+          );
+        } finally {
+          this.connection.setSessionType('stateless');
+          this.lockTracker.untrack(name);
+        }
+      },
+      () => undefined,
+    );
   }
 
-  getVersions(config: Partial<IServiceDefinitionConfig>) {
-    return this.versionsCap.getVersions(config);
+  /** Version history of the object's source. */
+  async getVersions(
+    config: Partial<IServiceDefinitionConfig>,
+  ): Promise<IAdtResponse<ObjectVersion[]>> {
+    return answering(
+      async () => ({
+        data: await getServiceDefinitionVersions(this.connection, config),
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+      }),
+      (answer) => answer.data as ObjectVersion[],
+    );
   }
 
-  getVersionSource(contentUri: string) {
-    return this.versionsCap.getVersionSource(contentUri);
+  /** The source of one version, by the `contentUri` an entry carries. */
+  async getVersionSource(contentUri: string): Promise<IAdtResponse<string>> {
+    return answering(
+      async () => ({
+        data: await getServiceDefinitionVersionSource(
+          this.connection,
+          contentUri,
+        ),
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+      }),
+      (answer) => String(answer.data),
+    );
   }
 }

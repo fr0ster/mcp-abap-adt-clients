@@ -30,13 +30,13 @@ export type {
   ICreateEnhancementParams,
   IDeleteEnhancementParams,
   IEnhancementConfig,
-  IEnhancementMetadata,
-  IEnhancementState,
+  IEnhancementResults,
   IUpdateEnhancementParams,
   IValidateEnhancementParams,
 } from './types';
 export {
   ENHANCEMENT_TYPE_CODES,
+  enhancementDocuments,
   getEnhancementBaseUrl,
   getEnhancementUri,
   isImplementationType,

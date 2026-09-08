@@ -84,10 +84,8 @@ describe('Shared - discovery', () => {
     // `unknown` and stop checking anything.
     const answer = (await withAcceptHandling(
       client.getUtils().discovery(),
-    )) as IAdtResponse<IAdtResult<IAdtWireResponse>>;
-    const result = expectResult(answer, 'discovery');
-
-    const xml = String(result.data);
+    )) as IAdtResponse<string>;
+    const xml = expectResult(answer, 'discovery');
     expect(xml.length).toBeGreaterThan(0);
     expect(xml).toMatch(/<app:service|<service/);
 

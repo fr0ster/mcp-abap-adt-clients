@@ -13,6 +13,7 @@ import { ACCEPT_DOMAIN } from '../../constants/contentTypes';
 import {
   encodeSapObjectName,
   limitDescription,
+  writeQuery,
 } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import {
@@ -101,7 +102,7 @@ function patchDomainXml(currentXml: string, args: IUpdateDomainParams): string {
 export async function updateDomain(
   connection: IAbapConnection,
   args: IUpdateDomainParams,
-  lockHandle: string,
+  lockHandle?: string,
 ): Promise<IAdtWireResponse> {
   const domainNameEncoded = encodeSapObjectName(args.domain_name.toLowerCase());
 
@@ -121,10 +122,7 @@ export async function updateDomain(
   const updatedXml = patchDomainXml(currentXml, args);
 
   // 3. PUT
-  const corrNrParam = args.transport_request
-    ? `&corrNr=${args.transport_request}`
-    : '';
-  const url = `/sap/bc/adt/ddic/domains/${domainNameEncoded}?lockHandle=${encodeURIComponent(lockHandle)}${corrNrParam}`;
+  const url = `/sap/bc/adt/ddic/domains/${domainNameEncoded}${writeQuery(lockHandle, args.transport_request)}`;
 
   const headers: Record<string, string> = {
     Accept: ACCEPT_DOMAIN,

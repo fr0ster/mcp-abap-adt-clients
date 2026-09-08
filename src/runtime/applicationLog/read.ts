@@ -10,19 +10,13 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
+  IGetApplicationLogObjectOptions,
+  IGetApplicationLogSourceOptions,
 } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 
-/**
- * Get application log object options
- */
-export interface IGetApplicationLogObjectOptions {
-  corrNr?: string;
-  lockHandle?: string;
-  version?: string;
-  accessMode?: string;
-  action?: string;
-}
+// Declared once, in the contract; re-exported so importers here are unchanged.
+export type { IGetApplicationLogObjectOptions } from '@mcp-abap-adt/interfaces';
 
 /**
  * Get application log object properties
@@ -59,14 +53,8 @@ export async function getApplicationLogObject(
   });
 }
 
-/**
- * Get application log object source options
- */
-export interface IGetApplicationLogSourceOptions {
-  corrNr?: string;
-  lockHandle?: string;
-  version?: string;
-}
+// Declared once, in the contract; re-exported so importers here are unchanged.
+export type { IGetApplicationLogSourceOptions } from '@mcp-abap-adt/interfaces';
 
 /**
  * Get application log object source

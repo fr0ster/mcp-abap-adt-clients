@@ -26,13 +26,11 @@ export async function getInterfaceMetadata(
   interfaceName: string,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  return orThrow(
-    getUtils(connection).readObjectMetadata(
-      'interface',
-      interfaceName,
-      undefined,
-      options,
-    ),
+  return getUtils(connection).objectMetadataWire(
+    'interface',
+    interfaceName,
+    undefined,
+    options,
   );
 }
 
@@ -46,14 +44,12 @@ export async function getInterfaceSource(
   version?: 'active' | 'inactive',
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  return orThrow(
-    getUtils(connection).readObjectSource(
-      'interface',
-      interfaceName,
-      undefined,
-      version,
-      options,
-    ),
+  return getUtils(connection).objectSourceWire(
+    'interface',
+    interfaceName,
+    undefined,
+    version,
+    options,
   );
 }
 

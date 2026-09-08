@@ -2,7 +2,6 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
-import { assertActivationSucceeded } from '../../utils/activationUtils';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
@@ -25,6 +24,5 @@ export async function activateScalarFunctionImplementation(
     data: buildActivationXml(name),
     headers: { Accept: 'application/xml', 'Content-Type': 'application/xml' },
   });
-  assertActivationSucceeded('Scalar function implementation', response.data);
   return response;
 }

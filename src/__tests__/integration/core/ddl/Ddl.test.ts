@@ -15,9 +15,11 @@ import * as path from 'node:path';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type { IDdlConfig, IDdlState } from '../../../../core/ddl';
+import type { IDdlConfig } from '../../../../core/ddl';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { expectResult } from '../../../helpers/contract';
+import { presenceOf } from '../../../helpers/objectPresence';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -63,7 +65,7 @@ describe('View (using AdtClient)', () => {
   let defaultPackage: string = '';
   let defaultTransport: string = '';
   let systemContext: Awaited<ReturnType<typeof resolveSystemContext>>;
-  let tester: BaseTester<IDdlConfig, IDdlState>;
+  let tester: BaseTester<IDdlConfig>;
 
   beforeAll(async () => {
     try {
@@ -123,7 +125,28 @@ describe('View (using AdtClient)', () => {
             ddlSource: params.ddl_source,
           };
         },
-        ensureObjectReady: async () => ({ success: true }),
+        // See the note in BehaviorImplementation.test.ts: a killed run never
+        // reaches its teardown, so the reliable place to clear leftovers is the
+        // start of the next one.
+        ensureObjectReady: async (ddlName: string) => {
+          if (!connection || !ddlName) return { success: true };
+          const existing = presenceOf(
+            await client.getDdl().read({ ddlName }),
+            `DDL source ${ddlName}`,
+          );
+          if (existing.present !== true) return { success: true };
+          const removed = await client.getDdl().delete({
+            ddlName,
+            transportRequest: tester.getTransportRequest(),
+          });
+          if (!removed.ok) {
+            testsLogger.warn?.(
+              `could not remove leftover ${ddlName}: ${removed.getError().message}`,
+            );
+          }
+          await new Promise((resolve) => setTimeout(resolve, 3000));
+          return { success: true };
+        },
       });
     } catch (error) {
       const errorMessage =
@@ -179,15 +202,13 @@ describe('View (using AdtClient)', () => {
       const ddlName = tfCase?.params?.ddl_name;
       if (!ddlName) return; // not configured / disabled → skip
 
-      let res: any;
-      try {
-        res = await client.getDdl().read({ ddlName }, 'active');
-      } catch {
-        return; // object absent on this system → skip, not fail
-      }
-      const src = String(
-        res?.readResult?.data ?? res?.data ?? '',
-      ).toLowerCase();
+      // A table function that is not on this system answers an empty body, and
+      // the assertions below say what it must contain — so absence fails on the
+      // content rather than being caught and skipped.
+      const answer = await client.getDdl().read({ ddlName }, 'active');
+      if (!answer.ok) return; // object absent on this system → skip, not fail
+
+      const src = String(answer.getResult().value ?? '').toLowerCase();
       expect(src).toContain('define table function');
       expect(src).toContain('implemented by method');
     },

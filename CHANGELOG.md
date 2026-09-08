@@ -5,6 +5,614 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [18.0.0] - 2026-09-06
+
+Requires `@mcp-abap-adt/interfaces@^39.0.0`.
+
+**Every member answers the contract, issues one request, and the reading is
+yours.** 17.0.0 moved `getUtils()` onto `IAdtResponse` and said the per-type
+handlers had not followed; this is them following, plus the decisions the
+contracts made in 30.0.0 through 34.0.0 — one member per endpoint, the result
+shape injected into the implementation once rather than chosen at each call, and
+the sequence around a write handed back to the consumer.
+
+### Breaking
+
+- **BREAKING: no client-side deadline by default.** Every request this library
+  makes carried `timeout: 45000` — 436 of them — and `SAP_TIMEOUT_DEFAULT` now
+  defaults to `0`, which the HTTP clients here read as "do not abort".
+
+  Aborting a request the server is still executing costs more than it saves.
+  Measured on the cloud trial: `POST /deletion/delete` was aborted at 45 s, the
+  retry came back `400 … Session Timed Out or Not Found` **with a new session
+  cookie**, and everything after it ran in a session nobody asked for. Of 794
+  responses in that run, 30 carried `set-cookie` — 29 were `_action=LOCK`
+  binding a stateful session, and the 30th was that error.
+
+  The damage is not the failed request. Over HTTP a session is two layers: the
+  ICF one the cookie addresses, and the ABAP one beneath it that holds the
+  enqueue locks. An abort replaces the first and strands the second — the lock
+  handle dies, the lock does not, and nothing can reach it again. That is the
+  same effect already recorded here as "a session recycle does not clear it;
+  only the unlock does". RFC never shows it, having one ABAP session for the
+  connection's lifetime and no ICF layer to replace.
+
+  **A caller who wants a deadline still has one** — `IAdtOperationOptions.timeout`
+  per call, `SAP_TIMEOUT_DEFAULT` for a system-wide floor. What is gone is this
+  library choosing it for them, which is the rule it already follows for the
+  lock window and the operation sequence.
+
+  That per-call promise is now kept, which it was not when this entry was first
+  written. The low-level functions take positional arguments and end in
+  `makeAdtRequest({ …, timeout: getTimeout('default') })` at 444 places, none of
+  which could see the option — so `options.timeout` did nothing anywhere except
+  a service binding's publication, and a caller who wanted a deadline had a
+  documented parameter that was ignored and an environment variable that was
+  process-wide. A member wraps its connection once now
+  (`withCallTimeout`, `src/utils/callTimeout.ts`) and everything below inherits
+  the deadline, including low-level functions that issue more than one request.
+  287 members across 36 files; `undefined` returns the connection itself, so a
+  caller who asks for nothing gets exactly what they had. A parameterised guard
+  asserts, for every member that declares an options bag, that the number the
+  caller passed is on every request the member issues.
+
+  A request that genuinely hangs now waits for the server or for TCP. That is
+  the trade, made deliberately: the abort ended nothing server-side, it only
+  ended what this side knew.
+
+- **A failed lock window restores the session.** `LockCapability` and
+  twenty-six handlers set the session stateful, ran the request, and set it back
+  as the last statement of the success path — so a refused `LOCK` left the
+  connection stateful. The connection is shared, so the next unrelated request
+  went out inside a session nobody asked for, and what the server takes during
+  such a request is held until that session ends. The rationale for the
+  success-only form named three cleanup layers, and the third of them — the
+  operation chains' catch blocks — is what this release removed. One atom now
+  holds the invariant (`inStatefulSession`, `src/core/shared/capabilities/statefulSession.ts`),
+  41 unprotected windows became 0, and a guard that refuses every request
+  asserts it for both members of every lockable type. That guard found seven
+  sites a mechanical sweep had missed, because they spell the call
+  `setSessionType?.(`.
+
+- **A write takes its source from `options.sourceCode` and nowhere else.**
+  Sixteen `update`/`updateMetadata` implementations read
+  `options?.sourceCode || config.sourceCode`, so one value had two channels and
+  the contract documented one. `AdtProgram.create` had the same expression and
+  handed the result to a function that ignores it — the POST carries metadata
+  only — and `AdtBehaviorImplementation.update` had three channels, of which
+  nothing in this repository ever set two.
+
+  `config.sourceCode` stays on the config types, because `check` needs it and
+  has nowhere else to get it: a syntax check compiles a source that is not on
+  the server yet. Its meaning is now single — the source being checked, not a
+  second way to write.
+
+  ```typescript
+  // before — either worked
+  await cls.update({ className, sourceCode }, { lockHandle });
+  await cls.update({ className }, { sourceCode, lockHandle });
+
+  // now — the second one
+  await cls.update({ className }, { sourceCode, lockHandle });
+  ```
+
+  A write with no `options.sourceCode` is refused before the request, as it
+  always was when neither channel carried one.
+
+  **Two more creates were handing a source to a function that ignores it.**
+  `getTable().create()` passed `ddl_code` and `getDdl().create()` passed
+  `ddl_source`; `createTable` reads five fields and `createDdl` seven, and
+  neither reads those. Same silence as the program's, found by looking for the
+  same expression. Both are gone from the call.
+
+  The type-specific channels that remain are the class includes and the DDL
+  configs — `testClassCode`, `localTypesCode`, `definitionsCode`, `macrosCode`,
+  `ddlCode`, `ddlSource` — which callers and tests do set, and which are a
+  separate decision from this one.
+
+- **A write states what it needs.** Every implementation of `IAdtUpdatable` and
+  `IAdtMetadataUpdatable` now names its own config instead of inheriting a
+  `Partial` the atom applied on everyone's behalf. For the 37 types whose write
+  really is all-optional nothing changes but the spelling —
+  `IAdtUpdatable<Partial<IClassConfig>, …>` — and for the one where it is not,
+  the requirement is finally sayable: a service binding's `update` is its
+  publication job, and `IServiceBindingPublicationConfig` demands the binding
+  name and the protocol that selects the endpoint. Previously the class narrowed
+  the parameter and the interface let the bad call through anyway, because
+  method parameters are bivariant; it compiled and threw before the wire.
+
+- **One endpoint, one member — the operation chains are gone.** A member issues
+  exactly one ADT request. `create` is the POST; `update` is the write and
+  carries `options.lockHandle` as given; `delete` is the DELETE. None of them
+  validates, checks, locks, polls for readiness, activates or rolls back any
+  more, and none of them touches `connection.setSessionType()`.
+
+  A multi-step operation is the consumer's sequence, because it is the consumer
+  that knows what belongs between the steps and what a failure at each one
+  means:
+
+  ```typescript
+  // before — one call, six requests, and no way to see or steer them
+  await client.getClass().create(config, { activateOnCreate: true });
+
+  // after — the calls are yours, and every one answers
+  const cls = client.getClass();
+  await cls.create(config);
+
+  const locked = await cls.lock(config);
+  if (!locked.ok) throw new Error(locked.getError().message);
+  const lockHandle = locked.getResult().value;
+  try {
+    await cls.update(config, { sourceCode, lockHandle });
+  } finally {
+    await cls.unlock(config, lockHandle);
+  }
+
+  await cls.activate(config);
+  ```
+
+  **Passing no lock handle is allowed.** Whether an unlocked write is accepted
+  is ADT's judgement about that object on that system, and its refusal comes
+  back in the answer. The seven low-level writes that used to throw
+  `lockHandle is required` before reaching the wire no longer do — they were
+  turning a server verdict into an exception the caller could not read.
+
+- **`activateOnCreate`, `activateOnUpdate` and `deleteOnFailure` are gone** from
+  `IAdtOperationOptions` (interfaces 34.0.0). They asked for extra steps, and
+  there are none left to ask for. Call `activate()` when you want the object
+  active. Nothing needs a rollback: a `create` that answers a result made
+  exactly one object, and one that answers a failure made none.
+
+- **`checkDeletion()` is a member of `IAdtDeletable`, on 30 types.** The
+  deletion approval ADT wants before a delete used to run inside `delete()`,
+  where a caller could neither skip it nor read what it said. Call it yourself:
+
+  ```typescript
+  const approved = await client.getClass().checkDeletion(config);
+  if (!approved.ok) throw new Error(approved.getError().message);
+  await client.getClass().delete(config);
+  ```
+
+  Deleting without it is allowed — ADT answers its own refusal. What you lose is
+  the reason: the check's document names what still points at the object.
+
+  It is not a capability of its own. Almost everything created can be removed;
+  what varies is the *moment* — something still references it, a transport holds
+  it, another user holds its lock — and every one of those is the server's to
+  answer. So anything that can be deleted can be asked, and the two members are
+  one atom.
+
+  **It reads its own document.** Every result set that carries the member gained
+  a `deletionCheck` strategy beside `check`, defaulting to `rawDocument`, and
+  the contract's third type parameter comes from that slot. The two are
+  different documents from different endpoints — `chkl:messages` from
+  `POST /checkruns` against `del:checkResponse` from `POST /deletion/check` —
+  and a consumer who injects a parser for their check runs must not have it
+  handed a deletability verdict.
+
+  **Not every type asks the deletion service.** A transport request cannot:
+  `/sap/bc/adt/deletion/check` answers `No URI-Mapping defined for URI
+  /sap/bc/adt/cts/transportrequests/…` — a fact about the address, not about the
+  request. `AdtRequest.checkDeletion` reads the request itself instead, where
+  the two things ADT actually requires (empty, unreleased) are stated. Measured
+  on the cloud trial; a standalone include and a metadata extension *are*
+  resolved by the service, and answer as a class does.
+
+  Measured on the cloud trial: the check is asked about a **URI**, and its
+  answer names the type and package it resolved that address to. A type with an
+  address has something to ask with, whether or not its own delete goes through
+  the deletion service — which is how `getInclude()`, `getMetadataExtension()`
+  and `getRequest()` came to offer it.
+
+- **Seven types no longer declare `IAdtDeletable`**, because they do not delete:
+  `getLocalTestClass()`, `getLocalTypes()`, `getLocalDefinitions()`,
+  `getLocalMacros()`, `getMessageClassMessage()`, `getUnitTest()` and
+  `getCdsUnitTest()`. Removing any of them is a **write of the parent** —
+  `delete()` on a class include is literally `update({ testClassCode: '' })`,
+  and removing a message rewrites its message class. There is no resource to
+  DELETE and none to ask about; the deletion service resolves a *message class*
+  and knows nothing of the rows inside it.
+
+  The concrete classes keep a `delete()` as the name for writing emptiness, but
+  the contract the factory hands back no longer declares it. **A caller reaching
+  it through the factory writes the empty content instead**, which is the
+  operation ADT actually offers:
+
+  ```typescript
+  // before
+  await client.getLocalTestClass().delete({ className: 'ZCL_X' });
+
+  // after
+  await client.getLocalTestClass().update(
+    { className: 'ZCL_X', testClassCode: '' },
+    { lockHandle },
+  );
+  ```
+
+- **Two endpoints that were reachable no other way became members**, and both
+  ended up with the names the resource split gave them: writing a function
+  include's `/source/main` is `update` (its `finclude` document is
+  `updateMetadata`), and the generated shell that binds a behavior
+  implementation to its definition is written with the **class's** `update`,
+  from the exported `mainSourceFor`. The `updateSource()` and `updateMain()`
+  names existed briefly on this branch and are not in the release.
+
+- **Removed for being compositions rather than requests:**
+  `AdtServiceBinding.createAndGenerateServiceBinding()` (call `create` then
+  `generateServiceBinding`), and the implicit unpublish inside a binding's
+  `delete()` — a published binding is unpublished with
+  `update({ desiredPublicationState: 'unpublished' })`, which is a call whose
+  answer you can see.
+
+- **`AdtUnitTest` and `AdtCdsUnitTest`: `create` is the container class's POST
+  and `validate` is its name validation.** Writing the tests into the class is
+  `getLocalTestClass().update()`, and the class must be active before its
+  include can be locked — an order that is not free, which is exactly why it
+  belongs to the caller rather than to a chain it cannot see into.
+
+- **`switchOn` / `switchOff` on a feature toggle answer the toggle's own
+  response**, not a runtime state read after it. Use `getRuntimeState()` for the
+  state.
+
+- **`AdtMessageClassMessage` keeps its chain, and is the only member that does.**
+  A message is a row inside its class's document: the write is one PUT, but it
+  needs two lock handles and a read-modify-write of XML this library assembles.
+  Making it single-request would mean publishing that assembly.
+
+- **`getInactiveObjects()` takes its reading from the result set.** It is one
+  GET with one answer, which is exactly what an `IResultStrategy` types, and it
+  was the last such member answering a shape nobody could change. `IUtilResults`
+  gained an `inactive` strategy, `getUtils(results)` declares
+  `IAdtGroupLifecycle<ReturnType<R['inactive']>>`, and the `includeRawXml` flag
+  is gone with the split — a consumer who wants the document passes
+  `rawDocument`, the same removal that flag got on `getWhereUsedList`.
+
+  `getPackageContents`, `getPackageHierarchy` and `getWhereUsedList` keep their
+  fixed readings, and the reason is measured rather than habitual: each makes
+  *several* requests — one node-structure request per object type plus a walk
+  into subpackages, or the scope then the search — and assembles one shape from
+  all of them. `IResultStrategy<T> = (answer: IAdtWireResponse) => T` cannot
+  type that. A consumer who wants another shape implements
+  `IAdtPackageBrowsing` or `IAdtInformationSystem` themselves; that the factory
+  cannot hand them one is a gap in the composition, recorded as open in the
+  contracts package's `DECISIONS.md` rather than claimed to be solved here.
+
+- **Every member answers `IAdtResponse<T>`.** `client.getClass().create(...)`
+  and its neighbours return a result or a failure instead of a state object, and
+  signal a refusal in the answer instead of throwing. Reading the result without
+  narrowing on `ok` does not compile.
+
+  ```typescript
+  // before
+  const state = await client.getClass().create(config);
+  if (state.errors.length) { /* … */ }
+
+  // after
+  const answer = await client.getClass().create(config);
+  if (!answer.ok) throw new Error(answer.getError().message);
+  answer.getResult().value;
+  ```
+
+- **The `IXxxState` types are gone**, all twenty-eight of them, along with the
+  stored envelopes on them (`createResult`, `updateResult`, `checkResult`,
+  `readResult`, `validationResponse`, `transportResult`, …) and the `errors`
+  array. A member answers one value; a failure is the other half of the answer.
+
+- **`AdtFailureOrigin` has two values**, `'connection'` and `'refusal'`, and
+  `IAdtError.cause` is gone. `'parse'` described *this library* failing to read a
+  document, which is not a verdict about the server — it pointed callers at a
+  system that had answered them correctly. That case throws `AdtParseError` as
+  itself now, and so does a consumer's own reading.
+
+- **The reading is injected once, at construction.** Every `parse` parameter and
+  every overload taking one is gone: `readWith(parse, …)`, `listNodes(parse)`,
+  `search(query, parse)`. Pass a result set to the factory instead:
+
+  ```typescript
+  import { classDocuments } from '@mcp-abap-adt/adt-clients';
+
+  const parsed = client.getClass({
+    ...classDocuments,
+    source: (answer) => myParser(String(answer.data)),
+  });
+  ```
+
+- **One endpoint, one member.** Removed for having a twin over the same request:
+  `AdtUtils.searchObjects` (use `search`), `AdtRequest.listNodes` (use `list`),
+  `Profiler.readWith` (implement `IProfiler`), `AdtServiceBinding`'s eight
+  `xxxServiceBinding` duplicates (use the atoms: `create`, `read`, `update`,
+  `delete`, `activate`, `check`), and `getWhereUsedList`'s `includeRawXml` flag
+  (use `getWhereUsed`, which answers the document).
+
+- **Result shapes moved to this package.** `ISearchResult`, `IWhereUsedListResult`,
+  `ITransportTree` and its four node types, `IRepositoryNodeContents`,
+  `INamedItem`, `IPackageHierarchyNode`, `IObjectReference`,
+  `IInactiveObjectsResponse`, `ObjectVersion`, the feed/ATC/trace shapes and the
+  abapGit ones now come from `@mcp-abap-adt/adt-clients` rather than from
+  `@mcp-abap-adt/interfaces`. A contract carries what is needed to use or replace
+  it; a shape a replacement reading would not produce is neither.
+
+- **`AdtRuntimeClientExperimental` is deleted.** It was `class X extends
+  AdtRuntimeClient {}` — an empty body, a rename wearing a class. Use
+  `AdtRuntimeClient`.
+
+- **`AdtAuthorizationField` no longer claims `IAdtTransportAware`.** The APS IAM
+  endpoint exposes no transport resource; `readTransport()` re-read the object at
+  its own URL and returned that.
+
+- **`AdtFunctionInclude.readSource()` is gone.** `read()` is the source, as the
+  contract says of an object that has one.
+
+- **`publishODataV2` and `unpublishODataV2` are gone.** They were two method
+  names for one endpoint with a `serviceType` parameter, and both issued a GET
+  to a `…jobs` URL that Eclipse POSTs to — so neither was the publish they were
+  named for. `update({ desiredPublicationState, serviceType })` covers odatav2
+  and odatav4 alike.
+
+- **`getODataV2ServiceBinding` and `getODataV4ServiceBinding` are one member:**
+  `getServiceGroup({ objectname, serviceType, … })`. Same defect, next door. Its
+  `Accept` now carries v1 as well as v2, as Eclipse sends it; v2 alone is a 406
+  on a system that serves only v1.
+
+- **The capability guard counts requests now, and found seven members that
+  make more than one.** Naming the right request proves it happened, not that it
+  happened alone — a member that reads the object and then writes it passed
+  every assertion the guard had. Two kinds turned up, both recorded as named
+  exceptions rather than quietly allowed:
+
+  - **read-modify-write**, which is ADT's shape and not a choice: a domain, a
+    data element, a table type, a package, a message class, an authorization
+    field and a function group *are* their document, and the endpoint takes it
+    whole, so changing one field is GET, patch, PUT. A caller holding the whole
+    document passes `options.xmlContent` and skips the read;
+  - **`getSystemInformation()`**, which decides cloud or on-premise and is
+    cached per client — a request, but not a step of the operation.
+
+  Everything else issues exactly what its capability names. The rule now fails
+  a build rather than a review.
+
+- **BREAKING: publishing takes the binding and the protocol, and nothing else.**
+  `serviceType` is **required** — it selects the endpoint, `odatav2` or
+  `odatav4`, and a caller holding a binding knows it from the variant. The
+  service name and version are **not accepted any more**: the job is posted with
+  no query string, to a body naming the target by type and name, so there is
+  nowhere for them to go.
+
+  ```typescript
+  await bindings.update(
+    { bindingName: 'ZAC_SRVB01', desiredPublicationState: 'published',
+      serviceType: 'odatav4' },
+    { timeout: 300_000 },
+  );
+  ```
+
+  **The signature says so.** `update` on a binding takes
+  `IServiceBindingPublicationConfig`, not `Partial<IServiceBindingConfig>`:
+  `serviceType` is required and `desiredPublicationState` is
+  `'published' | 'unpublished'`. Both calls that used to compile and then throw
+  before the wire now fail to compile, which is where a caller meets them.
+
+  Mid-branch this member read the binding first and filled all three in from its
+  own document. That read made one member two requests, and the state check it
+  also did is the server's answer anyway. A caller who wants to decide
+  beforehand reads the binding and looks at `srvb:allowedAction`.
+
+- **`desiredPublicationState: 'unchanged'` is refused by `update`.** A binding's
+  update *is* its publication, so there is no request that changes nothing. It
+  stays legitimate on a binding's *config*, where it says a create should not
+  publish.
+
+- **`AdtServiceBinding` gains `lock()` and `unlock()`**, and the manifest's
+  claim that "ADT offers no lock for a service binding" is retired — measured
+  from Eclipse, it takes one: `_action=LOCK&accessMode=MODIFY` before a publish
+  job, `_action=UNLOCK&lockHandle=…` when the editor closes. Publishing is what
+  editing a binding is.
+
+  **The library does not take it for you.** How long a lock is held is a policy
+  — an editor holds one across several publishes, a script for one call — and
+  the connection is shared. See "Service bindings: publishing is the editing" in
+  `docs/usage/CLIENT_API_REFERENCE.md` for the shape a consumer writes.
+
+- **`IAdtServiceBinding` is gone from `@mcp-abap-adt/interfaces`**, and
+  `IServiceBindingPublicationParams` / `IServiceGroupParams` are declared in this
+  package. A per-object interface that restated the capability atoms told a
+  consumer nothing the atoms did not, and it named two members that no longer
+  exist.
+
+- **`AdtInclude.delete` takes no lock handle, and `deleteInclude` lost the
+  parameter.** A `PROG/I` include was the one type deleted with
+  `DELETE /programs/includes/<name>?lockHandle=…`, and the file said so: "requires
+  a lock, like every other ADT deletion". Both halves were wrong. A lock is what
+  an *update* needs; a deletion is `POST /deletion/check` then
+  `POST /deletion/delete`, which every other type here already used, and an
+  existing lock does not let a delete through — it blocks it.
+
+  So the endpoint answered `400 Parameter lockHandle could not be found` to every
+  caller that had none, which is every cleanup, since nothing locks an object in
+  order to remove it. `Include - Full workflow` failed that way on both
+  transports.
+
+  Measured on E19 against a leftover the broken suite had left behind — no lock
+  taken, no stateful session:
+
+  ```
+  POST /sap/bc/adt/deletion/check   -> del:isDeletable="true" adtcore:type="PROG/I"
+  POST /sap/bc/adt/deletion/delete  -> del:isDeleted="true"
+  ```
+
+  `options.lockHandle` is gone from the signature rather than ignored, so a
+  caller cannot pass one and believe it mattered. As everywhere else, `200` from
+  the deletion service means accepted — `del:isDeleted` in the body is the
+  verdict.
+
+- **`AdtRequest.create()` answers the created request**, not its document:
+  `{ transportNumber, description, type, targetSystem, owner, uri, … }`. The
+  low-level `createTransport` hands the document on and `parseCreatedTransport`
+  is its shipped reading — it used to parse inside the writer and return the
+  object in place of the response, so the reading had nothing to read.
+
+### Fixed
+
+- **`withLongPolling` never reached the wire for five reads.** The four
+  class-include reads — `definitions`, `macros`, `testclasses`,
+  `implementations` — and `getBehaviorImplementationImplementations` took
+  `IReadOptions`, used it for `accept`, and never asked about long polling. A
+  caller set the option and nothing happened.
+
+  What they had in common is the separator. Their URL already carries
+  `?version=…`, so the `'?withLongPolling=true'` literal used elsewhere in that
+  layer could not be reused, and they dropped the option rather than joining it
+  correctly. `longPollingQuery(url, wanted)` now holds that decision in one
+  place.
+
+  The other 23 reads taking `IReadOptions` were never affected: they hand it to
+  `objectSourceWire`, `objectMetadataWire`, a local `buildQuery` or
+  `getClassTransport`, and all four read it. A count of 28 comes from grepping
+  bodies for the literal without following the delegation.
+
+  Pinned by ten unit tests asserting the whole URL, not merely that the
+  parameter appears in it — a second `?` is silently wrong, since SAP reads the
+  query up to it and ignores the rest. Unit coverage was necessary because the
+  integration suites cannot catch this: one full E19 run put 47 class-include
+  reads on the wire and not one asked for long polling, because no caller sets
+  it.
+
+- **A `deleteOnFailure` create deleted the object it had just made.** The
+  rollback was registered with `chain`'s `onScopeEnd`, which runs on every path
+  including success, and its `created` guard was true by then. Twenty-four
+  handlers. Fixed by naming the two kinds apart — `chain` gained `onFailure`
+  beside `onScopeEnd` — and then removed entirely with the chains themselves: a
+  `create` that is one POST has nothing to roll back. Recorded because the
+  defect shipped, and because the shape that produced it (cleanup and rollback
+  sharing one registration) is worth recognising elsewhere.
+
+- **A refused activation was reported as a connection failure.** Every activation
+  path threw a plain `Error` for the `<msg type="E">` ADT delivers inside a 200,
+  and `recogniseFailure` classified it `origin: 'connection'` — a caller told to
+  check a network that had worked. The writers hand the answer on, and all
+  forty-four `activate` call sites default to `activationRefusal`.
+
+- **`AdtEnhancement.readTransport` and `AdtTransformation.readTransport` read the
+  object**, not the transport. `getEnhancementTransport` and
+  `getTransformationTransport` were still there, unused.
+
+- **The authorization field and the feature toggle polled `version=active` after
+  a write they had not activated** — the version the update cannot have changed.
+
+- **`AdtUnitTest.validate` took the create path on any failed read**, so a 500
+  validated a NAME for a class that already existed. Only an empty body and a 404
+  mean absence.
+
+- **`AdtScalarFunctionImplementation.validate` lost its `validationUnsupported`
+  default**, reporting a rejected name where the system simply has no validation
+  resource.
+
+- **`AdtFunctionModuleLegacy.delete` passed `(module, group)`** to a lock taking
+  `(group, module)`.
+
+- **A publish or unpublish job's own verdict was thrown away.** `POST
+  …/{serviceType}/publishjobs` answers `<SEVERITY>` and `<SHORT_TEXT>` in an
+  `asx:abap` envelope — measured: `OK` / `ZAC_SRVB01 published locally`. The
+  member answered the document and a caller checking `ok` learned only that the
+  request completed. `publicationRefusal` reads it, and is the default `analyse`
+  for the publication path.
+
+- **`LockCapability.lock` and `Profiler.read` classified caller errors as
+  connection failures.** A missing name and a view the family does not have are
+  the caller's mistake and throw before any request. The first full run against
+  a system found the same shape across `AdtUtils`: an empty object name, a
+  missing SQL query, a type with no source resource — every low-level guard
+  threw inside the request `answering` runs, so it came back as
+  `origin: 'connection'`. They are raised in the contract members now.
+
+- **`rawDocument` answered `[object Object]` for every JSON endpoint.** The
+  transport parses `application/json` on the way in, so `answer.data` is an
+  object by the time a reading sees it; it is re-serialised rather than
+  stringified. The DSFI source read is the member this was visible on.
+
+- **Twenty-two low-level `delete` functions replaced the server's document**
+  with `{ success: true, …, message: 'X deleted successfully' }` — a sentence
+  this library wrote about a call it had not read. They hand the response on.
+
+- **Every successful package delete was reported as a refusal.** `AdtPackage`
+  used `deletionRefusal` for the delete step as well as the check, but a check
+  answers `del:isDeletable` and a deletion answers `del:isDeleted` — so the
+  check parser found no flag and defaulted to refusing. `packageDeletionRefusal`
+  reads the deletion result, and treats an empty body as nothing said.
+
+### Added
+
+- **`src/index.readings.ts`** — the injection surface. The strategy
+  implementations (`rawDocument`, `nothing`, `wireItself`), one `IXxxResults`
+  interface and `<type>Documents` default per object type, the shapes those
+  readings build, and the two error strategies a caller's own `analyse` can defer
+  to (`activationRefusal`, `deletionRefusal`). Without it the seam the contracts
+  name is unreachable from outside the package.
+
+- **`chain`'s `onFailure`** — a rollback that runs only when the chain fails.
+  One member uses `chain` now (`AdtMessageClassMessage.writeClass`); the helper
+  stays exported because a consumer composing its own sequence wants the same
+  unwind, including the visibility of a rollback that could not complete.
+
+- **`parseCreatedTransport`** — the reading of a transport create response.
+
+### Documentation
+
+- **[`docs/usage/OBJECT_LIFECYCLE.md`](docs/usage/OBJECT_LIFECYCLE.md)** — the
+  flow **you** compose: create → lock → update → unlock → activate. What
+  `create()` does and does not do (it makes the object shell, and nothing else),
+  that `update()` is the write with the lock window around it as a `try/finally`
+  of your own, that `delete()` takes no lock and stands beside `checkDeletion()`,
+  and the places the flow does not hold — a service binding, which is published
+  rather than edited, and a transport request, which is not a locked object.
+
+- **`README.md`, `CLAUDE.md`, `docs/README.md`,
+  [`STATEFUL_SESSION_GUIDE.md`](docs/usage/STATEFUL_SESSION_GUIDE.md),
+  [`CLIENT_API_REFERENCE.md`](docs/usage/CLIENT_API_REFERENCE.md) and
+  [`TROUBLESHOOTING.md`](docs/usage/TROUBLESHOOTING.md)** — every example that
+  passed an option to run a step now makes the call. The session guide states
+  the invariant that replaces the old automatic handling: only `lock` and
+  `unlock` change the session type.
+
+### Migration
+
+1. Narrow on `ok` at every call site. `answer.getResult()` does not exist on the
+   failure half and `answer.getError()` does not exist on the success half, so
+   the compiler finds them all for you — **in typed code**. It does not find
+   them in JavaScript, or anywhere a value is held as `any`: there,
+   `if (result !== undefined)` still compiles and is now always true, because a
+   member always answers an object. This package's own JavaScript test harness
+   broke exactly that way and reported creating objects it never created, so
+   search for `!== undefined` and `if (result)` around calls you migrate.
+2. Replace `state.errors` checks with `!answer.ok`, and `state.xxxResult` reads
+   with `answer.getResult().value`.
+3. Replace `try/catch` around a refusal with the failure half. Keep a `catch` for
+   `AdtParseError` — an answer this library could not read still throws.
+4. Move result-shape imports from `@mcp-abap-adt/interfaces` to
+   `@mcp-abap-adt/adt-clients`; the shapes themselves are unchanged.
+5. Replace a `parse` argument with a result set passed to the factory.
+6. If you branched on `origin === 'parse'`, catch `AdtParseError` instead.
+7. **Write the sequence a chain used to run for you.** A create that must end
+   active is now `create` → `lock` → `update` → `unlock` → `activate`, and each
+   one answers. Drop `activateOnCreate` / `activateOnUpdate` and call
+   `activate()`; drop `deleteOnFailure` and, if your own sequence can stop after
+   the POST, call `delete()` on that path yourself.
+8. **Pass `lockHandle` to every `update` and `delete` that needs one.** The
+   member no longer takes a lock, and it no longer refuses when none was given:
+   a write without a handle goes to ADT, and ADT decides. If your calls start
+   coming back with lock refusals from the server, that is the missing step.
+9. **Call `checkDeletion()` before `delete()`** where you relied on the delete
+   refusing an object something still points at.
+10. **Rename `read`/`update` to `readMetadata`/`updateMetadata` on the eight
+    document-only types**, and check the two whose `update` changed which
+    resource it writes (`getFunctionInclude()`, `getFeatureToggle()`). The
+    compiler finds the first group for you; it cannot find the second, because
+    the call still type-checks and writes somewhere else.
+11. **Replace `delete()` with `update()` on the seven types that do not delete**
+    — the four class includes, a message-class message, and the two unit-test
+    handlers. Writing empty content is what removing them has always meant, and
+    the contract now says so.
+
 ## [17.0.0] - 2026-09-02
 
 Requires `@mcp-abap-adt/interfaces@^28.0.0`.

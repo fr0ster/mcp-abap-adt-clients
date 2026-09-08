@@ -21,6 +21,7 @@ import {
 } from '../src/__tests__/helpers/sessionConfig';
 import { createConnectionLogger } from '../src/__tests__/helpers/testLogger';
 import { AdtRuntimeClient } from '../src/clients/AdtRuntimeClient';
+import { resultOf } from './resultOf';
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../.env');
 if (fs.existsSync(envPath)) {
@@ -57,8 +58,8 @@ async function main() {
       console.log(
         `\n=== System Messages (user=${options.user || 'all'}, max=${options.maxResults}) ===\n`,
       );
-      const response = await sm.list(options);
-      const xml = String(response.data);
+      const response = resultOf(await sm.list(options));
+      const xml = response;
       console.log(xml.slice(0, 5000));
       if (xml.length > 5000) {
         console.log('\n... (truncated)');
@@ -67,9 +68,9 @@ async function main() {
     }
 
     console.log(`\n=== System Message: ${messageId} ===\n`);
-    const response = await sm.getById(messageId);
-    console.log(String(response.data).slice(0, 5000));
-    if (String(response.data).length > 5000) {
+    const response = resultOf(await sm.getById(messageId));
+    console.log(response.slice(0, 5000));
+    if (response.length > 5000) {
       console.log('\n... (truncated)');
     }
   } finally {

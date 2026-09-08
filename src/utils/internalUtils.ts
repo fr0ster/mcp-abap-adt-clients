@@ -127,3 +127,47 @@ export function safeStringify(value: unknown, maxLength = 500): string {
     return String(value).substring(0, maxLength);
   }
 }
+
+/**
+ * The query string a write carries.
+ *
+ * Both parts are the caller's to supply, and both are omitted when absent. In
+ * particular a missing lock handle is not an error this library raises: whether
+ * a write without a lock is allowed is ADT's judgement about that object on
+ * that system, and refusing it here would turn a server verdict into a thrown
+ * exception the caller cannot read.
+ */
+export function writeQuery(
+  lockHandle?: string,
+  transportRequest?: string,
+): string {
+  const parts: string[] = [];
+  if (lockHandle) {
+    parts.push(`lockHandle=${encodeURIComponent(lockHandle)}`);
+  }
+  if (transportRequest) {
+    parts.push(`corrNr=${encodeURIComponent(transportRequest)}`);
+  }
+  return parts.length > 0 ? `?${parts.join('&')}` : '';
+}
+
+/**
+ * Add `withLongPolling=true` to a read URL that may already carry a query.
+ *
+ * The separator is the entire reason this exists. A read URL here is built two
+ * ways — bare, and with `?version=…` already on it — so a hardcoded `?` is
+ * right in one place and wrong in the other, and the ones that got it wrong
+ * were the ones that dropped the option instead: four class-include reads and
+ * the behaviour-implementation include took `IReadOptions`, used it for
+ * `accept`, and never asked about long polling at all. A caller could set it
+ * and nothing happened.
+ *
+ * Passed the flag rather than the options object, so this file stays free of
+ * the read-side types.
+ */
+export function longPollingQuery(url: string, wanted?: boolean): string {
+  if (!wanted) {
+    return url;
+  }
+  return `${url}${url.includes('?') ? '&' : '?'}withLongPolling=true`;
+}

@@ -1,23 +1,53 @@
 /**
- * AdtScalarFunctionImplementation - High-level CRUD for CDS scalar function implementations (DSFI/SFI).
- * Mirrors AdtScalarFunction; create() is metadata-only, source via update().
+ * AdtScalarFunctionImplementation - CRUD for `DSFI/DSF` scalar function
+ * implementations.
+ *
+ * Asymmetric by the endpoint's design: the source is JSON on `/source/main`,
+ * the metadata is blues v2 XML on `/dsfi/{name}`. `update` writes the source;
+ * `updateMetadata` writes the other.
+ *
+ * Activation is the consumer's to orchestrate — definition, AMDP class and
+ * implementation activate as a group, and this one alone is refused.
+ *
+ * Every member answers `IAdtResponse<T>`, where T is what the result set given
+ * at construction makes of that endpoint's answer.
  */
 import type {
-  HttpError,
+  AdtNoFailure,
   IAbapConnection,
+  IAdtActivatable,
+  IAdtCheckable,
+  IAdtCreatable,
+  IAdtCreateOptions,
+  IAdtDeletable,
+  IAdtError,
+  IAdtLockable,
+  IAdtMetadataReadable,
   IAdtOperationOptions,
-  IAdtSourceObject,
+  IAdtReadable,
+  IAdtResponse,
   IAdtSystemContext,
+  IAdtTransportAware,
+  IAdtUpdatable,
+  IAdtValidatable,
+  IAdtVersionable,
+  IAdtWireResponse,
+  IAnalyse,
   ILogger,
+  IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
-import { beginCriticalSection } from '../../utils/criticalSection';
-import { assertDeletable } from '../../utils/deletionCheck';
-import { safeErrorMessage } from '../../utils/internalUtils';
+import { ADT_NO_FAILURE, AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
+import { activationRefusal } from '../../utils/activationUtils';
+import { answering } from '../../utils/adtResponse';
+import { withCallTimeout } from '../../utils/callTimeout';
+import { deletionRefusal } from '../../utils/deletionCheck';
+import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import {
   createLockTracker,
   type LockRegistry,
   type LockTracker,
 } from '../shared/LockRegistry';
+import type { ObjectVersion } from '../shared/results';
 import type { IReadOptions } from '../shared/types';
 import { activateScalarFunctionImplementation } from './activation';
 import { checkScalarFunctionImplementation } from './check';
@@ -29,31 +59,92 @@ import {
   getScalarFunctionImplementationSource,
   getScalarFunctionImplementationTransport,
 } from './read';
-import type {
-  IScalarFunctionImplementationConfig,
-  IScalarFunctionImplementationState,
+import {
+  type IScalarFunctionImplementationConfig,
+  type IScalarFunctionImplementationResults,
+  scalarFunctionImplementationDocuments,
 } from './types';
 import { unlockScalarFunctionImplementation } from './unlock';
 import { updateScalarFunctionImplementation } from './update';
 import { updateScalarFunctionImplementationMetadata } from './updateMetadata';
 import { validateScalarFunctionImplementationName } from './validation';
-
-const VALIDATION_UNSUPPORTED_STATUSES = new Set([404, 405, 501]);
-
 import {
   getScalarFunctionImplementationVersionSource,
   getScalarFunctionImplementationVersions,
 } from './versions';
-export class AdtScalarFunctionImplementation
-  implements
-    IAdtSourceObject<
+
+/** Statuses that mean the system has no validation resource, not a bad name. */
+const VALIDATION_UNSUPPORTED_STATUSES = new Set([404, 405, 501]);
+
+/**
+ * The shipped reading of a validation answer this system may not offer.
+ *
+ * Measured: some systems answer 404, 405 or 501 for the DSFI validation
+ * resource. That is not a verdict about the name — it comes back as a failure
+ * named {@link AdtObjectErrorCodes.UNSUPPORTED_OPERATION}, so a consumer
+ * branches on the code rather than on a status. The same reading the scalar
+ * function and the append structure ship, for the same measured reason.
+ */
+export const validationUnsupported = (
+  verdict: IAdtError | AdtNoFailure,
+  answer?: IAdtWireResponse,
+): IAdtError | AdtNoFailure => {
+  if (verdict === ADT_NO_FAILURE) return ADT_NO_FAILURE;
+  const status = verdict.response?.status ?? answer?.status;
+  return status && VALIDATION_UNSUPPORTED_STATUSES.has(status)
+    ? {
+        ...verdict,
+        code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION,
+        message: `This system does not offer scalar-function-implementation name validation (HTTP ${status})`,
+      }
+    : verdict;
+};
+
+export class AdtScalarFunctionImplementation<
+  R extends
+    IScalarFunctionImplementationResults = typeof scalarFunctionImplementationDocuments,
+> implements
+    IAdtCreatable<
       IScalarFunctionImplementationConfig,
-      IScalarFunctionImplementationState
+      ReturnType<R['created']>
+    >,
+    IAdtReadable<IScalarFunctionImplementationConfig, ReturnType<R['source']>>,
+    IAdtMetadataReadable<
+      IScalarFunctionImplementationConfig,
+      ReturnType<R['metadata']>
+    >,
+    IAdtUpdatable<
+      Partial<IScalarFunctionImplementationConfig>,
+      ReturnType<R['updated']>
+    >,
+    IAdtDeletable<
+      IScalarFunctionImplementationConfig,
+      ReturnType<R['deletion']>,
+      ReturnType<R['deletionCheck']>
+    >,
+    IAdtValidatable<
+      IScalarFunctionImplementationConfig,
+      ReturnType<R['validation']>
+    >,
+    IAdtCheckable<IScalarFunctionImplementationConfig, ReturnType<R['check']>>,
+    IAdtActivatable<
+      IScalarFunctionImplementationConfig,
+      ReturnType<R['activation']>
+    >,
+    IAdtLockable<IScalarFunctionImplementationConfig>,
+    IAdtTransportAware<
+      IScalarFunctionImplementationConfig,
+      ReturnType<R['transport']>
+    >,
+    IAdtVersionable<
+      IScalarFunctionImplementationConfig,
+      ObjectVersion[],
+      string
     >
 {
-  private readonly connection: IAbapConnection;
-  private readonly logger?: ILogger;
-  private readonly systemContext: IAdtSystemContext;
+  protected readonly connection: IAbapConnection;
+  protected readonly logger?: ILogger;
+  protected readonly systemContext: IAdtSystemContext;
   private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'ScalarFunctionImplementation';
 
@@ -62,6 +153,11 @@ export class AdtScalarFunctionImplementation
     logger?: ILogger,
     systemContext?: IAdtSystemContext,
     lockRegistry?: LockRegistry,
+    // The one cast in this file, and it is on the default: the shipped set
+    // satisfies the erased bound, which the compiler cannot see through the
+    // `unknown`s. A cast on a member would be the factory lying about what it
+    // answers.
+    protected readonly results: R = scalarFunctionImplementationDocuments as unknown as R,
   ) {
     this.connection = connection;
     this.logger = logger;
@@ -74,383 +170,404 @@ export class AdtScalarFunctionImplementation
     );
   }
 
-  async validate(
-    config: Partial<IScalarFunctionImplementationConfig>,
-  ): Promise<IScalarFunctionImplementationState> {
-    const state: IScalarFunctionImplementationState = { errors: [] };
+  /** The name, or the caller's mistake — nothing was asked of the server yet. */
+  private name(config: Partial<IScalarFunctionImplementationConfig>): string {
     if (!config.implementationName) {
-      const error = new Error('Implementation name is required for validation');
-      state.errors.push({ method: 'validate', error, timestamp: new Date() });
-      throw error;
+      throw new Error('Implementation name is required');
     }
-    try {
-      state.validationResponse = await validateScalarFunctionImplementationName(
-        this.connection,
-        config.implementationName,
-        config.description,
-      );
-      state.validationSupported = true;
-      return state;
-    } catch (error) {
-      const status = (error as HttpError)?.response?.status;
-      if (status && VALIDATION_UNSUPPORTED_STATUSES.has(status)) {
-        state.validationSupported = false;
-        return state;
-      }
-      const err = error instanceof Error ? error : new Error(String(error));
-      this.logger?.error('validate', safeErrorMessage(err));
-      throw err;
-    }
+    return config.implementationName;
   }
 
-  async create(
-    config: IScalarFunctionImplementationConfig,
-    _options?: IAdtOperationOptions,
-  ): Promise<IScalarFunctionImplementationState> {
-    const state: IScalarFunctionImplementationState = { errors: [] };
-    if (!config.implementationName)
-      throw new Error('Implementation name is required');
-    if (!config.scalarFunctionName)
+  /** Validate the name before creating the object. */
+  async validate<E extends IAdtError = IAdtError>(
+    config: Partial<IScalarFunctionImplementationConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const name = this.name(config);
+
+    return answering(
+      () =>
+        validateScalarFunctionImplementationName(
+          connection,
+          name,
+          config.description,
+        ),
+      this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
+      (options?.analyse ?? validationUnsupported) as IAnalyse<E>,
+    );
+  }
+
+  /** Create the object. */
+  async create<E extends IAdtError = IAdtError>(
+    config: Omit<IScalarFunctionImplementationConfig, 'sourceCode'> & {
+      sourceCode?: never;
+    },
+    options?: IAdtCreateOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const name = this.name(config);
+    if (!config.scalarFunctionName) {
       throw new Error('Scalar function name is required');
-    if (!config.packageName) throw new Error('Package name is required');
-    if (!config.description) throw new Error('Description is required');
-    try {
-      state.createResult = await createScalarFunctionImplementation(
-        this.connection,
-        {
-          implementation_name: config.implementationName,
-          scalar_function_name: config.scalarFunctionName,
+    }
+    if (!config.packageName) {
+      throw new Error('Package name is required');
+    }
+    if (!config.description) {
+      throw new Error('Description is required');
+    }
+    return answering(
+      () =>
+        createScalarFunctionImplementation(connection, {
+          implementation_name: name,
+          scalar_function_name: config.scalarFunctionName as string,
           engine_value: config.engineValue,
-          package_name: config.packageName,
+          package_name: config.packageName as string,
           transport_request: config.transportRequest,
-          description: config.description,
+          description: config.description as string,
           masterSystem: this.systemContext.masterSystem,
           responsible: this.systemContext.responsible,
           masterLanguage:
             config.masterLanguage ?? this.systemContext.masterLanguage,
-        },
-      );
-      return state;
-    } catch (error) {
-      this.logger?.error('Create failed:', safeErrorMessage(error));
-      throw error;
-    }
+        }),
+      this.results.created as IResultStrategy<ReturnType<R['created']>>,
+      options?.analyse,
+    );
   }
 
-  async read(
+  /** Read the object. */
+  async read<E extends IAdtError = IAdtError>(
     config: Partial<IScalarFunctionImplementationConfig>,
     version?: 'active' | 'inactive',
-    options?: IReadOptions,
-  ): Promise<IScalarFunctionImplementationState | undefined> {
-    if (!config.implementationName)
-      throw new Error('Implementation name is required');
-    try {
-      const response = await getScalarFunctionImplementationSource(
-        this.connection,
-        config.implementationName,
-        version,
-        options,
-        this.logger,
-      );
-      return { readResult: response, errors: [] };
-    } catch (error) {
-      if ((error as HttpError).response?.status === 404) return undefined;
-      throw error;
-    }
+    options?: IReadOptions & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const name = this.name(config);
+
+    // No 404 special case: ADT answers a read for a missing object with 200 and
+    // an empty body, so absence was never a status to branch on — and whether
+    // an empty body *is* absence is the caller's reading, through `analyse`.
+    return answering(
+      () =>
+        getScalarFunctionImplementationSource(
+          connection,
+          name,
+          version,
+          options,
+          this.logger,
+        ),
+      this.results.source as IResultStrategy<ReturnType<R['source']>>,
+      options?.analyse,
+    );
   }
 
-  async readMetadata(
+  /** Read the object's metadata document. */
+  async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IScalarFunctionImplementationConfig>,
-    options?: IReadOptions,
-  ): Promise<IScalarFunctionImplementationState> {
-    if (!config.implementationName)
-      throw new Error('Implementation name is required');
-    const response = await getScalarFunctionImplementation(
-      this.connection,
-      config.implementationName,
-      'inactive',
-      options,
-      this.logger,
+    options?: IReadOptions & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const name = this.name(config);
+
+    return answering(
+      () =>
+        getScalarFunctionImplementation(
+          connection,
+          name,
+          options?.version ?? 'inactive',
+          options,
+          this.logger,
+        ),
+      this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
+      options?.analyse,
     );
-    return { metadataResult: response, errors: [] };
   }
 
-  async readTransport(
+  /** The transport request the object belongs to. */
+  async readTransport<E extends IAdtError = IAdtError>(
     config: Partial<IScalarFunctionImplementationConfig>,
-    options?: { withLongPolling?: boolean },
-  ): Promise<IScalarFunctionImplementationState> {
-    if (!config.implementationName)
-      throw new Error('Implementation name is required');
-    const response = await getScalarFunctionImplementationTransport(
-      this.connection,
-      config.implementationName,
-      options?.withLongPolling !== undefined
-        ? { withLongPolling: options.withLongPolling }
-        : undefined,
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const name = this.name(config);
+
+    return answering(
+      () =>
+        getScalarFunctionImplementationTransport(
+          connection,
+          name,
+          options?.withLongPolling !== undefined
+            ? { withLongPolling: options.withLongPolling }
+            : undefined,
+        ),
+      this.results.transport as IResultStrategy<ReturnType<R['transport']>>,
+      options?.analyse,
     );
-    return { transportResult: response, errors: [] };
   }
 
   /**
-   * Update the implementation source (JSON) via PUT /source/main.
-   * No check/long-poll/auto-activate — those don't apply to DSFI.
-   * Trio activation (DSFD+AMDP+DSFI) is the consumer's responsibility.
+   * Write the object.
+   *
+   * With `options.lockHandle` the caller holds the lock and owns the chain, so
+   * this is one request. Without it, this locks, checks, writes and unlocks —
+   * and the unlock happens on every path out.
    */
-  async update(
+  async update<E extends IAdtError = IAdtError>(
     config: Partial<IScalarFunctionImplementationConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IScalarFunctionImplementationState> {
-    if (!config.implementationName)
-      throw new Error('Implementation name is required');
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
 
-    const sourceCode = options?.sourceCode ?? config.sourceCode;
-    if (!sourceCode) throw new Error('Source code is required for update');
-
-    if (options?.lockHandle) {
-      const updateResult = await updateScalarFunctionImplementation(
-        this.connection,
-        {
-          implementation_name: config.implementationName,
-          source_code: sourceCode,
-          transport_request: config.transportRequest,
-        },
-        options.lockHandle,
-      );
-      return { updateResult, errors: [] };
+    const name = this.name(config);
+    // The source is the caller's, through `options.sourceCode`. This used to
+    // fall back to `config.sourceCode` — two channels for one value, where the
+    // contract documents one. `config.sourceCode` is `check`'s alone now: a
+    // syntax check compiles a source that is not on the server yet, so it has
+    // nowhere else to arrive.
+    const source = options?.sourceCode;
+    if (!source) {
+      throw new Error('Source code is required for update');
     }
 
-    let lockHandle: string | undefined;
-    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
-    // the lock but leaves the work half-done.
-    const endCriticalSection = beginCriticalSection(this.connection);
-    try {
-      this.connection.setSessionType('stateful');
-      lockHandle = await lockScalarFunctionImplementation(
-        this.connection,
-        config.implementationName,
-      );
-      this.lockTracker.track(config.implementationName, lockHandle);
-      const updateResult = await updateScalarFunctionImplementation(
-        this.connection,
-        {
-          implementation_name: config.implementationName,
-          source_code: sourceCode,
-          transport_request: config.transportRequest,
-        },
-        lockHandle,
-      );
-      await unlockScalarFunctionImplementation(
-        this.connection,
-        config.implementationName,
-        lockHandle,
-      );
-      this.lockTracker.untrack(config.implementationName);
-      lockHandle = undefined;
-      return { updateResult, errors: [] };
-    } catch (error) {
-      if (lockHandle) {
-        try {
-          await unlockScalarFunctionImplementation(
-            this.connection,
-            config.implementationName,
-            lockHandle,
-          );
-          this.lockTracker.untrack(config.implementationName);
-        } catch (unlockError) {
-          this.logger?.warn?.(
-            'Failed to unlock during cleanup:',
-            safeErrorMessage(unlockError),
-          );
-        }
-      }
-      this.logger?.error('Update failed:', safeErrorMessage(error));
-      throw error;
-    } finally {
-      this.connection.setSessionType('stateless');
-
-      endCriticalSection();
-    }
+    return answering(
+      () =>
+        updateScalarFunctionImplementation(
+          connection,
+          {
+            implementation_name: name,
+            source_code: source,
+            transport_request: config.transportRequest,
+          },
+          options?.lockHandle,
+        ),
+      this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      options?.analyse,
+    );
   }
 
   /**
-   * Update the metadata (blues v2 XML) via PUT /dsfi/{name}.
-   * Same lock/unlock/finally-stateless hardening as update().
+   * Write the implementation's **metadata** — blues v2 XML on `/dsfi/{name}`,
+   * a different resource from the JSON source `update` writes.
+   *
+   * The same lock window, for the same reason.
    */
-  async updateMetadata(
+  async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IScalarFunctionImplementationConfig>,
-    options?: IAdtOperationOptions,
-  ): Promise<IScalarFunctionImplementationState> {
-    if (!config.implementationName)
-      throw new Error('Implementation name is required');
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
 
-    const sourceCode = options?.sourceCode ?? config.sourceCode;
-    if (!sourceCode)
+    const name = this.name(config);
+    const source = options?.sourceCode;
+    if (!source) {
       throw new Error('Source code is required for updateMetadata');
-
-    if (options?.lockHandle) {
-      const updateResult = await updateScalarFunctionImplementationMetadata(
-        this.connection,
-        {
-          implementation_name: config.implementationName,
-          source_code: sourceCode,
-          transport_request: config.transportRequest,
-        },
-        options.lockHandle,
-      );
-      return { updateResult, errors: [] };
     }
 
-    let lockHandle: string | undefined;
-    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
-    // the lock but leaves the work half-done.
-    const endCriticalSection = beginCriticalSection(this.connection);
-    try {
-      this.connection.setSessionType('stateful');
-      lockHandle = await lockScalarFunctionImplementation(
-        this.connection,
-        config.implementationName,
-      );
-      this.lockTracker.track(config.implementationName, lockHandle);
-      const updateResult = await updateScalarFunctionImplementationMetadata(
-        this.connection,
-        {
-          implementation_name: config.implementationName,
-          source_code: sourceCode,
-          transport_request: config.transportRequest,
-        },
-        lockHandle,
-      );
-      await unlockScalarFunctionImplementation(
-        this.connection,
-        config.implementationName,
-        lockHandle,
-      );
-      this.lockTracker.untrack(config.implementationName);
-      lockHandle = undefined;
-      return { updateResult, errors: [] };
-    } catch (error) {
-      if (lockHandle) {
-        try {
-          await unlockScalarFunctionImplementation(
-            this.connection,
-            config.implementationName,
-            lockHandle,
-          );
-          this.lockTracker.untrack(config.implementationName);
-        } catch (unlockError) {
-          this.logger?.warn?.(
-            'Failed to unlock during cleanup:',
-            safeErrorMessage(unlockError),
-          );
-        }
-      }
-      this.logger?.error('UpdateMetadata failed:', safeErrorMessage(error));
-      throw error;
-    } finally {
-      this.connection.setSessionType('stateless');
-
-      endCriticalSection();
-    }
-  }
-
-  async delete(
-    config: Partial<IScalarFunctionImplementationConfig>,
-  ): Promise<IScalarFunctionImplementationState> {
-    if (!config.implementationName)
-      throw new Error('Implementation name is required');
-    try {
-      const deletionCheck = await checkDeletion(this.connection, {
-        implementation_name: config.implementationName,
-        transport_request: config.transportRequest,
-      });
-      // ADT already said whether this may be deleted; refusing to read that
-      // answer is how a delete came to report success while the object
-      // stayed. Throws on isDeletable=false or a message of type E; a W
-      // is a warning and passes.
-      assertDeletable(deletionCheck.data);
-      const deleteResult = await deleteScalarFunctionImplementation(
-        this.connection,
-        {
-          implementation_name: config.implementationName,
-          transport_request: config.transportRequest,
-        },
-      );
-      return { deleteResult, errors: [] };
-    } catch (error) {
-      this.logger?.error('Delete failed:', safeErrorMessage(error));
-      throw error;
-    }
-  }
-
-  async activate(
-    config: Partial<IScalarFunctionImplementationConfig>,
-  ): Promise<IScalarFunctionImplementationState> {
-    if (!config.implementationName)
-      throw new Error('Implementation name is required');
-    const result = await activateScalarFunctionImplementation(
-      this.connection,
-      config.implementationName,
+    return answering(
+      () =>
+        updateScalarFunctionImplementationMetadata(
+          connection,
+          {
+            implementation_name: name,
+            source_code: source,
+            transport_request: config.transportRequest,
+          },
+          options?.lockHandle,
+        ),
+      this.results.metadataUpdated as IResultStrategy<
+        ReturnType<R['metadataUpdated']>
+      >,
+      options?.analyse,
     );
-    return { activateResult: result, errors: [] };
   }
 
-  async check(
+  /**
+   * Asks ADT whether the object can be deleted.
+   *
+   * Its own member because it is its own endpoint. `delete` no longer runs
+   * it: a consumer that wants the check runs this first and decides what a
+   * refusal means.
+   */
+  async checkDeletion<E extends IAdtError = IAdtError>(
+    config: Partial<IScalarFunctionImplementationConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const name = this.name(config);
+    return answering(
+      () =>
+        checkDeletion(connection, {
+          implementation_name: name,
+          transport_request: config.transportRequest,
+        }),
+      this.results.deletionCheck as IResultStrategy<
+        ReturnType<R['deletionCheck']>
+      >,
+      (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
+    );
+  }
+
+  /**
+   * Delete the object.
+   *
+   * The deletion check is read, not merely performed: ADT answers a refusal
+   * with `del:isDeletable="false"` inside a 200, and a delete that ignored it
+   * reported success while the object stayed. {@link deletionRefusal} is the
+   * shipped reading of that answer; a caller who wants another passes their own
+   * `analyse`.
+   */
+  async delete<E extends IAdtError = IAdtError>(
+    config: Partial<IScalarFunctionImplementationConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const name = this.name(config);
+    return answering(
+      () =>
+        deleteScalarFunctionImplementation(connection, {
+          implementation_name: name,
+          transport_request: config.transportRequest,
+        }),
+      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      options?.analyse,
+    );
+  }
+
+  /** Activate the object. Needs no stateful session. */
+  async activate<E extends IAdtError = IAdtError>(
+    config: Partial<IScalarFunctionImplementationConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const name = this.name(config);
+
+    return answering(
+      () => activateScalarFunctionImplementation(connection, name),
+      this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
+      (options?.analyse ?? activationRefusal) as IAnalyse<E>,
+    );
+  }
+
+  /** Check the object. */
+  async check<E extends IAdtError = IAdtError>(
     config: Partial<IScalarFunctionImplementationConfig>,
     status?: string,
-  ): Promise<IScalarFunctionImplementationState> {
-    if (!config.implementationName)
-      throw new Error('Implementation name is required');
-    const version = status === 'active' ? 'active' : 'inactive';
-    const checkResult = await checkScalarFunctionImplementation(
-      this.connection,
-      config.implementationName,
-      version,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const name = this.name(config);
+    const version: 'active' | 'inactive' =
+      status === 'active' ? 'active' : 'inactive';
+
+    return answering(
+      () => checkScalarFunctionImplementation(connection, name, version),
+      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      options?.analyse,
     );
-    return { checkResult, errors: [] };
   }
 
+  /** Lock the object for modification. */
   async lock(
     config: Partial<IScalarFunctionImplementationConfig>,
-  ): Promise<string> {
-    if (!config.implementationName)
-      throw new Error('Implementation name is required');
-    this.connection.setSessionType('stateful');
-    const lockHandle = await lockScalarFunctionImplementation(
-      this.connection,
-      config.implementationName,
+  ): Promise<IAdtResponse<string>> {
+    const name = this.name(config);
+
+    return answering(
+      async () => {
+        const lockHandle = await inStatefulSession(this.connection, () =>
+          lockScalarFunctionImplementation(this.connection, name),
+        );
+        this.lockTracker.track(name, lockHandle);
+        // The handle is the value, and the request does not keep the wire it
+        // came on — so the answer is built around what the request produced.
+        return {
+          data: lockHandle,
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+        };
+      },
+      (answer) => String(answer.data),
     );
-    this.lockTracker.track(config.implementationName, lockHandle);
-    return lockHandle;
   }
 
+  /** Unlock the object. */
   async unlock(
     config: Partial<IScalarFunctionImplementationConfig>,
     lockHandle: string,
-  ): Promise<IScalarFunctionImplementationState> {
-    if (!config.implementationName)
-      throw new Error('Implementation name is required');
-    this.connection.setSessionType('stateful');
-    try {
-      const unlockResult = await unlockScalarFunctionImplementation(
-        this.connection,
-        config.implementationName,
-        lockHandle,
-      );
-      this.lockTracker.untrack(config.implementationName);
-      return { unlockResult, errors: [] };
-    } finally {
-      this.connection.setSessionType('stateless');
-    }
+  ): Promise<IAdtResponse<void>> {
+    const name = this.name(config);
+
+    return answering(
+      async () => {
+        // UNLOCK must run stateful (older BASIS #106); stateless after.
+        this.connection.setSessionType('stateful');
+        try {
+          return await unlockScalarFunctionImplementation(
+            this.connection,
+            name,
+            lockHandle,
+          );
+        } finally {
+          this.connection.setSessionType('stateless');
+          this.lockTracker.untrack(name);
+        }
+      },
+      () => undefined,
+    );
   }
 
-  getVersions(config: Partial<IScalarFunctionImplementationConfig>) {
-    return getScalarFunctionImplementationVersions(this.connection, config);
+  /** Version history of the object's source. */
+  async getVersions(
+    config: Partial<IScalarFunctionImplementationConfig>,
+  ): Promise<IAdtResponse<ObjectVersion[]>> {
+    return answering(
+      async () => ({
+        data: await getScalarFunctionImplementationVersions(
+          this.connection,
+          config,
+        ),
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+      }),
+      (answer) => answer.data as ObjectVersion[],
+    );
   }
 
-  getVersionSource(contentUri: string) {
-    return getScalarFunctionImplementationVersionSource(
-      this.connection,
-      contentUri,
+  /** The source of one version, by the `contentUri` an entry carries. */
+  async getVersionSource(contentUri: string): Promise<IAdtResponse<string>> {
+    return answering(
+      async () => ({
+        data: await getScalarFunctionImplementationVersionSource(
+          this.connection,
+          contentUri,
+        ),
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+      }),
+      (answer) => String(answer.data),
     );
   }
 }
