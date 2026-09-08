@@ -69,6 +69,10 @@ This package interacts with external packages **ONLY through interfaces**:
 - **`@mcp-abap-adt/connection`**: Uses the `IAbapConnection` interface for HTTP requests — does not know about the concrete connection implementation. It is a **dev** dependency; consumers supply their own implementation.
 - **No other direct package dependencies**: all remaining interactions happen through well-defined interfaces
 
+> **Coming from 17.x?** 18.0.0 is a breaking release — see
+> [docs/usage/MIGRATION-18.0.md](docs/usage/MIGRATION-18.0.md) for what changes
+> and why.
+
 ## Installation
 
 ### As npm Package

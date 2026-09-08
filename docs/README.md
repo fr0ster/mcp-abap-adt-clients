@@ -14,6 +14,7 @@ Complete documentation for the `@mcp-abap-adt/adt-clients` package.
 
 ## Usage Guides
 
+- [**MIGRATION-18.0.md**](usage/MIGRATION-18.0.md) — what a consumer on 17.x has to change, and why the compiler is right
 - [**OBJECT_LIFECYCLE.md**](usage/OBJECT_LIFECYCLE.md) — create → lock → update → unlock → activate: the calls you make, what each one does, where the flow does not hold
 - [**CLIENT_API_REFERENCE.md**](usage/CLIENT_API_REFERENCE.md) - Complete API reference for `AdtClient`
 - [**RFC_CONNECTION.md**](usage/RFC_CONNECTION.md) - RFC connection guide for legacy systems
