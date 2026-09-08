@@ -10,6 +10,11 @@
  *
  * So the rule under test is narrow and blunt: **a run that has not said what it
  * requires does not get to pass on a system this probe cannot reason about.**
+ *
+ * It is imported from `scripts/lib/atcProbeVerdict.ts` rather than from the
+ * probe: reaching it through the script executed dotenv, a logger and a
+ * connection factory at import, printing a real dependency error into a run
+ * that touches nothing.
  */
 
 import {
@@ -19,7 +24,7 @@ import {
   looksUnambiguouslyCloud,
   requiredKeysFor,
   verdictFor,
-} from '../../../../scripts/probe-atc';
+} from '../../../../scripts/lib/atcProbeVerdict';
 
 const silentLogger = () => ({
   log: jest.fn(),
