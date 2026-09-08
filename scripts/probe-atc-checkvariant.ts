@@ -291,12 +291,26 @@ async function main(): Promise<void> {
 
   const sapConfig = getConfig();
   const connection = await createTestConnection(createConnectionLogger());
-  const answered = {
-    documentShape: false,
-    checksListed: false,
-    mayCreate: null as boolean | null,
-    runAcceptedVariant: null as boolean | null,
+  /**
+   * Whether each question got an answer, kept apart from what the answer was.
+   *
+   * A booleans-only version conflated the two and then judged the run by it:
+   * `mayCreate: false` meant "the system refused", which this probe's whole
+   * contract calls a settled answer — a 403 closes question 3 as firmly as a
+   * 201 — yet it counted as unanswered and exited non-zero. `no` is a result;
+   * only `unknown` is a gap.
+   */
+  const answered: Record<
+    'documentShape' | 'checksListed' | 'mayCreate' | 'runAcceptedVariant',
+    'yes' | 'no' | 'unknown'
+  > = {
+    documentShape: 'unknown',
+    checksListed: 'unknown',
+    mayCreate: 'unknown',
+    runAcceptedVariant: 'unknown',
   };
+  /** The run made against a variant this probe did NOT create, if any. */
+  let fallbackRun: { variant: string; findingStats: string } | null = null;
   let createdVariant: string | null = null;
   /**
    * What this probe made and could not unmake.
@@ -424,7 +438,8 @@ async function main(): Promise<void> {
           headers: { Accept: ACCEPT_CHKV },
         },
       );
-      answered.documentShape = doc.status === 200 && doc.body.length > 0;
+      answered.documentShape =
+        doc.status === 200 && doc.body.length > 0 ? 'yes' : 'unknown';
       systemVariantDocument = doc.body;
 
       const formTemplate = await rec.call(
@@ -485,15 +500,16 @@ async function main(): Promise<void> {
 
     variantCount = (variants.body.match(/<nameditem:name>/g) ?? []).length;
 
-    // Checks, and only checks. The variants listing above answers "which
-    // selections of checks exist", which is a different question and was
-    // briefly allowed to satisfy this one — on a system where `/atc/checks`
-    // fails, that reported the checks question as answered while holding no
-    // list of checks at all, which is the one conclusion this probe must not
-    // reach by accident.
-    answered.checksListed =
-      (checks.status === 200 && checks.body.length > 0) ||
-      checkNames.length > 0;
+    // Checks, and only checks — the variants listing answers "which selections
+    // of checks exist", a different question.
+    //
+    // And one set of names behind both the count and the boolean. Reading
+    // `/atc/checks` as "answered" on a non-empty body while counting only the
+    // form template's names allowed `checksListed: true` beside
+    // `checksSeen: 0` — a claim with nothing under it, which is what the count
+    // was added to prevent.
+    checkNames = [...new Set([...checkNames, ...parseCheckNames(checks.body)])];
+    answered.checksListed = checkNames.length > 0 ? 'yes' : 'unknown';
 
     if (args.readOnly) {
       rec.note(
@@ -570,7 +586,7 @@ async function main(): Promise<void> {
             // had just created, so a 2xx hands ownership to the cleanup
             // outright and no read is consulted.
             createdVariant = args.newVariant;
-            answered.mayCreate = true;
+            answered.mayCreate = 'yes';
           } else {
             // Only a write that did NOT plainly succeed needs the system asked.
             // `status: null` is the dangerous one — a dropped socket after SAP
@@ -583,9 +599,14 @@ async function main(): Promise<void> {
             );
             if (after === 'present') {
               createdVariant = args.newVariant;
-              answered.mayCreate = true;
+              answered.mayCreate = 'yes';
             } else {
-              answered.mayCreate = false;
+              // A server that answered is a server that decided. `status: null`
+              // is the only silence here, and silence is the gap.
+              answered.mayCreate =
+                created.status !== null && after === 'absent'
+                  ? 'no'
+                  : 'unknown';
               if (after === 'unknown') {
                 rec.note(
                   'create-outcome-unknown',
@@ -603,7 +624,15 @@ async function main(): Promise<void> {
       }
 
       // --- Q4. Does a run accept it? -----------------------------------------
-      const variantForRun = createdVariant ?? systemVariant ?? undefined;
+      // Question 4 is "does a run accept the variant WE made". A run against
+      // the variant the system nominates cannot answer it: it proves the run
+      // path works, which was never in doubt, and says nothing about whether a
+      // document this probe wrote is usable. So the fallback still runs — it is
+      // where the FINDING_STATS evidence comes from — but it is recorded as
+      // itself, and question 4 stays open until there is a created variant to
+      // ask it about.
+      const ourVariant = createdVariant;
+      const variantForRun = ourVariant ?? systemVariant ?? undefined;
       if (!variantForRun) {
         rec.note(
           'no-variant-for-run',
@@ -631,11 +660,18 @@ async function main(): Promise<void> {
             typeof findings === 'string' ? findings : String(findings),
             'utf8',
           );
-          answered.runAcceptedVariant = true;
+          if (ourVariant) {
+            answered.runAcceptedVariant = 'yes';
+          } else {
+            fallbackRun = { variant: variantForRun, findingStats: triple };
+          }
           rec.note(
-            'run-with-variant',
-            'Does a run accept a named variant, and what does it find?',
-            `Variant: ${variantForRun}\nObject: class ${args.dirtyClass}\n` +
+            ourVariant ? 'run-with-our-variant' : 'run-with-system-variant',
+            ourVariant
+              ? 'Does a run accept the variant this probe created?'
+              : 'No variant of ours to ask about — what does the system variant find?',
+            `Variant: ${variantForRun}${ourVariant ? ' (created by this run)' : ' (the system nominates it; NOT ours)'}\n` +
+              `Object: class ${args.dirtyClass}\n` +
               `FINDING_STATS: ${triple}\n\n` +
               (triple === '0,0,0'
                 ? 'Zero. Either the variant looks for none of what the dirty class does ' +
@@ -645,7 +681,11 @@ async function main(): Promise<void> {
                   'the class actually contains.'),
           );
         } catch (error) {
-          answered.runAcceptedVariant = false;
+          // A refused run is an answer too — but only about the variant the
+          // question is about.
+          if (ourVariant) {
+            answered.runAcceptedVariant = 'no';
+          }
           rec.note(
             'run-with-variant-failed',
             'Does a run accept a named variant?',
@@ -683,6 +723,7 @@ async function main(): Promise<void> {
       answered,
       checksSeen: checkNames.length,
       variantsSeen: variantCount,
+      fallbackRun,
       leftBehind,
     });
 
@@ -692,8 +733,10 @@ async function main(): Promise<void> {
     const required: Array<keyof typeof answered> = args.readOnly
       ? ['documentShape', 'checksListed']
       : ['documentShape', 'checksListed', 'mayCreate', 'runAcceptedVariant'];
-    const unanswered = required.filter(
-      (key) => answered[key] === false || answered[key] === null,
+    const unanswered = required.filter((key) => answered[key] === 'unknown');
+    logger.info(
+      required.map((key) => `${key}: ${answered[key]}`).join(', ') +
+        ` (checks seen ${checkNames.length}, variants seen ${variantCount})`,
     );
     if (leftBehind.length > 0) {
       logger.error(
