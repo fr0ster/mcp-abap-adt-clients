@@ -5,6 +5,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [18.0.2] - 2026-09-08
+
+**Documentation only — what `FINDING_STATS` counts, measured twice instead of
+once.**
+
+The ATC client returns the server's triple verbatim and says so, and until now
+it also said that which position means which severity had been seen exactly
+once. That was true when it was written. It is not any more, and a consumer
+reading the published docs would still be told to treat the ordering as
+unknown.
+
+### Documentation
+
+- **`docs/usage/CLIENT_API_REFERENCE.md`** and the JSDoc on
+  `IAtcRunResult.findingStats`: a worklist with one priority-3 finding read
+  `"0,0,1"`, and a worklist with one priority-2 finding read `"0,1,0"` (BTP
+  trial, 2026-09-08). Two points, and `(priority 1, priority 2, priority 3)` is
+  the only ordering that fits both. A non-zero **first** position has still
+  never been observed, which is why `findingStats` remains a string rather than
+  becoming `{ errors, warnings, infos }` — naming the fields would publish a
+  guess about the one position nobody has watched the server fill.
+
+### Unchanged
+
+No behaviour changed, and no API. `src/runtime/atc/types.ts` carries no runtime
+export at all — the diff there is a comment. Everything else in this release is
+test and probe material, which the package does not ship: an ATC integration
+test, the shared class it runs against, and the check-variant probe that
+produced the measurement above.
+
 ## [18.0.1] - 2026-09-08
 
 **Documentation only — 18.0.0 shipped without the migration note it owed.**
