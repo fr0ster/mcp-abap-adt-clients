@@ -140,4 +140,52 @@ describe('classifyRunOutcome', () => {
   it('leaves the question open when there is no variant name to match', () => {
     expect(classifyRunOutcome('refusal', 400, NAMED, '')).toBe('unknown');
   });
+
+  it('requires the whole name, not a substring of a longer one', () => {
+    // The trap: a short variant name living inside the target's name. SAP
+    // refused the object here and said nothing about the variant.
+    expect(
+      classifyRunOutcome(
+        'refusal',
+        404,
+        'Object Z_ATC_DIRTY does not exist',
+        'Z_ATC',
+      ),
+    ).toBe('unknown');
+    // And the other direction: the variant is a prefix of what was refused.
+    expect(
+      classifyRunOutcome(
+        'refusal',
+        404,
+        'Check variant ZAC_SHR_ATC_VARIANT is unknown',
+        'ZAC_SHR_ATC_VAR',
+      ),
+    ).toBe('unknown');
+    // A namespace is part of an ABAP name, so this is a different object.
+    expect(
+      classifyRunOutcome('refusal', 404, 'Object /FOO/Z_ATC missing', 'Z_ATC'),
+    ).toBe('unknown');
+  });
+
+  it('accepts the name however the message punctuates it', () => {
+    expect(classifyRunOutcome('refusal', 400, 'Variant Z_ATC.', 'Z_ATC')).toBe(
+      'no',
+    );
+    expect(
+      classifyRunOutcome('refusal', 400, 'Unknown variant "Z_ATC"', 'Z_ATC'),
+    ).toBe('no');
+    // At the very end of the message, with nothing after it.
+    expect(
+      classifyRunOutcome(
+        'refusal',
+        400,
+        'No such check variant Z_ATC',
+        'Z_ATC',
+      ),
+    ).toBe('no');
+    // And at the very start.
+    expect(
+      classifyRunOutcome('refusal', 400, 'Z_ATC cannot be used', 'Z_ATC'),
+    ).toBe('no');
+  });
 });

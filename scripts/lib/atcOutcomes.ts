@@ -80,6 +80,13 @@ export function classifyCreateOutcome(
  * The only evidence tying a refusal to the variant is SAP naming it, so that
  * is what is required; everything else leaves the question open.
  *
+ * Naming it means the whole identifier, not a substring: a variant `Z_ATC`
+ * appears inside a message about the target `Z_ATC_DIRTY`, and a plain
+ * `includes` would take that as the server blaming the variant while it was
+ * refusing the object. The name has to stand on its own — bounded by something
+ * that cannot be part of an ABAP name, where `/` counts as part of one so a
+ * namespaced `/FOO/Z_ATC` stays a different object.
+ *
  * This is deliberately hard to satisfy. An open question costs a re-run on a
  * system that can create variants; a wrong `no` ends the enquiry with the
  * wrong conclusion recorded as measured.
@@ -93,7 +100,16 @@ export function classifyRunOutcome(
   if (origin !== 'refusal') return 'unknown';
   if (status !== undefined && status >= 500) return 'unknown';
   if (!variant) return 'unknown';
-  return message.toLowerCase().includes(variant.toLowerCase())
-    ? 'no'
-    : 'unknown';
+  return namesIdentifier(message, variant) ? 'no' : 'unknown';
+}
+
+/** Does this text name that identifier, whole rather than as a substring? */
+function namesIdentifier(text: string, identifier: string): boolean {
+  const escaped = identifier.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // `/` is an identifier character here: ABAP namespaces are part of the name.
+  const bounded = new RegExp(
+    `(^|[^A-Za-z0-9_/])${escaped}($|[^A-Za-z0-9_/])`,
+    'i',
+  );
+  return bounded.test(text);
 }
