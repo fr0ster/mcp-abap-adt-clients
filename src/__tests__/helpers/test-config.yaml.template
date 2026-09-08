@@ -352,6 +352,47 @@ shared_dependencies:
           ENDMETHOD.
         ENDCLASS.
 
+    - name: "ZAC_SHR_ATC_DIRTY"
+      description: "Shared class with deliberate ATC violations — the object an ATC run is expected to find something in"
+      available_in: ["onprem", "cloud"]
+      source: |
+        " Deliberately dirty. Every statement below is here to be found by an
+        " ATC check, and the comment above it names the check it is aimed at.
+        " A run over this class that reports FINDING_STATS "0,0,0" is not a
+        " clean class — it is a check variant that looks for none of this.
+        CLASS zac_shr_atc_dirty DEFINITION PUBLIC FINAL CREATE PUBLIC.
+          PUBLIC SECTION.
+            METHODS dirty
+              IMPORTING iv_input         TYPE i
+              RETURNING VALUE(rv_result) TYPE i.
+        ENDCLASS.
+
+        CLASS zac_shr_atc_dirty IMPLEMENTATION.
+          METHOD dirty.
+            " Declared and never read — the "unused variable" check.
+            DATA lv_never_used TYPE i.
+
+            " EQ instead of = — the "obsolete relational operator" check.
+            DATA lv_zero TYPE abap_bool VALUE abap_false.
+            IF iv_input EQ 0.
+              lv_zero = abap_true.
+            ENDIF.
+
+            " An empty handler on the root exception class — the "catch
+            " CX_ROOT" and "empty CATCH block" checks. The divisor is the
+            " parameter, so the division survives to runtime rather than
+            " being rejected as a constant division by zero.
+            TRY.
+                rv_result = 100 / iv_input.
+              CATCH cx_root.
+            ENDTRY.
+
+            IF lv_zero = abap_true.
+              rv_result = 0.
+            ENDIF.
+          ENDMETHOD.
+        ENDCLASS.
+
   interfaces:
     - name: "ZAC_SHR_IF01"
       description: "Shared interface for read-only tests"
@@ -2183,6 +2224,43 @@ runtime_gateway_errors:
       description: "Read gateway error log feed"
       params:
         max_results: 10
+
+# ATC check runs (AdtRuntimeClient.getAtc())
+atc_run:
+  test_cases:
+    - name: "adt_atc_run"
+      enabled: true
+      description: "Run ATC over the deliberately dirty shared class and read the worklist"
+      # No `available_in`: ATC exists on every system this library targets, and
+      # `getEnvironmentType()` answers "onprem" everywhere anyway — it defaults
+      # to it and nothing ever refines it — so a ["cloud"] filter here would
+      # skip the test on the very system it was measured on.
+      #
+      # The case runs everywhere because what it asserts by default is not
+      # system-specific: a class written to be found in must produce at least
+      # one finding, whatever the system's nominated variant checks.
+      params:
+        class_name: "ZAC_SHR_ATC_DIRTY"
+        # ← CHANGE (optional): pin the exact finding, once you have seen it.
+        #
+        # Left unset on purpose — which finding a run reports is the check
+        # variant's answer, not this library's, so a value measured on one
+        # system would turn a legitimately different variant into a red test
+        # on the next. Set BOTH or neither — the test refuses half a pair by
+        # name rather than skipping or failing obscurely — and both must be
+        # carried by the same finding.
+        #
+        # Measured on the BTP trial, 2026-09-08 under
+        # ABAP_CLOUD_DEVELOPMENT_DEFAULT: SLIN message 0245 ("No exception
+        # handling after the CATCH statement." — the empty CATCH cx_root) at
+        # priority 2, with FINDING_STATS "0,1,0". The test logs every finding
+        # it saw with its message and priority, so filling these in is a copy
+        # from your own run rather than a guess.
+        #
+        # expected_message_id: "0245"
+        # expected_priority: 2
+        poll_timeout_ms: 300000
+        poll_interval_ms: 3000
 
 # Profiler traces operations (AdtRuntimeClient)
 profiler_traces:

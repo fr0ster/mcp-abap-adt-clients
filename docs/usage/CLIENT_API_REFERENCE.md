@@ -1168,9 +1168,14 @@ if (done.waited) {
 ```
 
 `findingStats` is the server's `FINDING_STATS` triple verbatim, for example
-`"0,0,1"`. It is not parsed into named counts: which position is which severity
-has been observed once, in a worklist with a single priority-3 finding, which
-fits several orderings.
+`"0,0,1"`. It is still not parsed into named counts, but the ordering is no
+longer a single observation: a worklist with one priority-3 finding read
+`"0,0,1"`, and a worklist with one priority-2 finding read `"0,1,0"` (BTP
+trial, 2026-09-08, `ZAC_SHR_ATC_DIRTY` under `ABAP_CLOUD_DEVELOPMENT_DEFAULT`).
+Two points fitting `(priority 1, priority 2, priority 3)` and no other ordering
+that survives both. Position one has still never been seen non-zero, which is
+why this stays a string: `{ errors, warnings, infos }` would name a severity
+nobody here has watched the server count.
 
 **Polling under a bound you choose.** There is no `waitForRun` helper, and its
 absence is the design: waiting needs a stopping condition for a run that does
