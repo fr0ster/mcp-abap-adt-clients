@@ -349,7 +349,24 @@ async function main(): Promise<void> {
         headers: { Accept: `${ACCEPT_CHKO}, ${ACCEPT_NAMED_ITEMS}` },
       },
     );
-    answered.checksListed = checks.status === 200 && checks.body.length > 0;
+
+    // The other candidate, and the only one anyone has seen answer: PR #68's
+    // `listAtcVariants` reads `/atc/variants`, not the `/atc/checkvariants`
+    // discovery names. Two different URLs for the same subject, one of them
+    // verified on an on-prem system in that PR and neither of them on cloud.
+    const variants = await rec.call(
+      'list-variants-pr68',
+      'Does the URL PR #68 listed variants at answer on this system?',
+      {
+        method: 'GET',
+        url: `${ATC}/variants?maxItemCount=500&name=*`,
+        headers: { Accept: ACCEPT_NAMED_ITEMS },
+      },
+    );
+
+    answered.checksListed =
+      (checks.status === 200 && checks.body.length > 0) ||
+      (variants.status === 200 && variants.body.length > 0);
 
     if (args.readOnly) {
       rec.note(
