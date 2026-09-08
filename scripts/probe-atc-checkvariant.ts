@@ -292,6 +292,33 @@ async function main(): Promise<void> {
   const rec = new Recorder(connection, outDir, logger);
 
   /**
+   * Is there a variant by this name — yes, no, or the system did not say?
+   *
+   * Three values and not a boolean, because the third one decides whether this
+   * probe is allowed to write at all. `absent` has to cover an empty 200 as
+   * well as a 404: ADT answers absence with an empty body on the measured
+   * systems, and treating that as "present" would refuse every creation.
+   * Anything else — a dropped socket, a 403, a 500 — is `unknown`, and a probe
+   * that cannot see whether a name is taken cannot promise to clean up after
+   * itself.
+   */
+  const variantPresence = async (
+    name: string,
+    step: string,
+    question: string,
+  ): Promise<'present' | 'absent' | 'unknown'> => {
+    const read = await rec.call(step, question, {
+      method: 'GET',
+      url: `${CHKV}/${encodeURIComponent(name.toLowerCase())}`,
+      headers: { Accept: ACCEPT_CHKV },
+    });
+    if (read.status === 200) {
+      return read.body.trim().length > 0 ? 'present' : 'absent';
+    }
+    return read.status === 404 ? 'absent' : 'unknown';
+  };
+
+  /**
    * Remove what the probe made, and notice when it could not.
    *
    * `rec.call` swallows HTTP failures on purpose — a 403 to the POST is the
@@ -448,29 +475,77 @@ async function main(): Promise<void> {
             'would answer a different question than the one asked.',
         );
       } else {
-        const payload = source
-          .replace(/(adtcore:name=")[^"]+(")/, `$1${args.newVariant}$2`)
-          .replace(/(chkv:name=")[^"]+(")/, `$1${args.newVariant}$2`);
-        const created = await rec.call(
-          'create-variant',
-          'May this user create a check variant?',
-          {
-            method: 'POST',
-            // Measured 2026-09-08: a bare POST here answers 400 "Parameter
-            // corrNr could not be found" — the resource is mapped and the
-            // parameter is what it wants. Empty is what a local object on ABAP
-            // Cloud has to offer.
-            url: `${CHKV}?corrNr=`,
-            headers: {
-              'Content-Type': ACCEPT_CHKV,
-              Accept: ACCEPT_CHKV,
-            },
-            body: payload,
-          },
+        // Ask whether the name is free BEFORE writing. Not politeness: the
+        // check after the POST is what makes an ambiguous write safe, and it
+        // can only mean "this run made it" if the name was demonstrably absent
+        // beforehand. Without that, a variant someone else owns would be read
+        // as ours and deleted.
+        const before = await variantPresence(
+          args.newVariant,
+          'name-free-before-create',
+          'Is this name free to create, and free to delete afterwards?',
         );
-        answered.mayCreate = created.status !== null && created.status < 300;
-        if (answered.mayCreate) {
-          createdVariant = args.newVariant;
+
+        if (before !== 'absent') {
+          rec.note(
+            'create-not-attempted',
+            'May this user create a check variant?',
+            before === 'present'
+              ? `${args.newVariant} already exists on this system, so nothing was ` +
+                  'created. This probe removes what it made, never what it found — ' +
+                  'delete it by hand if it is a leftover, or pass --name=OTHER.'
+              : 'The system did not say whether this name is taken. Creating now ' +
+                  "would risk either writing over someone else's object or leaving " +
+                  'one behind unrecognised, so nothing was written.',
+          );
+        } else {
+          const payload = source
+            .replace(/(adtcore:name=")[^"]+(")/, `$1${args.newVariant}$2`)
+            .replace(/(chkv:name=")[^"]+(")/, `$1${args.newVariant}$2`);
+          const created = await rec.call(
+            'create-variant',
+            'May this user create a check variant?',
+            {
+              method: 'POST',
+              // Measured 2026-09-08: a bare POST here answers 400 "Parameter
+              // corrNr could not be found" — the resource is mapped and the
+              // parameter is what it wants. Empty is what a local object on
+              // ABAP Cloud has to offer.
+              url: `${CHKV}?corrNr=`,
+              headers: {
+                'Content-Type': ACCEPT_CHKV,
+                Accept: ACCEPT_CHKV,
+              },
+              body: payload,
+            },
+          );
+
+          // The status answers what the client saw; the system answers what
+          // happened. A write whose response was lost — a dropped socket, a
+          // timeout — comes back as `status: null`, and believing that would
+          // walk away from an object this run had just made. So ask again.
+          const after = await variantPresence(
+            args.newVariant,
+            'name-taken-after-create',
+            'Did the POST leave a variant behind, whatever it answered?',
+          );
+          if (after === 'present') {
+            createdVariant = args.newVariant;
+            answered.mayCreate = true;
+          } else {
+            answered.mayCreate =
+              created.status !== null && created.status < 300;
+            if (after === 'unknown') {
+              rec.note(
+                'create-outcome-unknown',
+                'Did the POST leave a variant behind?',
+                `The read after the POST did not say whether ${args.newVariant} ` +
+                  'now exists. If it does, this run created it and did not remove ' +
+                  'it — check the system before running again.',
+              );
+              leftBehind.push(`${args.newVariant} (unconfirmed)`);
+            }
+          }
         }
       }
 
