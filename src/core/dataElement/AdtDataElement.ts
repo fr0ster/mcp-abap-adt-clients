@@ -32,6 +32,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { activationRefusal } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
+import { withCallTimeout } from '../../utils/callTimeout';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import { validationRefusal } from '../../utils/validationRefusal';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
@@ -117,6 +118,9 @@ export class AdtDataElement<
     config: Partial<IDataElementConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     // The endpoint refuses an empty one, so this is a caller error rather than a
     // 400 to decode later.
@@ -127,7 +131,7 @@ export class AdtDataElement<
     return answering(
       () =>
         validateDataElementName(
-          this.connection,
+          connection,
           name,
           config.description as string,
           config.packageName,
@@ -142,6 +146,9 @@ export class AdtDataElement<
     config: Omit<IDataElementConfig, 'sourceCode'> & { sourceCode?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     if (!config.packageName) {
       throw new Error('Package name is required');
@@ -154,7 +161,7 @@ export class AdtDataElement<
     }
     return answering(
       () =>
-        createDataElement(this.connection, {
+        createDataElement(connection, {
           data_element_name: name,
           package_name: config.packageName as string,
           transport_request: config.transportRequest,
@@ -186,10 +193,13 @@ export class AdtDataElement<
     config: Partial<IDataElementConfig>,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     return answering(
-      () => getDataElement(this.connection, name, options),
+      () => getDataElement(connection, name, options),
       this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
       options?.analyse,
     );
@@ -200,10 +210,13 @@ export class AdtDataElement<
     config: Partial<IDataElementConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     return answering(
-      () => getDataElementTransport(this.connection, name, options),
+      () => getDataElementTransport(connection, name, options),
       this.results.transport as IResultStrategy<ReturnType<R['transport']>>,
       options?.analyse,
     );
@@ -220,6 +233,9 @@ export class AdtDataElement<
     config: Partial<IDataElementConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     if (!config.packageName) {
       throw new Error('Package name is required for update');
@@ -231,7 +247,7 @@ export class AdtDataElement<
     return answering(
       () =>
         updateDataElement(
-          this.connection,
+          connection,
           {
             data_element_name: name,
             package_name: config.packageName as string,
@@ -271,10 +287,13 @@ export class AdtDataElement<
     config: Partial<IDataElementConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     return answering(
       () =>
-        checkDeletion(this.connection, {
+        checkDeletion(connection, {
           data_element_name: name,
           transport_request: config.transportRequest,
         }),
@@ -298,10 +317,13 @@ export class AdtDataElement<
     config: Partial<IDataElementConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     return answering(
       () =>
-        deleteDataElement(this.connection, {
+        deleteDataElement(connection, {
           data_element_name: name,
           transport_request: config.transportRequest,
         }),
@@ -315,10 +337,13 @@ export class AdtDataElement<
     config: Partial<IDataElementConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     return answering(
-      () => activateDataElement(this.connection, name),
+      () => activateDataElement(connection, name),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
       (options?.analyse ?? activationRefusal) as IAnalyse<E>,
     );
@@ -330,12 +355,15 @@ export class AdtDataElement<
     status?: string,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     const version: 'active' | 'inactive' =
       status === 'active' ? 'active' : 'inactive';
 
     return answering(
-      () => checkDataElement(this.connection, name, version),
+      () => checkDataElement(connection, name, version),
       this.results.check as IResultStrategy<ReturnType<R['check']>>,
       options?.analyse,
     );

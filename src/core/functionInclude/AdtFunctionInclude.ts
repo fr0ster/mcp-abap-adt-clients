@@ -35,6 +35,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { activationRefusal } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
+import { withCallTimeout } from '../../utils/callTimeout';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import { validationRefusal } from '../../utils/validationRefusal';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
@@ -189,10 +190,13 @@ export class AdtFunctionInclude<
     config: Partial<IFunctionIncludeConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const { group, include } = this.names(config);
 
     return answering(
-      () => validateFunctionIncludeName(this.connection, group, include),
+      () => validateFunctionIncludeName(connection, group, include),
       this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
       (options?.analyse ?? validationRefusal) as IAnalyse<E>,
     );
@@ -203,6 +207,9 @@ export class AdtFunctionInclude<
     config: Omit<IFunctionIncludeConfig, 'sourceCode'> & { sourceCode?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     // Called for its guards: it throws when the name this member needs is
     // missing, which is the one thing checked before the request goes out.
     this.names(config);
@@ -210,8 +217,7 @@ export class AdtFunctionInclude<
       throw new Error('Description is required');
     }
     return answering(
-      () =>
-        createFunctionInclude(this.connection, this.buildCreateParams(config)),
+      () => createFunctionInclude(connection, this.buildCreateParams(config)),
       this.results.created as IResultStrategy<ReturnType<R['created']>>,
       options?.analyse,
     );
@@ -229,12 +235,15 @@ export class AdtFunctionInclude<
     version?: 'active' | 'inactive',
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const { group, include } = this.names(config);
 
     return answering(
       () =>
         readFunctionIncludeSource(
-          this.connection,
+          connection,
           group,
           include,
           version ?? 'active',
@@ -257,12 +266,15 @@ export class AdtFunctionInclude<
       version?: 'active' | 'inactive';
     } & IAdtOperationOptions,
   ): Promise<IAdtResponse<ReturnType<R['metadata']>>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const { group, include } = this.names(config);
 
     return answering(
       () =>
         readFunctionInclude(
-          this.connection,
+          connection,
           group,
           include,
           options?.version ?? 'active',
@@ -282,6 +294,9 @@ export class AdtFunctionInclude<
     config: Partial<IFunctionIncludeConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const params = this.buildCreateParams({
       ...(config as IFunctionIncludeConfig),
     });
@@ -289,7 +304,7 @@ export class AdtFunctionInclude<
     return answering(
       () =>
         updateFunctionInclude(
-          this.connection,
+          connection,
           params,
           options?.lockHandle,
           this.logger,
@@ -312,6 +327,9 @@ export class AdtFunctionInclude<
     config: Partial<IFunctionIncludeConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const { group, include } = this.names(config);
     // The source is the caller's, through `options.sourceCode`. This used to
     // fall back to `config.sourceCode` — two channels for one value, where the
@@ -326,7 +344,7 @@ export class AdtFunctionInclude<
     return answering(
       () =>
         uploadFunctionIncludeSource(
-          this.connection,
+          connection,
           group,
           include,
           source,
@@ -350,9 +368,12 @@ export class AdtFunctionInclude<
     config: Partial<IFunctionIncludeConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     this.names(config);
     return answering(
-      () => checkDeletion(this.connection, this.buildDeleteParams(config)),
+      () => checkDeletion(connection, this.buildDeleteParams(config)),
       this.results.deletionCheck as IResultStrategy<
         ReturnType<R['deletionCheck']>
       >,
@@ -369,10 +390,12 @@ export class AdtFunctionInclude<
     config: Partial<IFunctionIncludeConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     this.names(config);
     return answering(
-      () =>
-        deleteFunctionInclude(this.connection, this.buildDeleteParams(config)),
+      () => deleteFunctionInclude(connection, this.buildDeleteParams(config)),
       this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
       options?.analyse,
     );
@@ -383,10 +406,13 @@ export class AdtFunctionInclude<
     config: Partial<IFunctionIncludeConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const { group, include } = this.names(config);
 
     return answering(
-      () => activateFunctionInclude(this.connection, group, include),
+      () => activateFunctionInclude(connection, group, include),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
       (options?.analyse ?? activationRefusal) as IAnalyse<E>,
     );
@@ -398,6 +424,9 @@ export class AdtFunctionInclude<
     status?: string,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const { group, include } = this.names(config);
     const version: 'active' | 'inactive' =
       status === 'active' ? 'active' : 'inactive';
@@ -405,7 +434,7 @@ export class AdtFunctionInclude<
     return answering(
       () =>
         checkFunctionInclude(
-          this.connection,
+          connection,
           group,
           include,
           version,

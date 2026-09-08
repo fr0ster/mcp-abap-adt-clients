@@ -42,9 +42,37 @@ the sequence around a write handed back to the consumer.
   library choosing it for them, which is the rule it already follows for the
   lock window and the operation sequence.
 
+  That per-call promise is now kept, which it was not when this entry was first
+  written. The low-level functions take positional arguments and end in
+  `makeAdtRequest({ …, timeout: getTimeout('default') })` at 444 places, none of
+  which could see the option — so `options.timeout` did nothing anywhere except
+  a service binding's publication, and a caller who wanted a deadline had a
+  documented parameter that was ignored and an environment variable that was
+  process-wide. A member wraps its connection once now
+  (`withCallTimeout`, `src/utils/callTimeout.ts`) and everything below inherits
+  the deadline, including low-level functions that issue more than one request.
+  287 members across 36 files; `undefined` returns the connection itself, so a
+  caller who asks for nothing gets exactly what they had. A parameterised guard
+  asserts, for every member that declares an options bag, that the number the
+  caller passed is on every request the member issues.
+
   A request that genuinely hangs now waits for the server or for TCP. That is
   the trade, made deliberately: the abort ended nothing server-side, it only
   ended what this side knew.
+
+- **A failed lock window restores the session.** `LockCapability` and
+  twenty-six handlers set the session stateful, ran the request, and set it back
+  as the last statement of the success path — so a refused `LOCK` left the
+  connection stateful. The connection is shared, so the next unrelated request
+  went out inside a session nobody asked for, and what the server takes during
+  such a request is held until that session ends. The rationale for the
+  success-only form named three cleanup layers, and the third of them — the
+  operation chains' catch blocks — is what this release removed. One atom now
+  holds the invariant (`inStatefulSession`, `src/core/shared/capabilities/statefulSession.ts`),
+  41 unprotected windows became 0, and a guard that refuses every request
+  asserts it for both members of every lockable type. That guard found seven
+  sites a mechanical sweep had missed, because they spell the call
+  `setSessionType?.(`.
 
 - **A write takes its source from `options.sourceCode` and nowhere else.**
   Sixteen `update`/`updateMetadata` implementations read

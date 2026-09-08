@@ -33,6 +33,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { activationRefusal } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
+import { withCallTimeout } from '../../utils/callTimeout';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import { validationRefusal } from '../../utils/validationRefusal';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
@@ -120,10 +121,13 @@ export class AdtDdicTableType<
     config: Partial<ITableTypeConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     return answering(
-      () => validateTableTypeName(this.connection, name, config.description),
+      () => validateTableTypeName(connection, name, config.description),
       this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
       (options?.analyse ?? validationRefusal) as IAnalyse<E>,
     );
@@ -134,13 +138,16 @@ export class AdtDdicTableType<
     config: Omit<ITableTypeConfig, 'sourceCode'> & { sourceCode?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     if (!config.packageName) {
       throw new Error('Package name is required');
     }
     return answering(
       () =>
-        createTableType(this.connection, {
+        createTableType(connection, {
           tabletype_name: name,
           package_name: config.packageName as string,
           description: config.description,
@@ -160,10 +167,13 @@ export class AdtDdicTableType<
     config: Partial<ITableTypeConfig>,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     return answering(
-      () => getTableTypeMetadata(this.connection, name, options, this.logger),
+      () => getTableTypeMetadata(connection, name, options, this.logger),
       this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
       options?.analyse,
     );
@@ -174,10 +184,13 @@ export class AdtDdicTableType<
     config: Partial<ITableTypeConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     return answering(
-      () => getTableTypeTransport(this.connection, name, options),
+      () => getTableTypeTransport(connection, name, options),
       this.results.transport as IResultStrategy<ReturnType<R['transport']>>,
       options?.analyse,
     );
@@ -194,6 +207,9 @@ export class AdtDdicTableType<
     config: Partial<ITableTypeConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     const source =
       config.rowTypeName && config.rowTypeName.trim().length > 0
@@ -206,7 +222,7 @@ export class AdtDdicTableType<
     return answering(
       () =>
         updateTableType(
-          this.connection,
+          connection,
           {
             tabletype_name: name,
             description: config.description,
@@ -238,10 +254,13 @@ export class AdtDdicTableType<
     config: Partial<ITableTypeConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     return answering(
       () =>
-        checkDeletion(this.connection, {
+        checkDeletion(connection, {
           tabletype_name: name,
           transport_request: config.transportRequest,
         }),
@@ -265,10 +284,13 @@ export class AdtDdicTableType<
     config: Partial<ITableTypeConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     return answering(
       () =>
-        deleteTableType(this.connection, {
+        deleteTableType(connection, {
           tabletype_name: name,
           transport_request: config.transportRequest,
         }),
@@ -282,10 +304,13 @@ export class AdtDdicTableType<
     config: Partial<ITableTypeConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     return answering(
-      () => activateTableType(this.connection, name),
+      () => activateTableType(connection, name),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
       (options?.analyse ?? activationRefusal) as IAnalyse<E>,
     );
@@ -297,6 +322,9 @@ export class AdtDdicTableType<
     status?: string,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     const version: 'active' | 'inactive' =
       status === 'active' ? 'active' : 'inactive';
@@ -304,7 +332,7 @@ export class AdtDdicTableType<
     return answering(
       () =>
         runTableTypeCheckRun(
-          this.connection,
+          connection,
           'abapCheckRun',
           name,
           undefined,

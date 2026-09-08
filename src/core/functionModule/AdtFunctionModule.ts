@@ -38,6 +38,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { activationRefusal } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
+import { withCallTimeout } from '../../utils/callTimeout';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import { validationRefusal } from '../../utils/validationRefusal';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
@@ -153,12 +154,15 @@ export class AdtFunctionModule<
     config: Partial<IFunctionModuleConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const { group, module } = this.names(config);
 
     return answering(
       () =>
         validateFunctionModuleName(
-          this.connection,
+          connection,
           group,
           module,
           config.description,
@@ -173,13 +177,16 @@ export class AdtFunctionModule<
     config: Omit<IFunctionModuleConfig, 'sourceCode'> & { sourceCode?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const { group, module } = this.names(config);
     if (!config.description) {
       throw new Error('Description is required');
     }
     return answering(
       () =>
-        createFunctionModule(this.connection, {
+        createFunctionModule(connection, {
           functionGroupName: group,
           functionModuleName: module,
           transportRequest: config.transportRequest,
@@ -198,12 +205,15 @@ export class AdtFunctionModule<
     version?: 'active' | 'inactive',
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const { group, module } = this.names(config);
 
     // No 404 special case: whether an empty answer *is* absence is the caller's
     // reading, supplied through `analyse`.
     return answering(
-      () => getFunctionSource(this.connection, module, group, version, options),
+      () => getFunctionSource(connection, module, group, version, options),
       this.results.source as IResultStrategy<ReturnType<R['source']>>,
       options?.analyse,
     );
@@ -214,10 +224,13 @@ export class AdtFunctionModule<
     config: Partial<IFunctionModuleConfig>,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const { group, module } = this.names(config);
 
     return answering(
-      () => getFunctionMetadata(this.connection, module, group, options),
+      () => getFunctionMetadata(connection, module, group, options),
       this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
       options?.analyse,
     );
@@ -228,12 +241,15 @@ export class AdtFunctionModule<
     config: Partial<IFunctionModuleConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const { group, module } = this.names(config);
 
     return answering(
       () =>
         getFunctionModuleTransport(
-          this.connection,
+          connection,
           module,
           group,
           options?.withLongPolling !== undefined
@@ -256,6 +272,9 @@ export class AdtFunctionModule<
     config: Partial<IFunctionModuleConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const { group, module } = this.names(config);
     // The source is the caller's, through `options.sourceCode`. This used to
     // fall back to `config.sourceCode` — two channels for one value, where the
@@ -270,7 +289,7 @@ export class AdtFunctionModule<
     return answering(
       () =>
         update(
-          this.connection,
+          connection,
           {
             functionModuleName: module,
             functionGroupName: group,
@@ -296,10 +315,13 @@ export class AdtFunctionModule<
     config: Partial<IFunctionModuleConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const { group, module } = this.names(config);
     return answering(
       () =>
-        checkDeletion(this.connection, {
+        checkDeletion(connection, {
           function_module_name: module,
           function_group_name: group,
           transport_request: config.transportRequest,
@@ -320,10 +342,13 @@ export class AdtFunctionModule<
     config: Partial<IFunctionModuleConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const { group, module } = this.names(config);
     return answering(
       () =>
-        deleteFunctionModule(this.connection, {
+        deleteFunctionModule(connection, {
           function_module_name: module,
           function_group_name: group,
           transport_request: config.transportRequest,
@@ -338,10 +363,13 @@ export class AdtFunctionModule<
     config: Partial<IFunctionModuleConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const { group, module } = this.names(config);
 
     return answering(
-      () => activateFunctionModule(this.connection, group, module),
+      () => activateFunctionModule(connection, group, module),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
       (options?.analyse ?? activationRefusal) as IAnalyse<E>,
     );
@@ -353,6 +381,9 @@ export class AdtFunctionModule<
     status?: string,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const { group, module } = this.names(config);
     const version: 'active' | 'inactive' =
       status === 'active' ? 'active' : 'inactive';
@@ -360,7 +391,7 @@ export class AdtFunctionModule<
     return answering(
       () =>
         checkFunctionModule(
-          this.connection,
+          connection,
           group,
           module,
           version,

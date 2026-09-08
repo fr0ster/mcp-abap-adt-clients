@@ -35,6 +35,7 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
 import { answering } from '../../utils/adtResponse';
+import { withCallTimeout } from '../../utils/callTimeout';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import { validationRefusal } from '../../utils/validationRefusal';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
@@ -117,6 +118,9 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
     config: Partial<IPackageConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     if (!config.superPackage) {
       throw new Error('Super package is required for validation');
@@ -124,7 +128,7 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
 
     return answering(
       () =>
-        validatePackageBasic(this.connection, {
+        validatePackageBasic(connection, {
           package_name: name,
           super_package: config.superPackage as string,
           description: config.description,
@@ -153,6 +157,9 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
     config: Omit<IPackageConfig, 'sourceCode'> & { sourceCode?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     if (!config.superPackage) {
       throw new Error('Super package is required');
@@ -170,7 +177,7 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
     }
     return answering(
       () =>
-        createPackage(this.connection, {
+        createPackage(connection, {
           package_name: name,
           super_package: config.superPackage as string,
           description: config.description,
@@ -197,12 +204,15 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
     config: Partial<IPackageConfig>,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     return answering(
       () =>
         getPackage(
-          this.connection,
+          connection,
           name,
           options?.version ?? 'active',
           options,
@@ -218,10 +228,13 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
     config: Partial<IPackageConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     return answering(
-      () => getPackageTransport(this.connection, name, options),
+      () => getPackageTransport(connection, name, options),
       this.results.transport as IResultStrategy<ReturnType<R['transport']>>,
       options?.analyse,
     );
@@ -269,6 +282,9 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
     config: Partial<IPackageConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     if (!config.superPackage) {
       throw new Error('Super package is required for update');
@@ -291,8 +307,7 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
     };
 
     return answering(
-      () =>
-        updatePackage(this.connection, fields, options?.lockHandle as string),
+      () => updatePackage(connection, fields, options?.lockHandle as string),
       this.results.metadataUpdated as IResultStrategy<
         ReturnType<R['metadataUpdated']>
       >,
@@ -311,10 +326,13 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
     config: Partial<IPackageConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     return answering(
       () =>
-        checkPackageDeletion(this.connection, {
+        checkPackageDeletion(connection, {
           package_name: name,
           transport_request: config.transportRequest,
         }),
@@ -349,10 +367,13 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
     config: Partial<IPackageConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     return answering(
       () =>
-        deletePackage(this.connection, {
+        deletePackage(connection, {
           package_name: name,
           transport_request: config.transportRequest,
         }),
@@ -372,12 +393,15 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
     status?: string,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     const version: 'active' | 'inactive' =
       status === 'active' ? 'active' : 'inactive';
 
     return answering(
-      () => checkPackage(this.connection, name, version),
+      () => checkPackage(connection, name, version),
       this.results.check as IResultStrategy<ReturnType<R['check']>>,
       options?.analyse,
     );

@@ -34,6 +34,7 @@ import type {
 import { ADT_NO_FAILURE, AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
 import { activationRefusal } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
+import { withCallTimeout } from '../../utils/callTimeout';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import {
@@ -151,11 +152,13 @@ export class AdtAppendStructure<
     config: Partial<IAppendStructureConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     return answering(
-      () =>
-        validateAppendStructureName(this.connection, name, config.description),
+      () => validateAppendStructureName(connection, name, config.description),
       this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
       (options?.analyse ?? validationUnsupported) as IAnalyse<E>,
     );
@@ -166,6 +169,9 @@ export class AdtAppendStructure<
     config: Omit<IAppendStructureConfig, 'sourceCode'> & { sourceCode?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     if (!config.baseObject) throw new Error('Base object is required');
     if (!config.packageName) throw new Error('Package name is required');
@@ -173,7 +179,7 @@ export class AdtAppendStructure<
 
     return answering(
       () =>
-        createAppendStructure(this.connection, {
+        createAppendStructure(connection, {
           append_structure_name: name,
           base_object: config.baseObject as string,
           package_name: config.packageName as string,
@@ -195,6 +201,9 @@ export class AdtAppendStructure<
     version?: 'active' | 'inactive',
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     // No 404 special case: whether an empty answer *is* absence is the caller's
@@ -202,7 +211,7 @@ export class AdtAppendStructure<
     return answering(
       () =>
         getAppendStructureSource(
-          this.connection,
+          connection,
           name,
           version,
           options,
@@ -218,12 +227,15 @@ export class AdtAppendStructure<
     config: Partial<IAppendStructureConfig>,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     return answering(
       () =>
         getAppendStructure(
-          this.connection,
+          connection,
           name,
           options?.version ?? 'inactive',
           options,
@@ -239,12 +251,15 @@ export class AdtAppendStructure<
     config: Partial<IAppendStructureConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     return answering(
       () =>
         getAppendStructureTransport(
-          this.connection,
+          connection,
           name,
           options?.withLongPolling !== undefined
             ? { withLongPolling: options.withLongPolling }
@@ -269,6 +284,9 @@ export class AdtAppendStructure<
     config: Partial<IAppendStructureConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     // The source is the caller's, through `options.sourceCode`. This used to
     // fall back to `config.sourceCode` — two channels for one value, where the
@@ -281,7 +299,7 @@ export class AdtAppendStructure<
     return answering(
       () =>
         updateAppendStructure(
-          this.connection,
+          connection,
           {
             append_structure_name: name,
             source_code: source,
@@ -305,10 +323,13 @@ export class AdtAppendStructure<
     config: Partial<IAppendStructureConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     return answering(
       () =>
-        checkDeletion(this.connection, {
+        checkDeletion(connection, {
           append_structure_name: name,
           transport_request: config.transportRequest,
         }),
@@ -328,10 +349,13 @@ export class AdtAppendStructure<
     config: Partial<IAppendStructureConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     return answering(
       () =>
-        deleteAppendStructure(this.connection, {
+        deleteAppendStructure(connection, {
           append_structure_name: name,
           transport_request: config.transportRequest,
         }),
@@ -345,10 +369,13 @@ export class AdtAppendStructure<
     config: Partial<IAppendStructureConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     return answering(
-      () => activateAppendStructure(this.connection, name),
+      () => activateAppendStructure(connection, name),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
       (options?.analyse ?? activationRefusal) as IAnalyse<E>,
     );
@@ -360,12 +387,15 @@ export class AdtAppendStructure<
     status?: string,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     const version: 'active' | 'inactive' =
       status === 'active' ? 'active' : 'inactive';
 
     return answering(
-      () => checkAppendStructure(this.connection, name, version),
+      () => checkAppendStructure(connection, name, version),
       this.results.check as IResultStrategy<ReturnType<R['check']>>,
       options?.analyse,
     );

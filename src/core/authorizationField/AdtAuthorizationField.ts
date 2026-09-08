@@ -30,6 +30,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { activationRefusal } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
+import { withCallTimeout } from '../../utils/callTimeout';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import { validationRefusal } from '../../utils/validationRefusal';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
@@ -114,6 +115,9 @@ export class AdtAuthorizationField<
     config: Partial<IAuthorizationFieldConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     // The endpoint refuses an empty one, so this is a caller error rather than
     // a 400 to decode later.
@@ -124,7 +128,7 @@ export class AdtAuthorizationField<
     return answering(
       () =>
         validateAuthorizationFieldName(
-          this.connection,
+          connection,
           name,
           config.description as string,
           config.packageName,
@@ -141,6 +145,9 @@ export class AdtAuthorizationField<
     },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     if (!config.packageName) {
       throw new Error('Package name is required');
@@ -150,7 +157,7 @@ export class AdtAuthorizationField<
     }
     return answering(
       () =>
-        createAuthorizationField(this.connection, {
+        createAuthorizationField(connection, {
           authorization_field_name: name,
           description: config.description,
           package_name: config.packageName ?? '',
@@ -179,12 +186,15 @@ export class AdtAuthorizationField<
     config: Partial<IAuthorizationFieldConfig>,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     return answering(
       () =>
         readAuthorizationField(
-          this.connection,
+          connection,
           name,
           options?.version ?? 'active',
           options,
@@ -205,6 +215,9 @@ export class AdtAuthorizationField<
     config: Partial<IAuthorizationFieldConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     if (!config.packageName) {
       throw new Error('Package name is required for update');
@@ -213,7 +226,7 @@ export class AdtAuthorizationField<
     return answering(
       () =>
         updateAuthorizationField(
-          this.connection,
+          connection,
           {
             authorization_field_name: name,
             description: config.description,
@@ -255,10 +268,13 @@ export class AdtAuthorizationField<
     config: Partial<IAuthorizationFieldConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     return answering(
       () =>
-        checkDeletion(this.connection, {
+        checkDeletion(connection, {
           authorization_field_name: name,
           transport_request: config.transportRequest,
         }),
@@ -282,10 +298,13 @@ export class AdtAuthorizationField<
     config: Partial<IAuthorizationFieldConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     return answering(
       () =>
-        deleteAuthorizationField(this.connection, {
+        deleteAuthorizationField(connection, {
           authorization_field_name: name,
           transport_request: config.transportRequest,
         }),
@@ -299,10 +318,13 @@ export class AdtAuthorizationField<
     config: Partial<IAuthorizationFieldConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     return answering(
-      () => activateAuthorizationField(this.connection, name),
+      () => activateAuthorizationField(connection, name),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
       (options?.analyse ?? activationRefusal) as IAnalyse<E>,
     );
@@ -314,12 +336,15 @@ export class AdtAuthorizationField<
     status?: string,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     const version: 'active' | 'inactive' =
       status === 'active' ? 'active' : 'inactive';
 
     return answering(
-      () => checkAuthorizationField(this.connection, name, version),
+      () => checkAuthorizationField(connection, name, version),
       this.results.check as IResultStrategy<ReturnType<R['check']>>,
       options?.analyse,
     );

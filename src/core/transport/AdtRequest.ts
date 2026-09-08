@@ -45,6 +45,7 @@ import type {
 import { TRANSPORT_SEARCH_CONFIGURATIONS_URL } from '@mcp-abap-adt/interfaces';
 import { TransportSearchConfigurationMissing } from '../../utils/adtErrors';
 import { answering } from '../../utils/adtResponse';
+import { withCallTimeout } from '../../utils/callTimeout';
 import { createTransport } from './create';
 import { deleteTransport } from './delete';
 import { getTransportSearchConfigurations, listTransports } from './list';
@@ -127,6 +128,9 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
     config: Omit<ITransportConfig, 'sourceCode'> & { sourceCode?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     if (!config.description) {
       throw new Error('Transport request description is required');
     }
@@ -134,7 +138,7 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
     this.logger?.info?.('Creating transport request');
     return answering(
       () =>
-        createTransport(this.connection, {
+        createTransport(connection, {
           transport_type:
             config.transportType === 'customizing'
               ? 'customizing'
@@ -161,10 +165,13 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
     config: Partial<ITransportConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const number = this.number(config);
 
     return answering(
-      () => getTransport(this.connection, number),
+      () => getTransport(connection, number),
       this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
       options?.analyse,
     );
@@ -253,6 +260,9 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
     config: Partial<ITransportConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const number = this.number(config);
     if (!config.description) {
       throw new Error('Transport request description is required for update');
@@ -261,7 +271,7 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
 
     this.logger?.info?.('Updating transport request description:', number);
     return answering(
-      () => updateTransport(this.connection, number, description),
+      () => updateTransport(connection, number, description),
       this.results.metadataUpdated as IResultStrategy<
         ReturnType<R['metadataUpdated']>
       >,
@@ -298,10 +308,13 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
     config: Partial<ITransportConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const number = this.number(config);
 
     return answering(
-      () => getTransport(this.connection, number),
+      () => getTransport(connection, number),
       this.results.deletionCheck as IResultStrategy<
         ReturnType<R['deletionCheck']>
       >,
@@ -313,11 +326,14 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
     config: Partial<ITransportConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deleted']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const number = this.number(config);
 
     this.logger?.info?.('Deleting transport request:', number);
     return answering(
-      () => deleteTransport(this.connection, number),
+      () => deleteTransport(connection, number),
       this.results.deleted as IResultStrategy<ReturnType<R['deleted']>>,
       options?.analyse,
     );

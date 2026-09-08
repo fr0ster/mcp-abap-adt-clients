@@ -33,6 +33,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { activationRefusal } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
+import { withCallTimeout } from '../../utils/callTimeout';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import { validationRefusal } from '../../utils/validationRefusal';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
@@ -113,6 +114,9 @@ export class AdtDdl<R extends IDdlResults = typeof ddlDocuments>
     config: Partial<IDdlConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     if (!config.packageName) {
       throw new Error('Package name is required for validation');
@@ -121,7 +125,7 @@ export class AdtDdl<R extends IDdlResults = typeof ddlDocuments>
     return answering(
       () =>
         validateDdlName(
-          this.connection,
+          connection,
           name,
           config.packageName as string,
           config.description,
@@ -136,6 +140,9 @@ export class AdtDdl<R extends IDdlResults = typeof ddlDocuments>
     config: Omit<IDdlConfig, 'sourceCode'> & { sourceCode?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     if (!config.packageName) {
       throw new Error('Package name is required');
@@ -148,7 +155,7 @@ export class AdtDdl<R extends IDdlResults = typeof ddlDocuments>
         // No source here, for a table's reason: `createDdl` never read
         // `ddl_source`. A create posts metadata; the source is a PUT to
         // `…/source/main` under a lock.
-        createDdl(this.connection, {
+        createDdl(connection, {
           ddl_name: name,
           package_name: config.packageName as string,
           transport_request: config.transportRequest,
@@ -169,13 +176,16 @@ export class AdtDdl<R extends IDdlResults = typeof ddlDocuments>
     version?: 'active' | 'inactive',
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     // No 404 special case: ADT answers a read for a missing object with 200 and
     // an empty body, so absence was never a status to branch on — and whether
     // an empty body *is* absence is the caller's reading, through `analyse`.
     return answering(
-      () => getDdlSource(this.connection, name, version, options),
+      () => getDdlSource(connection, name, version, options),
       this.results.source as IResultStrategy<ReturnType<R['source']>>,
       options?.analyse,
     );
@@ -186,10 +196,13 @@ export class AdtDdl<R extends IDdlResults = typeof ddlDocuments>
     config: Partial<IDdlConfig>,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     return answering(
-      () => getDdlMetadata(this.connection, name, options),
+      () => getDdlMetadata(connection, name, options),
       this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
       options?.analyse,
     );
@@ -200,10 +213,13 @@ export class AdtDdl<R extends IDdlResults = typeof ddlDocuments>
     config: Partial<IDdlConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     return answering(
-      () => getDdlTransport(this.connection, name, options),
+      () => getDdlTransport(connection, name, options),
       this.results.transport as IResultStrategy<ReturnType<R['transport']>>,
       options?.analyse,
     );
@@ -220,6 +236,9 @@ export class AdtDdl<R extends IDdlResults = typeof ddlDocuments>
     config: Partial<IDdlConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     const source = options?.sourceCode || config.ddlSource;
 
@@ -229,7 +248,7 @@ export class AdtDdl<R extends IDdlResults = typeof ddlDocuments>
     return answering(
       () =>
         updateDdl(
-          this.connection,
+          connection,
           name,
           source as string,
           options?.lockHandle,
@@ -251,10 +270,13 @@ export class AdtDdl<R extends IDdlResults = typeof ddlDocuments>
     config: Partial<IDdlConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     return answering(
       () =>
-        checkDeletion(this.connection, {
+        checkDeletion(connection, {
           ddl_name: name,
           transport_request: config.transportRequest,
         }),
@@ -278,10 +300,13 @@ export class AdtDdl<R extends IDdlResults = typeof ddlDocuments>
     config: Partial<IDdlConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     return answering(
       () =>
-        deleteDdl(this.connection, {
+        deleteDdl(connection, {
           ddl_name: name,
           transport_request: config.transportRequest,
         }),
@@ -295,10 +320,13 @@ export class AdtDdl<R extends IDdlResults = typeof ddlDocuments>
     config: Partial<IDdlConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     return answering(
-      () => activateDDLS(this.connection, name),
+      () => activateDDLS(connection, name),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
       (options?.analyse ?? activationRefusal) as IAnalyse<E>,
     );
@@ -310,12 +338,15 @@ export class AdtDdl<R extends IDdlResults = typeof ddlDocuments>
     status?: string,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     const version: 'active' | 'inactive' =
       status === 'active' ? 'active' : 'inactive';
 
     return answering(
-      () => checkDdl(this.connection, name, version, config.ddlSource),
+      () => checkDdl(connection, name, version, config.ddlSource),
       this.results.check as IResultStrategy<ReturnType<R['check']>>,
       options?.analyse,
     );

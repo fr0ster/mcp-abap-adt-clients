@@ -90,6 +90,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
 import { answering, answeringValue } from '../../utils/adtResponse';
+import { withCallTimeout } from '../../utils/callTimeout';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { withRefusalDetection } from '../../utils/refusalAware';
 import { rawDocument } from '../../utils/resultStrategy';
@@ -250,8 +251,11 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
     criteria: ISearchObjectsParams,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['search']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     return answering(
-      () => searchObjects(this.connection, criteria),
+      () => searchObjects(connection, criteria),
       this.results.search as IResultStrategy<ReturnType<R['search']>>,
       options?.analyse,
     );

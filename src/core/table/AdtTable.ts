@@ -33,6 +33,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { activationRefusal } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
+import { withCallTimeout } from '../../utils/callTimeout';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import { validationRefusal } from '../../utils/validationRefusal';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
@@ -113,10 +114,13 @@ export class AdtTable<R extends ITableResults = typeof tableDocuments>
     config: Partial<ITableConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     return answering(
-      () => validateTableName(this.connection, name, config.description),
+      () => validateTableName(connection, name, config.description),
       this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
       (options?.analyse ?? validationRefusal) as IAnalyse<E>,
     );
@@ -127,6 +131,9 @@ export class AdtTable<R extends ITableResults = typeof tableDocuments>
     config: Omit<ITableConfig, 'sourceCode'> & { sourceCode?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     if (!config.packageName) {
       throw new Error('Package name is required');
@@ -137,7 +144,7 @@ export class AdtTable<R extends ITableResults = typeof tableDocuments>
         // package, transport, master and responsible — and `ddl_code` was not
         // among them, so passing it read as if a create wrote the source, and
         // it never did. The source is `update`'s, after `lock`.
-        createTable(this.connection, {
+        createTable(connection, {
           table_name: name,
           package_name: config.packageName as string,
           transport_request: config.transportRequest,
@@ -157,13 +164,16 @@ export class AdtTable<R extends ITableResults = typeof tableDocuments>
     version?: 'active' | 'inactive',
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     // No 404 special case: ADT answers a read for a missing object with 200 and
     // an empty body, so absence was never a status to branch on — and whether
     // an empty body *is* absence is the caller's reading, through `analyse`.
     return answering(
-      () => getTableSource(this.connection, name, version, options),
+      () => getTableSource(connection, name, version, options),
       this.results.source as IResultStrategy<ReturnType<R['source']>>,
       options?.analyse,
     );
@@ -174,10 +184,13 @@ export class AdtTable<R extends ITableResults = typeof tableDocuments>
     config: Partial<ITableConfig>,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     return answering(
-      () => getTableMetadata(this.connection, name, options),
+      () => getTableMetadata(connection, name, options),
       this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
       options?.analyse,
     );
@@ -188,12 +201,15 @@ export class AdtTable<R extends ITableResults = typeof tableDocuments>
     config: Partial<ITableConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     return answering(
       () =>
         getTableTransport(
-          this.connection,
+          connection,
           name,
           options?.withLongPolling !== undefined
             ? { withLongPolling: options.withLongPolling }
@@ -215,6 +231,9 @@ export class AdtTable<R extends ITableResults = typeof tableDocuments>
     config: Partial<ITableConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     const source = options?.sourceCode || config.ddlCode;
 
@@ -224,7 +243,7 @@ export class AdtTable<R extends ITableResults = typeof tableDocuments>
     return answering(
       () =>
         updateTable(
-          this.connection,
+          connection,
           {
             table_name: name,
             ddl_code: source as string,
@@ -248,10 +267,13 @@ export class AdtTable<R extends ITableResults = typeof tableDocuments>
     config: Partial<ITableConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     return answering(
       () =>
-        checkDeletion(this.connection, {
+        checkDeletion(connection, {
           table_name: name,
           transport_request: config.transportRequest,
         }),
@@ -275,10 +297,13 @@ export class AdtTable<R extends ITableResults = typeof tableDocuments>
     config: Partial<ITableConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     return answering(
       () =>
-        deleteTable(this.connection, {
+        deleteTable(connection, {
           table_name: name,
           transport_request: config.transportRequest,
         }),
@@ -292,10 +317,13 @@ export class AdtTable<R extends ITableResults = typeof tableDocuments>
     config: Partial<ITableConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     return answering(
-      () => activateTable(this.connection, name),
+      () => activateTable(connection, name),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
       (options?.analyse ?? activationRefusal) as IAnalyse<E>,
     );
@@ -307,19 +335,16 @@ export class AdtTable<R extends ITableResults = typeof tableDocuments>
     status?: string,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     const version: 'active' | 'inactive' =
       status === 'active' ? 'active' : 'inactive';
 
     return answering(
       () =>
-        runTableCheckRun(
-          this.connection,
-          'abapCheckRun',
-          name,
-          undefined,
-          version,
-        ),
+        runTableCheckRun(connection, 'abapCheckRun', name, undefined, version),
       this.results.check as IResultStrategy<ReturnType<R['check']>>,
       options?.analyse,
     );

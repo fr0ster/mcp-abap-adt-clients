@@ -33,6 +33,7 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
 import { answering } from '../../utils/adtResponse';
+import { withCallTimeout } from '../../utils/callTimeout';
 import { getSystemInformation } from '../../utils/systemInfo';
 import { validationRefusal } from '../../utils/validationRefusal';
 import { AdtClass } from '../class/AdtClass';
@@ -152,6 +153,9 @@ export class AdtBehaviorImplementation<
     config: Partial<IBehaviorImplementationConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     if (!config.behaviorDefinition) {
       throw new Error('Behavior definition is required for validation');
@@ -163,7 +167,7 @@ export class AdtBehaviorImplementation<
     return answering(
       () =>
         validateBehaviorImplementationName(
-          this.connection,
+          connection,
           name,
           config.packageName as string,
           config.description,
@@ -187,6 +191,9 @@ export class AdtBehaviorImplementation<
     },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     if (!config.packageName) {
       throw new Error('Package name is required');
@@ -200,7 +207,7 @@ export class AdtBehaviorImplementation<
 
     // The system names the author and the master system; a create that guessed
     // either would write the wrong one into the object's own metadata.
-    const systemInfo = await getSystemInformation(this.connection);
+    const systemInfo = await getSystemInformation(connection);
 
     this.logger?.info?.('Creating behavior implementation class');
     return this.class.create(
@@ -222,12 +229,15 @@ export class AdtBehaviorImplementation<
     version?: 'active' | 'inactive',
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     return answering(
       () =>
         getBehaviorImplementationSource(
-          this.connection,
+          connection,
           name,
           version,
           options,
@@ -243,12 +253,15 @@ export class AdtBehaviorImplementation<
     config: Partial<IBehaviorImplementationConfig>,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     return answering(
       () =>
         getBehaviorImplementationMetadata(
-          this.connection,
+          connection,
           name,
           options,
           this.logger,
@@ -263,12 +276,15 @@ export class AdtBehaviorImplementation<
     config: Partial<IBehaviorImplementationConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<string, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     return answering(
       () =>
         getBehaviorImplementationTransport(
-          this.connection,
+          connection,
           name,
           options?.withLongPolling !== undefined
             ? { withLongPolling: options.withLongPolling }
@@ -293,6 +309,9 @@ export class AdtBehaviorImplementation<
     config: Partial<IBehaviorImplementationConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     // The source is the caller's, through `options.sourceCode`. This used to
     // read `config.implementationCode` and `config.sourceCode` as well — three
@@ -309,7 +328,7 @@ export class AdtBehaviorImplementation<
     return answering(
       () =>
         updateBehaviorImplementation(
-          this.connection,
+          connection,
           name,
           source,
           options?.lockHandle,

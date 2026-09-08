@@ -29,6 +29,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { activationRefusal } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
+import { withCallTimeout } from '../../utils/callTimeout';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import { validationRefusal } from '../../utils/validationRefusal';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
@@ -88,6 +89,9 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
     config: Partial<IIncludeConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const includeName = requireName(config);
     if (!config.packageName) {
       throw new Error('packageName is required for validation');
@@ -104,7 +108,7 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
 
     return answering(
       () =>
-        this.connection.makeAdtRequest({
+        connection.makeAdtRequest({
           url: `/sap/bc/adt/includes/validation?${params.toString()}`,
           method: 'POST',
           timeout: 45000,
@@ -127,6 +131,9 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
     config: Omit<IIncludeConfig, 'sourceCode'> & { sourceCode?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const includeName = requireName(config);
     if (!config.packageName) {
       throw new Error('packageName is required to create an include');
@@ -134,7 +141,7 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
     return answering(
       () =>
         create(
-          this.connection,
+          connection,
           {
             includeName,
             description: config.description,
@@ -155,9 +162,12 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
     version?: 'active' | 'inactive',
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const includeName = requireName(config);
     return answering(
-      () => getIncludeSource(this.connection, includeName, version),
+      () => getIncludeSource(connection, includeName, version),
       this.results.source as IResultStrategy<ReturnType<R['source']>>,
       options?.analyse,
     );
@@ -168,9 +178,12 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
     config: Partial<IIncludeConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const includeName = requireName(config);
     return answering(
-      () => getIncludeMetadata(this.connection, includeName),
+      () => getIncludeMetadata(connection, includeName),
       this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
       options?.analyse,
     );
@@ -187,6 +200,9 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
     config: Partial<IIncludeConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     // Absence, not emptiness: clearing an include to empty is a real edit, and
     // a truthiness check made it impossible to express.
     // The source is the caller's, through `options.sourceCode`. This used to
@@ -205,7 +221,7 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
     return answering(
       () =>
         uploadIncludeSource(
-          this.connection,
+          connection,
           includeName,
           sourceCode,
           options?.lockHandle,
@@ -226,10 +242,13 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
     config: Partial<IIncludeConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const includeName = requireName(config);
 
     return answering(
-      () => checkDeletionByUri(this.connection, includeUrl(includeName)),
+      () => checkDeletionByUri(connection, includeUrl(includeName)),
       this.results.deletionCheck as IResultStrategy<
         ReturnType<R['deletionCheck']>
       >,
@@ -248,11 +267,13 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
     config: Partial<IIncludeConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const includeName = requireName(config);
 
     return answering(
-      () =>
-        deleteInclude(this.connection, includeName, config.transportRequest),
+      () => deleteInclude(connection, includeName, config.transportRequest),
       this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
       options?.analyse,
     );
@@ -263,9 +284,12 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
     config: Partial<IIncludeConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const includeName = requireName(config);
     return answering(
-      () => activateInclude(this.connection, includeName),
+      () => activateInclude(connection, includeName),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
       (options?.analyse ?? activationRefusal) as IAnalyse<E>,
     );

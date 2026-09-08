@@ -30,6 +30,7 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
 import { answering } from '../../utils/adtResponse';
+import { withCallTimeout } from '../../utils/callTimeout';
 import { validationRefusal } from '../../utils/validationRefusal';
 import type { LockRegistry } from '../shared/LockRegistry';
 import type { ObjectVersion } from '../shared/results';
@@ -87,6 +88,9 @@ export class AdtLocalDefinitions<
     config: Partial<ILocalDefinitionsConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     // Nothing was asked of the server yet, so there is no answer to describe:
     // a missing required argument is the caller's mistake and it throws.
     if (!config.className) {
@@ -99,7 +103,7 @@ export class AdtLocalDefinitions<
     return answering(
       () =>
         checkClassDefinitions(
-          this.connection,
+          connection,
           config.className as string,
           config.definitionsCode as string,
           'inactive',
@@ -116,6 +120,9 @@ export class AdtLocalDefinitions<
     version: 'active' | 'inactive' = 'active',
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     if (!config.className) {
       throw new Error('Class name is required');
     }
@@ -127,7 +134,7 @@ export class AdtLocalDefinitions<
     return answering(
       () =>
         getClassDefinitionsInclude(
-          this.connection,
+          connection,
           config.className as string,
           version,
           this.logger,
@@ -156,6 +163,9 @@ export class AdtLocalDefinitions<
     config: Partial<ILocalDefinitionsConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     if (!config.className) {
       throw new Error('Class name is required');
     }
@@ -174,7 +184,7 @@ export class AdtLocalDefinitions<
     return answering(
       () =>
         updateClassDefinitions(
-          this.connection,
+          connection,
           name,
           source,
           // `as string` because the low-level writer types it required; the
@@ -212,6 +222,9 @@ export class AdtLocalDefinitions<
     status: string = 'inactive',
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     if (!config.className) {
       throw new Error('Class name is required');
     }
@@ -222,7 +235,7 @@ export class AdtLocalDefinitions<
     return answering(
       () =>
         checkClassDefinitions(
-          this.connection,
+          connection,
           config.className as string,
           config.definitionsCode as string,
           status === 'active' ? 'active' : 'inactive',

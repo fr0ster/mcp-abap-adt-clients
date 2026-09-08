@@ -1,3 +1,4 @@
+import { withCallTimeout } from '../../utils/callTimeout';
 import { beginCriticalSection } from '../../utils/criticalSection';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 
@@ -107,6 +108,9 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
     config: Partial<IClassConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     // Nothing was asked of the server, so there is no answer to describe: a
     // missing required argument is the caller's mistake and it throws.
     if (!config.className) {
@@ -119,7 +123,7 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
     return answering(
       () =>
         validateClassName(
-          this.connection,
+          connection,
           config.className as string,
           config.packageName as string,
           config.description,
@@ -137,6 +141,9 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
     config: Omit<IClassConfig, 'sourceCode'> & { sourceCode?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     if (!config.className) {
       throw new Error('Class name is required');
     }
@@ -157,7 +164,7 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
     return answering(
       () =>
         createClass(
-          this.connection,
+          connection,
           {
             class_name: config.className as string,
             package_name: config.packageName as string,
@@ -190,6 +197,9 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
     version?: 'active' | 'inactive',
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     if (!config.className) {
       throw new Error('Class name is required');
     }
@@ -201,7 +211,7 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
     return answering(
       () =>
         getClassSource(
-          this.connection,
+          connection,
           config.className as string,
           version,
           options,
@@ -220,6 +230,9 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
     config: Partial<IClassConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     if (!config.className) {
       throw new Error('Class name is required');
     }
@@ -246,7 +259,7 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
     return answering(
       () =>
         updateClass(
-          this.connection,
+          connection,
           config.className as string,
           sourceCode,
           options?.lockHandle,
@@ -265,13 +278,16 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
     config: Partial<IClassConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     if (!config.className) {
       throw new Error('Class name is required');
     }
 
     return answering(
       () =>
-        checkDeletion(this.connection, {
+        checkDeletion(connection, {
           class_name: config.className as string,
           transport_request: config.transportRequest,
         }),
@@ -289,6 +305,9 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
     config: Partial<IClassConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     if (!config.className) {
       throw new Error('Class name is required');
     }
@@ -298,7 +317,7 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
     // delete, and it leaves the session mode alone.
     return answering(
       () =>
-        deleteClass(this.connection, {
+        deleteClass(connection, {
           class_name: config.className as string,
           transport_request: config.transportRequest,
         }),
@@ -315,6 +334,9 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
     status?: string,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     if (!config.className) {
       throw new Error('Class name is required');
     }
@@ -329,7 +351,7 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
     return answering(
       () =>
         checkClass(
-          this.connection,
+          connection,
           config.className as string,
           version,
           config.sourceCode,

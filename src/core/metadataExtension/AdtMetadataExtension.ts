@@ -28,6 +28,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { activationRefusal } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
+import { withCallTimeout } from '../../utils/callTimeout';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { validationRefusal } from '../../utils/validationRefusal';
@@ -123,6 +124,9 @@ export class AdtMetadataExtension<
     config: Partial<IMetadataExtensionConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     if (!config.packageName) {
       throw new Error('Package name is required for validation');
@@ -130,7 +134,7 @@ export class AdtMetadataExtension<
 
     return answering(
       () =>
-        validateMetadataExtension(this.connection, {
+        validateMetadataExtension(connection, {
           name,
           description: config.description ?? name,
           packageName: config.packageName as string,
@@ -147,6 +151,9 @@ export class AdtMetadataExtension<
     },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     if (!config.packageName) {
       throw new Error('Package name is required');
@@ -156,7 +163,7 @@ export class AdtMetadataExtension<
     }
     return answering(
       () =>
-        createMetadataExtension(this.connection, {
+        createMetadataExtension(connection, {
           name,
           description: config.description as string,
           packageName: config.packageName as string,
@@ -176,6 +183,9 @@ export class AdtMetadataExtension<
     version?: 'active' | 'inactive',
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     // No 404 special case: ADT answers a read for a missing object with 200 and
@@ -184,7 +194,7 @@ export class AdtMetadataExtension<
     return answering(
       () =>
         readMetadataExtensionSource(
-          this.connection,
+          connection,
           name,
           version ?? 'active',
           options,
@@ -199,10 +209,13 @@ export class AdtMetadataExtension<
     config: Partial<IMetadataExtensionConfig>,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     return answering(
-      () => readMetadataExtension(this.connection, name, options),
+      () => readMetadataExtension(connection, name, options),
       this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
       options?.analyse,
     );
@@ -213,10 +226,13 @@ export class AdtMetadataExtension<
     config: Partial<IMetadataExtensionConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     return answering(
-      () => getMetadataExtensionTransport(this.connection, name, options),
+      () => getMetadataExtensionTransport(connection, name, options),
       this.results.transport as IResultStrategy<ReturnType<R['transport']>>,
       options?.analyse,
     );
@@ -233,6 +249,9 @@ export class AdtMetadataExtension<
     config: Partial<IMetadataExtensionConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     // The source is the caller's, through `options.sourceCode`. This used to
     // fall back to `config.sourceCode` — two channels for one value, where the
@@ -247,7 +266,7 @@ export class AdtMetadataExtension<
     return answering(
       () =>
         updateMetadataExtension(
-          this.connection,
+          connection,
           name,
           source as string,
           options?.lockHandle,
@@ -269,12 +288,15 @@ export class AdtMetadataExtension<
     config: Partial<IMetadataExtensionConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     return answering(
       () =>
         checkDeletionByUri(
-          this.connection,
+          connection,
           `/sap/bc/adt/ddic/ddlx/sources/${encodeSapObjectName(name).toLowerCase()}`,
         ),
       this.results.deletionCheck as IResultStrategy<
@@ -288,10 +310,12 @@ export class AdtMetadataExtension<
     config: Partial<IMetadataExtensionConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     return answering(
-      () =>
-        deleteMetadataExtension(this.connection, name, config.transportRequest),
+      () => deleteMetadataExtension(connection, name, config.transportRequest),
       this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
       options?.analyse,
     );
@@ -302,10 +326,13 @@ export class AdtMetadataExtension<
     config: Partial<IMetadataExtensionConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     return answering(
-      () => activateMetadataExtension(this.connection, name),
+      () => activateMetadataExtension(connection, name),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
       (options?.analyse ?? activationRefusal) as IAnalyse<E>,
     );
@@ -317,12 +344,15 @@ export class AdtMetadataExtension<
     status?: string,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     const version: 'active' | 'inactive' =
       status === 'active' ? 'active' : 'inactive';
 
     return answering(
-      () => checkMetadataExtension(this.connection, name, version),
+      () => checkMetadataExtension(connection, name, version),
       this.results.check as IResultStrategy<ReturnType<R['check']>>,
       options?.analyse,
     );

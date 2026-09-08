@@ -29,6 +29,7 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
 import { answering } from '../../utils/adtResponse';
+import { withCallTimeout } from '../../utils/callTimeout';
 import { validationRefusal } from '../../utils/validationRefusal';
 import type { LockRegistry } from '../shared/LockRegistry';
 import type { ObjectVersion } from '../shared/results';
@@ -84,6 +85,9 @@ export class AdtLocalMacros<R extends IClassResults = typeof classDocuments>
     config: Partial<ILocalMacrosConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     // Nothing was asked of the server yet, so there is no answer to describe:
     // a missing required argument is the caller's mistake and it throws.
     if (!config.className) {
@@ -96,7 +100,7 @@ export class AdtLocalMacros<R extends IClassResults = typeof classDocuments>
     return answering(
       () =>
         checkClassMacros(
-          this.connection,
+          connection,
           config.className as string,
           config.macrosCode as string,
           'inactive',
@@ -113,6 +117,9 @@ export class AdtLocalMacros<R extends IClassResults = typeof classDocuments>
     version: 'active' | 'inactive' = 'active',
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     if (!config.className) {
       throw new Error('Class name is required');
     }
@@ -124,7 +131,7 @@ export class AdtLocalMacros<R extends IClassResults = typeof classDocuments>
     return answering(
       () =>
         getClassMacrosInclude(
-          this.connection,
+          connection,
           config.className as string,
           version,
           this.logger,
@@ -153,6 +160,9 @@ export class AdtLocalMacros<R extends IClassResults = typeof classDocuments>
     config: Partial<ILocalMacrosConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     if (!config.className) {
       throw new Error('Class name is required');
     }
@@ -168,7 +178,7 @@ export class AdtLocalMacros<R extends IClassResults = typeof classDocuments>
     return answering(
       () =>
         updateClassMacros(
-          this.connection,
+          connection,
           name,
           source,
           // `as string` because the low-level writer types it required; the
@@ -206,6 +216,9 @@ export class AdtLocalMacros<R extends IClassResults = typeof classDocuments>
     status: string = 'inactive',
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     if (!config.className) {
       throw new Error('Class name is required');
     }
@@ -216,7 +229,7 @@ export class AdtLocalMacros<R extends IClassResults = typeof classDocuments>
     return answering(
       () =>
         checkClassMacros(
-          this.connection,
+          connection,
           config.className as string,
           config.macrosCode as string,
           status === 'active' ? 'active' : 'inactive',

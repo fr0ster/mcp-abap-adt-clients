@@ -42,6 +42,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { activationRefusal } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
+import { withCallTimeout } from '../../utils/callTimeout';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import { validationRefusal } from '../../utils/validationRefusal';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
@@ -126,6 +127,9 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
     config: Partial<IProgramConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     // Nothing was asked of the server, so there is no answer to describe: a
     // missing required argument is the caller's mistake and it throws.
     if (!config.programName) {
@@ -141,7 +145,7 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
     return answering(
       () =>
         validateProgramName(
-          this.connection,
+          connection,
           config.programName as string,
           config.packageName as string,
           config.description,
@@ -156,6 +160,9 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
     config: Omit<IProgramConfig, 'sourceCode'> & { sourceCode?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     if (!config.programName) {
       throw new Error('Program name is required');
     }
@@ -166,7 +173,7 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
     return answering(
       () =>
         createProgram(
-          this.connection,
+          connection,
           {
             programName: name,
             packageName: config.packageName as string,
@@ -201,6 +208,9 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
     version?: 'active' | 'inactive',
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     if (!config.programName) {
       throw new Error('Program name is required');
     }
@@ -212,7 +222,7 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
     return answering(
       () =>
         getProgramSource(
-          this.connection,
+          connection,
           config.programName as string,
           version,
           options,
@@ -227,17 +237,16 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
     config: Partial<IProgramConfig>,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     if (!config.programName) {
       throw new Error('Program name is required');
     }
 
     return answering(
       () =>
-        getProgramMetadata(
-          this.connection,
-          config.programName as string,
-          options,
-        ),
+        getProgramMetadata(connection, config.programName as string, options),
       this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
       options?.analyse,
     );
@@ -254,6 +263,9 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
     config: Partial<IProgramConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     if (!config.programName) {
       throw new Error('Program name is required');
     }
@@ -264,7 +276,7 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
     // syntax check compiles a source that is not on the server yet, so it has
     // nowhere else to arrive.
     const source = options?.sourceCode;
-    const sessionId = this.connection.getSessionId?.() || '';
+    const sessionId = connection.getSessionId?.() || '';
 
     if (!source) {
       throw new Error('Source code is required for update');
@@ -272,7 +284,7 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
     return answering(
       () =>
         uploadProgramSource(
-          this.connection,
+          connection,
           name,
           source,
           options?.lockHandle as string,
@@ -295,13 +307,16 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
     config: Partial<IProgramConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     if (!config.programName) {
       throw new Error('Program name is required');
     }
     const name = config.programName;
     return answering(
       () =>
-        checkDeletion(this.connection, {
+        checkDeletion(connection, {
           programName: name,
           transportRequest: config.transportRequest,
         }),
@@ -325,13 +340,16 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
     config: Partial<IProgramConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     if (!config.programName) {
       throw new Error('Program name is required');
     }
     const name = config.programName;
     return answering(
       () =>
-        deleteProgram(this.connection, {
+        deleteProgram(connection, {
           programName: name,
           transportRequest: config.transportRequest,
         }),
@@ -345,12 +363,15 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
     config: Partial<IProgramConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     if (!config.programName) {
       throw new Error('Program name is required');
     }
 
     return answering(
-      () => activateProgram(this.connection, config.programName as string),
+      () => activateProgram(connection, config.programName as string),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
       (options?.analyse ?? activationRefusal) as IAnalyse<E>,
     );
@@ -362,6 +383,9 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
     status?: string,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     if (!config.programName) {
       throw new Error('Program name is required');
     }
@@ -371,7 +395,7 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
     return answering(
       () =>
         checkProgram(
-          this.connection,
+          connection,
           config.programName as string,
           version,
           config.sourceCode,
@@ -387,6 +411,9 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
     config: Partial<IProgramConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     if (!config.programName) {
       throw new Error('Program name is required');
     }
@@ -394,7 +421,7 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
     return answering(
       () =>
         getProgramTransport(
-          this.connection,
+          connection,
           config.programName as string,
           options?.withLongPolling !== undefined
             ? { withLongPolling: options.withLongPolling }

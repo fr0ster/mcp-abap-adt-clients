@@ -32,6 +32,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { activationRefusal } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
+import { withCallTimeout } from '../../utils/callTimeout';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import { validationRefusal } from '../../utils/validationRefusal';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
@@ -149,13 +150,16 @@ export class AdtEnhancement<
     config: Partial<IEnhancementConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     const type = this.enhancementType(config);
 
     return answering(
       () =>
         validateEnhancement(
-          this.connection,
+          connection,
           type,
           name,
           config.packageName,
@@ -171,6 +175,9 @@ export class AdtEnhancement<
     config: Omit<IEnhancementConfig, 'sourceCode'> & { sourceCode?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     const type = this.enhancementType(config);
     if (!config.packageName) {
@@ -179,7 +186,7 @@ export class AdtEnhancement<
     return answering(
       () =>
         createEnhancement(
-          this.connection,
+          connection,
           {
             enhancement_name: name,
             enhancement_type: type,
@@ -206,6 +213,9 @@ export class AdtEnhancement<
     version?: 'active' | 'inactive',
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     // No 404 special case: ADT answers a read for a missing object with 200 and
@@ -214,7 +224,7 @@ export class AdtEnhancement<
     return answering(
       () =>
         getEnhancementSource(
-          this.connection,
+          connection,
           this.enhancementType(config),
           name,
           version ?? 'active',
@@ -230,12 +240,15 @@ export class AdtEnhancement<
     config: Partial<IEnhancementConfig>,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     return answering(
       () =>
         getEnhancementMetadata(
-          this.connection,
+          connection,
           this.enhancementType(config),
           name,
           options,
@@ -251,12 +264,15 @@ export class AdtEnhancement<
     config: Partial<IEnhancementConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     return answering(
       () =>
         getEnhancementTransport(
-          this.connection,
+          connection,
           this.enhancementType(config),
           name,
           options?.withLongPolling !== undefined
@@ -279,6 +295,9 @@ export class AdtEnhancement<
     config: Partial<IEnhancementConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     const type = this.enhancementType(config);
     // The source is the caller's, through `options.sourceCode`. This used to
@@ -294,7 +313,7 @@ export class AdtEnhancement<
     return answering(
       () =>
         updateEnhancement(
-          this.connection,
+          connection,
           type,
           name,
           source as string,
@@ -318,10 +337,13 @@ export class AdtEnhancement<
     config: Partial<IEnhancementConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     return answering(
       () =>
-        checkDeletion(this.connection, {
+        checkDeletion(connection, {
           enhancement_name: name,
           enhancement_type: this.enhancementType(config),
           transport_request: config.transportRequest,
@@ -346,10 +368,13 @@ export class AdtEnhancement<
     config: Partial<IEnhancementConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     return answering(
       () =>
-        deleteEnhancement(this.connection, {
+        deleteEnhancement(connection, {
           enhancement_name: name,
           enhancement_type: this.enhancementType(config),
           transport_request: config.transportRequest,
@@ -364,15 +389,13 @@ export class AdtEnhancement<
     config: Partial<IEnhancementConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     return answering(
-      () =>
-        activateEnhancement(
-          this.connection,
-          this.enhancementType(config),
-          name,
-        ),
+      () => activateEnhancement(connection, this.enhancementType(config), name),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
       (options?.analyse ?? activationRefusal) as IAnalyse<E>,
     );
@@ -384,6 +407,9 @@ export class AdtEnhancement<
     status?: string,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     const version: 'active' | 'inactive' =
       status === 'active' ? 'active' : 'inactive';
@@ -391,7 +417,7 @@ export class AdtEnhancement<
     return answering(
       () =>
         checkEnhancementSource(
-          this.connection,
+          connection,
           this.enhancementType(config),
           name,
           version,

@@ -26,6 +26,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { activationRefusal } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
+import { withCallTimeout } from '../../utils/callTimeout';
 import { nothing, rawDocument } from '../../utils/resultStrategy';
 import {
   type ICapabilityContext,
@@ -169,6 +170,9 @@ export abstract class AdtClassMemberBase<
     config: Partial<IClassConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     // No server was asked anything, so there is no answer to describe. A missing
     // required argument is the caller's mistake, and it throws.
     if (!config.className) {
@@ -176,7 +180,7 @@ export abstract class AdtClassMemberBase<
     }
 
     return answering(
-      () => activateClass(this.connection, config.className as string),
+      () => activateClass(connection, config.className as string),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
       (options?.analyse ?? activationRefusal) as IAnalyse<E>,
     );
@@ -193,6 +197,9 @@ export abstract class AdtClassMemberBase<
     config: Partial<IClassConfig>,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     if (!config.className) {
       throw new Error('Class name is required');
     }
@@ -203,11 +210,7 @@ export abstract class AdtClassMemberBase<
 
     return answering(
       () =>
-        getClassMetadata(
-          this.connection,
-          config.className as string,
-          readOptions,
-        ),
+        getClassMetadata(connection, config.className as string, readOptions),
       this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
       options?.analyse,
     );
@@ -223,13 +226,15 @@ export abstract class AdtClassMemberBase<
     config: Partial<IClassConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<string, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     if (!config.className) {
       throw new Error('Class name is required');
     }
 
     return answering(
-      () =>
-        getClassTransport(this.connection, config.className as string, options),
+      () => getClassTransport(connection, config.className as string, options),
       rawDocument,
       options?.analyse,
     );

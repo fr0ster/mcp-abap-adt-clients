@@ -35,6 +35,7 @@ import {
 } from '../../constants/contentTypes';
 import { activationRefusal } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
+import { withCallTimeout } from '../../utils/callTimeout';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import {
   buildQueryString,
@@ -313,6 +314,9 @@ export class AdtServiceBinding<
     config: Partial<IServiceBindingConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     if (!config.serviceDefinitionName) {
       throw new Error('serviceDefinitionName is required for validation');
@@ -326,7 +330,7 @@ export class AdtServiceBinding<
     const packageName = config.packageName;
     return answering(
       () =>
-        this.transportCheckRequest({
+        this.transportCheckRequest(connection, {
           objectName: name,
           packageName,
           description: config.description,
@@ -348,6 +352,9 @@ export class AdtServiceBinding<
     config: Omit<IServiceBindingConfig, 'sourceCode'> & { sourceCode?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     if (!config.packageName) throw new Error('packageName is required');
     if (!config.description) throw new Error('description is required');
@@ -365,7 +372,7 @@ export class AdtServiceBinding<
     const bindingVariant = config.bindingVariant;
     return answering(
       () =>
-        this.createRequest({
+        this.createRequest(connection, {
           bindingName: name,
           packageName,
           description,
@@ -389,12 +396,15 @@ export class AdtServiceBinding<
     version?: 'active' | 'inactive',
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     // No 404 special case: whether an empty or missing answer *is* absence is
     // the caller's reading, supplied through `analyse`.
     return answering(
-      () => this.readRequest({ bindingName: name, version }),
+      () => this.readRequest(connection, { bindingName: name, version }),
       this.results.source as IResultStrategy<ReturnType<R['source']>>,
       options?.analyse,
     );
@@ -413,10 +423,17 @@ export class AdtServiceBinding<
       version?: 'active' | 'inactive';
     } & IAdtOperationOptions,
   ): Promise<IAdtResponse<ReturnType<R['metadata']>>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     return answering(
-      () => this.readRequest({ bindingName: name, version: options?.version }),
+      () =>
+        this.readRequest(connection, {
+          bindingName: name,
+          version: options?.version,
+        }),
       this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
       options?.analyse,
     );
@@ -446,6 +463,9 @@ export class AdtServiceBinding<
     config: IServiceBindingPublicationConfig,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     if (!config.desiredPublicationState) {
       throw new Error('desiredPublicationState is required');
@@ -469,7 +489,7 @@ export class AdtServiceBinding<
 
     return answering(
       () =>
-        this.updateRequest({
+        this.updateRequest(connection, {
           bindingName: name,
           desiredPublicationState,
           serviceType,
@@ -562,10 +582,13 @@ export class AdtServiceBinding<
     config: Partial<IServiceBindingConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     return answering(
-      () => this.deletionCheckRequest(name),
+      () => this.deletionCheckRequest(connection, name),
       this.results.deletionCheck as IResultStrategy<
         ReturnType<R['deletionCheck']>
       >,
@@ -577,11 +600,14 @@ export class AdtServiceBinding<
     config: Partial<IServiceBindingConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     return answering(
       () =>
-        this.deleteRequest({
+        this.deleteRequest(connection, {
           bindingName: name,
           transportRequest: config.transportRequest,
         }),
@@ -600,11 +626,17 @@ export class AdtServiceBinding<
     config: Partial<IServiceBindingConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     return answering(
       () =>
-        this.activateRequest({ bindingName: name, preauditRequested: true }),
+        this.activateRequest(connection, {
+          bindingName: name,
+          preauditRequested: true,
+        }),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
       (options?.analyse ?? activationRefusal) as IAnalyse<E>,
     );
@@ -616,11 +648,14 @@ export class AdtServiceBinding<
     status?: string,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     const version = status === 'active' ? 'active' : 'inactive';
 
     return answering(
-      () => this.checkRequest({ bindingName: name, version }),
+      () => this.checkRequest(connection, { bindingName: name, version }),
       this.results.check as IResultStrategy<ReturnType<R['check']>>,
       options?.analyse,
     );
@@ -636,6 +671,9 @@ export class AdtServiceBinding<
     config: Partial<IServiceBindingConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     if (!config.packageName) {
       throw new Error('packageName is required for transport check');
@@ -644,7 +682,7 @@ export class AdtServiceBinding<
 
     return answering(
       () =>
-        this.transportCheckRequest({
+        this.transportCheckRequest(connection, {
           objectName: name,
           packageName,
           description: config.description,
@@ -660,15 +698,17 @@ export class AdtServiceBinding<
     IAdtResponse<ReturnType<R['bindingTypes']>>
   > {
     return answering(
-      () => this.bindingTypesRequest(),
+      () => this.bindingTypesRequest(this.connection),
       this.results.bindingTypes as IResultStrategy<
         ReturnType<R['bindingTypes']>
       >,
     );
   }
 
-  private async bindingTypesRequest(): Promise<IAdtWireResponse> {
-    return this.connection.makeAdtRequest({
+  private async bindingTypesRequest(
+    connection: IAbapConnection,
+  ): Promise<IAdtWireResponse> {
+    return connection.makeAdtRequest({
       url: '/sap/bc/adt/businessservices/bindings/bindingtypes',
       method: 'GET',
       timeout: getTimeout('default'),
@@ -679,9 +719,12 @@ export class AdtServiceBinding<
   }
 
   /** ADT's generic deletion check, over this binding's URI. */
-  private async deletionCheckRequest(name: string): Promise<IAdtWireResponse> {
+  private async deletionCheckRequest(
+    connection: IAbapConnection,
+    name: string,
+  ): Promise<IAdtWireResponse> {
     const encoded = encodeSapObjectName(name).toLowerCase();
-    return this.connection.makeAdtRequest({
+    return connection.makeAdtRequest({
       url: '/sap/bc/adt/deletion/check',
       method: 'POST',
       timeout: getTimeout('default'),
@@ -697,6 +740,7 @@ export class AdtServiceBinding<
   }
 
   private async transportCheckRequest(
+    connection: IAbapConnection,
     params: ITransportCheckServiceBindingParams,
   ): Promise<IAdtWireResponse> {
     if (!params.objectName) {
@@ -706,7 +750,7 @@ export class AdtServiceBinding<
       throw new Error('packageName is required');
     }
 
-    return this.connection.makeAdtRequest({
+    return connection.makeAdtRequest({
       url: '/sap/bc/adt/cts/transportchecks',
       method: 'POST',
       timeout: getTimeout('default'),
@@ -719,6 +763,7 @@ export class AdtServiceBinding<
   }
 
   private async createRequest(
+    connection: IAbapConnection,
     params: ICreateServiceBindingParams,
   ): Promise<IAdtWireResponse> {
     if (!params.bindingName) {
@@ -743,7 +788,7 @@ export class AdtServiceBinding<
       throw new Error('bindingVariant is required');
     }
 
-    const systemInfo = await getSystemInformation(this.connection);
+    const systemInfo = await getSystemInformation(connection);
     const createParams: ICreateServiceBindingParams = {
       ...params,
       masterLanguage:
@@ -765,7 +810,7 @@ export class AdtServiceBinding<
       ? { corrNr: params.transportRequest }
       : undefined;
 
-    return this.connection.makeAdtRequest({
+    return connection.makeAdtRequest({
       url: '/sap/bc/adt/businessservices/bindings',
       method: 'POST',
       timeout: getTimeout('default'),
@@ -781,13 +826,14 @@ export class AdtServiceBinding<
   }
 
   private async readRequest(
+    connection: IAbapConnection,
     params: IReadServiceBindingParams,
   ): Promise<IAdtWireResponse> {
     if (!params.bindingName) {
       throw new Error('bindingName is required');
     }
 
-    return this.connection.makeAdtRequest({
+    return connection.makeAdtRequest({
       url: `/sap/bc/adt/businessservices/bindings/${AdtServiceBinding.encodeName(params.bindingName)}`,
       method: 'GET',
       timeout: getTimeout('default'),
@@ -817,6 +863,7 @@ export class AdtServiceBinding<
    * request they can see.
    */
   private async updateRequest(
+    connection: IAbapConnection,
     params: IServiceBindingPublicationParams,
   ): Promise<IAdtWireResponse> {
     if (!params.bindingName) {
@@ -861,13 +908,14 @@ export class AdtServiceBinding<
   }
 
   private async deleteRequest(
+    connection: IAbapConnection,
     params: IDeleteServiceBindingParams,
   ): Promise<IAdtWireResponse> {
     if (!params.bindingName) {
       throw new Error('bindingName is required');
     }
 
-    return this.connection.makeAdtRequest({
+    return connection.makeAdtRequest({
       url: '/sap/bc/adt/deletion/delete',
       method: 'POST',
       timeout: getTimeout('default'),
@@ -880,6 +928,7 @@ export class AdtServiceBinding<
   }
 
   private async checkRequest(
+    connection: IAbapConnection,
     params: ICheckServiceBindingParams,
   ): Promise<IAdtWireResponse> {
     if (!params.bindingName) {
@@ -890,7 +939,7 @@ export class AdtServiceBinding<
     const bindingUri = `/sap/bc/adt/businessservices/bindings/${AdtServiceBinding.encodeName(params.bindingName)}`;
     const xml = `<?xml version="1.0" encoding="UTF-8"?><chkrun:checkObjectList xmlns:chkrun="http://www.sap.com/adt/checkrun" xmlns:adtcore="http://www.sap.com/adt/core"><chkrun:checkObject adtcore:uri="${bindingUri}" chkrun:version="${version}"/></chkrun:checkObjectList>`;
 
-    return this.connection.makeAdtRequest({
+    return connection.makeAdtRequest({
       url: '/sap/bc/adt/checkruns',
       method: 'POST',
       timeout: getTimeout('default'),
@@ -903,6 +952,7 @@ export class AdtServiceBinding<
   }
 
   private async activateRequest(
+    connection: IAbapConnection,
     params: IActivateServiceBindingParams,
   ): Promise<IAdtWireResponse> {
     if (!params.bindingName) {
@@ -914,7 +964,7 @@ export class AdtServiceBinding<
     const bindingUri = `/sap/bc/adt/businessservices/bindings/${AdtServiceBinding.encodeName(params.bindingName)}`;
     const xml = `<?xml version="1.0" encoding="UTF-8"?><adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core"><adtcore:objectReference adtcore:uri="${bindingUri}" adtcore:name="${params.bindingName.toUpperCase()}"/></adtcore:objectReferences>`;
 
-    return this.connection.makeAdtRequest({
+    return connection.makeAdtRequest({
       url: `/sap/bc/adt/activation?method=activate&preauditRequested=${preauditRequested}`,
       method: 'POST',
       timeout: getTimeout('default'),
@@ -931,12 +981,13 @@ export class AdtServiceBinding<
     params: IGenerateServiceBindingParams,
   ): Promise<IAdtResponse<ReturnType<R['generation']>>> {
     return answering(
-      () => this.generateRequest(params),
+      () => this.generateRequest(this.connection, params),
       this.results.generation as IResultStrategy<ReturnType<R['generation']>>,
     );
   }
 
   private async generateRequest(
+    connection: IAbapConnection,
     params: IGenerateServiceBindingParams,
   ): Promise<IAdtWireResponse> {
     if (!params.bindingName) {
@@ -963,7 +1014,7 @@ export class AdtServiceBinding<
       serviceversion: params.serviceVersion,
       srvdname: params.serviceDefinitionName.toUpperCase(),
     });
-    return this.connection.makeAdtRequest({
+    return connection.makeAdtRequest({
       url: `/sap/bc/adt/businessservices/${path}/${encodeURIComponent(params.bindingName.toUpperCase())}?${genQs}`,
       method: 'GET',
       timeout: getTimeout('default'),
@@ -991,12 +1042,13 @@ export class AdtServiceBinding<
     params: IServiceGroupParams,
   ): Promise<IAdtResponse<ReturnType<R['odata']>>> {
     return answering(
-      () => this.serviceGroupRequest(params),
+      () => this.serviceGroupRequest(this.connection, params),
       this.results.odata as IResultStrategy<ReturnType<R['odata']>>,
     );
   }
 
   private async serviceGroupRequest(
+    connection: IAbapConnection,
     params: IServiceGroupParams,
   ): Promise<IAdtWireResponse> {
     if (!params.objectname) {
@@ -1011,7 +1063,7 @@ export class AdtServiceBinding<
       serviceversion: params.serviceversion,
       srvdname: params.srvdname,
     });
-    return this.connection.makeAdtRequest({
+    return connection.makeAdtRequest({
       url: `/sap/bc/adt/businessservices/${params.serviceType}/${encodeURIComponent(params.objectname)}?${query}`,
       method: 'GET',
       timeout: getTimeout('default'),
@@ -1027,7 +1079,7 @@ export class AdtServiceBinding<
     params: IClassifyServiceBindingParams,
   ): Promise<IAdtResponse<ReturnType<R['classification']>>> {
     return answering(
-      () => this.classifyRequest(params),
+      () => this.classifyRequest(this.connection, params),
       this.results.classification as IResultStrategy<
         ReturnType<R['classification']>
       >,
@@ -1035,6 +1087,7 @@ export class AdtServiceBinding<
   }
 
   private async classifyRequest(
+    connection: IAbapConnection,
     params: IClassifyServiceBindingParams,
   ): Promise<IAdtWireResponse> {
     if (!params.objectname) {
@@ -1048,7 +1101,7 @@ export class AdtServiceBinding<
       repositoryid: params.repositoryid,
       servicename: params.servicename,
     });
-    return this.connection.makeAdtRequest({
+    return connection.makeAdtRequest({
       url: `/sap/bc/adt/businessservices/release?${classifyQs}`,
       method: 'GET',
       timeout: getTimeout('default'),

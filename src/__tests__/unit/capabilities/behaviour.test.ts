@@ -35,6 +35,8 @@ type Recorded = {
   url: string;
   method: string;
   headers?: Record<string, string>;
+  /** What deadline the request actually carried, if any. */
+  timeout?: number;
 };
 
 /**
@@ -127,6 +129,7 @@ function recordingClient(activationBody: string = ACTIVATION_OK) {
         url: wireUrl(req),
         method: req.method,
         headers: req.headers,
+        timeout: (req as { timeout?: number }).timeout,
       });
       return {
         status: 200,
@@ -430,6 +433,73 @@ async function invoke(
 }
 
 /**
+ * `invoke`, with an options bag merged in.
+ *
+ * The members take options in their second or third position depending on the
+ * member, which is why this mirrors `invoke`'s switch rather than trying to be
+ * clever about arity.
+ */
+/** Where the options bag sits for a given member, 1-based. */
+const OPTIONS_POSITION: Record<string, number> = {
+  check: 3,
+  read: 3,
+  update: 2,
+  updateMetadata: 2,
+};
+
+/**
+ * Whether a member has anywhere to put an options bag.
+ *
+ * A member that declares none makes no per-call promise, so the guard has
+ * nothing to check on it. Read from the function's arity rather than kept as a
+ * list, so a member that gains or loses the parameter is covered without anyone
+ * remembering to edit this file.
+ */
+function takesOptions(
+  handler: Record<string, unknown>,
+  method: string,
+): boolean {
+  const fn = handler[method] as ((...args: unknown[]) => unknown) | undefined;
+  if (typeof fn !== 'function') return false;
+  if (method === 'unlock' || method === 'getVersionSource') return false;
+  return fn.length >= (OPTIONS_POSITION[method] ?? 2);
+}
+
+async function invokeWithOptions(
+  handler: Record<string, unknown>,
+  method: string,
+  config: Record<string, unknown>,
+  options: Record<string, unknown>,
+): Promise<void> {
+  const fn = handler[method] as (...args: unknown[]) => Promise<unknown>;
+  switch (method) {
+    case 'unlock':
+      await fn.call(handler, config, 'GUARD-LOCK');
+      return;
+    case 'getVersionSource':
+      await fn.call(handler, VERSION_CONTENT_URI);
+      return;
+    case 'check':
+      await fn.call(handler, config, 'inactive', options);
+      return;
+    case 'read':
+      await fn.call(handler, config, undefined, options);
+      return;
+    case 'update':
+    case 'updateMetadata':
+      await fn.call(handler, config, {
+        ...options,
+        sourceCode: String(config.sourceCode ?? '" guard'),
+        xmlContent: String(config.xmlContent ?? '<guard/>'),
+        lockHandle: 'GUARD-LOCK',
+      });
+      return;
+    default:
+      await fn.call(handler, config, options);
+  }
+}
+
+/**
  * Activation is judged by the messages, and a failure has to reach the caller.
  *
  * This is the one assertion that would have caught `functionGroup.activate`:
@@ -716,6 +786,62 @@ describe('capability guard — a failed lock window restores the session', () =>
         if (!sessionTypes.includes('stateful')) return;
         expect(sessionTypes[sessionTypes.length - 1]).toBe('stateless');
       });
+    }
+  }
+});
+
+/**
+ * The caller's deadline reaches the wire.
+ *
+ * Since 18.0.0 this library sends no client-side timeout of its own —
+ * `SAP_TIMEOUT_DEFAULT` defaults to `0` — and the CHANGELOG and the API
+ * reference both tell a caller that `IAdtOperationOptions.timeout` is how they
+ * ask for one. That was untrue for every member but the service binding's
+ * publication: the low-level functions end in
+ * `makeAdtRequest({ …, timeout: getTimeout('default') })` at 444 places, and
+ * none of them could see the option. So a caller who wanted a deadline had a
+ * documented parameter that did nothing, and the only real control was a
+ * process-wide environment variable.
+ *
+ * This asserts the promise rather than the mechanism: whatever a member does
+ * internally, a request it issues carries the number the caller passed.
+ */
+describe('capability guard — options.timeout reaches the wire', () => {
+  const DEADLINE = 4321;
+
+  for (const [name, entry] of Object.entries(
+    HANDLERS as Record<string, HandlerEntry>,
+  )) {
+    for (const atom of entry.capabilities) {
+      for (const method of ATOM_METHODS[atom as Atom]) {
+        // `lock` and `unlock` take no options bag — the lock window's shape is
+        // the caller's own sequence, and neither member has one to read.
+        if (method === 'lock' || method === 'unlock') continue;
+
+        it(`${name}.${method} carries the caller's timeout`, async () => {
+          const { client, calls } = recordingClient();
+          const handler = entry.factory(client) as unknown as Record<
+            string,
+            unknown
+          >;
+          // A member with no options parameter promises nothing per call.
+          if (!takesOptions(handler, method)) return;
+          try {
+            await invokeWithOptions(handler, method, entry.config, {
+              timeout: DEADLINE,
+            });
+          } catch {
+            // A member that refuses before the wire issued no request, and the
+            // check below is about requests that were issued.
+          }
+
+          const issued = calls.filter((c) => c.timeout !== undefined);
+          if (calls.length === 0) return;
+          expect(issued.map((c) => c.timeout)).toEqual(
+            calls.map(() => DEADLINE),
+          );
+        });
+      }
     }
   }
 });

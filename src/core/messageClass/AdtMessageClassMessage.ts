@@ -45,6 +45,7 @@ import type {
 import { ADT_NO_FAILURE, AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
 import { MESSAGE_CLASS_UPDATE_CONTENT_TYPE } from '../../constants/contentTypes';
 import { answering, failed } from '../../utils/adtResponse';
+import { withCallTimeout } from '../../utils/callTimeout';
 import { beginCriticalSection } from '../../utils/criticalSection';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { requestOf } from '../../utils/requestTrace';
@@ -126,10 +127,13 @@ export class AdtMessageClassMessage<
     _version?: 'active' | 'inactive',
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['read']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const { name, no } = this.names(config);
 
     return answering(
-      () => getMessageClassSource(this.connection, name),
+      () => getMessageClassSource(connection, name),
       this.results.read as IResultStrategy<ReturnType<R['read']>>,
       (options?.analyse ??
         (((verdict: IAdtError | AdtNoFailure, answer?: IAdtWireResponse) => {
@@ -206,11 +210,14 @@ export class AdtMessageClassMessage<
     deleting: boolean,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['written']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const { name, no } = this.names(config);
     const label = deleting ? 'deleteMessage' : 'upsertMessage';
 
     // Read the current class so every other message survives the PUT.
-    const current = await getMessageClassSource(this.connection, name);
+    const current = await getMessageClassSource(connection, name);
     const cls = parseMessageClass(String(current.data));
 
     if (!deleting) {
@@ -239,7 +246,7 @@ export class AdtMessageClassMessage<
 
     // A LOCK…UNLOCK window: a timeout in the middle releases the locks and
     // leaves the work half done.
-    const endCriticalSection = beginCriticalSection(this.connection);
+    const endCriticalSection = beginCriticalSection(connection);
 
     return chain(this.logger, async ({ step, onScopeEnd }) => {
       onScopeEnd(async () => {
@@ -247,36 +254,36 @@ export class AdtMessageClassMessage<
       });
 
       this.logger?.info?.(`${label}: stateful`);
-      this.connection.setSessionType('stateful');
+      connection.setSessionType('stateful');
       // Registered first so it unwinds last, and set unconditionally: the PUT
       // below runs stateless, so a failure at or after it leaves the connection
       // stateless — and an unlock sent that way does not reach the session
       // holding the handles. Asking "did we get far enough to have switched?"
       // is the question that produced that bug.
       onScopeEnd(async () => {
-        this.connection.setSessionType('stateless');
+        connection.setSessionType('stateless');
       });
 
       this.logger?.info?.(`${label}: lockMessage`);
       const messageLockHandle = await lockMessageIfGranted(
-        this.connection,
+        connection,
         name,
         no,
       );
       const releaseMessage = onScopeEnd(async () => {
-        this.connection.setSessionType('stateful');
-        await unlockAllMessages(this.connection, name, no);
+        connection.setSessionType('stateful');
+        await unlockAllMessages(connection, name, no);
       });
 
       this.logger?.info?.(`${label}: lockClassForMessage`);
       const classLockHandle = await lockClassForMessageOrPlain(
-        this.connection,
+        connection,
         name,
         no,
       );
       const releaseClass = onScopeEnd(async () => {
-        this.connection.setSessionType('stateful');
-        await unlockMessageClass(this.connection, name, classLockHandle);
+        connection.setSessionType('stateful');
+        await unlockMessageClass(connection, name, classLockHandle);
       });
 
       // The PUT carries the lock handle, so it does not need the lock session —
@@ -285,7 +292,7 @@ export class AdtMessageClassMessage<
       // (155) while the PUT that saves the message runs stateless (215), as do
       // the reads around it. The locks survive because they belong to the
       // enqueue session, not to the request that uses their handle.
-      this.connection.setSessionType('stateless');
+      connection.setSessionType('stateless');
       this.logger?.info?.(`${label}: PUT`);
       // Whichever handle this chain actually holds. When LOCK_MSG was refused
       // the class-for-message handle stands in, and the save takes it.
@@ -301,7 +308,7 @@ export class AdtMessageClassMessage<
       const written = await step(
         answering(
           () =>
-            this.connection.makeAdtRequest({
+            connection.makeAdtRequest({
               url: `${BASE}/${encoded}?lockHandle=${encodeURIComponent(classLockHandle)}${corrNr}`,
               method: 'PUT',
               timeout: getTimeout('default'),
@@ -319,13 +326,13 @@ export class AdtMessageClassMessage<
       // UNLOCK_ALL on the message at 15:17:15.202. This file used to do the
       // reverse and said the class lock "must be the final release", which the
       // trace refutes.
-      this.connection.setSessionType('stateful');
+      connection.setSessionType('stateful');
       this.logger?.info?.(`${label}: unlock class`);
-      await unlockMessageClass(this.connection, name, classLockHandle);
+      await unlockMessageClass(connection, name, classLockHandle);
       releaseClass();
 
       this.logger?.info?.(`${label}: unlockAllMessages`);
-      await unlockAllMessages(this.connection, name, no);
+      await unlockAllMessages(connection, name, no);
       releaseMessage();
 
       this.logger?.info?.(`${label}: done`);

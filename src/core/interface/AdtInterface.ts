@@ -37,6 +37,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { activationRefusal } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
+import { withCallTimeout } from '../../utils/callTimeout';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import { validationRefusal } from '../../utils/validationRefusal';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
@@ -119,6 +120,9 @@ export class AdtInterface<
     config: Partial<IInterfaceConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     if (!config.interfaceName) {
       throw new Error('Interface name is required for validation');
     }
@@ -129,7 +133,7 @@ export class AdtInterface<
     return answering(
       () =>
         validateInterfaceName(
-          this.connection,
+          connection,
           config.interfaceName as string,
           config.packageName as string,
           config.description,
@@ -144,6 +148,9 @@ export class AdtInterface<
     config: Omit<IInterfaceConfig, 'sourceCode'> & { sourceCode?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     if (!config.interfaceName) {
       throw new Error('Interface name is required');
     }
@@ -157,7 +164,7 @@ export class AdtInterface<
     return answering(
       () =>
         createInterface(
-          this.connection,
+          connection,
           {
             interfaceName: name,
             packageName: config.packageName as string,
@@ -181,6 +188,9 @@ export class AdtInterface<
     version?: 'active' | 'inactive',
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     if (!config.interfaceName) {
       throw new Error('Interface name is required');
     }
@@ -190,7 +200,7 @@ export class AdtInterface<
     return answering(
       () =>
         getInterfaceSource(
-          this.connection,
+          connection,
           config.interfaceName as string,
           version,
           options,
@@ -205,6 +215,9 @@ export class AdtInterface<
     config: Partial<IInterfaceConfig>,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     if (!config.interfaceName) {
       throw new Error('Interface name is required');
     }
@@ -212,7 +225,7 @@ export class AdtInterface<
     return answering(
       () =>
         getInterfaceMetadata(
-          this.connection,
+          connection,
           config.interfaceName as string,
           options,
         ),
@@ -232,6 +245,9 @@ export class AdtInterface<
     config: Partial<IInterfaceConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     if (!config.interfaceName) {
       throw new Error('Interface name is required');
     }
@@ -249,7 +265,7 @@ export class AdtInterface<
     return answering(
       () =>
         upload(
-          this.connection,
+          connection,
           name,
           source,
           options?.lockHandle as string,
@@ -272,13 +288,16 @@ export class AdtInterface<
     config: Partial<IInterfaceConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     if (!config.interfaceName) {
       throw new Error('Interface name is required');
     }
     const name = config.interfaceName;
     return answering(
       () =>
-        checkDeletion(this.connection, {
+        checkDeletion(connection, {
           interface_name: name,
           transport_request: config.transportRequest,
         }),
@@ -298,13 +317,16 @@ export class AdtInterface<
     config: Partial<IInterfaceConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     if (!config.interfaceName) {
       throw new Error('Interface name is required');
     }
     const name = config.interfaceName;
     return answering(
       () =>
-        deleteInterface(this.connection, {
+        deleteInterface(connection, {
           interface_name: name,
           transport_request: config.transportRequest,
         }),
@@ -318,12 +340,15 @@ export class AdtInterface<
     config: Partial<IInterfaceConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     if (!config.interfaceName) {
       throw new Error('Interface name is required');
     }
 
     return answering(
-      () => activateInterface(this.connection, config.interfaceName as string),
+      () => activateInterface(connection, config.interfaceName as string),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
       (options?.analyse ?? activationRefusal) as IAnalyse<E>,
     );
@@ -335,6 +360,9 @@ export class AdtInterface<
     status?: string,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     if (!config.interfaceName) {
       throw new Error('Interface name is required');
     }
@@ -344,7 +372,7 @@ export class AdtInterface<
     return answering(
       () =>
         checkInterface(
-          this.connection,
+          connection,
           config.interfaceName as string,
           version,
           config.sourceCode,
@@ -360,6 +388,9 @@ export class AdtInterface<
     config: Partial<IInterfaceConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     if (!config.interfaceName) {
       throw new Error('Interface name is required');
     }
@@ -367,7 +398,7 @@ export class AdtInterface<
     return answering(
       () =>
         getInterfaceTransport(
-          this.connection,
+          connection,
           config.interfaceName as string,
           options?.withLongPolling !== undefined
             ? { withLongPolling: options.withLongPolling }

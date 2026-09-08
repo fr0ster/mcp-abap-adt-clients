@@ -29,6 +29,7 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
 import { answering } from '../../utils/adtResponse';
+import { withCallTimeout } from '../../utils/callTimeout';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import { getTimeout } from '../../utils/timeouts';
 import { validationRefusal } from '../../utils/validationRefusal';
@@ -112,6 +113,9 @@ export class AdtMessageClass<
     config: Partial<IMessageClassConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     const params = new URLSearchParams({ objname: name });
     if (config.description) {
@@ -120,7 +124,7 @@ export class AdtMessageClass<
 
     return answering(
       () =>
-        this.connection.makeAdtRequest({
+        connection.makeAdtRequest({
           url: `${VALIDATE_BASE}?${params.toString()}`,
           method: 'POST',
           timeout: getTimeout('default'),
@@ -135,6 +139,9 @@ export class AdtMessageClass<
     config: Omit<IMessageClassConfig, 'sourceCode'> & { sourceCode?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     if (!config.packageName) {
       throw new Error('Package name is required');
@@ -146,7 +153,7 @@ export class AdtMessageClass<
     this.logger?.info?.('Creating message class');
     return answering(
       () =>
-        createMessageClass(this.connection, {
+        createMessageClass(connection, {
           name,
           description: config.description as string,
           package_name: config.packageName as string,
@@ -171,10 +178,13 @@ export class AdtMessageClass<
       version?: 'active' | 'inactive';
     } & IAdtOperationOptions,
   ): Promise<IAdtResponse<ReturnType<R['metadata']>>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     return answering(
-      () => getMessageClassSource(this.connection, name, options),
+      () => getMessageClassSource(connection, name, options),
       this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
       options?.analyse,
     );
@@ -185,12 +195,15 @@ export class AdtMessageClass<
     config: Partial<IMessageClassConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     return answering(
       () =>
         updateMessageClass(
-          this.connection,
+          connection,
           name,
           options?.lockHandle,
           config.description,
@@ -224,10 +237,13 @@ export class AdtMessageClass<
     config: Partial<IMessageClassConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     return answering(
-      () => checkDeletion(this.connection, name),
+      () => checkDeletion(connection, name),
       this.results.deletionCheck as IResultStrategy<
         ReturnType<R['deletionCheck']>
       >,
@@ -239,10 +255,13 @@ export class AdtMessageClass<
     config: Partial<IMessageClassConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     return answering(
-      () => deleteMessageClass(this.connection, name, config.transportRequest),
+      () => deleteMessageClass(connection, name, config.transportRequest),
       this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
       options?.analyse,
     );

@@ -28,6 +28,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { activationRefusal } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
+import { withCallTimeout } from '../../utils/callTimeout';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import { validationRefusal } from '../../utils/validationRefusal';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
@@ -121,6 +122,9 @@ export class AdtAccessControl<
     config: Partial<IAccessControlConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     if (!config.packageName) {
       throw new Error('Package name is required for validation');
@@ -129,7 +133,7 @@ export class AdtAccessControl<
     return answering(
       () =>
         validateAccessControlName(
-          this.connection,
+          connection,
           name,
           config.packageName as string,
           config.description,
@@ -144,13 +148,16 @@ export class AdtAccessControl<
     config: Omit<IAccessControlConfig, 'sourceCode'> & { sourceCode?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     if (!config.packageName) {
       throw new Error('Package name is required');
     }
     return answering(
       () =>
-        createAccessControl(this.connection, {
+        createAccessControl(connection, {
           access_control_name: name,
           description: config.description,
           package_name: config.packageName as string,
@@ -171,6 +178,9 @@ export class AdtAccessControl<
     version?: 'active' | 'inactive',
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     // No 404 special case: ADT answers a read for a missing object with 200 and
@@ -178,12 +188,7 @@ export class AdtAccessControl<
     // an empty body *is* absence is the caller's reading, through `analyse`.
     return answering(
       () =>
-        getAccessControlSource(
-          this.connection,
-          name,
-          version ?? 'active',
-          options,
-        ),
+        getAccessControlSource(connection, name, version ?? 'active', options),
       this.results.source as IResultStrategy<ReturnType<R['source']>>,
       options?.analyse,
     );
@@ -194,12 +199,15 @@ export class AdtAccessControl<
     config: Partial<IAccessControlConfig>,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     return answering(
       () =>
         getAccessControl(
-          this.connection,
+          connection,
           name,
           options?.version ?? 'active',
           options,
@@ -214,10 +222,13 @@ export class AdtAccessControl<
     config: Partial<IAccessControlConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     return answering(
-      () => getAccessControlTransport(this.connection, name, options),
+      () => getAccessControlTransport(connection, name, options),
       this.results.transport as IResultStrategy<ReturnType<R['transport']>>,
       options?.analyse,
     );
@@ -234,6 +245,9 @@ export class AdtAccessControl<
     config: Partial<IAccessControlConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     // The source is the caller's, through `options.sourceCode`. This used to
     // fall back to `config.sourceCode` — two channels for one value, where the
@@ -248,7 +262,7 @@ export class AdtAccessControl<
     return answering(
       () =>
         updateAccessControl(
-          this.connection,
+          connection,
           {
             access_control_name: name,
             source_code: source as string,
@@ -272,10 +286,13 @@ export class AdtAccessControl<
     config: Partial<IAccessControlConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     return answering(
       () =>
-        checkDeletion(this.connection, {
+        checkDeletion(connection, {
           access_control_name: name,
           transport_request: config.transportRequest,
         }),
@@ -299,10 +316,13 @@ export class AdtAccessControl<
     config: Partial<IAccessControlConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     return answering(
       () =>
-        deleteAccessControl(this.connection, {
+        deleteAccessControl(connection, {
           access_control_name: name,
           transport_request: config.transportRequest,
         }),
@@ -316,10 +336,13 @@ export class AdtAccessControl<
     config: Partial<IAccessControlConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     return answering(
-      () => activateAccessControl(this.connection, name),
+      () => activateAccessControl(connection, name),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
       (options?.analyse ?? activationRefusal) as IAnalyse<E>,
     );
@@ -331,13 +354,15 @@ export class AdtAccessControl<
     status?: string,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     const version: 'active' | 'inactive' =
       status === 'active' ? 'active' : 'inactive';
 
     return answering(
-      () =>
-        checkAccessControl(this.connection, name, version, config.sourceCode),
+      () => checkAccessControl(connection, name, version, config.sourceCode),
       this.results.check as IResultStrategy<ReturnType<R['check']>>,
       options?.analyse,
     );

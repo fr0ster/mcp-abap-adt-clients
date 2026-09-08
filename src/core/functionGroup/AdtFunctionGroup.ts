@@ -38,6 +38,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { activationRefusal } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
+import { withCallTimeout } from '../../utils/callTimeout';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import { validationRefusal } from '../../utils/validationRefusal';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
@@ -123,6 +124,9 @@ export class AdtFunctionGroup<
     config: Partial<IFunctionGroupConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     if (!config.functionGroupName) {
       throw new Error('Function group name is required for validation');
     }
@@ -130,7 +134,7 @@ export class AdtFunctionGroup<
     return answering(
       () =>
         validateFunctionGroupName(
-          this.connection,
+          connection,
           config.functionGroupName as string,
           config.packageName,
           config.description,
@@ -145,6 +149,9 @@ export class AdtFunctionGroup<
     config: Omit<IFunctionGroupConfig, 'sourceCode'> & { sourceCode?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     if (!config.functionGroupName) {
       throw new Error('Function group name is required');
     }
@@ -158,7 +165,7 @@ export class AdtFunctionGroup<
     return answering(
       () =>
         createFunctionGroup(
-          this.connection,
+          connection,
           {
             functionGroupName: name,
             packageName: config.packageName as string,
@@ -188,6 +195,9 @@ export class AdtFunctionGroup<
     config: Partial<IFunctionGroupConfig>,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     if (!config.functionGroupName) {
       throw new Error('Function group name is required');
     }
@@ -195,7 +205,7 @@ export class AdtFunctionGroup<
     return answering(
       () =>
         getFunctionGroup(
-          this.connection,
+          connection,
           config.functionGroupName as string,
           options,
         ),
@@ -209,6 +219,9 @@ export class AdtFunctionGroup<
     config: Partial<IFunctionGroupConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     if (!config.functionGroupName) {
       throw new Error('Function group name is required');
     }
@@ -216,7 +229,7 @@ export class AdtFunctionGroup<
     return answering(
       () =>
         getFunctionGroupTransport(
-          this.connection,
+          connection,
           config.functionGroupName as string,
           options?.withLongPolling !== undefined
             ? { withLongPolling: options.withLongPolling }
@@ -237,6 +250,9 @@ export class AdtFunctionGroup<
     config: Partial<IFunctionGroupConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     if (!config.functionGroupName) {
       throw new Error('Function group name is required');
     }
@@ -249,7 +265,7 @@ export class AdtFunctionGroup<
     return answering(
       () =>
         updateFunctionGroup(
-          this.connection,
+          connection,
           {
             function_group_name: name,
             description,
@@ -276,13 +292,16 @@ export class AdtFunctionGroup<
     config: Partial<IFunctionGroupConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     if (!config.functionGroupName) {
       throw new Error('Function group name is required');
     }
     const name = config.functionGroupName;
     return answering(
       () =>
-        checkDeletion(this.connection, {
+        checkDeletion(connection, {
           function_group_name: name,
           transport_request: config.transportRequest,
         }),
@@ -302,13 +321,16 @@ export class AdtFunctionGroup<
     config: Partial<IFunctionGroupConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     if (!config.functionGroupName) {
       throw new Error('Function group name is required');
     }
     const name = config.functionGroupName;
     return answering(
       () =>
-        deleteFunctionGroup(this.connection, {
+        deleteFunctionGroup(connection, {
           function_group_name: name,
           transport_request: config.transportRequest,
         }),
@@ -322,16 +344,16 @@ export class AdtFunctionGroup<
     config: Partial<IFunctionGroupConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     if (!config.functionGroupName) {
       throw new Error('Function group name is required');
     }
 
     return answering(
       () =>
-        activateFunctionGroup(
-          this.connection,
-          config.functionGroupName as string,
-        ),
+        activateFunctionGroup(connection, config.functionGroupName as string),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
       (options?.analyse ?? activationRefusal) as IAnalyse<E>,
     );
@@ -343,6 +365,9 @@ export class AdtFunctionGroup<
     status?: string,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     if (!config.functionGroupName) {
       throw new Error('Function group name is required');
     }
@@ -352,7 +377,7 @@ export class AdtFunctionGroup<
     return answering(
       () =>
         checkFunctionGroup(
-          this.connection,
+          connection,
           config.functionGroupName as string,
           version,
         ),

@@ -30,6 +30,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { activationRefusal } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
+import { withCallTimeout } from '../../utils/callTimeout';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import { validationRefusal } from '../../utils/validationRefusal';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
@@ -147,12 +148,15 @@ export class AdtFeatureToggle<
     config: Partial<IFeatureToggleConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     return answering(
       () =>
         validateFeatureToggleName(
-          this.connection,
+          connection,
           name,
           config.packageName,
           config.description,
@@ -167,6 +171,9 @@ export class AdtFeatureToggle<
     config: Omit<IFeatureToggleConfig, 'sourceCode'> & { sourceCode?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     // Called for its guards: it throws when the name this member needs is
     // missing, which is the one thing checked before the request goes out.
     this.name(config);
@@ -177,7 +184,7 @@ export class AdtFeatureToggle<
       throw new Error('Description is required');
     }
     return answering(
-      () => createFeatureToggle(this.connection, this.createParams(config)),
+      () => createFeatureToggle(connection, this.createParams(config)),
       this.results.created as IResultStrategy<ReturnType<R['created']>>,
       options?.analyse,
     );
@@ -189,13 +196,16 @@ export class AdtFeatureToggle<
     version?: 'active' | 'inactive',
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     // No 404 special case: ADT answers a read for a missing object with 200 and
     // an empty body, so absence was never a status to branch on — and whether
     // an empty body *is* absence is the caller's reading, through `analyse`.
     return answering(
-      () => readFeatureToggle(this.connection, name, version),
+      () => readFeatureToggle(connection, name, version),
       this.results.source as IResultStrategy<ReturnType<R['source']>>,
       options?.analyse,
     );
@@ -206,10 +216,13 @@ export class AdtFeatureToggle<
     config: Partial<IFeatureToggleConfig>,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     return answering(
-      () => readFeatureToggle(this.connection, name, options?.version),
+      () => readFeatureToggle(connection, name, options?.version),
       this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
       options?.analyse,
     );
@@ -226,10 +239,13 @@ export class AdtFeatureToggle<
     config: Partial<IFeatureToggleConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     return answering(
       () =>
         updateFeatureToggle(
-          this.connection,
+          connection,
           this.createParams(config as IFeatureToggleConfig),
           options?.lockHandle,
         ),
@@ -252,6 +268,9 @@ export class AdtFeatureToggle<
     config: Partial<IFeatureToggleConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     const source = config.source;
     if (!source) {
@@ -261,7 +280,7 @@ export class AdtFeatureToggle<
     return answering(
       () =>
         uploadFeatureToggleSource(
-          this.connection,
+          connection,
           name,
           source,
           options?.lockHandle,
@@ -283,11 +302,14 @@ export class AdtFeatureToggle<
     config: Partial<IFeatureToggleConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     // Called for its guards: it throws when the name this member needs is
     // missing, which is the one thing checked before the request goes out.
     this.name(config);
     return answering(
-      () => checkDeletion(this.connection, this.deleteParams(config)),
+      () => checkDeletion(connection, this.deleteParams(config)),
       this.results.deletionCheck as IResultStrategy<
         ReturnType<R['deletionCheck']>
       >,
@@ -308,11 +330,14 @@ export class AdtFeatureToggle<
     config: Partial<IFeatureToggleConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     // Called for its guards: it throws when the name this member needs is
     // missing, which is the one thing checked before the request goes out.
     this.name(config);
     return answering(
-      () => deleteFeatureToggle(this.connection, this.deleteParams(config)),
+      () => deleteFeatureToggle(connection, this.deleteParams(config)),
       this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
       options?.analyse,
     );
@@ -323,10 +348,13 @@ export class AdtFeatureToggle<
     config: Partial<IFeatureToggleConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     return answering(
-      () => activateFeatureToggle(this.connection, name),
+      () => activateFeatureToggle(connection, name),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
       (options?.analyse ?? activationRefusal) as IAnalyse<E>,
     );
@@ -338,12 +366,15 @@ export class AdtFeatureToggle<
     status?: string,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     const version: 'active' | 'inactive' =
       status === 'active' ? 'active' : 'inactive';
 
     return answering(
-      () => checkFeatureToggle(this.connection, name, version),
+      () => checkFeatureToggle(connection, name, version),
       this.results.check as IResultStrategy<ReturnType<R['check']>>,
       options?.analyse,
     );

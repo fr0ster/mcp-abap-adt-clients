@@ -28,6 +28,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { activationRefusal } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
+import { withCallTimeout } from '../../utils/callTimeout';
 import { deletionRefusal } from '../../utils/deletionCheck';
 import { validationRefusal } from '../../utils/validationRefusal';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
@@ -122,6 +123,9 @@ export class AdtBehaviorDefinition<
     config: Partial<IBehaviorDefinitionConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     // The endpoint takes all five: a validation with fewer is a 400 to decode
     // later rather than a caller error named here.
@@ -140,7 +144,7 @@ export class AdtBehaviorDefinition<
 
     return answering(
       () =>
-        validateBehaviorDefinition(this.connection, {
+        validateBehaviorDefinition(connection, {
           objname: name,
           rootEntity: config.rootEntity as string,
           description: config.description as string,
@@ -160,6 +164,9 @@ export class AdtBehaviorDefinition<
     },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     if (!config.packageName) {
       throw new Error('Package name is required');
@@ -175,7 +182,7 @@ export class AdtBehaviorDefinition<
     }
     return answering(
       () =>
-        createBehaviorDefinition(this.connection, {
+        createBehaviorDefinition(connection, {
           name,
           package: config.packageName as string,
           description: config.description as string,
@@ -197,6 +204,9 @@ export class AdtBehaviorDefinition<
     version?: 'active' | 'inactive',
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     // No 404 special case: ADT answers a read for a missing object with 200 and
@@ -205,7 +215,7 @@ export class AdtBehaviorDefinition<
     return answering(
       () =>
         readBehaviorDefinitionSource(
-          this.connection,
+          connection,
           name,
           version ?? 'active',
           options,
@@ -221,12 +231,15 @@ export class AdtBehaviorDefinition<
     config: Partial<IBehaviorDefinitionConfig>,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     return answering(
       () =>
         readBehaviorDefinition(
-          this.connection,
+          connection,
           name,
           '',
           options?.version ?? 'active',
@@ -243,10 +256,13 @@ export class AdtBehaviorDefinition<
     config: Partial<IBehaviorDefinitionConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     return answering(
-      () => getBehaviorDefinitionTransport(this.connection, name, options),
+      () => getBehaviorDefinitionTransport(connection, name, options),
       this.results.transport as IResultStrategy<ReturnType<R['transport']>>,
       options?.analyse,
     );
@@ -263,6 +279,9 @@ export class AdtBehaviorDefinition<
     config: Partial<IBehaviorDefinitionConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     // The source is the caller's, through `options.sourceCode`. This used to
     // fall back to `config.sourceCode` — two channels for one value, where the
@@ -276,7 +295,7 @@ export class AdtBehaviorDefinition<
     }
     return answering(
       () =>
-        updateBehaviorDefinition(this.connection, {
+        updateBehaviorDefinition(connection, {
           name,
           sourceCode: source as string,
           lockHandle: options?.lockHandle,
@@ -298,9 +317,12 @@ export class AdtBehaviorDefinition<
     config: Partial<IBehaviorDefinitionConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     return answering(
-      () => checkDeletion(this.connection, name),
+      () => checkDeletion(connection, name),
       this.results.deletionCheck as IResultStrategy<
         ReturnType<R['deletionCheck']>
       >,
@@ -321,14 +343,12 @@ export class AdtBehaviorDefinition<
     config: Partial<IBehaviorDefinitionConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     return answering(
-      () =>
-        deleteBehaviorDefinition(
-          this.connection,
-          name,
-          config.transportRequest,
-        ),
+      () => deleteBehaviorDefinition(connection, name, config.transportRequest),
       this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
       options?.analyse,
     );
@@ -339,10 +359,13 @@ export class AdtBehaviorDefinition<
     config: Partial<IBehaviorDefinitionConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
 
     return answering(
-      () => activateBehaviorDefinition(this.connection, name),
+      () => activateBehaviorDefinition(connection, name),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
       (options?.analyse ?? activationRefusal) as IAnalyse<E>,
     );
@@ -354,6 +377,9 @@ export class AdtBehaviorDefinition<
     status?: string,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
     const name = this.name(config);
     const version: 'active' | 'inactive' =
       status === 'active' ? 'active' : 'inactive';
@@ -361,7 +387,7 @@ export class AdtBehaviorDefinition<
     return answering(
       () =>
         checkBehaviorDefinition(
-          this.connection,
+          connection,
           name,
           'abapCheckRun',
           '',
