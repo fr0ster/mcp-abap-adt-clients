@@ -73,6 +73,22 @@ const testsLogger: ILogger = createTestsLogger();
 const SECTION = 'atc_run';
 const CASE = 'adt_atc_run';
 
+/**
+ * The polling bound the case configures, and a jest timeout that clears it.
+ *
+ * `getTimeout('test')` reads `test_settings.timeouts.test`, which the shipped
+ * template does not define — so on a fresh machine it falls back to 60s while
+ * this case asks to poll for five minutes. The test would be killed at a
+ * minute, never reaching its own deadline, and the failure would read as a
+ * hung run rather than as a bound nobody could have met.
+ */
+const CASE_PARAMS: Record<string, unknown> =
+  getEnabledTestCase(SECTION, CASE)?.params ?? {};
+const POLL_TIMEOUT_MS = toPositiveInt(CASE_PARAMS.poll_timeout_ms, 300_000);
+const POLL_INTERVAL_MS = toPositiveInt(CASE_PARAMS.poll_interval_ms, 3_000);
+/** The deadline plus room for the run, the reads and the connection. */
+const JEST_TIMEOUT = Math.max(getTimeout('test'), POLL_TIMEOUT_MS + 120_000);
+
 function toPositiveInt(value: unknown, fallback: number): number {
   const num = Number(value);
   if (!Number.isFinite(num) || num <= 0) return fallback;
@@ -82,6 +98,24 @@ function toPositiveInt(value: unknown, fallback: number): number {
 /** The triple as the server sent it, split — the test does the arithmetic. */
 function countsOf(findingStats: string): number[] {
   return findingStats.split(',').map((part) => Number(part.trim()));
+}
+
+/**
+ * The finding elements belonging to one object, as raw start tags.
+ *
+ * Scoped to the object rather than searched for across the document, and kept
+ * as whole elements rather than reduced to attributes: a worklist lists every
+ * object a run covered, and each finding carries its own message and priority.
+ * Two independent searches over the whole text would accept a document where
+ * the expected message sits on one finding and the expected priority on
+ * another — which is exactly the regression this test claims to catch.
+ */
+function findingsFor(worklist: string, objectName: string): string[] {
+  const object = new RegExp(
+    `<atcobject:object[^>]*adtcore:name="${objectName}"[\\s\\S]*?</atcobject:object>`,
+  ).exec(worklist);
+  if (!object) return [];
+  return object[0].match(/<atcfinding:finding[^>]*/g) ?? [];
 }
 
 describe('ATC check runs (using AdtRuntimeClient)', () => {
@@ -175,7 +209,7 @@ describe('ATC check runs (using AdtRuntimeClient)', () => {
         logTestEnd(testsLogger, testName);
       }
     },
-    getTimeout('test'),
+    JEST_TIMEOUT,
   );
 
   it(
@@ -203,13 +237,14 @@ describe('ATC check runs (using AdtRuntimeClient)', () => {
       }
 
       const className = String(testCase.params.class_name).toUpperCase();
-      const expectedMessageId = String(testCase.params.expected_message_id);
-      const expectedPriority = String(testCase.params.expected_priority);
-      const deadlineMs = toPositiveInt(
-        testCase.params.poll_timeout_ms,
-        300_000,
-      );
-      const intervalMs = toPositiveInt(testCase.params.poll_interval_ms, 3_000);
+      // Absent is a legitimate configuration — see the assertion below.
+      const expectedMessageId =
+        testCase.params.expected_message_id === undefined
+          ? ''
+          : String(testCase.params.expected_message_id);
+      const expectedPriority = String(testCase.params.expected_priority ?? '');
+      const deadlineMs = POLL_TIMEOUT_MS;
+      const intervalMs = POLL_INTERVAL_MS;
 
       try {
         const atc = runtime.getAtc();
@@ -257,14 +292,35 @@ describe('ATC check runs (using AdtRuntimeClient)', () => {
         // so finding the name proves the run covered it and nothing more.
         expect(worklist).toContain(className);
 
-        // What was actually found. Asserted by message rather than by count:
-        // the class carries three deliberate violations and only this one is in
-        // the variant the system nominates, so a changed number is information
-        // and a changed message is a different system.
-        expect(worklist).toContain(
-          `atcfinding:messageId="${expectedMessageId}"`,
+        // What it found ON OUR OBJECT. This assertion is the system-independent
+        // one and it is never conditional: whatever a system's nominated
+        // variant checks, a class written to be found in must produce a finding.
+        const findings = findingsFor(worklist, className);
+        testsLogger.info(
+          `${className}: ${findings.length} finding(s) — ${findings
+            .map(
+              (f) =>
+                `${/atcfinding:messageId="([^"]*)"/.exec(f)?.[1] ?? '?'}` +
+                `@p${/atcfinding:priority="([^"]*)"/.exec(f)?.[1] ?? '?'}`,
+            )
+            .join(', ')}`,
         );
-        expect(worklist).toContain(`atcfinding:priority="${expectedPriority}"`);
+        expect(findings.length).toBeGreaterThan(0);
+
+        // And which finding, where the case says so. Optional because the
+        // answer belongs to the system's check variant, not to this library:
+        // the trial's ABAP_CLOUD_DEVELOPMENT_DEFAULT reports 0245 at priority 2
+        // for the empty CATCH, and another system's variant may legitimately
+        // report something else. Both attributes must sit on ONE finding, and
+        // the line above logs what was seen — so filling this in is a copy.
+        if (expectedMessageId) {
+          const match = findings.find(
+            (finding) =>
+              finding.includes(`atcfinding:messageId="${expectedMessageId}"`) &&
+              finding.includes(`atcfinding:priority="${expectedPriority}"`),
+          );
+          expect(match).toBeDefined();
+        }
 
         logTestSuccess(testsLogger, testName);
       } catch (error) {
@@ -274,6 +330,6 @@ describe('ATC check runs (using AdtRuntimeClient)', () => {
         logTestEnd(testsLogger, testName);
       }
     },
-    getTimeout('test'),
+    JEST_TIMEOUT,
   );
 });

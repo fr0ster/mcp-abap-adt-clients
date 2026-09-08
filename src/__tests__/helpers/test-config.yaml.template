@@ -2236,18 +2236,27 @@ atc_run:
       # to it and nothing ever refines it — so a ["cloud"] filter here would
       # skip the test on the very system it was measured on.
       #
-      # What IS system-specific is the expectation below, and this file is
-      # per-machine (only the template is in git). A system whose nominated
-      # variant reports something else changes these two values rather than
-      # disabling the case.
+      # The case runs everywhere because what it asserts by default is not
+      # system-specific: a class written to be found in must produce at least
+      # one finding, whatever the system's nominated variant checks.
       params:
         class_name: "ZAC_SHR_ATC_DIRTY"
-        # SLIN's "No exception handling after the CATCH statement." — the empty
-        # CATCH cx_root in that class. Measured on the trial, 2026-09-08:
-        # FINDING_STATS "0,1,0" for this one finding at priority 2, which is
-        # also what says position 2 of the triple is priority 2.
-        expected_message_id: "0245"
-        expected_priority: 2
+        # ← CHANGE (optional): pin the exact finding, once you have seen it.
+        #
+        # Left unset on purpose — which finding a run reports is the check
+        # variant's answer, not this library's, so a value measured on one
+        # system would turn a legitimately different variant into a red test
+        # on the next. Set BOTH or neither; both must sit on the same finding.
+        #
+        # Measured on the BTP trial, 2026-09-08 under
+        # ABAP_CLOUD_DEVELOPMENT_DEFAULT: SLIN message 0245 ("No exception
+        # handling after the CATCH statement." — the empty CATCH cx_root) at
+        # priority 2, with FINDING_STATS "0,1,0". The test logs every finding
+        # it saw with its message and priority, so filling these in is a copy
+        # from your own run rather than a guess.
+        #
+        # expected_message_id: "0245"
+        # expected_priority: 2
         poll_timeout_ms: 300000
         poll_interval_ms: 3000
 
