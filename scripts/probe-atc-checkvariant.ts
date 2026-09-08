@@ -522,30 +522,41 @@ async function main(): Promise<void> {
             },
           );
 
-          // The status answers what the client saw; the system answers what
-          // happened. A write whose response was lost — a dropped socket, a
-          // timeout — comes back as `status: null`, and believing that would
-          // walk away from an object this run had just made. So ask again.
-          const after = await variantPresence(
-            args.newVariant,
-            'name-taken-after-create',
-            'Did the POST leave a variant behind, whatever it answered?',
-          );
-          if (after === 'present') {
+          if (created.status !== null && created.status < 300) {
+            // The system said it wrote. Nothing read afterwards can take that
+            // back — a 404 a moment later is eventual consistency, not an
+            // undo, and a read that fails is the network's problem, not the
+            // object's. Either would have this run walk away from something it
+            // had just created, so a 2xx hands ownership to the cleanup
+            // outright and no read is consulted.
             createdVariant = args.newVariant;
             answered.mayCreate = true;
           } else {
-            answered.mayCreate =
-              created.status !== null && created.status < 300;
-            if (after === 'unknown') {
-              rec.note(
-                'create-outcome-unknown',
-                'Did the POST leave a variant behind?',
-                `The read after the POST did not say whether ${args.newVariant} ` +
-                  'now exists. If it does, this run created it and did not remove ' +
-                  'it — check the system before running again.',
-              );
-              leftBehind.push(`${args.newVariant} (unconfirmed)`);
+            // Only a write that did NOT plainly succeed needs the system asked.
+            // `status: null` is the dangerous one — a dropped socket after SAP
+            // committed — and a 5xx can mean the same. A 403 will simply say
+            // absent, which costs one request and settles it.
+            const after = await variantPresence(
+              args.newVariant,
+              'name-taken-after-create',
+              'Did the POST leave a variant behind, whatever it answered?',
+            );
+            if (after === 'present') {
+              createdVariant = args.newVariant;
+              answered.mayCreate = true;
+            } else {
+              answered.mayCreate = false;
+              if (after === 'unknown') {
+                rec.note(
+                  'create-outcome-unknown',
+                  'Did the POST leave a variant behind?',
+                  `Neither the POST nor the read after it said whether ` +
+                    `${args.newVariant} now exists. If it does, this run created ` +
+                    'it and did not remove it — check the system before running ' +
+                    'again.',
+                );
+                leftBehind.push(`${args.newVariant} (unconfirmed)`);
+              }
             }
           }
         }
