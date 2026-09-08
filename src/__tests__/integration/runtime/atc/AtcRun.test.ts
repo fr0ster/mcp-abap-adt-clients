@@ -237,12 +237,28 @@ describe('ATC check runs (using AdtRuntimeClient)', () => {
       }
 
       const className = String(testCase.params.class_name).toUpperCase();
-      // Absent is a legitimate configuration — see the assertion below.
-      const expectedMessageId =
-        testCase.params.expected_message_id === undefined
-          ? ''
-          : String(testCase.params.expected_message_id);
-      const expectedPriority = String(testCase.params.expected_priority ?? '');
+      // Absent is a legitimate configuration — see the assertion below — but
+      // half of it is not. With only the message the search looks for
+      // `priority=""`, matches nothing and fails naming nothing; with only the
+      // priority the whole check is skipped in silence and the run goes green
+      // having verified less than its configuration asked for. Neither failure
+      // says what is wrong, so the pair is refused here, by name.
+      const hasMessageId = testCase.params.expected_message_id !== undefined;
+      const hasPriority = testCase.params.expected_priority !== undefined;
+      if (hasMessageId !== hasPriority) {
+        throw new Error(
+          `${SECTION}/${CASE}: expected_message_id and expected_priority pin ` +
+            'one finding together, so set both or neither — got ' +
+            `expected_message_id=${hasMessageId ? 'set' : 'unset'}, ` +
+            `expected_priority=${hasPriority ? 'set' : 'unset'}.`,
+        );
+      }
+      const expectedMessageId = hasMessageId
+        ? String(testCase.params.expected_message_id)
+        : '';
+      const expectedPriority = hasPriority
+        ? String(testCase.params.expected_priority)
+        : '';
       const deadlineMs = POLL_TIMEOUT_MS;
       const intervalMs = POLL_INTERVAL_MS;
 

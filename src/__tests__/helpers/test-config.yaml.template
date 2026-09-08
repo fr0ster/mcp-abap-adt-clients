@@ -2246,7 +2246,9 @@ atc_run:
         # Left unset on purpose — which finding a run reports is the check
         # variant's answer, not this library's, so a value measured on one
         # system would turn a legitimately different variant into a red test
-        # on the next. Set BOTH or neither; both must sit on the same finding.
+        # on the next. Set BOTH or neither — the test refuses half a pair by
+        # name rather than skipping or failing obscurely — and both must be
+        # carried by the same finding.
         #
         # Measured on the BTP trial, 2026-09-08 under
         # ABAP_CLOUD_DEVELOPMENT_DEFAULT: SLIN message 0245 ("No exception
