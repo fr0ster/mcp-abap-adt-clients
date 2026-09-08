@@ -8,9 +8,19 @@ This guide explains how `@mcp-abap-adt/adt-clients` manages ADT sessions for CRU
 - The connection maintains the ADT session (`sap-adt-connection-id`).
 - `lock` returns the `lockHandle`; `update` and `delete` carry it in
   `options.lockHandle`, and `unlock` gives it back.
-- **Only `lock` and `unlock` change the session type.** `lock` sets stateful,
-  `unlock` restores stateless. No other member touches it — which is what stops
-  one object's write from resetting the session while another holds a lock.
+- **Only `lock` and `unlock` change the session type**, and each covers its own
+  request and nothing more: `lock` sets stateful, acquires the handle, and puts
+  the session back to stateless before returning. The window between `lock` and
+  `unlock` is *not* stateful — the write inside it goes out stateless, carrying
+  the handle in `options.lockHandle`.
+- This is Eclipse's model, measured: of 792 requests in a full run, exactly four
+  carry `x-sap-adt-sessiontype: stateful` — two `LOCK`s and two `UNLOCK`s. The
+  source `PUT`, the activation and every read are stateless.
+- **A lock the server takes during activation outlives the `unlock`.** Activation
+  generates, and generation takes `E_ABAP_GENPH` on the generated program; that
+  one belongs to the ABAP session, not to the object, and is released when the
+  session ends — measured on E19, visible in SM12 for exactly as long as the
+  session lives. Nothing in this library can release it earlier.
 - Tests and helpers track locks in `.locks/active-locks.json`.
 
 ## Workflow Example
