@@ -243,6 +243,47 @@ function parseSystemCheckVariant(body: string): string | null {
 }
 
 /**
+ * Statuses that refuse the *operation*, as against complaining about the
+ * request.
+ *
+ * Question 3 asks whether this user may create a check variant. A 401 or 403
+ * answers it; so does a 405 or 501, which say the resource does not offer
+ * creation at all. A 400, a 409, a 422, a 500 do not: they say this particular
+ * request did not work — measured, the first attempt here answered 400
+ * "Parameter corrNr could not be found", which was about the URL and nothing
+ * about authorisation. Filing those as "not allowed" would close the question
+ * with the wrong answer, which is worse than leaving it open.
+ */
+const REFUSES_CREATION = new Set([401, 403, 405, 501]);
+
+/**
+ * What a creation attempt settled, from the status and what the system shows
+ * afterwards.
+ *
+ * Exported and pure so the rule can be tested without a SAP system: the danger
+ * it guards against is a confident wrong answer, and that is exactly the kind
+ * a live run cannot be relied on to produce on demand.
+ */
+export function classifyCreateOutcome(
+  status: number | null,
+  presenceAfter: 'present' | 'absent' | 'unknown',
+): 'yes' | 'no' | 'unknown' {
+  // The object is there. Whatever was said about it, this run made one.
+  if (presenceAfter === 'present') return 'yes';
+  // Nothing to see, and the server refused the operation itself.
+  if (
+    presenceAfter === 'absent' &&
+    status !== null &&
+    REFUSES_CREATION.has(status)
+  ) {
+    return 'no';
+  }
+  // Everything else: a complaint about the request, a server fault, a lost
+  // response, or a read that could not say. None of them answers the question.
+  return 'unknown';
+}
+
+/**
  * The checks a form template names.
  *
  * This is what answers "which checks exist here": `/atc/checks` does not list
@@ -311,6 +352,8 @@ async function main(): Promise<void> {
   };
   /** The run made against a variant this probe did NOT create, if any. */
   let fallbackRun: { variant: string; findingStats: string } | null = null;
+  /** What the creation attempt answered, so the classification is checkable. */
+  let createStatus: number | null = null;
   let createdVariant: string | null = null;
   /**
    * What this probe made and could not unmake.
@@ -597,16 +640,22 @@ async function main(): Promise<void> {
               'name-taken-after-create',
               'Did the POST leave a variant behind, whatever it answered?',
             );
-            if (after === 'present') {
+            createStatus = created.status;
+            answered.mayCreate = classifyCreateOutcome(created.status, after);
+            if (answered.mayCreate === 'yes') {
               createdVariant = args.newVariant;
-              answered.mayCreate = 'yes';
             } else {
-              // A server that answered is a server that decided. `status: null`
-              // is the only silence here, and silence is the gap.
-              answered.mayCreate =
-                created.status !== null && after === 'absent'
-                  ? 'no'
-                  : 'unknown';
+              if (answered.mayCreate === 'unknown' && after === 'absent') {
+                rec.note(
+                  'create-inconclusive',
+                  'May this user create a check variant?',
+                  `The POST answered ${created.status ?? 'nothing'} and no ` +
+                    'variant appeared. That says this request did not create ' +
+                    'one — not that creation is refused. Read ' +
+                    "`create-variant`'s body: a 400 here has already been a " +
+                    'complaint about the URL rather than about authorisation.',
+                );
+              }
               if (after === 'unknown') {
                 rec.note(
                   'create-outcome-unknown',
@@ -721,6 +770,7 @@ async function main(): Promise<void> {
       startedAt: new Date().toISOString(),
       args,
       answered,
+      createStatus,
       checksSeen: checkNames.length,
       variantsSeen: variantCount,
       fallbackRun,

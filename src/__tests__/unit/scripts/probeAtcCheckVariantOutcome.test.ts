@@ -1,0 +1,56 @@
+/**
+ * What a failed creation attempt is allowed to conclude.
+ *
+ * The probe is a script and would normally carry no test. This rule does,
+ * because the failure it guards against is a **confident wrong answer**: the
+ * probe's third question is whether this user may create a check variant, and
+ * treating any non-2xx as "not allowed" would close it on evidence that says
+ * something else entirely. That is not hypothetical — the first attempt against
+ * the trial answered `400 "Parameter corrNr could not be found"`, a complaint
+ * about the URL, with authorisation never reached.
+ *
+ * A live run cannot be relied on to produce a 400, a 409 and a dropped socket
+ * on demand, so the rule is tested where it can be: on its own.
+ */
+
+import { classifyCreateOutcome } from '../../../../scripts/probe-atc-checkvariant';
+
+describe('classifyCreateOutcome', () => {
+  it('reports a creation whenever the object is there afterwards', () => {
+    // Whatever the client saw, the system shows the object: this run made it.
+    expect(classifyCreateOutcome(201, 'present')).toBe('yes');
+    expect(classifyCreateOutcome(null, 'present')).toBe('yes');
+    expect(classifyCreateOutcome(500, 'present')).toBe('yes');
+    expect(classifyCreateOutcome(403, 'present')).toBe('yes');
+  });
+
+  it('reports a refusal only for statuses that refuse the operation', () => {
+    expect(classifyCreateOutcome(401, 'absent')).toBe('no');
+    expect(classifyCreateOutcome(403, 'absent')).toBe('no');
+    expect(classifyCreateOutcome(405, 'absent')).toBe('no');
+    expect(classifyCreateOutcome(501, 'absent')).toBe('no');
+  });
+
+  it('leaves the question open when the server complained about the request', () => {
+    // The measured one: 400 "Parameter corrNr could not be found" says the URL
+    // was wrong, not that this user may not create a variant.
+    expect(classifyCreateOutcome(400, 'absent')).toBe('unknown');
+    expect(classifyCreateOutcome(409, 'absent')).toBe('unknown');
+    expect(classifyCreateOutcome(415, 'absent')).toBe('unknown');
+    expect(classifyCreateOutcome(422, 'absent')).toBe('unknown');
+  });
+
+  it('leaves the question open on a server fault or a lost response', () => {
+    expect(classifyCreateOutcome(500, 'absent')).toBe('unknown');
+    expect(classifyCreateOutcome(503, 'absent')).toBe('unknown');
+    // No response at all — the socket that dropped after SAP may have written.
+    expect(classifyCreateOutcome(null, 'absent')).toBe('unknown');
+  });
+
+  it('leaves the question open when the read afterwards could not say', () => {
+    // A refusal plus a blind read is still not proof that nothing was written.
+    expect(classifyCreateOutcome(403, 'unknown')).toBe('unknown');
+    expect(classifyCreateOutcome(201, 'unknown')).toBe('unknown');
+    expect(classifyCreateOutcome(null, 'unknown')).toBe('unknown');
+  });
+});
