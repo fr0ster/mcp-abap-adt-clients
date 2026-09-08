@@ -350,10 +350,12 @@ async function main(): Promise<void> {
       },
     );
 
-    // The other candidate, and the only one anyone has seen answer: PR #68's
-    // `listAtcVariants` reads `/atc/variants`, not the `/atc/checkvariants`
-    // discovery names. Two different URLs for the same subject, one of them
-    // verified on an on-prem system in that PR and neither of them on cloud.
+    // The listing, which is a different resource from the object type rather
+    // than a different spelling of it. Discovery carries both: "ATC Check
+    // Variant" is `/atc/checkvariants` (the CHKV workbench object, addressed by
+    // name, chkvv4+xml), while "List of Variants" is `/atc/variants`
+    // {?maxItemCount,data} — and only the second one lists. PR #68 read this
+    // one; the collection GET above is the other, and answers uriMappingError.
     const variants = await rec.call(
       'list-variants-pr68',
       'Does the URL PR #68 listed variants at answer on this system?',
