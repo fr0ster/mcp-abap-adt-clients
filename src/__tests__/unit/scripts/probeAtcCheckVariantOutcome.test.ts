@@ -24,11 +24,19 @@ describe('classifyCreateOutcome', () => {
     expect(classifyCreateOutcome(403, 'present')).toBe('yes');
   });
 
-  it('reports a refusal only for statuses that refuse the operation', () => {
-    expect(classifyCreateOutcome(401, 'absent')).toBe('no');
-    expect(classifyCreateOutcome(403, 'absent')).toBe('no');
+  it('reports a refusal only where creation is not on offer at all', () => {
+    // The verb is not implemented here, so nobody creates one this way.
     expect(classifyCreateOutcome(405, 'absent')).toBe('no');
     expect(classifyCreateOutcome(501, 'absent')).toBe('no');
+  });
+
+  it('does not read an authorization-shaped refusal as the answer', () => {
+    // The 403 measured on the trial named S_ABPLNGVS — the ABAP language
+    // version, not a role — and the payload sent carried a SAP-owned variant's
+    // package and version. So it may be about the request. A 401 is weaker
+    // still: an expired session says nothing about what its owner may do.
+    expect(classifyCreateOutcome(403, 'absent')).toBe('unknown');
+    expect(classifyCreateOutcome(401, 'absent')).toBe('unknown');
   });
 
   it('leaves the question open when the server complained about the request', () => {

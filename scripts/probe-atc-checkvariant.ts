@@ -33,10 +33,14 @@
  *     the run path is already a client, and re-hand-rolling it here would test
  *     the probe rather than the library.
  *
- * **Nothing here concludes from silence.** Every step's raw body is written to
- * disk and the verdict names which of the four questions were answered. A step
- * that fails is evidence too — `403` to the POST settles question 3 as firmly
- * as `201` does.
+ * **Nothing here concludes from silence — or from a status alone.** Every
+ * step's raw body is written to disk and the verdict names which of the four
+ * questions were answered. A failure is evidence too, but only of what it
+ * actually shows: a `201` settles question 3, while a `403` does not. The one
+ * measured here named `S_ABPLNGVS`, which is the ABAP language version rather
+ * than a role — an unresolvable version surfaces AS an authorization refusal —
+ * so it may be about the payload this probe sent. Read the body; the verdict
+ * leaves that question open rather than answering it from a number.
  *
  * Usage:
  *   npx ts-node scripts/probe-atc-checkvariant.ts --out=atc-chkv-probe
@@ -243,18 +247,29 @@ function parseSystemCheckVariant(body: string): string | null {
 }
 
 /**
- * Statuses that refuse the *operation*, as against complaining about the
- * request.
+ * Statuses that say creation is not on offer here at all.
  *
- * Question 3 asks whether this user may create a check variant. A 401 or 403
- * answers it; so does a 405 or 501, which say the resource does not offer
- * creation at all. A 400, a 409, a 422, a 500 do not: they say this particular
- * request did not work — measured, the first attempt here answered 400
- * "Parameter corrNr could not be found", which was about the URL and nothing
- * about authorisation. Filing those as "not allowed" would close the question
- * with the wrong answer, which is worse than leaving it open.
+ * Deliberately short, and deliberately without 401 or 403. Question 3 asks
+ * whether a check variant can be created; `405` and `501` answer it — the
+ * resource does not implement the verb, so nobody creates one this way.
+ *
+ * An authorization-shaped refusal does NOT answer it, however much it looks
+ * like the answer. The 403 measured here named `S_ABPLNGVS`, which is the ABAP
+ * language version and not a role: an unresolvable version is reported as an
+ * authorization failure, and the payload this probe sent was a copy of a
+ * SAP-owned variant carrying neither our package nor our language version. So
+ * that 403 may be about the request. A `401` is weaker still — an expired
+ * session says nothing about what its owner may do.
+ *
+ * And a complaint about the request answers nothing either: the first attempt
+ * here was `400 "Parameter corrNr could not be found"`, about the URL, with
+ * authorisation never reached.
+ *
+ * Everything but this pair therefore leaves the question open, with the body on
+ * disk for a human to read. An open question is cheap; a wrong answer to it
+ * ends the enquiry.
  */
-const REFUSES_CREATION = new Set([401, 403, 405, 501]);
+const REFUSES_CREATION = new Set([405, 501]);
 
 /**
  * What a creation attempt settled, from the status and what the system shows
@@ -621,6 +636,11 @@ async function main(): Promise<void> {
             },
           );
 
+          // Recorded for every attempt, not just the failed ones: the field is
+          // the evidence the verdict is judged against, and a `mayCreate: yes`
+          // beside a null status is a claim with its receipt missing.
+          createStatus = created.status;
+
           if (created.status !== null && created.status < 300) {
             // The system said it wrote. Nothing read afterwards can take that
             // back — a 404 a moment later is eventual consistency, not an
@@ -640,7 +660,6 @@ async function main(): Promise<void> {
               'name-taken-after-create',
               'Did the POST leave a variant behind, whatever it answered?',
             );
-            createStatus = created.status;
             answered.mayCreate = classifyCreateOutcome(created.status, after);
             if (answered.mayCreate === 'yes') {
               createdVariant = args.newVariant;
@@ -690,6 +709,14 @@ async function main(): Promise<void> {
         );
       } else {
         const atc = new AdtRuntimeClient(connection, logger).getAtc();
+
+        // Only the run itself answers question 4, so only the run is inside
+        // this try. It used to wrap the worklist read and a local file write
+        // as well, which meant a failed `getFindings` — or a full disk —
+        // reported the variant as REJECTED by a run that had in fact accepted
+        // it. What comes after is evidence about the findings, not about
+        // whether the variant was usable.
+        let accepted: { triple: string; worklistId: string } | null = null;
         try {
           const value = await orThrow(
             atc.run(
@@ -699,21 +726,33 @@ async function main(): Promise<void> {
               { wait: true, checkVariant: variantForRun },
             ),
           );
-          const triple = value.waited ? value.findingStats : '(not waited)';
-          // The triple counts; the worklist says what was counted. Without it,
-          // "0,1,0" names neither the check nor the priority, so the position
-          // stays as undecoded as a row of zeroes would leave it.
-          const findings = await orThrow(atc.getFindings(value.worklistId));
-          fs.writeFileSync(
-            path.join(outDir, 'findings.xml'),
-            typeof findings === 'string' ? findings : String(findings),
-            'utf8',
-          );
+          accepted = {
+            triple: value.waited ? value.findingStats : '(not waited)',
+            worklistId: value.worklistId,
+          };
           if (ourVariant) {
             answered.runAcceptedVariant = 'yes';
           } else {
-            fallbackRun = { variant: variantForRun, findingStats: triple };
+            fallbackRun = {
+              variant: variantForRun,
+              findingStats: accepted.triple,
+            };
           }
+        } catch (error) {
+          // A refused run is an answer too — but only about the variant the
+          // question is about.
+          if (ourVariant) {
+            answered.runAcceptedVariant = 'no';
+          }
+          rec.note(
+            'run-with-variant-failed',
+            'Does a run accept a named variant?',
+            `Variant: ${variantForRun}\nRun rejected: ${String(error)}`,
+          );
+        }
+
+        if (accepted) {
+          const { triple, worklistId } = accepted;
           rec.note(
             ourVariant ? 'run-with-our-variant' : 'run-with-system-variant',
             ourVariant
@@ -729,17 +768,26 @@ async function main(): Promise<void> {
                 : 'Non-zero — the positions of FINDING_STATS can be read against what ' +
                   'the class actually contains.'),
           );
-        } catch (error) {
-          // A refused run is an answer too — but only about the variant the
-          // question is about.
-          if (ourVariant) {
-            answered.runAcceptedVariant = 'no';
+
+          // The triple counts; the worklist says what was counted. A failure
+          // here costs the findings file and nothing else — the run's verdict
+          // above is already settled.
+          try {
+            const findings = await orThrow(atc.getFindings(worklistId));
+            fs.writeFileSync(
+              path.join(outDir, 'findings.xml'),
+              typeof findings === 'string' ? findings : String(findings),
+              'utf8',
+            );
+          } catch (error) {
+            rec.note(
+              'findings-unread',
+              'What did the run find?',
+              `The run was accepted and reported ${triple}, but reading its ` +
+                `worklist ${worklistId} failed: ${String(error)}. That is a ` +
+                'missing detail, not a rejected variant.',
+            );
           }
-          rec.note(
-            'run-with-variant-failed',
-            'Does a run accept a named variant?',
-            `Variant: ${variantForRun}\nRun rejected: ${String(error)}`,
-          );
         }
       }
     }
