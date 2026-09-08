@@ -352,6 +352,47 @@ shared_dependencies:
           ENDMETHOD.
         ENDCLASS.
 
+    - name: "ZAC_SHR_ATC_DIRTY"
+      description: "Shared class with deliberate ATC violations — the object an ATC run is expected to find something in"
+      available_in: ["onprem", "cloud"]
+      source: |
+        " Deliberately dirty. Every statement below is here to be found by an
+        " ATC check, and the comment above it names the check it is aimed at.
+        " A run over this class that reports FINDING_STATS "0,0,0" is not a
+        " clean class — it is a check variant that looks for none of this.
+        CLASS zac_shr_atc_dirty DEFINITION PUBLIC FINAL CREATE PUBLIC.
+          PUBLIC SECTION.
+            METHODS dirty
+              IMPORTING iv_input         TYPE i
+              RETURNING VALUE(rv_result) TYPE i.
+        ENDCLASS.
+
+        CLASS zac_shr_atc_dirty IMPLEMENTATION.
+          METHOD dirty.
+            " Declared and never read — the "unused variable" check.
+            DATA lv_never_used TYPE i.
+
+            " EQ instead of = — the "obsolete relational operator" check.
+            DATA lv_zero TYPE abap_bool VALUE abap_false.
+            IF iv_input EQ 0.
+              lv_zero = abap_true.
+            ENDIF.
+
+            " An empty handler on the root exception class — the "catch
+            " CX_ROOT" and "empty CATCH block" checks. The divisor is the
+            " parameter, so the division survives to runtime rather than
+            " being rejected as a constant division by zero.
+            TRY.
+                rv_result = 100 / iv_input.
+              CATCH cx_root.
+            ENDTRY.
+
+            IF lv_zero = abap_true.
+              rv_result = 0.
+            ENDIF.
+          ENDMETHOD.
+        ENDCLASS.
+
   interfaces:
     - name: "ZAC_SHR_IF01"
       description: "Shared interface for read-only tests"
