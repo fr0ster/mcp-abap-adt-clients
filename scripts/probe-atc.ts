@@ -150,7 +150,6 @@ export {
   verdictFor,
 } from './lib/atcProbeVerdict';
 
-import type { ICandidate } from './lib/atcProbeVerdict';
 import {
   assertKnownKeys,
   CANDIDATES,
