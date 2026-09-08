@@ -277,13 +277,69 @@ async function main(): Promise<void> {
     runAcceptedVariant: null as boolean | null,
   };
   let createdVariant: string | null = null;
+  /**
+   * What this probe made and could not unmake.
+   *
+   * An array rather than a nullable string so a write inside a callback is
+   * still visible to the reader below — and because "nothing left behind" is
+   * the only acceptable ending, whatever else the probe did or did not learn.
+   */
+  const leftBehind: string[] = [];
+
+  // Declared beside the connection rather than inside the try below: the
+  // `finally` has to reach both to undo what was done and to write the
+  // evidence, and it cannot see anything the try scoped.
+  const rec = new Recorder(connection, outDir, logger);
+
+  /**
+   * Remove what the probe made, and notice when it could not.
+   *
+   * `rec.call` swallows HTTP failures on purpose — a 403 to the POST is the
+   * answer this probe exists to record, not a crash — which means a failed
+   * DELETE is just as quiet. So the status is read here: a variant this run
+   * created and did not remove is residue in someone's system and the next
+   * run's name collision, and it must not end in a process that exits 0
+   * announcing that every question was answered.
+   */
+  const removeCreatedVariant = async (name: string): Promise<void> => {
+    const uri = `${CHKV}/${encodeURIComponent(name.toLowerCase())}`;
+    await inStatefulSession(connection, async () => {
+      const lock = await rec.call(
+        'lock-created-variant',
+        'Is a variant locked like every other workbench object?',
+        {
+          method: 'POST',
+          url: `${uri}?_action=LOCK&accessMode=MODIFY`,
+          headers: { Accept: ACCEPT_LOCK },
+          body: null,
+        },
+      );
+      const handle = parseLockHandle(lock.body);
+      const deleted = await rec.call(
+        'delete-created-variant',
+        'May this user delete a check variant?',
+        {
+          method: 'DELETE',
+          url: handle ? `${uri}?lockHandle=${encodeURIComponent(handle)}` : uri,
+        },
+      );
+      // 404 counts as gone: something removed it, and the probe's job was
+      // that it not be there.
+      const gone =
+        deleted.status !== null &&
+        (deleted.status < 300 || deleted.status === 404);
+      if (!gone) {
+        leftBehind.push(name);
+      }
+    });
+  };
+
   /** The document the creation payload is derived from, kept as it was read. */
   let systemVariantDocument = '';
 
   try {
     await connection.connect();
     logger.info(`Connected to ${sapConfig.url}`);
-    const rec = new Recorder(connection, outDir, logger);
 
     // --- Q1. What does a variant document look like? -------------------------
     const customizing = await rec.call(
@@ -470,33 +526,25 @@ async function main(): Promise<void> {
         }
       }
     }
-
-    // --- Cleanup: whatever this probe created, it removes ---------------------
+  } finally {
+    // Everything below runs whatever happened above, in this order: undo,
+    // record, judge, hang up.
+    //
+    // The cleanup used to sit on the success path, so an error anywhere
+    // between the POST that created a variant and this point skipped it — the
+    // run that failed, the one worth repeating, was exactly the one that left
+    // something behind.
     if (createdVariant) {
-      const uri = `${CHKV}/${encodeURIComponent(createdVariant.toLowerCase())}`;
-      await inStatefulSession(connection, async () => {
-        const lock = await rec.call(
-          'lock-created-variant',
-          'Is a variant locked like every other workbench object?',
-          {
-            method: 'POST',
-            url: `${uri}?_action=LOCK&accessMode=MODIFY`,
-            headers: { Accept: ACCEPT_LOCK },
-            body: null,
-          },
+      try {
+        await removeCreatedVariant(createdVariant);
+      } catch (error) {
+        leftBehind.push(createdVariant);
+        rec.note(
+          'cleanup-failed',
+          'Was everything this probe created removed?',
+          `Removing ${createdVariant} threw: ${String(error)}`,
         );
-        const handle = parseLockHandle(lock.body);
-        await rec.call(
-          'delete-created-variant',
-          'May this user delete a check variant?',
-          {
-            method: 'DELETE',
-            url: handle
-              ? `${uri}?lockHandle=${encodeURIComponent(handle)}`
-              : uri,
-          },
-        );
-      });
+      }
     }
 
     rec.flush({
@@ -505,23 +553,31 @@ async function main(): Promise<void> {
       startedAt: new Date().toISOString(),
       args,
       answered,
+      leftBehind,
     });
 
     const unanswered = Object.entries(answered)
       .filter(([, v]) => v === false || v === null)
       .map(([k]) => k);
+    if (leftBehind.length > 0) {
+      logger.error(
+        `LEFT BEHIND in ${sapConfig.url}: ${leftBehind.join(', ')} — this probe created ` +
+          'them and could not remove them. Delete them before the next run, which ' +
+          'would otherwise collide with the same name.',
+      );
+      process.exitCode = 1;
+    }
     if (unanswered.length > 0) {
       logger.warn(
         `Unanswered: ${unanswered.join(', ')} — read the raw bodies before designing anything on top of this.`,
       );
       process.exitCode = 1;
-    } else {
-      logger.info('All four questions answered.');
+    } else if (leftBehind.length === 0) {
+      logger.info('All four questions answered, nothing left behind.');
     }
-  } finally {
-    // In `finally`: the run worth repeating is the one that failed, and it is
-    // the one that would otherwise leave a session standing on a system whose
-    // pool this probe shares with every test run.
+
+    // Last: the pool is shared with every test run, and a session left
+    // standing is felt by whoever runs next.
     await releaseTestConnection(connection);
   }
 
