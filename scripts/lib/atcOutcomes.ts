@@ -1,5 +1,5 @@
 /**
- * What a creation attempt settled — the rule, with nothing else attached.
+ * What an attempt settled — the rules, with nothing else attached.
  *
  * Its own module because it is the one part of the probe worth a test, and a
  * test that has to import the probe imports a script: dotenv, a logger, a
@@ -58,4 +58,28 @@ export function classifyCreateOutcome(
   // Everything else: a complaint about the request, a server fault, a lost
   // response, or a read that could not say. None of them answers the question.
   return 'unknown';
+}
+
+/**
+ * What a failed check run settled about the variant it was given.
+ *
+ * The same distinction the creation rule makes, for the same reason: an
+ * exception is not a verdict. `atc.run` rejecting can mean SAP looked at the
+ * request and refused it — an answer — or that no answer exists at all: a
+ * timeout after the server accepted the run, a dropped connection, an expired
+ * session, a fault inside the implementation reading the reply. Calling those
+ * "the variant was rejected" is the confident wrong answer this probe keeps
+ * being caught giving.
+ *
+ * `origin` is the contract's own judgement and the one worth trusting:
+ * `refusal` is "SAP answered, about this object, and said no"; `connection` is
+ * "no usable answer exists". A 5xx is kept out of the first: a server fault is
+ * not a statement about the variant.
+ */
+export function classifyRunOutcome(
+  origin: 'connection' | 'refusal' | 'thrown',
+  status: number | undefined,
+): 'no' | 'unknown' {
+  if (origin !== 'refusal') return 'unknown';
+  return status !== undefined && status >= 500 ? 'unknown' : 'no';
 }

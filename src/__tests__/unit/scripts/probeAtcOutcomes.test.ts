@@ -16,7 +16,10 @@
  * error into a run that is supposed to touch nothing.
  */
 
-import { classifyCreateOutcome } from '../../../../scripts/lib/atcCreateOutcome';
+import {
+  classifyCreateOutcome,
+  classifyRunOutcome,
+} from '../../../../scripts/lib/atcOutcomes';
 
 describe('classifyCreateOutcome', () => {
   it('reports a creation whenever the object is there afterwards', () => {
@@ -63,5 +66,33 @@ describe('classifyCreateOutcome', () => {
     expect(classifyCreateOutcome(403, 'unknown')).toBe('unknown');
     expect(classifyCreateOutcome(201, 'unknown')).toBe('unknown');
     expect(classifyCreateOutcome(null, 'unknown')).toBe('unknown');
+  });
+});
+
+describe('classifyRunOutcome', () => {
+  it('reports a rejection when SAP looked at the request and refused it', () => {
+    expect(classifyRunOutcome('refusal', 400)).toBe('no');
+    expect(classifyRunOutcome('refusal', 403)).toBe('no');
+    expect(classifyRunOutcome('refusal', 404)).toBe('no');
+    // A refusal whose strategy did not keep the response is still a refusal:
+    // `origin` is the contract's own judgement, not an inference from a number.
+    expect(classifyRunOutcome('refusal', undefined)).toBe('no');
+  });
+
+  it('does not read a server fault as a statement about the variant', () => {
+    expect(classifyRunOutcome('refusal', 500)).toBe('unknown');
+    expect(classifyRunOutcome('refusal', 503)).toBe('unknown');
+  });
+
+  it('leaves the question open when no usable answer arrived', () => {
+    // A timeout after the server accepted the run, a dropped socket, an expired
+    // session — the run may well have been accepted.
+    expect(classifyRunOutcome('connection', undefined)).toBe('unknown');
+    expect(classifyRunOutcome('connection', 504)).toBe('unknown');
+  });
+
+  it('leaves the question open when the implementation threw', () => {
+    // Its own reading failed; the variant was never judged.
+    expect(classifyRunOutcome('thrown', undefined)).toBe('unknown');
   });
 });

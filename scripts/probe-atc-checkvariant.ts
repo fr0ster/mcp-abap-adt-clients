@@ -76,7 +76,7 @@ import { createConnectionLogger } from '../src/__tests__/helpers/testLogger';
 import { AdtRuntimeClient } from '../src/clients/AdtRuntimeClient';
 import { inStatefulSession } from '../src/core/shared/capabilities/statefulSession';
 import { orThrow } from '../src/utils/adtResponse';
-import { classifyCreateOutcome } from './lib/atcCreateOutcome';
+import { classifyCreateOutcome, classifyRunOutcome } from './lib/atcOutcomes';
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../.env');
 if (fs.existsSync(envPath)) {
@@ -666,37 +666,71 @@ async function main(): Promise<void> {
         // it. What comes after is evidence about the findings, not about
         // whether the variant was usable.
         let accepted: { triple: string; worklistId: string } | null = null;
+        // The answer is read rather than thrown, because `orThrow` keeps the
+        // message and drops the one field that says whether this was a verdict:
+        // `origin`. A refusal is SAP looking at the request and saying no; a
+        // `connection` failure is a timeout, a dropped socket or an expired
+        // session, none of which is a statement about the variant.
+        let failure: {
+          origin: string;
+          status?: number;
+          message: string;
+        } | null = null;
         try {
-          const value = await orThrow(
-            atc.run(
-              {
-                objects: [{ objectType: 'class', objectName: args.dirtyClass }],
-              },
-              { wait: true, checkVariant: variantForRun },
-            ),
+          const answer = await atc.run(
+            {
+              objects: [{ objectType: 'class', objectName: args.dirtyClass }],
+            },
+            { wait: true, checkVariant: variantForRun },
           );
-          accepted = {
-            triple: value.waited ? value.findingStats : '(not waited)',
-            worklistId: value.worklistId,
-          };
-          if (ourVariant) {
-            answered.runAcceptedVariant = 'yes';
+          if (answer.ok) {
+            const value = answer.getResult().value;
+            accepted = {
+              triple: value.waited ? value.findingStats : '(not waited)',
+              worklistId: value.worklistId,
+            };
+            if (ourVariant) {
+              answered.runAcceptedVariant = 'yes';
+            } else {
+              fallbackRun = {
+                variant: variantForRun,
+                findingStats: accepted.triple,
+              };
+            }
           } else {
-            fallbackRun = {
-              variant: variantForRun,
-              findingStats: accepted.triple,
+            const error = answer.getError();
+            failure = {
+              origin: error.origin,
+              status: error.response?.status,
+              message: error.message,
             };
           }
         } catch (error) {
-          // A refused run is an answer too — but only about the variant the
-          // question is about.
+          // The implementation threw rather than answering — its own reading
+          // failed, which says nothing about the variant.
+          failure = { origin: 'thrown', message: String(error) };
+        }
+
+        if (failure) {
+          const verdict = classifyRunOutcome(
+            failure.origin as 'connection' | 'refusal' | 'thrown',
+            failure.status,
+          );
+          // Only about the variant the question is about, and only when the
+          // failure was a verdict rather than a silence.
           if (ourVariant) {
-            answered.runAcceptedVariant = 'no';
+            answered.runAcceptedVariant = verdict;
           }
           rec.note(
             'run-with-variant-failed',
             'Does a run accept a named variant?',
-            `Variant: ${variantForRun}\nRun rejected: ${String(error)}`,
+            `Variant: ${variantForRun}\n` +
+              `origin=${failure.origin} status=${failure.status ?? 'none'}\n` +
+              `${failure.message}\n\n` +
+              (verdict === 'no'
+                ? 'SAP answered about this request and refused it — that is an answer.'
+                : 'No usable answer: this says the attempt did not complete, not ' +
+                  'that the variant is unusable. Question 4 stays open.'),
           );
         }
 
