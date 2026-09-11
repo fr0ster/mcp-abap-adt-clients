@@ -36,7 +36,8 @@ const NOT_IN_A_PACKAGE: Record<string, string> = {
   functionInclude: 'a function group, via containerRef',
   messageClassMessage: 'a message class — it is a row, not an object',
   transport: 'nothing; a transport request is not a package object',
-  package: 'a superPackage, which it requires instead',
+  package:
+    'a superPackage — and a top-level one has none, so nothing here is required',
   localTestClass: 'its container class',
   localTypes: 'its container class',
   localDefinitions: 'its container class',
@@ -127,14 +128,6 @@ describe('a create without the object\u2019s name', () => {
       //
       // A handler that raises a TypeError instead is a caller's defect
       // surfacing in the caller's stack, which is also accepted.
-      // A package is its own package, so dropping its name drops the field the
-      // guard above protects. The guard is right to fire; this block is not
-      // about it.
-      if (name === 'package') {
-        await expect(handler.create(withoutName)).rejects.toThrow(/package/i);
-        return;
-      }
-
       try {
         const answered = await handler.create(withoutName);
         expect(answered).toHaveProperty('ok', false);

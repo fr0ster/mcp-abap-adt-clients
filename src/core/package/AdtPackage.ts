@@ -154,19 +154,13 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
     config: Omit<IPackageConfig, 'sourceCode'> & { sourceCode?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
-    // **The one guard this package keeps, and only on a create.**
+    // **No guard here, unlike every other create.**
     //
-    // An object created without a package is the single thing `delete()` cannot
-    // undo: the deletion check resolves through the package, so it answers
-    // "Object does not exist" while the name stays taken for good, and clearing
-    // it is SAP GUI territory. Everywhere else a missing field produces a
-    // request the server answers, which is a reading a strategy can take. Here
-    // it produces a state with no way out through ADT at all.
-    if (!config.packageName) {
-      throw new Error(
-        'packageName is required for create: an object created without one cannot be deleted through ADT',
-      );
-    }
+    // Elsewhere `packageName` is the package an object is bound to, and an
+    // object created without one cannot be removed through ADT — that is the
+    // one hazard this package guards. For a package it is the package's own
+    // name; what binds it is `superPackage`, and a top-level package has none
+    // by design. There is no field here whose absence traps anything.
 
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
