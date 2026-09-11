@@ -96,13 +96,10 @@ import { rawDocument } from '../../utils/resultStrategy';
 import { getTimeout } from '../../utils/timeouts';
 import { getAllTypes as getAllTypesUtil } from './allTypes';
 import { getDiscovery as getDiscoveryUtil } from './discovery';
-import { listFunctionGroupIncludes } from './functionGroupIncludesList';
-import { listFunctionModules } from './functionModulesList';
 import { fetchInactiveObjects } from './getInactiveObjects';
 import { activateObjectsGroup } from './groupActivation';
 import { checkDeletionGroup, deleteObjectsGroup } from './groupDeletion';
 import { getInclude as getIncludeUtil } from './include';
-import { getIncludesList } from './includesList';
 import { fetchNodeStructure as fetchNodeStructureUtil } from './nodeStructure';
 import { getObjectStructure as getObjectStructureUtil } from './objectStructure';
 // Import utility functions
@@ -733,78 +730,6 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
           options?.withShortDescriptions ?? true,
         ),
       this.results.node as IResultStrategy<ReturnType<R['node']>>,
-    );
-  }
-
-  /**
-   * Get list of includes for ABAP object
-   *
-   * Recursively discovers and lists all include files within an ABAP program or include.
-   *
-   * @param objectName - Object name (program or include)
-   * @param objectType - Object type: 'PROG/P' | 'PROG/I' | 'FUGR' | 'CLAS/OC'
-   * @param timeout - Optional timeout in milliseconds (default: 30000)
-   * @returns Array of include names
-   *
-   * @example
-   * ```typescript
-   * const includes = await utils.getIncludesList('ZMY_PROGRAM', 'PROG/P');
-   * // Returns: ['ZMY_INCLUDE1', 'ZMY_INCLUDE2', ...]
-   * ```
-   */
-  async getIncludesList(
-    objectName: string,
-    objectType: 'PROG/P' | 'PROG/I' | 'FUGR' | 'CLAS/OC',
-    timeout: number = 30000,
-  ): Promise<IAdtResponse<string[]>> {
-    if (!objectName) {
-      throw new Error('Object name is required');
-    }
-
-    return answeringValue(() =>
-      getIncludesList(this.connection, objectName, objectType, timeout),
-    );
-  }
-
-  /**
-   * List the function modules of a function group.
-   *
-   * @example
-   * const fms = await utils.listFunctionModules('ZMY_FUGR');
-   * // Returns: ['Z_MY_FM1', 'Z_MY_FM2']
-   */
-  async listFunctionModules(
-    functionGroupName: string,
-  ): Promise<IAdtResponse<string[]>> {
-    if (!functionGroupName) {
-      throw new Error('Function group name is required');
-    }
-
-    return answeringValue(() =>
-      listFunctionModules(this.connection, functionGroupName),
-    );
-  }
-
-  /**
-   * List the includes of a function group (TOP, UXX collector, custom includes).
-   *
-   * Complements listFunctionModules: includes hold code that is not part of any
-   * function module (global data/types in TOP, FORM routines in custom includes),
-   * so a complete function-group backup needs them.
-   *
-   * @example
-   * const includes = await utils.listFunctionGroupIncludes('ZMY_FUGR');
-   * // Returns: ['LZMY_FUGRTOP', 'LZMY_FUGRUXX', ...]
-   */
-  async listFunctionGroupIncludes(
-    functionGroupName: string,
-  ): Promise<IAdtResponse<string[]>> {
-    if (!functionGroupName) {
-      throw new Error('Function group name is required');
-    }
-
-    return answeringValue(() =>
-      listFunctionGroupIncludes(this.connection, functionGroupName),
     );
   }
 

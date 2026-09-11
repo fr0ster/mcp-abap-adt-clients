@@ -15,6 +15,7 @@ import type {
   ISessionLifecycleAware,
 } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
+import { functionGroupChildren } from '../../../../scripts/lib/functionGroupChildren';
 import type { AdtClient } from '../../../clients/AdtClient';
 import { orThrow } from '../../../utils/adtResponse';
 import {
@@ -77,8 +78,13 @@ describe('Shared - listFunctionModules', () => {
 
     logTestStep(`listFunctionModules(${SHARED_FUNCTION_GROUP})`, testsLogger);
 
-    const result = await orThrow(
-      client.getUtils().listFunctionModules(SHARED_FUNCTION_GROUP),
+    // The two calls a consumer composes since 19.0.0, in place of the member
+    // that made them. See scripts/lib/functionGroupChildren.ts.
+    const result = await functionGroupChildren(
+      connection,
+      SHARED_FUNCTION_GROUP,
+      'FUGR/FF',
+      testsLogger,
     );
 
     testsLogger.info?.(`🎯 Function modules: ${JSON.stringify(result)}`);
@@ -110,10 +116,11 @@ describe('Shared - listFunctionModules', () => {
       testsLogger,
     );
 
-    const result = await orThrow(
-      client
-        .getUtils()
-        .listFunctionModules(SHARED_FUNCTION_GROUP.toLowerCase()),
+    const result = await functionGroupChildren(
+      connection,
+      SHARED_FUNCTION_GROUP.toLowerCase(),
+      'FUGR/FF',
+      testsLogger,
     );
 
     const upper = result.map((fm) => fm.toUpperCase());
