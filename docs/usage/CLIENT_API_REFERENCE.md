@@ -300,27 +300,36 @@ await abapGit.link({
   branchName: 'refs/heads/main',
 });
 
-// Pull — awaits the async server-side job. AbortSignal stops only the
-// client-side wait loop; the server may still be running.
-try {
-  const result = await abapGit.pull({
-    package: 'ZMY_PKG',
-    pollIntervalMs: 2000,
-    maxPollDurationMs: 600_000,
-    onProgress: (s) => console.log(`status: ${s.status} — ${s.statusText}`),
-  });
-  if (result.finalStatus.status === 'E' || result.finalStatus.status === 'A') {
-    console.error('pull failed:', result.errorLog);
-  }
-} catch (err: any) {
-  // AbortError / TimeoutError carry lastKnownStatus when a read succeeded
-  // before the client gave up waiting. The server-side job may still be
-  // running — poll getRepo(package) until status !== 'R' before retrying.
-  if (err.name === 'AbortError' || err.name === 'TimeoutError') {
-    console.warn('pull wait stopped:', err.lastKnownStatus);
-  } else {
-    throw err;
-  }
+// Pull — one POST, to the link `listRepos` reported. It does not wait.
+const repos = await abapGit.listRepos();
+if (!repos.ok) throw new Error(repos.getError().message);
+const linked = repos.getResult().value.find((r) => r.package === 'ZMY_PKG');
+if (!linked?.pullLink) throw new Error('ZMY_PKG reports no pull link');
+
+const started = await abapGit.pull({
+  package: 'ZMY_PKG',
+  pullLink: linked.pullLink,
+  branchName: 'refs/heads/main',
+});
+if (!started.ok) throw new Error(started.getError().message);
+
+// The wait is yours: how long, how often, and what to do when it does not
+// finish. Until 19.0.0 `pull` ran this loop, and an AbortSignal passed to it
+// stopped only this loop — never the server's job. Written here, that is
+// visible instead of explained.
+const deadline = Date.now() + 600_000;
+let status = linked;
+while (status.status === 'R' && Date.now() < deadline) {
+  await new Promise((resolve) => setTimeout(resolve, 2000));
+  const answer = await abapGit.getRepo('ZMY_PKG');
+  if (!answer.ok) throw new Error(answer.getError().message);
+  status = answer.getResult().value;
+  console.log(`status: ${status.status} — ${status.statusText}`);
+}
+
+if (status.status === 'E' || status.status === 'A') {
+  const log = await abapGit.getErrorLog('ZMY_PKG');
+  console.error('pull failed:', log.ok ? log.getResult().value : log.getError());
 }
 
 // Read status without triggering a pull
@@ -340,7 +349,7 @@ await abapGit.unlink({ package: 'ZMY_PKG' });
 
 **Availability.** ADT-integrated abapGit ships with SAP BTP ABAP Environment (Steampunk) and modern on-prem from ABAP Platform 2022+. Legacy kernels (E77 and older) do not expose `/sap/bc/adt/abapgit/*`. This is **not** the community abapGit that installs via SE38 — that one is a separate ABAP program with its own UI and does not go through ADT.
 
-**Async pull contract.** The server-side pull continues independently of the client-side wait. If you abort or hit `maxPollDurationMs`, the thrown `AbortError` / `TimeoutError` carries `lastKnownStatus` (when the last `listRepos` succeeded before the client gave up). The client **must** poll `getRepo(package)` until `status !== 'R'` before re-issuing `pull` or `unlink`. Retrying `pull` while the previous server-side job is still `R` is unsupported and fails fast.
+**Async pull contract.** `pull` starts the server-side job and answers. The job then runs on its own, and nothing you do on this side stops it — which is why the wait above is written in your code rather than hidden in a member with a timeout option. Poll `getRepo(package)` until `status !== 'R'` before re-issuing `pull` or `unlink`: starting a second pull while the first is still `R` is unsupported and fails fast.
 
 **Content-type version.** Defaults to `v3` for sapcli compatibility. Cloud MDD advertises `v4`; consumers can opt in via `new AdtAbapGitClient(conn, logger, { contentTypeVersion: 'v4' })`.
 

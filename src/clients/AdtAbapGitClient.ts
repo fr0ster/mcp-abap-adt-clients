@@ -31,7 +31,6 @@ import { pullRepo } from './abapGit/pull';
 import type {
   IAbapGitErrorLogEntry,
   IAbapGitExternalRepoInfo,
-  IAbapGitPullResult,
   IAbapGitRepoStatus,
 } from './abapGit/types';
 import { unlinkRepo } from './abapGit/unlink';
@@ -45,6 +44,7 @@ function toPublicRepoStatus(r: {
   createdBy?: string;
   createdAt?: string;
   repositoryId?: string;
+  atomLinks?: { pullLink?: string };
 }): IAbapGitRepoStatus {
   return {
     package: r.package,
@@ -55,6 +55,7 @@ function toPublicRepoStatus(r: {
     createdBy: r.createdBy,
     createdAt: r.createdAt,
     repositoryId: r.repositoryId,
+    pullLink: r.atomLinks?.pullLink,
   };
 }
 
@@ -64,7 +65,7 @@ export class AdtAbapGitClient
       IAbapGitRepoStatus[],
       IAbapGitRepoStatus | undefined,
       IAbapGitErrorLogEntry[],
-      IAbapGitPullResult,
+      void,
       IAbapGitExternalRepoInfo
     >
 {
@@ -93,20 +94,18 @@ export class AdtAbapGitClient
   }
 
   /**
-   * Pull a linked repository, and wait for the server to finish.
+   * Start a pull. One POST, to the link `listRepos` reported.
    *
-   * The wait is client-side: aborting or timing out stops this loop only, and
-   * the server-side job may still be running. A caller that aborted must poll
-   * `getRepo(package)` until the status is no longer `R` before pulling or
-   * unlinking again.
+   * It does not wait. Polling `getRepo(package)` until the status leaves `R`,
+   * deciding how long to allow and what to do when it does not, and reading
+   * `getErrorLog` when the status says to — all of that is the caller's, and
+   * was four requests in this member until 19.0.0.
    */
-  async pull(
-    args: IAbapGitPullArgs<IAbapGitRepoStatus>,
-  ): Promise<IAdtResponse<IAbapGitPullResult>> {
+  async pull(args: IAbapGitPullArgs): Promise<IAdtResponse<void>> {
     this.logger?.debug?.(`AdtAbapGitClient.pull: package=${args.package}`);
-    return answeringValue(() =>
-      pullRepo(this.connection, args, this.contentTypeVersion),
-    );
+    return answeringValue(async () => {
+      await pullRepo(this.connection, args, this.contentTypeVersion);
+    });
   }
 
   /** Unlink a package from its repository. */

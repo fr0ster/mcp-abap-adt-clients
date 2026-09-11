@@ -50,14 +50,14 @@ export function buildLinkBody(args: IAbapGitLinkArgs): string {
 }
 
 export function buildPullBody(
-  args: IAbapGitPullArgs<IAbapGitRepoStatus>,
-  resolvedBranch: string,
+  args: IAbapGitPullArgs,
+  resolvedBranch?: string,
 ): string {
   return (
     `<?xml version="1.0" encoding="UTF-8"?>` +
     `<abapgitrepo:repository xmlns:abapgitrepo="${NS_ABAPGITREPO}">` +
     childRepo('package', args.package) +
-    childRepo('branchName', resolvedBranch) +
+    childRepo('branchName', resolvedBranch ?? args.branchName ?? '') +
     childRepo('remoteUser', args.remoteUser) +
     childRepo('remotePassword', args.remotePassword) +
     childRepo('transportRequest', args.transportRequest) +

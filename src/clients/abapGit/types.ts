@@ -28,6 +28,15 @@ export interface IAbapGitRepoStatus {
   createdBy?: string;
   createdAt?: string;
   repositoryId?: string;
+  /**
+   * Where a pull for this repository is posted.
+   *
+   * Reported since 19.0.0, because `pull` no longer lists the repositories to
+   * find it — a caller lists once, keeps the link, and posts. The server names
+   * it as an atom link on the repository; a repository that offers none cannot
+   * be pulled, which is why this is optional rather than invented.
+   */
+  pullLink?: string;
 }
 
 /** One line of a pull's error log. */
@@ -36,12 +45,6 @@ export interface IAbapGitErrorLogEntry {
   objectType: string;
   objectName: string;
   messageText: string;
-}
-
-/** What a finished pull answers: the status it ended on, and what it logged. */
-export interface IAbapGitPullResult {
-  finalStatus: IAbapGitRepoStatus;
-  errorLog?: IAbapGitErrorLogEntry[];
 }
 
 /** One branch of an external repository. */
