@@ -7,12 +7,12 @@
  * deletion is a check followed by the deletion service, and an existing lock
  * does not enable the delete — it blocks it.
  *
- * Measured on E19, 2026-09-07, on the `ZAC_INCL01` left behind by the suite
+ * Measured 2026-09-07, on an include left behind by the suite
  * this bug was breaking. No lock taken anywhere, no session made stateful:
  *
  * ```
  * POST /sap/bc/adt/deletion/check
- *   <del:object adtcore:uri="/sap/bc/adt/programs/includes/zac_incl01"/>
+ *   <del:object adtcore:uri="/sap/bc/adt/programs/includes/zmy_include"/>
  *   200 del:isDeletable="true" adtcore:type="PROG/I" externalStrongReferences="0"
  *
  * POST /sap/bc/adt/deletion/delete

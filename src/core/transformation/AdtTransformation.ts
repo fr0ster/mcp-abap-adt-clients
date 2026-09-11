@@ -65,7 +65,7 @@ import {
 /**
  * The shipped reading of a validation answer this system may not offer.
  *
- * Measured on a cloud trial: `/xslt/transformations/validation` answers 404
+ * Measured on one system: `/xslt/transformations/validation` answers 404
  * there. That is not a verdict about the name, and the old code turned it into
  * a fabricated `{ status: 200, data: '' }` — a success the server never gave.
  * It comes back as a failure named

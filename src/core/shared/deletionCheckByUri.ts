@@ -7,7 +7,7 @@
  * copy of it, which is duplication this file does not expand: the types that had
  * no copy use this instead of gaining a twenty-third.
  *
- * Measured on the cloud trial, 2026-09-06, asking about a message class:
+ * Measured on one system, 2026-09-06, asking about a message class:
  *
  * ```
  * POST /sap/bc/adt/deletion/check

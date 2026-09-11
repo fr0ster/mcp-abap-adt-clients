@@ -16,7 +16,7 @@ import type { ITimeoutConfig } from '@mcp-abap-adt/interfaces';
  * of them — and aborting a request the server is still executing costs more
  * than it saves.
  *
- * Measured on the cloud trial: `POST /deletion/delete` was aborted at 45 s, the
+ * Measured on one system: `POST /deletion/delete` was aborted at 45 s, the
  * retry was answered `400 … Session Timed Out or Not Found` with a **new**
  * session cookie, and everything afterwards ran in a session nobody asked for.
  * Of 794 responses in that run, 30 carried `set-cookie`: 29 were `_action=LOCK`

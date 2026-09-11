@@ -38,7 +38,7 @@ export async function getFeeds(
  * Get feed variants
  *
  * The endpoint requires `category` and refuses the request without it — measured
- * on E19 2026-08-31: `GET /sap/bc/adt/feeds/variants` answers
+ * 2026-08-31: `GET /sap/bc/adt/feeds/variants` answers
  * `400 ExceptionParameterNotFound`, `SADT_RESOURCE/017`, "Parameter category
  * could not be found", and the same call with a category answers 200. It was
  * being sent without one, so this never worked.

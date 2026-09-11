@@ -76,7 +76,7 @@ import { resolveBindingVariant, serviceDocuments } from './types';
  *
  * Nobody read it. The member answered the document and a caller who checked
  * only `ok` learned that the request completed, never what it did — which is
- * the shape this release removes everywhere else. Measured on the trial
+ * the shape this release removes everywhere else. Measured
  * 2026-09-05: the POST takes ~130s of server time and then says exactly this.
  *
  * Conservative in the same way as its neighbours: a body with no `SEVERITY` is
@@ -221,7 +221,7 @@ export class AdtServiceBinding<
     // decided to.
     timeout?: number,
   ): Promise<IAdtWireResponse> {
-    // **The document Eclipse sends**, captured on the cloud trial: the target is
+    // **The document Eclipse sends**, captured on one system: the target is
     // named by *type* — `SCGR`, a service group — and by name, with no
     // `adtcore:uri`. This library used to send the binding's URI instead, and
     // the server accepted it; "the server accepted it" and "this is what the
@@ -266,7 +266,7 @@ export class AdtServiceBinding<
     // decided to.
     timeout?: number,
   ): Promise<IAdtWireResponse> {
-    // **The document Eclipse sends**, captured on the cloud trial: the target is
+    // **The document Eclipse sends**, captured on one system: the target is
     // named by *type* — `SCGR`, a service group — and by name, with no
     // `adtcore:uri`. This library used to send the binding's URI instead, and
     // the server accepted it; "the server accepted it" and "this is what the
@@ -507,7 +507,7 @@ export class AdtServiceBinding<
    *
    * **Publishing is what editing a service binding is** — it is not edited any
    * other way — so this is the lock a publication takes. Measured from Eclipse
-   * (ADT 3.60.3) on the trial, 2026-09-05: `_action=LOCK&accessMode=MODIFY` on a
+   * (ADT 3.60.3) , 2026-09-05: `_action=LOCK&accessMode=MODIFY` on a
    * stateful session before the job, and `_action=UNLOCK&lockHandle=…` when the
    * editor closes.
    *

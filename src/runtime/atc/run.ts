@@ -1,7 +1,7 @@
 /**
  * ATC check runs: the five requests a run is made of.
  *
- * The traffic here was captured against a cloud trial rather than taken from
+ * The traffic here was captured against one system rather than taken from
  * documentation, and two of the headers are the resource rather than a detail:
  * the worklist is created and read as `text/plain` where everything around it
  * is XML, and the run resource answers only to

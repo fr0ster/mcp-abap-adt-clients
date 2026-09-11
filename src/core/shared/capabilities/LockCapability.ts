@@ -58,7 +58,7 @@ export class LockCapability<TConfig, TReadResult = void>
         //
         // It used to stay stateful for the whole lock window, so every write
         // between lock and unlock ran inside the session. Eclipse does not:
-        // measured on E19, its stateful session carries `LOCK` and `UNLOCK` and
+        // measured its stateful session carries `LOCK` and `UNLOCK` and
         // nothing else — the source `PUT` goes out stateless on a session of
         // its own, carrying only `lockHandle` and `corrNr`.
         //

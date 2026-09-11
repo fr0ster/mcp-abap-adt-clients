@@ -53,7 +53,7 @@ export type IncludeValidationResult = string;
 /**
  * What the DELETE answers.
  *
- * Measured on E19 (`RFCSAPRL 816`): a successful DELETE does **not** release the
+ * Measured : a successful DELETE does **not** release the
  * lock with the object. The editing registration on the name stays, and the next
  * create for that name is answered 403 `ExceptionResourceNoAuthorization`. So the
  * unlock still has to run afterwards.

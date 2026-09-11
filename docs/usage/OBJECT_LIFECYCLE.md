@@ -224,7 +224,7 @@ Eclipse shows, which is where a caller picks the wrong one.
 
 The first two are the trap: "Local Types" in the Eclipse editor writes to
 `implementations`, and `definitions` is the one Eclipse calls *Class-relevant*
-Local Types. Both rows are from ADT 3.60.3 traffic against a cloud trial:
+Local Types. Both rows are from ADT 3.60.3 traffic against one system:
 
 ```
 PUT /sap/bc/adt/oo/classes/zadt_bld_cls02/includes/implementations?lockHandle=4E23…   200   stateless

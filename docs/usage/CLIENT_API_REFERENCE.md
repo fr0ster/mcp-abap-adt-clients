@@ -52,7 +52,7 @@ Additional factory methods follow the same shape — a config in, a contract bac
 
 ```typescript
 // Authorization Field (SUSO / AUTH) — DDIC-style, XML-only.
-// Available on modern on-prem (E19+) and cloud MDD; absent on legacy systems.
+// Available on modern on-prem (ABAP Platform 2022+) and cloud MDD; absent on legacy systems.
 // Endpoint: /sap/bc/adt/aps/iam/auth/{name}
 await client.getAuthorizationField().create({
   authorizationFieldName: 'ZAUTHF01',
@@ -80,7 +80,7 @@ const source = await fincl.readSource({
 });
 
 // Feature Toggle (FTG2/FT) — SAP feature-gate artifact with JSON source payload.
-// Available on modern on-prem and cloud MDD; absent on legacy kernels (E77).
+// Available on modern on-prem and cloud MDD; absent on legacy kernels (BASIS < 7.50).
 // Endpoint: /sap/bc/adt/sfw/featuretoggles/{name}
 // Factory returns IFeatureToggleObject — extends IAdtObject<IFeatureToggleConfig,
 // IFeatureToggleState> and adds five domain methods (switchOn, switchOff,
@@ -90,7 +90,7 @@ const toggle = client.getFeatureToggle();
 
 // --- 1. Create a custom feature toggle ---
 // CREATE typically requires SAP_DEVELOPER-equivalent authorization. On cloud
-// trial systems FTG2/FT creation is usually SAP-reserved — expect HTTP 403.
+// On some systems FTG2/FT creation is SAP-reserved — expect HTTP 403.
 // On modern on-prem (BASIS ≥ 7.50) with developer auth, this works.
 await toggle.create({
   featureToggleName: 'ZMY_FEATURE',
@@ -247,7 +247,7 @@ Contract notes:
 |-------------|-----------------|--------------------------|---------------------|-------------------------------------------|
 | Modern on-prem (BASIS ≥ 7.50) | ✅ with S_DEVELOP | ✅ with lock + transport | ✅ with transport | ✅ |
 | Cloud MDD | ⚠️ usually SAP-reserved; HTTP 403 for customer creation | ⚠️ typically limited to SAP-provided toggles | ⚠️ depends on toggle's `configurable` flag | ✅ against SAP-provided toggles |
-| Legacy (BASIS < 7.50, e.g. E77) | ❌ endpoint absent | ❌ | ❌ | ❌ |
+| Legacy (BASIS < 7.50, BASIS < 7.50) | ❌ endpoint absent | ❌ | ❌ | ❌ |
 
 ### AbapGit (ADT-integrated)
 
@@ -347,7 +347,7 @@ const log = await abapGit.getErrorLog('ZMY_PKG');
 await abapGit.unlink({ package: 'ZMY_PKG' });
 ```
 
-**Availability.** ADT-integrated abapGit ships with SAP BTP ABAP Environment (Steampunk) and modern on-prem from ABAP Platform 2022+. Legacy kernels (E77 and older) do not expose `/sap/bc/adt/abapgit/*`. This is **not** the community abapGit that installs via SE38 — that one is a separate ABAP program with its own UI and does not go through ADT.
+**Availability.** ADT-integrated abapGit ships with SAP BTP ABAP Environment (Steampunk) and modern on-prem from ABAP Platform 2022+. Legacy kernels (BASIS < 7.50) do not expose `/sap/bc/adt/abapgit/*`. This is **not** the community abapGit that installs via SE38 — that one is a separate ABAP program with its own UI and does not go through ADT.
 
 **Async pull contract.** `pull` starts the server-side job and answers. The job then runs on its own, and nothing you do on this side stops it — which is why the wait above is written in your code rather than hidden in a member with a timeout option. Poll `getRepo(package)` until `status !== 'R'` before re-issuing `pull` or `unlink`: starting a second pull while the first is still `R` is unsupported and fails fast.
 

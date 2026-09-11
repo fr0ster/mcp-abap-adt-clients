@@ -132,7 +132,7 @@ This is handled automatically by `createAdtClient()` which returns either `AdtCl
 Non-unicode legacy systems require `text/plain` (without `charset=utf-8`) as the source artifact content type in checkRun XML payloads. Set `SAP_UNICODE=false` in `.env` to configure this:
 
 ```env
-SAP_UNICODE=false   # Non-unicode legacy system (e.g., E77)
+SAP_UNICODE=false   # Non-unicode legacy system 
 ```
 
 If omitted, the library defaults to `text/plain; charset=utf-8` (unicode). Setting this incorrectly causes checkRun to return `notProcessed` with `"Dirty Source: Wrong content type"`.

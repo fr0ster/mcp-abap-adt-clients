@@ -33,7 +33,7 @@ export async function updateFeatureToggle(
       // No `X-sap-adt-sessiontype` here. A write is stateless — Eclipse sends
       // it that way, carrying only `lockHandle` and `corrNr` — and the header
       // was set on the request while the connection's own mode was stateless,
-      // so the connector never knew: measured on the trial, this PUT went out
+      // so the connector never knew: measured , this PUT went out
       // labelled stateful without the `sap-adt-request-id` the connector adds
       // in that mode. What the server takes during a request that runs inside
       // the session is held by that session, which is what

@@ -318,7 +318,7 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
    * Close the lock window, and the session mode with it.
    *
    * `lock()` sets stateful; only this puts it back. It did not, and the session
-   * stayed stateful for everything that followed — measured on E19, the four
+   * stayed stateful for everything that followed — measured the four
    * requests after an include's unlock all went out stateful: the read, the
    * **activation**, the read after it, and the deletion. Every other type here
    * pairs the two calls; this one set stateful and never cleared it.

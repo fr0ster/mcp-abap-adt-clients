@@ -29,7 +29,7 @@ This guide explains how `@mcp-abap-adt/adt-clients` manages ADT sessions for CRU
 - **A lock the server takes during activation outlives the `unlock`.** Activation
   generates, and generation takes `E_ABAP_GENPH` on the generated program; that
   one belongs to the ABAP session, not to the object, and is released when the
-  session ends — measured on E19, visible in SM12 for exactly as long as the
+  session ends — measured visible in SM12 for exactly as long as the
   session lives. Nothing in this library can release it earlier.
 - Tests and helpers track locks in `.locks/active-locks.json`.
 

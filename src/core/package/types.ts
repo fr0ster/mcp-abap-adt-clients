@@ -56,7 +56,7 @@ export type PackageValidationResult = string;
 /**
  * What the deletion answers.
  *
- * Measured on E19 2026-08-31: a package this session has just updated cannot be
+ * Measured 2026-08-31: a package this session has just updated cannot be
  * deleted by this session. `deletion/check` answers `isDeletable="true"` while
  * `deletion/delete` answers **200** carrying `isDeleted="false"` and PAK/058,
  * "package is already locked" — so the document, not the status, is the verdict.

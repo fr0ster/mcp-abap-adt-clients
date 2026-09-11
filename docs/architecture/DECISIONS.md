@@ -224,7 +224,7 @@ therefore "document reality".
 concatenates four arguments, and a placeholder shows that better, because it
 names what the argument is for instead of where somebody once ran it.
 
-**Deliberately not covered.** The ~35 comments reading "Measured on E19 <date>:
+**Deliberately not covered.** The ~35 comments reading "Measured <date>:
 …" stay. Those are not identifiers the code uses; they are the provenance of a
 measured fact, and stripping them would leave assertions about SAP with no
 record of where the answer came from.

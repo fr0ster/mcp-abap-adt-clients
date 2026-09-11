@@ -145,7 +145,7 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
    * Create the package: validate → create → check.
    *
    * The check is a checkrun on the new object, the way Eclipse does it, not a
-   * second call to the validation endpoint — captured on E19 2026-08-31, which
+   * second call to the validation endpoint — captured 2026-08-31, which
    * validates, creates, then posts `/sap/bc/adt/checkruns` on the created
    * package before it is ever locked.
    */
@@ -241,7 +241,7 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
    *
    * **Package update over RFC fails**, and not for the reason the old comment
    * gave. It said the PUT "cannot access the PAK lock created by the LOCK
-   * call". Measured on E19 2026-08-31, that is wrong: the PUT reads the
+   * call". Measured 2026-08-31, that is wrong: the PUT reads the
    * parameter, validates the handle, and accepts ours. Four answers from the
    * same endpoint, same session, same package, over rfc:
    *
@@ -350,7 +350,7 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
    * Delete the package.
    *
    * A package this session has just updated cannot be deleted by this session —
-   * measured on E19 2026-08-31: `deletion/check` answers `isDeletable="true"`
+   * measured 2026-08-31: `deletion/check` answers `isDeletable="true"`
    * while `deletion/delete` answers HTTP 200 carrying `isDeleted="false"` and
    * PAK/058, "package is already locked", even though the UNLOCK moments
    * earlier answered 200. It is not a delay: retried for 30 seconds inside the

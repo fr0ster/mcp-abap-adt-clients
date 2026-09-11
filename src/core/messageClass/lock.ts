@@ -105,7 +105,7 @@ export async function lockClassForMessage(
 /**
  * The class lock a message save needs, the way Eclipse takes it.
  *
- * A capture of Eclipse on E19 2026-08-31, creating ZOK_MESSAGE_0002 and adding
+ * A capture of Eclipse 2026-08-31, creating a message class and adding
  * message 000, shows the message-scoped variant refused and the plain class lock
  * granted right after, with the plain handle going on to the PUT. Whether
  * Eclipse asks conditionally or simply sends both is not visible in the log —
@@ -139,7 +139,7 @@ export async function lockClassForMessageOrPlain(
  * The message lock, or nothing — and nothing is a valid answer.
  *
  * `LOCK_MSG` is refused with 403 when the message class was created in this
- * same ABAP session: measured on E19 2026-08-31, and unavoidable over RFC,
+ * same ABAP session: measured 2026-08-31, and unavoidable over RFC,
  * where one conversation is one session for its whole life. The
  * message-scoped class lock is granted in exactly that situation, and a save
  * carrying it as `mc:lockhandle` answers 200 — so a refusal here costs the

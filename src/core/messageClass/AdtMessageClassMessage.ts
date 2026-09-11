@@ -286,7 +286,7 @@ export class AdtMessageClassMessage<
       });
 
       // The PUT carries the lock handle, so it does not need the lock session —
-      // and Eclipse deliberately keeps it out of one. In the E19 capture of
+      // and Eclipse deliberately keeps it out of one. In a capture of
       // 2026-08-31 every lock and unlock is on the stateful "enqueue" session
       // (155) while the PUT that saves the message runs stateless (215), as do
       // the reads around it. The locks survive because they belong to the
@@ -320,8 +320,7 @@ export class AdtMessageClassMessage<
       );
 
       // Back to the lock session to give the handles up, and in Eclipse's
-      // order: the class first, then the message locks. Captured on E19
-      // 2026-08-31 editing ZADT_MSGX01 — UNLOCK on the class at 15:17:15.085,
+      // order: the class first, then the message locks. Captured // 2026-08-31 editing ZADT_MSGX01 — UNLOCK on the class at 15:17:15.085,
       // UNLOCK_ALL on the message at 15:17:15.202. This file used to do the
       // reverse and said the class lock "must be the final release", which the
       // trace refutes.

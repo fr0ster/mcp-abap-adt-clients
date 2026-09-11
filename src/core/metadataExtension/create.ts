@@ -65,7 +65,7 @@ export async function createMetadataExtension(
   </adtcore:transportInfo>`
         : `<adtcore:packageRef adtcore:name="${params.packageName}"/>`
     }
-  
+
 </ddlxsources:ddlxSource>`;
 
   const headers = {

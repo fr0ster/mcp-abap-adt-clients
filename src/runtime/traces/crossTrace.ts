@@ -9,7 +9,7 @@
  * - Get trace activations
  *
  * **Nothing here has a measured non-empty shape.** Both a modern on-prem system
- * and a cloud trial answered `200` with an empty root — `<sxt:traces/>` and
+ * and one system answered `200` with an empty root — `<sxt:traces/>` and
  * `<sxt:activations/>` — under the typed content types. That is an answer, not
  * a gap: the endpoints exist and are served. It does mean any assumption about
  * the contents of an entry is unevidenced, so the readers hand the body back
