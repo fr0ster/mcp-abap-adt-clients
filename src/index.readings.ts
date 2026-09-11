@@ -79,6 +79,13 @@ export { serviceDefinitionDocuments } from './core/serviceDefinition/types';
 /** The reading of `/activation/inactiveobjects`, injectable since 18.0.0. */
 export { inactiveObjects } from './core/shared/getInactiveObjects';
 /**
+ * The run id out of a started activation's `Location` value.
+ *
+ * Exported beside `activationRunId`, for a caller whose own reading keeps the
+ * exchange and pulls the id out later.
+ */
+export { extractRunId } from './core/shared/groupActivation';
+/**
  * What a deletion check answers, named once for every result set that carries a
  * `deletionCheck` strategy. It is a different document from `check`'s.
  */
@@ -101,6 +108,7 @@ export type {
   PackageHierarchySupportedType,
 } from './core/shared/utilResults';
 export {
+  activationRunId,
   namedItems,
   nodeContents,
   searchHits,

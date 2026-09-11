@@ -19,6 +19,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
 import { parseNamedItems } from './allTypes';
+import { extractRunId } from './groupActivation';
 import { toNodeContents } from './nodeStructure';
 import { parseSearchResults } from './search';
 
@@ -236,4 +237,31 @@ export const whereUsedReferences: IResultStrategy<IWhereUsedListResult> = (
     resultDescription: root['@_resultDescription'] || '',
     references,
   };
+};
+
+/**
+ * The run id a started activation answers with.
+ *
+ * `/activation/runs` answers `202` and puts the id in `Location` — the body
+ * carries nothing a caller needs. So this is the **default** reading for
+ * `activateObjectsGroup`: without it the id is discarded and the two members
+ * that take one, {@link getActivationRun} and {@link getActivationResults},
+ * cannot be reached at all.
+ *
+ * A caller who wants the response itself passes `wireItself` in their reading
+ * set, and one who wants the body passes `rawDocument`.
+ *
+ * Answers `''` when no header carried an id. That is not a verdict about the
+ * server — it is this reading saying it found none, and whether a start without
+ * an id means anything is the caller's question.
+ */
+export const activationRunId: IResultStrategy<string> = (answer) => {
+  const headers = answer.headers as Record<string, unknown> | undefined;
+  const location =
+    headers?.location ??
+    headers?.Location ??
+    headers?.['content-location'] ??
+    headers?.['Content-Location'];
+
+  return extractRunId(location as never) ?? '';
 };

@@ -182,6 +182,8 @@ const RUNTIME_EXPORTS = [
   'metadataExtensionDocuments',
   'namedItems',
   'nodeContents',
+  'activationRunId',
+  'extractRunId',
   'nothing',
   'nothingIsARefusal',
   'packageDocuments',

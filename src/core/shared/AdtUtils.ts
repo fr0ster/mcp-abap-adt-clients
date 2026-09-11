@@ -110,6 +110,7 @@ import { getObjectStructure as getObjectStructureUtil } from './objectStructure'
 import { searchObjects } from './search';
 import { getSqlQuery } from './sqlQuery';
 import { getTableColumns, getTableContents } from './tableContents';
+import { activationRunId } from './utilResults';
 import { getVirtualFoldersContents } from './virtualFolders';
 import {
   assertWhereUsedTarget,
@@ -417,13 +418,26 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    * @param preauditRequested - Whether to request pre-audit
    * @returns Activation result
    */
+  /**
+   * Start an activation run — `/activation/runs`.
+   *
+   * One POST. It answers the **run id**, not the body: the server puts it in
+   * `Location` and the body carries nothing a caller needs, while both members
+   * that continue the sequence — {@link getActivationRun} and
+   * {@link getActivationResults} — take an id.
+   *
+   * `activationRunId` is that reading, exported for a caller who keeps the
+   * exchange with `wireItself` and pulls the id out later; `extractRunId` reads
+   * a `Location` value directly. The contract pins this member's result to a
+   * string, so the reading is not one of the injectable set.
+   */
   async activateObjectsGroup(
     objects: IObjectReference[],
     preauditRequested: boolean = false,
   ): Promise<IAdtResponse<string>> {
     return answering(
       () => activateObjectsGroup(this.connection, objects, preauditRequested),
-      rawDocument,
+      activationRunId,
     );
   }
 

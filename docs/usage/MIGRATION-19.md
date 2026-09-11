@@ -167,7 +167,7 @@ for the empty root; that distinction is now yours to make, on the body.
 | `AdtClass.updateTestClasses` | `lock`, `getLocalTestClass().update(config, { lockHandle })`, `unlock` |
 | `updateClassWithCheck` | `check`, then `update` |
 | `AdtAtc.run` | `resolveCheckVariant`, `createWorklist`, `startRun(worklistId, …)` |
-| the wait inside `activateObjectsGroup` | it is the POST; `extractRunId` reads the run id from `Location`, `getActivationRun(runId, { withLongPolling: true })` says what it is doing, `getActivationResults(runId)` fetches them |
+| the wait inside `activateObjectsGroup` | it is the POST; `extractRunId` reads the run id from `Location`, `activateObjectsGroup` answers the **run id**, `getActivationRun(runId, { withLongPolling: true })` says what it is doing, `getActivationResults(runId)` fetches them |
 | `runWithProfiling` | `scheduleTrace`, then `runWithProfiler(target, { profilerId })` |
 | the wait inside `AdtAbapGitClient.pull` | `listRepos` for the link, `pull({ package, pullLink })`, then poll `getRepo` |
 | the metadata read inside `getTableContents` | `getTableColumns(name)`, then `getTableContents({ …, sql_query })` |
@@ -178,6 +178,12 @@ just an order.
 **`getWhereUsedList` fell back silently.** When `/usageReferences/scope`
 answered `404` — some S/4 releases do — it searched unscoped and filtered the
 references client-side. Your system, your decision.
+
+**`activateObjectsGroup` answers the run id, not the body.** The server puts it
+in `Location` and the body carries nothing you need, while both members that
+continue the sequence take an id. `activationRunId` is that reading and
+`extractRunId` reads a `Location` value directly, both exported, for a caller
+whose own reading keeps the exchange instead.
 
 **`pull` waited on a job it could not stop.** The `AbortSignal` you passed
 aborted this client's own `sleep`, never the server's work. Written in your own
