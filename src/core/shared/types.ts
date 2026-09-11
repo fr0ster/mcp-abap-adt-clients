@@ -15,7 +15,6 @@ export type {
   AdtSourceObjectTypeLower,
   IGetDiscoveryParams,
   IGetNodeContentsOptions,
-  IGetPackageContentsOptions,
   IGetSqlQueryParams,
   IGetTableContentsParams,
   IGetVirtualFoldersContentsParams,
