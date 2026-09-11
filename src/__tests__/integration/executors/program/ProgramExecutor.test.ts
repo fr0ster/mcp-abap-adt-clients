@@ -325,13 +325,27 @@ describe('ProgramExecutor (integration)', () => {
         // be told apart from the ones already there.
         const tracesBefore = await traceIdsNow(profiler, { user: traceUser });
 
-        logTestStep('create trace parameters + run with profiler', testsLogger);
-        const result = expectResult(
-          await executor
-            .getProgramExecutor()
-            .runWithProfiling({ programName }, { profilerParameters }),
-          'result',
+        // Two calls since 19.0.0: schedule the measurement, then run under it.
+        // `runWithProfiling` did both, and the order was fixed in the library.
+        logTestStep(
+          'create trace parameters, then run with profiler',
+          testsLogger,
         );
+        const programExecutor = executor.getProgramExecutor();
+        const profilerId = expectResult(
+          await programExecutor.scheduleTrace(profilerParameters),
+          'scheduled trace',
+        );
+        const result = {
+          run: expectResult(
+            await programExecutor.runWithProfiler(
+              { programName },
+              { profilerId },
+            ),
+            'result',
+          ),
+          profilerId,
+        };
 
         const runOutput = String(result.run);
         expect(runOutput).toMatch(/PROGRAM_EXECUTOR_RUN_PROBE\(\s*\)\s*=\s*1/i);

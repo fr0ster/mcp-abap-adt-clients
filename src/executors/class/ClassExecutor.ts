@@ -1,13 +1,15 @@
 import type {
   IAbapConnection,
   IAdtResponse,
+  IAdtRunnable,
   IClassExecuteWithProfilerOptions,
   IClassExecuteWithProfilingOptions,
   IClassExecuteWithProfilingResult,
   IClassExecutionTarget,
-  IClassExecutor,
   ILogger,
   IProfilerTraceParameters,
+  IRunnableWithProfiler,
+  ITraceScheduling,
 } from '@mcp-abap-adt/interfaces';
 import { runClass } from '../../core/class/run';
 import type { INamedItem } from '../../core/shared/utilResults';
@@ -17,8 +19,24 @@ import { rawDocument } from '../../utils/resultStrategy';
 import { getTimeout } from '../../utils/timeouts';
 import { TraceScheduling } from '../traceScheduling';
 
+/**
+ * **Not `IClassExecutor` since 19.0.0.** That composite includes
+ * `IRunnableWithProfiling`, whose `runWithProfiling` scheduled a trace, ran the
+ * class under it, and answered both — three requests in one member, with the
+ * order fixed here. The three atoms below are what this class offers; a caller
+ * who wants the old member writes `scheduleTrace`, then `runWithProfiler` with
+ * the id it answered. The composite stays in the contract for an implementation
+ * that joins them.
+ */
 export class ClassExecutor
-  implements IClassExecutor<string, INamedItem[], ITraceRequestEntry[], string>
+  implements
+    IAdtRunnable<IClassExecutionTarget, string>,
+    IRunnableWithProfiler<
+      IClassExecutionTarget,
+      string,
+      IClassExecuteWithProfilerOptions
+    >,
+    ITraceScheduling<INamedItem[], ITraceRequestEntry[], string>
 {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
@@ -69,48 +87,6 @@ export class ClassExecutor
       throw new Error('profilerId is required');
     }
     return this.runWithProfilerId(target.className, options.profilerId);
-  }
-
-  /**
-   * Run under a freshly scheduled measurement.
-   *
-   * It does **not** wait for the trace. SAP writes traces asynchronously, so
-   * when this returns there may be no trace, there may never be one, and the
-   * caller may legitimately read it a week later — the feed carries an
-   * expiration about four weeks out.
-   *
-   * The previous version polled up to five times and then **threw** when it
-   * found nothing, which turned "the trace is not written yet" — the normal
-   * case — into a failed run. Worse, its fallback took the first id in the
-   * feed, and position in that feed is not age: it could return a trace from
-   * eight days earlier with no indication that it had.
-   *
-   * To read what this run produced: note `profiler.list()` before running,
-   * then look for an id that is new.
-   */
-  async runWithProfiling(
-    target: IClassExecutionTarget,
-    options: IClassExecuteWithProfilingOptions = {},
-  ): Promise<IAdtResponse<IClassExecuteWithProfilingResult<string>>> {
-    if (!target.className) {
-      throw new Error('Class name is required');
-    }
-
-    const scheduled = await this.scheduleTrace(options.profilerParameters);
-    if (!scheduled.ok) {
-      // The measurement could not be configured, so there is nothing to run
-      // under it — the scheduling's own failure is the answer.
-      return failed(scheduled.getError());
-    }
-    const profilerId = scheduled.getResult().value;
-    this.logger?.debug?.('Scheduled trace for class run', {
-      className: target.className,
-      profilerId,
-    });
-
-    const run = await this.runWithProfilerId(target.className, profilerId);
-    if (!run.ok) return failed(run.getError());
-    return succeeded({ run: run.getResult().value, profilerId });
   }
 
   private async runWithProfilerId(
