@@ -5,6 +5,67 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [19.0.0] - 2026-09-11
+
+**BREAKING — the verdict on a response belongs to the consumer.**
+
+The result and error strategies are injected so that decision is yours. This
+package was taking it first. Everything that read a response into a verdict is
+removed; what ADT answered reaches you whole.
+
+Full migration: [`docs/usage/MIGRATION-19.md`](docs/usage/MIGRATION-19.md).
+
+### Removed
+
+- `activationRefusal`, `validationRefusal`, `deletionRefusal` — the three
+  failure strategies, unwired from the 81 call sites where they were the
+  default.
+- `parseCheckRunResponse` and the `CheckMessage` shape.
+- `parseDeletionCheck`, `assertDeletable`, `DeletionNotPermittedError`,
+  `assertActivationSucceeded`.
+- `withRefusalDetection` — see Changed.
+- `waitForCleanCheckRun`, which polled a check run until the report came back
+  empty and judged every answer on the way.
+- The trailing `logger?: ILogger` parameter of `checkDdl` and
+  `checkAccessControl`, which existed only for the retries that went with it.
+  Neither function is exported from this package.
+
+### Added
+
+- `nothingIsARefusal` — the one failure strategy here, and it finds none. Every
+  exchange that produced an answer comes back as a success carrying it,
+  refusals included. A request that never completed is still a failure.
+- `withRequestTrace` — the half of the old connection wrapper that is
+  mechanical: it puts `{ method, url }` back on an answer the connection
+  normalised it off, on both the returning and the throwing path.
+
+### Changed
+
+- **The default `analyse` is none.** Members pass `options?.analyse` through and
+  substitute nothing. An ADT refusal delivered inside a `2xx` now arrives as a
+  success carrying that document. A transport failure is still a failure,
+  carrying its response and its request.
+- **Nineteen `check*` functions return their report** instead of raising
+  `Error('… check failed: …')`. A check run that finds a syntax error is a check
+  run that worked, and the throw was costing the findings, the line numbers and
+  the T100 keys. The `ddl` and `accessControl` retries are gone with them: both
+  were waits on the server.
+- `class/validation.ts` and `functionModule/validation.ts` no longer raise a
+  verdict from a check report.
+- `updateClassWithCheck` still runs the check and no longer reads the report.
+- Documentation that described the shipped defaults — `ARCHITECTURE.md`,
+  `CLIENT_API_REFERENCE.md`, `OBJECT_LIFECYCLE.md`, `TROUBLESHOOTING.md` — says
+  what this package does now and points at the `analyse` you supply.
+- `check:docs` no longer scans `docs/superpowers/`. A plan describes code that
+  does not exist yet, so checking its imports against today's exports would fail
+  every plan for being a plan.
+
+### Unchanged
+
+Result strategies. `rawDocument` is still the default reading everywhere it was,
+so no member's return type moved, and `wireItself` still hands back the whole
+exchange.
+
 ## [18.0.2] - 2026-09-08
 
 **Documentation only — what `FINDING_STATS` counts, measured twice instead of
