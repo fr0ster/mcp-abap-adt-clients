@@ -12,79 +12,8 @@ import type {
   IUpdatePackageParams,
 } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_PACKAGE, CT_PACKAGE } from '../../constants/contentTypes';
-import {
-  encodeSapObjectName,
-  limitDescription,
-} from '../../utils/internalUtils';
+import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
-import {
-  extractXmlString,
-  patchIf,
-  patchXmlAttribute,
-  patchXmlElementAttribute,
-} from '../../utils/xmlPatch';
-
-/**
- * Patch current package XML with updated values.
- * Only modifies fields that are explicitly provided in args.
- */
-function patchPackageXml(
-  currentXml: string,
-  args: IUpdatePackageParams,
-): string {
-  let xml = currentXml;
-
-  // Read-modify-write: empty string means "don't change" — preserve value from GET.
-  // Only non-empty values are patched into the XML.
-
-  // Description (always provided for update)
-  if (args.description) {
-    const description = limitDescription(args.description);
-    xml = patchXmlAttribute(xml, 'adtcore:description', description);
-  }
-
-  // Responsible
-  xml = patchIf(xml, args.responsible || undefined, (x, val) =>
-    patchXmlAttribute(x, 'adtcore:responsible', val),
-  );
-
-  // Master system
-  xml = patchIf(xml, args.master_system || undefined, (x, val) =>
-    patchXmlAttribute(x, 'adtcore:masterSystem', val),
-  );
-
-  // Package type (pak:packageType attribute on pak:attributes element)
-  xml = patchIf(xml, args.package_type || undefined, (x, val) =>
-    patchXmlElementAttribute(x, 'pak:attributes', 'pak:packageType', val),
-  );
-
-  // Record changes
-  if (args.record_changes !== undefined) {
-    xml = patchXmlElementAttribute(
-      xml,
-      'pak:attributes',
-      'pak:recordChanges',
-      args.record_changes ? 'true' : 'false',
-    );
-  }
-
-  // Super package
-  xml = patchIf(xml, args.super_package || undefined, (x, val) =>
-    patchXmlElementAttribute(x, 'pak:superPackage', 'adtcore:name', val),
-  );
-
-  // Software component
-  xml = patchIf(xml, args.software_component || undefined, (x, val) =>
-    patchXmlElementAttribute(x, 'pak:softwareComponent', 'pak:name', val),
-  );
-
-  // Transport layer
-  xml = patchIf(xml, args.transport_layer || undefined, (x, val) =>
-    patchXmlElementAttribute(x, 'pak:transportLayer', 'pak:name', val),
-  );
-
-  return xml;
-}
 
 /**
  * Write the document the caller built.

@@ -5,60 +5,85 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
-## [19.0.0] - 2026-09-11
+## [19.0.0] - 2026-09-12
 
-**BREAKING — the verdict on a response belongs to the consumer.**
+**BREAKING — this package stops deciding anything.**
 
-The result and error strategies are injected so that decision is yours. This
-package was taking it first. Everything that read a response into a verdict is
-removed; what ADT answered reaches you whole.
+Two rules produced every change, and both were the design's stated intent. The
+verdict on a response belongs to the consumer, because the strategies are
+injected so that decision is theirs. And one member issues one endpoint call,
+because a member that sends several has already chosen an order and cannot be
+given a reading at all — `IResultStrategy` takes one answer.
+
+Needs `@mcp-abap-adt/interfaces` 43.0.0.
 
 Full migration: [`docs/usage/MIGRATION-19.md`](docs/usage/MIGRATION-19.md).
 
-### Removed
+### Removed — readings that produced a verdict
 
-- `activationRefusal`, `validationRefusal`, `deletionRefusal` — the three
-  failure strategies, unwired from the 81 call sites where they were the
-  default.
-- `parseCheckRunResponse` and the `CheckMessage` shape.
-- `parseDeletionCheck`, `assertDeletable`, `DeletionNotPermittedError`,
-  `assertActivationSucceeded`.
-- `withRefusalDetection` — see Changed.
-- `waitForCleanCheckRun`, which polled a check run until the report came back
-  empty and judged every answer on the way.
-- The trailing `logger?: ILogger` parameter of `checkDdl` and
-  `checkAccessControl`, which existed only for the retries that went with it.
-  Neither function is exported from this package.
+`activationRefusal`, `validationRefusal`, `deletionRefusal` — the three failure
+strategies, unwired from the 81 call sites where they were the default.
+`parseCheckRunResponse` and the `CheckMessage` shape. `parseDeletionCheck`,
+`assertDeletable`, `DeletionNotPermittedError`, `assertActivationSucceeded`.
+`withRefusalDetection` — see Changed. `waitForCleanCheckRun`, which polled a
+check run until the report came back empty and judged every answer on the way.
+
+Their source is recoverable at the `18.0.2` tag.
+
+### Removed — members that made several requests
+
+The package walks `getPackageContents`, `getPackageContentsList`,
+`getPackageHierarchy`; the object walks `getIncludesList`,
+`listFunctionModules`, `listFunctionGroupIncludes`; and the sequences
+`getWhereUsedList`, `AdtClass.updateTestClasses`, `updateClassWithCheck`,
+`AdtAtc.run`, `runWithProfiling` on both executors.
+
+Every single-request step they were built from stays, and the migration shows
+the sequence for each. `AdtMessageClassMessage.writeClass` is the one exception:
+a message is a row inside its class's document, and no endpoint writes one.
 
 ### Added
 
 - `nothingIsARefusal` — the one failure strategy here, and it finds none. Every
-  exchange that produced an answer comes back as a success carrying it,
-  refusals included. A request that never completed is still a failure.
-- `withRequestTrace` — the half of the old connection wrapper that is
-  mechanical: it puts `{ method, url }` back on an answer the connection
-  normalised it off, on both the returning and the throwing path.
+  exchange that produced an answer comes back as a success carrying it.
+- `withRequestTrace` — the mechanical half of the old connection wrapper: it
+  puts `{ method, url }` back on an answer the connection normalised it off, on
+  both the returning and the throwing path.
+- `whereUsedReferences` — the reference-list shape the old walker returned,
+  offered by name rather than imposed. Not a default.
+- `getTableColumns`, `getActivationResults`, `extractRunId`,
+  `AdtAtc.resolveCheckVariant`, `AdtAtc.createWorklist`, `AdtAtc.startRun` — the
+  steps promoted so a caller can compose what the removed members joined.
+- `pullLink` on `IAbapGitRepoStatus`, because a caller who cannot see it cannot
+  start a pull.
 
 ### Changed
 
-- **The default `analyse` is none.** Members pass `options?.analyse` through and
-  substitute nothing. An ADT refusal delivered inside a `2xx` now arrives as a
-  success carrying that document. A transport failure is still a failure,
-  carrying its response and its request.
-- **Nineteen `check*` functions return their report** instead of raising
-  `Error('… check failed: …')`. A check run that finds a syntax error is a check
-  run that worked, and the throw was costing the findings, the line numbers and
-  the T100 keys. The `ddl` and `accessControl` retries are gone with them: both
-  were waits on the server.
-- `class/validation.ts` and `functionModule/validation.ts` no longer raise a
-  verdict from a check report.
-- `updateClassWithCheck` still runs the check and no longer reads the report.
-- Documentation that described the shipped defaults — `ARCHITECTURE.md`,
-  `CLIENT_API_REFERENCE.md`, `OBJECT_LIFECYCLE.md`, `TROUBLESHOOTING.md` — says
-  what this package does now and points at the `analyse` you supply.
-- `check:docs` no longer scans `docs/superpowers/`. A plan describes code that
-  does not exist yet, so checking its imports against today's exports would fail
-  every plan for being a plan.
+- **The default `analyse` is none.** An ADT refusal delivered inside a `2xx` now
+  arrives as a success carrying that document. A transport failure is still a
+  failure, carrying its response and its request.
+- **Eighteen `check.ts` modules return their report** instead of raising. A
+  check run that finds a syntax error is a check run that worked, and the throw
+  cost the findings, the line numbers and the T100 keys. The `ddl` and
+  `accessControl` retries went with them: both were waits on the server.
+- **`update` takes a complete document** on domain, package, dataElement,
+  tableType, transport and functionGroup. A partial update no longer exists: the
+  fields beside `document` describe a create, and a field left out is not
+  preserved. The patch helpers went with the read.
+- **`pull` is one POST** and answers nothing, like `link` and `unlink`.
+  `IAbapGitPullResult` held a `finalStatus` and an `errorLog`, both products of
+  the polling.
+- **`getTableContents` posts the statement it is given.**
+- **A create no longer reads `/core/http/systeminformation`** to fill
+  `masterSystem` and `responsible`. Both come from the config, and that read
+  swallowed its own failure and answered `null`.
+- **454 input guards are gone.** The field was already required in the type; the
+  guard added a string this package invented, thrown out of a member whose
+  contract promises an `IAdtResponse`. **One stays**, on the `create` of the 25
+  handlers whose object lives in a package: an object created without one cannot
+  be removed through ADT at all.
+- **Notes name no system.** 51 references to the system an observation came from
+  are gone across 32 files; the observations and their dates stay.
 
 ### Unchanged
 

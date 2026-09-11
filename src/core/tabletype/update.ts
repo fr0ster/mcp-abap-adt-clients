@@ -7,65 +7,13 @@
  */
 
 import type {
-  HttpError,
   IAbapConnection,
   IAdtWireResponse,
-  ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { CT_TABLE_TYPE } from '../../constants/contentTypes';
-import {
-  encodeSapObjectName,
-  limitDescription,
-  writeQuery,
-} from '../../utils/internalUtils';
+import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
-import {
-  extractXmlString,
-  patchIf,
-  patchXmlAttribute,
-  patchXmlElement,
-} from '../../utils/xmlPatch';
 import type { IUpdateTableTypeParams } from './types';
-
-/**
- * Patch current table type XML with updated values.
- * Only modifies fields that are explicitly provided in params.
- */
-function patchTableTypeXml(
-  currentXml: string,
-  params: IUpdateTableTypeParams,
-): string {
-  let xml = currentXml;
-
-  // Description
-  if (params.description) {
-    const description = limitDescription(params.description);
-    xml = patchXmlAttribute(xml, 'adtcore:description', description);
-  }
-
-  // Row type
-  xml = patchIf(xml, params.row_type_kind, (x, val) =>
-    patchXmlElement(x, 'ttyp:typeKind', val),
-  );
-  xml = patchIf(xml, params.row_type_name, (x, val) =>
-    patchXmlElement(x, 'ttyp:typeName', val.toUpperCase()),
-  );
-
-  // Access type
-  xml = patchIf(xml, params.access_type, (x, val) =>
-    patchXmlElement(x, 'ttyp:accessType', val),
-  );
-
-  // Primary key
-  xml = patchIf(xml, params.primary_key_definition, (x, val) =>
-    patchXmlElement(x, 'ttyp:definition', val),
-  );
-  xml = patchIf(xml, params.primary_key_kind, (x, val) =>
-    patchXmlElement(x, 'ttyp:kind', val),
-  );
-
-  return xml;
-}
 
 /**
  * Write the document the caller built.

@@ -4,6 +4,12 @@
 
 TypeScript clients for SAP ABAP Development Tools (ADT).
 
+> **Upgrading from 18.x?** 19.0.0 stops this package from deciding anything: the
+> readings that turned a response into a verdict are gone, every member issues
+> one endpoint call, and 454 input guards went with them.
+> [`docs/usage/MIGRATION-19.md`](docs/usage/MIGRATION-19.md) is what a consumer
+> on the old contract has to change.
+
 ## Features
 
 - ✅ **Client API** – simplified interface for common operations:
