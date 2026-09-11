@@ -203,10 +203,7 @@ import { AdtUtils } from '../core/shared/AdtUtils';
 import { type LockFailure, LockRegistry } from '../core/shared/LockRegistry';
 import type { ObjectVersion } from '../core/shared/results';
 import { type IUtilResults, utilDocuments } from '../core/shared/utilResultSet';
-import type {
-  IPackageContentItem,
-  IWhereUsedListResult,
-} from '../core/shared/utilResults';
+import type { IWhereUsedListResult } from '../core/shared/utilResults';
 import {
   AdtStructure,
   type IStructureConfig,

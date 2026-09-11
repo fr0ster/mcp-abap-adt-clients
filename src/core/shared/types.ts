@@ -34,8 +34,6 @@ export type {
   IInactiveObjectsResponse,
   INamedItem,
   IObjectReference,
-  IPackageContentItem,
-  IPackageHierarchyNode,
   IRepositoryNodeChild,
   IRepositoryNodeContents,
   IRepositoryObjectNode,

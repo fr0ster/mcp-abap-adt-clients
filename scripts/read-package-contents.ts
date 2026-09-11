@@ -31,10 +31,7 @@ import {
   createLibraryLogger,
 } from '../src/__tests__/helpers/testLogger';
 import { AdtClient } from '../src/clients/AdtClient';
-import type {
-  IPackageContentItem,
-  IPackageHierarchyNode,
-} from '../src/core/shared/types';
+import type {} from '../src/core/shared/types';
 import type { IWalkedNode } from './lib/packageWalk';
 import { walkPackage } from './lib/packageWalk';
 

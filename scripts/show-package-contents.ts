@@ -29,7 +29,6 @@ import {
   createLibraryLogger,
 } from '../src/__tests__/helpers/testLogger';
 import { AdtClient } from '../src/clients/AdtClient';
-import type { IPackageHierarchyNode } from '../src/core/shared/types';
 import { orThrow } from '../src/utils/adtResponse';
 import type { IWalkedNode } from './lib/packageWalk';
 import { walkPackage } from './lib/packageWalk';

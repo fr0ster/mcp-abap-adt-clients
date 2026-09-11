@@ -12,9 +12,9 @@ import type {
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
+import type { IWalkedNode } from '../../../../scripts/lib/packageWalk';
 import { walkPackage } from '../../../../scripts/lib/packageWalk';
 import type { AdtClient } from '../../../clients/AdtClient';
-import type { IPackageHierarchyNode } from '../../../core/shared/utilResults';
 import { failed } from '../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import type { TestableObject } from '../../helpers/BaseTester';
@@ -83,7 +83,7 @@ class PackageHierarchyObject
 
   read(
     config: Partial<IPackageHierarchyParams>,
-  ): Promise<IAdtResponse<IPackageHierarchyNode>> {
+  ): Promise<IAdtResponse<IWalkedNode>> {
     if (!config.package_name) {
       return Promise.reject(new Error('package_name required'));
     }
@@ -94,9 +94,9 @@ class PackageHierarchyObject
         ({
           ok: true,
           getResult: () => ({
-            value: tree as unknown as IPackageHierarchyNode,
+            value: tree as unknown as IWalkedNode,
           }),
-        }) as unknown as IAdtResponse<IPackageHierarchyNode>,
+        }) as unknown as IAdtResponse<IWalkedNode>,
     );
   }
 
@@ -227,7 +227,7 @@ describe('Shared - getPackageHierarchy', () => {
       try {
         const result = (await tester.readTest(config, {
           skipReadMetadata: true,
-        })) as IPackageHierarchyNode;
+        })) as IWalkedNode;
         expect(result?.name).toBeDefined();
         expect(result?.name).toBe(config.package_name.toUpperCase());
         expect(result?.type).toBeDefined();

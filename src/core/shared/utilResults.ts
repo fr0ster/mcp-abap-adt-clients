@@ -113,27 +113,6 @@ export type PackageHierarchySupportedType =
 
 export type PackageHierarchyCodeFormat = 'source' | 'xml';
 
-/** One node of a package tree. */
-export interface IPackageHierarchyNode extends IAdtObjectHit {
-  /** Coarse classification of the node, derived from its `type` code. */
-  kind?: PackageHierarchySupportedType;
-  /** Whether this node is a subpackage. */
-  isPackage: boolean;
-  codeFormat?: PackageHierarchyCodeFormat;
-  restoreStatus?: 'ok' | 'not-implemented';
-  children?: IPackageHierarchyNode[];
-}
-
-/** One item of a flat package listing. */
-export interface IPackageContentItem extends IAdtObjectHit {
-  /** Coarse classification of the item, derived from its `type` code. */
-  kind?: PackageHierarchySupportedType;
-  /** Package containing this object — always known when listing a package. */
-  packageName: string;
-  /** Whether this item is a subpackage */
-  isPackage: boolean;
-}
-
 /** How far a package listing walks. */
 export interface IGetPackageContentsListOptions {
   includeSubpackages?: boolean;
