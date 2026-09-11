@@ -41,17 +41,7 @@ export async function createTransport(
   connection: IAbapConnection,
   params: ICreateTransportParams,
 ): Promise<IAdtWireResponse> {
-  if (!params.description) {
-    throw new Error('Transport description is required');
-  }
-
-  const username = params.owner;
-
-  if (!username) {
-    throw new Error(
-      'Cannot create transport request: owner is required. Please provide owner in params.',
-    );
-  }
+  const username = params.owner as string;
 
   const url = `/sap/bc/adt/cts/transportrequests`;
 

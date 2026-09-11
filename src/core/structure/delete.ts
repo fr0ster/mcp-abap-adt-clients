@@ -29,10 +29,6 @@ export async function checkDeletion(
 ): Promise<IAdtWireResponse> {
   const { structure_name } = params;
 
-  if (!structure_name) {
-    throw new Error('structure_name is required');
-  }
-
   const encodedName = encodeSapObjectName(structure_name);
   const objectUri = `/sap/bc/adt/ddic/structures/${encodedName}`;
 
@@ -66,10 +62,6 @@ export async function deleteStructure(
   params: DeleteStructureParams,
 ): Promise<IAdtWireResponse> {
   const { structure_name, transport_request } = params;
-
-  if (!structure_name) {
-    throw new Error('structure_name is required');
-  }
 
   const encodedName = encodeSapObjectName(structure_name);
   const objectUri = `/sap/bc/adt/ddic/structures/${encodedName}`;

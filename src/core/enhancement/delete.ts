@@ -29,13 +29,6 @@ export async function checkDeletion(
 ): Promise<IAdtWireResponse> {
   const { enhancement_name, enhancement_type } = params;
 
-  if (!enhancement_name) {
-    throw new Error('enhancement_name is required');
-  }
-  if (!enhancement_type) {
-    throw new Error('enhancement_type is required');
-  }
-
   const encodedName = encodeSapObjectName(enhancement_name);
   const objectUri = getEnhancementUri(enhancement_type, encodedName);
 
@@ -72,13 +65,6 @@ export async function deleteEnhancement(
   params: IDeleteEnhancementParams,
 ): Promise<IAdtWireResponse> {
   const { enhancement_name, enhancement_type, transport_request } = params;
-
-  if (!enhancement_name) {
-    throw new Error('enhancement_name is required');
-  }
-  if (!enhancement_type) {
-    throw new Error('enhancement_type is required');
-  }
 
   const encodedName = encodeSapObjectName(enhancement_name);
   const objectUri = getEnhancementUri(enhancement_type, encodedName);

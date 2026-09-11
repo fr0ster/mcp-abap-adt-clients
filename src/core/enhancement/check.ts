@@ -33,13 +33,6 @@ export async function checkEnhancement(
     source_code,
   } = params;
 
-  if (!enhancement_name) {
-    throw new Error('enhancement_name is required');
-  }
-  if (!enhancement_type) {
-    throw new Error('enhancement_type is required');
-  }
-
   const encodedName = encodeSapObjectName(enhancement_name).toLowerCase();
   const objectUri = getEnhancementUri(enhancement_type, encodedName);
   const versionParam = version === 'inactive' ? 'workingArea' : 'active';

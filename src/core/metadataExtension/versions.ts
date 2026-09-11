@@ -12,8 +12,9 @@ export async function getMetadataExtensionVersions(
   connection: IAbapConnection,
   config: Partial<IMetadataExtensionConfig>,
 ): Promise<ObjectVersion[]> {
-  if (!config.name) throw new Error('name is required');
-  const encodedName = encodeSapObjectName(config.name.toLowerCase());
+  const encodedName = encodeSapObjectName(
+    (config.name as string).toLowerCase(),
+  );
   const url = `/sap/bc/adt/ddic/ddlx/sources/${encodedName}/source/main/versions`;
   try {
     const res = await connection.makeAdtRequest({

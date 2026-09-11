@@ -21,13 +21,6 @@ export async function createTable(
   connection: IAbapConnection,
   params: ICreateTableParams,
 ): Promise<IAdtWireResponse> {
-  if (!params.table_name) {
-    throw new Error('Table name is required');
-  }
-  if (!params.package_name) {
-    throw new Error('Package name is required');
-  }
-
   const masterSystem = params.masterSystem || '';
   const responsible = params.responsible || '';
 

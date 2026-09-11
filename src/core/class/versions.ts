@@ -19,7 +19,6 @@ export async function getClassIncludeVersions(
   className: string,
   includeType: ClassIncludeType,
 ): Promise<ObjectVersion[]> {
-  if (!className) throw new Error('className is required');
   const encodedName = encodeSapObjectName(className);
   const url = `/sap/bc/adt/oo/classes/${encodedName}/includes/${includeType}/versions`;
   try {

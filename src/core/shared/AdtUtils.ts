@@ -667,10 +667,6 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    * @returns Query result
    */
   async getSqlQuery(params: IGetSqlQueryParams): Promise<IAdtResponse<string>> {
-    if (!params.sql_query) {
-      throw new Error('SQL query is required');
-    }
-
     return answering(() => getSqlQuery(this.connection, params), rawDocument);
   }
 
@@ -771,13 +767,6 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
     objectType: string,
     objectName: string,
   ): Promise<IAdtResponse<string>> {
-    if (!objectType) {
-      throw new Error('Object type is required');
-    }
-    if (!objectName) {
-      throw new Error('Object name is required');
-    }
-
     return answering(
       () => getObjectStructureUtil(this.connection, objectType, objectName),
       rawDocument,
@@ -799,10 +788,6 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    * ```
    */
   async getInclude(includeName: string): Promise<IAdtResponse<string>> {
-    if (!includeName) {
-      throw new Error('Include name is required');
-    }
-
     return answering(
       () => getIncludeUtil(this.connection, includeName),
       rawDocument,
@@ -856,10 +841,7 @@ function getObjectMetadataUri(
       return `/sap/bc/adt/oo/interfaces/${encodedName}`;
     case 'functionmodule':
     case 'fugr/ff': {
-      if (!functionGroup) {
-        throw new Error('Function group is required for function module');
-      }
-      const encodedGroup = encodeSapObjectName(functionGroup);
+      const encodedGroup = encodeSapObjectName(functionGroup as string);
       return `/sap/bc/adt/functions/groups/${encodedGroup}/fmodules/${encodedName}`;
     }
     case 'view':
@@ -957,10 +939,7 @@ function getObjectSourceUri(
       return `/sap/bc/adt/oo/interfaces/${encodedName}/source/main${versionParam}`;
     case 'functionmodule':
     case 'fugr/ff': {
-      if (!functionGroup) {
-        throw new Error('Function group is required for function module');
-      }
-      const encodedGroup = encodeSapObjectName(functionGroup);
+      const encodedGroup = encodeSapObjectName(functionGroup as string);
       return `/sap/bc/adt/functions/groups/${encodedGroup}/fmodules/${encodedName}/source/main${versionParam}`;
     }
     case 'view':

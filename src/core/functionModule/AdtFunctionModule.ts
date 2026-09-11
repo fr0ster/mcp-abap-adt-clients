@@ -133,15 +133,9 @@ export class AdtFunctionModule<
     group: string;
     module: string;
   } {
-    if (!config.functionModuleName) {
-      throw new Error('Function module name is required');
-    }
-    if (!config.functionGroupName) {
-      throw new Error('Function group name is required');
-    }
     return {
-      group: config.functionGroupName,
-      module: config.functionModuleName,
+      group: config.functionGroupName as string,
+      module: config.functionModuleName as string,
     };
   }
 
@@ -177,9 +171,6 @@ export class AdtFunctionModule<
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const { group, module } = this.names(config);
-    if (!config.description) {
-      throw new Error('Description is required');
-    }
     return answering(
       () =>
         createFunctionModule(connection, {
@@ -279,9 +270,6 @@ export class AdtFunctionModule<
     // nowhere else to arrive.
     const source = options?.sourceCode;
 
-    if (!source) {
-      throw new Error('Source code is required for update');
-    }
     return answering(
       () =>
         update(
@@ -289,7 +277,7 @@ export class AdtFunctionModule<
           {
             functionModuleName: module,
             functionGroupName: group,
-            sourceCode: source,
+            sourceCode: source as string,
             lockHandle: options?.lockHandle as string,
             transportRequest: config.transportRequest,
           },

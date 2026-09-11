@@ -87,12 +87,6 @@ export class AdtLocalTypes<R extends IClassResults = typeof classDocuments>
 
     // Nothing was asked of the server yet, so there is no answer to describe:
     // a missing required argument is the caller's mistake and it throws.
-    if (!config.className) {
-      throw new Error('Class name is required for validation');
-    }
-    if (!config.localTypesCode) {
-      throw new Error('Local types code is required for validation');
-    }
 
     return answering(
       () =>
@@ -116,10 +110,6 @@ export class AdtLocalTypes<R extends IClassResults = typeof classDocuments>
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
-
-    if (!config.className) {
-      throw new Error('Class name is required');
-    }
 
     // No 404 special case any more: ADT answers a read for an include that was
     // never written with 200 and an empty body, so absence was never a status
@@ -160,19 +150,10 @@ export class AdtLocalTypes<R extends IClassResults = typeof classDocuments>
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    if (!config.className) {
-      throw new Error('Class name is required');
-    }
     // An empty string is source: writing it is how the include is emptied
     // (see delete()). Only its absence is an error.
-    if (
-      config.localTypesCode === undefined &&
-      options?.sourceCode === undefined
-    ) {
-      throw new Error('Local types code is required');
-    }
 
-    const name = config.className;
+    const name = config.className as string;
     const source = options?.sourceCode ?? config.localTypesCode ?? '';
 
     return answering(
@@ -203,10 +184,6 @@ export class AdtLocalTypes<R extends IClassResults = typeof classDocuments>
     config: Partial<ILocalTypesConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
-    if (!config.className) {
-      throw new Error('Class name is required');
-    }
-
     return await this.update({ ...config, localTypesCode: '' }, options);
   }
 
@@ -218,13 +195,6 @@ export class AdtLocalTypes<R extends IClassResults = typeof classDocuments>
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
-
-    if (!config.className) {
-      throw new Error('Class name is required');
-    }
-    if (!config.localTypesCode) {
-      throw new Error('Local types code is required');
-    }
 
     return answering(
       () =>
@@ -244,8 +214,7 @@ export class AdtLocalTypes<R extends IClassResults = typeof classDocuments>
   async getVersions(
     config: Partial<ILocalTypesConfig>,
   ): Promise<IAdtResponse<ObjectVersion[]>> {
-    if (!config.className) throw new Error('className is required');
-    const name = config.className;
+    const name = config.className as string;
     return answering(
       async () => ({
         data: await this.getIncludeVersions(name, 'implementations'),

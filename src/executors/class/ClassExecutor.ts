@@ -67,9 +67,6 @@ export class ClassExecutor
   ): Promise<IAdtResponse<string>> => this.scheduling.scheduleTrace(options);
 
   async run(target: IClassExecutionTarget): Promise<IAdtResponse<string>> {
-    if (!target.className) {
-      throw new Error('Class name is required');
-    }
     return answering(
       () => runClass(this.connection, target.className, true),
       rawDocument,
@@ -80,12 +77,6 @@ export class ClassExecutor
     target: IClassExecutionTarget,
     options: IClassExecuteWithProfilerOptions,
   ): Promise<IAdtResponse<string>> {
-    if (!target.className) {
-      throw new Error('Class name is required');
-    }
-    if (!options.profilerId) {
-      throw new Error('profilerId is required');
-    }
     return this.runWithProfilerId(target.className, options.profilerId);
   }
 

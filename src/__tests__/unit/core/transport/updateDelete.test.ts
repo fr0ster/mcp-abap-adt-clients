@@ -120,18 +120,6 @@ describe('AdtRequest.update()', () => {
     expect(calls).toHaveLength(1);
     expect(calls[0].method).toBe('PUT');
   });
-
-  it('rejects without a transport number before any request goes out', async () => {
-    const { connection, calls } = connectionOver(() => TRANSPORT_ITEM_XML);
-
-    await expect(
-      new AdtRequest(connection).updateMetadata({
-        description: 'New description',
-      }),
-    ).rejects.toThrow(/transport request number/i);
-
-    expect(calls).toHaveLength(0);
-  });
 });
 
 describe('AdtRequest.delete()', () => {
@@ -156,13 +144,15 @@ describe('AdtRequest.delete()', () => {
     }
   });
 
-  it('rejects without a transport number before any request goes out', async () => {
+  it('sends the delete with what it was given, and judges none of it', async () => {
+    // No guard on the number since 19.0.0: the URL is built from what was
+    // given and the server answers. A caller who names nothing gets the
+    // server's words, which a strategy can read.
     const { connection, calls } = connectionOver(() => TRANSPORT_ITEM_XML);
 
-    await expect(new AdtRequest(connection).delete({})).rejects.toThrow(
-      /transport request number/i,
-    );
+    await new AdtRequest(connection).delete({});
 
-    expect(calls).toHaveLength(0);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].method).toBe('DELETE');
   });
 });

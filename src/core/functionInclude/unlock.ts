@@ -20,16 +20,6 @@ export async function unlockFunctionInclude(
   includeName: string,
   lockHandle: string,
 ): Promise<IAdtWireResponse> {
-  if (!groupName) {
-    throw new Error('Function group name is required');
-  }
-  if (!includeName) {
-    throw new Error('Include name is required');
-  }
-  if (!lockHandle) {
-    throw new Error('lockHandle is required');
-  }
-
   const groupLower = encodeSapObjectName(groupName).toLowerCase();
   const encodedInclude = encodeSapObjectName(includeName.toUpperCase());
   const url = `/sap/bc/adt/functions/groups/${groupLower}/includes/${encodedInclude}?_action=UNLOCK&lockHandle=${encodeURIComponent(lockHandle)}`;

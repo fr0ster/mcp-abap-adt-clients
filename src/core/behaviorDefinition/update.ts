@@ -56,11 +56,7 @@ export async function update(
     lockHandle?: string;
   },
 ): Promise<IAdtWireResponse> {
-  if (!params.sourceCode) {
-    throw new Error('sourceCode is required');
-  }
-
-  const url = `/sap/bc/adt/bo/behaviordefinitions/${encodeSapObjectName(params.name).toLowerCase()}/source/main${writeQuery(params.lockHandle, params.transportRequest)}`;
+  const url = `/sap/bc/adt/bo/behaviordefinitions/${encodeSapObjectName(params.name as string).toLowerCase()}/source/main${writeQuery(params.lockHandle, params.transportRequest)}`;
 
   const headers = {
     'Content-Type': CT_SOURCE,

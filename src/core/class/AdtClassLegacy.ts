@@ -37,10 +37,6 @@ export class AdtClassLegacy<
     config: Partial<IClassConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
-    if (!config.className) {
-      throw new Error('Class name is required');
-    }
-
     // Low-level mode: caller owns the session
 
     return super.update(config, options);
@@ -56,10 +52,7 @@ export class AdtClassLegacy<
     config: Partial<IClassConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
-    if (!config.className) {
-      throw new Error('Class name is required');
-    }
-    const name = config.className;
+    const name = config.className as string;
 
     const objectUrl = `/sap/bc/adt/oo/classes/${encodeSapObjectName(name).toLowerCase()}`;
     return answering(

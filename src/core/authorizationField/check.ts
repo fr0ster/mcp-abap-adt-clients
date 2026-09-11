@@ -30,10 +30,6 @@ export async function checkAuthorizationField(
   version: 'active' | 'inactive',
   xmlContent?: string,
 ): Promise<IAdtWireResponse> {
-  if (!name) {
-    throw new Error('Authorization field name is required');
-  }
-
   const encoded = encodeSapObjectName(name.toUpperCase());
   const uri = `/sap/bc/adt/aps/iam/auth/${encoded}`;
 

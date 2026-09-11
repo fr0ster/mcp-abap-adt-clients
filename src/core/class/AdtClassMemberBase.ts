@@ -82,8 +82,7 @@ export abstract class AdtClassMemberBase<
   // said on the way out is nothing a caller asked for.
   protected readonly lockCap = new LockCapability<IClassConfig>(this.capCtx, {
     nameOf: (c) => {
-      if (!c.className) throw new Error('Class name is required');
-      return c.className;
+      return c.className as string;
     },
     acquire: async (ctx, name) => ({
       lockHandle: await lockClass(ctx.connection, name),
@@ -97,8 +96,7 @@ export abstract class AdtClassMemberBase<
     this.capCtx,
     {
       nameOf: (c) => {
-        if (!c.className) throw new Error('className is required');
-        return c.className;
+        return c.className as string;
       },
       list: (ctx, name) =>
         getClassIncludeVersions(ctx.connection, name, 'main'),
@@ -173,9 +171,6 @@ export abstract class AdtClassMemberBase<
 
     // No server was asked anything, so there is no answer to describe. A missing
     // required argument is the caller's mistake, and it throws.
-    if (!config.className) {
-      throw new Error('Class name is required');
-    }
 
     return answering(
       () => activateClass(connection, config.className as string),
@@ -197,10 +192,6 @@ export abstract class AdtClassMemberBase<
   ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
-
-    if (!config.className) {
-      throw new Error('Class name is required');
-    }
 
     const readOptions = this.contentTypes
       ? { ...options, accept: this.contentTypes.classRead().accept }
@@ -226,10 +217,6 @@ export abstract class AdtClassMemberBase<
   ): Promise<IAdtResponse<string, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
-
-    if (!config.className) {
-      throw new Error('Class name is required');
-    }
 
     return answering(
       () => getClassTransport(connection, config.className as string, options),

@@ -25,10 +25,6 @@ export async function checkDeletion(
 ): Promise<IAdtWireResponse> {
   const { table_name } = params;
 
-  if (!table_name) {
-    throw new Error('table_name is required');
-  }
-
   const encodedName = encodeSapObjectName(table_name);
   const objectUri = `/sap/bc/adt/ddic/tables/${encodedName}`;
 
@@ -61,10 +57,6 @@ export async function deleteTable(
   params: IDeleteTableParams,
 ): Promise<IAdtWireResponse> {
   const { table_name, transport_request } = params;
-
-  if (!table_name) {
-    throw new Error('table_name is required');
-  }
 
   const encodedName = encodeSapObjectName(table_name);
   const objectUri = `/sap/bc/adt/ddic/tables/${encodedName}`;

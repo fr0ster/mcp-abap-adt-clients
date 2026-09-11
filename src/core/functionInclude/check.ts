@@ -28,13 +28,6 @@ export async function checkFunctionInclude(
   xmlContent?: string,
   sourceContentType?: string,
 ): Promise<IAdtWireResponse> {
-  if (!groupName) {
-    throw new Error('Function group name is required');
-  }
-  if (!includeName) {
-    throw new Error('Include name is required');
-  }
-
   const groupLower = encodeSapObjectName(groupName).toLowerCase();
   const encodedInclude = encodeSapObjectName(includeName.toUpperCase());
   const objectUri = `/sap/bc/adt/functions/groups/${groupLower}/includes/${encodedInclude}`;

@@ -25,10 +25,6 @@ export async function checkDeletion(
 ): Promise<IAdtWireResponse> {
   const { interface_name } = params;
 
-  if (!interface_name) {
-    throw new Error('interface_name is required');
-  }
-
   const encodedName = encodeSapObjectName(interface_name);
   const objectUri = `/sap/bc/adt/oo/interfaces/${encodedName}`;
 
@@ -61,10 +57,6 @@ export async function deleteInterface(
   params: IDeleteInterfaceParams,
 ): Promise<IAdtWireResponse> {
   const { interface_name, transport_request } = params;
-
-  if (!interface_name) {
-    throw new Error('interface_name is required');
-  }
 
   const encodedName = encodeSapObjectName(interface_name);
   const objectUri = `/sap/bc/adt/oo/interfaces/${encodedName}`;

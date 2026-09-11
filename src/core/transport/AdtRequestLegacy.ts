@@ -83,10 +83,7 @@ export class AdtRequestLegacy<
     config: Partial<ITransportConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
-    if (!config.transportNumber) {
-      throw new Error('Transport request number is required');
-    }
-    const number = config.transportNumber;
+    const number = config.transportNumber as string;
 
     return answering(
       () => getTransportLegacy(this.conn, number),

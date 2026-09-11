@@ -50,14 +50,6 @@ function makeConn(
 }
 
 describe('AdtUnitTest.validate()', () => {
-  it('rejects before any request when no container class is named (zero calls)', async () => {
-    const { conn, calls } = makeConn(() => ({ data: '' }));
-    const h = new AdtUnitTest(conn, createLibraryLogger());
-
-    await expect(h.validate({})).rejects.toThrow(/container class name/i);
-    expect(calls).toHaveLength(0);
-  });
-
   it('validates the container class name — one request, whatever exists', async () => {
     const { conn, calls } = makeConn((r) => {
       expect(r.method).toBe('POST');
@@ -169,20 +161,6 @@ describe('AdtCdsUnitTest.validate()', () => {
    * sending. That is a caller error with a name rather than a 400 to decode off
    * the wire, and it must cost no request at all.
    */
-  it('refuses a missing package before sending anything', async () => {
-    const { conn, calls } = makeConn(() => ({ status: 200, data: '<ok/>' }));
-    const h = new AdtCdsUnitTest(conn, createLibraryLogger());
-
-    await expect(
-      h.validate({
-        className: 'ZCL_X',
-        classTemplate: '<template/>',
-        testClassSource: 'CLASS ltcl_test DEFINITION FOR TESTING.',
-      }),
-    ).rejects.toThrow(/Package name is required/);
-    expect(calls).toHaveLength(0);
-  });
-
   it('falls back to the parent when no class is being generated', async () => {
     const { conn, calls } = makeConn((r) => {
       expect(r.method).toBe('POST');

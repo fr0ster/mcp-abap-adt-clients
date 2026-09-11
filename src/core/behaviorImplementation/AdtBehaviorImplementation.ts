@@ -139,10 +139,7 @@ export class AdtBehaviorImplementation<
 
   /** The class name, or the caller's mistake. */
   private name(config: Partial<IBehaviorImplementationConfig>): string {
-    if (!config.className) {
-      throw new Error('Class name is required');
-    }
-    return config.className;
+    return config.className as string;
   }
 
   /** Validate the class name and its behavior definition before creating. */
@@ -154,12 +151,6 @@ export class AdtBehaviorImplementation<
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const name = this.name(config);
-    if (!config.behaviorDefinition) {
-      throw new Error('Behavior definition is required for validation');
-    }
-    if (!config.packageName) {
-      throw new Error('Package name is required for validation');
-    }
 
     return answering(
       () =>
@@ -188,19 +179,24 @@ export class AdtBehaviorImplementation<
     },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    // **The one guard this package keeps, and only on a create.**
+    //
+    // An object created without a package is the single thing `delete()` cannot
+    // undo: the deletion check resolves through the package, so it answers
+    // "Object does not exist" while the name stays taken for good, and clearing
+    // it is SAP GUI territory. Everywhere else a missing field produces a
+    // request the server answers, which is a reading a strategy can take. Here
+    // it produces a state with no way out through ADT at all.
+    if (!config.packageName) {
+      throw new Error(
+        'packageName is required for create: an object created without one cannot be deleted through ADT',
+      );
+    }
+
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const name = this.name(config);
-    if (!config.packageName) {
-      throw new Error('Package name is required');
-    }
-    if (!config.description) {
-      throw new Error('Description is required');
-    }
-    if (!config.behaviorDefinition) {
-      throw new Error('Behavior definition is required');
-    }
 
     // The author and the master system come from the config. This used to ask
     // `/core/http/systeminformation` for them, which made a create two requests
@@ -319,15 +315,12 @@ export class AdtBehaviorImplementation<
     // never reads the definition's name. It was required here while `update`
     // also wrote the generated shell, which does mention it — the guard outlived
     // the reason for it and refused a write it had no stake in.
-    if (!source) {
-      throw new Error('Implementation code is required for update');
-    }
     return answering(
       () =>
         updateBehaviorImplementation(
           connection,
           name,
-          source,
+          source as string,
           options?.lockHandle,
           config.transportRequest,
         ),

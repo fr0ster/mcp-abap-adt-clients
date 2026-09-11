@@ -25,10 +25,6 @@ export async function checkDeletion(
 ): Promise<IAdtWireResponse> {
   const { programName: program_name } = params;
 
-  if (!program_name) {
-    throw new Error('program_name is required');
-  }
-
   const encodedName = encodeSapObjectName(program_name);
   const objectUri = `/sap/bc/adt/programs/programs/${encodedName}`;
 
@@ -62,10 +58,6 @@ export async function deleteProgram(
 ): Promise<IAdtWireResponse> {
   const { programName: program_name, transportRequest: transport_request } =
     params;
-
-  if (!program_name) {
-    throw new Error('program_name is required');
-  }
 
   const encodedName = encodeSapObjectName(program_name);
   const objectUri = `/sap/bc/adt/programs/programs/${encodedName}`;

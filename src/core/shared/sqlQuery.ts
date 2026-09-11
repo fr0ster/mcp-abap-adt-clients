@@ -25,10 +25,6 @@ export async function getSqlQuery(
   connection: IAbapConnection,
   params: IGetSqlQueryParams,
 ): Promise<IAdtWireResponse> {
-  if (!params.sql_query) {
-    throw new Error('SQL query is required');
-  }
-
   const rowNumber = params.row_number || 100;
   const url = `/sap/bc/adt/datapreview/freestyle?rowNumber=${rowNumber}`;
 

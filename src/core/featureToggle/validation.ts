@@ -25,9 +25,6 @@ export async function validateFeatureToggleName(
   packageName?: string,
   description?: string,
 ): Promise<IAdtWireResponse> {
-  if (!name) {
-    throw new Error('Feature toggle name is required');
-  }
   const params: Record<string, string> = { objname: name.toUpperCase() };
   if (packageName) params.packagename = packageName.toUpperCase();
   if (description) params.description = description;

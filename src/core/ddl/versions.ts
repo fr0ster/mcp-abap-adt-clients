@@ -12,8 +12,7 @@ export async function getDdlVersions(
   connection: IAbapConnection,
   config: Partial<IDdlConfig>,
 ): Promise<ObjectVersion[]> {
-  if (!config.ddlName) throw new Error('ddlName is required');
-  const encodedName = encodeSapObjectName(config.ddlName);
+  const encodedName = encodeSapObjectName(config.ddlName as string);
   const url = `/sap/bc/adt/ddic/ddl/sources/${encodedName}/source/main/versions`;
   try {
     const res = await connection.makeAdtRequest({

@@ -25,10 +25,6 @@ export async function checkDeletion(
 ): Promise<IAdtWireResponse> {
   const { data_element_name } = params;
 
-  if (!data_element_name) {
-    throw new Error('data_element_name is required');
-  }
-
   const encodedName = encodeSapObjectName(data_element_name);
   const objectUri = `/sap/bc/adt/ddic/dataelements/${encodedName}`;
 
@@ -61,10 +57,6 @@ export async function deleteDataElement(
   params: IDeleteDataElementParams,
 ): Promise<IAdtWireResponse> {
   const { data_element_name, transport_request } = params;
-
-  if (!data_element_name) {
-    throw new Error('data_element_name is required');
-  }
 
   const encodedName = encodeSapObjectName(data_element_name);
   const objectUri = `/sap/bc/adt/ddic/dataelements/${encodedName}`;

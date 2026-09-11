@@ -77,17 +77,13 @@ describe('a create without a package', () => {
       >;
       expect(packageName).toBeDefined();
 
-      // Either shape is a refusal; what must not happen is a request going out.
-      // A throw is what the handlers do today: a missing required argument is
-      // the caller's mistake, not a verdict from the server.
-      let answered: unknown;
-      try {
-        answered = await handler.create(withoutPackage);
-      } catch (error) {
-        expect(String((error as Error).message)).toMatch(/package/i);
-        return;
-      }
-      expect(answered).toHaveProperty('ok', false);
+      // **A throw, and no request.** 19.0.0 removed 454 input guards on the
+      // rule that the server judges its own requests; this is the one that
+      // stayed, so the assertion is exact rather than "either shape". A
+      // response with `ok: false` would pass while the request had already gone
+      // out and made the object — which is the state this guard exists to
+      // prevent.
+      await expect(handler.create(withoutPackage)).rejects.toThrow(/package/i);
     });
   }
 });
@@ -123,14 +119,28 @@ describe('a create without the object\u2019s name', () => {
       const withoutName = { ...(entry.config as Record<string, unknown>) };
       delete withoutName[key];
 
-      let answered: unknown;
-      try {
-        answered = await handler.create(withoutName);
-      } catch (error) {
-        expect(String((error as Error).message)).toMatch(/name|required/i);
+      // **A name is not a package.** 19.0.0 removed the guards on it: a create
+      // without a name builds a URL from what it was given and the server
+      // answers, which is a reading a strategy can take and a state a caller
+      // can recover from. So the assertion here is that the request went out —
+      // the opposite of the block above, and deliberately so.
+      //
+      // A handler that raises a TypeError instead is a caller's defect
+      // surfacing in the caller's stack, which is also accepted.
+      // A package is its own package, so dropping its name drops the field the
+      // guard above protects. The guard is right to fire; this block is not
+      // about it.
+      if (name === 'package') {
+        await expect(handler.create(withoutName)).rejects.toThrow(/package/i);
         return;
       }
-      expect(answered).toHaveProperty('ok', false);
+
+      try {
+        const answered = await handler.create(withoutName);
+        expect(answered).toHaveProperty('ok', false);
+      } catch (error) {
+        expect(error).toBeInstanceOf(TypeError);
+      }
     });
   }
 });

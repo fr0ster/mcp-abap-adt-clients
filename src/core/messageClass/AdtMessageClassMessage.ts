@@ -102,9 +102,7 @@ export class AdtMessageClassMessage<
     name: string;
     no: string;
   } {
-    if (!config.className) throw new Error('className is required');
-    if (!config.msgno) throw new Error('msgno is required');
-    return { name: config.className, no: String(config.msgno) };
+    return { name: config.className as string, no: String(config.msgno) };
   }
 
   // ── read ──────────────────────────────────────────────────────────────────

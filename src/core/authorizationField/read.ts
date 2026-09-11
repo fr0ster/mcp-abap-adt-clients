@@ -23,10 +23,6 @@ export async function readAuthorizationField(
   version: 'active' | 'inactive' = 'active',
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  if (!name) {
-    throw new Error('Authorization field name is required');
-  }
-
   const encoded = encodeSapObjectName(name.toUpperCase());
   const params = new URLSearchParams();
   params.append('version', version);

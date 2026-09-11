@@ -38,23 +38,15 @@ export async function update(
   },
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
-  if (!args.enhancement_name) {
-    throw new Error('enhancement_name is required');
-  }
-  if (!args.enhancement_type) {
-    throw new Error('enhancement_type is required');
-  }
-  if (!args.source_code) {
-    throw new Error('source_code is required');
-  }
-
   if (!supportsSourceCode(args.enhancement_type)) {
     throw new Error(
       `Enhancement type '${args.enhancement_type}' does not support source code update. Only 'enhoxhh' supports source code.`,
     );
   }
 
-  const encodedName = encodeSapObjectName(args.enhancement_name).toLowerCase();
+  const encodedName = encodeSapObjectName(
+    args.enhancement_name as string,
+  ).toLowerCase();
   const baseUri = getEnhancementUri(args.enhancement_type, encodedName);
 
   // Build URL with parameters

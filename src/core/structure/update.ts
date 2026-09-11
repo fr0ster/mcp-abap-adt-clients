@@ -21,7 +21,9 @@ export async function upload(
   params: IUpdateStructureParams,
   lockHandle?: string,
 ): Promise<IAdtWireResponse> {
-  const structureNameEncoded = encodeSapObjectName(params.structureName);
+  const structureNameEncoded = encodeSapObjectName(
+    params.structureName as string,
+  );
   const url = `/sap/bc/adt/ddic/structures/${structureNameEncoded}/source/main${writeQuery(lockHandle, params.transportRequest)}`;
 
   const headers = {

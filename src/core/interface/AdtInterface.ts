@@ -119,13 +119,6 @@ export class AdtInterface<
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    if (!config.interfaceName) {
-      throw new Error('Interface name is required for validation');
-    }
-    if (!config.packageName) {
-      throw new Error('Package name is required for validation');
-    }
-
     return answering(
       () =>
         validateInterfaceName(
@@ -144,19 +137,24 @@ export class AdtInterface<
     config: Omit<IInterfaceConfig, 'sourceCode'> & { sourceCode?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    // **The one guard this package keeps, and only on a create.**
+    //
+    // An object created without a package is the single thing `delete()` cannot
+    // undo: the deletion check resolves through the package, so it answers
+    // "Object does not exist" while the name stays taken for good, and clearing
+    // it is SAP GUI territory. Everywhere else a missing field produces a
+    // request the server answers, which is a reading a strategy can take. Here
+    // it produces a state with no way out through ADT at all.
+    if (!config.packageName) {
+      throw new Error(
+        'packageName is required for create: an object created without one cannot be deleted through ADT',
+      );
+    }
+
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    if (!config.interfaceName) {
-      throw new Error('Interface name is required');
-    }
-    if (!config.packageName) {
-      throw new Error('Package name is required');
-    }
-    if (!config.description) {
-      throw new Error('Description is required');
-    }
-    const name = config.interfaceName;
+    const name = config.interfaceName as string;
     return answering(
       () =>
         createInterface(
@@ -187,10 +185,6 @@ export class AdtInterface<
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    if (!config.interfaceName) {
-      throw new Error('Interface name is required');
-    }
-
     // No 404 special case: ADT answers a read for a missing object with 200 and
     // an empty body, and whether that *is* absence is the caller's reading.
     return answering(
@@ -213,10 +207,6 @@ export class AdtInterface<
   ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
-
-    if (!config.interfaceName) {
-      throw new Error('Interface name is required');
-    }
 
     return answering(
       () =>
@@ -244,10 +234,7 @@ export class AdtInterface<
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    if (!config.interfaceName) {
-      throw new Error('Interface name is required');
-    }
-    const name = config.interfaceName;
+    const name = config.interfaceName as string;
     // The source is the caller's, through `options.sourceCode`. This used to
     // fall back to `config.sourceCode` — two channels for one value, where the
     // contract documents one. `config.sourceCode` is `check`'s alone now: a
@@ -255,15 +242,12 @@ export class AdtInterface<
     // nowhere else to arrive.
     const source = options?.sourceCode;
 
-    if (!source) {
-      throw new Error('Source code is required for update');
-    }
     return answering(
       () =>
         upload(
           connection,
           name,
-          source,
+          source as string,
           options?.lockHandle as string,
           config.transportRequest,
           this.contentTypes?.sourceArtifactContentType(),
@@ -287,10 +271,7 @@ export class AdtInterface<
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    if (!config.interfaceName) {
-      throw new Error('Interface name is required');
-    }
-    const name = config.interfaceName;
+    const name = config.interfaceName as string;
     return answering(
       () =>
         checkDeletion(connection, {
@@ -316,10 +297,7 @@ export class AdtInterface<
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    if (!config.interfaceName) {
-      throw new Error('Interface name is required');
-    }
-    const name = config.interfaceName;
+    const name = config.interfaceName as string;
     return answering(
       () =>
         deleteInterface(connection, {
@@ -339,10 +317,6 @@ export class AdtInterface<
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    if (!config.interfaceName) {
-      throw new Error('Interface name is required');
-    }
-
     return answering(
       () => activateInterface(connection, config.interfaceName as string),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
@@ -359,9 +333,6 @@ export class AdtInterface<
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    if (!config.interfaceName) {
-      throw new Error('Interface name is required');
-    }
     const version: 'active' | 'inactive' =
       status === 'active' ? 'active' : 'inactive';
 
@@ -387,10 +358,6 @@ export class AdtInterface<
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    if (!config.interfaceName) {
-      throw new Error('Interface name is required');
-    }
-
     return answering(
       () =>
         getInterfaceTransport(
@@ -407,10 +374,7 @@ export class AdtInterface<
 
   /** Lock the interface for modification. */
   async lock(config: Partial<IInterfaceConfig>): Promise<IAdtResponse<string>> {
-    if (!config.interfaceName) {
-      throw new Error('Interface name is required');
-    }
-    const name = config.interfaceName;
+    const name = config.interfaceName as string;
 
     return answering(
       async () => {
@@ -436,10 +400,7 @@ export class AdtInterface<
     config: Partial<IInterfaceConfig>,
     lockHandle: string,
   ): Promise<IAdtResponse<void>> {
-    if (!config.interfaceName) {
-      throw new Error('Interface name is required');
-    }
-    const name = config.interfaceName;
+    const name = config.interfaceName as string;
 
     return answering(
       async () => {

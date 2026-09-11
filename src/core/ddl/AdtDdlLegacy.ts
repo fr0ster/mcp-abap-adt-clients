@@ -23,10 +23,7 @@ export class AdtDdlLegacy<
     config: Partial<IDdlConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
-    if (!config.ddlName) {
-      throw new Error('DDL name is required');
-    }
-    const name = config.ddlName;
+    const name = config.ddlName as string;
 
     const objectUrl = `/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(name).toLowerCase()}`;
     return answering(

@@ -31,13 +31,6 @@ export async function validateEnhancementName(
   const { enhancement_name, enhancement_type, package_name, description } =
     params;
 
-  if (!enhancement_name) {
-    throw new Error('enhancement_name is required');
-  }
-  if (!enhancement_type) {
-    throw new Error('enhancement_type is required');
-  }
-
   const typeCode = ENHANCEMENT_TYPE_CODES[enhancement_type];
 
   // Build query parameters for validation

@@ -101,12 +101,16 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
     );
   }
 
-  /** The name, or the caller's mistake — nothing was asked of the server yet. */
+  /**
+   * The name as the caller gave it.
+   *
+   * No guard: the config's type says the field is there, and a `Partial<>` at
+   * the call site is what widens it. A caller who passes nothing builds a URL
+   * from nothing and the server answers — which is a reading a strategy can
+   * take, where a sentence composed here would not be.
+   */
   private name(config: Partial<IPackageConfig>): string {
-    if (!config.packageName) {
-      throw new Error('Package name is required');
-    }
-    return config.packageName;
+    return config.packageName as string;
   }
 
   /** Validate the package's configuration before creating it. */
@@ -118,9 +122,6 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const name = this.name(config);
-    if (!config.superPackage) {
-      throw new Error('Super package is required for validation');
-    }
 
     return answering(
       () =>
@@ -153,24 +154,24 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
     config: Omit<IPackageConfig, 'sourceCode'> & { sourceCode?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    // **The one guard this package keeps, and only on a create.**
+    //
+    // An object created without a package is the single thing `delete()` cannot
+    // undo: the deletion check resolves through the package, so it answers
+    // "Object does not exist" while the name stays taken for good, and clearing
+    // it is SAP GUI territory. Everywhere else a missing field produces a
+    // request the server answers, which is a reading a strategy can take. Here
+    // it produces a state with no way out through ADT at all.
+    if (!config.packageName) {
+      throw new Error(
+        'packageName is required for create: an object created without one cannot be deleted through ADT',
+      );
+    }
+
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const name = this.name(config);
-    if (!config.superPackage) {
-      throw new Error('Super package is required');
-    }
-    if (!config.description) {
-      throw new Error('Description is required');
-    }
-    if (!config.softwareComponent) {
-      throw new Error('Software component is required');
-    }
-    if (!config.responsible && !this.systemContext.responsible) {
-      throw new Error(
-        'Responsible person is required: provide it in package config or in AdtClient options',
-      );
-    }
     return answering(
       () =>
         createPackage(connection, {
@@ -282,13 +283,7 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const name = this.name(config);
-    if (!config.superPackage) {
-      throw new Error('Super package is required for update');
-    }
-    if (!config.softwareComponent) {
-      throw new Error('Software component is required for update');
-    }
-    const superPackage = config.superPackage;
+    const superPackage = config.superPackage as string;
     const softwareComponent = config.softwareComponent;
 
     const fields = {

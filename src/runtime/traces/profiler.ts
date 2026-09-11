@@ -66,9 +66,6 @@ function escapeXmlAttr(value: string): string {
 
 function toTraceId(value: string): string {
   const trimmed = value.trim();
-  if (!trimmed) {
-    throw new Error('Trace ID is required');
-  }
   const marker = '/sap/bc/adt/runtime/traces/abaptraces/';
   const markerIndex = trimmed.indexOf(marker);
   if (markerIndex >= 0) {
@@ -91,9 +88,6 @@ function toTraceId(value: string): string {
 }
 
 export function normalizeProfilerTraceId(traceIdOrUri: string): string {
-  if (!traceIdOrUri) {
-    throw new Error('Trace ID is required');
-  }
   return toTraceId(String(traceIdOrUri));
 }
 
@@ -577,10 +571,6 @@ export async function getTraceRequestsByUri(
   connection: IAbapConnection,
   uri: string,
 ): Promise<IAdtWireResponse> {
-  if (!uri) {
-    throw new Error('URI is required');
-  }
-
   const url = `/sap/bc/adt/runtime/traces/abaptraces/requests?uri=${encodeURIComponent(uri)}`;
 
   return connection.makeAdtRequest({

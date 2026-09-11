@@ -31,13 +31,6 @@ export async function updateFunctionInclude(
   lockHandle?: string,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
-  if (!params.function_group_name) {
-    throw new Error('function_group_name is required');
-  }
-  if (!params.include_name) {
-    throw new Error('include_name is required');
-  }
-
   const groupLower = encodeSapObjectName(
     params.function_group_name,
   ).toLowerCase();

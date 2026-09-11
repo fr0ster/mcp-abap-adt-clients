@@ -206,14 +206,6 @@ describe('AdtUnitTest — running', () => {
     expect(runId).toBe('00155D-3F2A');
   });
 
-  it('rejects an empty test list before issuing anything', async () => {
-    const { conn, calls } = makeConn();
-    const h = new AdtUnitTest(conn, createLibraryLogger());
-
-    await expect(h.run([])).rejects.toThrow(/at least one test definition/i);
-    expect(calls).toHaveLength(0);
-  });
-
   it('asking about a run is a separate request, taking the id', async () => {
     const { conn, calls } = makeConn(() => ({ data: '<aunit:runStatus/>' }));
     const h = new AdtUnitTest(conn, createLibraryLogger());

@@ -36,10 +36,6 @@ export async function checkDeletionByUri(
   connection: IAbapConnection,
   objectUri: string,
 ): Promise<IAdtWireResponse> {
-  if (!objectUri) {
-    throw new Error('objectUri is required');
-  }
-
   const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
 <del:checkRequest xmlns:del="http://www.sap.com/adt/deletion" xmlns:adtcore="http://www.sap.com/adt/core">
   <del:object adtcore:uri="${objectUri}"/>

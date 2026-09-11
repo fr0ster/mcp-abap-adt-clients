@@ -12,8 +12,7 @@ export async function getInterfaceVersions(
   connection: IAbapConnection,
   config: Partial<IInterfaceConfig>,
 ): Promise<ObjectVersion[]> {
-  if (!config.interfaceName) throw new Error('interfaceName is required');
-  const encodedName = encodeSapObjectName(config.interfaceName);
+  const encodedName = encodeSapObjectName(config.interfaceName as string);
   const url = `/sap/bc/adt/oo/interfaces/${encodedName}/source/main/versions`;
   try {
     const res = await connection.makeAdtRequest({

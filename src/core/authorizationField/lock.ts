@@ -18,10 +18,6 @@ export async function lockAuthorizationField(
   name: string,
   logger?: ILogger,
 ): Promise<string> {
-  if (!name) {
-    throw new Error('Authorization field name is required');
-  }
-
   const encoded = encodeSapObjectName(name.toUpperCase());
   const url = `/sap/bc/adt/aps/iam/auth/${encoded}?_action=LOCK&accessMode=MODIFY`;
 

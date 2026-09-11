@@ -129,9 +129,6 @@ async function updateClassInclude(
 ): Promise<IAdtWireResponse> {
   // Empty source is legitimate: PUTting it is how an include is emptied.
   // Only a missing argument is an error.
-  if (includeSource === undefined || includeSource === null) {
-    throw new Error(`${includeType} source code is required`);
-  }
 
   const encodedName = encodeSapObjectName(className).toLowerCase();
   const url = `/sap/bc/adt/oo/classes/${encodedName}/includes/${includeType}${writeQuery(lockHandle, transportRequest)}`;

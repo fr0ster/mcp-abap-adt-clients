@@ -24,10 +24,6 @@ export async function updateClass(
   transportRequest?: string,
   sourceContentType?: string,
 ): Promise<IAdtWireResponse> {
-  if (!sourceCode) {
-    throw new Error('source_code is required');
-  }
-
   // **No lock handle is not this library's verdict.** It used to throw here, and
   // an update without a lock is a thing ADT judges: it answers its own refusal,
   // naming what it wants, and that answer is what a caller should read. The
@@ -64,10 +60,6 @@ export async function updateClassImplementations(
   transportRequest?: string,
   sourceContentType?: string,
 ): Promise<IAdtWireResponse> {
-  if (!implementationCode) {
-    throw new Error('implementationCode is required');
-  }
-
   const encodedName = encodeSapObjectName(className).toLowerCase();
   const url = `/sap/bc/adt/oo/classes/${encodedName}/includes/implementations${writeQuery(lockHandle, transportRequest)}`;
 

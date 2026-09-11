@@ -1,4 +1,7 @@
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type {
+  EnhancementType,
+  IAbapConnection,
+} from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 import type { ObjectVersion } from '../shared/results';
 import { parseVersionsFeed, throwVersionsError } from '../shared/versions';
@@ -11,9 +14,10 @@ export async function getEnhancementVersions(
   connection: IAbapConnection,
   config: Partial<IEnhancementConfig>,
 ): Promise<ObjectVersion[]> {
-  if (!config.enhancementName) throw new Error('enhancementName is required');
-  if (!config.enhancementType) throw new Error('enhancementType is required');
-  const url = `${getEnhancementUri(config.enhancementType, config.enhancementName)}/source/main/versions`;
+  const url = `${getEnhancementUri(
+    config.enhancementType as EnhancementType,
+    config.enhancementName as string,
+  )}/source/main/versions`;
   try {
     const res = await connection.makeAdtRequest({
       url,

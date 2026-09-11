@@ -41,8 +41,8 @@ export async function updateFunctionGroup(
   document: string,
   contentTypes?: IAdtContentTypes,
 ): Promise<IAdtWireResponse> {
-  const encodedName = encodeSapObjectName(params.function_group_name);
-  const lockHandle = params.lock_handle;
+  const encodedName = encodeSapObjectName(params.function_group_name as string);
+  const lockHandle = params.lock_handle as string;
   const url = `/sap/bc/adt/functions/groups/${encodedName}${lockHandle ? `?lockHandle=${encodeURIComponent(lockHandle)}` : ''}${params.transport_request ? `${lockHandle ? '&' : '?'}corrNr=${params.transport_request}` : ''}`;
 
   const ct = contentTypes?.functionGroupUpdate();

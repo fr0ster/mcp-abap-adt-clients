@@ -30,18 +30,6 @@ function makeConn(handler: (r: any) => Partial<IAdtWireResponse> | Error) {
 }
 
 describe('AdtAppendStructure handler', () => {
-  it('create() requires baseObject', async () => {
-    const { conn } = makeConn(() => ({ data: '' }));
-    const as = new AdtAppendStructure(conn);
-    await expect(
-      as.create({
-        appendStructureName: 'ZOK_S',
-        packageName: 'ZPKG',
-        description: 'd',
-      }),
-    ).rejects.toThrow(/base/i);
-  });
-
   it('create() only POSTs metadata (no lock/update) with a valid baseObject', async () => {
     const { conn, calls } = makeConn(() => ({ data: '' }));
     const as = new AdtAppendStructure(conn);

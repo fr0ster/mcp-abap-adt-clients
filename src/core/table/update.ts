@@ -19,12 +19,6 @@ export async function updateTable(
   params: IUpdateTableParams,
   lockHandle?: string,
 ): Promise<IAdtWireResponse> {
-  if (!params.table_name) {
-    throw new Error('table_name is required');
-  }
-  if (!params.ddl_code) {
-    throw new Error('ddl_code is required');
-  }
   const tableName = params.table_name.toUpperCase();
   const url = `/sap/bc/adt/ddic/tables/${encodeSapObjectName(tableName).toLowerCase()}/source/main${writeQuery(lockHandle, params.transport_request)}`;
 

@@ -113,10 +113,6 @@ export class AdtFunctionGroup<
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    if (!config.functionGroupName) {
-      throw new Error('Function group name is required for validation');
-    }
-
     return answering(
       () =>
         validateFunctionGroupName(
@@ -135,19 +131,24 @@ export class AdtFunctionGroup<
     config: Omit<IFunctionGroupConfig, 'sourceCode'> & { sourceCode?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    // **The one guard this package keeps, and only on a create.**
+    //
+    // An object created without a package is the single thing `delete()` cannot
+    // undo: the deletion check resolves through the package, so it answers
+    // "Object does not exist" while the name stays taken for good, and clearing
+    // it is SAP GUI territory. Everywhere else a missing field produces a
+    // request the server answers, which is a reading a strategy can take. Here
+    // it produces a state with no way out through ADT at all.
+    if (!config.packageName) {
+      throw new Error(
+        'packageName is required for create: an object created without one cannot be deleted through ADT',
+      );
+    }
+
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    if (!config.functionGroupName) {
-      throw new Error('Function group name is required');
-    }
-    if (!config.packageName) {
-      throw new Error('Package name is required');
-    }
-    if (!config.description) {
-      throw new Error('Description is required');
-    }
-    const name = config.functionGroupName;
+    const name = config.functionGroupName as string;
     return answering(
       () =>
         createFunctionGroup(
@@ -184,10 +185,6 @@ export class AdtFunctionGroup<
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    if (!config.functionGroupName) {
-      throw new Error('Function group name is required');
-    }
-
     return answering(
       () =>
         getFunctionGroup(
@@ -207,10 +204,6 @@ export class AdtFunctionGroup<
   ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
-
-    if (!config.functionGroupName) {
-      throw new Error('Function group name is required');
-    }
 
     return answering(
       () =>
@@ -239,10 +232,7 @@ export class AdtFunctionGroup<
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    if (!config.functionGroupName) {
-      throw new Error('Function group name is required');
-    }
-    const name = config.functionGroupName;
+    const name = config.functionGroupName as string;
 
     return answering(
       () =>
@@ -280,10 +270,7 @@ export class AdtFunctionGroup<
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    if (!config.functionGroupName) {
-      throw new Error('Function group name is required');
-    }
-    const name = config.functionGroupName;
+    const name = config.functionGroupName as string;
     return answering(
       () =>
         checkDeletion(connection, {
@@ -309,10 +296,7 @@ export class AdtFunctionGroup<
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    if (!config.functionGroupName) {
-      throw new Error('Function group name is required');
-    }
-    const name = config.functionGroupName;
+    const name = config.functionGroupName as string;
     return answering(
       () =>
         deleteFunctionGroup(connection, {
@@ -332,10 +316,6 @@ export class AdtFunctionGroup<
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    if (!config.functionGroupName) {
-      throw new Error('Function group name is required');
-    }
-
     return answering(
       () =>
         activateFunctionGroup(connection, config.functionGroupName as string),
@@ -353,9 +333,6 @@ export class AdtFunctionGroup<
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    if (!config.functionGroupName) {
-      throw new Error('Function group name is required');
-    }
     const version: 'active' | 'inactive' =
       status === 'active' ? 'active' : 'inactive';
 
@@ -375,10 +352,7 @@ export class AdtFunctionGroup<
   async lock(
     config: Partial<IFunctionGroupConfig>,
   ): Promise<IAdtResponse<string>> {
-    if (!config.functionGroupName) {
-      throw new Error('Function group name is required');
-    }
-    const name = config.functionGroupName;
+    const name = config.functionGroupName as string;
 
     return answering(
       async () => {
@@ -404,10 +378,7 @@ export class AdtFunctionGroup<
     config: Partial<IFunctionGroupConfig>,
     lockHandle: string,
   ): Promise<IAdtResponse<void>> {
-    if (!config.functionGroupName) {
-      throw new Error('Function group name is required');
-    }
-    const name = config.functionGroupName;
+    const name = config.functionGroupName as string;
 
     return answering(
       async () => {

@@ -12,8 +12,7 @@ export async function getBehaviorImplementationVersions(
   connection: IAbapConnection,
   config: Partial<IBehaviorImplementationConfig>,
 ): Promise<ObjectVersion[]> {
-  if (!config.className) throw new Error('className is required');
-  const encodedName = encodeSapObjectName(config.className);
+  const encodedName = encodeSapObjectName(config.className as string);
   const url = `/sap/bc/adt/oo/classes/${encodedName}/includes/implementations/versions`;
   try {
     const res = await connection.makeAdtRequest({

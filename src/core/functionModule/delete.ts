@@ -25,13 +25,6 @@ export async function checkDeletion(
 ): Promise<IAdtWireResponse> {
   const { function_module_name, function_group_name } = params;
 
-  if (!function_module_name) {
-    throw new Error('function_module_name is required');
-  }
-  if (!function_group_name) {
-    throw new Error('function_group_name is required');
-  }
-
   const encodedGroupName = encodeSapObjectName(function_group_name);
   const encodedModuleName = encodeSapObjectName(function_module_name);
   const objectUri = `/sap/bc/adt/functions/groups/${encodedGroupName}/fmodules/${encodedModuleName}`;
@@ -66,13 +59,6 @@ export async function deleteFunctionModule(
 ): Promise<IAdtWireResponse> {
   const { function_module_name, function_group_name, transport_request } =
     params;
-
-  if (!function_module_name) {
-    throw new Error('function_module_name is required');
-  }
-  if (!function_group_name) {
-    throw new Error('function_group_name is required');
-  }
 
   const encodedGroupName = encodeSapObjectName(function_group_name);
   const encodedModuleName = encodeSapObjectName(function_module_name);

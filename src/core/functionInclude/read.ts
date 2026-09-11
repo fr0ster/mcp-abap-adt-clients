@@ -26,13 +26,6 @@ export async function readFunctionInclude(
   version: 'active' | 'inactive' = 'active',
   _options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  if (!groupName) {
-    throw new Error('Function group name is required');
-  }
-  if (!includeName) {
-    throw new Error('Include name is required');
-  }
-
   const groupLower = encodeSapObjectName(groupName).toLowerCase();
   const encodedInclude = encodeSapObjectName(includeName.toUpperCase());
   const params = new URLSearchParams();

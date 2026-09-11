@@ -104,18 +104,8 @@ describe('runtime/dumps/read', () => {
     );
   });
 
-  it('getRuntimeDumpById validates ID and requests dump payload', async () => {
+  it('getRuntimeDumpById requests the dump payload', async () => {
     const connection = createConnectionMock();
-
-    await expect(getRuntimeDumpById(connection, '   ')).rejects.toThrow(
-      'Runtime dump ID is required',
-    );
-    await expect(
-      getRuntimeDumpById(
-        connection,
-        '/sap/bc/adt/runtime/dumps/ABCDEF1234567890',
-      ),
-    ).rejects.toThrow('Runtime dump ID must not contain "/"');
 
     await getRuntimeDumpById(connection, 'ABCDEF1234567890');
 

@@ -56,9 +56,6 @@ export async function getFeedVariants(
   connection: IAbapConnection,
   category: string,
 ): Promise<IAdtWireResponse> {
-  if (!category) {
-    throw new Error('category is required for /sap/bc/adt/feeds/variants');
-  }
   const url = `/sap/bc/adt/feeds/variants?category=${encodeURIComponent(category)}`;
 
   return connection.makeAdtRequest({

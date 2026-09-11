@@ -23,10 +23,6 @@ export async function updateBehaviorImplementation(
   lockHandle?: string,
   transportRequest?: string,
 ): Promise<IAdtWireResponse> {
-  if (!sourceCode) {
-    throw new Error('sourceCode is required');
-  }
-
   const encodedName = encodeSapObjectName(className).toLowerCase();
   const url = `/sap/bc/adt/oo/classes/${encodedName}/includes/implementations${writeQuery(lockHandle, transportRequest)}`;
 

@@ -109,10 +109,6 @@ export async function startClassUnitTestRun(
   tests: IClassUnitTestDefinition[],
   options?: IClassUnitTestRunOptions,
 ): Promise<IAdtWireResponse> {
-  if (!tests.length) {
-    throw new Error('At least one test definition is required');
-  }
-
   const scope = options?.scope ?? {
     ownTests: true,
     foreignTests: false,
@@ -163,9 +159,6 @@ export async function getClassUnitTestStatus(
   runId: string,
   withLongPolling: boolean = true,
 ): Promise<IAdtWireResponse> {
-  if (!runId) {
-    throw new Error('runId is required');
-  }
   const query = withLongPolling ? '?withLongPolling=true' : '';
   return connection.makeAdtRequest({
     url: `/sap/bc/adt/abapunit/runs/${runId}${query}`,
@@ -182,9 +175,6 @@ export async function getClassUnitTestResult(
   runId: string,
   options?: { withNavigationUris?: boolean; format?: 'abapunit' | 'junit' },
 ): Promise<IAdtWireResponse> {
-  if (!runId) {
-    throw new Error('runId is required');
-  }
   const params: string[] = [];
   if (options?.withNavigationUris === false) {
     params.push('withNavigationUris=false');
@@ -213,10 +203,6 @@ export async function startClassUnitTestRunByObject(
   className: string,
   options?: IClassUnitTestRunOptions,
 ): Promise<IAdtWireResponse> {
-  if (!className) {
-    throw new Error('className is required');
-  }
-
   const scope = options?.scope ?? {
     ownTests: true,
     foreignTests: false,

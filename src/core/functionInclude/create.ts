@@ -23,13 +23,6 @@ export async function create(
   connection: IAbapConnection,
   args: ICreateFunctionIncludeParams,
 ): Promise<IAdtWireResponse> {
-  if (!args.function_group_name) {
-    throw new Error('function_group_name is required');
-  }
-  if (!args.include_name) {
-    throw new Error('include_name is required');
-  }
-
   const groupLower = encodeSapObjectName(
     args.function_group_name,
   ).toLowerCase();

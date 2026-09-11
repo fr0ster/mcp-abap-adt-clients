@@ -23,13 +23,13 @@ export async function searchObjects(
   connection: IAbapConnection,
   params: ISearchObjectsParams,
 ): Promise<IAdtWireResponse> {
-  const encodedQuery = encodeSapObjectName(params.query);
+  const encodedQuery = encodeSapObjectName(params.query as string);
   const maxResults = params.maxResults || 100;
 
   let url = `/sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=${encodedQuery}&maxResults=${maxResults}`;
 
   if (params.objectType) {
-    url += `&objectType=${encodeSapObjectName(params.objectType)}`;
+    url += `&objectType=${encodeSapObjectName(params.objectType as string)}`;
   }
 
   return connection.makeAdtRequest({

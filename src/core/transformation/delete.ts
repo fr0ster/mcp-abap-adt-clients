@@ -21,10 +21,6 @@ export async function checkDeletion(
 ): Promise<IAdtWireResponse> {
   const { transformation_name } = params;
 
-  if (!transformation_name) {
-    throw new Error('transformation_name is required');
-  }
-
   const encodedName = encodeSapObjectName(transformation_name);
   const objectUri = `/sap/bc/adt/xslt/transformations/${encodedName}`;
 
@@ -57,10 +53,6 @@ export async function deleteTransformation(
   params: IDeleteTransformationParams,
 ): Promise<IAdtWireResponse> {
   const { transformation_name, transport_request } = params;
-
-  if (!transformation_name) {
-    throw new Error('transformation_name is required');
-  }
 
   const encodedName = encodeSapObjectName(transformation_name);
   const objectUri = `/sap/bc/adt/xslt/transformations/${encodedName}`;

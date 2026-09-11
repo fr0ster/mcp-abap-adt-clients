@@ -24,10 +24,6 @@ export async function deleteTransport(
   connection: IAbapConnection,
   transportNumber: string,
 ): Promise<IAdtWireResponse> {
-  if (!transportNumber) {
-    throw new Error('Transport request number is required');
-  }
-
   const encodedNumber = encodeSapObjectName(transportNumber);
   const url = `/sap/bc/adt/cts/transportrequests/${encodedNumber}`;
 

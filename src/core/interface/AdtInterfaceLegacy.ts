@@ -27,10 +27,7 @@ export class AdtInterfaceLegacy<
     config: Partial<IInterfaceConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
-    if (!config.interfaceName) {
-      throw new Error('Interface name is required');
-    }
-    const name = config.interfaceName;
+    const name = config.interfaceName as string;
 
     const objectUrl = `/sap/bc/adt/oo/interfaces/${encodeSapObjectName(name).toLowerCase()}`;
     return answering(

@@ -131,13 +131,10 @@ export class AdtFunctionInclude<
     group: string;
     include: string;
   } {
-    if (!config.functionGroupName) {
-      throw new Error('Function group name is required');
-    }
-    if (!config.includeName) {
-      throw new Error('Include name is required');
-    }
-    return { group: config.functionGroupName, include: config.includeName };
+    return {
+      group: config.functionGroupName as string,
+      include: config.includeName as string,
+    };
   }
 
   /** Map camelCase config to the snake_case low-level params. */
@@ -209,9 +206,6 @@ export class AdtFunctionInclude<
     // Called for its guards: it throws when the name this member needs is
     // missing, which is the one thing checked before the request goes out.
     this.names(config);
-    if (!config.description) {
-      throw new Error('Description is required');
-    }
     return answering(
       () => createFunctionInclude(connection, this.buildCreateParams(config)),
       this.results.created as IResultStrategy<ReturnType<R['created']>>,
@@ -333,9 +327,6 @@ export class AdtFunctionInclude<
     // syntax check compiles a source that is not on the server yet, so it has
     // nowhere else to arrive.
     const source = options?.sourceCode;
-    if (source === undefined) {
-      throw new Error('Source code is required for update');
-    }
 
     return answering(
       () =>
@@ -343,7 +334,7 @@ export class AdtFunctionInclude<
           connection,
           group,
           include,
-          source,
+          source as string,
           options?.lockHandle,
           this.isUnicode(),
           config.transportRequest,

@@ -25,10 +25,6 @@ export async function checkDeletion(
 ): Promise<IAdtWireResponse> {
   const { ddl_name } = params;
 
-  if (!ddl_name) {
-    throw new Error('ddl_name is required');
-  }
-
   const encodedName = encodeSapObjectName(ddl_name);
   const objectUri = `/sap/bc/adt/ddic/ddl/sources/${encodedName}`;
 
@@ -61,10 +57,6 @@ export async function deleteDdl(
   params: IDeleteDdlParams,
 ): Promise<IAdtWireResponse> {
   const { ddl_name, transport_request } = params;
-
-  if (!ddl_name) {
-    throw new Error('ddl_name is required');
-  }
 
   const encodedName = encodeSapObjectName(ddl_name);
   const objectUri = `/sap/bc/adt/ddic/ddl/sources/${encodedName}`;

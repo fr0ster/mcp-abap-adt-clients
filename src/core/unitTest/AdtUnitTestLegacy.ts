@@ -44,10 +44,6 @@ export class AdtUnitTestLegacy<
     tests: IClassUnitTestDefinition[],
     options?: IClassUnitTestRunOptions,
   ): Promise<IAdtResponse<ReturnType<R['run']>>> {
-    if (!tests || tests.length === 0) {
-      throw new Error('At least one test definition is required');
-    }
-
     this.logger?.info?.('Starting unit test run (legacy)');
     const answer = await answering(
       async () => {

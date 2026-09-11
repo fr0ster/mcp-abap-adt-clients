@@ -26,9 +26,6 @@ export type {
 
 function normalizeDumpId(dumpId: string): string {
   const normalized = dumpId?.trim();
-  if (!normalized) {
-    throw new Error('Runtime dump ID is required');
-  }
   if (normalized.includes('/')) {
     throw new Error('Runtime dump ID must not contain "/"');
   }

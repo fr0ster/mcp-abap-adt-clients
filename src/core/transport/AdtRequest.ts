@@ -107,10 +107,7 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
 
   /** The request number, or the caller's mistake. */
   private number(config: Partial<ITransportConfig>): string {
-    if (!config.transportNumber) {
-      throw new Error('Transport request number is required');
-    }
-    return config.transportNumber;
+    return config.transportNumber as string;
   }
 
   /**
@@ -125,10 +122,6 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
-
-    if (!config.description) {
-      throw new Error('Transport request description is required');
-    }
 
     this.logger?.info?.('Creating transport request');
     return answering(
@@ -210,14 +203,6 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
    * legitimate. Guarding earlier would reject it.
    */
   protected async resolveSearchConfiguration(): Promise<string> {
-    if (hasDeferredResponses(this.connection)) {
-      throw new Error(
-        'configUri is required on a batch client: resolving a search ' +
-          'configuration needs a response that a batch cannot deliver until ' +
-          'execute().',
-      );
-    }
-
     const configurations = await getTransportSearchConfigurations(
       this.connection,
     );

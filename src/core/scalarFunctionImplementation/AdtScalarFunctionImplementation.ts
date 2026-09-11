@@ -168,12 +168,16 @@ export class AdtScalarFunctionImplementation<
     );
   }
 
-  /** The name, or the caller's mistake — nothing was asked of the server yet. */
+  /**
+   * The name as the caller gave it.
+   *
+   * No guard: the config's type says the field is there, and a `Partial<>` at
+   * the call site is what widens it. A caller who passes nothing builds a URL
+   * from nothing and the server answers — which is a reading a strategy can
+   * take, where a sentence composed here would not be.
+   */
   private name(config: Partial<IScalarFunctionImplementationConfig>): string {
-    if (!config.implementationName) {
-      throw new Error('Implementation name is required');
-    }
-    return config.implementationName;
+    return config.implementationName as string;
   }
 
   /** Validate the name before creating the object. */
@@ -205,19 +209,24 @@ export class AdtScalarFunctionImplementation<
     },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    // **The one guard this package keeps, and only on a create.**
+    //
+    // An object created without a package is the single thing `delete()` cannot
+    // undo: the deletion check resolves through the package, so it answers
+    // "Object does not exist" while the name stays taken for good, and clearing
+    // it is SAP GUI territory. Everywhere else a missing field produces a
+    // request the server answers, which is a reading a strategy can take. Here
+    // it produces a state with no way out through ADT at all.
+    if (!config.packageName) {
+      throw new Error(
+        'packageName is required for create: an object created without one cannot be deleted through ADT',
+      );
+    }
+
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const name = this.name(config);
-    if (!config.scalarFunctionName) {
-      throw new Error('Scalar function name is required');
-    }
-    if (!config.packageName) {
-      throw new Error('Package name is required');
-    }
-    if (!config.description) {
-      throw new Error('Description is required');
-    }
     return answering(
       () =>
         createScalarFunctionImplementation(connection, {
@@ -334,9 +343,6 @@ export class AdtScalarFunctionImplementation<
     // syntax check compiles a source that is not on the server yet, so it has
     // nowhere else to arrive.
     const source = options?.sourceCode;
-    if (!source) {
-      throw new Error('Source code is required for update');
-    }
 
     return answering(
       () =>
@@ -344,7 +350,7 @@ export class AdtScalarFunctionImplementation<
           connection,
           {
             implementation_name: name,
-            source_code: source,
+            source_code: source as string,
             transport_request: config.transportRequest,
           },
           options?.lockHandle,
@@ -369,9 +375,6 @@ export class AdtScalarFunctionImplementation<
 
     const name = this.name(config);
     const source = options?.sourceCode;
-    if (!source) {
-      throw new Error('Source code is required for updateMetadata');
-    }
 
     return answering(
       () =>
@@ -379,7 +382,7 @@ export class AdtScalarFunctionImplementation<
           connection,
           {
             implementation_name: name,
-            source_code: source,
+            source_code: source as string,
             transport_request: config.transportRequest,
           },
           options?.lockHandle,

@@ -19,13 +19,6 @@ export async function unlockAuthorizationField(
   name: string,
   lockHandle: string,
 ): Promise<IAdtWireResponse> {
-  if (!name) {
-    throw new Error('Authorization field name is required');
-  }
-  if (!lockHandle) {
-    throw new Error('lockHandle is required');
-  }
-
   const encoded = encodeSapObjectName(name.toUpperCase());
   const url = `/sap/bc/adt/aps/iam/auth/${encoded}?_action=UNLOCK&lockHandle=${encodeURIComponent(lockHandle)}`;
 

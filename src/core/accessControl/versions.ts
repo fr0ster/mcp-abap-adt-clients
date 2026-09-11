@@ -12,10 +12,8 @@ export async function getAccessControlVersions(
   connection: IAbapConnection,
   config: Partial<IAccessControlConfig>,
 ): Promise<ObjectVersion[]> {
-  if (!config.accessControlName)
-    throw new Error('accessControlName is required');
   const encodedName = encodeSapObjectName(
-    config.accessControlName.toLowerCase(),
+    (config.accessControlName as string).toLowerCase(),
   );
   const url = `/sap/bc/adt/acm/dcl/sources/${encodedName}/source/main/versions`;
   try {

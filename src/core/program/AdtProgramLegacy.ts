@@ -27,10 +27,7 @@ export class AdtProgramLegacy<
     config: Partial<IProgramConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
-    if (!config.programName) {
-      throw new Error('Program name is required');
-    }
-    const name = config.programName;
+    const name = config.programName as string;
 
     const objectUrl = `/sap/bc/adt/programs/programs/${encodeSapObjectName(name).toLowerCase()}`;
     return answering(

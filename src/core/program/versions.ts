@@ -12,8 +12,7 @@ export async function getProgramVersions(
   connection: IAbapConnection,
   config: Partial<IProgramConfig>,
 ): Promise<ObjectVersion[]> {
-  if (!config.programName) throw new Error('programName is required');
-  const encodedName = encodeSapObjectName(config.programName);
+  const encodedName = encodeSapObjectName(config.programName as string);
   const url = `/sap/bc/adt/programs/programs/${encodedName}/source/main/versions`;
   try {
     const res = await connection.makeAdtRequest({

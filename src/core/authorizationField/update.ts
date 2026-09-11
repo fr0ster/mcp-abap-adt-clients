@@ -31,9 +31,6 @@ export async function updateAuthorizationField(
   lockHandle?: string,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
-  if (!params.authorization_field_name) {
-    throw new Error('authorization_field_name is required');
-  }
   const encoded = encodeSapObjectName(
     params.authorization_field_name.toUpperCase(),
   );

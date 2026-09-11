@@ -200,14 +200,7 @@ function isScopeResourceUnavailable(error: unknown): boolean {
 export function assertWhereUsedTarget(params: {
   object_name?: string;
   object_type?: string;
-}): void {
-  if (!params.object_name) {
-    throw new Error('Object name is required');
-  }
-  if (!params.object_type) {
-    throw new Error('Object type is required');
-  }
-}
+}): void {}
 
 /**
  * Get where-used scope configuration (Step 1 of 2)

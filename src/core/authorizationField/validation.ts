@@ -27,10 +27,6 @@ export async function validateAuthorizationFieldName(
   description: string,
   packageName?: string,
 ): Promise<IAdtWireResponse> {
-  if (!name) {
-    throw new Error('Authorization field name is required');
-  }
-
   const url = '/sap/bc/adt/aps/iam/auth/validation';
   const queryParams = new URLSearchParams({
     objname: name,

@@ -27,10 +27,6 @@ export async function checkFeatureToggle(
   version: 'active' | 'inactive',
   xmlContent?: string,
 ): Promise<IAdtWireResponse> {
-  if (!name) {
-    throw new Error('Feature toggle name is required');
-  }
-
   const encoded = encodeSapObjectName(name.toLowerCase());
   const uri = `/sap/bc/adt/sfw/featuretoggles/${encoded}`;
 

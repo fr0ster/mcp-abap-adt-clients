@@ -66,9 +66,6 @@ export class ProgramExecutor
   ): Promise<IAdtResponse<string>> => this.scheduling.scheduleTrace(options);
 
   async run(target: IProgramExecutionTarget): Promise<IAdtResponse<string>> {
-    if (!target.programName) {
-      throw new Error('Program name is required');
-    }
     return answering(
       () => runProgram(this.connection, target.programName),
       rawDocument,
@@ -79,12 +76,6 @@ export class ProgramExecutor
     target: IProgramExecutionTarget,
     options: IProgramExecuteWithProfilerOptions,
   ): Promise<IAdtResponse<string>> {
-    if (!target.programName) {
-      throw new Error('Program name is required');
-    }
-    if (!options.profilerId) {
-      throw new Error('profilerId is required');
-    }
     return this.runWithProfilerId(target.programName, options.profilerId);
   }
 

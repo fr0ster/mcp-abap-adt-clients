@@ -97,12 +97,16 @@ export class AdtDdl<R extends IDdlResults = typeof ddlDocuments>
     );
   }
 
-  /** The name, or the caller's mistake — nothing was asked of the server yet. */
+  /**
+   * The name as the caller gave it.
+   *
+   * No guard: the config's type says the field is there, and a `Partial<>` at
+   * the call site is what widens it. A caller who passes nothing builds a URL
+   * from nothing and the server answers — which is a reading a strategy can
+   * take, where a sentence composed here would not be.
+   */
   private name(config: Partial<IDdlConfig>): string {
-    if (!config.ddlName) {
-      throw new Error('DDL name is required');
-    }
-    return config.ddlName;
+    return config.ddlName as string;
   }
 
   /** Validate the name before creating the object. */
@@ -114,9 +118,6 @@ export class AdtDdl<R extends IDdlResults = typeof ddlDocuments>
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const name = this.name(config);
-    if (!config.packageName) {
-      throw new Error('Package name is required for validation');
-    }
 
     return answering(
       () =>
@@ -136,16 +137,24 @@ export class AdtDdl<R extends IDdlResults = typeof ddlDocuments>
     config: Omit<IDdlConfig, 'sourceCode'> & { sourceCode?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    // **The one guard this package keeps, and only on a create.**
+    //
+    // An object created without a package is the single thing `delete()` cannot
+    // undo: the deletion check resolves through the package, so it answers
+    // "Object does not exist" while the name stays taken for good, and clearing
+    // it is SAP GUI territory. Everywhere else a missing field produces a
+    // request the server answers, which is a reading a strategy can take. Here
+    // it produces a state with no way out through ADT at all.
+    if (!config.packageName) {
+      throw new Error(
+        'packageName is required for create: an object created without one cannot be deleted through ADT',
+      );
+    }
+
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const name = this.name(config);
-    if (!config.packageName) {
-      throw new Error('Package name is required');
-    }
-    if (!config.description) {
-      throw new Error('Description is required');
-    }
     return answering(
       () =>
         // No source here, for a table's reason: `createDdl` never read
@@ -238,9 +247,6 @@ export class AdtDdl<R extends IDdlResults = typeof ddlDocuments>
     const name = this.name(config);
     const source = options?.sourceCode || config.ddlSource;
 
-    if (!source) {
-      throw new Error('Source code is required for update');
-    }
     return answering(
       () =>
         updateDdl(

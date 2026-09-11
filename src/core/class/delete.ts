@@ -25,10 +25,6 @@ export async function checkDeletion(
 ): Promise<IAdtWireResponse> {
   const { class_name } = params;
 
-  if (!class_name) {
-    throw new Error('class_name is required');
-  }
-
   const encodedName = encodeSapObjectName(class_name);
   const objectUri = `/sap/bc/adt/oo/classes/${encodedName}`;
 
@@ -61,10 +57,6 @@ export async function deleteClass(
   params: IDeleteClassParams,
 ): Promise<IAdtWireResponse> {
   const { class_name, transport_request } = params;
-
-  if (!class_name) {
-    throw new Error('class_name is required');
-  }
 
   const encodedName = encodeSapObjectName(class_name);
   const objectUri = `/sap/bc/adt/oo/classes/${encodedName}`;

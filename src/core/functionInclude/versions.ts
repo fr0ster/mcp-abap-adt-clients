@@ -12,13 +12,12 @@ export async function getFunctionIncludeVersions(
   connection: IAbapConnection,
   config: Partial<IFunctionIncludeConfig>,
 ): Promise<ObjectVersion[]> {
-  if (!config.functionGroupName)
-    throw new Error('functionGroupName is required');
-  if (!config.includeName) throw new Error('includeName is required');
   const groupLower = encodeSapObjectName(
-    config.functionGroupName,
+    config.functionGroupName as string,
   ).toLowerCase();
-  const encodedInclude = encodeSapObjectName(config.includeName.toUpperCase());
+  const encodedInclude = encodeSapObjectName(
+    (config.includeName as string).toUpperCase(),
+  );
   const url = `/sap/bc/adt/functions/groups/${groupLower}/includes/${encodedInclude}/versions`;
   try {
     const res = await connection.makeAdtRequest({
