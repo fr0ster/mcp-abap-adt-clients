@@ -188,9 +188,26 @@ whose own reading keeps the exchange instead.
 **If you read the activated objects straight after, you now race them.**
 `activateObjectsGroup` used to return only once the run had finished, so code
 that activated and then read the active version worked by accident of the wait.
-It is the POST alone now. `scripts/lib/activationRun.ts` in this repository is the wait written out — start, poll `getActivationRun` with
-`withLongPolling` until the status leaves `running`, then read the results — and
-is the shortest migration to copy.
+It is the POST alone now, and it answers the run id. The wait is four lines you
+write where you need it:
+
+```typescript
+const runId = (await utils.activateObjectsGroup(objects)).getResult().value;
+
+let status = '';
+const deadline = Date.now() + 120_000;
+while (status !== 'finished' && Date.now() < deadline) {
+  const run = await utils.getActivationRun(runId, { withLongPolling: true });
+  status = activationStatusIn(String(run.getResult().value));
+  if (status === 'error' || status === 'failed') throw new Error(status);
+}
+
+const results = await utils.getActivationResults(runId);
+```
+
+`withLongPolling` makes the server hold each read open, so this waits rather
+than spins. How long to allow, and what a failure costs you, are decisions about
+your work — which is why there is no member here that makes them.
 
 **`pull` waited on a job it could not stop.** The `AbortSignal` you passed
 aborted this client's own `sleep`, never the server's work. Written in your own

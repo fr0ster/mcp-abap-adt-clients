@@ -15,12 +15,16 @@ import { join } from 'node:path';
  * moves into `src/`, and is exported — and the release is undone by a helper
  * nobody argued about. So the location is asserted rather than assumed, and a
  * new sequence has to be added to this list deliberately.
+ *
+ * `activateAndWait` was one of these for a commit and is not here because it no
+ * longer exists anywhere: a wait is four lines, so each caller writes its own.
+ * Its name stays in the entry-point check below, so bringing it back as an
+ * export fails a test rather than passing review.
  */
 const SEQUENCES = [
   'packageWalk.ts',
   'functionGroupChildren.ts',
   'tableSelect.ts',
-  'activationRun.ts',
 ];
 
 describe("a consumer's sequence", () => {
