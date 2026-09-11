@@ -227,8 +227,9 @@ export class AdtDdicTableType<
             primary_key_kind: config.primaryKeyKind || 'nonUnique',
             transport_request: config.transportRequest,
           },
+          // The document the caller built; the fields above describe a create.
+          config.document as string,
           options?.lockHandle,
-          this.logger,
         ),
       this.results.metadataUpdated as IResultStrategy<
         ReturnType<R['metadataUpdated']>

@@ -303,7 +303,14 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
     };
 
     return answering(
-      () => updatePackage(connection, fields, options?.lockHandle as string),
+      () =>
+        updatePackage(
+          connection,
+          fields,
+          // The document the caller built; the fields above describe a create.
+          config.document as string,
+          options?.lockHandle as string,
+        ),
       this.results.metadataUpdated as IResultStrategy<
         ReturnType<R['metadataUpdated']>
       >,

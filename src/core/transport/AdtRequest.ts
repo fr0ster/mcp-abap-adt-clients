@@ -247,9 +247,13 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
   /**
    * Update the request's description.
    *
-   * ADT's only mutable field on a request. Read-modify-write: GET the current
-   * XML, patch the description into it, PUT it back — building the body from
-   * scratch would drop every server-managed field the client does not model.
+   * The description is ADT's only mutable field on a request, and the document
+   * carries every server-managed field beside it. So a caller reads the current
+   * document, patches the description into it, and passes the result — building
+   * a body from the description alone would drop the rest.
+   *
+   * That read used to happen here. It does not: two requests in one member is
+   * an order and a merge the caller cannot replace.
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<ITransportConfig>,
@@ -259,14 +263,10 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const number = this.number(config);
-    if (!config.description) {
-      throw new Error('Transport request description is required for update');
-    }
-    const description = config.description;
 
-    this.logger?.info?.('Updating transport request description:', number);
+    this.logger?.info?.('Updating transport request:', number);
     return answering(
-      () => updateTransport(connection, number, description),
+      () => updateTransport(connection, number, config.document as string),
       this.results.metadataUpdated as IResultStrategy<
         ReturnType<R['metadataUpdated']>
       >,

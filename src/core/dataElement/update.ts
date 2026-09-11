@@ -205,93 +205,37 @@ function patchDataElementXml(
 }
 
 /**
- * Update data element - atomic PUT operation (read-modify-write pattern)
- * NOTE: Requires object to be locked first via lockDataElement()
- * NOTE: Caller should call connection.setSessionType("stateful") before locking
+ * Write the document the caller built.
+ *
+ * **One request.** This used to GET the current document, patch the named
+ * fields into it, and PUT the result — two requests in one member, and a merge
+ * whose rules nobody outside could change. A caller reads the document with the
+ * member that reads it, edits it, and passes it here, which is also where the
+ * guarantee that it is valid belongs.
+ *
+ * A field left out of `document` is not preserved: nothing was read to preserve
+ * it from.
  */
 export async function updateDataElement(
   connection: IAbapConnection,
   params: IUpdateDataElementParams,
+  document: string,
   lockHandle?: string,
-  logger?: ILogger,
 ): Promise<IAdtWireResponse> {
-  if (!params.data_element_name) {
-    throw new Error('Data element name is required');
-  }
-  if (!params.package_name) {
-    throw new Error('Package name is required');
-  }
-
-  const dataElementNameEncoded = encodeSapObjectName(
+  const encodedName = encodeSapObjectName(
     params.data_element_name.toLowerCase(),
   );
-
-  // 1. GET current XML
-  const currentResponse = await connection.makeAdtRequest({
-    url: `/sap/bc/adt/ddic/dataelements/${dataElementNameEncoded}`,
-    method: 'GET',
-    timeout: getTimeout('default'),
-    headers: { Accept: ACCEPT_DATA_ELEMENT },
-  });
-  const currentXml = extractXmlString(
-    currentResponse.data,
-    `data element ${params.data_element_name}`,
-  );
-
-  // 2. Patch only changed fields
-  const updatedXml = patchDataElementXml(currentXml, params);
-
-  // Debug: log XML when DEBUG_ADT_LIBS is enabled
-  if (debugEnabled) {
-    logger?.debug?.('[UPDATE XML]');
-    try {
-      const { XMLParser, XMLBuilder } = await import('fast-xml-parser');
-      const parser = new XMLParser({
-        ignoreAttributes: false,
-        attributeNamePrefix: '',
-      });
-      const builder = new XMLBuilder({
-        ignoreAttributes: false,
-        attributeNamePrefix: '',
-        format: true,
-        indentBy: '  ',
-      });
-      const parsed = parser.parse(updatedXml);
-      const formatted = builder.build(parsed);
-      logger?.debug?.(formatted);
-    } catch {
-      logger?.debug?.(updatedXml);
-    }
-  }
-
-  // 3. PUT
-  const url = `/sap/bc/adt/ddic/dataelements/${dataElementNameEncoded}${writeQuery(lockHandle, params.transport_request)}`;
-
-  const headers: Record<string, string> = {
-    Accept: ACCEPT_DATA_ELEMENT,
-    'Content-Type':
-      'application/vnd.sap.adt.dataelements.v2+xml; charset=utf-8',
-  };
+  const url = `/sap/bc/adt/ddic/dataelements/${encodedName}${writeQuery(lockHandle, params.transport_request)}`;
 
   return connection.makeAdtRequest({
     url,
     method: 'PUT',
     timeout: getTimeout('default'),
-    data: updatedXml,
-    headers,
+    data: document,
+    headers: {
+      Accept: ACCEPT_DATA_ELEMENT,
+      'Content-Type':
+        'application/vnd.sap.adt.dataelements.v2+xml; charset=utf-8',
+    },
   });
-}
-
-/**
- * @deprecated Use updateDataElement directly. Kept for backward compatibility.
- */
-export async function updateDataElementInternal(
-  connection: IAbapConnection,
-  args: IUpdateDataElementParams,
-  lockHandle: string | undefined,
-  _username: string,
-  _domainInfo: { dataType: string; length: number; decimals: number },
-  logger?: ILogger,
-): Promise<IAdtWireResponse> {
-  return updateDataElement(connection, args, lockHandle, logger);
 }

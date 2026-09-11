@@ -68,60 +68,33 @@ function patchTableTypeXml(
 }
 
 /**
- * Update table type using existing lock/session (read-modify-write pattern)
+ * Write the document the caller built.
+ *
+ * **One request.** This used to GET the current document, patch the named
+ * fields into it, and PUT the result — two requests in one member, and a merge
+ * whose rules nobody outside could change. A caller reads the document with the
+ * member that reads it, edits it, and passes it here, which is also where the
+ * guarantee that it is valid belongs.
+ *
+ * A field left out of `document` is not preserved: nothing was read to preserve
+ * it from.
  */
 export async function updateTableType(
   connection: IAbapConnection,
   params: IUpdateTableTypeParams,
+  document: string,
   lockHandle?: string,
-  logger?: ILogger,
 ): Promise<IAdtWireResponse> {
-  if (!params.tabletype_name) {
-    throw new Error('tabletype_name is required');
-  }
-  const tableTypeName = params.tabletype_name.toUpperCase();
-  const encodedName = encodeSapObjectName(tableTypeName).toLowerCase();
+  const encodedName = encodeSapObjectName(
+    params.tabletype_name.toUpperCase(),
+  ).toLowerCase();
   const url = `/sap/bc/adt/ddic/tabletypes/${encodedName}${writeQuery(lockHandle, params.transport_request)}`;
 
-  // 1. GET current XML
-  const { getTableTypeMetadata } = await import('./read');
-  const currentResponse = await getTableTypeMetadata(
-    connection,
-    tableTypeName,
-    undefined,
-    logger,
-  );
-  const currentXml = extractXmlString(
-    currentResponse.data,
-    `table type ${params.tabletype_name}`,
-  );
-
-  // 2. Patch only changed fields
-  const updatedXml = patchTableTypeXml(currentXml, params);
-
-  // 3. PUT
-  const headers = {
-    Accept: CT_TABLE_TYPE,
-    'Content-Type': CT_TABLE_TYPE,
-  };
-
-  try {
-    return await connection.makeAdtRequest({
-      url,
-      method: 'PUT',
-      timeout: getTimeout('default'),
-      data: updatedXml,
-      headers,
-    });
-  } catch (error: unknown) {
-    // Relayed, not restated. A sentence composed here would replace the
-    // response the caller's strategy reads, and `IAdtError.response` would
-    // arrive empty on the one failure that carries SAP's own words.
-    const e = error as HttpError;
-    logger?.error?.(
-      `update of table type ${params.tabletype_name} was refused`,
-      { status: e.response?.status },
-    );
-    throw error;
-  }
+  return connection.makeAdtRequest({
+    url,
+    method: 'PUT',
+    timeout: getTimeout('default'),
+    data: document,
+    headers: { Accept: CT_TABLE_TYPE, 'Content-Type': CT_TABLE_TYPE },
+  });
 }

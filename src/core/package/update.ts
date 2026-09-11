@@ -87,85 +87,34 @@ function patchPackageXml(
 }
 
 /**
- * Update package with new data (read-modify-write pattern)
+ * Write the document the caller built.
  *
- * NOTE: Requires stateful session mode enabled via connection.setSessionType("stateful")
+ * **One request.** This used to GET the current document, patch the named
+ * fields into it, and PUT the result — two requests in one member, and a merge
+ * whose rules nobody outside could change. A caller reads the document with the
+ * member that reads it, edits it, and passes it here, which is also where the
+ * guarantee that it is valid belongs.
+ *
+ * A field left out of `document` is not preserved: nothing was read to preserve
+ * it from.
  */
 export async function updatePackage(
   connection: IAbapConnection,
   params: IUpdatePackageParams,
+  document: string,
   lockHandle: string,
 ): Promise<IAdtWireResponse> {
-  if (!params.package_name) {
-    throw new Error('package_name is required');
-  }
-
-  const packageNameEncoded = encodeSapObjectName(
-    params.package_name.toLowerCase(),
-  );
-
-  // 1. GET current XML
-  const currentResponse = await connection.makeAdtRequest({
-    url: `/sap/bc/adt/packages/${packageNameEncoded}`,
-    method: 'GET',
-    timeout: getTimeout('default'),
-    headers: { Accept: ACCEPT_PACKAGE },
-  });
-  const currentXml = extractXmlString(
-    currentResponse.data,
-    `package ${params.package_name}`,
-  );
-
-  // 2. Patch only changed fields
-  const updatedXml = patchPackageXml(currentXml, params);
-
-  // 3. PUT
+  const encodedName = encodeSapObjectName(params.package_name.toLowerCase());
   const corrNrParam = params.transport_request
     ? `&corrNr=${params.transport_request}`
     : '';
-  const url = `/sap/bc/adt/packages/${packageNameEncoded}?lockHandle=${encodeURIComponent(lockHandle)}${corrNrParam}`;
+  const url = `/sap/bc/adt/packages/${encodedName}?lockHandle=${encodeURIComponent(lockHandle)}${corrNrParam}`;
 
-  const headers = {
-    'Content-Type': CT_PACKAGE,
-    Accept: ACCEPT_PACKAGE,
-  };
-
-  return await connection.makeAdtRequest({
+  return connection.makeAdtRequest({
     url,
     method: 'PUT',
     timeout: getTimeout('default'),
-    data: updatedXml,
-    headers,
+    data: document,
+    headers: { 'Content-Type': CT_PACKAGE, Accept: ACCEPT_PACKAGE },
   });
-}
-
-/**
- * Update only package description (safe update - only modifiable field)
- *
- * NOTE: Requires stateful session mode enabled via connection.setSessionType("stateful")
- */
-export async function updatePackageDescription(
-  connection: IAbapConnection,
-  packageName: string,
-  description: string,
-  lockHandle: string,
-  superPackage?: string,
-): Promise<IAdtWireResponse> {
-  if (!packageName) {
-    throw new Error('package_name is required');
-  }
-  if (!description) {
-    throw new Error('description is required');
-  }
-
-  return updatePackage(
-    connection,
-    {
-      package_name: packageName,
-      description: limitDescription(description),
-      super_package: superPackage || '',
-      record_changes: false,
-    },
-    lockHandle,
-  );
 }

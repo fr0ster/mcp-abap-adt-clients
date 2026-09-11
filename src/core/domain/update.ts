@@ -95,45 +95,35 @@ function patchDomainXml(currentXml: string, args: IUpdateDomainParams): string {
 }
 
 /**
- * Update domain with new data (read-modify-write pattern)
+ * Write the document the caller built.
  *
- * NOTE: Requires stateful session mode enabled via connection.setSessionType("stateful")
+ * **One request.** This used to GET the current document, patch the fields
+ * named in `params` into it, and PUT the result — two requests in one member,
+ * and a merge whose rules nobody outside could change. A caller reads the
+ * document with the member that reads it, edits it, and passes it here, which
+ * is also where the guarantee that it is valid belongs.
+ *
+ * So `params` carries what the *request* needs — the name, the transport — and
+ * nothing that used to be merged into the body. A field left out of `document`
+ * is not preserved: nothing was read to preserve it from.
  */
 export async function updateDomain(
   connection: IAbapConnection,
   args: IUpdateDomainParams,
+  document: string,
   lockHandle?: string,
 ): Promise<IAdtWireResponse> {
   const domainNameEncoded = encodeSapObjectName(args.domain_name.toLowerCase());
-
-  // 1. GET current XML
-  const currentResponse = await connection.makeAdtRequest({
-    url: `/sap/bc/adt/ddic/domains/${domainNameEncoded}`,
-    method: 'GET',
-    timeout: getTimeout('default'),
-    headers: { Accept: ACCEPT_DOMAIN },
-  });
-  const currentXml = extractXmlString(
-    currentResponse.data,
-    `domain ${args.domain_name}`,
-  );
-
-  // 2. Patch only changed fields
-  const updatedXml = patchDomainXml(currentXml, args);
-
-  // 3. PUT
   const url = `/sap/bc/adt/ddic/domains/${domainNameEncoded}${writeQuery(lockHandle, args.transport_request)}`;
 
-  const headers: Record<string, string> = {
-    Accept: ACCEPT_DOMAIN,
-    'Content-Type': 'application/vnd.sap.adt.domains.v2+xml; charset=utf-8',
-  };
-
-  return await connection.makeAdtRequest({
+  return connection.makeAdtRequest({
     url,
     method: 'PUT',
     timeout: getTimeout('default'),
-    data: updatedXml,
-    headers,
+    data: document,
+    headers: {
+      Accept: ACCEPT_DOMAIN,
+      'Content-Type': 'application/vnd.sap.adt.domains.v2+xml; charset=utf-8',
+    },
   });
 }

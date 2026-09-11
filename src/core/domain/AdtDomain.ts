@@ -225,6 +225,9 @@ export class AdtDomain<R extends IDomainResults = typeof domainDocuments>
       throw new Error('Package name is required for update');
     }
 
+    // `config.document` is what gets written. The fields beside it describe a
+    // create; on an update nothing here merges them into a document, because
+    // nothing is read to merge them into.
     return answering(
       () =>
         updateDomain(
@@ -233,18 +236,8 @@ export class AdtDomain<R extends IDomainResults = typeof domainDocuments>
             domain_name: name,
             package_name: config.packageName as string,
             transport_request: config.transportRequest,
-            description: config.description,
-            datatype: config.datatype,
-            length: config.length,
-            decimals: config.decimals,
-            conversion_exit: config.conversion_exit,
-            lowercase: config.lowercase,
-            sign_exists: config.sign_exists,
-            value_table: config.value_table,
-            fixed_values: config.fixed_values,
-            masterSystem: this.systemContext.masterSystem,
-            responsible: this.systemContext.responsible,
-          },
+          } as Parameters<typeof updateDomain>[1],
+          config.document as string,
           options?.lockHandle,
         ),
       this.results.metadataUpdated as IResultStrategy<

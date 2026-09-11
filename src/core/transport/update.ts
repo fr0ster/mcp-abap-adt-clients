@@ -22,57 +22,32 @@ import { getTimeout } from '../../utils/timeouts';
 import { extractXmlString, patchXmlAttribute } from '../../utils/xmlPatch';
 
 /**
- * Update a transport request's description (read-modify-write pattern).
+ * Write the document the caller built.
  *
- * The item resource is `/sap/bc/adt/cts/transportrequests/<NUMBER>`, distinct
- * from the collection URL used by create/list, and takes
- * `application/vnd.sap.adt.transportorganizer.v1+xml` — captured 2026-08-07.
+ * **One request.** This used to GET the current document, patch the named
+ * fields into it, and PUT the result — two requests in one member, and a merge
+ * whose rules nobody outside could change. A caller reads the document with the
+ * member that reads it, edits it, and passes it here, which is also where the
+ * guarantee that it is valid belongs.
+ *
+ * A field left out of `document` is not preserved: nothing was read to preserve
+ * it from.
  */
 export async function updateTransport(
   connection: IAbapConnection,
   transportNumber: string,
-  description: string,
+  document: string,
 ): Promise<IAdtWireResponse> {
-  if (!transportNumber) {
-    throw new Error('Transport request number is required');
-  }
-  if (!description) {
-    throw new Error('description is required');
-  }
-
-  const encodedNumber = encodeSapObjectName(transportNumber);
-  const url = `/sap/bc/adt/cts/transportrequests/${encodedNumber}`;
-
-  // 1. GET current XML
-  const currentResponse = await connection.makeAdtRequest({
-    url,
-    method: 'GET',
-    timeout: getTimeout('default'),
-    headers: { Accept: ACCEPT_TRANSPORT },
-  });
-  const currentXml = extractXmlString(
-    currentResponse.data,
-    `transport request ${transportNumber}`,
-  );
-
-  // 2. Patch only the description
-  const updatedXml = patchXmlAttribute(
-    currentXml,
-    'tm:desc',
-    limitDescription(description),
-  );
-
-  // 3. PUT
-  const headers = {
-    'Content-Type': ACCEPT_TRANSPORT,
-    Accept: ACCEPT_TRANSPORT,
-  };
+  const url = `/sap/bc/adt/cts/transportrequests/${encodeSapObjectName(transportNumber)}`;
 
   return connection.makeAdtRequest({
     url,
     method: 'PUT',
     timeout: getTimeout('default'),
-    data: updatedXml,
-    headers,
+    data: document,
+    headers: {
+      'Content-Type': ACCEPT_TRANSPORT,
+      Accept: ACCEPT_TRANSPORT,
+    },
   });
 }
