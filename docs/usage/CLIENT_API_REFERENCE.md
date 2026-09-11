@@ -722,7 +722,22 @@ and what you are about to do, so you write the `analyse` and this package stays
 out of it.
 
 Omit `analyse` and you still get a failure when the transport itself failed,
-carrying the response and the request it arrived on.
+carrying the response and the request it arrived on. Pass `nothingIsARefusal`
+and you do not even get that: every exchange that produced an answer comes back
+as a success carrying it, so a `403` and its document are yours to read.
+
+```typescript
+import { nothingIsARefusal, wireItself } from '@mcp-abap-adt/adt-clients';
+
+const cls = client.getClass({ ...classDocuments, source: wireItself });
+const answer = await cls.read(config, 'active', { analyse: nothingIsARefusal });
+if (answer.ok) {
+  const exchange = answer.getResult().value; // status, headers, body
+}
+```
+
+A request that never completed is still a failure — there is no answer to read,
+and a success built from none would be a lie.
 
 ### Service bindings: publishing is the editing
 

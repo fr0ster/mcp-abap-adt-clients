@@ -156,5 +156,13 @@ export { unitTestDocuments } from './core/unitTest/types';
  * if (!answer.ok) answer.getError().t100;   // typed, no cast
  * ```
  */
+/**
+ * The one failure strategy here, and it finds none.
+ *
+ * Paired with `wireItself` it hands back every exchange that produced an
+ * answer, refusals included, so the caller reads the body rather than being
+ * told what it meant.
+ */
+export { nothingIsARefusal } from './utils/adtResponse';
 /** The readings this package ships, as building blocks for your own sets. */
 export { nothing, rawDocument, wireItself } from './utils/resultStrategy';

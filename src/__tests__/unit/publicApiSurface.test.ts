@@ -183,6 +183,7 @@ const RUNTIME_EXPORTS = [
   'namedItems',
   'nodeContents',
   'nothing',
+  'nothingIsARefusal',
   'packageDocuments',
   'parseCreatedTransport',
   'programDocuments',
