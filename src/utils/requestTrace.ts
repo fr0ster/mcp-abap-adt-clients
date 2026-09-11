@@ -101,7 +101,23 @@ export function withRequestTrace(connection: IAbapConnection): IAbapConnection {
     D = unknown,
   >(request: IAbapRequestOptions): Promise<IAdtWireResponse<T, D>> {
     const asked = { method: request?.method, url: request?.url };
-    const response = await base<T, D>(request);
+
+    let response: IAdtWireResponse<T, D>;
+    try {
+      response = await base<T, D>(request);
+    } catch (error: unknown) {
+      // The path a refusal most often takes. `recogniseFailure` reads `request`
+      // off whatever was thrown, and what the transport puts there is its own
+      // native request object, not the two fields the contract asks for — so a
+      // status the server refused was the one failure a caller could not locate
+      // in a chain of six. Written onto the error rather than composed into a
+      // new one: replacing it would discard the response riding alongside.
+      if (error && typeof error === 'object') {
+        (error as { request?: unknown }).request = asked;
+      }
+      throw error;
+    }
+
     // A new object rather than a field written onto the connection's own: the
     // method is wrapped carefully above, and writing into the value it returns
     // would give that care away.

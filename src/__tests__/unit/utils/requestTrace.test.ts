@@ -22,7 +22,9 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
+import { answering as compose } from '../../../utils/adtResponse';
 import { requestOf, withRequestTrace } from '../../../utils/requestTrace';
+import { rawDocument } from '../../../utils/resultStrategy';
 
 /** An activation checklist carrying an error-severity message. */
 const REFUSED_ACTIVATION = `<?xml version="1.0" encoding="UTF-8"?>
@@ -90,6 +92,80 @@ describe('the request an answer arrived on', () => {
     } as IAdtWireResponse;
 
     expect(requestOf(bare)).toBeUndefined();
+  });
+
+  it('is attached to a status the transport refused', async () => {
+    // The path a refusal most often takes, and the one that had nothing: the
+    // transport throws, and what it puts in `request` is its own native object
+    // rather than the two fields the contract asks for.
+    const refusing = {
+      makeAdtRequest: async () => {
+        const error = new Error(
+          'Request failed with status code 403',
+        ) as Error & {
+          response?: unknown;
+          request?: unknown;
+        };
+        error.response = {
+          status: 403,
+          statusText: 'Forbidden',
+          headers: {},
+          data: '<exc><localizedMessage>locked</localizedMessage></exc>',
+        };
+        error.request = { aNativeRequestObject: true };
+        throw error;
+      },
+    } as unknown as IAbapConnection;
+
+    const connection = withRequestTrace(refusing);
+
+    await expect(
+      connection.makeAdtRequest({
+        url: '/sap/bc/adt/oo/classes/zcl_x',
+        method: 'DELETE',
+      } as Parameters<IAbapConnection['makeAdtRequest']>[0]),
+    ).rejects.toMatchObject({
+      request: { method: 'DELETE', url: '/sap/bc/adt/oo/classes/zcl_x' },
+    });
+  });
+
+  it('reaches the caller on the failure the contract builds from it', async () => {
+    const refusing = {
+      makeAdtRequest: async () => {
+        const error = new Error(
+          'Request failed with status code 403',
+        ) as Error & {
+          response?: unknown;
+        };
+        error.response = {
+          status: 403,
+          statusText: 'Forbidden',
+          headers: {},
+          data: '<exc><localizedMessage>locked</localizedMessage></exc>',
+        };
+        throw error;
+      },
+    } as unknown as IAbapConnection;
+
+    const connection = withRequestTrace(refusing);
+
+    const answer = await compose(
+      () =>
+        connection.makeAdtRequest({
+          url: '/sap/bc/adt/oo/classes/zcl_x',
+          method: 'DELETE',
+        } as Parameters<IAbapConnection['makeAdtRequest']>[0]),
+      rawDocument,
+    );
+
+    expect(answer.ok).toBe(false);
+    if (answer.ok) throw new Error('expected a failure');
+    const failure = answer.getError();
+    expect(failure.request).toEqual({
+      method: 'DELETE',
+      url: '/sap/bc/adt/oo/classes/zcl_x',
+    });
+    expect(failure.response?.status).toBe(403);
   });
 
   it('wraps once, however many times it is asked', async () => {
