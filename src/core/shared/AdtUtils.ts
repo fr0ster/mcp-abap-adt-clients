@@ -97,7 +97,7 @@ import { getTimeout } from '../../utils/timeouts';
 import { getAllTypes as getAllTypesUtil } from './allTypes';
 import { getDiscovery as getDiscoveryUtil } from './discovery';
 import { fetchInactiveObjects } from './getInactiveObjects';
-import { activateObjectsGroup } from './groupActivation';
+import { activateObjectsGroup, getActivationResults } from './groupActivation';
 import { checkDeletionGroup, deleteObjectsGroup } from './groupDeletion';
 import { getInclude as getIncludeUtil } from './include';
 import { fetchNodeStructure as fetchNodeStructureUtil } from './nodeStructure';
@@ -424,6 +424,21 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
   ): Promise<IAdtResponse<string>> {
     return answering(
       () => activateObjectsGroup(this.connection, objects, preauditRequested),
+      rawDocument,
+    );
+  }
+
+  /**
+   * What an activation run produced — `/activation/results/{runId}`.
+   *
+   * One request. {@link activateObjectsGroup} starts the run and answers; the
+   * run id is in its `Location` header, and `extractRunId` reads it. How long
+   * to wait before asking for the results is the caller's decision, which is
+   * why this is a separate member rather than a step inside that one.
+   */
+  async getActivationResults(runId: string): Promise<IAdtResponse<string>> {
+    return answering(
+      () => getActivationResults(this.connection, runId),
       rawDocument,
     );
   }

@@ -14,9 +14,33 @@
  * rests on evidence rather than on reasoning.
  */
 
-import type { IAbapConnection, IAtcRunTarget } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAtcRunOptions,
+  IAtcRunTarget,
+} from '@mcp-abap-adt/interfaces';
 import { AdtAtc } from '../../../runtime/atc/AdtAtc';
 import { expectResult } from '../../helpers/contract';
+
+/**
+ * The sequence `AdtAtc.run` performed until 19.0.0, written out.
+ *
+ * Three requests — the check variant, a worklist for it, then the run — so it
+ * could not stay one member: the order and the worklist's reuse were decided
+ * there rather than by the caller. This reproduces it exactly, which is what a
+ * caller migrating unchanged behaviour writes, and lets these cases keep
+ * asserting what they asserted.
+ */
+const runAtc = async (
+  atc: AdtAtc,
+  target: IAtcRunTarget,
+  options?: IAtcRunOptions,
+) => {
+  const checkVariant =
+    options?.checkVariant ?? (await atc.resolveCheckVariant());
+  const worklistId = await atc.createWorklist(checkVariant);
+  return atc.startRun(worklistId, target, options);
+};
 
 // The properties as the trial sent them: four of them, and the one this client
 // needs is not the first.
@@ -123,7 +147,7 @@ describe('AdtAtc — resolving the check variant', () => {
     const { connection, calls } = connectionFor();
 
     const result = expectResult(
-      await new AdtAtc(connection, logger() as never).run(TARGET),
+      await runAtc(new AdtAtc(connection, logger() as never), TARGET),
       'result',
     );
 
@@ -142,7 +166,7 @@ describe('AdtAtc — resolving the check variant', () => {
   it('reads customizing with GET and uses systemCheckVariant', async () => {
     const { connection, calls } = connectionFor();
 
-    await new AdtAtc(connection, logger() as never).run(TARGET, {});
+    await runAtc(new AdtAtc(connection, logger() as never), TARGET, {});
 
     const customizing = calls.find((c) => c.url.includes('/atc/customizing'));
     expect(customizing?.method).toBe('GET');
@@ -156,7 +180,7 @@ describe('AdtAtc — resolving the check variant', () => {
   it('an explicit checkVariant skips /atc/customizing entirely', async () => {
     const { connection, calls } = connectionFor();
 
-    await new AdtAtc(connection, logger() as never).run(TARGET, {
+    await runAtc(new AdtAtc(connection, logger() as never), TARGET, {
       checkVariant: 'ZMY_VARIANT',
     });
 
@@ -175,7 +199,7 @@ describe('AdtAtc — resolving the check variant', () => {
     });
 
     await expect(
-      new AdtAtc(connection, logger() as never).run(TARGET),
+      runAtc(new AdtAtc(connection, logger() as never), TARGET),
     ).rejects.toMatchObject({ code: 'ATC_NO_CHECK_VARIANT' });
 
     // No worklist created with `undefined` in the URL.
@@ -192,7 +216,8 @@ describe('AdtAtc — the request itself', () => {
   it('the run payload carries every object, the inclusive kind and the cap', async () => {
     const { connection, calls } = connectionFor();
 
-    await new AdtAtc(connection, logger() as never).run(
+    await runAtc(
+      new AdtAtc(connection, logger() as never),
       {
         objects: [
           { objectType: 'class', objectName: 'ZCL_X' },
@@ -214,7 +239,9 @@ describe('AdtAtc — the request itself', () => {
       run: { status: 200, data: WAITING_RUN, headers: {} },
     });
 
-    await new AdtAtc(connection, logger() as never).run(TARGET, { wait: true });
+    await runAtc(new AdtAtc(connection, logger() as never), TARGET, {
+      wait: true,
+    });
 
     expect(calls.find((c) => c.url.includes('/atc/runs?'))?.url).toContain(
       'clientWait=true',
@@ -228,7 +255,7 @@ describe('AdtAtc — the request itself', () => {
     const { connection, calls } = connectionFor();
     const atc = new AdtAtc(connection, logger() as never);
 
-    await atc.run(TARGET);
+    await runAtc(atc, TARGET);
     await atc.getRunStatus(RUN_ID);
     await atc.getFindings(WORKLIST_ID);
 
@@ -265,7 +292,7 @@ describe('AdtAtc — what a started run answers with', () => {
     const { connection } = connectionFor();
 
     const result = expectResult(
-      await new AdtAtc(connection, logger() as never).run(TARGET),
+      await runAtc(new AdtAtc(connection, logger() as never), TARGET),
       'result',
     );
 
@@ -283,7 +310,7 @@ describe('AdtAtc — what a started run answers with', () => {
     });
 
     await expect(
-      new AdtAtc(connection, logger() as never).run(TARGET),
+      runAtc(new AdtAtc(connection, logger() as never), TARGET),
     ).rejects.toMatchObject({ code: 'ATC_NO_RUN_LOCATION' });
   });
 
@@ -295,7 +322,7 @@ describe('AdtAtc — what a started run answers with', () => {
     });
 
     const result = expectResult(
-      await new AdtAtc(connection, logger() as never).run(TARGET, {
+      await runAtc(new AdtAtc(connection, logger() as never), TARGET, {
         wait: true,
       }),
       'result',
@@ -319,7 +346,7 @@ describe('AdtAtc — what a started run answers with', () => {
     });
 
     await expect(
-      new AdtAtc(connection, logger() as never).run(TARGET, { wait: true }),
+      runAtc(new AdtAtc(connection, logger() as never), TARGET, { wait: true }),
     ).rejects.toMatchObject({ code: 'ATC_NO_FINDING_STATS' });
   });
 
@@ -338,7 +365,7 @@ describe('AdtAtc — what a started run answers with', () => {
     });
 
     const result = expectResult(
-      await new AdtAtc(connection, log as never).run(TARGET, {
+      await runAtc(new AdtAtc(connection, log as never), TARGET, {
         wait: true,
       }),
       'result',
@@ -360,7 +387,7 @@ describe('AdtAtc — what a started run answers with', () => {
     });
 
     const result = expectResult(
-      await new AdtAtc(connection, logger() as never).run(TARGET, {
+      await runAtc(new AdtAtc(connection, logger() as never), TARGET, {
         wait: true,
       }),
       'waiting run',
@@ -458,19 +485,27 @@ describe('AdtAtc — refusing before the request', () => {
       worklist: { status: 200, data: '   ', headers: {} },
     });
 
+    // `createWorklist` is its own member since 19.0.0, so this is asserted
+    // where it happens rather than through a run that made the call for you.
     await expect(
-      new AdtAtc(connection, logger() as never).run(TARGET),
+      new AdtAtc(connection, logger() as never).createWorklist('ANY'),
     ).rejects.toMatchObject({ code: 'ATC_NO_WORKLIST_ID' });
 
     expect(urlsOf(calls).some((u) => u.includes('/atc/runs?'))).toBe(false);
   });
 
   // 16. The tuple type stops a TypeScript caller; a JavaScript one arrives.
+  //
+  // Asserted against `startRun` rather than the composed sequence: since
+  // 19.0.0 the variant and the worklist are the caller's own calls, so "before
+  // any request" is a claim about this member, not about the three together.
   it('an empty object set rejects before any request', async () => {
     const { connection } = connectionFor();
 
     await expect(
-      new AdtAtc(connection, logger() as never).run({ objects: [] } as never),
+      new AdtAtc(connection, logger() as never).startRun('WL1', {
+        objects: [],
+      } as never),
     ).rejects.toMatchObject({ code: 'ADT_VALIDATION_FAILED' });
 
     expect(connection.makeAdtRequest).not.toHaveBeenCalled();
@@ -487,7 +522,7 @@ describe('AdtAtc — refusing before the request', () => {
     const { connection } = connectionFor();
 
     await expect(
-      new AdtAtc(connection, logger() as never).run(TARGET, {
+      new AdtAtc(connection, logger() as never).startRun('WL1', TARGET, {
         maximumVerdicts: value,
       }),
     ).rejects.toMatchObject({ code: 'ADT_VALIDATION_FAILED' });
@@ -513,8 +548,13 @@ describe('AdtAtc — the documents are read structurally', () => {
       },
     });
 
-    await new AdtAtc(connection, logger() as never).run(TARGET);
+    // Asserted on `resolveCheckVariant` directly: reading customizing is its
+    // own member since 19.0.0, and what a caller does with the variant — put it
+    // in a worklist, or not — is theirs.
+    const atc = new AdtAtc(connection, logger() as never);
+    expect(await atc.resolveCheckVariant()).toBe('ZREVERSED');
 
+    await atc.createWorklist('ZREVERSED');
     expect(calls.find((c) => c.url.includes('/atc/worklists?'))?.url).toContain(
       'checkVariant=ZREVERSED',
     );
@@ -573,7 +613,7 @@ describe('AdtAtc — the documents are read structurally', () => {
     });
 
     const result = expectResult(
-      await new AdtAtc(connection, logger() as never).run(TARGET, {
+      await new AdtAtc(connection, logger() as never).startRun('WL1', TARGET, {
         wait: true,
       }),
       'waiting run',
@@ -601,7 +641,7 @@ describe('AdtAtc — the documents are read structurally', () => {
     const log = logger();
 
     const result = expectResult(
-      await new AdtAtc(connection, log as never).run(TARGET, {
+      await runAtc(new AdtAtc(connection, log as never), TARGET, {
         wait: true,
       }),
       'result',
@@ -629,7 +669,7 @@ describe('AdtAtc — the confirmed URI templates', () => {
   ] as const)('%s is checked at %s', async (objectType, uri) => {
     const { connection, calls } = connectionFor();
 
-    await new AdtAtc(connection, logger() as never).run({
+    await new AdtAtc(connection, logger() as never).startRun('WL1', {
       objects: [{ objectType, objectName: 'ZX' }],
     });
 
@@ -648,7 +688,7 @@ describe('AdtAtc — the confirmed URI templates', () => {
     const { connection } = connectionFor();
 
     await expect(
-      new AdtAtc(connection, logger() as never).run({
+      new AdtAtc(connection, logger() as never).startRun('WL1', {
         // A member the union does not have yet — the shape a future addition
         // arrives in, before anyone adds its template.
         objects: [{ objectType: 'program' as never, objectName: 'ZX' }],

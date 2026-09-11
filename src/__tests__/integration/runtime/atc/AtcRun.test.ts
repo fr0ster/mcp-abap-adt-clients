@@ -169,13 +169,17 @@ describe('ATC check runs (using AdtRuntimeClient)', () => {
 
       try {
         logTestStep(`run ATC over class ${className}, waiting`, testsLogger);
+        // Three calls since 19.0.0, because a run is three requests: the
+        // system's check variant, a worklist for it, then the run.
+        const atc = runtime.getAtc();
+        const variant = await atc.resolveCheckVariant();
+        const worklistId = await atc.createWorklist(variant);
         const result = expectResult(
-          await runtime
-            .getAtc()
-            .run(
-              { objects: [{ objectType: 'class', objectName: className }] },
-              { wait: true },
-            ),
+          await atc.startRun(
+            worklistId,
+            { objects: [{ objectType: 'class', objectName: className }] },
+            { wait: true },
+          ),
           'ATC run',
         );
 
@@ -266,8 +270,10 @@ describe('ATC check runs (using AdtRuntimeClient)', () => {
         const atc = runtime.getAtc();
 
         logTestStep(`start ATC run over class ${className}`, testsLogger);
+        const variant = await atc.resolveCheckVariant();
+        const worklistId = await atc.createWorklist(variant);
         const started = expectResult(
-          await atc.run({
+          await atc.startRun(worklistId, {
             objects: [{ objectType: 'class', objectName: className }],
           }),
           'ATC run',

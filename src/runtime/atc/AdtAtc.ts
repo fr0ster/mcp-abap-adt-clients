@@ -63,23 +63,35 @@ function header(
   return typeof value === 'string' ? value : undefined;
 }
 
+/**
+ * **Not `IAdtRunnable` since 19.0.0.** That atom's `run` is one call, and an
+ * ATC run is three: the check variant, a worklist for it, then the run itself.
+ * A member that made all three chose the order and denied the caller a worklist
+ * they could reuse. The atom stays in the contract for whoever composes them.
+ */
 export class AdtAtc
-  implements
-    IAdtRunnable<IAtcRunTarget, IAtcRunResult, IAtcRunOptions>,
-    IAtcRunStatusReadable<IAtcRunStatus>,
-    IAtcFindings<string>
+  implements IAtcRunStatusReadable<IAtcRunStatus>, IAtcFindings<string>
 {
   constructor(
     private readonly connection: IAbapConnection,
     private readonly logger: ILogger,
   ) {}
 
-  async run(
+  /**
+   * Start a run against a worklist — `/atc/runs`.
+   *
+   * **One request.** This was `run(target, options)` until 19.0.0, and it made
+   * three: the check variant out of customizing, a worklist for it, then the
+   * run. The first two are members of their own now
+   * ({@link resolveCheckVariant}, {@link createWorklist}) and the caller calls
+   * them in the order they want — reusing a worklist across runs, or naming a
+   * variant without asking the system for one.
+   */
+  async startRun(
+    worklistId: string,
     target: IAtcRunTarget,
     options?: IAtcRunOptions,
   ): Promise<IAdtResponse<IAtcRunResult>> {
-    // `options` is optional in the contract, so every read of it is guarded.
-    // A caller writing `run(target)` is doing what the interface allows.
     const wait = options?.wait ?? false;
     const maximumVerdicts =
       options?.maximumVerdicts ?? DEFAULT_MAXIMUM_VERDICTS;
@@ -87,10 +99,6 @@ export class AdtAtc
     this.assertTarget(target);
     this.assertMaximumVerdicts(maximumVerdicts);
 
-    const checkVariant =
-      options?.checkVariant ?? (await this.resolveCheckVariant());
-
-    const worklistId = await this.createWorklist(checkVariant);
     const uris = target.objects.map((o) =>
       buildAtcObjectUri(o.objectType, o.objectName),
     );
@@ -170,7 +178,14 @@ export class AdtAtc
     }
   }
 
-  private async resolveCheckVariant(): Promise<string> {
+  /**
+   * The system's check variant, out of `/atc/customizing`.
+   *
+   * One request. Public since 19.0.0 because {@link startRun} no longer fetches
+   * it: which variant a run uses is the caller's choice, and asking for the
+   * system default is one of the things they may choose.
+   */
+  async resolveCheckVariant(): Promise<string> {
     const response = await getAtcCustomizing(this.connection);
     const variant = parseSystemCheckVariant(response.data);
     if (!variant) {
@@ -184,7 +199,14 @@ export class AdtAtc
     return variant;
   }
 
-  private async createWorklist(checkVariant: string): Promise<string> {
+  /**
+   * A worklist for a variant — `/atc/worklists`.
+   *
+   * One request, answering the worklist id. Public for the same reason as
+   * {@link resolveCheckVariant}: the run is a sequence now, and this is one of
+   * its steps.
+   */
+  async createWorklist(checkVariant: string): Promise<string> {
     const response = await createAtcWorklist(this.connection, checkVariant);
     const worklistId = asText(response.data).trim();
     // Non-empty, and nothing more specific: the observed ids are 32-character

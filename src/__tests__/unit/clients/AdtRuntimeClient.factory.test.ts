@@ -165,14 +165,21 @@ describe('AdtRuntimeClient factory pattern', () => {
       expect(typeof p.read).toBe('function');
     });
 
-    // The three capabilities the narrowed return type promises, and nothing
-    // else: no create, no lock, no activate.
-    it('atc has exactly the runnable and reader methods', () => {
+    // The capabilities the narrowed return type promises, and nothing else: no
+    // create, no lock, no activate.
+    //
+    // `run` is gone since 19.0.0 — it made three requests, so the check
+    // variant, the worklist and the run are three members and the caller joins
+    // them.
+    it('atc has the run steps and the readers', () => {
       const { client } = createRuntimeClient();
       const atc = client.getAtc();
-      expect(typeof atc.run).toBe('function');
+      expect(typeof atc.resolveCheckVariant).toBe('function');
+      expect(typeof atc.createWorklist).toBe('function');
+      expect(typeof atc.startRun).toBe('function');
       expect(typeof atc.getRunStatus).toBe('function');
       expect(typeof atc.getFindings).toBe('function');
+      expect((atc as unknown as Record<string, unknown>).run).toBeUndefined();
     });
 
     it('dumps has expected methods', () => {

@@ -6,7 +6,7 @@
  * - getCrossTrace() — Cross trace analysis
  * - getSt05Trace() — ST05 performance traces
  * - getApplicationLog() — Application log analysis
- * - getAtc() — ATC check runs: start one, poll it, read the worklist
+ * - getAtc() — ATC: the check variant, a worklist, a run, its status, its findings
  * - getAtcLog() — ATC check failure and execution logs
  * - getDdicActivation() — DDIC activation graph
  * - getDumps() — Runtime dump analysis
@@ -28,7 +28,10 @@
  *
  * // Logs
  * const appLog = await client.getApplicationLog().getObject('Z_MY_LOG');
- * const started = await client.getAtc().run({
+ * const atc = client.getAtc();
+ * const variant = await atc.resolveCheckVariant();
+ * const worklistId = await atc.createWorklist(variant);
+ * const started = await atc.startRun(worklistId, {
  *   objects: [{ objectType: 'class', objectName: 'ZCL_MY_CLASS' }],
  * });
  * const atcLogs = await client.getAtcLog().getCheckFailureLogs();
