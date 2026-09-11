@@ -41,7 +41,7 @@ const xmlParser = new XMLParser({
  * with one answer, which is exactly the shape an `IResultStrategy` types. The
  * `includeRawXml` flag it used to take is gone with the split — a consumer who
  * wants the document passes `rawDocument` as the strategy, which is the same
- * removal `getWhereUsedList`'s flag got in this release.
+ * removal the where-used walker's type flags got in this release.
  */
 export async function fetchInactiveObjects(
   connection: IAbapConnection,

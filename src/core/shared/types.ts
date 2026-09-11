@@ -19,7 +19,6 @@ export type {
   IGetSqlQueryParams,
   IGetTableContentsParams,
   IGetVirtualFoldersContentsParams,
-  IGetWhereUsedListParams,
   IGetWhereUsedParams,
   IGetWhereUsedScopeParams,
   IReadOptions,

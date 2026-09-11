@@ -104,6 +104,7 @@ export {
   namedItems,
   nodeContents,
   searchHits,
+  whereUsedReferences,
 } from './core/shared/utilResults';
 export type { IStructureResults } from './core/structure/types';
 export { structureDocuments } from './core/structure/types';

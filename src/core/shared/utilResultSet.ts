@@ -14,7 +14,6 @@
  * |---|---|---|
  * | `search`, `getAllTypes`, `fetchNodeStructure` | one each | here |
  * | `getInactiveObjects` | one GET | here, since 18.0.0 |
- * | `getWhereUsedList` | the scope, then the search | no single answer |
  *
  * The last three assemble one shape from several answers, which is not what
  * `IResultStrategy<T> = (answer: IAdtWireResponse) => T` types. They answer the
@@ -35,6 +34,7 @@
  */
 
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces';
+import { rawDocument } from '../../utils/resultStrategy';
 import { inactiveObjects } from './getInactiveObjects';
 import { namedItems, nodeContents, searchHits } from './utilResults';
 
@@ -47,6 +47,16 @@ export interface IUtilResults {
   readonly node: IResultStrategy<unknown>;
   /** What `/activation/inactiveobjects` answers — one GET, one answer. */
   readonly inactive: IResultStrategy<unknown>;
+  /**
+   * What `/usageReferences` answers.
+   *
+   * The default is the document. A parsed reference list used to be what
+   * `getWhereUsedList` returned, and that member joined two requests to get
+   * there — the scope, then the search — so it could never be given a reading
+   * at all. Now the join is the caller's and the shape is a reading like any
+   * other.
+   */
+  readonly whereUsed: IResultStrategy<unknown>;
 }
 
 /**
@@ -59,4 +69,5 @@ export const utilDocuments = {
   types: namedItems,
   node: nodeContents,
   inactive: inactiveObjects,
+  whereUsed: rawDocument,
 } satisfies IUtilResults;

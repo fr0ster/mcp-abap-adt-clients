@@ -2012,7 +2012,7 @@ export class AdtClient {
     results: R,
   ): IAdtInformationSystem<
     ReturnType<R['search']>,
-    IWhereUsedListResult,
+    ReturnType<R['whereUsed']>,
     ReturnType<R['types']>
   > &
     IAdtRepositoryStructure<ReturnType<R['node']>> &

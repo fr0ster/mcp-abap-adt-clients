@@ -17,6 +17,7 @@ import type {
   IObjectReference,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
+import { XMLParser } from 'fast-xml-parser';
 import { parseNamedItems } from './allTypes';
 import { toNodeContents } from './nodeStructure';
 import { parseSearchResults } from './search';
@@ -57,12 +58,15 @@ export interface IWhereUsedReference extends IAdtObjectHit {
   objectIdentifier?: string;
 }
 
-/** What a where-used run answers, read. */
+/**
+ * What a where-used run answers, read.
+ *
+ * **No `objectName` or `objectType` since 19.0.0.** A reading sees the answer
+ * and nothing else, and the document does not name what was searched — those
+ * two fields were copied from the call's own parameters by a member that had
+ * them in hand. The caller knows what they asked for.
+ */
 export interface IWhereUsedListResult {
-  /** Object that was searched */
-  objectName: string;
-  /** Object type that was searched */
-  objectType: string;
   /** Total number of references found */
   totalReferences: number;
   /** Result description from SAP */
@@ -200,3 +204,57 @@ export const nodeContents: IResultStrategy<IRepositoryNodeContents> = (
 /** A named-item list — the types, the traces, whatever the endpoint names. */
 export const namedItems: IResultStrategy<INamedItem[]> = (answer) =>
   parseNamedItems(String(answer.data ?? ''));
+
+/**
+ * A where-used answer, read into references.
+ *
+ * Not the default — `whereUsed` defaults to the document, because a reference
+ * list drops what a caller may want. Named and exported so a caller who does
+ * want this shape asks for it by passing it in their reading set.
+ *
+ * Packages are skipped: `DEVC/K` entries are container nodes in this document,
+ * not places the object is used.
+ */
+export const whereUsedReferences: IResultStrategy<IWhereUsedListResult> = (
+  answer,
+) => {
+  const parser = new XMLParser({
+    ignoreAttributes: false,
+    attributeNamePrefix: '@_',
+    removeNSPrefix: true,
+  });
+  const root = parser.parse(String(answer.data ?? ''))?.usageReferenceResult;
+
+  if (!root) {
+    return { totalReferences: 0, resultDescription: '', references: [] };
+  }
+
+  const raw = root.referencedObjects?.referencedObject;
+  const list = Array.isArray(raw) ? raw : raw ? [raw] : [];
+  const references: IWhereUsedReference[] = [];
+
+  for (const entry of list) {
+    const adtObject = entry.adtObject;
+    if (!adtObject) continue;
+    const type = adtObject['@_type'] || '';
+    if (type === 'DEVC/K') continue;
+
+    references.push({
+      uri: entry['@_uri'] || '',
+      name: adtObject['@_name'] || '',
+      type,
+      parentUri: entry['@_parentUri'],
+      packageName: adtObject.packageRef?.['@_name'],
+      responsible: adtObject['@_responsible'],
+      isResult: entry['@_isResult'] === 'true',
+      usageInformation: entry['@_usageInformation'],
+      objectIdentifier: entry.objectIdentifier,
+    });
+  }
+
+  return {
+    totalReferences: Number.parseInt(root['@_numberOfResults'] || '0', 10),
+    resultDescription: root['@_resultDescription'] || '',
+    references,
+  };
+};

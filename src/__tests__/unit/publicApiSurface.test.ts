@@ -200,6 +200,7 @@ const RUNTIME_EXPORTS = [
   'transportDocuments',
   'unitTestDocuments',
   'utilDocuments',
+  'whereUsedReferences',
   'wireItself',
 ];
 

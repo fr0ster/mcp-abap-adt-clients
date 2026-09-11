@@ -88,7 +88,13 @@ Project-wide. Every task's requirements implicitly include them.
    migration a real consumer performs, exercised. The one carve-out: a test that
    asserts behaviour which no longer exists — a guard's message, a deleted
    reading's verdict — pins something that is gone and goes with it.
-10. Language: English for every artifact. Biome: single quotes, semicolons,
+10. **Three layers, and a decision belongs to exactly one.** *adt tools* — this
+    package — give the instrument: one member, one endpoint call, no order, no
+    wait, no verdict. *mcp tools* — the server — compose the sequence and judge
+    what a body means. The *llm pipeline* decides what is wanted. A join made
+    here cannot be replaced by the layer that owns it, so when a member would do
+    two things, the join goes up.
+11. Language: English for every artifact. Biome: single quotes, semicolons,
    2-space indent. Diagnostics through the injected `ILogger`, never `console.*`.
 
 **Running the tests.** Everything here is covered by unit tests, which need no
@@ -1291,6 +1297,19 @@ same family as the rest of this plan.
 Two of them poll — `activateObjectsGroup` and `pullRepo` — which this project
 already ruled out in its own words: waiting on an asynchronous ADT job is the
 consumer's, not this package's.
+
+**The rule is split, not delete.** A chain comes apart into the single-request
+calls it was made of, and each of those becomes a member in its own right. A
+part is deleted **only** when the split shows it already exists — `getWhereUsed`
+and `getWhereUsedScope` are both public already, so `getWhereUsedList` leaves
+and nothing replaces it. Where a part is private today it is promoted, not
+discarded: `getActivationResults`, `resolveCheckVariant`, `createWorklist` and
+`runWithProfilerId` are each one request and each becomes public.
+
+Promoting a member adds nothing to `@mcp-abap-adt/interfaces` — a class may
+carry members past its atoms. Only *removing* a member an atom declares forces
+an interfaces change, which narrows the cross-package work to `getWhereUsedList`
+in `IAdtInformationSystem` and `runWithProfiling` in `IAdtRunnable`.
 
 **What stays, verified.** `getWhereUsed` and `getWhereUsedScope` each issue
 exactly one request and keep their place; only the member that chains them goes.
