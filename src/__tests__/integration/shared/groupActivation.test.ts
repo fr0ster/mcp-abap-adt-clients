@@ -538,10 +538,14 @@ define structure ${structureName} {
         const activation = await activateAndWait(client, objectsToActivate, {
           logger: testsLogger,
         });
+        // `finished`, exactly. `activateAndWait` raises on `error`, on
+        // `failed`, and on a run that had not finished by the deadline — so
+        // reaching here already means the run worked, and this says so rather
+        // than accepting "anything but running".
         expect(activation.runId).toBeTruthy();
-        expect(activation.status).not.toBe('running');
+        expect(activation.status).toBe('finished');
         testsLogger.info?.(
-          `✅ activation run ${activation.runId} ended as ${activation.status}`,
+          `✅ activation run ${activation.runId} finished; results: ${activation.results.slice(0, 120)}`,
         );
 
         logTestSuccess(testsLogger, 'Group Activation - full workflow');

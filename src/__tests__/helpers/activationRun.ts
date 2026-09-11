@@ -27,12 +27,18 @@ export function activationStatusIn(document: string): string {
 }
 
 /**
- * Start a group activation and wait for it to reach a terminal status.
+ * Start a group activation and wait for it to **finish**.
  *
  * `withLongPolling` is on: the server holds each read open rather than
- * answering at once, so this is a wait rather than a spin. The deadline is the
- * caller's, and a run still going when it passes raises — a test that carried
- * on regardless would be asserting against a system mid-activation.
+ * answering at once, so this is a wait rather than a spin.
+ *
+ * **It raises on anything but `finished`**, and that is this helper being a
+ * caller rather than the package being one. Reading `runs:status` is a
+ * judgement, and 19.0.0 moved judgements to whoever is asking — here the asker
+ * is a test or a setup script that needs the objects actually active before it
+ * looks at them. `error` and `failed` are failures; a status that never
+ * arrived by the deadline is a failure too, because carrying on would assert
+ * against a system still activating.
  */
 export async function activateAndWait(
   client: AdtClient,
@@ -52,6 +58,8 @@ export async function activateAndWait(
 
   const deadline = Date.now() + (options?.deadlineMs ?? 120_000);
   let status = '';
+  let finished = false;
+
   while (Date.now() < deadline) {
     const answer = await utils.getActivationRun(runId, {
       withLongPolling: true,
@@ -60,12 +68,25 @@ export async function activateAndWait(
       throw new Error(`run ${runId}: ${answer.getError().message}`);
     }
     status = activationStatusIn(String(answer.getResult().value));
-    options?.logger?.debug?.(`activation run ${runId}: ${status}`);
-    if (status !== 'running' && status !== 'scheduled' && status !== '') break;
+    options?.logger?.debug?.(`activation run ${runId}: ${status || '(none)'}`);
+
+    if (status === 'finished') {
+      finished = true;
+      break;
+    }
+    if (status === 'error' || status === 'failed') {
+      throw new Error(`activation run ${runId} ended as ${status}`);
+    }
+    // Anything else — `running`, `scheduled`, or a status this reading did not
+    // find — is not an ending, so the wait continues until the deadline says
+    // otherwise. An unrecognised status is not treated as success: a document
+    // nobody here can read is a reason to keep asking, not to move on.
   }
 
-  if (status === 'running' || status === 'scheduled') {
-    throw new Error(`run ${runId} was still ${status} at the deadline`);
+  if (!finished) {
+    throw new Error(
+      `activation run ${runId} had not finished at the deadline; last status was ${status || 'not found in the document'}`,
+    );
   }
 
   const results = await utils.getActivationResults(runId);
