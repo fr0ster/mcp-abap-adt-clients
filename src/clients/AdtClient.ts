@@ -29,7 +29,6 @@ import type {
   IAdtMetadataReadable,
   IAdtMetadataUpdatable,
   IAdtObjectAccess,
-  IAdtPackageBrowsing,
   IAdtReadable,
   IAdtRepositoryStructure,
   IAdtRequest,
@@ -2017,7 +2016,6 @@ export class AdtClient {
     ReturnType<R['types']>
   > &
     IAdtRepositoryStructure<ReturnType<R['node']>> &
-    IAdtPackageBrowsing<IPackageContentItem[]> &
     IAdtGroupLifecycle<ReturnType<R['inactive']>> &
     IAdtDataPreview &
     IAdtDiscovery &

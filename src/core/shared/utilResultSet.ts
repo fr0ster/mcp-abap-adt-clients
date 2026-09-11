@@ -14,14 +14,12 @@
  * |---|---|---|
  * | `search`, `getAllTypes`, `fetchNodeStructure` | one each | here |
  * | `getInactiveObjects` | one GET | here, since 18.0.0 |
- * | `getPackageContents` | one node-structure request **per object type**, plus a walk into subpackages | no single answer |
- * | `getPackageHierarchy` | the same walk, assembled as a tree | no single answer |
  * | `getWhereUsedList` | the scope, then the search | no single answer |
  *
  * The last three assemble one shape from several answers, which is not what
  * `IResultStrategy<T> = (answer: IAdtWireResponse) => T` types. They answer the
  * shape they measured, and a consumer who wants another writes their own
- * `IAdtPackageBrowsing` or `IAdtInformationSystem` — which is what the contract
+ * `IAdtInformationSystem` — which is what the contract
  * being an interface is for. That the factory cannot hand them one is recorded
  * as open in `DECISIONS.md`; it is a gap in the *composition*, not a reading
  * that was forgotten here.

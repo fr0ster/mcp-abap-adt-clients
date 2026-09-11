@@ -88,13 +88,9 @@ export type { IUtilResults } from './core/shared/utilResultSet';
 export { utilDocuments } from './core/shared/utilResultSet';
 export type {
   IAdtObjectHit,
-  IGetPackageContentsListOptions,
-  IGetPackageHierarchyOptions,
   IInactiveObjectsResponse,
   INamedItem,
   IObjectReference,
-  IPackageContentItem,
-  IPackageHierarchyNode,
   IRepositoryNodeChild,
   IRepositoryNodeContents,
   IRepositoryObjectNode,

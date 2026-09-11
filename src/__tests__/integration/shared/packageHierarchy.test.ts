@@ -12,6 +12,7 @@ import type {
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
+import { walkPackage } from '../../../../scripts/lib/packageWalk';
 import type { AdtClient } from '../../../clients/AdtClient';
 import type { IPackageHierarchyNode } from '../../../core/shared/utilResults';
 import { failed } from '../../../utils/adtResponse';
@@ -54,9 +55,11 @@ class PackageHierarchyObject
   implements TestableObject<IPackageHierarchyParams>
 {
   private client: AdtClient;
+  private connection: IAbapConnection;
 
-  constructor(client: AdtClient) {
+  constructor(client: AdtClient, connection: IAbapConnection) {
     this.client = client;
+    this.connection = connection;
   }
 
   /** Every member this resource does not have — answered, not thrown. */
@@ -84,7 +87,17 @@ class PackageHierarchyObject
     if (!config.package_name) {
       return Promise.reject(new Error('package_name required'));
     }
-    return this.client.getUtils().getPackageHierarchy(config.package_name);
+    // The walk a consumer writes, over the single-request member that stayed.
+    // See scripts/lib/packageWalk.ts for why it is not a member.
+    return walkPackage(this.connection, config.package_name).then(
+      (tree) =>
+        ({
+          ok: true,
+          getResult: () => ({
+            value: tree as unknown as IPackageHierarchyNode,
+          }),
+        }) as unknown as IAdtResponse<IPackageHierarchyNode>,
+    );
   }
 
   readMetadata() {
@@ -126,7 +139,10 @@ describe('Shared - getPackageHierarchy', () => {
       hasConfig = true;
       isCloudSystem = await isCloudEnvironment(connection);
 
-      const packageHierarchyObject = new PackageHierarchyObject(client);
+      const packageHierarchyObject = new PackageHierarchyObject(
+        client,
+        connection,
+      );
       tester = new BaseTester(
         packageHierarchyObject,
         'PackageHierarchy',

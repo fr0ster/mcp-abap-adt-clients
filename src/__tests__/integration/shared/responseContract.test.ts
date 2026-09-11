@@ -226,24 +226,34 @@ describe('Response contract - 17.0.0', () => {
         );
         return;
       }
-      logTestStep(`package hierarchy for ${NEVER_EXISTS}`, testsLogger);
+      logTestStep(`node structure for ${NEVER_EXISTS}`, testsLogger);
 
-      const answer = await client.getUtils().getPackageHierarchy(NEVER_EXISTS);
+      const answer = await client
+        .getUtils()
+        .fetchNodeStructure('DEVC/K', NEVER_EXISTS);
 
-      // The sharpest case in this file. "There is nothing in it" and "there is
-      // no such thing" are different answers, and a parser that finds no nodes
-      // reports the first for both. That is how a logon page from an expired
-      // session read as "the package is empty".
-      if (answer.ok) {
-        const tree = answer.getResult().value;
-        throw new Error(
-          `a package that does not exist answered a result: ${JSON.stringify(tree).slice(0, 200)}`,
-        );
-      }
+      // The sharpest case in this file, and since 19.0.0 it is a statement
+      // about the endpoint rather than about a verdict this package gives.
+      //
+      // `/repository/nodestructure` answers 200 with an **empty body** for a
+      // package that does not exist, and 200 with a tree for one that does.
+      // "There is nothing in it" and "there is no such thing" arrive
+      // byte-identical, so nothing below the caller can tell them apart — which
+      // is how a logon page from an expired session once read as an empty
+      // package.
+      //
+      // The walk that used to raise for this left with the other multi-request
+      // members. A caller who needs the distinction makes it here, on the body,
+      // and `scripts/lib/packageWalk.ts` shows one doing exactly that.
+      expect(answer.ok).toBe(true);
+      if (!answer.ok) throw new Error('expected an answer to read');
 
-      expect(answer.getError().message.length).toBeGreaterThan(0);
+      const body = String(
+        (answer.getResult().value as { data?: unknown })?.data ?? '',
+      );
+      expect(body.trim().length).toBe(0);
       testsLogger.info?.(
-        `📛 ${answer.getError().origin}: ${answer.getError().message}`,
+        `📛 ${NEVER_EXISTS} answered 200 with ${body.length} bytes — absence and emptiness are the same document`,
       );
     }, 60000);
   });

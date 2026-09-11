@@ -81,7 +81,6 @@ import type {
   IAdtInformationSystem,
   IAdtObjectAccess,
   IAdtOperationOptions,
-  IAdtPackageBrowsing,
   IAdtRepositoryStructure,
   IAdtResponse,
   IAdtWireResponse,
@@ -106,8 +105,6 @@ import { getInclude as getIncludeUtil } from './include';
 import { getIncludesList } from './includesList';
 import { fetchNodeStructure as fetchNodeStructureUtil } from './nodeStructure';
 import { getObjectStructure as getObjectStructureUtil } from './objectStructure';
-import { getPackageContentsList } from './packageContentsList';
-import { getPackageHierarchy } from './packageHierarchy';
 // Import utility functions
 import { searchObjects } from './search';
 import { getSqlQuery } from './sqlQuery';
@@ -182,18 +179,14 @@ import { type IUtilResults, utilDocuments } from './utilResultSet';
  * and until it does, the information system is the one this class answers to,
  * because that is what `getUtils()` hands out.
  *
- * **The members not in any atom stay on the class**, and this paragraph used to
- * describe them wrongly in two ways worth naming, since both were caught in
- * review rather than by anything here.
- *
- * It named `getPackageContents` as the one outside the contract. It is the one
- * *inside* it — `IAdtPackageBrowsing` declares exactly that member — and
- * `getPackageContentsList`, which it called the contract-shaped sibling, is the
- * extra. Backwards. What is true: `searchObjects` and `getWhereUsed` have
- * contract-shaped siblings (`search`, `getWhereUsedList`) over the same
- * endpoint, and `getPackageContents` delegates to `getPackageContentsList` —
- * one endpoint answered by two public members, which decision 16 says it should
- * not be.
+ * **The package walk is gone, and with it `IAdtPackageBrowsing`.** A walk is
+ * one node-structure request per object type plus a descent into subpackages,
+ * so `IResultStrategy` — which takes one answer — could never be given for it,
+ * and the class shipped one member per reading instead: a flat list and a tree.
+ * That is the growth the strategy axis exists to prevent. The walk is assembled
+ * by the caller over `fetchNodeStructure`, which is a single request and keeps
+ * its `node` reading. The atom stays in `@mcp-abap-adt/interfaces` for whoever
+ * implements it; this class no longer claims it.
  *
  * And it said a caller who needs another shape "passes a parser" to the sibling.
  * The parser overloads went in 30.0.0, when the reading became something
@@ -211,7 +204,6 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
       ReturnType<R['types']>
     >,
     IAdtRepositoryStructure<ReturnType<R['node']>>,
-    IAdtPackageBrowsing<IPackageContentItem[]>,
     IAdtGroupLifecycle<ReturnType<R['inactive']>>,
     IAdtDataPreview,
     IAdtDiscovery,
@@ -843,102 +835,6 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
 
     return answeringValue(() =>
       listFunctionGroupIncludes(this.connection, functionGroupName),
-    );
-  }
-
-  /**
-   * Get package contents as raw XML
-   *
-   * Low-level method that retrieves package contents as raw XML response.
-   * For most use cases, prefer getPackageContentsList() or getPackageHierarchy().
-   *
-   * @param packageName - Package name
-   * @returns Axios response with XML containing package contents
-   *
-   * @example
-   * ```typescript
-   * const response = await utils.getPackageContents('ZMY_PACKAGE');
-   * // Response contains XML with objects in the package
-   * ```
-   */
-  async getPackageContents(
-    packageName: string,
-    options?: IGetPackageContentsOptions,
-  ): Promise<IAdtResponse<IPackageContentItem[]>> {
-    // The contract asks what a package holds, not which requests were made to
-    // find out — so this is the flat listing, which is the answer to that
-    // question. The single node-structure request that used to stand in for it
-    // answered one level of a tree and left the caller to walk the rest.
-    return answeringValue(() =>
-      getPackageContentsList(
-        this.connection,
-        packageName,
-        { includeDescriptions: options?.withShortDescriptions },
-        this.logger,
-      ),
-    );
-  }
-
-  /**
-   * Get package contents as a flat list
-   *
-   * Returns all objects in a package as a flat array. This is a convenient
-   * wrapper that fetches all object categories and returns them in a single list.
-   *
-   * @param packageName - Package name
-   * @param options - Optional options for fetching
-   * @returns Array of package content items
-   *
-   * @example
-   * ```typescript
-   * const items = await utils.getPackageContentsList('ZMY_PACKAGE');
-   * // Returns: [{ name: 'ZCL_MY_CLASS', type: 'CLAS/OC', description: '...' }, ...]
-   *
-   * // Include subpackage contents recursively
-   * const allItems = await utils.getPackageContentsList('ZMY_PACKAGE', {
-   *   includeSubpackages: true,
-   * });
-   * ```
-   */
-  async getPackageContentsList(
-    packageName: string,
-    options?: IGetPackageContentsListOptions,
-  ): Promise<IAdtResponse<IPackageContentItem[]>> {
-    return answeringValue(() =>
-      getPackageContentsList(
-        this.connection,
-        packageName,
-        options,
-        this.logger,
-      ),
-    );
-  }
-
-  /**
-   * Get package hierarchy as a tree structure
-   *
-   * Builds a tree of package contents and subpackages using node structure.
-   *
-   * @param packageName - Package name
-   * @param options - Optional hierarchy options
-   * @returns Root tree node for the package hierarchy
-   *
-   * @example
-   * ```typescript
-   * const tree = await utils.getPackageHierarchy('ZMY_PACKAGE', {
-   *   includeSubpackages: true,
-   *   maxDepth: 5,
-   *   includeDescriptions: true,
-   * });
-   * // tree contains package, subpackages, and objects in a hierarchy
-   * ```
-   */
-  async getPackageHierarchy(
-    packageName: string,
-    options?: IGetPackageHierarchyOptions,
-  ): Promise<IAdtResponse<IPackageHierarchyNode>> {
-    return answeringValue(() =>
-      getPackageHierarchy(this.connection, packageName, options, this.logger),
     );
   }
 
