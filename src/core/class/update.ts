@@ -11,55 +11,6 @@ import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
- * Update class source code with validation (high-level function)
- *
- * This function:
- * 1. Validates source code using check operation
- * 2. Only updates if validation passes (no errors)
- * 3. Allows warnings to pass through
- *
- * Requires class to be locked first
- *
- * @param connection - SAP connection
- * @param className - Class name
- * @param sourceCode - Source code to validate and update
- * @param lockHandle - Lock handle from lock operation
- * @param transportRequest - Optional transport request
- * @returns Update result
- * @throws Error if check finds errors or update fails
- *
- * NOTE: Requires stateful session mode enabled via connection.setSessionType("stateful")
- */
-export async function updateClassWithCheck(
-  connection: IAbapConnection,
-  className: string,
-  sourceCode: string,
-  lockHandle?: string,
-  transportRequest?: string,
-  sourceContentType?: string,
-): Promise<IAdtWireResponse> {
-  if (!sourceCode) {
-    throw new Error('source_code is required');
-  }
-
-  // The check still runs, and its report is no longer read here: whether a
-  // finding should block the write is the caller's call, and this member is
-  // two requests in one, which the plan removes separately.
-  const { checkClass } = await import('./check');
-
-  await checkClass(connection, className, 'inactive', sourceCode);
-
-  return await updateClass(
-    connection,
-    className,
-    sourceCode,
-    lockHandle,
-    transportRequest,
-    sourceContentType,
-  );
-}
-
-/**
  * Update class source code (low-level function)
  * Requires class to be locked first
  *

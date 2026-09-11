@@ -313,16 +313,7 @@ const EXTRA_REQUESTS: Record<string, string> = {
   // Two have not been converted yet and still read first. They are listed as
   // debt, not as shape.
   'messageClass.updateMetadata': 'GET the document, patch it, PUT it back',
-  'authorizationField.updateMetadata': 'as messageClass',
-  'functionGroup.updateMetadata': 'as messageClass, plus its own check',
-
-  // **Not a step of the operation.** `getSystemInformation()` answers whether
-  // this is cloud or on-premise, which decides content types and which
-  // endpoints exist at all. It is asked once and cached on the client; the
-  // guard sees it because each of these tests builds a fresh one.
-  'behaviorImplementation.create': 'systeminformation, then the POST',
-  'service.create': 'as behaviorImplementation.create',
-  'serviceBinding.create': 'as behaviorImplementation.create',
+  'functionGroup.updateMetadata': 'as messageClass, plus a lock window',
 };
 
 /**

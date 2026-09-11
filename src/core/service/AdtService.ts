@@ -785,22 +785,17 @@ export class AdtServiceBinding<
       throw new Error('bindingVariant is required');
     }
 
-    const systemInfo = await getSystemInformation(connection);
+    // The language, the master system and the author come from what the caller
+    // gave, or from the system context they set on this client. They used to
+    // fall back to `/core/http/systeminformation`, which made a create two
+    // requests — and that read answered `null` on its own failure, so the
+    // fallback could silently be no value at all.
     const createParams: ICreateServiceBindingParams = {
       ...params,
       masterLanguage:
-        params.masterLanguage ??
-        this.systemContext.masterLanguage ??
-        systemInfo?.language ??
-        'EN',
-      masterSystem:
-        params.masterSystem ??
-        this.systemContext.masterSystem ??
-        systemInfo?.systemID,
-      responsible:
-        params.responsible ??
-        this.systemContext.responsible ??
-        systemInfo?.userName,
+        params.masterLanguage ?? this.systemContext.masterLanguage ?? 'EN',
+      masterSystem: params.masterSystem ?? this.systemContext.masterSystem,
+      responsible: params.responsible ?? this.systemContext.responsible,
     };
 
     const queryParams = params.transportRequest

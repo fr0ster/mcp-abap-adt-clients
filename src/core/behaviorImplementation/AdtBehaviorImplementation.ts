@@ -202,10 +202,10 @@ export class AdtBehaviorImplementation<
       throw new Error('Behavior definition is required');
     }
 
-    // The system names the author and the master system; a create that guessed
-    // either would write the wrong one into the object's own metadata.
-    const systemInfo = await getSystemInformation(connection);
-
+    // The author and the master system come from the config. This used to ask
+    // `/core/http/systeminformation` for them, which made a create two requests
+    // — and answered `null` on its own failure, so a create could silently
+    // write neither. The caller knows who they are.
     this.logger?.info?.('Creating behavior implementation class');
     return this.class.create(
       {
@@ -213,8 +213,8 @@ export class AdtBehaviorImplementation<
         packageName: config.packageName,
         transportRequest: config.transportRequest,
         description: config.description,
-        masterSystem: systemInfo?.systemID,
-        responsible: systemInfo?.userName || '',
+        masterSystem: config.masterSystem,
+        responsible: config.responsible,
       },
       options,
     );
