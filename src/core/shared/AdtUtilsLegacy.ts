@@ -2,6 +2,7 @@
  * AdtUtilsLegacy - Utility operations for legacy SAP systems (BASIS < 7.50)
  *
  * Overrides methods that rely on endpoints absent from legacy /sap/bc/adt/discovery:
+ * - getTableColumns → /sap/bc/adt/datapreview/ddic/{name}/metadata (not available)
  * - getTableContents → /sap/bc/adt/datapreview/ddic (not available)
  * - getSqlQuery → /sap/bc/adt/datapreview/freestyle (not available)
  * - activateObjectsGroup → /sap/bc/adt/activation/runs (not available, uses /sap/bc/adt/activation)
@@ -90,6 +91,15 @@ ${objectReferences}
    * question — and it is what separates this from a refusal, which is a server
    * answering about an object.
    */
+  override async getTableColumns(
+    _tableName: string,
+  ): Promise<IAdtResponse<string>> {
+    return this.refuse(
+      'Table columns',
+      '/sap/bc/adt/datapreview/ddic/{name}/metadata',
+    );
+  }
+
   override async getTableContents(
     _params: IGetTableContentsParams,
   ): Promise<IAdtResponse<string>> {

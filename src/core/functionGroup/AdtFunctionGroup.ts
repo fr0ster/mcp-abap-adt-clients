@@ -242,11 +242,7 @@ export class AdtFunctionGroup<
     if (!config.functionGroupName) {
       throw new Error('Function group name is required');
     }
-    if (!config.description) {
-      throw new Error('Description is required for update');
-    }
     const name = config.functionGroupName;
-    const description = config.description;
 
     return answering(
       () =>
@@ -254,10 +250,13 @@ export class AdtFunctionGroup<
           connection,
           {
             function_group_name: name,
-            description,
             lock_handle: options?.lockHandle as string,
             transport_request: config.transportRequest,
-          },
+          } as Parameters<typeof updateFunctionGroup>[1],
+          // The document the caller built. The description used to be merged
+          // into a document read here, inside a lock window opened here; both
+          // the read and the window are theirs now.
+          config.document as string,
           this.contentTypes,
         ),
       this.results.metadataUpdated as IResultStrategy<

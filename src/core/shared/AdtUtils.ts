@@ -105,7 +105,7 @@ import { getObjectStructure as getObjectStructureUtil } from './objectStructure'
 // Import utility functions
 import { searchObjects } from './search';
 import { getSqlQuery } from './sqlQuery';
-import { getTableContents } from './tableContents';
+import { getTableColumns, getTableContents } from './tableContents';
 import { getVirtualFoldersContents } from './virtualFolders';
 import {
   assertWhereUsedTarget,
@@ -665,6 +665,20 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
   }
 
   /**
+   * The columns a DDIC entity has — `/datapreview/ddic/{name}/metadata`.
+   *
+   * One request. It exists because {@link getTableContents} no longer makes it:
+   * the statement is the caller's, and this is where they learn what they may
+   * name in it.
+   */
+  async getTableColumns(tableName: string): Promise<IAdtResponse<string>> {
+    return answering(
+      () => getTableColumns(this.connection, tableName),
+      rawDocument,
+    );
+  }
+
+  /**
    * Get table contents via ADT Data Preview API
    * ⚠️ ABAP Cloud Limitation: Only works on on-premise systems with basic auth
    *
@@ -674,10 +688,6 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
   async getTableContents(
     params: IGetTableContentsParams,
   ): Promise<IAdtResponse<string>> {
-    if (!params.table_name) {
-      throw new Error('Table name is required');
-    }
-
     return answering(
       () => getTableContents(this.connection, params),
       rawDocument,

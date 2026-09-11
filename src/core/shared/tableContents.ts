@@ -21,79 +21,51 @@ import type { IGetTableContentsParams } from './types';
 const ACCEPT_HEADER = ACCEPT_DATA_PREVIEW;
 
 /**
- * Get column names for a DDIC entity via metadata endpoint
+ * The columns a DDIC entity has — `/datapreview/ddic/{name}/metadata`.
+ *
+ * One request, and the document as it arrived. It exists because
+ * {@link getTableContents} no longer makes it: the statement is the caller's,
+ * and this is where they learn what they may name in it.
  */
-async function getColumnNames(
+export async function getTableColumns(
   connection: IAbapConnection,
   tableName: string,
-): Promise<string[]> {
+): Promise<IAdtWireResponse> {
   const encodedName = encodeSapObjectName(tableName);
-  const url = `/sap/bc/adt/datapreview/ddic/${encodedName}/metadata`;
 
-  const response = await connection.makeAdtRequest({
-    url,
+  return connection.makeAdtRequest({
+    url: `/sap/bc/adt/datapreview/ddic/${encodedName}/metadata`,
     method: 'GET',
     timeout: getTimeout('default'),
-    headers: {
-      Accept: ACCEPT_HEADER,
-    },
+    headers: { Accept: ACCEPT_HEADER },
   });
-
-  const xml = response.data;
-  const fields: string[] = [];
-  const fieldMatches = xml.match(/dataPreview:name="([^"]+)"/g);
-
-  if (fieldMatches) {
-    for (const match of fieldMatches) {
-      const nameMatch = match.match(/dataPreview:name="([^"]+)"/);
-      if (nameMatch) {
-        fields.push(nameMatch[1]);
-      }
-    }
-  }
-
-  return fields;
 }
 
 /**
- * Get table contents via ADT DDIC Data Preview API
+ * Rows from a DDIC entity — `/datapreview/ddic`.
  *
- * @param connection - ABAP connection
- * @param params - Table contents parameters
- * @returns Table contents
+ * **One request: the statement in `params.sql_query` is posted as given.** This
+ * used to read the entity's metadata first and build
+ * `SELECT T~A, T~B FROM T` out of every column it found — two requests, and a
+ * statement the caller could not reach: not the column list, not an ordering,
+ * not a `WHERE`. Read the columns with {@link getTableColumns} and write the
+ * statement you want.
  */
 export async function getTableContents(
   connection: IAbapConnection,
   params: IGetTableContentsParams,
 ): Promise<IAdtWireResponse> {
-  if (!params.table_name) {
-    throw new Error('Table name is required');
-  }
-
-  const maxRows = params.max_rows || 100;
   const tableName = params.table_name.toUpperCase();
-
-  // Get column names via metadata endpoint (as Eclipse ADT does)
-  const fields = await getColumnNames(connection, tableName);
-
-  if (fields.length === 0) {
-    throw new Error('Could not retrieve column names from table metadata');
-  }
-
-  // Build SQL with TABLE~FIELD syntax (as Eclipse ADT does)
-  const fieldList = fields.map((f) => `${tableName}~${f}`).join(', ');
-  const sqlQuery = `SELECT ${fieldList} FROM ${tableName}`;
-
-  const url = `/sap/bc/adt/datapreview/ddic?rowNumber=${maxRows}&ddicEntityName=${encodeURIComponent(tableName)}`;
+  const maxRows = params.max_rows || 100;
 
   return connection.makeAdtRequest({
-    url,
+    url: `/sap/bc/adt/datapreview/ddic?rowNumber=${maxRows}&ddicEntityName=${encodeURIComponent(tableName)}`,
     method: 'POST',
     timeout: getTimeout('long'),
-    data: sqlQuery,
+    data: params.sql_query,
     headers: {
-      'Content-Type': 'text/plain',
       Accept: ACCEPT_HEADER,
+      'Content-Type': 'text/plain; charset=utf-8',
     },
   });
 }

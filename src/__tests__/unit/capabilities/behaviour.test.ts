@@ -312,8 +312,12 @@ const EXTRA_REQUESTS: Record<string, string> = {
   //
   // Two have not been converted yet and still read first. They are listed as
   // debt, not as shape.
+  //
+  // One left, and it is the documented exception: a message is a row inside its
+  // class's document, so writing one means reading the class, replacing that
+  // row and putting the class back. There is no endpoint that writes a single
+  // message.
   'messageClass.updateMetadata': 'GET the document, patch it, PUT it back',
-  'functionGroup.updateMetadata': 'as messageClass, plus a lock window',
 };
 
 /**
