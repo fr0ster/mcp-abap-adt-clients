@@ -245,13 +245,17 @@ discovery collection declares an empty `<app:accept/>` and the type answers
 
 ## `activate()` and what counts as a failure
 
-`activationExecuted="false"` does **not** mean the activation failed. It means
-there was nothing to do — the object was already active. Only a message of type
-`E` is a verdict. This is what the shipped `activationRefusal` analysis reads,
-and it is the default at every `activate` call site.
+`activate()` returns what ADT answered and judges none of it. ADT answers `200`
+whether or not the activation happened, so the status does not carry the
+verdict and this library does not look for one in the body either: reading an
+activation checklist is your `analyse`, written from the responses your own
+system gives.
 
-A locked object refuses activation with HTTP 403, not with a message in the
-body.
+Two things worth knowing while you write it. `activationExecuted="false"` has
+been observed on an object that was already active, with no message attached —
+so the flag on its own does not separate "nothing to do" from "refused". And a
+locked object refuses with HTTP 403, which never reaches a body-reading strategy
+at all.
 
 ## How to check a created object, and when
 
@@ -443,10 +447,10 @@ two ways, and one of them was being dropped. Measured across seven types:
 | `domain`, `structure`, `table`, `class`, `serviceDefinition` | a failing status |
 | `functionGroup`, `ddl` | **`200`** carrying `<SEVERITY>ERROR</SEVERITY>` |
 
-Only the function group was reading that body, so `getDdl().validate()` answered
-"fine" for a name the system had already rejected. Fixed: `validationRefusal` is
-the shipped default on every `validate()` now, and it is deliberately narrow — a
-`200` without `<SEVERITY>ERROR</SEVERITY>` stays a success.
+So a `validate()` that returns a `200` has not told you the name is free. The
+body is the answer, and reading `<SEVERITY>` out of it is your `analyse` — this
+package ships none, because which severities matter depends on what you are
+about to do with the name.
 
 What `validate()` does **not** answer is whether the object exists: a name that
 is free validates fine whether or not anything was ever created under it. For

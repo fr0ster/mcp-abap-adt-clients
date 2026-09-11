@@ -9,7 +9,6 @@
  */
 
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces';
-import type { DeletionCheckResult } from '../shared/results';
 
 /**
  * The check reporters ADT accepts for a behavior definition.

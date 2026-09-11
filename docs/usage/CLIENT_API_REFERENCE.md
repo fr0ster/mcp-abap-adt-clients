@@ -713,12 +713,16 @@ await client.getClass().read({ className: 'ZCL_X' }, 'active', {
 ```
 
 The failure question is asked first, always: a reading is never handed a refusal
-to make a value out of. The shipped defaults are `deletionRefusal`,
-`activationRefusal`, `validationUnsupported` and their neighbours — each reading
-the `<msg type="E">` or the status ADT delivers inside a 200, which nothing below
-the contract can tell from a success. `activationRefusal` and `deletionRefusal`
-are exported, so your own `analyse` can defer to one instead of re-deriving what
-it already knows.
+to make a value out of. **No error strategy ships from this package.** ADT
+delivers some refusals inside a `200` — an activation checklist carrying
+`<msg type="E">`, a validation carrying `<SEVERITY>ERROR</SEVERITY>`, a deletion
+check saying no — and nothing below the contract can tell those from a success.
+Which of them your application should treat as a failure depends on your system
+and what you are about to do, so you write the `analyse` and this package stays
+out of it.
+
+Omit `analyse` and you still get a failure when the transport itself failed,
+carrying the response and the request it arrived on.
 
 ### Service bindings: publishing is the editing
 

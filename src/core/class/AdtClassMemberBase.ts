@@ -20,11 +20,9 @@ import type {
   IAdtOperationOptions,
   IAdtResponse,
   IAdtSystemContext,
-  IAnalyse,
   ILogger,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
-import { activationRefusal } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { nothing, rawDocument } from '../../utils/resultStrategy';
@@ -182,7 +180,7 @@ export abstract class AdtClassMemberBase<
     return answering(
       () => activateClass(connection, config.className as string),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
-      (options?.analyse ?? activationRefusal) as IAnalyse<E>,
+      options?.analyse,
     );
   }
 

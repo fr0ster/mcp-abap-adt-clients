@@ -7,7 +7,6 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_TRANSPORT } from '../../constants/contentTypes';
-import { orThrow } from '../../utils/adtResponse';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { noopLogger } from '../../utils/noopLogger';
 import { getTimeout } from '../../utils/timeouts';

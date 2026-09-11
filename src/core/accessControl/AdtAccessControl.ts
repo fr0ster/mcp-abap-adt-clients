@@ -22,15 +22,11 @@ import type {
   IAdtUpdatable,
   IAdtValidatable,
   IAdtVersionable,
-  IAnalyse,
   ILogger,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
-import { activationRefusal } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
-import { deletionRefusal } from '../../utils/deletionCheck';
-import { validationRefusal } from '../../utils/validationRefusal';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import {
   createLockTracker,
@@ -139,7 +135,7 @@ export class AdtAccessControl<
           config.description,
         ),
       this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
-      (options?.analyse ?? validationRefusal) as IAnalyse<E>,
+      options?.analyse,
     );
   }
 
@@ -299,7 +295,7 @@ export class AdtAccessControl<
       this.results.deletionCheck as IResultStrategy<
         ReturnType<R['deletionCheck']>
       >,
-      (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
+      options?.analyse,
     );
   }
 
@@ -344,7 +340,7 @@ export class AdtAccessControl<
     return answering(
       () => activateAccessControl(connection, name),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
-      (options?.analyse ?? activationRefusal) as IAnalyse<E>,
+      options?.analyse,
     );
   }
 

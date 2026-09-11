@@ -205,7 +205,6 @@ import { type LockFailure, LockRegistry } from '../core/shared/LockRegistry';
 import type { ObjectVersion } from '../core/shared/results';
 import { type IUtilResults, utilDocuments } from '../core/shared/utilResultSet';
 import type {
-  IInactiveObjectsResponse,
   IPackageContentItem,
   IWhereUsedListResult,
 } from '../core/shared/utilResults';
@@ -247,7 +246,7 @@ import {
   type IUnitTestResults,
   unitTestDocuments,
 } from '../core/unitTest';
-import { withRefusalDetection } from '../utils/refusalAware';
+import { withRequestTrace } from '../utils/requestTrace';
 
 /**
  * **What each factory hands back, named once.**
@@ -829,10 +828,10 @@ export class AdtClient {
     logger?: ILogger,
     options?: IAdtClientOptions,
   ) {
-    // Wrapped once, here, where a connection enters the library. A refusal SAP
-    // sends with a 2xx would otherwise be stored as a result and reported as
-    // success — see src/utils/refusalAware.ts for what that measured.
-    this.connection = withRefusalDetection(connection);
+    // Wrapped once, here, where a connection enters the library. The wrapper
+    // puts the request back on the answer and reads nothing: what a body means
+    // is the caller's, through the `analyse` they pass.
+    this.connection = withRequestTrace(connection);
     // Pass the connection so unlockAll() can keep the whole batch stateful.
     this.lockRegistry = new LockRegistry(connection);
     this.logger = logger ?? {

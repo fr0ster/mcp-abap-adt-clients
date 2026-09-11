@@ -31,12 +31,9 @@ import type {
   IAdtMetadataReadable,
   IAdtMetadataUpdatable,
   IAdtOperationOptions,
-  IAdtReadable,
   IAdtRequest,
   IAdtResponse,
   IAdtSystemContext,
-  IAdtUpdatable,
-  IAnalyse,
   IDeferredResponseConnection,
   IListTransportsOptions,
   ILogger,
@@ -49,12 +46,10 @@ import { withCallTimeout } from '../../utils/callTimeout';
 import { createTransport } from './create';
 import { deleteTransport } from './delete';
 import { getTransportSearchConfigurations, listTransports } from './list';
-import { parseTransportTree } from './parseTransportTree';
 import { getTransport } from './read';
 import {
   type ITransportConfig,
   type ITransportResults,
-  type ITransportTree,
   transportDocuments,
 } from './types';
 import { updateTransport } from './update';

@@ -26,21 +26,15 @@ import type {
   IAdtMetadataReadable,
   IAdtMetadataUpdatable,
   IAdtOperationOptions,
-  IAdtReadable,
   IAdtResponse,
   IAdtSystemContext,
   IAdtTransportAware,
-  IAdtUpdatable,
   IAdtValidatable,
-  IAnalyse,
   ILogger,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
-import { activationRefusal } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
-import { deletionRefusal } from '../../utils/deletionCheck';
-import { validationRefusal } from '../../utils/validationRefusal';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import {
   createLockTracker,
@@ -62,14 +56,6 @@ import {
 import { unlockFunctionGroup } from './unlock';
 import { updateFunctionGroup } from './update';
 import { validateFunctionGroupName } from './validation';
-
-/**
- * Kept as the name this module has always exported. The reading is no longer
- * function-group-specific: a DDL source answers the same `200` with
- * `<SEVERITY>ERROR</SEVERITY>` and was not being read at all, so it lives in
- * {@link validationRefusal} and is the default for every type now.
- */
-export const validationSeverity = validationRefusal;
 
 export class AdtFunctionGroup<
   R extends IFunctionGroupResults = typeof functionGroupDocuments,
@@ -140,7 +126,7 @@ export class AdtFunctionGroup<
           config.description,
         ),
       this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
-      (options?.analyse ?? validationRefusal) as IAnalyse<E>,
+      options?.analyse,
     );
   }
 
@@ -308,7 +294,7 @@ export class AdtFunctionGroup<
       this.results.deletionCheck as IResultStrategy<
         ReturnType<R['deletionCheck']>
       >,
-      (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
+      options?.analyse,
     );
   }
 
@@ -355,7 +341,7 @@ export class AdtFunctionGroup<
       () =>
         activateFunctionGroup(connection, config.functionGroupName as string),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
-      (options?.analyse ?? activationRefusal) as IAnalyse<E>,
+      options?.analyse,
     );
   }
 

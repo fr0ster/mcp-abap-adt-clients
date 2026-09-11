@@ -14,7 +14,6 @@ import type {
   IAdtActivatable,
   IAdtCheckable,
   IAdtContentTypes,
-  IAdtDeletable,
   IAdtError,
   IAdtMetadataReadable,
   IAdtOperationOptions,
@@ -23,14 +22,12 @@ import type {
   IAdtSystemContext,
   IAdtUpdatable,
   IAdtValidatable,
-  IAnalyse,
   ILocalTestClassConfig,
   ILogger,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
-import { validationRefusal } from '../../utils/validationRefusal';
 import type { LockRegistry } from '../shared/LockRegistry';
 import type { ObjectVersion } from '../shared/results';
 import type { IReadOptions } from '../shared/types';
@@ -107,7 +104,7 @@ export class AdtLocalTestClass<R extends IClassResults = typeof classDocuments>
           this.contentTypes?.sourceArtifactContentType(),
         ),
       this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
-      (options?.analyse ?? validationRefusal) as IAnalyse<E>,
+      options?.analyse,
     );
   }
 

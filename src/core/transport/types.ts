@@ -9,8 +9,6 @@
 
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces';
 import { rawDocument } from '../../utils/resultStrategy';
-import type { DeletionCheckResult } from '../shared/results';
-import type { ICreatedTransport } from './parseCreatedTransport';
 import { parseCreatedTransport } from './parseCreatedTransport';
 import { parseTransportTree } from './parseTransportTree';
 

@@ -130,13 +130,13 @@ export { transportDocuments } from './core/transport/types';
 export type { IUnitTestResults } from './core/unitTest/types';
 export { unitTestDocuments } from './core/unitTest/types';
 /**
- * The error strategies, for a caller composing rather than replacing them.
+ * No error strategy ships from here.
  *
- * Each is already the shipped default of the member it belongs to; they are
- * exported so a consumer's own `analyse` can defer to one instead of
- * re-deriving what it knows.
+ * This package relays what ADT answered; reading a body into a verdict depends
+ * on the system and the task, and is decided from a corpus of real responses
+ * rather than from this source. A caller passes their own `analyse`, and
+ * `nothingIsARefusal` with `wireItself` is how that corpus is collected.
  */
-export { activationRefusal } from './utils/activationUtils';
 /*
  * `IAnalyse<E>` and `IAdtOperationOptions<E>` are **not** re-exported here.
  * They lived in this package while the shape was being proven against real
@@ -156,7 +156,5 @@ export { activationRefusal } from './utils/activationUtils';
  * if (!answer.ok) answer.getError().t100;   // typed, no cast
  * ```
  */
-export { deletionRefusal } from './utils/deletionCheck';
 /** The readings this package ships, as building blocks for your own sets. */
 export { nothing, rawDocument, wireItself } from './utils/resultStrategy';
-export { validationRefusal } from './utils/validationRefusal';

@@ -10,7 +10,6 @@
  */
 
 import type { EnhancementType } from '@mcp-abap-adt/interfaces';
-import type { DeletionCheckResult } from '../shared/results';
 
 // Types defined in @mcp-abap-adt/interfaces
 export type {

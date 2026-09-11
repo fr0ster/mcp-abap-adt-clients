@@ -22,16 +22,12 @@ import type {
   IAdtResponse,
   IAdtUpdatable,
   IAdtValidatable,
-  IAnalyse,
   IIncludeConfig,
   ILogger,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
-import { activationRefusal } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
-import { deletionRefusal } from '../../utils/deletionCheck';
-import { validationRefusal } from '../../utils/validationRefusal';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import { checkDeletionByUri } from '../shared/deletionCheckByUri';
 import { activateInclude } from './activation';
@@ -115,7 +111,7 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
           headers: { Accept: 'application/vnd.sap.as+xml' },
         }),
       this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
-      (options?.analyse ?? validationRefusal) as IAnalyse<E>,
+      options?.analyse,
     );
   }
 
@@ -252,7 +248,7 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
       this.results.deletionCheck as IResultStrategy<
         ReturnType<R['deletionCheck']>
       >,
-      (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
+      options?.analyse,
     );
   }
 
@@ -291,7 +287,7 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
     return answering(
       () => activateInclude(connection, includeName),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
-      (options?.analyse ?? activationRefusal) as IAnalyse<E>,
+      options?.analyse,
     );
   }
 

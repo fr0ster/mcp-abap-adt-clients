@@ -14,7 +14,6 @@ import {
   ACCEPT_CHECK_MESSAGES,
   CT_CHECK_OBJECTS,
 } from '../../constants/contentTypes';
-import { parseCheckRunResponse } from '../../utils/checkRun';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
@@ -72,12 +71,6 @@ export async function checkFunctionInclude(
       'Content-Type': CT_CHECK_OBJECTS,
     },
   });
-
-  const checkResult = parseCheckRunResponse(response);
-  if (checkResult.has_errors) {
-    const errorMessages = checkResult.errors.map((err) => err.text).join('; ');
-    throw new Error(`Function include check failed: ${errorMessages}`);
-  }
 
   return response;
 }

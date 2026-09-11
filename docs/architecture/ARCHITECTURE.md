@@ -187,10 +187,11 @@ never neither. Two strategies decide what that is, and the order is fixed:
 
 1. **The error strategy** (`analyse`, per call) decides whether the answer is a
    failure at all. It is asked first, so a reading is never handed a refusal to
-   make a value out of. The shipped defaults read what ADT delivers inside a 200
-   — `deletionRefusal`, `activationRefusal`, `validationUnsupported`,
-   `validationRefusal`, `testDoublesVerdict`, `startedRun` — because nothing
-   below the contract can tell those from a success.
+   make a value out of. **This package ships none.** ADT delivers some refusals
+   inside a `200`, and which documents count as one depends on the system and
+   the task — so the decision is the consumer's, taken from a corpus of their
+   own responses. Omit `analyse` and a transport failure still reaches you with
+   its response attached; nothing here reads a body.
 2. **The result strategy** (injected into the implementation once, at
    construction) decides what a non-failure becomes. Defaults ship per object
    type as `<type>Documents`.

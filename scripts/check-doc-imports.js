@@ -138,6 +138,17 @@ function relativeEntry(specifier) {
   return matches.length === 1 ? matches[0] : null;
 }
 
+/**
+ * Plans and specs are excluded on purpose.
+ *
+ * This gate keeps documentation honest about the API a consumer can call. A
+ * plan under `docs/superpowers/` describes code that does not exist yet — that
+ * is what a plan is — so checking its imports against today's exports would
+ * fail every plan for being a plan, and the pressure would be to weaken the
+ * plan rather than to write the code. They leave the tree when implemented.
+ */
+const NOT_API_DOCS = `${path.sep}superpowers${path.sep}`;
+
 function docFiles() {
   const out = [];
   for (const entry of DOC_ROOTS) {
@@ -147,7 +158,7 @@ function docFiles() {
       out.push(...walk(full).filter((f) => f.endsWith('.md')));
     else out.push(full);
   }
-  return out;
+  return out.filter((f) => !f.includes(NOT_API_DOCS));
 }
 
 /** One surface per module specifier — the whole point of the check. */

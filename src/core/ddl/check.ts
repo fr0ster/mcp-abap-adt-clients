@@ -5,88 +5,30 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-  ILogger,
 } from '@mcp-abap-adt/interfaces';
-import {
-  type CheckRunVersion,
-  parseCheckRunResponse,
-  runCheckRun,
-} from '../../utils/checkRun';
+import { type CheckRunVersion, runCheckRun } from '../../utils/checkRun';
 
 /**
- * Check view (DDLS) syntax
+ * Check view (DDLS) syntax.
+ *
+ * One POST to the check-run endpoint, and its report as it arrived.
+ *
+ * This used to retry once when the report came back `notProcessed` saying the
+ * data definition did not exist, on the theory that an inactive version had not
+ * materialised yet. That is a wait, and a wait belongs to the caller.
  */
-function shouldRetryMissingVersion(
-  checkResult: ReturnType<typeof parseCheckRunResponse>,
-): boolean {
-  if (checkResult.status !== 'notProcessed') {
-    return false;
-  }
-  const message = (checkResult.message || '').toLowerCase();
-  return (
-    message.includes('does not exist') ||
-    message.includes('missing data definition')
-  );
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 export async function checkDdl(
   connection: IAbapConnection,
   ddlName: string,
   version: CheckRunVersion = 'active',
   sourceCode?: string,
-  logger?: ILogger,
 ): Promise<IAdtWireResponse> {
-  let attempt = 0;
-  // Allow one retry when system did not materialize inactive version yet
-  while (attempt < 2) {
-    const response = await runCheckRun(
-      connection,
-      'view',
-      ddlName,
-      version,
-      'abapCheckRun',
-      sourceCode,
-    );
-    const checkResult = parseCheckRunResponse(response);
-
-    if (!checkResult.success && checkResult.has_errors) {
-      const errorMessage = checkResult.message || '';
-
-      if (attempt === 0 && shouldRetryMissingVersion(checkResult)) {
-        if (process.env.DEBUG_ADT_LIBS === 'true') {
-          logger?.warn?.(
-            `Check retry for view ${ddlName}: ${errorMessage} (waiting for inactive version)`,
-          );
-        }
-        attempt += 1;
-        await delay(2000);
-        continue;
-      }
-
-      if (shouldRetryMissingVersion(checkResult)) {
-        if (process.env.DEBUG_ADT_LIBS === 'true') {
-          logger?.warn?.(
-            `Check warning for view ${ddlName}: ${errorMessage} (version not available, continue)`,
-          );
-        }
-        return response;
-      }
-
-      const errorMessages = checkResult.errors
-        .map((err) => err.text)
-        .join('; ');
-      throw new Error(`View check failed: ${errorMessages}`);
-    }
-
-    return response;
-  }
-
-  // Should not reach here because loop returns on success
-  throw new Error(
-    `View check failed: Version ${version} not available for ${ddlName}`,
+  return runCheckRun(
+    connection,
+    'view',
+    ddlName,
+    version,
+    'abapCheckRun',
+    sourceCode,
   );
 }

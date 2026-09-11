@@ -42,28 +42,13 @@ export async function updateClassWithCheck(
     throw new Error('source_code is required');
   }
 
-  // Import check function
+  // The check still runs, and its report is no longer read here: whether a
+  // finding should block the write is the caller's call, and this member is
+  // two requests in one, which the plan removes separately.
   const { checkClass } = await import('./check');
-  const { parseCheckRunResponse } = await import('../../utils/checkRun');
 
-  // Check source code before update
-  const checkResponse = await checkClass(
-    connection,
-    className,
-    'inactive',
-    sourceCode,
-  );
-  const checkResult = parseCheckRunResponse(checkResponse);
+  await checkClass(connection, className, 'inactive', sourceCode);
 
-  // Block update if there are errors
-  if (checkResult.has_errors) {
-    const errorMessages = checkResult.errors
-      .map((err: { text?: string }) => err.text)
-      .join('; ');
-    throw new Error(`Class check failed, update blocked: ${errorMessages}`);
-  }
-
-  // Proceed with update (warnings are allowed)
   return await updateClass(
     connection,
     className,

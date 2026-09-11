@@ -10,7 +10,6 @@
 
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces';
 import { nothing, rawDocument } from '../../utils/resultStrategy';
-import type { DeletionCheckResult } from '../shared/results';
 
 // Types defined in @mcp-abap-adt/interfaces
 export type { IIncludeConfig } from '@mcp-abap-adt/interfaces';
@@ -64,7 +63,7 @@ export type IncludeDeletionResult = string;
 /**
  * A source upload writes; ADT answers it with nothing worth reading.
  */
-export type IncludeUpdated = void;
+export type IncludeUpdated = undefined;
 
 /** One strategy per member of a include implementation. See `IClassResults`. */
 export interface IIncludeResults {

@@ -9,7 +9,6 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_SOURCE } from '../../constants/contentTypes';
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
-import { orThrow } from '../../utils/adtResponse';
 import { noopLogger } from '../../utils/noopLogger';
 import { AdtUtils } from '../shared/AdtUtils';
 import type { IReadOptions } from '../shared/types';

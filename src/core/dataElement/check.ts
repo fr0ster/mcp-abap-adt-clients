@@ -10,11 +10,7 @@ import {
   ACCEPT_CHECK_MESSAGES,
   CT_CHECK_OBJECTS,
 } from '../../constants/contentTypes';
-import {
-  type CheckRunVersion,
-  parseCheckRunResponse,
-  runCheckRun,
-} from '../../utils/checkRun';
+import { type CheckRunVersion, runCheckRun } from '../../utils/checkRun';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
@@ -81,31 +77,6 @@ export async function checkDataElement(
       'abapCheckRun',
       undefined,
     );
-  }
-
-  const checkResult = parseCheckRunResponse(response);
-
-  // Check only for type E messages - HTTP 200 is normal, errors are in XML response
-  if (checkResult.has_errors) {
-    const errorTexts = checkResult.errors
-      .map((err) => err.text || '')
-      .join(' ')
-      .toLowerCase();
-
-    // Ignore messages that should not cause failure
-    const shouldIgnore =
-      (errorTexts.includes('importing') && errorTexts.includes('database')) ||
-      // For newly created empty data elements, these errors are expected until object is fully initialized
-      (errorTexts.includes('no domain') &&
-        errorTexts.includes('data type was defined')) ||
-      errorTexts.includes('datatype is expected');
-
-    if (!shouldIgnore) {
-      const errorMessages = checkResult.errors
-        .map((err) => err.text)
-        .join('; ');
-      throw new Error(`Data element check failed: ${errorMessages}`);
-    }
   }
 
   return response;

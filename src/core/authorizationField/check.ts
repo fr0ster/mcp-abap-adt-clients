@@ -11,7 +11,6 @@ import {
   CT_AUTHORIZATION_FIELD,
   CT_CHECK_OBJECTS,
 } from '../../constants/contentTypes';
-import { parseCheckRunResponse } from '../../utils/checkRun';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
@@ -68,12 +67,6 @@ export async function checkAuthorizationField(
       'Content-Type': CT_CHECK_OBJECTS,
     },
   });
-
-  const checkResult = parseCheckRunResponse(response);
-  if (checkResult.has_errors) {
-    const errorMessages = checkResult.errors.map((err) => err.text).join('; ');
-    throw new Error(`Authorization field check failed: ${errorMessages}`);
-  }
 
   return response;
 }

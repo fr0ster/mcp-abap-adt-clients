@@ -12,7 +12,6 @@
 
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces';
 import { rawDocument } from '../../utils/resultStrategy';
-import type { DeletionCheckResult } from '../shared/results';
 
 // Types defined in @mcp-abap-adt/interfaces
 export type {

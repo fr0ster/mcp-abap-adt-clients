@@ -13,7 +13,6 @@
 
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces';
 import { nothing, rawDocument } from '../../utils/resultStrategy';
-import type { DeletionCheckResult } from '../shared/results';
 
 // Types defined in @mcp-abap-adt/interfaces
 export type {
@@ -71,7 +70,7 @@ export type ClassValidationResult = string;
 export type ClassDeletionResult = string;
 
 /** An update writes; ADT answers it with nothing worth reading. */
-export type ClassUpdated = void;
+export type ClassUpdated = undefined;
 
 /**
  * One strategy per member of a class implementation.

@@ -11,10 +11,7 @@ import {
   ACCEPT_CHECK_MESSAGES,
   CT_CHECK_OBJECTS,
 } from '../../constants/contentTypes';
-import {
-  type CheckRunVersion,
-  parseCheckRunResponse,
-} from '../../utils/checkRun';
+import type { CheckRunVersion } from '../../utils/checkRun';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
@@ -97,26 +94,6 @@ export async function checkFunctionModule(
     data: xmlBody,
     headers,
   });
-
-  const checkResult = parseCheckRunResponse(response);
-
-  if (checkResult.has_errors) {
-    const errorMessages = checkResult.errors.map((err) => err.text).join('; ');
-    throw new Error(`Function module check failed: ${errorMessages}`);
-  }
-
-  if (checkResult.warnings.length > 0) {
-    throw new Error(
-      `Function module check failed: ${checkResult.message || 'Warnings found'}`,
-    );
-  }
-
-  // If status is 'notProcessed', it's an error
-  if (checkResult.status === 'notProcessed') {
-    throw new Error(
-      `Function module check failed: ${checkResult.message || 'Object could not be processed'}`,
-    );
-  }
 
   return response;
 }

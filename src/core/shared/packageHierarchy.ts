@@ -21,7 +21,7 @@ import type {
 
 const debugEnabled = process.env.DEBUG_ADT_LIBS === 'true';
 
-const xmlParser = new XMLParser({
+const _xmlParser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: '',
   parseAttributeValue: true,

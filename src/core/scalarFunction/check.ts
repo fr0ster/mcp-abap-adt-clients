@@ -2,11 +2,7 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
-import {
-  type CheckRunVersion,
-  parseCheckRunResponse,
-  runCheckRun,
-} from '../../utils/checkRun';
+import { type CheckRunVersion, runCheckRun } from '../../utils/checkRun';
 
 export async function checkScalarFunction(
   connection: IAbapConnection,
@@ -22,10 +18,5 @@ export async function checkScalarFunction(
     'abapCheckRun',
     sourceCode,
   );
-  const checkResult = parseCheckRunResponse(response);
-  if (checkResult.has_errors) {
-    const errorMessages = checkResult.errors.map((err) => err.text).join('; ');
-    throw new Error(`Scalar function check failed: ${errorMessages}`);
-  }
   return response;
 }

@@ -29,7 +29,6 @@ import type {
   AdtNoFailure,
   IAdtError,
   IAdtResponse,
-  IAdtResult,
   IAdtWireResponse,
   IAnalyse,
   IResultStrategy,

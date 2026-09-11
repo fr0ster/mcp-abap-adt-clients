@@ -12,24 +12,18 @@ import type {
   ViewArgs,
   ViewResult,
 } from '@mcp-abap-adt/interfaces';
-import { answering, answeringValue } from '../../utils/adtResponse';
+import { answering } from '../../utils/adtResponse';
 import {
   buildTraceParametersXml,
-  createTraceParameters,
   DEFAULT_PROFILER_TRACE_PARAMETERS,
   deleteTrace,
   extractProfilerIdFromResponse,
   getTraceDbAccesses,
   getTraceHitList,
-  getTraceRequestsByUri,
   getTraceStatements,
-  listObjectTypes,
-  listProcessTypes,
   listTraceFiles,
-  listTraceRequests,
 } from './profiler';
 import {
-  compareRecordedAt,
   parseDbAccesses,
   parseHitList,
   parseStatements,
@@ -42,7 +36,7 @@ export class Profiler implements IProfiler<IAbapTraceEntry, IAbapTraceViews> {
 
   constructor(
     private readonly connection: IAbapConnection,
-    private readonly logger: ILogger,
+    readonly _logger: ILogger,
   ) {}
 
   /**

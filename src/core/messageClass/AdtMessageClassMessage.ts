@@ -30,7 +30,6 @@ import type {
   IAbapConnection,
   IAdtCreatable,
   IAdtCreateOptions,
-  IAdtDeletable,
   IAdtError,
   IAdtMetadataReadable,
   IAdtOperationOptions,
@@ -44,7 +43,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { ADT_NO_FAILURE, AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
 import { MESSAGE_CLASS_UPDATE_CONTENT_TYPE } from '../../constants/contentTypes';
-import { answering, failed } from '../../utils/adtResponse';
+import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { beginCriticalSection } from '../../utils/criticalSection';
 import { encodeSapObjectName } from '../../utils/internalUtils';

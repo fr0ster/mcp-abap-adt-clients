@@ -27,7 +27,6 @@ import type {
   IAbapConnection,
   IAdtCreatable,
   IAdtCreateOptions,
-  IAdtDeletable,
   IAdtError,
   IAdtLockable,
   IAdtMetadataReadable,
