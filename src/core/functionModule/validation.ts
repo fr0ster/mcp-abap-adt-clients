@@ -75,8 +75,9 @@ export async function validateFunctionModuleSource(
   sourceCode?: string,
   version: 'inactive' | 'active' = 'active',
 ): Promise<IAdtWireResponse> {
-  const { runCheckRun, runCheckRunWithSource, parseCheckRunResponse } =
-    await import('../../utils/checkRun');
+  const { runCheckRun, runCheckRunWithSource } = await import(
+    '../../utils/checkRun'
+  );
 
   // Build object type path for function module
   const objectType = 'function_module';
@@ -102,26 +103,6 @@ export async function validateFunctionModuleSource(
       objectName,
       version,
       'abapCheckRun',
-    );
-  }
-
-  const checkResult = parseCheckRunResponse(response);
-
-  if (checkResult.has_errors) {
-    const errorMessages = checkResult.errors.map((err) => err.text).join('; ');
-    throw new Error(`Source validation failed: ${errorMessages}`);
-  }
-
-  if (checkResult.warnings.length > 0) {
-    throw new Error(
-      `Source validation failed: ${checkResult.message || 'Warnings found'}`,
-    );
-  }
-
-  // If status is 'notProcessed', it's an error
-  if (checkResult.status === 'notProcessed') {
-    throw new Error(
-      `Source validation failed: ${checkResult.message || 'Object could not be processed'}`,
     );
   }
 

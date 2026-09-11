@@ -11,7 +11,7 @@ import {
   ACCEPT_CHECK_MESSAGES,
   CT_CHECK_OBJECTS,
 } from '../../constants/contentTypes';
-import { parseCheckRunResponse, runCheckRun } from '../../utils/checkRun';
+import { runCheckRun } from '../../utils/checkRun';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
@@ -77,13 +77,6 @@ export async function checkDomainSyntax(
       'abapCheckRun',
       undefined,
     );
-  }
-
-  const checkResult = parseCheckRunResponse(response);
-
-  if (checkResult.has_errors) {
-    const errorMessages = checkResult.errors.map((err) => err.text).join('; ');
-    throw new Error(`Domain check failed: ${errorMessages}`);
   }
 
   return response;

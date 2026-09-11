@@ -26,7 +26,7 @@ import {
   type ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { AdtOperationError } from '../../utils/adtErrors';
-import { answering, answeringValue } from '../../utils/adtResponse';
+import { answering } from '../../utils/adtResponse';
 import { rawDocument } from '../../utils/resultStrategy';
 import {
   parseRunStatus,

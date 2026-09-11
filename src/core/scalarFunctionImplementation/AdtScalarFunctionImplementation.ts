@@ -37,10 +37,8 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
 import { ADT_NO_FAILURE, AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
-import { activationRefusal } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
-import { deletionRefusal } from '../../utils/deletionCheck';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import {
   createLockTracker,
@@ -417,7 +415,7 @@ export class AdtScalarFunctionImplementation<
       this.results.deletionCheck as IResultStrategy<
         ReturnType<R['deletionCheck']>
       >,
-      (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
+      options?.analyse,
     );
   }
 
@@ -462,7 +460,7 @@ export class AdtScalarFunctionImplementation<
     return answering(
       () => activateScalarFunctionImplementation(connection, name),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
-      (options?.analyse ?? activationRefusal) as IAnalyse<E>,
+      options?.analyse,
     );
   }
 

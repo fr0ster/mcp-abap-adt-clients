@@ -17,7 +17,7 @@ import type {
   PackageHierarchySupportedType,
 } from './types';
 
-const xmlParser = new XMLParser({
+const _xmlParser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: '',
   parseAttributeValue: true,

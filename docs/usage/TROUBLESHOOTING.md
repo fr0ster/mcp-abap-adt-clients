@@ -151,10 +151,10 @@ verdict in the body:
 <SHORT_TEXT>Data definition ZAC_X already exists</SHORT_TEXT>
 ```
 
-Only the function group's reading looked at that, so `getDdl().validate()`
-reported success for a name the system had already rejected, and a caller who
-validates before creating was waved through into a create that then failed.
-`validationRefusal` is the default on every `validate()` now.
+A `validate()` that returns `200` has therefore not told you the name is free —
+the body has. This package reads none of it: supply an `analyse` that looks for
+`<SEVERITY>` if a rejected name should reach you as a failure, or read the
+document yourself.
 
 Note what `validate()` still does not answer: whether the object exists. A free
 name validates fine either way. And note what an abandoned create leaves — the

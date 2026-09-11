@@ -28,16 +28,13 @@ import type {
   IAdtUpdatable,
   IAdtValidatable,
   IAdtVersionable,
-  IAnalyse,
   ILogger,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { getSystemInformation } from '../../utils/systemInfo';
-import { validationRefusal } from '../../utils/validationRefusal';
 import { AdtClass } from '../class/AdtClass';
-import { updateClass } from '../class/update';
 import type { LockRegistry } from '../shared/LockRegistry';
 import type { ObjectVersion } from '../shared/results';
 import type { IReadOptions } from '../shared/types';
@@ -174,7 +171,7 @@ export class AdtBehaviorImplementation<
           config.behaviorDefinition,
         ),
       this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
-      (options?.analyse ?? validationRefusal) as IAnalyse<E>,
+      options?.analyse,
     );
   }
 

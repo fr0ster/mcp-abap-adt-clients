@@ -2,11 +2,7 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
-import {
-  type CheckRunVersion,
-  parseCheckRunResponse,
-  runCheckRun,
-} from '../../utils/checkRun';
+import { type CheckRunVersion, runCheckRun } from '../../utils/checkRun';
 
 export async function checkAppendStructure(
   connection: IAbapConnection,
@@ -22,10 +18,5 @@ export async function checkAppendStructure(
     'abapCheckRun',
     sourceCode,
   );
-  const checkResult = parseCheckRunResponse(response);
-  if (checkResult.has_errors) {
-    const errorMessages = checkResult.errors.map((err) => err.text).join('; ');
-    throw new Error(`Append structure check failed: ${errorMessages}`);
-  }
   return response;
 }

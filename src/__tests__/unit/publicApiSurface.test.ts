@@ -158,14 +158,12 @@ const RUNTIME_EXPORTS = [
   // and the two error strategies a caller's own `analyse` can defer to.
   // Without them the seam the contracts name is unreachable from outside.
   'accessControlDocuments',
-  'activationRefusal',
   'appendStructureDocuments',
   'authorizationFieldDocuments',
   'behaviorDefinitionDocuments',
   'classDocuments',
   'dataElementDocuments',
   'ddlDocuments',
-  'deletionRefusal',
   'domainDocuments',
   'enhancementDocuments',
   'featureToggleDocuments',
@@ -201,7 +199,6 @@ const RUNTIME_EXPORTS = [
   'transportDocuments',
   'unitTestDocuments',
   'utilDocuments',
-  'validationRefusal',
   'wireItself',
 ];
 

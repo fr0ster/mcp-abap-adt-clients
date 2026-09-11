@@ -40,14 +40,11 @@ import type {
   IAdtValidatable,
   IAdtVersionable,
   IAdtWireResponse,
-  IAnalyse,
   ILogger,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
 import { answering } from '../../utils/adtResponse';
-import { deletionRefusal } from '../../utils/deletionCheck';
 import { safeErrorMessage } from '../../utils/internalUtils';
-import { validationRefusal } from '../../utils/validationRefusal';
 import type { LockRegistry } from '../shared/LockRegistry';
 import type { ObjectVersion } from '../shared/results';
 import type { IReadOptions } from '../shared/types';
@@ -130,7 +127,7 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
           config.superclass,
         ),
       this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
-      (options?.analyse ?? validationRefusal) as IAnalyse<E>,
+      options?.analyse,
     );
   }
 
@@ -294,7 +291,7 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
       this.results.deletionCheck as IResultStrategy<
         ReturnType<R['deletionCheck']>
       >,
-      (options?.analyse ?? deletionRefusal) as IAnalyse<E>,
+      options?.analyse,
     );
   }
 

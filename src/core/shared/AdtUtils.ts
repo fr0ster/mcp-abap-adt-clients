@@ -92,7 +92,7 @@ import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiati
 import { answering, answeringValue } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { withRefusalDetection } from '../../utils/refusalAware';
+import { withRequestTrace } from '../../utils/requestTrace';
 import { rawDocument } from '../../utils/resultStrategy';
 import { getTimeout } from '../../utils/timeouts';
 import { getAllTypes as getAllTypesUtil } from './allTypes';
@@ -155,7 +155,6 @@ import type {
   IGetWhereUsedListParams,
   IGetWhereUsedParams,
   IGetWhereUsedScopeParams,
-  IInactiveObjectsResponse,
   IObjectReference,
   IPackageContentItem,
   IPackageHierarchyNode,
@@ -227,10 +226,10 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
     // The one cast in this file, and it is on the default. See AdtClass.
     private readonly results: R = utilDocuments as unknown as R,
   ) {
-    // Wrapped once, here, where a connection enters the library. A refusal SAP
-    // sends with a 2xx would otherwise be stored as a result and reported as
-    // success — see src/utils/refusalAware.ts for what that measured.
-    this.connection = withRefusalDetection(connection);
+    // Wrapped once, here, where a connection enters the library. The wrapper
+    // puts the request back on the answer and reads nothing: what a body means
+    // is the caller's, through the `analyse` they pass.
+    this.connection = withRequestTrace(connection);
     this.logger = logger;
   }
 

@@ -11,7 +11,6 @@ import {
   CT_CHECK_OBJECTS,
   CT_FEATURE_TOGGLE_METADATA,
 } from '../../constants/contentTypes';
-import { parseCheckRunResponse } from '../../utils/checkRun';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
@@ -65,12 +64,6 @@ export async function checkFeatureToggle(
       'Content-Type': CT_CHECK_OBJECTS,
     },
   });
-
-  const checkResult = parseCheckRunResponse(response);
-  if (checkResult.has_errors) {
-    const errorMessages = checkResult.errors.map((err) => err.text).join('; ');
-    throw new Error(`Feature toggle check failed: ${errorMessages}`);
-  }
 
   return response;
 }

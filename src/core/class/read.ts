@@ -9,7 +9,6 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_SOURCE, ACCEPT_TRANSPORT } from '../../constants/contentTypes';
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
-import { orThrow } from '../../utils/adtResponse';
 import {
   encodeSapObjectName,
   longPollingQuery,

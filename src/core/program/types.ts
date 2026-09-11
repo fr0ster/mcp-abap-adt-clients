@@ -10,7 +10,6 @@
 
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces';
 import { nothing, rawDocument } from '../../utils/resultStrategy';
-import type { DeletionCheckResult } from '../shared/results';
 
 // Types defined in @mcp-abap-adt/interfaces
 export type {
@@ -64,7 +63,7 @@ export type ProgramValidationResult = string;
 export type ProgramDeletionResult = string;
 
 /** An update writes; ADT answers it with nothing worth reading. */
-export type ProgramUpdated = void;
+export type ProgramUpdated = undefined;
 
 /** The transport document for the program, from its `objectstates` resource. */
 export type ProgramTransport = string;

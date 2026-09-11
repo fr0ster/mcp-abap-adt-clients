@@ -500,50 +500,13 @@ async function invokeWithOptions(
 }
 
 /**
- * Activation is judged by the messages, and a failure has to reach the caller.
- *
- * This is the one assertion that would have caught `functionGroup.activate`:
- * it POSTed correctly and then ignored the answer, so a failed activation came
- * back as `errors: []`. Asserting only that a POST went out would have passed.
+ * Activation once had a section here asserting that an error-severity message
+ * came back as a failure. Nothing in this package reads an activation
+ * checklist any more: ADT answers 200, the exchange succeeded, and the
+ * document is the result. Whether it says the activation happened is the
+ * caller's reading, through the `analyse` they pass, so the assertion moved
+ * out with the strategy it was about.
  */
-const FAILED_ACTIVATION = `<?xml version="1.0" encoding="utf-8"?>
-<chkl:messages xmlns:chkl="http://www.sap.com/abapxml/checklist">
-  <msg objDescr="ZGUARD" type="E" line="1" href="/sap/bc/adt/guard">
-    <shortText><txt>Object could not be activated</txt></shortText>
-  </msg>
-</chkl:messages>`;
-
-describe('capability guard — activation reports failure', () => {
-  for (const [name, entry] of Object.entries(
-    HANDLERS as Record<string, HandlerEntry>,
-  )) {
-    if (!entry.capabilities.includes('activatable')) continue;
-
-    it(`${name}: an error-severity message reaches the caller`, async () => {
-      const { client } = recordingClient(FAILED_ACTIVATION);
-      const handler = entry.factory(client) as unknown as Record<
-        string,
-        unknown
-      >;
-      const activate = handler.activate as (
-        c: unknown,
-      ) => Promise<IAdtResponse<unknown>>;
-
-      // The failure half, or a throw. Either reaches the caller; what must not
-      // happen is a success — which is what `errors: []` was, and why this
-      // assertion exists at all. ADT answers a refused activation with 200 and
-      // a `<msg type="E">`, so nothing below the contract can tell.
-      let reached = false;
-      try {
-        reached = !(await activate.call(handler, entry.config)).ok;
-      } catch {
-        reached = true;
-      }
-
-      expect(reached).toBe(true);
-    });
-  }
-});
 
 describe('capability guard — behaviour', () => {
   for (const [name, entry] of Object.entries(

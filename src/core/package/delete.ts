@@ -4,7 +4,6 @@
 
 import type {
   AdtNoFailure,
-  HttpError,
   IAbapConnection,
   IAdtError,
   IAdtWireResponse,

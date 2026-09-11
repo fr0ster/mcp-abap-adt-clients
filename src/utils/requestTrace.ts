@@ -20,9 +20,9 @@
  * request?  NONE
  * ```
  *
- * So `withRefusalDetection` — which already holds the request, and already
- * wraps every connection the clients are given — attaches it on the way back,
- * and this is where the vocabulary for reading it lives.
+ * So `withRequestTrace` below — which wraps every connection the clients are
+ * given — attaches it on the way back, and this is where the vocabulary for
+ * reading it lives.
  *
  * **A stand-in, deliberately.** `IAdtWireResponse.request` is already in the
  * contract, typed `unknown` and populated by nobody. Its resting place is the
@@ -30,7 +30,11 @@
  * here, where real traffic can be run against it.
  */
 
-import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAbapRequestOptions,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces';
 
 /** Enough to say which call, and nothing more. Matches `IAdtError.request`. */
 export interface IAdtRequestTrace {
@@ -52,4 +56,57 @@ export function requestOf(
   const carried = answer?.request as IAdtRequestTrace | undefined;
   if (!carried || (!carried.url && !carried.method)) return undefined;
   return { method: carried.method, url: carried.url };
+}
+
+/** Connections already carrying the trace. */
+const traced = new WeakSet<IAbapConnection>();
+
+/**
+ * Put the request back on the answer.
+ *
+ * The connection normalises a successful answer down to `status`, `statusText`,
+ * `headers` and `data`, dropping `config` and `request`. This is the last place
+ * that information exists, so a failure built further up can say which call it
+ * was. It reads nothing and decides nothing: what a body means is the caller's,
+ * through their own `analyse`.
+ *
+ * Replaces `makeAdtRequest` and calls the method captured at install time, which
+ * is how `installAcceptNegotiation` in `./acceptNegotiation` already works —
+ * deliberately the same shape, because the two must compose in either order.
+ *
+ * A `Proxy` was tried first and is wrong here: accept-negotiation keys a
+ * `WeakMap` by the connection object to remember the original method, and a
+ * proxy is a different object from its target. The negotiation wrapper then
+ * resolved `connection.makeAdtRequest` back through the proxy and the two called
+ * each other until the stack ran out. Preserving the object's identity is not a
+ * detail — another wrapper depends on it.
+ */
+export function withRequestTrace(connection: IAbapConnection): IAbapConnection {
+  // A connection that cannot issue a request has no answer to annotate. Some
+  // members compute a URI and never call out, and they are exercised with a
+  // connection that offers nothing else — wrapping that would fail at
+  // construction over a method the caller was never going to use.
+  if (
+    traced.has(connection) ||
+    typeof connection?.makeAdtRequest !== 'function'
+  ) {
+    return connection;
+  }
+  traced.add(connection);
+
+  const base = connection.makeAdtRequest.bind(connection);
+
+  connection.makeAdtRequest = async function makeAdtRequestTraced<
+    T = unknown,
+    D = unknown,
+  >(request: IAbapRequestOptions): Promise<IAdtWireResponse<T, D>> {
+    const asked = { method: request?.method, url: request?.url };
+    const response = await base<T, D>(request);
+    // A new object rather than a field written onto the connection's own: the
+    // method is wrapped carefully above, and writing into the value it returns
+    // would give that care away.
+    return { ...response, request: asked };
+  };
+
+  return connection;
 }

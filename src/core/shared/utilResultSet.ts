@@ -38,15 +38,7 @@
 
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces';
 import { inactiveObjects } from './getInactiveObjects';
-import type { IInactiveObjectsResponse } from './types';
-import {
-  type INamedItem,
-  type IRepositoryNodeContents,
-  type ISearchResult,
-  namedItems,
-  nodeContents,
-  searchHits,
-} from './utilResults';
+import { namedItems, nodeContents, searchHits } from './utilResults';
 
 export interface IUtilResults {
   /** Hits of an object search. */

@@ -10,7 +10,6 @@
 
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces';
 import { rawDocument } from '../../utils/resultStrategy';
-import type { DeletionCheckResult } from '../shared/results';
 
 // Types defined in @mcp-abap-adt/interfaces
 export type {
@@ -58,7 +57,7 @@ export type FunctionGroupActivationResult = string;
  * What validation answers.
  *
  * Measured: a *failure* arrives inside a 200 as `<SEVERITY>ERROR</SEVERITY>`
- * with the reason in `<SHORT_TEXT>`, which is why {@link validationSeverity}
+ * with the reason in `<SHORT_TEXT>`, which is why a caller's own `analyse`
  * reads the document rather than the status.
  */
 export type FunctionGroupValidationResult = string;

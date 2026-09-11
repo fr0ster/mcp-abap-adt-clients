@@ -7,160 +7,12 @@
  */
 
 import type {
-  AdtNoFailure,
   IAbapConnection,
-  IAdtError,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
-import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces';
-import { XMLParser } from 'fast-xml-parser';
 import { CT_ACTIVATION } from '../constants/contentTypes';
 import { encodeSapObjectName } from './internalUtils';
-import { requestOf } from './requestTrace';
 import { getTimeout } from './timeouts';
-
-/**
- * Extract a human-readable text from a single ADT `<msg>` node.
- */
-function extractActivationMsgText(msg: {
-  shortText?: { txt?: unknown } | string;
-  objDescr?: unknown;
-}): string {
-  const shortText = msg?.shortText;
-  if (shortText && typeof shortText === 'object' && 'txt' in shortText) {
-    const txt = (shortText as { txt?: unknown }).txt;
-    if (typeof txt === 'string' && txt.trim()) {
-      return txt.trim();
-    }
-  }
-  if (typeof shortText === 'string' && shortText.trim()) {
-    return shortText.trim();
-  }
-  if (typeof msg?.objDescr === 'string' && msg.objDescr.trim()) {
-    return msg.objDescr.trim();
-  }
-  return 'activation error';
-}
-
-/**
- * Inspect an ADT activation response body for an **explicit failure signal**.
- *
- * ADT's `/sap/bc/adt/activation` endpoint returns HTTP 200 even when activation
- * fails on a syntax error, carrying a `<chkl:messages>` body with
- * `<msg type="E">` entries. Treating "no HTTP error" as success masks these
- * failures (issue #78).
- *
- * **The failure signal is an `E` message, not `activationExecuted="false"`.**
- * This originally treated the flag alone as a failure, which is wrong — probed
- * against a trial system:
- *
- * | scenario                       | HTTP | activationExecuted | `msg` |
- * |--------------------------------|------|--------------------|-------|
- * | class already active           | 200  | `false`            | none  |
- * | DDIC table already active      | 200  | `true`             | none  |
- * | class does not exist           | 200  | `false`            | `E`   |
- * | locked by another session      | 403  | —                  | —     |
- *
- * A class that needs no activation reports `false` with an empty message list —
- * indistinguishable, by the flag alone, from a class that does not exist. So the
- * flag says whether ADT did any work, not whether the work succeeded, and only
- * the messages carry the verdict. The lock case the old wording named is a 403
- * and never reached this function at all.
- *
- * Conservative by design: returns a failure detail string ONLY on a positive
- * error signal. Empty, unparseable, or unrecognized bodies return `null`
- * (success) so the many object types whose success-body shape differs are never
- * regressed into false failures.
- *
- * @returns failure detail text, or `null` when no failure signal is present
- */
-function detectActivationFailure(responseData: unknown): string | null {
-  if (typeof responseData !== 'string' || responseData.trim() === '') {
-    return null;
-  }
-
-  let parsed: Record<string, unknown>;
-  try {
-    const parser = new XMLParser({
-      ignoreAttributes: false,
-      attributeNamePrefix: '',
-    });
-    parsed = parser.parse(responseData) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
-
-  const messages = parsed?.['chkl:messages'] as
-    | {
-        msg?: unknown;
-      }
-    | undefined;
-  if (!messages) {
-    return null;
-  }
-
-  const rawMsg = messages.msg;
-  const msgList = Array.isArray(rawMsg) ? rawMsg : rawMsg ? [rawMsg] : [];
-  const errorTexts = msgList
-    .filter((m) => {
-      const severity =
-        (m as { type?: unknown; severity?: unknown })?.type ??
-        (m as { severity?: unknown })?.severity;
-      return typeof severity === 'string' && severity.toUpperCase() === 'E';
-    })
-    .map((m) =>
-      extractActivationMsgText(
-        m as Parameters<typeof extractActivationMsgText>[0],
-      ),
-    );
-
-  return errorTexts.length > 0 ? errorTexts.join('; ') : null;
-}
-
-/**
- * Throw unless an activation response is free of error messages.
- *
- * Nine object types each carried a private copy of this check, all written the
- * same way — `activationExecuted && checkExecuted`, with the `<msg>` list never
- * read at all. That shape is wrong twice over:
- *
- * - It refuses a valid response. An object that needs no activation answers
- *   `activationExecuted="false"`, so `AdtClient` threw over objects that were
- *   already active. See `detectActivationFailure` above for the probed table.
- * - It discards what SAP said. A genuine failure carries the reason in
- *   `<msg type="E">` — "Class ZAC_… does not have a TMDIR entry" — and every
- *   copy replaced it with the fixed string "Activation failed".
- *
- * One rule in one place, so the nine cannot drift apart again. Callers keep
- * their own prefix, which is the only part that was ever type-specific.
- *
- * @param objectLabel prefix for the thrown message, e.g. `'Scalar function'`
- * @throws when the response carries at least one error-severity message
- */
-/**
- * ADT's own activation verdict, as a failure rather than an exception.
- *
- * The shipped `analyse` for an activation step. Same rule as
- * {@link assertActivationSucceeded} — an `<msg type="E">` is the verdict and
- * `activationExecuted="false"` is not — but returned, because a chain's
- * failures are answered. A consumer who reads activation messages some other
- * way passes their own `analyse` instead.
- */
-export const activationRefusal = (
-  verdict: IAdtError | AdtNoFailure,
-  answer?: IAdtWireResponse,
-): IAdtError | AdtNoFailure => {
-  if (verdict !== ADT_NO_FAILURE) return verdict;
-  const failure = detectActivationFailure(answer?.data);
-  return failure
-    ? {
-        origin: 'refusal',
-        message: `Activation failed: ${failure}`,
-        response: answer,
-        request: requestOf(answer),
-      }
-    : ADT_NO_FAILURE;
-};
 
 /**
  * Build object URI from name and type
@@ -338,10 +190,8 @@ export async function activateObjectInSession(
   });
 
   // The answer, as it arrived. ADT returns 200 even on a failed activation
-  // (locked object, syntax errors), and this used to throw a plain `Error` for
-  // it — which `recogniseFailure` then called `origin: 'connection'`, sending a
-  // caller to look at a network that had worked perfectly. The verdict is
-  // {@link activationRefusal}'s to give, and every `activate` member defaults
-  // to it (issue #78).
+  // (locked object, syntax errors), so the status does not carry the verdict
+  // and neither does this function. Whether a checklist body means the
+  // activation happened is read by the caller's own `analyse`.
   return response;
 }

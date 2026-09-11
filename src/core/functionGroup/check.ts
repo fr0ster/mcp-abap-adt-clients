@@ -29,8 +29,9 @@ export async function checkFunctionGroup(
   version: 'active' | 'inactive',
   sourceCode?: string,
 ): Promise<IAdtWireResponse> {
-  const { runCheckRun, runCheckRunWithSource, parseCheckRunResponse } =
-    await import('../../utils/checkRun');
+  const { runCheckRun, runCheckRunWithSource } = await import(
+    '../../utils/checkRun'
+  );
 
   let response: IAdtWireResponse;
 
@@ -53,37 +54,6 @@ export async function checkFunctionGroup(
       version,
       'abapCheckRun',
     );
-  }
-
-  const checkResult = parseCheckRunResponse(response);
-
-  // Check only for type E messages - HTTP 200 is normal, errors are in XML response
-  if (checkResult.has_errors) {
-    const errorTexts = checkResult.errors
-      .map((err) => err.text || '')
-      .join(' ')
-      .toLowerCase();
-
-    // WORKAROUND: Ignore Kerberos library not loaded error (test cloud issue)
-    // This is a known issue in test environments where Kerberos library is not available
-    const isKerberosError = errorTexts.includes('kerberos library not loaded');
-
-    // For newly created empty function groups (no function modules), these errors are expected
-    // until function modules are added to the function group
-    const isEmptyFunctionGroupError =
-      (errorTexts.includes('report') &&
-        errorTexts.includes('program statement is missing')) ||
-      errorTexts.includes('program type is include') ||
-      errorTexts.includes('report/program statement is missing');
-
-    const shouldIgnore = isKerberosError || isEmptyFunctionGroupError;
-
-    if (!shouldIgnore) {
-      const errorMessages = checkResult.errors
-        .map((err) => err.text)
-        .join('; ');
-      throw new Error(`Function group check failed: ${errorMessages}`);
-    }
   }
 
   return response;

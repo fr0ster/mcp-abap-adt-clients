@@ -85,22 +85,24 @@ describe('the failure type a caller injected', () => {
     expect(failure.message).toMatch(/TMDIR/);
   });
 
-  it('leaves the shipped default in place when nobody injects one', async () => {
+  it('answers a refusal document as a result when nobody injects a strategy', async () => {
     const client = new AdtClient(answering(REFUSED));
 
     const answer = await client
       .getClass()
       .activate({ className: 'ZZ_NO_SUCH_OBJECT_ZZ' });
 
-    expect(answer.ok).toBe(false);
-    if (answer.ok) throw new Error('expected a refusal');
-    // `activationRefusal` reads the same document its own way, and the failure
-    // is the plain contract — which is what `E` defaults to.
-    const failure: IAdtError = answer.getError();
-    expect(failure.message).toMatch(/does not have a TMDIR entry/);
+    // Nothing here reads an activation checklist. ADT answered 200, so the
+    // exchange succeeded and the document is the result; whether it says the
+    // activation happened is the caller's reading.
+    expect(answer.ok).toBe(true);
+    if (!answer.ok) throw new Error('expected the document');
+    expect(String(answer.getResult().value)).toMatch(
+      /does not have a TMDIR entry/,
+    );
   });
 
-  it('can clear a verdict the shipped default would have raised', async () => {
+  it('can still clear a verdict a strategy of its own raised', async () => {
     const client = new AdtClient(answering(REFUSED));
 
     const answer = await client

@@ -79,8 +79,9 @@ export async function validateClassSource(
   sourceCode?: string,
   version: 'inactive' | 'active' = 'active',
 ): Promise<IAdtWireResponse> {
-  const { runCheckRun, runCheckRunWithSource, parseCheckRunResponse } =
-    await import('../../utils/checkRun');
+  const { runCheckRun, runCheckRunWithSource } = await import(
+    '../../utils/checkRun'
+  );
 
   let response: IAdtWireResponse;
 
@@ -103,12 +104,6 @@ export async function validateClassSource(
       version,
       'abapCheckRun',
     );
-  }
-
-  const checkResult = parseCheckRunResponse(response);
-
-  if (!checkResult.success || checkResult.has_errors) {
-    throw new Error(`Source validation failed: ${checkResult.message}`);
   }
 
   return response;

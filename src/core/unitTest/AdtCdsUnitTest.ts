@@ -19,7 +19,6 @@ import type {
   IAdtOperationOptions,
   IAdtResponse,
   IAdtWireResponse,
-  IAnalyse,
   ICdsTestDoubleCheckable,
   ICdsUnitTestConfig,
   ILogger,
@@ -29,7 +28,6 @@ import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
 import { answering } from '../../utils/adtResponse';
 import { requestOf } from '../../utils/requestTrace';
-import { validationRefusal } from '../../utils/validationRefusal';
 import { startClassUnitTestRunByObject } from '../class/run';
 import { validateClassName } from '../class/validation';
 import { AdtDdl } from '../ddl/AdtDdl';
@@ -157,7 +155,7 @@ export class AdtCdsUnitTest<
           config.description || `CDS unit test for ${name}`,
         ),
       this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
-      (options?.analyse ?? validationRefusal) as IAnalyse<E>,
+      options?.analyse,
     );
   }
 
