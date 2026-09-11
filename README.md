@@ -209,39 +209,41 @@ if (found.ok) {
   found.getError().message;       // what SAP said, verbatim
 }
 
-// Where-used with parsed results
-const answer = await utils.getWhereUsedList({
-  object_name: 'ZCL_TEST',
-  object_type: 'class',
-  enableAllTypes: true  // Eclipse "select all" behavior
+// Where-used: the scope, edited, then the search. Three calls since 19.0.0,
+// because they are three requests — and what to do when a system has no
+// /usageReferences/scope sub-resource (some S/4 releases 404 it) is a decision
+// about your system, so it is yours rather than a fallback hidden in here.
+const scope = await utils.getWhereUsedScope({
+  object_name: 'ZMY_TABLE',
+  object_type: 'table',
 });
-
-if (!answer.ok) {
+if (!scope.ok) {
   // A refusal is an answer, not an exception flying past. `origin` says which
   // remedy applies: restore the channel, or ask the server something else —
   // two different problems that "something went wrong" hides.
-  throw new Error(answer.getError().message);
+  throw new Error(scope.getError().message);
 }
 
-const result = answer.getResult().value;
-console.log(`Found ${result.totalReferences} references`);
-for (const ref of result.references) {
-  console.log(`${ref.name} (${ref.type}) in ${ref.packageName}`);
-}
-
-// Restrict to specific object types — SAP filters server-side, so it never
-// returns the unwanted types (e.g. hundreds of classes when you want structures).
-// On systems without the /usageReferences/scope sub-resource (some S/4 releases
-// 404 it) the search falls back to unscoped and the filter is applied to the
-// parsed references client-side, so you still get the narrowed set.
-await utils.getWhereUsedList({
-  object_name: 'ZMY_TABLE',
-  object_type: 'table',
-  enableOnlyTypes: ['TABL/DS', 'TABL/DT']  // or disableTypes: ['CLAS/OC']
+// No request: it rewrites the document the call above returned.
+const narrowed = utils.modifyWhereUsedScope(scope.getResult().value, {
+  enableOnly: ['TABL/DS', 'TABL/DT'],  // or disable: ['CLAS/OC']
 });
 
-// Where-used with raw XML (legacy)
-await utils.getWhereUsed({ object_name: 'ZCL_TEST', object_type: 'class' });
+const answer = await utils.getWhereUsed({
+  object_name: 'ZMY_TABLE',
+  object_type: 'table',
+  scopeXml: narrowed,
+});
+
+// The default reading is the document. `whereUsedReferences` is the shape the
+// old member returned, offered by name rather than imposed:
+import { whereUsedReferences } from '@mcp-abap-adt/adt-clients';
+
+const references = whereUsedReferences({ data: answer.getResult().value } as never);
+console.log(`Found ${references.totalReferences} references`);
+for (const ref of references.references) {
+  console.log(`${ref.name} (${ref.type}) in ${ref.packageName}`);
+}
 ```
 
 ### Using AdtClientsWS (Realtime)

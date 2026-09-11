@@ -105,8 +105,8 @@ These types throw an error with the exact missing endpoint when the getter is ca
 |---------|--------|----------|
 | Search objects | `search()` | `/sap/bc/adt/repository/informationsystem/search` |
 | Node structure | `fetchNodeStructure()` | `/sap/bc/adt/repository/nodestructure` |
-| Package hierarchy | `getPackageHierarchy()` | (uses nodeStructure) |
-| Package contents | `getPackageContentsList()` | (uses nodeStructure) |
+| Package hierarchy | removed in 19.0.0 — the caller walks `fetchNodeStructure()` | (uses nodeStructure) |
+| Package contents | removed in 19.0.0 — the caller walks `fetchNodeStructure()` | (uses nodeStructure) |
 | Object structure | `getObjectStructure()` | `/sap/bc/adt/repository/objectstructure` |
 | Read metadata | `readObjectMetadata()` | `/sap/bc/adt/repository/informationsystem/metadata` |
 | Inactive objects | `getInactiveObjects()` | `/sap/bc/adt/activation/inactiveobjects` |
@@ -118,7 +118,7 @@ These types throw an error with the exact missing endpoint when the getter is ca
 
 | Utility | Method | Missing Endpoint | Legacy Alternative |
 |---------|--------|------------------|--------------------|
-| Where-used | `getWhereUsed()`, `getWhereUsedList()` | `/sap/bc/adt/repository/informationsystem/usageReferences` | Old API exists: `POST .../whereused?RIS_REQUEST_TYPE=WHERE_USED_LAZY` + `.../fullnamemapping` — not yet implemented |
+| Where-used | `getWhereUsedScope()`, `modifyWhereUsedScope()`, `getWhereUsed()` | `/sap/bc/adt/repository/informationsystem/usageReferences` | Old API exists: `POST .../whereused?RIS_REQUEST_TYPE=WHERE_USED_LAZY` + `.../fullnamemapping` — not yet implemented |
 | Group activation | `activateObjectsGroup()` | `/sap/bc/adt/activation/runs` | Sync API exists: `POST /sap/bc/adt/activation?method=activate` — not yet adapted for group use |
 | Group deletion | `checkDeletionGroup()`, `deleteObjectsGroup()` | `/sap/bc/adt/deletion/check` + `/delete` | Direct `DELETE` per object (used by Legacy handlers) |
 | Table contents | `getTableContents()` | `/sap/bc/adt/datapreview/ddic` | None |
