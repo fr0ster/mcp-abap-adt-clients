@@ -6,12 +6,19 @@
  * requests and a wait in one member, so it could not stay one: how long to
  * allow and what a failure means are decisions about the caller's work.
  *
- * The sequence is here rather than repeated at each call site, because several
- * tests need it and a copy per test is a copy per mistake.
+ * It lives under `scripts/`, beside the package and function-group walks and
+ * the table statement — outside the published package, which ships only `dist`,
+ * `docs/usage`, the README and the licences. That is deliberate and load-
+ * bearing: this file is a **consumer's** sequence, and a consumer's sequence
+ * inside `src/` would be the join this release removed, one directory over and
+ * one pull request away from being exported again.
+ *
+ * The sequence is written once rather than repeated at each call site, because
+ * several callers need it and a copy per caller is a copy per mistake.
  */
 import type { ILogger } from '@mcp-abap-adt/interfaces';
-import type { AdtClient } from '../../clients/AdtClient';
-import type { IObjectReference } from '../../core/shared/types';
+import type { AdtClient } from '../../src/clients/AdtClient';
+import type { IObjectReference } from '../../src/core/shared/types';
 
 export interface IActivationOutcome {
   readonly runId: string;

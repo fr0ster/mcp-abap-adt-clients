@@ -188,8 +188,7 @@ whose own reading keeps the exchange instead.
 **If you read the activated objects straight after, you now race them.**
 `activateObjectsGroup` used to return only once the run had finished, so code
 that activated and then read the active version worked by accident of the wait.
-It is the POST alone now. `src/__tests__/helpers/activationRun.ts` in this
-repository is the wait written out — start, poll `getActivationRun` with
+It is the POST alone now. `scripts/lib/activationRun.ts` in this repository is the wait written out — start, poll `getActivationRun` with
 `withLongPolling` until the status leaves `running`, then read the results — and
 is the shortest migration to copy.
 

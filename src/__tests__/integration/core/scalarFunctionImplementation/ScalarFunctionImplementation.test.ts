@@ -21,10 +21,10 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
+import { activateAndWait } from '../../../../../scripts/lib/activationRun';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import { orThrow } from '../../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
-import { activateAndWait } from '../../../helpers/activationRun';
 import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,

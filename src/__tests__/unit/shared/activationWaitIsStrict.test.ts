@@ -2,11 +2,11 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
-import { AdtClient } from '../../../index';
 import {
   activateAndWait,
   activationStatusIn,
-} from '../../helpers/activationRun';
+} from '../../../../scripts/lib/activationRun';
+import { AdtClient } from '../../../index';
 
 /**
  * The wait ends on `finished`, and on nothing else.
