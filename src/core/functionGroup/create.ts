@@ -94,29 +94,6 @@ export async function create(
     return response;
   } catch (error: unknown) {
     const e = error as HttpError;
-    // Special handling: Ignore Kerberos error for FunctionGroup
-    // SAP sometimes returns HTTP 400 with "Kerberos library not loaded" but still creates the object
-    // This is a known issue with FunctionGroup create - we ignore the error
-    if (e.response?.status === 400) {
-      const errorData =
-        typeof e.response.data === 'string'
-          ? e.response.data
-          : safeStringify(e.response.data);
-
-      if (errorData.includes('Kerberos library not loaded')) {
-        logger?.debug?.(
-          `[WARN] FunctionGroup create returned Kerberos error, but object may have been created - ignoring error`,
-        );
-        // Return a mock successful response (status 201)
-        return {
-          ...e.response,
-          status: 201,
-          statusText: 'Created',
-          data: e.response.data,
-        } as IAdtWireResponse;
-      }
-    }
-
     // Log error details for debugging (same as class/create.ts)
     if (e.response && debugEnabled) {
       logger?.error?.(

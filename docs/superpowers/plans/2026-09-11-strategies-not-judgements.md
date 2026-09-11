@@ -1553,21 +1553,29 @@ Heaviest: `src/core/service/AdtService.ts` (36), `src/core/class/AdtClass.ts`
   are required, and the compiler keeps saying so. What goes is the runtime
   re-check of what the type already states.
 
-- [ ] **Step 1: Decide how a missing value serialises, and write it down**
+- [ ] **Step 1: Understand what this does and does not promise**
 
-Two candidates, and the choice must be one rule applied everywhere, recorded at
-the top of `src/utils/internalUtils.ts`:
+Nothing is added. Not a serialisation rule, not a tolerant helper, not a
+`string | undefined` signature. Replacing 454 guards with tolerance in sixty-one
+places is the same defence spread thinner, and it is still this package deciding
+what a caller may leave out.
 
-- **`String(value)`** — a missing name becomes the literal `undefined` in the
-  URL. The server answers about an object called `UNDEFINED`, which is a real
-  answer and traceable in a corpus.
-- **empty string** — the URL loses a segment and the server answers about a
-  different resource, or 404s on a malformed path.
+A field typed as required that arrives `undefined` is a defect in the caller's
+code, which the compiler already told them about. What happens next depends on
+the member and **that is accepted**:
 
-Recommend `String(value)`: it produces one predictable, greppable request rather
-than a differently-shaped URL. Put the decision in the plan's own record by
-noting it here once chosen, and make `encodeSapObjectName` and the case-shifting
-helpers accept `string | undefined` under it.
+- Where the value goes to `encodeSapObjectName` — `encodeURIComponent` — the URL
+  is built from the string `"undefined"`, the request goes out, and SAP answers.
+  `src/core/class/read.ts:91` is this shape.
+- Where a method is called on it first — `updateTableType` does
+  `params.tabletype_name.toUpperCase()`, and there are 61 such sites in
+  `src/core` — a `TypeError` is raised locally. It is not caught, not wrapped
+  and not prevented. A defect in the caller's code says so in the caller's
+  stack; that is more useful than a sentence this package composed.
+
+So the promise is **not** "every missing field reaches the server". It is "this
+package stops answering for the server". Write that in the migration document
+in those words.
 
 - [ ] **Step 2: Write the representative behavioural tests**
 
@@ -1642,10 +1650,10 @@ reads need, in order.
 
 Run: `MCP_ENV_PATH=/tmp/nonexistent-env npx jest src/__tests__/unit/missingValueReachesTheServer.test.ts`
 Expected: the class case fails with `Class name is required` from
-`AdtClass.read`; the table type case fails with `tabletype_name is required`
-from `updateTableType`, and after that guard goes, on
-`TypeError: Cannot read properties of undefined (reading 'toUpperCase')` until
-Step 5 makes the name's path tolerate a missing value.
+`AdtClass.read`. Drop the table-type case from this file — with the guard gone
+it raises a `TypeError`, which is the accepted outcome from Step 1 and not
+something to assert a request against. Assert the class shape and one more
+member of the same shape instead.
 
 - [ ] **Step 4: Write the source test**
 
@@ -1678,9 +1686,11 @@ describe('production code', () => {
 - [ ] **Step 5: Delete the guards, one file at a time, committing per file**
 
 For each file: delete every `if (!config.x) throw new Error('x is required');`
-and every multi-line equivalent, then make the paths that used to be protected
-tolerate a missing value under the Step 1 rule. Run `npm run build:fast` after
-each file so damage stays local.
+and every multi-line equivalent. Delete a local variable that existed only to
+satisfy one. Add nothing. Run `npm run build:fast` after each file so damage
+stays local — a cast that the guard used to justify (`config.className as
+string`) may now be the only thing keeping a file compiling, and that cast is
+fine: the type already says the field is there.
 
 Work heaviest-first per the list above.
 

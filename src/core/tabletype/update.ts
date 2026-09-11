@@ -114,17 +114,14 @@ export async function updateTableType(
       headers,
     });
   } catch (error: unknown) {
+    // Relayed, not restated. A sentence composed here would replace the
+    // response the caller's strategy reads, and `IAdtError.response` would
+    // arrive empty on the one failure that carries SAP's own words.
     const e = error as HttpError;
-    const status = e.response?.status || 'unknown';
-    const statusText = e.response?.statusText || '';
-    const responseData = e.response?.data
-      ? typeof e.response.data === 'string'
-        ? e.response.data
-        : JSON.stringify(e.response.data, null, 2)
-      : e.message || 'No response data';
-
-    const fullError = `Failed to update table type ${params.tabletype_name}: HTTP ${status} ${statusText} — ${responseData}`;
-    logger?.error?.(fullError);
-    throw new Error(fullError);
+    logger?.error?.(
+      `update of table type ${params.tabletype_name} was refused`,
+      { status: e.response?.status },
+    );
+    throw error;
   }
 }
