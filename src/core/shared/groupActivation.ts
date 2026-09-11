@@ -12,7 +12,7 @@ import { headerValueToString } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { IObjectReference } from './types';
 
-const xmlParser = new XMLParser({
+const _xmlParser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: '@_',
   parseAttributeValue: false,
@@ -38,6 +38,36 @@ export function extractRunId(
   if (!locationValue) return null;
   const match = locationValue.match(/\/activation\/runs\/([^/]+)/);
   return match ? match[1] : null;
+}
+
+/**
+ * What an activation run is doing — `/activation/runs/{runId}`.
+ *
+ * One request, and the document as it arrived. `withLongPolling` reaches the
+ * wire, so it is a parameter: the server holds the request open rather than
+ * answering immediately, which is how a caller waits without a tight loop.
+ *
+ * **The reading is the caller's.** The document carries `runs:status` —
+ * `finished`, `error`, `failed`, or a progress percentage while it runs — and
+ * which of those ends a wait is their decision. This package used to loop here
+ * with a sixty-second ceiling and a one-second interval, treat `error` and
+ * `failed` as a thrown exception, and answer nothing about the rest.
+ */
+export async function getActivationRun(
+  connection: IAbapConnection,
+  runId: string,
+  options?: { withLongPolling?: boolean },
+): Promise<IAdtWireResponse> {
+  const query = options?.withLongPolling ? '?withLongPolling=true' : '';
+
+  return connection.makeAdtRequest({
+    url: `/sap/bc/adt/activation/runs/${runId}${query}`,
+    method: 'GET',
+    timeout: getTimeout('default'),
+    headers: {
+      Accept: 'application/xml, application/vnd.sap.adt.backgroundrun.v1+xml',
+    },
+  });
 }
 
 /**

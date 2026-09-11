@@ -317,8 +317,10 @@ if (!started.ok) throw new Error(started.getError().message);
 // finish. Until 19.0.0 `pull` ran this loop, and an AbortSignal passed to it
 // stopped only this loop — never the server's job. Written here, that is
 // visible instead of explained.
+// Read once before testing the condition: `linked` was fetched before the POST,
+// so its status says nothing about this pull.
 const deadline = Date.now() + 600_000;
-let status = linked;
+let status = (await abapGit.getRepo('ZMY_PKG')).getResult().value;
 while (status.status === 'R' && Date.now() < deadline) {
   await new Promise((resolve) => setTimeout(resolve, 2000));
   const answer = await abapGit.getRepo('ZMY_PKG');

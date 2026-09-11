@@ -51,7 +51,7 @@ a message is a row inside its class's document, and no endpoint writes one.
   both the returning and the throwing path.
 - `whereUsedReferences` — the reference-list shape the old walker returned,
   offered by name rather than imposed. Not a default.
-- `getTableColumns`, `getActivationResults`, `extractRunId`,
+- `getTableColumns`, `getActivationRun`, `getActivationResults`, `extractRunId`,
   `AdtAtc.resolveCheckVariant`, `AdtAtc.createWorklist`, `AdtAtc.startRun` — the
   steps promoted so a caller can compose what the removed members joined.
 - `pullLink` on `IAbapGitRepoStatus`, because a caller who cannot see it cannot

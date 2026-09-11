@@ -167,7 +167,7 @@ for the empty root; that distinction is now yours to make, on the body.
 | `AdtClass.updateTestClasses` | `lock`, `getLocalTestClass().update(config, { lockHandle })`, `unlock` |
 | `updateClassWithCheck` | `check`, then `update` |
 | `AdtAtc.run` | `resolveCheckVariant`, `createWorklist`, `startRun(worklistId, …)` |
-| the wait inside `activateObjectsGroup` | it is the POST; `extractRunId` reads the run id from `Location`, `getActivationResults(runId)` fetches them |
+| the wait inside `activateObjectsGroup` | it is the POST; `extractRunId` reads the run id from `Location`, `getActivationRun(runId, { withLongPolling: true })` says what it is doing, `getActivationResults(runId)` fetches them |
 | `runWithProfiling` | `scheduleTrace`, then `runWithProfiler(target, { profilerId })` |
 | the wait inside `AdtAbapGitClient.pull` | `listRepos` for the link, `pull({ package, pullLink })`, then poll `getRepo` |
 | the metadata read inside `getTableContents` | `getTableColumns(name)`, then `getTableContents({ …, sql_query })` |
@@ -188,8 +188,10 @@ const repos = await abapGit.listRepos();
 const repo = repos.getResult().value.find((r) => r.package === 'ZPKG');
 await abapGit.pull({ package: 'ZPKG', pullLink: repo.pullLink });
 
+// Read once before testing the condition: `repo` was fetched before the POST,
+// so its status says nothing about this pull.
 const deadline = Date.now() + 600_000;
-let status = repo;
+let status = (await abapGit.getRepo('ZPKG')).getResult().value;
 while (status.status === 'R' && Date.now() < deadline) {
   await new Promise((r) => setTimeout(r, 5_000));
   status = (await abapGit.getRepo('ZPKG')).getResult().value;

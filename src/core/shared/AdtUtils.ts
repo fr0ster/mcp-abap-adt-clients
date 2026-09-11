@@ -97,7 +97,11 @@ import { getTimeout } from '../../utils/timeouts';
 import { getAllTypes as getAllTypesUtil } from './allTypes';
 import { getDiscovery as getDiscoveryUtil } from './discovery';
 import { fetchInactiveObjects } from './getInactiveObjects';
-import { activateObjectsGroup, getActivationResults } from './groupActivation';
+import {
+  activateObjectsGroup,
+  getActivationResults,
+  getActivationRun,
+} from './groupActivation';
 import { checkDeletionGroup, deleteObjectsGroup } from './groupDeletion';
 import { getInclude as getIncludeUtil } from './include';
 import { fetchNodeStructure as fetchNodeStructureUtil } from './nodeStructure';
@@ -431,6 +435,24 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    * to wait before asking for the results is the caller's decision, which is
    * why this is a separate member rather than a step inside that one.
    */
+  /**
+   * What an activation run is doing — `/activation/runs/{runId}`.
+   *
+   * One request. `withLongPolling` holds it open on the server rather than
+   * answering immediately, so a caller waits without a tight loop. What the
+   * document's `runs:status` means — and which value ends their wait — is
+   * theirs to read.
+   */
+  async getActivationRun(
+    runId: string,
+    options?: { withLongPolling?: boolean },
+  ): Promise<IAdtResponse<string>> {
+    return answering(
+      () => getActivationRun(this.connection, runId, options),
+      rawDocument,
+    );
+  }
+
   async getActivationResults(runId: string): Promise<IAdtResponse<string>> {
     return answering(
       () => getActivationResults(this.connection, runId),

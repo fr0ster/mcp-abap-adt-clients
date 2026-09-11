@@ -154,14 +154,21 @@ describe('AbapGit (standalone AdtAbapGitClient)', () => {
         'pull',
       );
 
-      const deadline = Date.now() + 300_000;
-      let status = repo;
-      while (status.status === 'R' && Date.now() < deadline) {
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-        status = expectResult(
+      // The first read is unconditional. `repo` was fetched *before* the POST,
+      // so its status says nothing about this pull — starting the loop on it
+      // would skip the wait entirely and let `unlink` run against a job still
+      // in progress.
+      const readStatus = async () =>
+        expectResult(
           await abapGit.getRepo(flowCaseDef.params.package),
           'repository status',
         ) as typeof repo;
+
+      const deadline = Date.now() + 300_000;
+      let status = await readStatus();
+      while (status.status === 'R' && Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        status = await readStatus();
       }
       expect(status.status).not.toBe('R');
 
