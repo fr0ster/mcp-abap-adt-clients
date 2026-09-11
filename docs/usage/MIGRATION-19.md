@@ -185,6 +185,14 @@ continue the sequence take an id. `activationRunId` is that reading and
 `extractRunId` reads a `Location` value directly, both exported, for a caller
 whose own reading keeps the exchange instead.
 
+**If you read the activated objects straight after, you now race them.**
+`activateObjectsGroup` used to return only once the run had finished, so code
+that activated and then read the active version worked by accident of the wait.
+It is the POST alone now. `src/__tests__/helpers/activationRun.ts` in this
+repository is the wait written out — start, poll `getActivationRun` with
+`withLongPolling` until the status leaves `running`, then read the results — and
+is the shortest migration to copy.
+
 **`pull` waited on a job it could not stop.** The `AbortSignal` you passed
 aborted this client's own `sleep`, never the server's work. Written in your own
 loop, that is visible instead of explained.

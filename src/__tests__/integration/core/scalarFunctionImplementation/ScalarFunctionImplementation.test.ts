@@ -24,6 +24,7 @@ import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import { orThrow } from '../../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { activateAndWait } from '../../../helpers/activationRun';
 import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
@@ -297,13 +298,17 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
             await dsfi.unlock({ implementationName: implName }, implLock);
           }
 
-          // 4) Group-activate the trio (synchronous).
-          await orThrow(
-            client.getUtils().activateObjectsGroup([
+          // 4) Group-activate the trio, and wait for it. The member starts
+          // the run and answers its id since 19.0.0 — reading the active source
+          // straight after the POST would read whatever was there before.
+          await activateAndWait(
+            client,
+            [
               { type: 'DSFD/SCF', name: funcName },
               { type: 'CLAS/OC', name: amdpName },
               { type: 'DSFI/SFI', name: implName },
-            ]),
+            ],
+            { logger: testsLogger },
           );
 
           // 5) Read implementation source (JSON) — must contain the amdpReference.

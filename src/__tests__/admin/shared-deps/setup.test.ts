@@ -19,6 +19,7 @@ import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
 import { orThrow } from '../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
+import { activateAndWait } from '../../helpers/activationRun';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -244,10 +245,17 @@ describe('Admin: Setup shared dependencies', () => {
           `Group activating ${groupActivationObjects.length} objects: ${groupActivationObjects.map((o) => `${o.type}:${o.name}`).join(', ')}`,
         );
         try {
-          await orThrow(
-            client.getUtils().activateObjectsGroup(groupActivationObjects),
+          // Start, wait, read. Since 19.0.0 the member is the POST alone, and
+          // setup that carried on after it would build the next object against
+          // a system still activating the last one.
+          const activation = await activateAndWait(
+            client,
+            groupActivationObjects,
+            { logger: testsLogger },
           );
-          testsLogger.info('Group activation completed successfully');
+          testsLogger.info(
+            `Group activation run ${activation.runId} ended as ${activation.status}`,
+          );
         } catch (error) {
           const msg = error instanceof Error ? error.message : String(error);
           testsLogger.error(`Group activation failed: ${msg}`);
@@ -311,11 +319,14 @@ describe('Admin: Setup shared dependencies', () => {
           `Still inactive, activating: ${firstPass.map((o) => `${o.type}:${o.name}`).join(', ')}`,
         );
         try {
-          await client
-            .getUtils()
-            .activateObjectsGroup(
-              firstPass.map((o) => ({ type: o.type, name: o.name })),
-            );
+          // Waited for, because the inactive list is read immediately below:
+          // asking what is still inactive while the activation is running
+          // answers about the moment before it.
+          await activateAndWait(
+            client,
+            firstPass.map((o) => ({ type: o.type, name: o.name })),
+            { logger: testsLogger },
+          );
         } catch (error) {
           const msg = error instanceof Error ? error.message : String(error);
           testsLogger.error(`Closing activation failed: ${msg}`);
