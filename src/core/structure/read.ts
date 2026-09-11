@@ -11,6 +11,7 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
 import { noopLogger } from '../../utils/noopLogger';
 import { getTimeout } from '../../utils/timeouts';
 import { AdtUtils } from '../shared/AdtUtils';
+import { objectMetadataWire, objectSourceWire } from '../shared/objectWire';
 import type { IReadOptions } from '../shared/types';
 
 function getUtils(connection: IAbapConnection): AdtUtils {
@@ -25,7 +26,8 @@ export async function getStructureMetadata(
   structureName: string,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  return getUtils(connection).objectMetadataWire(
+  return objectMetadataWire(
+    connection,
     'structure',
     structureName,
     undefined,
@@ -42,7 +44,8 @@ export async function getStructureSource(
   version?: 'active' | 'inactive',
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  return getUtils(connection).objectSourceWire(
+  return objectSourceWire(
+    connection,
     'structure',
     structureName,
     undefined,
