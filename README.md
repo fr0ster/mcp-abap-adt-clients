@@ -392,11 +392,16 @@ await client.getClass().unlock({ className: 'ZCL_TEST' }, handle);
 ```
 
 Watch the read. ADT answers a read of a not-yet-ready object with **HTTP 200 and
-an empty body**, never a 404, and an empty document written back replaces the
-object with nothing. Nothing in this package checks that for you any more; a
-caller who edits what they read should confirm they read something.
+an empty body**, never a 404, so what you edit may be nothing at all.
 
-Full detail: [`docs/usage/MIGRATION-19.md`](docs/usage/MIGRATION-19.md).
+This package does not check what you pass, and cannot: whether a document is
+complete is a question only your system can answer, and it answers it — in its
+own words, on the write. That is why the rule above is worth knowing rather than
+relying on being caught.
+
+Full detail: [`docs/usage/MIGRATION-19.md`](docs/usage/MIGRATION-19.md). Every
+sequence 19.0.0 handed back to the consumer is written out under
+[`examples/`](examples), one file per removed member.
 
 ### Creating Behavior Implementation Classes
 

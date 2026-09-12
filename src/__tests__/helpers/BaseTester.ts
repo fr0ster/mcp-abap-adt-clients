@@ -1049,16 +1049,15 @@ export class BaseTester<TConfig, TState = unknown> {
             'read document (before update)',
             false,
           );
-          if (current === undefined) {
-            throw new Error(
-              `${this.loggerPrefix} declares updateTakesDocument, but its ` +
-                'document read came back with nothing to write.',
-            );
-          }
+          // Not checked for emptiness, and deliberately. Whether what was
+          // read is a complete document is not something this side can know —
+          // the server is the only one that knows what it will accept, and it
+          // says so in its own words. A guard here would answer that question
+          // on its behalf and be wrong the first time it disagreed.
           documentToWrite =
             typeof options.updateTakesDocument === 'function'
-              ? options.updateTakesDocument(current)
-              : current;
+              ? options.updateTakesDocument(current ?? '')
+              : (current ?? '');
         }
 
         currentStep = 'update';

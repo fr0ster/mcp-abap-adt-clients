@@ -558,8 +558,11 @@ document that happens to say less, and the object becomes what you sent. Only an
 *empty* body draws a `400`. This is the failure mode to watch for when porting
 from 18.x.
 
-**Validity is yours to guarantee.** This package does not know what your system
-will accept, and does not inspect what you pass.
+**Validity is yours to guarantee, and the server's to rule on.** This package
+does not inspect what you pass and could not usefully: whether a document is
+complete depends on what your system accepts, which is a question it answers
+itself, on the write, in its own words. So there is no guard here to catch a
+short document — which is exactly why a caller has to know the rule.
 
 One read-modify-write stays, and it is the one no endpoint can replace:
 `AdtMessageClassMessage` writes a message that is a row inside its class's

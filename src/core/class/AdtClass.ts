@@ -324,11 +324,11 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
     const version: 'active' | 'inactive' =
       status === 'active' ? 'active' : 'inactive';
 
-    // No parse-and-throw on `has_errors`. A `<msg type="E">` inside a 200 is a
-    // refusal, and recognising it is the error strategy's job — done once, on
-    // the connection, for every member — rather than this member's, done again
-    // and differently. A caller who reads check messages some other way says so
-    // through `analyse`.
+    // No parse-and-throw on `has_errors`. The report comes back whatever it
+    // says, because a check that finds a syntax error is a check that worked —
+    // and throwing cost the findings, the line numbers and the T100 keys.
+    // Whether a message means "do not write" is the caller's, through
+    // `analyse`; no error strategy ships from this package.
     return answering(
       () =>
         checkClass(

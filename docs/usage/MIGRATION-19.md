@@ -157,6 +157,10 @@ the order ADT's own client uses; the package performs none of these steps for
 you, and the only one it ever performed — the read, inside those six updates —
 is what 19.0.0 removed.
 
+Every removed member is written out in full under [`examples/`](../../examples),
+one file each, so "the consumer does it now" names specific calls in a specific
+order rather than leaving you to reconstruct them.
+
 **A partial update never existed for source, and no longer exists for
 documents.** The fields beside `document` describe a create; on an update they
 are not sent. Guaranteeing the content is valid is yours, which is the point:
