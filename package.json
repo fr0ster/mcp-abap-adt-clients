@@ -111,7 +111,8 @@
     "check:config": "node scripts/check-config-drift.js",
     "corpus:capture": "npx ts-node scripts/capture-adt-corpus.ts",
     "build:packages": "npm run build --workspaces --if-present",
-    "test:packages": "npm test --workspaces --if-present"
+    "test:packages": "npm test --workspaces --if-present",
+    "release:publish": "bash scripts/publish-changed.sh"
   },
   "engines": {
     "node": ">=18.0.0"

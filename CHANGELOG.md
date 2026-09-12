@@ -14,6 +14,10 @@ package together can have one; this one cannot. Tags follow the same rule:
 `v<version>` is `adt-clients`', `adt-strategies@<version>` is the other's.
 
 When `adt-clients` moves into `packages/`, this file goes with it.
+
+Releases go out with `npm run release:publish`, which publishes only the
+packages whose version is missing from the registry — the same consequence of
+independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
