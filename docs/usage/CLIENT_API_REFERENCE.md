@@ -696,6 +696,12 @@ the interface each satisfies (`IClassResults`, …). The three building blocks a
 `rawDocument` (the body as it arrived), `nothing` (for a member ADT answers with
 nothing worth reading, such as an unlock) and `wireItself`.
 
+**A set covers every member that makes a request.** `utilDocuments` is the
+largest, at twenty slots — one for each member of `AdtUtils` that reaches ADT.
+The three that reach nothing (`modifyWhereUsedScope`, `supportsSourceCode`,
+`getObjectSourceUri`) have no slot, because a strategy reads an answer and they
+have none.
+
 **Chosen once, not per call.** That fits how these consumers work: a backup tool
 wants documents whole for everything it touches, a script wants two fields from
 every read, an MCP server picks by what its model is about to do — and none of

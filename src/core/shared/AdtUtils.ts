@@ -92,7 +92,6 @@ import { answering, answeringValue } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { withRequestTrace } from '../../utils/requestTrace';
-import { rawDocument } from '../../utils/resultStrategy';
 import { getTimeout } from '../../utils/timeouts';
 import { getAllTypes as getAllTypesUtil } from './allTypes';
 import { getDiscovery as getDiscoveryUtil } from './discovery';
@@ -118,7 +117,6 @@ import {
 import { searchObjects } from './search';
 import { getSqlQuery } from './sqlQuery';
 import { getTableColumns, getTableContents } from './tableContents';
-import { activationRunId } from './utilResults';
 import { getVirtualFoldersContents } from './virtualFolders';
 import {
   assertWhereUsedTarget,
@@ -193,24 +191,45 @@ import { type IUtilResults, utilDocuments } from './utilResultSet';
  *
  * And it said a caller who needs another shape "passes a parser" to the sibling.
  * The parser overloads went in 30.0.0, when the reading became something
- * injected once rather than passed per call. There is no way to ask for another
- * shape from these members today: `IUtilResults` carries readings for `search`,
- * `types` and `node` only, and the package, where-used and inactive-object
- * members build their value from several requests through `answeringValue`,
- * which no strategy sees.
+ * injected once rather than passed per call — and since 19.0.0 there is nothing
+ * left that a reading cannot reach. Every member below that makes a request
+ * takes its shape from a slot of `IUtilResults`, all twenty of them. The three
+ * that take none — `modifyWhereUsedScope`, `supportsSourceCode` and
+ * `getObjectSourceUri` — make no request, so there is no answer for a strategy
+ * to read.
  */
 export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
   implements
     IAdtInformationSystem<
       ReturnType<R['search']>,
       ReturnType<R['whereUsed']>,
+      ReturnType<R['whereUsedScope']>,
+      ReturnType<R['folders']>,
       ReturnType<R['types']>
     >,
-    IAdtRepositoryStructure<ReturnType<R['node']>>,
-    IAdtGroupLifecycle<ReturnType<R['inactive']>>,
-    IAdtDataPreview,
-    IAdtDiscovery,
-    IAdtObjectAccess
+    IAdtRepositoryStructure<
+      ReturnType<R['node']>,
+      ReturnType<R['objectStructure']>
+    >,
+    IAdtGroupLifecycle<
+      ReturnType<R['inactive']>,
+      ReturnType<R['activation']>,
+      ReturnType<R['run']>,
+      ReturnType<R['results']>,
+      ReturnType<R['deletionCheck']>,
+      ReturnType<R['deletion']>
+    >,
+    IAdtDataPreview<
+      ReturnType<R['query']>,
+      ReturnType<R['columns']>,
+      ReturnType<R['contents']>
+    >,
+    IAdtDiscovery<ReturnType<R['discovery']>>,
+    IAdtObjectAccess<
+      ReturnType<R['source']>,
+      ReturnType<R['metadata']>,
+      ReturnType<R['include']>
+    >
 {
   protected connection: IAbapConnection;
   private logger: ILogger;
@@ -219,7 +238,7 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
     connection: IAbapConnection,
     logger: ILogger,
     // The one cast in this file, and it is on the default. See AdtClass.
-    private readonly results: R = utilDocuments as unknown as R,
+    protected readonly results: R = utilDocuments as unknown as R,
   ) {
     // Wrapped once, here, where a connection enters the library. The wrapper
     // puts the request back on the answer and reads nothing: what a body means
@@ -263,10 +282,10 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    */
   async getVirtualFoldersContents(
     params: IGetVirtualFoldersContentsParams,
-  ): Promise<IAdtResponse<string>> {
+  ): Promise<IAdtResponse<ReturnType<R['folders']>>> {
     return answering(
       () => getVirtualFoldersContents(this.connection, params),
-      rawDocument,
+      this.results.folders as IResultStrategy<ReturnType<R['folders']>>,
     );
   }
 
@@ -304,7 +323,7 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    */
   async getWhereUsedScope(
     params: IGetWhereUsedScopeParams,
-  ): Promise<IAdtResponse<string>> {
+  ): Promise<IAdtResponse<ReturnType<R['whereUsedScope']>>> {
     // Before `answering`, not inside the request: a missing name is the
     // caller's mistake, and classified inside it comes back as
     // `origin: 'connection'` — advice to check a network nothing reached.
@@ -312,7 +331,9 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
 
     return answering(
       () => getWhereUsedScope(this.connection, params),
-      rawDocument,
+      this.results.whereUsedScope as IResultStrategy<
+        ReturnType<R['whereUsedScope']>
+      >,
     );
   }
 
@@ -434,18 +455,18 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    * that continue the sequence — {@link getActivationRun} and
    * {@link getActivationResults} — take an id.
    *
-   * `activationRunId` is that reading, exported for a caller who keeps the
-   * exchange with `wireItself` and pulls the id out later; `extractRunId` reads
-   * a `Location` value directly. The contract pins this member's result to a
-   * string, so the reading is not one of the injectable set.
+   * `activationRunId` is the **default** for the `activation` slot, and it is
+   * exported: a caller who keeps the exchange passes `wireItself` instead and
+   * pulls the id out later, and `extractRunId` reads a `Location` value
+   * directly.
    */
   async activateObjectsGroup(
     objects: IObjectReference[],
     preauditRequested: boolean = false,
-  ): Promise<IAdtResponse<string>> {
+  ): Promise<IAdtResponse<ReturnType<R['activation']>>> {
     return answering(
       () => activateObjectsGroup(this.connection, objects, preauditRequested),
-      activationRunId,
+      this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
     );
   }
 
@@ -468,17 +489,19 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
   async getActivationRun(
     runId: string,
     options?: { withLongPolling?: boolean },
-  ): Promise<IAdtResponse<string>> {
+  ): Promise<IAdtResponse<ReturnType<R['run']>>> {
     return answering(
       () => getActivationRun(this.connection, runId, options),
-      rawDocument,
+      this.results.run as IResultStrategy<ReturnType<R['run']>>,
     );
   }
 
-  async getActivationResults(runId: string): Promise<IAdtResponse<string>> {
+  async getActivationResults(
+    runId: string,
+  ): Promise<IAdtResponse<ReturnType<R['results']>>> {
     return answering(
       () => getActivationResults(this.connection, runId),
-      rawDocument,
+      this.results.results as IResultStrategy<ReturnType<R['results']>>,
     );
   }
 
@@ -490,10 +513,12 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    */
   async checkDeletionGroup(
     objects: IObjectReference[],
-  ): Promise<IAdtResponse<string>> {
+  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>>> {
     return answering(
       () => checkDeletionGroup(this.connection, objects),
-      rawDocument,
+      this.results.deletionCheck as IResultStrategy<
+        ReturnType<R['deletionCheck']>
+      >,
     );
   }
 
@@ -507,10 +532,10 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
   async deleteObjectsGroup(
     objects: IObjectReference[],
     transportRequest?: string,
-  ): Promise<IAdtResponse<string>> {
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>>> {
     return answering(
       () => deleteObjectsGroup(this.connection, objects, transportRequest),
-      rawDocument,
+      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
     );
   }
 
@@ -530,7 +555,7 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
     objectName: string,
     functionGroup?: string,
     options?: IReadOptions,
-  ): Promise<IAdtResponse<string>> {
+  ): Promise<IAdtResponse<ReturnType<R['metadata']>>> {
     // Built here, not inside the request: `getObjectMetadataUri` refuses a type
     // it has no resource for, and that is the caller's mistake. Classified
     // inside `answering` it would come back as `origin: 'connection'`, pointing
@@ -546,7 +571,7 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
           functionGroup,
           options,
         ),
-      rawDocument,
+      this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
     );
   }
 
@@ -569,7 +594,7 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
     functionGroup?: string,
     version?: 'active' | 'inactive',
     options?: IReadOptions,
-  ): Promise<IAdtResponse<string>> {
+  ): Promise<IAdtResponse<ReturnType<R['source']>>> {
     // Raised before anything is asked, rather than dressed as a verdict about
     // the server: a type with no source resource, and a function module with no
     // function group, are both the caller's mistake. `getObjectSourceUri` is
@@ -593,7 +618,7 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
           version,
           options,
         ),
-      rawDocument,
+      this.results.source as IResultStrategy<ReturnType<R['source']>>,
     );
   }
 
@@ -632,8 +657,13 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    * @param params - SQL query parameters
    * @returns Query result
    */
-  async getSqlQuery(params: IGetSqlQueryParams): Promise<IAdtResponse<string>> {
-    return answering(() => getSqlQuery(this.connection, params), rawDocument);
+  async getSqlQuery(
+    params: IGetSqlQueryParams,
+  ): Promise<IAdtResponse<ReturnType<R['query']>>> {
+    return answering(
+      () => getSqlQuery(this.connection, params),
+      this.results.query as IResultStrategy<ReturnType<R['query']>>,
+    );
   }
 
   /**
@@ -643,10 +673,12 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    * the statement is the caller's, and this is where they learn what they may
    * name in it.
    */
-  async getTableColumns(tableName: string): Promise<IAdtResponse<string>> {
+  async getTableColumns(
+    tableName: string,
+  ): Promise<IAdtResponse<ReturnType<R['columns']>>> {
     return answering(
       () => getTableColumns(this.connection, tableName),
-      rawDocument,
+      this.results.columns as IResultStrategy<ReturnType<R['columns']>>,
     );
   }
 
@@ -659,10 +691,10 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    */
   async getTableContents(
     params: IGetTableContentsParams,
-  ): Promise<IAdtResponse<string>> {
+  ): Promise<IAdtResponse<ReturnType<R['contents']>>> {
     return answering(
       () => getTableContents(this.connection, params),
-      rawDocument,
+      this.results.contents as IResultStrategy<ReturnType<R['contents']>>,
     );
   }
 
@@ -674,10 +706,10 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    */
   async discovery(
     params: IGetDiscoveryParams = {},
-  ): Promise<IAdtResponse<string>> {
+  ): Promise<IAdtResponse<ReturnType<R['discovery']>>> {
     return answering(
       () => getDiscoveryUtil(this.connection, params),
-      rawDocument,
+      this.results.discovery as IResultStrategy<ReturnType<R['discovery']>>,
     );
   }
 
@@ -732,10 +764,12 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
   async getObjectStructure(
     objectType: string,
     objectName: string,
-  ): Promise<IAdtResponse<string>> {
+  ): Promise<IAdtResponse<ReturnType<R['objectStructure']>>> {
     return answering(
       () => getObjectStructureUtil(this.connection, objectType, objectName),
-      rawDocument,
+      this.results.objectStructure as IResultStrategy<
+        ReturnType<R['objectStructure']>
+      >,
     );
   }
 
@@ -753,10 +787,12 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    * const sourceCode = response.data; // Include source code
    * ```
    */
-  async getInclude(includeName: string): Promise<IAdtResponse<string>> {
+  async getInclude(
+    includeName: string,
+  ): Promise<IAdtResponse<ReturnType<R['include']>>> {
     return answering(
       () => getIncludeUtil(this.connection, includeName),
-      rawDocument,
+      this.results.include as IResultStrategy<ReturnType<R['include']>>,
     );
   }
 

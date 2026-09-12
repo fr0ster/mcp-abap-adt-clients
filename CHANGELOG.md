@@ -15,7 +15,7 @@ injected so that decision is theirs. And one member issues one endpoint call,
 because a member that sends several has already chosen an order and cannot be
 given a reading at all — `IResultStrategy` takes one answer.
 
-Needs `@mcp-abap-adt/interfaces` 43.0.0.
+Needs `@mcp-abap-adt/interfaces` 44.0.0.
 
 Full migration: [`docs/usage/MIGRATION-19.md`](docs/usage/MIGRATION-19.md).
 
@@ -86,11 +86,31 @@ a message is a row inside its class's document, and no endpoint writes one.
 - **Notes name no system.** 51 references to the system an observation came from
   are gone across 32 files; the observations and their dates stay.
 
+### Changed — every member of `AdtUtils` takes a reading
+
+`IUtilResults` grew from five slots to twenty: one for each member that makes a
+request.
+
+The fifteen added are not a widening. Those members were typed
+`IAdtResponse<string>` in the contract until `@mcp-abap-adt/interfaces` 44.0.0,
+so the contract had chosen the document and no reading could have been offered
+for them. Now each result is a type parameter, and every one is filled from the
+injected set:
+
+`whereUsedScope`, `folders`, `objectStructure`, `activation`, `run`, `results`,
+`deletionCheck`, `deletion`, `query`, `columns`, `contents`, `discovery`,
+`source`, `metadata`, `include`.
+
+`modifyWhereUsedScope`, `supportsSourceCode` and `getObjectSourceUri` take none
+and never will: they make no request, so there is no answer for a strategy to
+read.
+
 ### Unchanged
 
-Result strategies. `rawDocument` is still the default reading everywhere it was,
-so no member's return type moved, and `wireItself` still hands back the whole
-exchange.
+**No member answers differently.** Every one of the fifteen new slots defaults
+to the shape that member already produced — `rawDocument` for fourteen of them,
+and `activationRunId` for `activateObjectsGroup`, which is what it already
+applied. `wireItself` still hands back the whole exchange.
 
 ## [18.0.2] - 2026-09-08
 

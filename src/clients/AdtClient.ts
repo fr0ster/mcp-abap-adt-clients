@@ -2010,13 +2010,33 @@ export class AdtClient {
   ): IAdtInformationSystem<
     ReturnType<R['search']>,
     ReturnType<R['whereUsed']>,
+    ReturnType<R['whereUsedScope']>,
+    ReturnType<R['folders']>,
     ReturnType<R['types']>
   > &
-    IAdtRepositoryStructure<ReturnType<R['node']>> &
-    IAdtGroupLifecycle<ReturnType<R['inactive']>> &
-    IAdtDataPreview &
-    IAdtDiscovery &
-    IAdtObjectAccess;
+    IAdtRepositoryStructure<
+      ReturnType<R['node']>,
+      ReturnType<R['objectStructure']>
+    > &
+    IAdtGroupLifecycle<
+      ReturnType<R['inactive']>,
+      ReturnType<R['activation']>,
+      ReturnType<R['run']>,
+      ReturnType<R['results']>,
+      ReturnType<R['deletionCheck']>,
+      ReturnType<R['deletion']>
+    > &
+    IAdtDataPreview<
+      ReturnType<R['query']>,
+      ReturnType<R['columns']>,
+      ReturnType<R['contents']>
+    > &
+    IAdtDiscovery<ReturnType<R['discovery']>> &
+    IAdtObjectAccess<
+      ReturnType<R['source']>,
+      ReturnType<R['metadata']>,
+      ReturnType<R['include']>
+    >;
   getUtils<R extends IUtilResults = typeof utilDocuments>(
     results: R = utilDocuments as unknown as R,
   ): AdtUtils<R> {

@@ -18,7 +18,7 @@ Nothing changes silently. Every item below is a name that no longer exports, a
 call that now returns where it used to throw, or a signature the compiler will
 stop you on.
 
-It needs `@mcp-abap-adt/interfaces` 43.0.0, whose own migration is in its
+It needs `@mcp-abap-adt/interfaces` 44.0.0, whose own migration is in its
 CHANGELOG.
 
 ---
@@ -271,7 +271,58 @@ through the package, so it answers "Object does not exist" while the name stays
 taken for good, and clearing it is SAP GUI territory. Twenty-five handlers guard it, and the guard throws before any request. A package is not among them: what
 binds a package is `superPackage`, and a top-level package has none.
 
-## 10. What did not move
+## 10. Every member of `AdtUtils` now takes a reading
+
+`IUtilResults` had five slots. It has twenty — one for each member that makes a
+request.
+
+The fifteen that were added are not a widening. Those members were typed
+`IAdtResponse<string>` in the contract, so the *contract* had chosen the
+document and a reading could not have been offered for them at all. 44.0.0 of
+`@mcp-abap-adt/interfaces` made each result a type parameter, and this fills
+every one in.
+
+| slot | member | shipped default |
+|---|---|---|
+| `search` | `search` | the hits |
+| `whereUsed` | `getWhereUsed` | the document |
+| `whereUsedScope` | `getWhereUsedScope` | the document |
+| `folders` | `getVirtualFoldersContents` | the document |
+| `types` | `getAllTypes` | the named items |
+| `node` | `fetchNodeStructure` | the node contents |
+| `objectStructure` | `getObjectStructure` | the document |
+| `inactive` | `getInactiveObjects` | the object list |
+| `activation` | `activateObjectsGroup` | the **run id** |
+| `run` | `getActivationRun` | the document |
+| `results` | `getActivationResults` | the document |
+| `deletionCheck` | `checkDeletionGroup` | the document |
+| `deletion` | `deleteObjectsGroup` | the document |
+| `query` | `getSqlQuery` | the document |
+| `columns` | `getTableColumns` | the document |
+| `contents` | `getTableContents` | the document |
+| `discovery` | `discovery` | the document |
+| `source` | `readObjectSource` | the document |
+| `metadata` | `readObjectMetadata` | the document |
+| `include` | `getInclude` | the document |
+
+**Nothing you call answers differently.** Every default is the shape that member
+already produced. What changed is that you can now replace any of them:
+
+```typescript
+const utils = client.getUtils({
+  ...utilDocuments,
+  contents: (answer) => myRowParser(String(answer.data)),
+});
+
+const rows = (await utils.getTableContents(params)).getResult(); // MyRow[]
+```
+
+Three members take no reading and never will — `modifyWhereUsedScope` edits a
+document you handed it, `supportsSourceCode` answers from a table in this
+package, and `getObjectSourceUri` builds an address. None of them has an answer
+to read.
+
+## 11. What did not move
 
 Result strategies. `rawDocument` is still the default reading everywhere it was,
 so no member's return type changed, and `wireItself` still hands back the whole
