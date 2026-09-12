@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Publish the packages in this repository whose version is not yet on npm.
 #
-#   npm run release:publish            # publish what is missing
-#   npm run release:publish -- --dry   # say what would be published, touch nothing
+#   npm run release:publish                  # publish what is missing
+#   npm run release:publish -- --dry         # say what would be published, touch nothing
+#   npm run release:publish -- --otp 123456  # with a one-time password
 #
 # **"Changed" is read from the registry, not from git.** A package is published
 # when its declared version is absent from npm, and skipped when it is there.
@@ -15,14 +16,34 @@
 # subset rather than everything, which is what a repository that bumps all its
 # packages together would do.
 #
-# On the first `npm publish` a browser window opens for 2FA. Tick "trust this
-# device for 5 minutes" and the rest of the run goes through without prompting.
+# **Two-factor authentication.** npm asks for a one-time password on publish. It
+# normally opens a browser and waits, but that needs a terminal it can take over,
+# and it does not always get one from inside a script — the failure is `EOTP`,
+# with a URL printed and no wait. Two ways through:
+#
+#   npm run release:publish -- --otp 123456    # a code from your authenticator
+#   npm publish --workspace @mcp-abap-adt/adt-strategies --access public
+#
+# The second runs npm directly, where the browser flow works. An automation
+# token (npmjs.com → Access Tokens → Granular, "Automation") skips the prompt
+# altogether and is what CI would use.
 set -uo pipefail
 
 cd "$(dirname "$0")/.."
 
 DRY=0
-[ "${1:-}" = "--dry" ] && DRY=1
+OTP=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --dry) DRY=1; shift ;;
+    --otp) OTP="${2:-}"; shift 2 ;;
+    --otp=*) OTP="${1#--otp=}"; shift ;;
+    *) echo "unknown argument: $1" >&2; exit 2 ;;
+  esac
+done
+
+OTP_ARGS=""
+[ -n "$OTP" ] && OTP_ARGS="--otp $OTP"
 
 # Every package — the root one, which still lives here, plus each workspace —
 # in dependency order. The order is derived, not listed: a package that depends
@@ -97,13 +118,20 @@ while IFS='|' read -r name dir; do
   # a dependency that never made it, and an unusable release set is worse than
   # a partial one you know about.
   if [ "$dir" = "." ]; then
-    npm publish --access public
+    # shellcheck disable=SC2086
+    npm publish --access public $OTP_ARGS
   else
-    npm publish --workspace "$name" --access public
+    # shellcheck disable=SC2086
+    npm publish --workspace "$name" --access public $OTP_ARGS
   fi
-  if [ "$?" -ne 0 ]; then
+  status=$?
+  if [ "$status" -ne 0 ]; then
     echo "!!! $name@$version failed to publish — stopping here." >&2
     echo "    Published so far: $PUBLISHED. Nothing after this was attempted." >&2
+    if [ -z "$OTP" ]; then
+      echo "    If that was EOTP, npm wanted a one-time password:" >&2
+      echo "      npm run release:publish -- --otp <code>" >&2
+    fi
     exit 1
   fi
   PUBLISHED=$((PUBLISHED + 1))
