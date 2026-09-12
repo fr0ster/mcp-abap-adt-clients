@@ -88,6 +88,15 @@ a message is a row inside its class's document, and no endpoint writes one.
   contract promises an `IAdtResponse`. **One stays**, on the `create` of the 25
   handlers whose object lives in a package: an object created without one cannot
   be removed through ADT at all.
+- **Three validations stop reading a status.** `metadataExtension` and
+  `behaviorImplementation` caught a `400` and handed the response back as a
+  success; `behaviorDefinition` replaced the error with a sentence this package
+  invented, losing the response. All three now let the exchange through as it
+  came. One status cannot be the rule: recorded in `corpus/adt/`, a name already
+  taken answers `400` with an `exc:exception` for a class, a domain and a table,
+  and `200` with `<SEVERITY>ERROR</SEVERITY>` for a DDL source and a function
+  group. A caller who reads a taken name as a success says so in `analyse`,
+  which receives the document either way.
 - **Notes name no system.** 51 references to the system an observation came from
   are gone across 32 files; the observations and their dates stay.
 
