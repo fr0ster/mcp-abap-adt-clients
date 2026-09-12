@@ -14,11 +14,17 @@ Which leaves a real gap for anyone who has no opinion yet. This package fills
 it — with an opinion, stated as one, and built from evidence rather than taste.
 
 ```typescript
-import { adtRefusal } from '@mcp-abap-adt/adt-strategies';
+import { analyseActivation, asItCame } from '@mcp-abap-adt/adt-strategies';
 
 const answer = await client
   .getClass()
-  .activate({ className: 'ZCL_X' }, { analyse: adtRefusal });
+  .activate({ className: 'ZCL_X' }, { analyse: analyseActivation });
+
+if (!answer.ok) {
+  for (const message of answer.getError().messages) {
+    console.error(`[${message.type}] ${message.text}`);
+  }
+}
 ```
 
 ## Why it cannot be one rule
@@ -43,26 +49,38 @@ misses the first of them silently and reports a taken name as free.
 
 ## What is in it
 
-Six shapes, each reading one document form, none reading the status:
+**The error axis**, which is almost all of it. One strategy per document form —
+`analyseActivation`, `analyseCheck`, `analyseDeletion`, `analyseValidation`,
+`analyseUnitTest`, `analyseException` — and `analyseAny`, which dispatches on
+the root element when the form is not known in advance.
 
-`activationRefusal`, `checkRunRefusal`, `deletionRefusal`,
-`deletionCheckRefusal`, `validationRefusal`, `exceptionRefusal`.
+Each answers an `IAdtMessageFailure`: the contract's `IAdtError` plus every
+message in the document, normalised. SAP spells severity three ways and carries
+a T100 key in exactly one of the forms; the reading flattens that so a caller
+matching on `type === 'E'` does not have to know which carrier they got.
 
-`adtRefusal` composes all six, exception last. `firstOf(...)` composes your own.
-`nothingIsARefusal` turns judgement off.
+The readings underneath are exported too — `readActivationRefusal` and its
+siblings, pure functions over a document — for a caller assembling their own
+strategy rather than taking one.
+
+**The result axis has exactly one member**, `asItCame`: the answer unchanged,
+XML or ABAP text alike. Shaping a result is the consumer's decision — which
+fields, to what end — and there is no defensible default for it. The absence of
+shaping is the only one.
 
 ## How the defaults are justified
 
-Every shape is tested against the recorded answer it was derived from **and**
+Every strategy is tested against the recorded answer it was derived from **and**
 against the recorded success it must be told apart from. That pairing is the
-point: on most of these endpoints the refusal and the success share a status,
-so a shape that fires on both would look correct and recognise nothing.
+point: on most of these endpoints the refusal and the success share a status, so
+a reading that fires on both would look correct and recognise nothing.
 
-The tests need no SAP system. They read files.
+Forty tests, no SAP system. The corpus is the fixture.
 
-One row of the test table was wrong when it was first written — a table was
-listed under `validationRefusal`, and the corpus rejected it on the first run.
-That is the argument for this package in one line.
+One row of the table was wrong when it was first written — a table was listed
+under validation, and the corpus rejected it on the first run: a table answers
+`400` with an exception document, not `<SEVERITY>ERROR</SEVERITY>`. That is the
+argument for this package in one line.
 
 ## Licence
 

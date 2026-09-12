@@ -113,10 +113,10 @@ use. Reading this package's source will tell you what it does; it will not tell
 you what your server says.
 
 **If you have no opinion yet**, `@mcp-abap-adt/adt-strategies` has one. It lives
-in this repository under `packages/adt-strategies`, ships six shapes derived
-from the recordings above, and each one is tested against the refusal it came
-from *and* the success it has to be told apart from. Take it, or take `firstOf`
-and assemble your own.
+in this repository under `packages/adt-strategies`: one failure strategy per
+document form above, each tested against the refusal it came from *and* the
+success it has to be told apart from, plus `asItCame` for the result axis. It
+collects error strategies and nothing else — shaping a result is yours.
 
 ## See also
 

@@ -3,34 +3,52 @@
  *
  * That package returns the contract and reads nothing into it: whether an
  * answer is a failure is a decision it refuses to take on your behalf, because
- * it depends on which types you touch and what you were doing.
+ * it depends on which object types you touch and what you were doing. This
+ * package takes that decision, for the common case, from evidence.
  *
- * This package takes that decision, for the common case, from evidence. Every
- * shape here is derived from a recorded answer in `corpus/adt/` at the root of
- * this repository, and every one is tested against those files — so a default
- * is a reading of something the server actually sent, not a guess that compiles.
+ * **Almost everything here is on the error axis, and that is deliberate.**
+ * Shaping a *result* is the consumer's — which fields, to what end — and there
+ * is no defensible default. The single exception is `asItCame`, the absence of
+ * shaping.
  *
  * ```typescript
- * import { adtRefusal } from '@mcp-abap-adt/adt-strategies';
+ * import { analyseActivation, asItCame } from '@mcp-abap-adt/adt-strategies';
  *
- * await client.getClass().activate({ className: 'ZCL_X' }, { analyse: adtRefusal });
+ * const utils = client.getUtils({ ...utilDocuments, metadata: asItCame });
+ * await client.getClass().activate({ className: 'ZCL_X' }, { analyse: analyseActivation });
  * ```
  *
- * Swap any part of it with `firstOf`.
+ * Every reading is tested against the recorded answers in `corpus/adt/` at the
+ * root of this repository — against the refusal it came from, and against the
+ * success it has to be told apart from.
  */
 
+// The error axis: a strategy per form, and one that dispatches.
 export {
-  adtRefusal,
-  firstOf,
-  nothingIsARefusal,
-  type RefusalShape,
-} from './refusals/compose';
+  analyseActivation,
+  analyseAny,
+  analyseCheck,
+  analyseDeletion,
+  analyseException,
+  analyseUnitTest,
+  analyseValidation,
+  type IAdtMessageFailure,
+} from './refusals/analyse';
+
+// The readings underneath them — pure functions over a document, for a caller
+// composing their own strategy rather than taking one.
 export {
-  activationRefusal,
-  bodyOf,
-  checkRunRefusal,
-  deletionCheckRefusal,
-  deletionRefusal,
-  exceptionRefusal,
-  validationRefusal,
-} from './refusals/shapes';
+  type AdtMessage,
+  type AdtRefusal,
+  isIndeterminateWalkAnswer,
+  readActivationRefusal,
+  readAdtRefusal,
+  readCheckRunRefusal,
+  readDeletionRefusal,
+  readExceptionRefusal,
+  readUnitTestRefusal,
+  readValidationRefusal,
+} from './refusals/read';
+
+// The result axis, which has exactly one member.
+export { asItCame, rawOf } from './result';
