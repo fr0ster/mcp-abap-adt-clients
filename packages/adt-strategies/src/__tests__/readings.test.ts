@@ -206,3 +206,82 @@ describe('a document the parser cannot read', () => {
     expect(readAdtRefusal(malformed)).toBeNull();
   });
 });
+
+/**
+ * The group operations, which answer one `del:object` per object asked about.
+ *
+ * `deleteObjectsGroup` and `checkDeletionGroup` take a list, so two objects
+ * come back as two elements and the parser gives an array. This reading took
+ * `root.object` as a single element: every attribute then read `undefined`,
+ * the explicit `"true"` was missing, and a **successful** deletion of two
+ * objects was reported as a refusal.
+ *
+ * The envelope below is the recorded one, with a second object added.
+ */
+describe('a deletion answer naming several objects', () => {
+  const deletionResult = (...objects: string[]): string =>
+    `<?xml version="1.0" encoding="utf-8"?><del:deletionResult xmlns:del="http://www.sap.com/adt/deletion" xmlns:adtcore="http://www.sap.com/adt/core">${objects.join('')}</del:deletionResult>`;
+
+  const deleted = (name: string, ok: boolean, text = ''): string =>
+    `<del:object del:isDeleted="${ok}" adtcore:name="${name}" adtcore:type="CLAS/OC"><del:message del:priority="0" del:type="${ok ? 'S' : 'E'}"><del:text>${text}</del:text></del:message></del:object>`;
+
+  it('is not a refusal when every object was deleted', () => {
+    expect(
+      readDeletionRefusal(
+        deletionResult(deleted('ZCL_A', true), deleted('ZCL_B', true)),
+      ),
+    ).toBeNull();
+  });
+
+  it('is a refusal when one of them was not, and names that one', () => {
+    const found = readDeletionRefusal(
+      deletionResult(
+        deleted('ZCL_A', true),
+        deleted('ZCL_B', false, 'You are already editing ZCL_B'),
+      ),
+    );
+    expect(found).not.toBeNull();
+    expect(found?.messages).toHaveLength(1);
+    expect(found?.message).toContain('ZCL_B');
+    expect(found?.message).not.toContain('ZCL_A');
+    expect(found?.messages[0].text).toContain('already editing');
+  });
+
+  it('reports each refused object when more than one was', () => {
+    const found = readDeletionRefusal(
+      deletionResult(
+        deleted('ZCL_A', false, 'locked'),
+        deleted('ZCL_B', false, 'in use'),
+      ),
+    );
+    expect(found?.messages).toHaveLength(2);
+    expect(found?.message).toContain('ZCL_A');
+    expect(found?.message).toContain('ZCL_B');
+  });
+
+  it('still reads the single-object answer the corpus recorded', () => {
+    expect(
+      readDeletionRefusal(documentOf('refusal-delete-refused')),
+    ).not.toBeNull();
+    expect(readDeletionRefusal(documentOf('delete-success'))).toBeNull();
+  });
+});
+
+describe('an activation that reports no reason', () => {
+  /**
+   * `messages` is documented as never empty. This branch was the one place it
+   * could be: `activationExecuted="false"` with no `<msg>` at all put the
+   * explanation in `message` and left the list bare — so a caller reading only
+   * `messages`, which the type invites, saw nothing wrong with a failed
+   * activation.
+   */
+  it('still carries a message, because the type promises one', () => {
+    const silent =
+      '<?xml version="1.0" encoding="utf-8"?><chkl:messages xmlns:chkl="http://www.sap.com/abapxml/checklist"><chkl:properties checkExecuted="true" activationExecuted="false" generationExecuted="false"/></chkl:messages>';
+    const found = readActivationRefusal(silent);
+    expect(found).not.toBeNull();
+    expect(found?.messages.length).toBeGreaterThan(0);
+    expect(found?.messages[0].type).toBe('E');
+    expect(found?.messages[0].text).toContain('gave no reason');
+  });
+});

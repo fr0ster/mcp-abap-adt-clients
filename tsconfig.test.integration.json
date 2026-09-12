@@ -15,6 +15,11 @@
     // that used to live here called `CrudClient`, a class renamed several
     // majors before anyone noticed, so the directory a consumer opens
     // first contained nothing that could run.
+    // And the workspace packages, so a script that crosses the seam between
+    // them is checked at the seam. The trace field is why: the wrapper writes
+    // `request`, a strategy read `config`, and unit tests on either side of
+    // that mismatch both passed.
+    "packages/*/src/**/*",
     "examples/**/*",
     "scripts/**/*",
     "src/**/*"

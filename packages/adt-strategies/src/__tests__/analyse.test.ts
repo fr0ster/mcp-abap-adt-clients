@@ -208,21 +208,55 @@ describe('asItCame', () => {
 });
 
 describe('the request the failure carries', () => {
-  it('is copied from the answer by name, never the transport object', () => {
-    // `IAdtError.request` is what tells a caller which step of a chain refused.
-    // The recordings carry no transport config, so this is the one place a
-    // crafted answer is the only way to reach the branch.
+  /**
+   * **`request`, which is where `adt-clients` puts it.** This read `config`
+   * alone — axios's field, and the one the repository this came from used. The
+   * contract declares `IAdtWireResponse.request`, `withRequestTrace` writes
+   * there, and so every failure this package built carried no request at all:
+   * a refusal in a chain of six calls could not be located, which is the one
+   * thing the field exists for.
+   *
+   * The first version of this test asserted the `config` shape and passed,
+   * which is how a test locks a bug in place.
+   */
+  it('comes from the contract field the library writes', () => {
     const verdict = failed(
       analyseException(ADT_NO_FAILURE, {
         data: answerFor('refusal-lock-held-by-other').data,
         status: 403,
-        config: { method: 'POST', url: '/sap/bc/adt/oo/classes/zcl_x' },
+        request: { method: 'POST', url: '/sap/bc/adt/oo/classes/zcl_x' },
       } as never),
     );
     expect(verdict.request).toEqual({
       method: 'POST',
       url: '/sap/bc/adt/oo/classes/zcl_x',
     });
+  });
+
+  it('falls back to config for a transport nothing wrapped', () => {
+    const verdict = failed(
+      analyseException(ADT_NO_FAILURE, {
+        data: answerFor('refusal-lock-held-by-other').data,
+        status: 403,
+        config: { method: 'GET', url: '/sap/bc/adt/oo/classes/zcl_y' },
+      } as never),
+    );
+    expect(verdict.request).toEqual({
+      method: 'GET',
+      url: '/sap/bc/adt/oo/classes/zcl_y',
+    });
+  });
+
+  it('prefers the contract field when an answer carries both', () => {
+    const verdict = failed(
+      analyseException(ADT_NO_FAILURE, {
+        data: answerFor('refusal-lock-held-by-other').data,
+        status: 403,
+        request: { method: 'POST', url: '/the/traced/one' },
+        config: { method: 'GET', url: '/the/transport/one' },
+      } as never),
+    );
+    expect(verdict.request?.url).toBe('/the/traced/one');
   });
 
   it('is absent when the answer carries no config', () => {

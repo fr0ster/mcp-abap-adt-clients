@@ -276,7 +276,11 @@ export function readActivationRefusal(document: unknown): AdtRefusal | null {
   return {
     form: 'activation',
     message: `Activation failed: ${explanation}`,
-    messages,
+    // `messages` is documented as never empty, and this branch was the one
+    // place it could be: `activationExecuted="false"` with no `<msg>` at all
+    // put the explanation in `message` and left the list bare, so a caller
+    // reading only `messages` — which the type invites — saw nothing wrong.
+    messages: messages.length ? messages : [{ type: 'E', text: explanation }],
   };
 }
 
@@ -309,35 +313,56 @@ export function readDeletionRefusal(document: unknown): AdtRefusal | null {
 
   const isCheck = Boolean(parsed.checkResponse);
   const root = parsed.checkResponse ?? parsed.deletionResult;
-  const object = root?.object;
-  if (!object) return null;
-
-  const message = object.message;
-  const messageType = String(message?.['@type'] ?? '').toUpperCase();
-  const messageText = textOf(message?.text);
+  // **Several objects, not one.** `deleteObjectsGroup` and `checkDeletionGroup`
+  // take a list, so the server answers one `del:object` per object asked
+  // about — and the parser gives an array for two or more. Read as a single
+  // object, every attribute came back `undefined`, the explicit "true" was
+  // missing, and a successful group deletion of two objects read as a refusal.
+  const objects = asArray(root?.object);
+  if (objects.length === 0) return null;
 
   // Absent means "not stated", and a deletion the server never approved is not
   // one to assume: anything but an explicit "true" is a refusal.
   const verdictAttribute = isCheck ? '@isDeletable' : '@isDeleted';
-  const permitted = object[verdictAttribute] === 'true';
-  const refused = !permitted || messageType === 'E';
-  if (!refused) return null;
 
-  const name =
-    typeof object['@name'] === 'string' ? object['@name'] : '(unnamed object)';
-  const references =
-    isCheck &&
-    (object['@externalStrongReferences'] || object['@externalWeakReferences'])
-      ? `${object['@externalStrongReferences'] ?? 0} strong and ${object['@externalWeakReferences'] ?? 0} weak external references`
-      : undefined;
-  const reason = messageText || references || 'the server did not say why';
+  const refused: AdtMessage[] = [];
+  const names: string[] = [];
+
+  for (const object of objects) {
+    const message = object?.message;
+    const messageType = String(message?.['@type'] ?? '').toUpperCase();
+    const messageText = textOf(message?.text);
+
+    const permitted = object?.[verdictAttribute] === 'true';
+    if (permitted && messageType !== 'E') continue;
+
+    const name =
+      typeof object?.['@name'] === 'string'
+        ? object['@name']
+        : '(unnamed object)';
+    const references =
+      isCheck &&
+      (object?.['@externalStrongReferences'] ||
+        object?.['@externalWeakReferences'])
+        ? `${object['@externalStrongReferences'] ?? 0} strong and ${object['@externalWeakReferences'] ?? 0} weak external references`
+        : undefined;
+    const reason = messageText || references || 'the server did not say why';
+
+    names.push(name);
+    refused.push({
+      type: severity(messageType || 'E'),
+      text: `${name}: ${reason}`,
+    });
+  }
+
+  // One object refused is a refusal, even where the rest were permitted: the
+  // caller asked for all of them.
+  if (refused.length === 0) return null;
 
   return {
     form: 'deletion',
-    message: `ADT refuses to delete ${name}: ${reason}`,
-    messages: [
-      { type: severity(messageType || 'E'), text: messageText || reason },
-    ],
+    message: `ADT refuses to delete ${names.join(', ')}`,
+    messages: refused,
   };
 }
 

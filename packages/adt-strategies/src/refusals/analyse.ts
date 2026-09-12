@@ -56,15 +56,35 @@ function asFailure(
   };
 }
 
-/** Method and url, copied by name. Never the object the transport held. */
+/**
+ * Method and url, copied by name. Never the object the transport held.
+ *
+ * **`request` first, and that is the fix for a real bug.** This read `config`
+ * alone, which is axios's field — correct in the repository this came from,
+ * wrong here. `@mcp-abap-adt/adt-clients` writes the trace onto
+ * `IAdtWireResponse.request`, the field the contract declares for it, so every
+ * failure this package built carried no request at all: a refusal in a chain
+ * of six calls could not be located, which is the one thing the field exists
+ * for.
+ *
+ * `config` stays as a fallback, for an answer handed over by a transport that
+ * was never wrapped.
+ */
 function requestOf(
   answer: IAdtWireResponse | undefined,
 ): { method?: string; url?: string } | undefined {
+  const carried = (answer as { request?: { method?: unknown; url?: unknown } })
+    ?.request;
   const config = (answer as { config?: { method?: unknown; url?: unknown } })
     ?.config;
-  const method = typeof config?.method === 'string' ? config.method : undefined;
-  const url = typeof config?.url === 'string' ? config.url : undefined;
-  return method || url ? { method, url } : undefined;
+
+  for (const source of [carried, config]) {
+    const method =
+      typeof source?.method === 'string' ? source.method : undefined;
+    const url = typeof source?.url === 'string' ? source.url : undefined;
+    if (method || url) return { method, url };
+  }
+  return undefined;
 }
 
 /**
