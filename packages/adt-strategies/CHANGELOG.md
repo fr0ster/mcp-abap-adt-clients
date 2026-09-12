@@ -70,13 +70,13 @@ seam cannot: a request trace read from `config` where `adt-clients` writes
 was taken as a single element, and an activation refusal whose message list
 could be empty against a type that promised otherwise.
 
-### Not published
+### Published
 
-No `npm publish` accompanied this tag. Either of these does it:
+On npm as `@mcp-abap-adt/adt-strategies@0.1.0`. Verified from the registry
+rather than from the working tree: installed into an empty project, seventeen
+exports present, `analyseActivation` reads a refusal out of a checklist.
 
 ```bash
 npm run publish:strategies   # this package
 npm run release:publish      # every package the registry is missing
 ```
-
-`npm run release:publish -- --dry` says what it would do and touches nothing.
