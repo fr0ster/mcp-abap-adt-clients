@@ -12,7 +12,7 @@ system's business and not what is being illustrated.
 
 | file | the point | exercised by |
 |---|---|---|
-| `update-a-class.ts` | what `updateClassWithCheck` used to do inside itself: check, judge, lock, write, unlock, activate — and that the write carries the **whole** source | `integration/core/class/Class.test.ts`, except the check — see below |
+| `update-a-class.ts` | what `updateClassWithCheck` used to do inside itself: check, judge, lock, write, unlock, activate — and that the write carries the **whole** source | `integration/core/class/Class.test.ts`, and `integration/shared/checkRun.test.ts` for the check |
 | `update-a-domain.ts` | the same for `updateDomain`, where the content is the object's document and the patch was the package's | `integration/core/domain/Domain.test.ts` |
 | `activate-a-group.ts` | what `activateAndWait` used to do: start a run, watch it, read what it produced — and the waiting is yours | `integration/shared/groupActivation.test.ts` |
 | `where-used.ts` | what `getWhereUsedList` used to do: scope, edit the scope, search | `integration/shared/whereUsed.test.ts` |
@@ -34,12 +34,12 @@ unlikely.
 Type-checked is not the same as true, which is what the right-hand column above
 is for.
 
-**One row in that column is short, and saying so is the point of having it.**
-`check` is not called by any integration test, on any type. Eighteen `check.ts`
-modules changed in 19.0.0 — they return their report instead of raising — and
-nothing exercises that against a live system. The step is illustrated in
-`update-a-class.ts` because a caller who wants it needs to see where it goes;
-it is not evidence that the call behaves as drawn.
+That column was short in one place until `integration/shared/checkRun.test.ts`
+was written for it: `check` was called by no integration test on any type, while
+eighteen `check.ts` modules changed behaviour in this release. It now covers the
+three answers the endpoint gives — including the one where a check of an object
+that does not exist is indistinguishable from a clean check unless you read
+`chkrun:status`.
 
 ## Imports
 
