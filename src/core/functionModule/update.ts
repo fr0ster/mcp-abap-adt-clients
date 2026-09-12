@@ -16,6 +16,10 @@ import type { IUpdateFunctionModuleParams } from './types';
  * Upload function module source code (low-level - uses existing lockHandle)
  * This function does NOT lock/unlock - it assumes the object is already locked
  * Used internally by AdtFunctionModule
+ *
+ * **The whole content, every time.** This is a replace, never a merge. Read
+ * what the object holds, change what you mean to change, and pass the result:
+ * anything left out is gone, because nothing is read here to keep it.
  */
 export async function update(
   connection: IAbapConnection,

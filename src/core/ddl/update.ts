@@ -14,6 +14,10 @@ import { getTimeout } from '../../utils/timeouts';
  * Update view DDL source code
  * Low-level: Only uploads DDL source with lock handle, does NOT lock/unlock/activate
  * For complete workflow, use AdtDdl
+ *
+ * **The whole content, every time.** This is a replace, never a merge. Read
+ * what the object holds, change what you mean to change, and pass the result:
+ * anything left out is gone, because nothing is read here to keep it.
  */
 export async function updateDdl(
   connection: IAbapConnection,

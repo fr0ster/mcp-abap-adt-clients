@@ -512,54 +512,83 @@ created.getResult().value.transportNumber;   // 'DEVK900123'
 created.getResult().value.owner;             // the task's owner
 ```
 
-### What `update()` refuses to write
+### `update()` writes the whole content
 
-Five object types — `domain`, `dataElement`, `package`, `tabletype`,
-`functionGroup` — update by **read-modify-write**: GET the current XML, patch the
-changed fields into it, PUT it back. Building the XML from scratch would drop
-fields the client does not model (`abapLanguageVersion` and friends), so the
-server's own body is the base.
+**Every type, every time: `update` replaces. It never merges.**
 
-That makes the read a hard dependency, and ADT answers a read of a not-yet-ready
-object with **HTTP 200 and an empty body** — never a 404. Since **10.1.0** such a
-read fails instead of being patched and sent:
+ADT's `PUT` overwrites what the object holds, and this package sends what you
+hand it. Read the object, change what you mean to change, pass the result.
+Anything you leave out is gone, because nothing is read on your behalf to keep
+it.
 
+What "the whole content" is depends on the type, and on nothing else:
+
+| types | the whole content | passed as |
+|---|---|---|
+| class, program, interface, DDL, and the other source-bearing types | the full source | `options.sourceCode` |
+| domain, package, dataElement, tableType, transport, functionGroup | the object's own document | `config.document` |
+
+```typescript
+// A source type. Sending one method body replaces the class with that body.
+const current = await client.getClass().read({ className: 'ZCL_X' }, 'active');
+const edited = addAMethod(String(current.getResult().value));
+
+const handle = (await client.getClass().lock({ className: 'ZCL_X' })).getResult().value;
+await client.getClass().update({ className: 'ZCL_X' }, { sourceCode: edited, lockHandle: handle });
+await client.getClass().unlock({ className: 'ZCL_X' }, handle);
+
+// A document type. Same shape, different noun.
+const doc = await client.getDomain().readMetadata({ domainName: 'ZD' });
+const patched = patchTheDescription(String(doc.getResult().value), 'new');
+
+const lock = (await client.getDomain().lock({ domainName: 'ZD' })).getResult().value;
+await client.getDomain().updateMetadata({ domainName: 'ZD', document: patched }, { lockHandle: lock });
+await client.getDomain().unlock({ domainName: 'ZD' }, lock);
 ```
-XmlPatchError: Cannot update domain ZAC_DOM01: the read returned an empty body.
+
+**Until 19.0.0 the six document types hid this.** They fetched the current
+document, patched the config's named fields into it, and PUT the result — so a
+caller could pass a description alone and the rest survived. That read is gone,
+along with the patch helpers (`patchDomainXml` and its four siblings) and the
+`XmlPatchError` this section used to describe. The object is not read on your
+behalf any more, so nothing preserves what you omit.
+
+**An incomplete write does not announce itself.** The server accepts a valid
+document that happens to say less, and the object becomes what you sent. Only an
+*empty* body draws a `400`. This is the failure mode to watch for when porting
+from 18.x.
+
+**Validity is yours to guarantee.** This package does not know what your system
+will accept, and does not inspect what you pass.
+
+One read-modify-write stays, and it is the one no endpoint can replace:
+`AdtMessageClassMessage` writes a message that is a row inside its class's
+document.
+
+### What `activate()` answers, and who judges it
+
+`/sap/bc/adt/activation` answers **HTTP 200 even when activation fails**, so the
+verdict is in the body. **This package no longer reads it.**
+
+Until 19.0.0 it applied a rule of its own — a response carrying `<msg type="E">`
+was a failure — and threw. That strategy is gone, with its two siblings. An
+activation now comes back as a success carrying the checklist, and turning that
+into a failure is the `analyse` you pass:
+
+```typescript
+await client.getClass().activate({ className: 'ZCL_X' }, {
+  analyse: (verdict, answer) =>
+    /type="E"/.test(String(answer?.data ?? ''))
+      ? { origin: 'refusal', message: String(answer?.data) }
+      : verdict,
+});
 ```
 
-Before, the patch found nothing to replace, returned the body unchanged
-silently, and the PUT went out without the field — which the server rejected
-with a message pointing nowhere near the cause (`The description is missing`).
-A slow system now surfaces as a read error naming the object.
+Build yours from your own corpus of answers rather than from the sketch above.
+The measurements below are what this package saw before it stopped judging, and
+they are offered as evidence, not as a rule.
 
-**A patch that cannot find its target throws.** A caller reaches a patch only
-when it intends the change, so "no match" means the PUT would not carry what was
-asked for.
-
-**One deliberate exception.** Setting an attribute on an element that is present
-without it *adds* the attribute rather than failing, because ADT emits exactly
-that for an unset reference:
-
-| ADT returns | meaning |
-|---|---|
-| `<doma:valueTableRef/>` | domain with no value table |
-| `<pak:superPackage/>` | package with no parent |
-
-So `value_table` and `super_package` now take effect when set for the first
-time; they were silently ignored before. If your code passes `super_package` on
-a root package and relied on it doing nothing, it now moves the package.
-
-### What `activate()` treats as a failure
-
-`/sap/bc/adt/activation` answers **HTTP 200 even when activation fails**, so the verdict
-has to be read out of the body. The rule the client applies:
-
-> An activation failed if, and only if, the response carries an error-severity
-> `<msg type="E">`. The thrown message quotes SAP's own text.
-
-`activationExecuted="false"` is **not** a failure signal, despite how it reads. Probed
-against a live system:
+`activationExecuted="false"` is **not** a failure signal, despite how it reads:
 
 | scenario | HTTP | `activationExecuted` | `msg` |
 |---|---|---|---|
@@ -577,9 +606,9 @@ consumer reading these responses directly should branch on the messages, not the
 A lock held by another session is an HTTP 403 (`User … is currently editing …`) and
 surfaces as a rejected request, never as a body to inspect.
 
-Empty, unparseable, or unrecognized bodies are treated as success — object types differ
-in the shape of their success body, and inferring failure from an unfamiliar one would
-turn working calls into errors.
+Object types differ in the shape of their success body, which is why inferring a
+failure from an unfamiliar one turns working calls into errors — and why the
+judgement moved to the caller, who knows which types they are activating.
 
 ### Accept Negotiation
 

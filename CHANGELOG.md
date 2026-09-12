@@ -67,10 +67,15 @@ a message is a row inside its class's document, and no endpoint writes one.
   check run that finds a syntax error is a check run that worked, and the throw
   cost the findings, the line numbers and the T100 keys. The `ddl` and
   `accessControl` retries went with them: both were waits on the server.
-- **`update` takes a complete document** on domain, package, dataElement,
-  tableType, transport and functionGroup. A partial update no longer exists: the
-  fields beside `document` describe a create, and a field left out is not
-  preserved. The patch helpers went with the read.
+- **`update` writes the whole content, on every type.** It always did — ADT's
+  `PUT` replaces — but six types hid it by fetching the current document and
+  patching the config's named fields into it: domain, package, dataElement,
+  tableType, transport and functionGroup. They take `config.document` now, and
+  the patch helpers went with the read. For source-bearing types nothing
+  changed; what changed is that the rule is now stated, in the migration note,
+  the README, the API reference and the doc comment of every `update`. An
+  incomplete write does not announce itself — the server accepts a document that
+  says less, and the object becomes what was sent.
 - **`pull` is one POST** and answers nothing, like `link` and `unlink`.
   `IAbapGitPullResult` held a `finalStatus` and an `errorLog`, both products of
   the polling.

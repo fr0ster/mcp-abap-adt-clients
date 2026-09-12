@@ -24,6 +24,10 @@ const debugEnabled = process.env.DEBUG_ADT_LIBS === 'true';
 
 /**
  * Update function include metadata via PUT.
+ *
+ * **The whole content, every time.** This is a replace, never a merge. Read
+ * what the object holds, change what you mean to change, and pass the result:
+ * anything left out is gone, because nothing is read here to keep it.
  */
 export async function updateFunctionInclude(
   connection: IAbapConnection,

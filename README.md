@@ -368,23 +368,35 @@ implementations pass it internally on reads after create/update.
 See the caveat above — on the system measured, the flag had no effect on object
 reads at all.
 
-**Note:** `create()` and `update()` request long polling on their follow-up reads
-where the handler supports it. Read that as "asked for", not "ensured" — the
-caveat above stands, and nothing in this library can make the system answer
-sooner than it does.
+**Note:** long polling is a flag on a read you make. `create()` and `update()`
+issue one request each and make no follow-up read of their own since 19.0.0.
 
-What the library does guarantee is that a read which came back empty is not
-written back. ADT answers a read of a not-yet-ready object with **HTTP 200 and
-an empty body**, never a 404, so a read-modify-write update used to patch that
-empty body — changing nothing, because there was nothing to change — and PUT the
-result. Since 10.1.0 that read fails with `XmlPatchError`, naming the object:
+### `update()` writes the whole content
 
+**Every type, every time: `update` replaces. It never merges.** Read the object,
+change what you mean to change, pass the result. Anything you leave out is gone,
+because nothing is read on your behalf to keep it.
+
+For a class, a program or a DDL source the whole content is the **full source**.
+For domain, package, dataElement, tableType, transport and functionGroup it is
+the object's own **document**, passed as `config.document` — those six fetched
+and patched it for you until 19.0.0, and no longer do.
+
+```typescript
+const current = await client.getClass().read({ className: 'ZCL_TEST' }, 'active');
+const edited = addAMethod(String(current.getResult().value));
+
+const handle = (await client.getClass().lock({ className: 'ZCL_TEST' })).getResult().value;
+await client.getClass().update({ className: 'ZCL_TEST' }, { sourceCode: edited, lockHandle: handle });
+await client.getClass().unlock({ className: 'ZCL_TEST' }, handle);
 ```
-Cannot update domain ZAC_DOM01: the read returned an empty body.
-```
 
-A slow system therefore surfaces as a read error, not as a write the server
-rejects for a reason that points nowhere near the cause.
+Watch the read. ADT answers a read of a not-yet-ready object with **HTTP 200 and
+an empty body**, never a 404, and an empty document written back replaces the
+object with nothing. Nothing in this package checks that for you any more; a
+caller who edits what they read should confirm they read something.
+
+Full detail: [`docs/usage/MIGRATION-19.md`](docs/usage/MIGRATION-19.md).
 
 ### Creating Behavior Implementation Classes
 

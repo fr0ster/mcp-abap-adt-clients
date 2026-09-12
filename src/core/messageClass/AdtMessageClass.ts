@@ -197,7 +197,11 @@ export class AdtMessageClass<
     );
   }
 
-  /** Update the message class's own metadata: lock → PUT → unlock. */
+  /** Update the message class's own metadata: lock → PUT → unlock. *
+   * **The whole content, every time.** This is a replace, never a merge. Read
+   * what the object holds, change what you mean to change, and pass the result:
+   * anything left out is gone, because nothing is read here to keep it.
+   */
   async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IMessageClassConfig>,
     options?: IAdtOperationOptions<E>,

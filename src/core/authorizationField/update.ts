@@ -24,6 +24,10 @@ const debugEnabled = process.env.DEBUG_ADT_LIBS === 'true';
  * Update authorization field via PUT.
  * The payload has the same shape as create; only unspecified optional fields
  * are omitted (server preserves their prior values).
+ *
+ * **The whole content, every time.** This is a replace, never a merge. Read
+ * what the object holds, change what you mean to change, and pass the result:
+ * anything left out is gone, because nothing is read here to keep it.
  */
 export async function updateAuthorizationField(
   connection: IAbapConnection,

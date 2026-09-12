@@ -249,6 +249,10 @@ export class AdtMetadataExtension<
    * With `options.lockHandle` the caller holds the lock and owns the chain, so
    * this is one request. Without it, this locks, checks, writes and unlocks —
    * and the unlock happens on every path out.
+   *
+   * **The whole content, every time.** This is a replace, never a merge. Read
+   * what the object holds, change what you mean to change, and pass the result:
+   * anything left out is gone, because nothing is read here to keep it.
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IMetadataExtensionConfig>,

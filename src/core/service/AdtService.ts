@@ -444,6 +444,10 @@ export class AdtServiceBinding<
    * all: the job carries neither. The job takes ~133 seconds on the systems
    * measured, so pass `options.timeout` unless the 120s default is enough,
    * which it is not.
+   *
+   * **The whole content, every time.** This is a replace, never a merge. Read
+   * what the object holds, change what you mean to change, and pass the result:
+   * anything left out is gone, because nothing is read here to keep it.
    */
   async update<E extends IAdtError = IAdtError>(
     // **Narrower than `IAdtUpdatable` gives every other type, on purpose.**

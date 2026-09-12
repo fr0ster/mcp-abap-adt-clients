@@ -219,6 +219,10 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
    * Update class with full operation chain
    * Always starts with lock
    * If options.lockHandle is provided, performs only low-level update without lock/check/unlock chain
+   *
+   * **The whole content, every time.** This is a replace, never a merge. Read
+   * what the object holds, change what you mean to change, and pass the result:
+   * anything left out is gone, because nothing is read here to keep it.
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig>,

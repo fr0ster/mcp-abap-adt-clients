@@ -279,6 +279,10 @@ export class AdtFunctionInclude<
    * Update the include: its metadata, and its source when source was given.
    *
    * With `options.lockHandle` the caller holds the lock and owns the chain.
+   *
+   * **The whole content, every time.** This is a replace, never a merge. Read
+   * what the object holds, change what you mean to change, and pass the result:
+   * anything left out is gone, because nothing is read here to keep it.
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionIncludeConfig>,
@@ -312,6 +316,10 @@ export class AdtFunctionInclude<
    * Its own member because it is its own endpoint: `update` writes the
    * `finclude` metadata, and a consumer that wants both issues both, in the
    * order it decides.
+   *
+   * **The whole content, every time.** This is a replace, never a merge. Read
+   * what the object holds, change what you mean to change, and pass the result:
+   * anything left out is gone, because nothing is read here to keep it.
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionIncludeConfig>,

@@ -10,6 +10,10 @@ import type { IUpdateAccessControlParams } from './types';
 /**
  * Update access control source code
  * Requires object to be locked first (lockHandle must be provided)
+ *
+ * **The whole content, every time.** This is a replace, never a merge. Read
+ * what the object holds, change what you mean to change, and pass the result:
+ * anything left out is gone, because nothing is read here to keep it.
  */
 export async function updateAccessControl(
   connection: IAbapConnection,

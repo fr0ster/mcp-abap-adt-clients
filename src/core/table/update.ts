@@ -13,6 +13,10 @@ import type { IUpdateTableParams } from './types';
 
 /**
  * Update table using existing lock/session (Builder workflow)
+ *
+ * **The whole content, every time.** This is a replace, never a merge. Read
+ * what the object holds, change what you mean to change, and pass the result:
+ * anything left out is gone, because nothing is read here to keep it.
  */
 export async function updateTable(
   connection: IAbapConnection,

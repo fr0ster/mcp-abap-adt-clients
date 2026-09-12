@@ -96,12 +96,31 @@ need one, write the loop around the call.
 `checkDdl` and `checkAccessControl` also lost a trailing `logger?` parameter
 that existed only for those retries. Neither is exported from this package.
 
-## 4. `update` takes a complete document
+## 4. `update` takes the whole content — for every type
 
-Six updates fetched the current document, patched the config's named fields into
-it, and PUT the result: **domain, package, dataElement, tableType, transport**
-and **functionGroup**, which also locked and unlocked around it.
+**Read this even if you touch none of the six types below.**
 
+`update` is a replace. It always was, on every type: ADT's `PUT` overwrites what
+the object holds, and this package sends what you give it. What changed in
+19.0.0 is that six types stopped hiding that by fetching the current document
+and merging your fields into it.
+
+So the rule is one rule, and it is worth saying plainly because nothing in the
+signature says it:
+
+> Read what the object holds, change what you mean to change, pass the result.
+> Anything you leave out is gone — nothing is read on your behalf to keep it.
+
+For a class, a program, a DDL source or an interface, the whole content is the
+**full source**. Sending one changed method body replaces the class with that
+method body. This did not change in 19.0.0; it has always been so, and it is
+stated here because a caller who only reads the migration for the six types
+below would not learn it anywhere else.
+
+For domain, package, dataElement, tableType, transport and functionGroup, the
+whole content is the object's **document**, and this is the part that changed.
+Those six fetched the current document, patched the config's named fields into
+it, and PUT the result — `functionGroup` also locked and unlocked around it.
 They send `config.document` now.
 
 ```typescript
@@ -120,11 +139,35 @@ await client.getDomain().updateMetadata(
 await client.getDomain().unlock({ domainName: 'ZD' }, handle);
 ```
 
-**A partial update no longer exists.** The fields beside `document` describe a
-create; on an update they are not sent, and a field you leave out of the
-document is not preserved, because nothing was read to preserve it from.
-Guaranteeing the document is valid is yours, which is the point: this package
-does not know what your system will accept.
+The same sequence for a source-bearing type, unchanged since 18.x and shown so
+the shape is visible side by side:
+
+```typescript
+const current = await client.getClass().read({ className: 'ZCL_X' }, 'active');
+const edited = addAMethod(String(current.getResult().value));
+
+const handle = (await client.getClass().lock({ className: 'ZCL_X' })).getResult().value;
+await client.getClass().update({ className: 'ZCL_X' }, { sourceCode: edited, lockHandle: handle });
+await client.getClass().unlock({ className: 'ZCL_X' }, handle);
+await client.getClass().activate({ className: 'ZCL_X' });
+```
+
+Read, edit, lock, write, unlock. The read comes before the lock because that is
+the order ADT's own client uses; the package performs none of these steps for
+you, and the only one it ever performed — the read, inside those six updates —
+is what 19.0.0 removed.
+
+**A partial update never existed for source, and no longer exists for
+documents.** The fields beside `document` describe a create; on an update they
+are not sent. Guaranteeing the content is valid is yours, which is the point:
+this package does not know what your system will accept.
+
+**This is the change most likely to pass a test suite and fail in production.**
+An update that sends less than the whole content does not error — the server
+accepts it and the object becomes what you sent. Our own integration harness
+made exactly this mistake on all six types and the server answered `400` only
+because the body was empty; a body that is merely *incomplete* is a valid
+document, and ADT writes it.
 
 The patch helpers went with the read — `patchDomainXml` and its four siblings.
 

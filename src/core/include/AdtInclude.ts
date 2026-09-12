@@ -196,6 +196,10 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
    * `options.sourceCode` wins over the config's. `options.lockHandle` means the
    * caller already holds the lock and manages it — this then writes only, and
    * neither locks nor unlocks. Activation is `options.activateOnUpdate`.
+   *
+   * **The whole content, every time.** This is a replace, never a merge. Read
+   * what the object holds, change what you mean to change, and pass the result:
+   * anything left out is gone, because nothing is read here to keep it.
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IIncludeConfig>,

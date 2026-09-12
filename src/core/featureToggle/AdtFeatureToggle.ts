@@ -243,6 +243,10 @@ export class AdtFeatureToggle<
    * A feature toggle is one of three types with two writable resources: this
    * document at `/sfw/featuretoggles/{name}`, and its JSON source at
    * `source/main`, which `update` writes.
+   *
+   * **The whole content, every time.** This is a replace, never a merge. Read
+   * what the object holds, change what you mean to change, and pass the result:
+   * anything left out is gone, because nothing is read here to keep it.
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IFeatureToggleConfig>,
@@ -272,6 +276,10 @@ export class AdtFeatureToggle<
    * There was no member for this at all until 18.0.0: `uploadFeatureToggleSource`
    * existed and nothing reached it, while `update` wrote the document. Now the
    * names say which resource each one addresses, as everywhere else.
+   *
+   * **The whole content, every time.** This is a replace, never a merge. Read
+   * what the object holds, change what you mean to change, and pass the result:
+   * anything left out is gone, because nothing is read here to keep it.
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IFeatureToggleConfig>,

@@ -12,6 +12,11 @@ import { getTimeout } from '../../utils/timeouts';
 import type { ICreateFeatureToggleParams } from './types';
 import { buildFeatureToggleXml } from './xmlBuilder';
 
+/** *
+ * **The whole content, every time.** This is a replace, never a merge. Read
+ * what the object holds, change what you mean to change, and pass the result:
+ * anything left out is gone, because nothing is read here to keep it.
+ */
 export async function updateFeatureToggle(
   connection: IAbapConnection,
   params: ICreateFeatureToggleParams,

@@ -145,6 +145,10 @@ export class AdtLocalDefinitions<
    * say the member locked, checked, wrote and unlocked; that chain came out
    * when a member became one request, and a reader chasing an unreleased lock
    * would have looked here and stopped.
+   *
+   * **The whole content, every time.** This is a replace, never a merge. Read
+   * what the object holds, change what you mean to change, and pass the result:
+   * anything left out is gone, because nothing is read here to keep it.
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<ILocalDefinitionsConfig>,

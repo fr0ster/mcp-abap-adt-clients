@@ -297,6 +297,10 @@ export class AdtBehaviorImplementation<
    * declares which definition it implements.
    *
    * The answer is the include write's — that is the source a caller passed.
+   *
+   * **The whole content, every time.** This is a replace, never a merge. Read
+   * what the object holds, change what you mean to change, and pass the result:
+   * anything left out is gone, because nothing is read here to keep it.
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IBehaviorImplementationConfig>,

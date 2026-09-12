@@ -241,6 +241,10 @@ export class AdtUnitTest<R extends IUnitTestResults = typeof unitTestDocuments>
    * `options.lockHandle` writes inside a lock the caller already holds, which is
    * the point of having both this and {@link create}: the container's lock is
    * taken once and a caller can update the class and its tests in one window.
+   *
+   * **The whole content, every time.** This is a replace, never a merge. Read
+   * what the object holds, change what you mean to change, and pass the result:
+   * anything left out is gone, because nothing is read here to keep it.
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IUnitTestConfig>,

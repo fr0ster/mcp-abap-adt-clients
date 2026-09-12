@@ -292,6 +292,10 @@ export class AdtAppendStructure<
    * for their flow. `check()` and `waitForCleanCheckRun()` are available for
    * that; this member does not insert an opinion between the caller and the
    * write.
+   *
+   * **The whole content, every time.** This is a replace, never a merge. Read
+   * what the object holds, change what you mean to change, and pass the result:
+   * anything left out is gone, because nothing is read here to keep it.
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IAppendStructureConfig>,
