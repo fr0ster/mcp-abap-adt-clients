@@ -206,3 +206,29 @@ describe('asItCame', () => {
     expect(asItCame({ data: undefined } as never)).toBe('');
   });
 });
+
+describe('the request the failure carries', () => {
+  it('is copied from the answer by name, never the transport object', () => {
+    // `IAdtError.request` is what tells a caller which step of a chain refused.
+    // The recordings carry no transport config, so this is the one place a
+    // crafted answer is the only way to reach the branch.
+    const verdict = failed(
+      analyseException(ADT_NO_FAILURE, {
+        data: answerFor('refusal-lock-held-by-other').data,
+        status: 403,
+        config: { method: 'POST', url: '/sap/bc/adt/oo/classes/zcl_x' },
+      } as never),
+    );
+    expect(verdict.request).toEqual({
+      method: 'POST',
+      url: '/sap/bc/adt/oo/classes/zcl_x',
+    });
+  });
+
+  it('is absent when the answer carries no config', () => {
+    const verdict = failed(
+      analyseException(ADT_NO_FAILURE, answerFor('refusal-lock-held-by-other')),
+    );
+    expect(verdict.request).toBeUndefined();
+  });
+});

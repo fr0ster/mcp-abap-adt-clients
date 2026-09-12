@@ -160,3 +160,49 @@ describe('isIndeterminateWalkAnswer', () => {
     ).toBe(false);
   });
 });
+
+/**
+ * The branches the corpus does not reach.
+ *
+ * Nothing here is invented behaviour: each is a line that exists because a
+ * server can send that value, and the recordings simply do not happen to
+ * contain one. Testing them with a crafted document is honest as long as the
+ * document is the shape the reading is written for — which is why each of
+ * these is a real envelope with one attribute changed.
+ */
+describe('severities the recordings do not contain', () => {
+  const runResult = (severity: string): string =>
+    `<?xml version="1.0" encoding="utf-8"?><aunit:runResult xmlns:aunit="http://www.sap.com/adt/api/aunit"><program adtcore:name="ZX" xmlns:adtcore="http://www.sap.com/adt/core"><testClasses><testClass adtcore:name="LTC"><testMethods><testMethod adtcore:name="TEST" adtcore:uri="/x"><alerts><alert kind="failedAssertion" severity="${severity}"><title>an alert</title></alert></alerts></testMethod></testMethods></testClass></testClasses></program></aunit:runResult>`;
+
+  it('grades TOLERABLE as a warning, so it is not a failure on its own', () => {
+    // ABAP Unit's own scale. A run whose only alert is tolerable has no `E`,
+    // and the reading answers null — the caller decides what a warning means.
+    expect(readUnitTestRefusal(runResult('tolerable'))).toBeNull();
+  });
+
+  it('grades FATAL as an error', () => {
+    const found = readUnitTestRefusal(runResult('fatal'));
+    expect(found?.messages[0].type).toBe('E');
+  });
+
+  it('passes an unrecognised spelling through rather than guessing', () => {
+    // `return s` — a severity this package has never seen keeps its own name,
+    // so a caller matching on it sees what the server said instead of a
+    // silent reclassification.
+    const found = readUnitTestRefusal(runResult('critical'));
+    expect(found?.messages[0].type).toBe('E');
+
+    const odd = readUnitTestRefusal(runResult('blocker'));
+    // No `E` among the messages, so not a refusal — but the spelling survived.
+    expect(odd).toBeNull();
+  });
+});
+
+describe('a document the parser cannot read', () => {
+  it('is not a refusal, and does not throw', () => {
+    const malformed = '<?xml version="1.0"?><chkl:messages><msg type="E"';
+    expect(() => readActivationRefusal(malformed)).not.toThrow();
+    expect(readActivationRefusal(malformed)).toBeNull();
+    expect(readAdtRefusal(malformed)).toBeNull();
+  });
+});
