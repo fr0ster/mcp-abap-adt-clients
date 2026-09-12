@@ -339,7 +339,7 @@ describe('Shared - getWhereUsed', () => {
     }
   }, 60000); // Increased timeout to 60s for table where-used queries which can be slow
 
-  it('should throw error if object name is missing', async () => {
+  it('answers a missing object name rather than throwing', async () => {
     if (!hasConfig) {
       testsLogger.warn?.(
         '⚠️ Skipping test: No .env file or SAP configuration found',
@@ -363,16 +363,20 @@ describe('Shared - getWhereUsed', () => {
       return;
     }
 
-    logTestStep('validate error if object name is missing', testsLogger);
-    await expect(
-      new AdtUtils(connection, testsLogger).getWhereUsed({
-        object_name: '',
-        object_type: 'class',
-      }),
-    ).rejects.toThrow('Object name is required');
+    // The member answers the contract. It used to throw a sentence this
+    // package invented about a parameter; 19.0.0 removed that guard, so an
+    // empty name is asked of the server and the server's own refusal comes
+    // back inside `IAdtResponse`.
+    logTestStep('an empty object name is answered, not thrown', testsLogger);
+    const noName = await new AdtUtils(connection, testsLogger).getWhereUsed({
+      object_name: '',
+      object_type: 'class',
+    });
+    expect(noName.ok).toBe(false);
+    expect(noName.ok ? '' : noName.getError().message).toBeTruthy();
   });
 
-  it('should throw error if object type is missing', async () => {
+  it('answers a missing object type rather than throwing', async () => {
     if (!hasConfig) {
       testsLogger.warn?.(
         '⚠️ Skipping test: No .env file or SAP configuration found',
@@ -396,13 +400,13 @@ describe('Shared - getWhereUsed', () => {
       return;
     }
 
-    logTestStep('validate error if object type is missing', testsLogger);
-    await expect(
-      new AdtUtils(connection, testsLogger).getWhereUsed({
-        object_name: 'TEST',
-        object_type: '',
-      }),
-    ).rejects.toThrow('Object type is required');
+    logTestStep('an empty object type is answered, not thrown', testsLogger);
+    const noType = await new AdtUtils(connection, testsLogger).getWhereUsed({
+      object_name: 'TEST',
+      object_type: '',
+    });
+    expect(noType.ok).toBe(false);
+    expect(noType.ok ? '' : noType.getError().message).toBeTruthy();
   });
 
   it('should get where-used list with parsed results', async () => {

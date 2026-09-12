@@ -14,6 +14,7 @@ import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IPackageConfig } from '../../../../core/package';
 import { deletePackage } from '../../../../core/package/delete';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { patchXmlAttribute } from '../../../../utils/xmlPatch';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { expectResult } from '../../../helpers/contract';
 import { presenceOf } from '../../../helpers/objectPresence';
@@ -255,6 +256,12 @@ describe('Package (using AdtClient)', () => {
         }
 
         await tester.flowTestAuto({
+          updateTakesDocument: (current) =>
+            patchXmlAttribute(
+              current,
+              'adtcore:description',
+              `${config.description || ''} (updated)`.slice(0, 60),
+            ),
           // Packages do not require activation in ADT
           activateOnCreate: true,
           activateOnUpdate: true,

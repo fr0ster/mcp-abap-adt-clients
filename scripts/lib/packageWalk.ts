@@ -36,11 +36,24 @@ const bodyOf = (data: unknown): string =>
  * One level: the package's own node structure, plus one request per object
  * type it reports.
  *
- * **An empty body at the root is not an empty package.** `/repository/
- * nodestructure` answers `200` with zero bytes for a package that does not
- * exist and `200` with a tree for one that does, so the status cannot tell them
- * apart and there is no document to read. The package used to raise for this;
- * now the caller decides, and this is what deciding looks like.
+ * **An empty body is a level with nothing in it, and nothing more than that.**
+ * This walk used to read zero bytes as "the package does not exist" and raise.
+ *
+ * Measured 2026-09-12, four packages through this same function:
+ *
+ * | package | `/packages/{name}` | node structure |
+ * |---|---|---|
+ * | a populated root | `200` | 3551 bytes, 3 subpackages, 4 object types |
+ * | a shared fixture | `200` | 4204 bytes, 15 object types |
+ * | an empty leftover | `200` | **0 bytes** |
+ * | a container left empty | `200` | **0 bytes** |
+ * | a name never created | `404` | not asked |
+ *
+ * So zero bytes is what an **existing but empty** package answers, and the
+ * sentence this used to raise was wrong about the one case it named. This
+ * endpoint cannot separate empty from absent, so the walk states neither and
+ * descends no further. A caller who needs the distinction has `/packages/
+ * {name}`, which answers `404` for a name that was never created.
  */
 export async function walkPackage(
   connection: IAbapConnection,
@@ -59,10 +72,8 @@ export async function walkPackage(
   );
   const xml = bodyOf(root.data);
   if (xml.trim().length === 0) {
-    throw new Error(
-      `node structure for ${name} came back empty, which is what ADT answers ` +
-        'for a package that does not exist — it neither refuses nor says so',
-    );
+    logger?.debug?.('node structure came back empty', { package: name });
+    return { name, type: 'DEVC/K', isPackage: true, children: [] };
   }
 
   const { nodes, objectTypes } = parseNodeStructure(xml, logger);

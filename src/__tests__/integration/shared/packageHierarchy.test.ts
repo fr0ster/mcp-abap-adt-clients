@@ -231,6 +231,13 @@ describe('Shared - getPackageHierarchy', () => {
         expect(result?.name).toBeDefined();
         expect(result?.name).toBe(config.package_name.toUpperCase());
         expect(result?.type).toBeDefined();
+        // The walk stopped raising on an empty level in 19.0.0 — an existing
+        // but empty package answers zero bytes, so the raise was wrong about
+        // the one cause it named. That makes an empty tree indistinguishable
+        // from a broken walk unless the test says otherwise, and it did not:
+        // it asserted the root's own name and type and nothing below them.
+        expect(result.isPackage).toBe(true);
+        expect(result.children.length).toBeGreaterThan(0);
         logTestSuccess(testsLogger, testName);
       } catch (error: any) {
         if (error?.response?.status === 406) {

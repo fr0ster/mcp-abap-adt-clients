@@ -18,6 +18,7 @@ import type { AdtClient } from '../../../../clients/AdtClient';
 import type { ITableTypeConfig } from '../../../../core/tabletype';
 import { getTableType } from '../../../../core/tabletype/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { patchXmlAttribute } from '../../../../utils/xmlPatch';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { expectResult } from '../../../helpers/contract';
 import {
@@ -169,6 +170,12 @@ describe('TableType (using AdtClient)', () => {
         // TableType is XML-based, no sourceCode needed
         // Update config contains XML parameters (rowTypeName, etc.)
         await tester.flowTestAuto({
+          updateTakesDocument: (current) =>
+            patchXmlAttribute(
+              current,
+              'adtcore:description',
+              `${config?.description || ''} (updated)`.slice(0, 60),
+            ),
           updateConfig: config
             ? {
                 tableTypeName: config.tableTypeName,

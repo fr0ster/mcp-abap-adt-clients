@@ -119,7 +119,6 @@ import { getSqlQuery } from './sqlQuery';
 import { getTableColumns, getTableContents } from './tableContents';
 import { getVirtualFoldersContents } from './virtualFolders';
 import {
-  assertWhereUsedTarget,
   getWhereUsed,
   getWhereUsedScope,
   modifyWhereUsedScope,
@@ -324,11 +323,6 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
   async getWhereUsedScope(
     params: IGetWhereUsedScopeParams,
   ): Promise<IAdtResponse<ReturnType<R['whereUsedScope']>>> {
-    // Before `answering`, not inside the request: a missing name is the
-    // caller's mistake, and classified inside it comes back as
-    // `origin: 'connection'` — advice to check a network nothing reached.
-    assertWhereUsedTarget(params);
-
     return answering(
       () => getWhereUsedScope(this.connection, params),
       this.results.whereUsedScope as IResultStrategy<
@@ -415,8 +409,6 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
   async getWhereUsed(
     params: IGetWhereUsedParams,
   ): Promise<IAdtResponse<ReturnType<R['whereUsed']>>> {
-    assertWhereUsedTarget(params);
-
     return answering(
       () => getWhereUsed(this.connection, params),
       this.results.whereUsed as IResultStrategy<ReturnType<R['whereUsed']>>,
@@ -570,6 +562,7 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
           objectName,
           functionGroup,
           options,
+          this.logger,
         ),
       this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
     );
@@ -617,6 +610,7 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
           functionGroup,
           version,
           options,
+          this.logger,
         ),
       this.results.source as IResultStrategy<ReturnType<R['source']>>,
     );

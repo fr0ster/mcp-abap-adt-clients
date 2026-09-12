@@ -17,6 +17,7 @@ import type {
   AdtSourceObjectType,
   IAbapConnection,
   IAdtWireResponse,
+  ILogger,
   IReadOptions,
 } from '@mcp-abap-adt/interfaces';
 import {
@@ -44,6 +45,7 @@ export async function objectSourceWire(
   functionGroup?: string,
   version?: 'active' | 'inactive',
   options?: IReadOptions,
+  logger?: ILogger,
 ): Promise<IAdtWireResponse> {
   if (!supportsSourceCode(objectType)) {
     throw new Error(
@@ -68,9 +70,7 @@ export async function objectSourceWire(
         Accept: acceptHeader,
       },
     },
-    {
-      logger: undefined,
-    },
+    { logger },
   );
 }
 
@@ -89,6 +89,7 @@ export async function objectMetadataWire(
   objectName: string,
   functionGroup?: string,
   options?: IReadOptions,
+  logger?: ILogger,
 ): Promise<IAdtWireResponse> {
   let uri = getObjectMetadataUri(objectType, objectName, functionGroup);
   const params = [];
@@ -112,9 +113,7 @@ export async function objectMetadataWire(
         Accept: acceptHeader,
       },
     },
-    {
-      logger: undefined,
-    },
+    { logger },
   );
 }
 

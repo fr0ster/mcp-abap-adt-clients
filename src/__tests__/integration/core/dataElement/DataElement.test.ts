@@ -22,6 +22,7 @@ import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IDataElementConfig } from '../../../../core/dataElement';
 import { getDataElement } from '../../../../core/dataElement/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { patchXmlAttribute } from '../../../../utils/xmlPatch';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { expectResult } from '../../../helpers/contract';
 import {
@@ -384,6 +385,12 @@ describe('DataElement (using AdtClient)', () => {
         try {
           // Use BaseTester.flowTest() for standardized CRUD flow
           await tester.flowTest(config, testCase.params, {
+            updateTakesDocument: (current) =>
+              patchXmlAttribute(
+                current,
+                'adtcore:description',
+                `${config.description || ''} (updated)`.slice(0, 60),
+              ),
             updateConfig: {
               dataElementName: config.dataElementName,
               packageName: config.packageName!,

@@ -6,22 +6,14 @@
  */
 
 import type {
-  HttpError,
   IAbapConnection,
   IAdtContentTypes,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
 import { CT_FUNCTION_GROUP } from '../../constants/contentTypes';
-import {
-  encodeSapObjectName,
-  limitDescription,
-} from '../../utils/internalUtils';
+import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
-import { extractXmlString, patchXmlAttribute } from '../../utils/xmlPatch';
-import { lockFunctionGroup } from './lock';
-import { getFunctionGroup } from './read';
 import type { IUpdateFunctionGroupParams } from './types';
-import { unlockFunctionGroup } from './unlock';
 
 /**
  * Write the document the caller built.

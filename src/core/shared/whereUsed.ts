@@ -189,20 +189,6 @@ function isScopeResourceUnavailable(error: unknown): boolean {
 }
 
 /**
- * The two things every where-used call needs before it can ask anything.
- *
- * Exported and called by the contract members **before** `answering`, not only
- * from inside these functions: a guard that throws inside the request is caught
- * by `answering` and classified `origin: 'connection'` — which tells a caller to
- * check a network that was never reached, over a parameter they left empty. A
- * caller error is not a verdict about a server.
- */
-export function assertWhereUsedTarget(params: {
-  object_name?: string;
-  object_type?: string;
-}): void {}
-
-/**
  * Get where-used scope configuration (Step 1 of 2)
  *
  * Returns available object types for where-used search.
@@ -234,8 +220,6 @@ export async function getWhereUsedScope(
   connection: IAbapConnection,
   params: IGetWhereUsedScopeParams,
 ): Promise<IAdtWireResponse> {
-  assertWhereUsedTarget(params);
-
   const objectUri = buildObjectUri(params.object_name, params.object_type);
   const scopeUrl = `/sap/bc/adt/repository/informationsystem/usageReferences/scope?uri=${encodeURIComponent(objectUri)}`;
   const scopeRequestBody =
@@ -271,8 +255,6 @@ export async function getWhereUsed(
   connection: IAbapConnection,
   params: IGetWhereUsedParams,
 ): Promise<IAdtWireResponse> {
-  assertWhereUsedTarget(params);
-
   const objectUri = buildObjectUri(params.object_name, params.object_type);
 
   // Step 2: perform the actual where-used search.
