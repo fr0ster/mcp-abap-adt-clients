@@ -17,7 +17,8 @@ When `adt-clients` moves into `packages/`, this file goes with it.
 
 Releases go out with `npm run release:publish`, which publishes only the
 packages whose version is missing from the registry — the same consequence of
-independent versions.
+independent versions. One package at a time: `npm run publish:clients` and
+`npm run publish:strategies`.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 

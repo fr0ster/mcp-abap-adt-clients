@@ -72,6 +72,11 @@ could be empty against a type that promised otherwise.
 
 ### Not published
 
-No `npm publish` accompanied this tag. `npm run release:publish` publishes the
-packages whose version is not yet on the registry — this one, and nothing else.
-`-- --dry` says what it would do and touches nothing.
+No `npm publish` accompanied this tag. Either of these does it:
+
+```bash
+npm run publish:strategies   # this package
+npm run release:publish      # every package the registry is missing
+```
+
+`npm run release:publish -- --dry` says what it would do and touches nothing.
