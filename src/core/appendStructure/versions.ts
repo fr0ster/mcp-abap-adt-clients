@@ -12,10 +12,8 @@ export async function getAppendStructureVersions(
   connection: IAbapConnection,
   config: Partial<IAppendStructureConfig>,
 ): Promise<ObjectVersion[]> {
-  if (!config.appendStructureName)
-    throw new Error('appendStructureName is required');
   const encodedName = encodeSapObjectName(
-    config.appendStructureName.toLowerCase(),
+    (config.appendStructureName as string).toLowerCase(),
   );
   const url = `/sap/bc/adt/ddic/structures/${encodedName}/source/main/versions`;
   try {

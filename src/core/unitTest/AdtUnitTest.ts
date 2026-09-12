@@ -134,10 +134,7 @@ export class AdtUnitTest<R extends IUnitTestResults = typeof unitTestDocuments>
 
   /** The container class's name, or the caller's mistake. */
   protected name(config: Partial<IUnitTestConfig>): string {
-    if (!config.className) {
-      throw new Error('Container class name is required');
-    }
-    return config.className;
+    return config.className as string;
   }
 
   /**
@@ -244,18 +241,16 @@ export class AdtUnitTest<R extends IUnitTestResults = typeof unitTestDocuments>
    * `options.lockHandle` writes inside a lock the caller already holds, which is
    * the point of having both this and {@link create}: the container's lock is
    * taken once and a caller can update the class and its tests in one window.
+   *
+   * **The whole content, every time.** This is a replace, never a merge. Read
+   * what the object holds, change what you mean to change, and pass the result:
+   * anything left out is gone, because nothing is read here to keep it.
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IUnitTestConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
     const name = this.name(config);
-    if (
-      config.testClassSource === undefined &&
-      options?.sourceCode === undefined
-    ) {
-      throw new Error('Test class source is required');
-    }
 
     return this.adtLocalTestClass.update(
       {
@@ -310,10 +305,6 @@ export class AdtUnitTest<R extends IUnitTestResults = typeof unitTestDocuments>
     tests: IClassUnitTestDefinition[],
     options?: IClassUnitTestRunOptions,
   ): Promise<IAdtResponse<ReturnType<R['run']>>> {
-    if (!tests || tests.length === 0) {
-      throw new Error('At least one test definition is required');
-    }
-
     this.logger?.info?.('Starting unit test run');
     const answer = await answering(
       () => startClassUnitTestRun(this.connection, tests, options),

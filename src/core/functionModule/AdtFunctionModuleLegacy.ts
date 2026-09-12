@@ -28,17 +28,11 @@ export class AdtFunctionModuleLegacy<
     config: Partial<IFunctionModuleConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
-    if (!config.functionModuleName) {
-      throw new Error('Function module name is required');
-    }
-    if (!config.functionGroupName) {
-      throw new Error('Function group name is required');
-    }
-    const group = config.functionGroupName;
+    const group = config.functionGroupName as string;
     const module = config.functionModuleName;
 
     const encodedGroup = encodeSapObjectName(group).toLowerCase();
-    const encodedModule = encodeSapObjectName(module).toLowerCase();
+    const encodedModule = encodeSapObjectName(module as string).toLowerCase();
     const objectUrl = `/sap/bc/adt/functions/groups/${encodedGroup}/fmodules/${encodedModule}`;
     return answering(
       () =>

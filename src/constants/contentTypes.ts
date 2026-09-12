@@ -44,7 +44,7 @@ export const ACCEPT_VALIDATION = 'application/vnd.sap.as+xml';
 /**
  * What a publication job answers, asked for the way Eclipse asks.
  *
- * Measured on the cloud trial, both directions: the response comes back as
+ * Measured on one system, both directions: the response comes back as
  * `application/vnd.sap.as+xml; charset=utf-8; dataname=com.sap.adt.StatusMessage`
  * and carries `<SEVERITY>` and `<SHORT_TEXT>`. Eclipse names that `dataname` in
  * its `Accept`; this library asked for the bare media type and got the same
@@ -281,7 +281,7 @@ export const CT_ABAPGIT_EXTERNAL_REPO_INFO_REQUEST_V2 =
 export const ACCEPT_ABAPGIT_EXTERNAL_REPO_INFO_RESPONSE_V2 =
   'application/abapgit.adt.repo.info.ext.response.v2+xml';
 
-// ATC (ABAP Test Cockpit) — captured against a cloud trial, not taken from
+// ATC (ABAP Test Cockpit) — captured against one system, not taken from
 // documentation. Two of these are the resource rather than a detail: the
 // worklist is created and its id read as text/plain where everything around it
 // is XML, and the run resource answers only to the backgroundrun type. A

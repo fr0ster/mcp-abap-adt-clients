@@ -105,20 +105,4 @@ describe('the batch guard', () => {
 
     expect(calls).toHaveLength(1);
   });
-
-  it('refuses to resolve, rather than hanging, when no configUri is given', async () => {
-    const { connection, calls } = connectionOver(
-      bodies(CONFIGURATIONS('/a')),
-      deferred,
-    );
-
-    const started = Date.now();
-    await expect(new AdtRequest(connection).list()).rejects.toThrow(
-      /configUri is required on a batch client/,
-    );
-
-    // A deadlock would surface as a timeout, which reads like a slow pass.
-    expect(Date.now() - started).toBeLessThan(1000);
-    expect(calls).toHaveLength(0);
-  });
 });

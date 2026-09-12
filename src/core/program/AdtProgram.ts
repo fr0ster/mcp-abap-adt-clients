@@ -128,15 +128,9 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
 
     // Nothing was asked of the server, so there is no answer to describe: a
     // missing required argument is the caller's mistake and it throws.
-    if (!config.programName) {
-      throw new Error('Program name is required for validation');
-    }
     // The endpoint requires it: without `packagename` it answers 400, so a
     // missing package is a caller error worth naming here rather than an HTTP
     // failure to decode later.
-    if (!config.packageName) {
-      throw new Error('Package name is required for validation');
-    }
 
     return answering(
       () =>
@@ -156,16 +150,24 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
     config: Omit<IProgramConfig, 'sourceCode'> & { sourceCode?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    // **The one guard this package keeps, and only on a create.**
+    //
+    // An object created without a package is the single thing `delete()` cannot
+    // undo: the deletion check resolves through the package, so it answers
+    // "Object does not exist" while the name stays taken for good, and clearing
+    // it is SAP GUI territory. Everywhere else a missing field produces a
+    // request the server answers, which is a reading a strategy can take. Here
+    // it produces a state with no way out through ADT at all.
+    if (!config.packageName) {
+      throw new Error(
+        'packageName is required for create: an object created without one cannot be deleted through ADT',
+      );
+    }
+
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    if (!config.programName) {
-      throw new Error('Program name is required');
-    }
-    if (!config.packageName) {
-      throw new Error('Package name is required');
-    }
-    const name = config.programName;
+    const name = config.programName as string;
     return answering(
       () =>
         createProgram(
@@ -207,10 +209,6 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    if (!config.programName) {
-      throw new Error('Program name is required');
-    }
-
     // No 404 special case any more. ADT answers a read for a missing program
     // with 200 and an empty body, so absence was never a status to branch on —
     // and whether an empty body *is* absence is the caller's reading, supplied
@@ -236,10 +234,6 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    if (!config.programName) {
-      throw new Error('Program name is required');
-    }
-
     return answering(
       () =>
         getProgramMetadata(connection, config.programName as string, options),
@@ -254,6 +248,10 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
    * With `options.lockHandle` the caller holds the lock and owns the chain, so
    * this is one request. Without it, this locks, checks, writes and unlocks —
    * and the unlock happens on every path out.
+   *
+   * **The whole content, every time.** This is a replace, never a merge. Read
+   * what the object holds, change what you mean to change, and pass the result:
+   * anything left out is gone, because nothing is read here to keep it.
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IProgramConfig>,
@@ -262,10 +260,7 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    if (!config.programName) {
-      throw new Error('Program name is required');
-    }
-    const name = config.programName;
+    const name = config.programName as string;
     // The source is the caller's, through `options.sourceCode`. This used to
     // fall back to `config.sourceCode` — two channels for one value, where the
     // contract documents one. `config.sourceCode` is `check`'s alone now: a
@@ -274,15 +269,12 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
     const source = options?.sourceCode;
     const sessionId = connection.getSessionId?.() || '';
 
-    if (!source) {
-      throw new Error('Source code is required for update');
-    }
     return answering(
       () =>
         uploadProgramSource(
           connection,
           name,
-          source,
+          source as string,
           options?.lockHandle as string,
           sessionId,
           config.transportRequest,
@@ -306,10 +298,7 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    if (!config.programName) {
-      throw new Error('Program name is required');
-    }
-    const name = config.programName;
+    const name = config.programName as string;
     return answering(
       () =>
         checkDeletion(connection, {
@@ -339,10 +328,7 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    if (!config.programName) {
-      throw new Error('Program name is required');
-    }
-    const name = config.programName;
+    const name = config.programName as string;
     return answering(
       () =>
         deleteProgram(connection, {
@@ -362,10 +348,6 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    if (!config.programName) {
-      throw new Error('Program name is required');
-    }
-
     return answering(
       () => activateProgram(connection, config.programName as string),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
@@ -382,9 +364,6 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    if (!config.programName) {
-      throw new Error('Program name is required');
-    }
     const version: 'active' | 'inactive' =
       status === 'active' ? 'active' : 'inactive';
 
@@ -410,10 +389,6 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    if (!config.programName) {
-      throw new Error('Program name is required');
-    }
-
     return answering(
       () =>
         getProgramTransport(
@@ -430,10 +405,7 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
 
   /** Lock the program for modification. */
   async lock(config: Partial<IProgramConfig>): Promise<IAdtResponse<string>> {
-    if (!config.programName) {
-      throw new Error('Program name is required');
-    }
-    const name = config.programName;
+    const name = config.programName as string;
 
     return answering(
       async () => {
@@ -460,10 +432,7 @@ export class AdtProgram<R extends IProgramResults = typeof programDocuments>
     config: Partial<IProgramConfig>,
     lockHandle: string,
   ): Promise<IAdtResponse<void>> {
-    if (!config.programName) {
-      throw new Error('Program name is required');
-    }
-    const name = config.programName;
+    const name = config.programName as string;
 
     return answering(
       async () => {

@@ -127,18 +127,19 @@ export class AdtEnhancement<
   private enhancementType(
     config: Partial<IEnhancementConfig>,
   ): EnhancementType {
-    if (!config.enhancementType) {
-      throw new Error('Enhancement type is required');
-    }
-    return config.enhancementType;
+    return config.enhancementType as EnhancementType;
   }
 
-  /** The name, or the caller's mistake — nothing was asked of the server yet. */
+  /**
+   * The name as the caller gave it.
+   *
+   * No guard: the config's type says the field is there, and a `Partial<>` at
+   * the call site is what widens it. A caller who passes nothing builds a URL
+   * from nothing and the server answers — which is a reading a strategy can
+   * take, where a sentence composed here would not be.
+   */
   private name(config: Partial<IEnhancementConfig>): string {
-    if (!config.enhancementName) {
-      throw new Error('Enhancement name is required');
-    }
-    return config.enhancementName;
+    return config.enhancementName as string;
   }
 
   /** Validate the name before creating the object. */
@@ -171,14 +172,25 @@ export class AdtEnhancement<
     config: Omit<IEnhancementConfig, 'sourceCode'> & { sourceCode?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    // **The one guard this package keeps, and only on a create.**
+    //
+    // An object created without a package is the single thing `delete()` cannot
+    // undo: the deletion check resolves through the package, so it answers
+    // "Object does not exist" while the name stays taken for good, and clearing
+    // it is SAP GUI territory. Everywhere else a missing field produces a
+    // request the server answers, which is a reading a strategy can take. Here
+    // it produces a state with no way out through ADT at all.
+    if (!config.packageName) {
+      throw new Error(
+        'packageName is required for create: an object created without one cannot be deleted through ADT',
+      );
+    }
+
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const name = this.name(config);
     const type = this.enhancementType(config);
-    if (!config.packageName) {
-      throw new Error('Package name is required');
-    }
     return answering(
       () =>
         createEnhancement(
@@ -286,6 +298,10 @@ export class AdtEnhancement<
    * With `options.lockHandle` the caller holds the lock and owns the chain, so
    * this is one request. Without it, this locks, checks, writes and unlocks —
    * and the unlock happens on every path out.
+   *
+   * **The whole content, every time.** This is a replace, never a merge. Read
+   * what the object holds, change what you mean to change, and pass the result:
+   * anything left out is gone, because nothing is read here to keep it.
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IEnhancementConfig>,
@@ -303,9 +319,6 @@ export class AdtEnhancement<
     // nowhere else to arrive.
     const source = options?.sourceCode;
 
-    if (!source) {
-      throw new Error('Source code is required for update');
-    }
     return answering(
       () =>
         updateEnhancement(

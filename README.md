@@ -4,6 +4,12 @@
 
 TypeScript clients for SAP ABAP Development Tools (ADT).
 
+> **Upgrading from 18.x?** 19.0.0 stops this package from deciding anything: the
+> readings that turned a response into a verdict are gone, every member issues
+> one endpoint call, and 454 input guards went with them.
+> [`docs/usage/MIGRATION-19.md`](docs/usage/MIGRATION-19.md) is what a consumer
+> on the old contract has to change.
+
 ## Features
 
 - ✅ **Client API** – simplified interface for common operations:
@@ -209,39 +215,41 @@ if (found.ok) {
   found.getError().message;       // what SAP said, verbatim
 }
 
-// Where-used with parsed results
-const answer = await utils.getWhereUsedList({
-  object_name: 'ZCL_TEST',
-  object_type: 'class',
-  enableAllTypes: true  // Eclipse "select all" behavior
+// Where-used: the scope, edited, then the search. Three calls since 19.0.0,
+// because they are three requests — and what to do when a system has no
+// /usageReferences/scope sub-resource (some S/4 releases 404 it) is a decision
+// about your system, so it is yours rather than a fallback hidden in here.
+const scope = await utils.getWhereUsedScope({
+  object_name: 'ZMY_TABLE',
+  object_type: 'table',
 });
-
-if (!answer.ok) {
+if (!scope.ok) {
   // A refusal is an answer, not an exception flying past. `origin` says which
   // remedy applies: restore the channel, or ask the server something else —
   // two different problems that "something went wrong" hides.
-  throw new Error(answer.getError().message);
+  throw new Error(scope.getError().message);
 }
 
-const result = answer.getResult().value;
-console.log(`Found ${result.totalReferences} references`);
-for (const ref of result.references) {
-  console.log(`${ref.name} (${ref.type}) in ${ref.packageName}`);
-}
-
-// Restrict to specific object types — SAP filters server-side, so it never
-// returns the unwanted types (e.g. hundreds of classes when you want structures).
-// On systems without the /usageReferences/scope sub-resource (some S/4 releases
-// 404 it) the search falls back to unscoped and the filter is applied to the
-// parsed references client-side, so you still get the narrowed set.
-await utils.getWhereUsedList({
-  object_name: 'ZMY_TABLE',
-  object_type: 'table',
-  enableOnlyTypes: ['TABL/DS', 'TABL/DT']  // or disableTypes: ['CLAS/OC']
+// No request: it rewrites the document the call above returned.
+const narrowed = utils.modifyWhereUsedScope(scope.getResult().value, {
+  enableOnly: ['TABL/DS', 'TABL/DT'],  // or disable: ['CLAS/OC']
 });
 
-// Where-used with raw XML (legacy)
-await utils.getWhereUsed({ object_name: 'ZCL_TEST', object_type: 'class' });
+const answer = await utils.getWhereUsed({
+  object_name: 'ZMY_TABLE',
+  object_type: 'table',
+  scopeXml: narrowed,
+});
+
+// The default reading is the document. `whereUsedReferences` is the shape the
+// old member returned, offered by name rather than imposed:
+import { whereUsedReferences } from '@mcp-abap-adt/adt-clients';
+
+const references = whereUsedReferences({ data: answer.getResult().value } as never);
+console.log(`Found ${references.totalReferences} references`);
+for (const ref of references.references) {
+  console.log(`${ref.name} (${ref.type}) in ${ref.packageName}`);
+}
 ```
 
 ### Using AdtClientsWS (Realtime)
@@ -360,23 +368,40 @@ implementations pass it internally on reads after create/update.
 See the caveat above — on the system measured, the flag had no effect on object
 reads at all.
 
-**Note:** `create()` and `update()` request long polling on their follow-up reads
-where the handler supports it. Read that as "asked for", not "ensured" — the
-caveat above stands, and nothing in this library can make the system answer
-sooner than it does.
+**Note:** long polling is a flag on a read you make. `create()` and `update()`
+issue one request each and make no follow-up read of their own since 19.0.0.
 
-What the library does guarantee is that a read which came back empty is not
-written back. ADT answers a read of a not-yet-ready object with **HTTP 200 and
-an empty body**, never a 404, so a read-modify-write update used to patch that
-empty body — changing nothing, because there was nothing to change — and PUT the
-result. Since 10.1.0 that read fails with `XmlPatchError`, naming the object:
+### `update()` writes the whole content
 
+**Every type, every time: `update` replaces. It never merges.** Read the object,
+change what you mean to change, pass the result. Anything you leave out is gone,
+because nothing is read on your behalf to keep it.
+
+For a class, a program or a DDL source the whole content is the **full source**.
+For domain, package, dataElement, tableType, transport and functionGroup it is
+the object's own **document**, passed as `config.document` — those six fetched
+and patched it for you until 19.0.0, and no longer do.
+
+```typescript
+const current = await client.getClass().read({ className: 'ZCL_TEST' }, 'active');
+const edited = addAMethod(String(current.getResult().value));
+
+const handle = (await client.getClass().lock({ className: 'ZCL_TEST' })).getResult().value;
+await client.getClass().update({ className: 'ZCL_TEST' }, { sourceCode: edited, lockHandle: handle });
+await client.getClass().unlock({ className: 'ZCL_TEST' }, handle);
 ```
-Cannot update domain ZAC_DOM01: the read returned an empty body.
-```
 
-A slow system therefore surfaces as a read error, not as a write the server
-rejects for a reason that points nowhere near the cause.
+Watch the read. ADT answers a read of a not-yet-ready object with **HTTP 200 and
+an empty body**, never a 404, so what you edit may be nothing at all.
+
+This package does not check what you pass, and cannot: whether a document is
+complete is a question only your system can answer, and it answers it — in its
+own words, on the write. That is why the rule above is worth knowing rather than
+relying on being caught.
+
+Full detail: [`docs/usage/MIGRATION-19.md`](docs/usage/MIGRATION-19.md). Every
+sequence 19.0.0 handed back to the consumer is written out under
+[`examples/`](examples), one file per removed member.
 
 ### Creating Behavior Implementation Classes
 

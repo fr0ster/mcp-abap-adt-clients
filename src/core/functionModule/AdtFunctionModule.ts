@@ -133,15 +133,9 @@ export class AdtFunctionModule<
     group: string;
     module: string;
   } {
-    if (!config.functionModuleName) {
-      throw new Error('Function module name is required');
-    }
-    if (!config.functionGroupName) {
-      throw new Error('Function group name is required');
-    }
     return {
-      group: config.functionGroupName,
-      module: config.functionModuleName,
+      group: config.functionGroupName as string,
+      module: config.functionModuleName as string,
     };
   }
 
@@ -177,9 +171,6 @@ export class AdtFunctionModule<
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const { group, module } = this.names(config);
-    if (!config.description) {
-      throw new Error('Description is required');
-    }
     return answering(
       () =>
         createFunctionModule(connection, {
@@ -263,6 +254,10 @@ export class AdtFunctionModule<
    * With `options.lockHandle` the caller holds the lock and owns the chain, so
    * this is one request. Without it, this locks, checks, writes and unlocks —
    * and the unlock happens on every path out.
+   *
+   * **The whole content, every time.** This is a replace, never a merge. Read
+   * what the object holds, change what you mean to change, and pass the result:
+   * anything left out is gone, because nothing is read here to keep it.
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionModuleConfig>,
@@ -279,9 +274,6 @@ export class AdtFunctionModule<
     // nowhere else to arrive.
     const source = options?.sourceCode;
 
-    if (!source) {
-      throw new Error('Source code is required for update');
-    }
     return answering(
       () =>
         update(
@@ -289,7 +281,7 @@ export class AdtFunctionModule<
           {
             functionModuleName: module,
             functionGroupName: group,
-            sourceCode: source,
+            sourceCode: source as string,
             lockHandle: options?.lockHandle as string,
             transportRequest: config.transportRequest,
           },

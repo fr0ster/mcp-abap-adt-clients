@@ -110,12 +110,6 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
 
     // Nothing was asked of the server, so there is no answer to describe: a
     // missing required argument is the caller's mistake and it throws.
-    if (!config.className) {
-      throw new Error('Class name is required for validation');
-    }
-    if (!config.packageName) {
-      throw new Error('Package name is required for validation');
-    }
 
     return answering(
       () =>
@@ -138,15 +132,22 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
     config: Omit<IClassConfig, 'sourceCode'> & { sourceCode?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    // **The one guard this package keeps, and only on a create.**
+    //
+    // An object created without a package is the single thing `delete()` cannot
+    // undo: the deletion check resolves through the package, so it answers
+    // "Object does not exist" while the name stays taken for good, and clearing
+    // it is SAP GUI territory. Everywhere else a missing field produces a
+    // request the server answers, which is a reading a strategy can take. Here
+    // it produces a state with no way out through ADT at all.
+    if (!config.packageName) {
+      throw new Error(
+        'packageName is required for create: an object created without one cannot be deleted through ADT',
+      );
+    }
+
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
-
-    if (!config.className) {
-      throw new Error('Class name is required');
-    }
-    if (!config.packageName) {
-      throw new Error('Package name is required');
-    }
 
     // One member, one endpoint: this is the POST and nothing else. What used to
     // follow it — a validate, a check, an activation — are members of their own,
@@ -197,10 +198,6 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    if (!config.className) {
-      throw new Error('Class name is required');
-    }
-
     // No 404 special case any more. ADT answers a read for a missing class with
     // 200 and an empty body, so absence was never a status to branch on — and
     // whether an empty body *is* absence is the caller's reading, supplied
@@ -222,6 +219,10 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
    * Update class with full operation chain
    * Always starts with lock
    * If options.lockHandle is provided, performs only low-level update without lock/check/unlock chain
+   *
+   * **The whole content, every time.** This is a replace, never a merge. Read
+   * what the object holds, change what you mean to change, and pass the result:
+   * anything left out is gone, because nothing is read here to keep it.
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig>,
@@ -230,18 +231,12 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    if (!config.className) {
-      throw new Error('Class name is required');
-    }
     // The source is the caller's, through `options.sourceCode`. This used to
     // fall back to `config.sourceCode` — two channels for one value, where the
     // contract documents one. `config.sourceCode` is `check`'s alone now: a
     // syntax check compiles a source that is not on the server yet, so it has
     // nowhere else to arrive.
     const sourceCode = options?.sourceCode;
-    if (sourceCode === undefined) {
-      throw new Error('Source code is required for update');
-    }
 
     // **One member, one endpoint: the PUT.** This used to be a window — lock,
     // check, PUT, unlock, check, and an activation on request — six requests
@@ -258,7 +253,7 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
         updateClass(
           connection,
           config.className as string,
-          sourceCode,
+          sourceCode as string,
           options?.lockHandle,
           config.transportRequest,
           this.contentTypes?.sourceArtifactContentType(),
@@ -277,10 +272,6 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
-
-    if (!config.className) {
-      throw new Error('Class name is required');
-    }
 
     return answering(
       () =>
@@ -304,10 +295,6 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
-
-    if (!config.className) {
-      throw new Error('Class name is required');
-    }
 
     // One member, one endpoint. The approval ADT wants first is `checkDeletion`
     // above — a caller who wants it asks it, and reads what it said. This is the
@@ -334,17 +321,14 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    if (!config.className) {
-      throw new Error('Class name is required');
-    }
     const version: 'active' | 'inactive' =
       status === 'active' ? 'active' : 'inactive';
 
-    // No parse-and-throw on `has_errors`. A `<msg type="E">` inside a 200 is a
-    // refusal, and recognising it is the error strategy's job — done once, on
-    // the connection, for every member — rather than this member's, done again
-    // and differently. A caller who reads check messages some other way says so
-    // through `analyse`.
+    // No parse-and-throw on `has_errors`. The report comes back whatever it
+    // says, because a check that finds a syntax error is a check that worked —
+    // and throwing cost the findings, the line numbers and the T100 keys.
+    // Whether a message means "do not write" is the caller's, through
+    // `analyse`; no error strategy ships from this package.
     return answering(
       () =>
         checkClass(
@@ -364,9 +348,6 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
    * Uses parent class lock - sufficient for updating testclasses include
    */
   async lockTestClasses(config: Partial<IClassConfig>): Promise<string> {
-    if (!config.className) {
-      throw new Error('Class name is required');
-    }
     // Stateful for the LOCK request alone.
     //
     // This used to say "stay stateful while the lock is held … avoids 423 on
@@ -377,7 +358,7 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
     // inside the session leaves what it takes there.
     // Bound before the closure: `config.className` is a mutable property, so
     // the guard above does not narrow it inside a callback.
-    const className = config.className;
+    const className = config.className as string;
     return await inStatefulSession(this.connection, () =>
       lockClass(this.connection, className),
     );
@@ -391,10 +372,7 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
     config: Partial<IClassConfig>,
     lockHandle: string,
   ): Promise<IAdtWireResponse> {
-    if (!config.className) {
-      throw new Error('Class name is required');
-    }
-    const className = config.className;
+    const className = config.className as string;
     return await inStatefulSession(this.connection, () =>
       unlockClass(this.connection, className, lockHandle),
     );
@@ -407,98 +385,13 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
     config: Partial<IClassConfig> & { testClassCode: string },
     version: 'active' | 'inactive' = 'inactive',
   ): Promise<IAdtWireResponse> {
-    if (!config.className) {
-      throw new Error('Class name is required');
-    }
-    if (!config.testClassCode) {
-      throw new Error('Test class code is required');
-    }
     return await checkClassLocalTestClass(
       this.connection,
-      config.className,
+      config.className as string,
       config.testClassCode,
       version,
       this.contentTypes?.sourceArtifactContentType(),
     );
-  }
-
-  /**
-   * Update test classes (local classes) with full operation chain
-   * Always starts with lock of parent class
-   */
-  async updateTestClasses(
-    config: Partial<IClassConfig> & { testClassCode: string },
-  ): Promise<IAdtWireResponse> {
-    if (!config.className) {
-      throw new Error('Class name is required');
-    }
-    if (!config.testClassCode) {
-      throw new Error('Test class code is required');
-    }
-    // Bound once: the guard above narrows the property here, but not inside the
-    // callbacks below — a mutable property is re-widened in a closure.
-    const className = config.className;
-
-    let lockHandle: string | undefined;
-
-    // This try is a LOCK…UNLOCK window; a timeout in the middle releases
-
-    // the lock but leaves the work half-done.
-
-    const endCriticalSection = beginCriticalSection(this.connection);
-
-    try {
-      // 1. Lock parent class (stateful only for lock)
-      // Lock handle from parent class is sufficient for updating testclasses include
-      this.logger?.info?.('Step 1: Locking parent class');
-      lockHandle = await inStatefulSession(this.connection, () =>
-        lockClass(this.connection, className),
-      );
-      this.lockTracker.track(config.className, lockHandle);
-      this.logger?.info?.('Parent class locked, handle:', lockHandle);
-
-      // 2. Update test classes (uses parent class lock handle)
-      this.logger?.info?.('Step 2: Updating test classes');
-      const response = await updateClassTestInclude(
-        this.connection,
-        config.className,
-        config.testClassCode,
-        lockHandle,
-        config.transportRequest,
-        this.contentTypes?.sourceArtifactContentType(),
-      );
-
-      // 3. Unlock parent class (switch to stateless after unlock)
-      this.logger?.info?.('Step 3: Unlocking parent class');
-      const handleToRelease = lockHandle;
-      await inStatefulSession(this.connection, () =>
-        unlockClass(this.connection, className, handleToRelease),
-      );
-      this.lockTracker.untrack(className);
-      lockHandle = undefined;
-
-      return response;
-    } catch (error) {
-      // Cleanup: unlock on error
-      if (lockHandle) {
-        try {
-          this.logger?.warn?.('Unlocking parent class after error');
-          const handleToRelease = lockHandle;
-          await inStatefulSession(this.connection, () =>
-            unlockClass(this.connection, className, handleToRelease),
-          );
-          this.lockTracker.untrack(className);
-        } catch (unlockError) {
-          this.logger?.warn?.(
-            'Failed to unlock parent class after error:',
-            safeErrorMessage(unlockError),
-          );
-        }
-      }
-      throw error;
-    } finally {
-      endCriticalSection();
-    }
   }
 
   /**
@@ -507,15 +400,9 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
   async activateTestClasses(
     config: Partial<IClassConfig> & { testClassName: string },
   ): Promise<IAdtWireResponse> {
-    if (!config.className) {
-      throw new Error('Class name is required');
-    }
-    if (!config.testClassName) {
-      throw new Error('Test class name is required');
-    }
     return await activateClassTestClasses(
       this.connection,
-      config.className,
+      config.className as string,
       config.testClassName,
     );
   }
@@ -523,8 +410,7 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
   async getVersions(
     config: Partial<IClassConfig>,
   ): Promise<IAdtResponse<ObjectVersion[]>> {
-    if (!config.className) throw new Error('className is required');
-    const name = config.className;
+    const name = config.className as string;
     return answering(
       async () => ({
         data: await this.getIncludeVersions(name, 'main'),

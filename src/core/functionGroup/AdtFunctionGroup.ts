@@ -113,10 +113,6 @@ export class AdtFunctionGroup<
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    if (!config.functionGroupName) {
-      throw new Error('Function group name is required for validation');
-    }
-
     return answering(
       () =>
         validateFunctionGroupName(
@@ -135,19 +131,24 @@ export class AdtFunctionGroup<
     config: Omit<IFunctionGroupConfig, 'sourceCode'> & { sourceCode?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    // **The one guard this package keeps, and only on a create.**
+    //
+    // An object created without a package is the single thing `delete()` cannot
+    // undo: the deletion check resolves through the package, so it answers
+    // "Object does not exist" while the name stays taken for good, and clearing
+    // it is SAP GUI territory. Everywhere else a missing field produces a
+    // request the server answers, which is a reading a strategy can take. Here
+    // it produces a state with no way out through ADT at all.
+    if (!config.packageName) {
+      throw new Error(
+        'packageName is required for create: an object created without one cannot be deleted through ADT',
+      );
+    }
+
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    if (!config.functionGroupName) {
-      throw new Error('Function group name is required');
-    }
-    if (!config.packageName) {
-      throw new Error('Package name is required');
-    }
-    if (!config.description) {
-      throw new Error('Description is required');
-    }
-    const name = config.functionGroupName;
+    const name = config.functionGroupName as string;
     return answering(
       () =>
         createFunctionGroup(
@@ -184,10 +185,6 @@ export class AdtFunctionGroup<
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    if (!config.functionGroupName) {
-      throw new Error('Function group name is required');
-    }
-
     return answering(
       () =>
         getFunctionGroup(
@@ -208,10 +205,6 @@ export class AdtFunctionGroup<
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    if (!config.functionGroupName) {
-      throw new Error('Function group name is required');
-    }
-
     return answering(
       () =>
         getFunctionGroupTransport(
@@ -231,6 +224,10 @@ export class AdtFunctionGroup<
    *
    * With `options.lockHandle` the caller holds the lock and owns the chain, so
    * this is one request.
+   *
+   * **The whole content, every time.** This is a replace, never a merge. Read
+   * what the object holds, change what you mean to change, and pass the result:
+   * anything left out is gone, because nothing is read here to keep it.
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionGroupConfig>,
@@ -239,14 +236,7 @@ export class AdtFunctionGroup<
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    if (!config.functionGroupName) {
-      throw new Error('Function group name is required');
-    }
-    if (!config.description) {
-      throw new Error('Description is required for update');
-    }
-    const name = config.functionGroupName;
-    const description = config.description;
+    const name = config.functionGroupName as string;
 
     return answering(
       () =>
@@ -254,10 +244,13 @@ export class AdtFunctionGroup<
           connection,
           {
             function_group_name: name,
-            description,
             lock_handle: options?.lockHandle as string,
             transport_request: config.transportRequest,
-          },
+          } as Parameters<typeof updateFunctionGroup>[1],
+          // The document the caller built. The description used to be merged
+          // into a document read here, inside a lock window opened here; both
+          // the read and the window are theirs now.
+          config.document as string,
           this.contentTypes,
         ),
       this.results.metadataUpdated as IResultStrategy<
@@ -281,10 +274,7 @@ export class AdtFunctionGroup<
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    if (!config.functionGroupName) {
-      throw new Error('Function group name is required');
-    }
-    const name = config.functionGroupName;
+    const name = config.functionGroupName as string;
     return answering(
       () =>
         checkDeletion(connection, {
@@ -310,10 +300,7 @@ export class AdtFunctionGroup<
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    if (!config.functionGroupName) {
-      throw new Error('Function group name is required');
-    }
-    const name = config.functionGroupName;
+    const name = config.functionGroupName as string;
     return answering(
       () =>
         deleteFunctionGroup(connection, {
@@ -333,10 +320,6 @@ export class AdtFunctionGroup<
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    if (!config.functionGroupName) {
-      throw new Error('Function group name is required');
-    }
-
     return answering(
       () =>
         activateFunctionGroup(connection, config.functionGroupName as string),
@@ -354,9 +337,6 @@ export class AdtFunctionGroup<
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    if (!config.functionGroupName) {
-      throw new Error('Function group name is required');
-    }
     const version: 'active' | 'inactive' =
       status === 'active' ? 'active' : 'inactive';
 
@@ -376,10 +356,7 @@ export class AdtFunctionGroup<
   async lock(
     config: Partial<IFunctionGroupConfig>,
   ): Promise<IAdtResponse<string>> {
-    if (!config.functionGroupName) {
-      throw new Error('Function group name is required');
-    }
-    const name = config.functionGroupName;
+    const name = config.functionGroupName as string;
 
     return answering(
       async () => {
@@ -405,10 +382,7 @@ export class AdtFunctionGroup<
     config: Partial<IFunctionGroupConfig>,
     lockHandle: string,
   ): Promise<IAdtResponse<void>> {
-    if (!config.functionGroupName) {
-      throw new Error('Function group name is required');
-    }
-    const name = config.functionGroupName;
+    const name = config.functionGroupName as string;
 
     return answering(
       async () => {

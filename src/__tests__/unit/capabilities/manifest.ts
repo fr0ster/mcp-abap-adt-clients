@@ -366,6 +366,7 @@ export const HANDLERS = {
     requests: {
       create: '/sap/bc/adt/ddic/tabletypes',
       readMetadata: '/sap/bc/adt/ddic/tabletypes/ZGUARD_TTYP',
+      updateMetadata: '/sap/bc/adt/ddic/tabletypes/zguard_ttyp',
       // One request each, since 18.0.0: `delete` deletes, and the approval
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
       // whose refusal it reads, rather than a half of this one it cannot see.
@@ -856,6 +857,7 @@ export const HANDLERS = {
     requests: {
       create: '/sap/bc/adt/ddic/dataelements',
       readMetadata: '/sap/bc/adt/ddic/dataelements/ZGUARD_DTEL',
+      updateMetadata: '/sap/bc/adt/ddic/dataelements/zguard_dtel',
       // One request each, since 18.0.0: `delete` deletes, and the approval
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
       // whose refusal it reads, rather than a half of this one it cannot see.
@@ -931,6 +933,7 @@ export const HANDLERS = {
     requests: {
       create: '/sap/bc/adt/packages',
       readMetadata: '/sap/bc/adt/packages/ZGUARD_PKG',
+      updateMetadata: '/sap/bc/adt/packages/zguard_pkg',
       // One request each, since 18.0.0: `delete` deletes, and the approval
       // ADT wants first is `checkDeletion` — a member the consumer calls, and
       // whose refusal it reads, rather than a half of this one it cannot see.
@@ -1317,6 +1320,7 @@ export const HANDLERS = {
     requests: {
       create: '/sap/bc/adt/cts/transportrequests',
       readMetadata: '/sap/bc/adt/cts/transportrequests/DEVK900000',
+      updateMetadata: '/sap/bc/adt/cts/transportrequests/DEVK900000',
       delete: '/sap/bc/adt/cts/transportrequests/DEVK900000',
       // Measured: the deletion service answers `No URI-Mapping defined for
       // URI /sap/bc/adt/cts/transportrequests/…`, so this type asks the only

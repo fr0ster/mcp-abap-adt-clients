@@ -24,6 +24,7 @@ import type {
   IAdtSystemContext,
   IAdtUpdatable,
   IAdtValidatable,
+  IFeatureToggleSource,
   ILogger,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
@@ -107,12 +108,16 @@ export class AdtFeatureToggle<
     );
   }
 
-  /** The name, or the caller's mistake — nothing was asked of the server yet. */
+  /**
+   * The name as the caller gave it.
+   *
+   * No guard: the config's type says the field is there, and a `Partial<>` at
+   * the call site is what widens it. A caller who passes nothing builds a URL
+   * from nothing and the server answers — which is a reading a strategy can
+   * take, where a sentence composed here would not be.
+   */
   private name(config: Partial<IFeatureToggleConfig>): string {
-    if (!config.featureToggleName) {
-      throw new Error('Feature toggle name is required');
-    }
-    return config.featureToggleName;
+    return config.featureToggleName as string;
   }
 
   /** Map camelCase config to the snake_case low-level params. */
@@ -167,18 +172,26 @@ export class AdtFeatureToggle<
     config: Omit<IFeatureToggleConfig, 'sourceCode'> & { sourceCode?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    // **The one guard this package keeps, and only on a create.**
+    //
+    // An object created without a package is the single thing `delete()` cannot
+    // undo: the deletion check resolves through the package, so it answers
+    // "Object does not exist" while the name stays taken for good, and clearing
+    // it is SAP GUI territory. Everywhere else a missing field produces a
+    // request the server answers, which is a reading a strategy can take. Here
+    // it produces a state with no way out through ADT at all.
+    if (!config.packageName) {
+      throw new Error(
+        'packageName is required for create: an object created without one cannot be deleted through ADT',
+      );
+    }
+
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     // Called for its guards: it throws when the name this member needs is
     // missing, which is the one thing checked before the request goes out.
     this.name(config);
-    if (!config.packageName) {
-      throw new Error('Package name is required');
-    }
-    if (!config.description) {
-      throw new Error('Description is required');
-    }
     return answering(
       () => createFeatureToggle(connection, this.createParams(config)),
       this.results.created as IResultStrategy<ReturnType<R['created']>>,
@@ -230,6 +243,10 @@ export class AdtFeatureToggle<
    * A feature toggle is one of three types with two writable resources: this
    * document at `/sfw/featuretoggles/{name}`, and its JSON source at
    * `source/main`, which `update` writes.
+   *
+   * **The whole content, every time.** This is a replace, never a merge. Read
+   * what the object holds, change what you mean to change, and pass the result:
+   * anything left out is gone, because nothing is read here to keep it.
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IFeatureToggleConfig>,
@@ -259,6 +276,10 @@ export class AdtFeatureToggle<
    * There was no member for this at all until 18.0.0: `uploadFeatureToggleSource`
    * existed and nothing reached it, while `update` wrote the document. Now the
    * names say which resource each one addresses, as everywhere else.
+   *
+   * **The whole content, every time.** This is a replace, never a merge. Read
+   * what the object holds, change what you mean to change, and pass the result:
+   * anything left out is gone, because nothing is read here to keep it.
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IFeatureToggleConfig>,
@@ -269,16 +290,13 @@ export class AdtFeatureToggle<
 
     const name = this.name(config);
     const source = config.source;
-    if (!source) {
-      throw new Error('source is required to write a feature toggle source');
-    }
 
     return answering(
       () =>
         uploadFeatureToggleSource(
           connection,
           name,
-          source,
+          source as IFeatureToggleSource,
           options?.lockHandle,
           config.transportRequest,
         ),

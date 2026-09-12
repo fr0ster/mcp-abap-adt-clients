@@ -12,10 +12,8 @@ export async function getServiceDefinitionVersions(
   connection: IAbapConnection,
   config: Partial<IServiceDefinitionConfig>,
 ): Promise<ObjectVersion[]> {
-  if (!config.serviceDefinitionName)
-    throw new Error('serviceDefinitionName is required');
   const encodedName = encodeSapObjectName(
-    config.serviceDefinitionName.toLowerCase(),
+    (config.serviceDefinitionName as string).toLowerCase(),
   );
   const url = `/sap/bc/adt/ddic/srvd/sources/${encodedName}/source/main/versions`;
   try {

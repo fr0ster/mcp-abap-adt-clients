@@ -2048,7 +2048,7 @@ read_metadata:
       description: "Validate error for unsupported object type"
       params: {}
 
-# Where-Used (getWhereUsed, getWhereUsedList, getWhereUsedScope)
+# Where-Used (getWhereUsedScope, modifyWhereUsedScope, getWhereUsed)
 # Searches for references to an ABAP object across the system.
 # Two-step flow: 1) GET scope (available object types), 2) POST search with scope.
 # Supported object types: class, program, include, functionGroup, functionModule,
@@ -2094,7 +2094,7 @@ where_used:
     - name: "where_used_list_parsed"
       enabled: true
       available_in: ["onprem", "cloud"]
-      description: "Test getWhereUsedList with parsed results. Uses shared_dependencies.tables."
+      description: "The scope, edited, then the search, read into references. Uses shared_dependencies.tables."
       params:
         object_name: "ZAC_SHR_VTABL"  # → shared_dependencies.tables
         object_type: "table"
@@ -2103,11 +2103,10 @@ where_used:
     - name: "where_used_list_raw_xml"
       enabled: true
       available_in: ["onprem", "cloud"]
-      description: "Test getWhereUsedList with raw XML included. Uses shared_dependencies.tables."
+      description: "The same search, answered as the document. Uses shared_dependencies.tables."
       params:
         object_name: "ZAC_SHR_VTABL"  # → shared_dependencies.tables
         object_type: "table"
-        include_raw_xml: true
 
     - name: "where_used_list_filtered"
       enabled: true

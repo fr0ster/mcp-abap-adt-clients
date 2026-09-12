@@ -18,10 +18,6 @@ export async function createPackage(
   connection: IAbapConnection,
   params: ICreatePackageParams,
 ): Promise<IAdtWireResponse> {
-  if (!params.package_name) {
-    throw new Error('Package name is required');
-  }
-
   const url = `/sap/bc/adt/packages`;
 
   const escapeXml = (str: string | undefined): string =>
@@ -38,14 +34,11 @@ export async function createPackage(
   );
   const packageType = params.package_type || 'development';
 
-  const masterSystem = params.master_system;
+  const masterSystem = params.master_system as string;
   const lang = params.master_language?.trim() || 'EN';
   const responsibleUser = params.responsible || '';
 
   // Software component is required for package creation
-  if (!params.software_component) {
-    throw new Error('Software component is required for package creation');
-  }
   const softwareComponentXml = `<pak:softwareComponent pak:name="${escapeXml(params.software_component)}"/>`;
 
   const transportLayerXml = params.transport_layer

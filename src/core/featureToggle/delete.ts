@@ -27,10 +27,6 @@ export async function checkDeletion(
   connection: IAbapConnection,
   params: IDeleteFeatureToggleParams,
 ): Promise<IAdtWireResponse> {
-  if (!params.feature_toggle_name) {
-    throw new Error('feature_toggle_name is required');
-  }
-
   const uri = objectUri(params.feature_toggle_name);
 
   const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
@@ -57,10 +53,6 @@ export async function deleteFeatureToggle(
   connection: IAbapConnection,
   params: IDeleteFeatureToggleParams,
 ): Promise<IAdtWireResponse> {
-  if (!params.feature_toggle_name) {
-    throw new Error('feature_toggle_name is required');
-  }
-
   const uri = objectUri(params.feature_toggle_name);
   const transportTag = params.transport_request?.trim()
     ? `<del:transportNumber>${params.transport_request}</del:transportNumber>`

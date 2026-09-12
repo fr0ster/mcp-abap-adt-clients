@@ -131,13 +131,10 @@ export class AdtFunctionInclude<
     group: string;
     include: string;
   } {
-    if (!config.functionGroupName) {
-      throw new Error('Function group name is required');
-    }
-    if (!config.includeName) {
-      throw new Error('Include name is required');
-    }
-    return { group: config.functionGroupName, include: config.includeName };
+    return {
+      group: config.functionGroupName as string,
+      include: config.includeName as string,
+    };
   }
 
   /** Map camelCase config to the snake_case low-level params. */
@@ -209,9 +206,6 @@ export class AdtFunctionInclude<
     // Called for its guards: it throws when the name this member needs is
     // missing, which is the one thing checked before the request goes out.
     this.names(config);
-    if (!config.description) {
-      throw new Error('Description is required');
-    }
     return answering(
       () => createFunctionInclude(connection, this.buildCreateParams(config)),
       this.results.created as IResultStrategy<ReturnType<R['created']>>,
@@ -285,6 +279,10 @@ export class AdtFunctionInclude<
    * Update the include: its metadata, and its source when source was given.
    *
    * With `options.lockHandle` the caller holds the lock and owns the chain.
+   *
+   * **The whole content, every time.** This is a replace, never a merge. Read
+   * what the object holds, change what you mean to change, and pass the result:
+   * anything left out is gone, because nothing is read here to keep it.
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionIncludeConfig>,
@@ -318,6 +316,10 @@ export class AdtFunctionInclude<
    * Its own member because it is its own endpoint: `update` writes the
    * `finclude` metadata, and a consumer that wants both issues both, in the
    * order it decides.
+   *
+   * **The whole content, every time.** This is a replace, never a merge. Read
+   * what the object holds, change what you mean to change, and pass the result:
+   * anything left out is gone, because nothing is read here to keep it.
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionIncludeConfig>,
@@ -333,9 +335,6 @@ export class AdtFunctionInclude<
     // syntax check compiles a source that is not on the server yet, so it has
     // nowhere else to arrive.
     const source = options?.sourceCode;
-    if (source === undefined) {
-      throw new Error('Source code is required for update');
-    }
 
     return answering(
       () =>
@@ -343,7 +342,7 @@ export class AdtFunctionInclude<
           connection,
           group,
           include,
-          source,
+          source as string,
           options?.lockHandle,
           this.isUnicode(),
           config.transportRequest,

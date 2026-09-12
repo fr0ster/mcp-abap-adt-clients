@@ -30,7 +30,6 @@ describe('runtime/traces/profiler', () => {
         '/sap/bc/adt/runtime/traces/abaptraces/ABCD1234EFGH5678/hitlist',
       ),
     ).toBe('ABCD1234EFGH5678');
-    expect(() => normalizeProfilerTraceId('')).toThrow('Trace ID is required');
   });
 
   it('buildTraceParametersXml merges defaults and escapes description', () => {
@@ -146,12 +145,9 @@ describe('runtime/traces/profiler', () => {
     );
   });
 
-  it('getTraceRequestsByUri validates uri and encodes query param', async () => {
+  it('getTraceRequestsByUri encodes the uri into the query param', async () => {
     const connection = createConnectionMock();
 
-    await expect(getTraceRequestsByUri(connection, '')).rejects.toThrow(
-      'URI is required',
-    );
     await getTraceRequestsByUri(connection, '/sap/bc/adt/oo/classes/zcl_test');
 
     expect(connection.makeAdtRequest).toHaveBeenCalledWith(

@@ -112,9 +112,11 @@ export function withRequestTrace(connection: IAbapConnection): IAbapConnection {
       // status the server refused was the one failure a caller could not locate
       // in a chain of six. Written onto the error rather than composed into a
       // new one: replacing it would discard the response riding alongside.
-      if (error && typeof error === 'object') {
-        (error as { request?: unknown }).request = asked;
-      }
+      //
+      // No check that the thrown thing can carry a field. A transport that
+      // throws a string is broken in a way this wrapper must not paper over,
+      // and the TypeError says so where a silent skip would not.
+      (error as { request?: unknown }).request = asked;
       throw error;
     }
 

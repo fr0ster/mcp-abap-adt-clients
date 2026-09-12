@@ -25,9 +25,6 @@ export async function updateClassTestInclude(
 ): Promise<IAdtWireResponse> {
   // Empty source is legitimate: PUTting it is how a test class is deleted.
   // Only a missing argument is an error.
-  if (testClassSource === undefined || testClassSource === null) {
-    throw new Error('Test class source code is required');
-  }
 
   const encodedName = encodeSapObjectName(className).toLowerCase();
   const url = `/sap/bc/adt/oo/classes/${encodedName}/includes/testclasses${writeQuery(lockHandle, transportRequest)}`;

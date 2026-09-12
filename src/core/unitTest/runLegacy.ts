@@ -55,10 +55,6 @@ export async function startClassUnitTestRunLegacy(
   tests: IClassUnitTestDefinition[],
   _options?: IClassUnitTestRunOptions,
 ): Promise<IAdtWireResponse> {
-  if (!tests.length) {
-    throw new Error('At least one test definition is required');
-  }
-
   const objectRefs = tests
     .map((test) => {
       const className = encodeSapObjectName(test.containerClass).toLowerCase();

@@ -25,9 +25,6 @@ export async function validateFunctionIncludeName(
   groupName: string,
   _includeName: string,
 ): Promise<IAdtWireResponse> {
-  if (!groupName) {
-    throw new Error('Function group name is required');
-  }
   const groupLower = encodeSapObjectName(groupName).toLowerCase();
   return connection.makeAdtRequest({
     method: 'GET',

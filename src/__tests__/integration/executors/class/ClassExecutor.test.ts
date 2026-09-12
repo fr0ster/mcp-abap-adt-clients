@@ -284,7 +284,7 @@ describe('ClassExecutor (integration)', () => {
   it(
     'should execute class with profiling and return trace id',
     async () => {
-      const testName = 'ClassExecutor - runWithProfiling';
+      const testName = 'ClassExecutor - scheduleTrace then runWithProfiler';
       const testCase = getEnabledTestCase(
         'execute_class',
         'adt_class_executor',
@@ -336,25 +336,35 @@ describe('ClassExecutor (integration)', () => {
         const profiler = runtimeClient.getProfiler();
         const before = await traceIdsNow(profiler);
 
-        logTestStep('schedule a trace + run with profiler', testsLogger);
-        let result = expectResult(
-          await executor
-            .getClassExecutor()
-            .runWithProfiling({ className }, { profilerParameters }),
-          'result',
-        );
+        // Two calls since 19.0.0: schedule the measurement, then run under it.
+        // `runWithProfiling` did both, and the order was fixed in the library.
+        logTestStep('schedule a trace, then run with profiler', testsLogger);
+        const classExecutor = executor.getClassExecutor();
+        const profiledRun = async () => {
+          const profilerId = expectResult(
+            await classExecutor.scheduleTrace(profilerParameters),
+            'scheduled trace',
+          );
+          return {
+            run: expectResult(
+              await classExecutor.runWithProfiler(
+                { className },
+                { profilerId },
+              ),
+              'result',
+            ),
+            profilerId,
+          };
+        };
+
+        let result = await profiledRun();
         if (isMissingClassRunMainMessage(result.run)) {
           await client.getClass().read({ className }, 'active', {
             withLongPolling: true,
           });
           await wait(1000);
           await runClassWithReadinessRetry(className);
-          result = expectResult(
-            await executor
-              .getClassExecutor()
-              .runWithProfiling({ className }, { profilerParameters }),
-            'profiled run (retry)',
-          );
+          result = await profiledRun();
         }
 
         const runOutput = String(result.run);

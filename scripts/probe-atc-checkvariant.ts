@@ -677,7 +677,11 @@ async function main(): Promise<void> {
           message: string;
         } | null = null;
         try {
-          const answer = await atc.run(
+          // The variant is named, so no customizing read; the worklist is its
+          // own call since 19.0.0.
+          const worklistId = await atc.createWorklist(variantForRun);
+          const answer = await atc.startRun(
+            worklistId,
             {
               objects: [{ objectType: 'class', objectName: args.dirtyClass }],
             },

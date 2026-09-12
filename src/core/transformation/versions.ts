@@ -12,10 +12,8 @@ export async function getTransformationVersions(
   connection: IAbapConnection,
   config: Partial<ITransformationConfig>,
 ): Promise<ObjectVersion[]> {
-  if (!config.transformationName)
-    throw new Error('transformationName is required');
   const encodedName = encodeSapObjectName(
-    config.transformationName.toLowerCase(),
+    (config.transformationName as string).toLowerCase(),
   );
   const url = `/sap/bc/adt/xslt/transformations/${encodedName}/source/main/versions`;
   try {

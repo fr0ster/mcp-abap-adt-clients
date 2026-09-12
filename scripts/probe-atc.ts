@@ -619,11 +619,15 @@ async function main(): Promise<void> {
     logger.info(`Reading contents of ${packageName}`);
 
     const readContents = async () => {
-      const items = await orThrow(
-        utils.getPackageContentsList(packageName, {
-          includeSubpackages: true,
-        }),
-      );
+      // The walk is the consumer's since 19.0.0; this script is one.
+      const { walkPackage } = await import('./lib/packageWalk');
+      const tree = await walkPackage(connection, packageName, 3);
+      const items: { name: string; type: string }[] = [];
+      const collect = (node: typeof tree): void => {
+        if (!node.isPackage) items.push({ name: node.name, type: node.type });
+        for (const child of node.children) collect(child);
+      };
+      collect(tree);
       const map = new Map<
         string,
         { name: string; type: string; uri?: string }
@@ -633,7 +637,6 @@ async function main(): Promise<void> {
           map.set(item.type, {
             name: item.name,
             type: item.type,
-            uri: item.uri,
           });
         }
       }

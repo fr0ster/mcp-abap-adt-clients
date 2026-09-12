@@ -29,8 +29,9 @@ import {
   createLibraryLogger,
 } from '../src/__tests__/helpers/testLogger';
 import { AdtClient } from '../src/clients/AdtClient';
-import type { IPackageHierarchyNode } from '../src/core/shared/types';
 import { orThrow } from '../src/utils/adtResponse';
+import type { IWalkedNode } from './lib/packageWalk';
+import { walkPackage } from './lib/packageWalk';
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../.env');
 if (fs.existsSync(envPath)) {
@@ -83,19 +84,11 @@ function parseArgs(argv: string[]): Options {
   };
 }
 
-function printTree(
-  node: IPackageHierarchyNode,
-  prefix = '',
-  isLast = true,
-): void {
+function printTree(node: IWalkedNode, prefix = '', isLast = true): void {
   const connector = isLast ? '└── ' : '├── ';
-  const typeLabel = node.type || node.type || '';
-  const descPart = node.description ? ` - ${node.description}` : '';
-  const statusIcon = node.restoreStatus === 'ok' ? '' : ' [!]';
+  const typeLabel = node.type || '';
 
-  console.log(
-    `${prefix}${connector}${node.name} (${typeLabel})${descPart}${statusIcon}`,
-  );
+  console.log(`${prefix}${connector}${node.name} (${typeLabel})`);
 
   const children = node.children || [];
   const newPrefix = prefix + (isLast ? '    ' : '│   ');
@@ -105,7 +98,7 @@ function printTree(
   }
 }
 
-function countObjects(node: IPackageHierarchyNode): {
+function countObjects(node: IWalkedNode): {
   packages: number;
   objects: number;
 } {
@@ -153,12 +146,10 @@ async function run(): Promise<void> {
   console.log('');
 
   try {
-    const hierarchy = await orThrow(
-      utils.getPackageHierarchy(options.packageName, {
-        maxDepth: options.maxDepth,
-        includeSubpackages: options.includeSubpackages,
-        includeDescriptions: options.includeDescriptions,
-      }),
+    const hierarchy = await walkPackage(
+      connection,
+      options.packageName,
+      options.includeSubpackages ? options.maxDepth : 1,
     );
 
     if (options.jsonOutput) {

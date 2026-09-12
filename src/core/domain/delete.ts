@@ -25,10 +25,6 @@ export async function checkDeletion(
 ): Promise<IAdtWireResponse> {
   const { domain_name } = params;
 
-  if (!domain_name) {
-    throw new Error('domain_name is required');
-  }
-
   const encodedName = encodeSapObjectName(domain_name);
   const objectUri = `/sap/bc/adt/ddic/domains/${encodedName}`;
 
@@ -61,10 +57,6 @@ export async function deleteDomain(
   params: IDeleteDomainParams,
 ): Promise<IAdtWireResponse> {
   const { domain_name, transport_request } = params;
-
-  if (!domain_name) {
-    throw new Error('domain_name is required');
-  }
 
   const encodedName = encodeSapObjectName(domain_name);
   const objectUri = `/sap/bc/adt/ddic/domains/${encodedName}`;

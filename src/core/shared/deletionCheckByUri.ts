@@ -7,7 +7,7 @@
  * copy of it, which is duplication this file does not expand: the types that had
  * no copy use this instead of gaining a twenty-third.
  *
- * Measured on the cloud trial, 2026-09-06, asking about a message class:
+ * Measured on one system, 2026-09-06, asking about a message class:
  *
  * ```
  * POST /sap/bc/adt/deletion/check
@@ -36,10 +36,6 @@ export async function checkDeletionByUri(
   connection: IAbapConnection,
   objectUri: string,
 ): Promise<IAdtWireResponse> {
-  if (!objectUri) {
-    throw new Error('objectUri is required');
-  }
-
   const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
 <del:checkRequest xmlns:del="http://www.sap.com/adt/deletion" xmlns:adtcore="http://www.sap.com/adt/core">
   <del:object adtcore:uri="${objectUri}"/>

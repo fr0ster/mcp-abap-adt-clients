@@ -99,12 +99,16 @@ export class AdtDataElement<
     );
   }
 
-  /** The name, or the caller's mistake — nothing was asked of the server yet. */
+  /**
+   * The name as the caller gave it.
+   *
+   * No guard: the config's type says the field is there, and a `Partial<>` at
+   * the call site is what widens it. A caller who passes nothing builds a URL
+   * from nothing and the server answers — which is a reading a strategy can
+   * take, where a sentence composed here would not be.
+   */
   private name(config: Partial<IDataElementConfig>): string {
-    if (!config.dataElementName) {
-      throw new Error('Data element name is required');
-    }
-    return config.dataElementName;
+    return config.dataElementName as string;
   }
 
   /** Validate the name before creating the object. */
@@ -118,9 +122,6 @@ export class AdtDataElement<
     const name = this.name(config);
     // The endpoint refuses an empty one, so this is a caller error rather than a
     // 400 to decode later.
-    if (!config.description) {
-      throw new Error('Description is required for validation');
-    }
 
     return answering(
       () =>
@@ -140,19 +141,24 @@ export class AdtDataElement<
     config: Omit<IDataElementConfig, 'sourceCode'> & { sourceCode?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    // **The one guard this package keeps, and only on a create.**
+    //
+    // An object created without a package is the single thing `delete()` cannot
+    // undo: the deletion check resolves through the package, so it answers
+    // "Object does not exist" while the name stays taken for good, and clearing
+    // it is SAP GUI territory. Everywhere else a missing field produces a
+    // request the server answers, which is a reading a strategy can take. Here
+    // it produces a state with no way out through ADT at all.
+    if (!config.packageName) {
+      throw new Error(
+        'packageName is required for create: an object created without one cannot be deleted through ADT',
+      );
+    }
+
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const name = this.name(config);
-    if (!config.packageName) {
-      throw new Error('Package name is required');
-    }
-    if (!config.description) {
-      throw new Error('Description is required');
-    }
-    if (!config.typeKind) {
-      throw new Error('Type kind is required');
-    }
     return answering(
       () =>
         createDataElement(connection, {
@@ -222,6 +228,10 @@ export class AdtDataElement<
    * With `options.lockHandle` the caller holds the lock and owns the chain, so
    * this is one request. Without it, this locks, checks, writes and unlocks —
    * and the unlock happens on every path out.
+   *
+   * **The whole content, every time.** This is a replace, never a merge. Read
+   * what the object holds, change what you mean to change, and pass the result:
+   * anything left out is gone, because nothing is read here to keep it.
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IDataElementConfig>,
@@ -231,12 +241,6 @@ export class AdtDataElement<
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const name = this.name(config);
-    if (!config.packageName) {
-      throw new Error('Package name is required for update');
-    }
-    if (!config.typeKind) {
-      throw new Error('Type kind is required for update');
-    }
 
     return answering(
       () =>
@@ -260,8 +264,10 @@ export class AdtDataElement<
             search_help_parameter: config.searchHelpParameter,
             set_get_parameter: config.setGetParameter,
           },
+          // The document the caller built. The fields beside it describe a
+          // create; on an update nothing merges them into a body here.
+          config.document as string,
           options?.lockHandle,
-          this.logger,
         ),
       this.results.metadataUpdated as IResultStrategy<
         ReturnType<R['metadataUpdated']>

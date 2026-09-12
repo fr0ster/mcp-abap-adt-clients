@@ -23,6 +23,10 @@ const BASE = '/sap/bc/adt/messageclass';
  * then rebuilds the full XML with the description override and PUTs it back.
  *
  * NOTE: Caller must enable stateful session and hold a valid lockHandle.
+ *
+ * **The whole content, every time.** This is a replace, never a merge. Read
+ * what the object holds, change what you mean to change, and pass the result:
+ * anything left out is gone, because nothing is read here to keep it.
  */
 export async function updateMessageClass(
   connection: IAbapConnection,

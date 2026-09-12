@@ -362,10 +362,24 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
           `run shared class ${className} with profiling`,
           testsLogger,
         );
-        const result = expectResult(
-          await executor.getClassExecutor().runWithProfiling({ className }),
-          'result',
+        // Two calls since 19.0.0: schedule the measurement, then run under it.
+        // `runWithProfiling` did both and fixed the order here.
+        const classExecutor = executor.getClassExecutor();
+        const profilerId = expectResult(
+          await classExecutor.scheduleTrace(),
+          'scheduled trace',
         );
+        expect(profilerId).toContain(
+          '/sap/bc/adt/runtime/traces/abaptraces/parameters/',
+        );
+
+        const result = {
+          run: expectResult(
+            await classExecutor.runWithProfiler({ className }, { profilerId }),
+            'result',
+          ),
+          profilerId,
+        };
 
         // The run's own answer, read by the shipped strategy. There is no
         // status to check here any more — a run that failed would have come
@@ -376,9 +390,6 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
           testsLogger,
         );
 
-        expect(result.profilerId).toContain(
-          '/sap/bc/adt/runtime/traces/abaptraces/parameters/',
-        );
         // A run promises no trace — SAP writes it afterwards.
         expect(result).not.toHaveProperty('traceId');
 

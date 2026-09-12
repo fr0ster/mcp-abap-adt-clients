@@ -7,124 +7,43 @@
  */
 
 import type {
-  HttpError,
   IAbapConnection,
   IAdtWireResponse,
-  ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { CT_TABLE_TYPE } from '../../constants/contentTypes';
-import {
-  encodeSapObjectName,
-  limitDescription,
-  writeQuery,
-} from '../../utils/internalUtils';
+import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
-import {
-  extractXmlString,
-  patchIf,
-  patchXmlAttribute,
-  patchXmlElement,
-} from '../../utils/xmlPatch';
 import type { IUpdateTableTypeParams } from './types';
 
 /**
- * Patch current table type XML with updated values.
- * Only modifies fields that are explicitly provided in params.
- */
-function patchTableTypeXml(
-  currentXml: string,
-  params: IUpdateTableTypeParams,
-): string {
-  let xml = currentXml;
-
-  // Description
-  if (params.description) {
-    const description = limitDescription(params.description);
-    xml = patchXmlAttribute(xml, 'adtcore:description', description);
-  }
-
-  // Row type
-  xml = patchIf(xml, params.row_type_kind, (x, val) =>
-    patchXmlElement(x, 'ttyp:typeKind', val),
-  );
-  xml = patchIf(xml, params.row_type_name, (x, val) =>
-    patchXmlElement(x, 'ttyp:typeName', val.toUpperCase()),
-  );
-
-  // Access type
-  xml = patchIf(xml, params.access_type, (x, val) =>
-    patchXmlElement(x, 'ttyp:accessType', val),
-  );
-
-  // Primary key
-  xml = patchIf(xml, params.primary_key_definition, (x, val) =>
-    patchXmlElement(x, 'ttyp:definition', val),
-  );
-  xml = patchIf(xml, params.primary_key_kind, (x, val) =>
-    patchXmlElement(x, 'ttyp:kind', val),
-  );
-
-  return xml;
-}
-
-/**
- * Update table type using existing lock/session (read-modify-write pattern)
+ * Write the document the caller built.
+ *
+ * **One request.** This used to GET the current document, patch the named
+ * fields into it, and PUT the result — two requests in one member, and a merge
+ * whose rules nobody outside could change. A caller reads the document with the
+ * member that reads it, edits it, and passes it here, which is also where the
+ * guarantee that it is valid belongs.
+ *
+ * **The whole content, every time.** This is a replace, never a merge. Read
+ * what the object holds, change what you mean to change, and pass the result:
+ * anything left out is gone, because nothing is read here to keep it.
  */
 export async function updateTableType(
   connection: IAbapConnection,
   params: IUpdateTableTypeParams,
+  document: string,
   lockHandle?: string,
-  logger?: ILogger,
 ): Promise<IAdtWireResponse> {
-  if (!params.tabletype_name) {
-    throw new Error('tabletype_name is required');
-  }
-  const tableTypeName = params.tabletype_name.toUpperCase();
-  const encodedName = encodeSapObjectName(tableTypeName).toLowerCase();
+  const encodedName = encodeSapObjectName(
+    params.tabletype_name.toUpperCase(),
+  ).toLowerCase();
   const url = `/sap/bc/adt/ddic/tabletypes/${encodedName}${writeQuery(lockHandle, params.transport_request)}`;
 
-  // 1. GET current XML
-  const { getTableTypeMetadata } = await import('./read');
-  const currentResponse = await getTableTypeMetadata(
-    connection,
-    tableTypeName,
-    undefined,
-    logger,
-  );
-  const currentXml = extractXmlString(
-    currentResponse.data,
-    `table type ${params.tabletype_name}`,
-  );
-
-  // 2. Patch only changed fields
-  const updatedXml = patchTableTypeXml(currentXml, params);
-
-  // 3. PUT
-  const headers = {
-    Accept: CT_TABLE_TYPE,
-    'Content-Type': CT_TABLE_TYPE,
-  };
-
-  try {
-    return await connection.makeAdtRequest({
-      url,
-      method: 'PUT',
-      timeout: getTimeout('default'),
-      data: updatedXml,
-      headers,
-    });
-  } catch (error: unknown) {
-    const e = error as HttpError;
-    const status = e.response?.status || 'unknown';
-    const statusText = e.response?.statusText || '';
-    const responseData = e.response?.data
-      ? typeof e.response.data === 'string'
-        ? e.response.data
-        : JSON.stringify(e.response.data, null, 2)
-      : e.message || 'No response data';
-
-    const fullError = `Failed to update table type ${params.tabletype_name}: HTTP ${status} ${statusText} — ${responseData}`;
-    logger?.error?.(fullError);
-    throw new Error(fullError);
-  }
+  return connection.makeAdtRequest({
+    url,
+    method: 'PUT',
+    timeout: getTimeout('default'),
+    data: document,
+    headers: { Accept: CT_TABLE_TYPE, 'Content-Type': CT_TABLE_TYPE },
+  });
 }

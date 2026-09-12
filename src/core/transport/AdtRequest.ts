@@ -107,10 +107,7 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
 
   /** The request number, or the caller's mistake. */
   private number(config: Partial<ITransportConfig>): string {
-    if (!config.transportNumber) {
-      throw new Error('Transport request number is required');
-    }
-    return config.transportNumber;
+    return config.transportNumber as string;
   }
 
   /**
@@ -125,10 +122,6 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
-
-    if (!config.description) {
-      throw new Error('Transport request description is required');
-    }
 
     this.logger?.info?.('Creating transport request');
     return answering(
@@ -210,14 +203,6 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
    * legitimate. Guarding earlier would reject it.
    */
   protected async resolveSearchConfiguration(): Promise<string> {
-    if (hasDeferredResponses(this.connection)) {
-      throw new Error(
-        'configUri is required on a batch client: resolving a search ' +
-          'configuration needs a response that a batch cannot deliver until ' +
-          'execute().',
-      );
-    }
-
     const configurations = await getTransportSearchConfigurations(
       this.connection,
     );
@@ -247,9 +232,17 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
   /**
    * Update the request's description.
    *
-   * ADT's only mutable field on a request. Read-modify-write: GET the current
-   * XML, patch the description into it, PUT it back — building the body from
-   * scratch would drop every server-managed field the client does not model.
+   * The description is ADT's only mutable field on a request, and the document
+   * carries every server-managed field beside it. So a caller reads the current
+   * document, patches the description into it, and passes the result — building
+   * a body from the description alone would drop the rest.
+   *
+   * That read used to happen here. It does not: two requests in one member is
+   * an order and a merge the caller cannot replace.
+   *
+   * **The whole content, every time.** This is a replace, never a merge. Read
+   * what the object holds, change what you mean to change, and pass the result:
+   * anything left out is gone, because nothing is read here to keep it.
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<ITransportConfig>,
@@ -259,14 +252,10 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const number = this.number(config);
-    if (!config.description) {
-      throw new Error('Transport request description is required for update');
-    }
-    const description = config.description;
 
-    this.logger?.info?.('Updating transport request description:', number);
+    this.logger?.info?.('Updating transport request:', number);
     return answering(
-      () => updateTransport(connection, number, description),
+      () => updateTransport(connection, number, config.document as string),
       this.results.metadataUpdated as IResultStrategy<
         ReturnType<R['metadataUpdated']>
       >,

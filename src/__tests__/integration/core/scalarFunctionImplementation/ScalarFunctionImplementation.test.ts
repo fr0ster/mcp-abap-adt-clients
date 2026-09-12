@@ -21,6 +21,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
+import { activationStatusIn } from '../../../../../scripts/lib/activationRun';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import { orThrow } from '../../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
@@ -297,14 +298,38 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
             await dsfi.unlock({ implementationName: implName }, implLock);
           }
 
-          // 4) Group-activate the trio (synchronous).
-          await orThrow(
-            client.getUtils().activateObjectsGroup([
+          // 4) Group-activate the trio, then wait: step 5 reads the active
+          // source, and reading it straight after the POST would read whatever
+          // was there before.
+          const utils = client.getUtils();
+          const runId = expectResult(
+            await utils.activateObjectsGroup([
               { type: 'DSFD/SCF', name: funcName },
               { type: 'CLAS/OC', name: amdpName },
               { type: 'DSFI/SFI', name: implName },
             ]),
+            'activation run id',
           );
+          // The wait is this caller's. `activateObjectsGroup` is the POST and
+          // answers the run id; how long to allow, and what a failure costs, are
+          // decisions about this test.
+          let runStatus = '';
+          const runDeadline = Date.now() + 120_000;
+          while (runStatus !== 'finished' && Date.now() < runDeadline) {
+            const run = expectResult(
+              await utils.getActivationRun(runId, { withLongPolling: true }),
+              'activation run status',
+            );
+            runStatus = activationStatusIn(String(run));
+            if (runStatus === 'error' || runStatus === 'failed') {
+              throw new Error(`activation run ${runId} ended as ${runStatus}`);
+            }
+          }
+          if (runStatus !== 'finished') {
+            throw new Error(
+              `activation run ${runId} had not finished at the deadline`,
+            );
+          }
 
           // 5) Read implementation source (JSON) — must contain the amdpReference.
           // The DSFI source resource answers JSON, which the transport parses

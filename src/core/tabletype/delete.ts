@@ -25,10 +25,6 @@ export async function checkDeletion(
 ): Promise<IAdtWireResponse> {
   const { tabletype_name } = params;
 
-  if (!tabletype_name) {
-    throw new Error('tabletype_name is required');
-  }
-
   const encodedName = encodeSapObjectName(tabletype_name);
   const objectUri = `/sap/bc/adt/ddic/tabletypes/${encodedName}`;
 
@@ -61,10 +57,6 @@ export async function deleteTableType(
   params: IDeleteTableTypeParams,
 ): Promise<IAdtWireResponse> {
   const { tabletype_name, transport_request } = params;
-
-  if (!tabletype_name) {
-    throw new Error('tabletype_name is required');
-  }
 
   const encodedName = encodeSapObjectName(tabletype_name);
   const objectUri = `/sap/bc/adt/ddic/tabletypes/${encodedName}`;

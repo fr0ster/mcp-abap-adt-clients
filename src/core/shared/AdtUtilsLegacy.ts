@@ -2,6 +2,7 @@
  * AdtUtilsLegacy - Utility operations for legacy SAP systems (BASIS < 7.50)
  *
  * Overrides methods that rely on endpoints absent from legacy /sap/bc/adt/discovery:
+ * - getTableColumns → /sap/bc/adt/datapreview/ddic/{name}/metadata (not available)
  * - getTableContents → /sap/bc/adt/datapreview/ddic (not available)
  * - getSqlQuery → /sap/bc/adt/datapreview/freestyle (not available)
  * - activateObjectsGroup → /sap/bc/adt/activation/runs (not available, uses /sap/bc/adt/activation)
@@ -12,10 +13,9 @@
  * mentioned `getTransaction` was its own doc comment and this refusal of it.
  */
 
-import type { IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type { IAdtResponse, IResultStrategy } from '@mcp-abap-adt/interfaces';
 import { buildObjectUri } from '../../utils/activationUtils';
 import { answering, failed } from '../../utils/adtResponse';
-import { rawDocument } from '../../utils/resultStrategy';
 import { getTimeout } from '../../utils/timeouts';
 import { AdtUtils } from './AdtUtils';
 import type {
@@ -45,7 +45,7 @@ export class AdtUtilsLegacy<
   override async activateObjectsGroup(
     objects: IObjectReference[],
     preauditRequested: boolean = false,
-  ): Promise<IAdtResponse<string>> {
+  ): Promise<IAdtResponse<ReturnType<R['activation']>>> {
     const url = `/sap/bc/adt/activation?method=activate&preauditRequested=${preauditRequested}`;
 
     const objectReferences = objects
@@ -72,7 +72,7 @@ ${objectReferences}
             'Content-Type': 'application/xml',
           },
         }),
-      rawDocument,
+      this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
     );
   }
 
@@ -90,15 +90,24 @@ ${objectReferences}
    * question — and it is what separates this from a refusal, which is a server
    * answering about an object.
    */
+  override async getTableColumns(
+    _tableName: string,
+  ): Promise<IAdtResponse<ReturnType<R['columns']>>> {
+    return this.refuse(
+      'Table columns',
+      '/sap/bc/adt/datapreview/ddic/{name}/metadata',
+    );
+  }
+
   override async getTableContents(
     _params: IGetTableContentsParams,
-  ): Promise<IAdtResponse<string>> {
+  ): Promise<IAdtResponse<ReturnType<R['contents']>>> {
     return this.refuse('Table contents', '/sap/bc/adt/datapreview/ddic');
   }
 
   override async getSqlQuery(
     _params: IGetSqlQueryParams,
-  ): Promise<IAdtResponse<string>> {
+  ): Promise<IAdtResponse<ReturnType<R['query']>>> {
     return this.refuse('SQL query', '/sap/bc/adt/datapreview/freestyle');
   }
 

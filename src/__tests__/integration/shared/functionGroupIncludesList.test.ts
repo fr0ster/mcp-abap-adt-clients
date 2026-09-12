@@ -15,6 +15,7 @@ import type {
   ISessionLifecycleAware,
 } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
+import { functionGroupChildren } from '../../../../scripts/lib/functionGroupChildren';
 import type { AdtClient } from '../../../clients/AdtClient';
 import { orThrow } from '../../../utils/adtResponse';
 import {
@@ -81,8 +82,11 @@ describe('Shared - listFunctionGroupIncludes', () => {
       testsLogger,
     );
 
-    const result = await orThrow(
-      client.getUtils().listFunctionGroupIncludes(SHARED_FUNCTION_GROUP),
+    const result = await functionGroupChildren(
+      connection,
+      SHARED_FUNCTION_GROUP,
+      'FUGR/I',
+      testsLogger,
     );
 
     testsLogger.info?.(`🎯 Includes: ${JSON.stringify(result)}`);

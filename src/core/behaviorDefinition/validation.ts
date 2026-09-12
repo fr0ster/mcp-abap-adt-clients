@@ -37,31 +37,29 @@ export async function validate(
   connection: IAbapConnection,
   params: IBehaviorDefinitionValidationParams,
 ): Promise<IAdtWireResponse> {
-  try {
-    const queryParams = new URLSearchParams({
-      objname: params.objname,
-      rootEntity: params.rootEntity,
-      description: params.description,
-      package: params.package,
-      implementationType: params.implementationType,
-    });
+  // The error is not rewrapped. It used to be replaced with a sentence this
+  // package invented, which threw the response away — so a refusal naming the
+  // object arrived as a message naming nothing, and `analyse` had no document
+  // to read. `answering` keeps the response off the thrown error; leaving the
+  // throw alone is what lets it.
+  const queryParams = new URLSearchParams({
+    objname: params.objname,
+    rootEntity: params.rootEntity,
+    description: params.description,
+    package: params.package,
+    implementationType: params.implementationType,
+  });
 
-    const url = `/sap/bc/adt/bo/behaviordefinitions/validation?${queryParams.toString()}`;
+  const url = `/sap/bc/adt/bo/behaviordefinitions/validation?${queryParams.toString()}`;
 
-    const response = await connection.makeAdtRequest({
-      url,
-      method: 'POST',
-      timeout: getTimeout('default'),
-      headers: {
-        Accept: ACCEPT_VALIDATION,
-      },
-    });
+  const response = await connection.makeAdtRequest({
+    url,
+    method: 'POST',
+    timeout: getTimeout('default'),
+    headers: {
+      Accept: ACCEPT_VALIDATION,
+    },
+  });
 
-    return response;
-  } catch (error: unknown) {
-    const e = error as HttpError;
-    throw new Error(
-      `Failed to validate behavior definition ${params.objname}: ${e.message}`,
-    );
-  }
+  return response;
 }

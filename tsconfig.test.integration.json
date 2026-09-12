@@ -11,6 +11,11 @@
     // them: `is_package` and `adtType` were renamed, the scripts kept the
     // old names, and at runtime they read `undefined` and took the wrong
     // branch in silence (#114).
+    // And every example, for the same reason and a sharper one: the four
+    // that used to live here called `CrudClient`, a class renamed several
+    // majors before anyone noticed, so the directory a consumer opens
+    // first contained nothing that could run.
+    "examples/**/*",
     "scripts/**/*",
     "src/**/*"
     // Kept in step with tsconfig.test.json, which carries the same four lines

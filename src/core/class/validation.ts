@@ -19,8 +19,7 @@ import { getTimeout } from '../../utils/timeouts';
  * Returns raw response from ADT - consumer decides how to interpret it
  */
 /**
- * `packageName` is required by the endpoint, not optional. Measured on E19
- * (`RFCSAPRL 816`) 2026-08-28: without `packagename` it answers **400,
+ * `packageName` is required by the endpoint, not optional. Measured * 2026-08-28: without `packagename` it answers **400,
  * "Parameter packagename could not be found."** — see
  * `docs/evidence/2026-08-28-validation-required-params.md`.
  */

@@ -21,7 +21,9 @@ export async function upload(
   params: IUpdateStructureParams,
   lockHandle?: string,
 ): Promise<IAdtWireResponse> {
-  const structureNameEncoded = encodeSapObjectName(params.structureName);
+  const structureNameEncoded = encodeSapObjectName(
+    params.structureName as string,
+  );
   const url = `/sap/bc/adt/ddic/structures/${structureNameEncoded}/source/main${writeQuery(lockHandle, params.transportRequest)}`;
 
   const headers = {
@@ -40,6 +42,10 @@ export async function upload(
 
 /**
  * Update structure with DDL code (alias for upload with lockHandle in params)
+ *
+ * **The whole content, every time.** This is a replace, never a merge. Read
+ * what the object holds, change what you mean to change, and pass the result:
+ * anything left out is gone, because nothing is read here to keep it.
  */
 export async function updateStructure(
   connection: IAbapConnection,

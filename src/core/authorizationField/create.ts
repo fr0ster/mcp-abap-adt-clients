@@ -23,13 +23,6 @@ export async function create(
   connection: IAbapConnection,
   args: ICreateAuthorizationFieldParams,
 ): Promise<IAdtWireResponse> {
-  if (!args.authorization_field_name) {
-    throw new Error('authorization_field_name is required');
-  }
-  if (!args.package_name) {
-    throw new Error('package_name is required');
-  }
-
   const url = `/sap/bc/adt/aps/iam/auth${args.transport_request ? `?corrNr=${encodeURIComponent(args.transport_request)}` : ''}`;
 
   const xmlBody = buildAuthorizationFieldXml(args);

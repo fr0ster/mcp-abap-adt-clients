@@ -29,6 +29,10 @@ const debugEnabled = process.env.DEBUG_ADT_LIBS === 'true';
  * @param connection - SAP connection
  * @param args - Update parameters
  * @returns Axios response
+ *
+ * **The whole content, every time.** This is a replace, never a merge. Read
+ * what the object holds, change what you mean to change, and pass the result:
+ * anything left out is gone, because nothing is read here to keep it.
  */
 export async function update(
   connection: IAbapConnection,
@@ -38,23 +42,15 @@ export async function update(
   },
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
-  if (!args.enhancement_name) {
-    throw new Error('enhancement_name is required');
-  }
-  if (!args.enhancement_type) {
-    throw new Error('enhancement_type is required');
-  }
-  if (!args.source_code) {
-    throw new Error('source_code is required');
-  }
-
   if (!supportsSourceCode(args.enhancement_type)) {
     throw new Error(
       `Enhancement type '${args.enhancement_type}' does not support source code update. Only 'enhoxhh' supports source code.`,
     );
   }
 
-  const encodedName = encodeSapObjectName(args.enhancement_name).toLowerCase();
+  const encodedName = encodeSapObjectName(
+    args.enhancement_name as string,
+  ).toLowerCase();
   const baseUri = getEnhancementUri(args.enhancement_type, encodedName);
 
   // Build URL with parameters

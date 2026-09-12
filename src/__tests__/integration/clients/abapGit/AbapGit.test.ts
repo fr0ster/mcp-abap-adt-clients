@@ -131,16 +131,46 @@ describe('AbapGit (standalone AdtAbapGitClient)', () => {
         branchName: flowCaseDef.params.branch,
       });
 
-      const pullResult = expectResult(
+      // Four steps since 19.0.0, because a pull was four requests: find the
+      // link, post, wait, and read the log if the status says to. The waiting
+      // is here because it belongs to whoever is waiting.
+      const repos = expectResult(await abapGit.listRepos(), 'repositories');
+      const repo = repos.find(
+        (r) =>
+          r.package.toUpperCase() === flowCaseDef.params.package.toUpperCase(),
+      );
+      if (!repo?.pullLink) {
+        throw new Error(
+          `abapGit repository for ${flowCaseDef.params.package} reported no pull link`,
+        );
+      }
+
+      expectResult(
         await abapGit.pull({
           package: flowCaseDef.params.package,
+          pullLink: repo.pullLink,
           branchName: flowCaseDef.params.branch,
-          pollIntervalMs: 2000,
-          maxPollDurationMs: 300_000,
         }),
         'pull',
       );
-      expect(pullResult.finalStatus.status).not.toBe('R');
+
+      // The first read is unconditional. `repo` was fetched *before* the POST,
+      // so its status says nothing about this pull — starting the loop on it
+      // would skip the wait entirely and let `unlink` run against a job still
+      // in progress.
+      const readStatus = async () =>
+        expectResult(
+          await abapGit.getRepo(flowCaseDef.params.package),
+          'repository status',
+        ) as typeof repo;
+
+      const deadline = Date.now() + 300_000;
+      let status = await readStatus();
+      while (status.status === 'R' && Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        status = await readStatus();
+      }
+      expect(status.status).not.toBe('R');
 
       if (typeof (abapGit as any).unlink === 'function') {
         await abapGit.unlink({ package: flowCaseDef.params.package });

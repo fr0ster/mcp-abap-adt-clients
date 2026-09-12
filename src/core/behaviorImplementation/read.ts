@@ -9,13 +9,8 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_SOURCE } from '../../constants/contentTypes';
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
-import { noopLogger } from '../../utils/noopLogger';
-import { AdtUtils } from '../shared/AdtUtils';
+import { objectMetadataWire, objectSourceWire } from '../shared/objectWire';
 import type { IReadOptions } from '../shared/types';
-
-function getUtils(connection: IAbapConnection, logger?: ILogger): AdtUtils {
-  return new AdtUtils(connection, logger ?? noopLogger);
-}
 
 /**
  * Get behavior implementation class metadata (without source code)
@@ -28,11 +23,13 @@ export async function getBehaviorImplementationMetadata(
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
-  return getUtils(connection, logger).objectMetadataWire(
+  return objectMetadataWire(
+    connection,
     'class',
     className,
     undefined,
     options,
+    logger,
   );
 }
 
@@ -49,12 +46,14 @@ export async function getBehaviorImplementationSource(
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
-  return getUtils(connection, logger).objectSourceWire(
+  return objectSourceWire(
+    connection,
     'class',
     className,
     undefined,
     version,
     options,
+    logger,
   );
 }
 

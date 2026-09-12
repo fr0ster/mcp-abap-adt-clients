@@ -25,10 +25,6 @@ export async function activateAuthorizationField(
   connection: IAbapConnection,
   name: string,
 ): Promise<IAdtWireResponse> {
-  if (!name) {
-    throw new Error('Authorization field name is required');
-  }
-
   const url = `/sap/bc/adt/activation?method=activate&preauditRequested=true`;
   const xmlBody = buildActivationXml(name);
 

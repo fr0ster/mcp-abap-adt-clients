@@ -101,12 +101,16 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
     );
   }
 
-  /** The name, or the caller's mistake — nothing was asked of the server yet. */
+  /**
+   * The name as the caller gave it.
+   *
+   * No guard: the config's type says the field is there, and a `Partial<>` at
+   * the call site is what widens it. A caller who passes nothing builds a URL
+   * from nothing and the server answers — which is a reading a strategy can
+   * take, where a sentence composed here would not be.
+   */
   private name(config: Partial<IPackageConfig>): string {
-    if (!config.packageName) {
-      throw new Error('Package name is required');
-    }
-    return config.packageName;
+    return config.packageName as string;
   }
 
   /** Validate the package's configuration before creating it. */
@@ -118,9 +122,6 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const name = this.name(config);
-    if (!config.superPackage) {
-      throw new Error('Super package is required for validation');
-    }
 
     return answering(
       () =>
@@ -145,7 +146,7 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
    * Create the package: validate → create → check.
    *
    * The check is a checkrun on the new object, the way Eclipse does it, not a
-   * second call to the validation endpoint — captured on E19 2026-08-31, which
+   * second call to the validation endpoint — captured 2026-08-31, which
    * validates, creates, then posts `/sap/bc/adt/checkruns` on the created
    * package before it is ever locked.
    */
@@ -153,24 +154,18 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
     config: Omit<IPackageConfig, 'sourceCode'> & { sourceCode?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    // **No guard here, unlike every other create.**
+    //
+    // Elsewhere `packageName` is the package an object is bound to, and an
+    // object created without one cannot be removed through ADT — that is the
+    // one hazard this package guards. For a package it is the package's own
+    // name; what binds it is `superPackage`, and a top-level package has none
+    // by design. There is no field here whose absence traps anything.
+
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const name = this.name(config);
-    if (!config.superPackage) {
-      throw new Error('Super package is required');
-    }
-    if (!config.description) {
-      throw new Error('Description is required');
-    }
-    if (!config.softwareComponent) {
-      throw new Error('Software component is required');
-    }
-    if (!config.responsible && !this.systemContext.responsible) {
-      throw new Error(
-        'Responsible person is required: provide it in package config or in AdtClient options',
-      );
-    }
     return answering(
       () =>
         createPackage(connection, {
@@ -241,7 +236,7 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
    *
    * **Package update over RFC fails**, and not for the reason the old comment
    * gave. It said the PUT "cannot access the PAK lock created by the LOCK
-   * call". Measured on E19 2026-08-31, that is wrong: the PUT reads the
+   * call". Measured 2026-08-31, that is wrong: the PUT reads the
    * parameter, validates the handle, and accepts ours. Four answers from the
    * same endpoint, same session, same package, over rfc:
    *
@@ -273,6 +268,10 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
    * critical for release: http is the primary transport for modern on-premise
    * systems, and rfc exists for BASIS < 7.50, where package CRUD is not
    * supported regardless.
+   *
+   * **The whole content, every time.** This is a replace, never a merge. Read
+   * what the object holds, change what you mean to change, and pass the result:
+   * anything left out is gone, because nothing is read here to keep it.
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IPackageConfig>,
@@ -282,13 +281,7 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const name = this.name(config);
-    if (!config.superPackage) {
-      throw new Error('Super package is required for update');
-    }
-    if (!config.softwareComponent) {
-      throw new Error('Software component is required for update');
-    }
-    const superPackage = config.superPackage;
+    const superPackage = config.superPackage as string;
     const softwareComponent = config.softwareComponent;
 
     const fields = {
@@ -303,7 +296,14 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
     };
 
     return answering(
-      () => updatePackage(connection, fields, options?.lockHandle as string),
+      () =>
+        updatePackage(
+          connection,
+          fields,
+          // The document the caller built; the fields above describe a create.
+          config.document as string,
+          options?.lockHandle as string,
+        ),
       this.results.metadataUpdated as IResultStrategy<
         ReturnType<R['metadataUpdated']>
       >,
@@ -343,7 +343,7 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
    * Delete the package.
    *
    * A package this session has just updated cannot be deleted by this session —
-   * measured on E19 2026-08-31: `deletion/check` answers `isDeletable="true"`
+   * measured 2026-08-31: `deletion/check` answers `isDeletable="true"`
    * while `deletion/delete` answers HTTP 200 carrying `isDeleted="false"` and
    * PAK/058, "package is already locked", even though the UNLOCK moments
    * earlier answered 200. It is not a delay: retried for 30 seconds inside the

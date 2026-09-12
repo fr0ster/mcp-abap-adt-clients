@@ -19,13 +19,6 @@ export async function readFunctionIncludeSource(
   includeName: string,
   version: 'active' | 'inactive' = 'active',
 ): Promise<IAdtWireResponse> {
-  if (!groupName) {
-    throw new Error('Function group name is required');
-  }
-  if (!includeName) {
-    throw new Error('Include name is required');
-  }
-
   const groupLower = encodeSapObjectName(groupName).toLowerCase();
   const encodedInclude = encodeSapObjectName(includeName.toUpperCase());
   const url = `/sap/bc/adt/functions/groups/${groupLower}/includes/${encodedInclude}/source/main?version=${encodeURIComponent(version)}`;

@@ -11,7 +11,7 @@ import { getTimeout } from '../../utils/timeouts';
  */
 /**
  * Both `packageName` and `description` are required by the endpoint, and both
- * used to be sent conditionally. Measured on E19 2026-08-28: omitting either
+ * used to be sent conditionally. Measured 2026-08-28: omitting either
  * answers **400, "Parameter … could not be found."**, while an empty
  * `description` is accepted. See `docs/evidence/2026-08-28-validation-required-params.md`.
  */

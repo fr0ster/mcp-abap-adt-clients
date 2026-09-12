@@ -302,38 +302,34 @@ const EXTRA_REQUESTS: Record<string, string> = {
   'messageClassMessage.update': 'as create',
   'messageClassMessage.delete': 'as create',
 
-  // **Read-modify-write, and ADT's shape rather than this library's choice.**
-  // These objects *are* their document, and the endpoint takes it whole: to
-  // change one field you fetch the XML, patch it and PUT it back. A caller who
-  // has the whole document can hand it over in `options.xmlContent`, which is
-  // the seam that exists for it; without one there is no single request that
-  // changes a domain's length.
-  'domain.updateMetadata': 'GET the document, patch it, PUT it back',
-  'dataElement.updateMetadata': 'as domain',
-  'tableType.updateMetadata': 'as domain',
-  'package.updateMetadata': 'as domain',
-  'messageClass.updateMetadata': 'as domain',
-  'authorizationField.updateMetadata': 'as domain',
-  'functionGroup.updateMetadata': 'as domain, plus its own check',
-
-  // **Not a step of the operation.** `getSystemInformation()` answers whether
-  // this is cloud or on-premise, which decides content types and which
-  // endpoints exist at all. It is asked once and cached on the client; the
-  // guard sees it because each of these tests builds a fresh one.
-  'behaviorImplementation.create': 'systeminformation, then the POST',
-  'service.create': 'as behaviorImplementation.create',
-  'serviceBinding.create': 'as behaviorImplementation.create',
+  // **Read-modify-write, and the two that are left.**
+  //
+  // These objects *are* their document and the endpoint takes it whole, so
+  // changing one field means fetching the XML, patching it and PUTting it back.
+  // Since 19.0.0 that read is the caller's: `config.document` carries what they
+  // built, and domain, dataElement, tableType, package and transport each issue
+  // one PUT.
+  //
+  // Two have not been converted yet and still read first. They are listed as
+  // debt, not as shape.
+  //
+  // One left, and it is the documented exception: a message is a row inside its
+  // class's document, so writing one means reading the class, replacing that
+  // row and putting the class back. There is no endpoint that writes a single
+  // message.
+  'messageClass.updateMetadata': 'GET the document, patch it, PUT it back',
 };
 
-const VERB_NOT_REACHED: Record<string, string> = {
-  'tableType.updateMetadata':
-    'read-modify-write: it GETs the table type first, and the generic body is not one to patch',
-  'dataElement.updateMetadata':
-    'read-modify-write; the generic body has no doma/dtel structure to patch',
-  'package.updateMetadata': 'read-modify-write over package XML',
-  'transport.updateMetadata':
-    'reads the request first; the generic body is not a tm:request',
-};
+/**
+ * Members the guard cannot reach with its generic fixture.
+ *
+ * Empty since 19.0.0. The three that were here — dataElement, package and
+ * transport — were unreachable because they read the current document before
+ * writing, and the guard's generic body was not a document they could patch.
+ * They write what the caller passes now, so a generic body is exactly what they
+ * send.
+ */
+const VERB_NOT_REACHED: Record<string, string> = {};
 
 /** The content URI `getVersionSource` is handed, and must fetch. */
 const VERSION_CONTENT_URI = '/sap/bc/adt/guard/versions/1';

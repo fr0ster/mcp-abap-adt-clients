@@ -12,8 +12,7 @@ export async function getBehaviorDefinitionVersions(
   connection: IAbapConnection,
   config: Partial<IBehaviorDefinitionConfig>,
 ): Promise<ObjectVersion[]> {
-  if (!config.name) throw new Error('name is required');
-  const encodedName = encodeSapObjectName(config.name).toLowerCase();
+  const encodedName = encodeSapObjectName(config.name as string).toLowerCase();
   const url = `/sap/bc/adt/bo/behaviordefinitions/${encodedName}/source/main/versions`;
   try {
     const res = await connection.makeAdtRequest({

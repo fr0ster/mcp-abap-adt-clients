@@ -88,13 +88,6 @@ export async function checkDeletion(
   connection: IAbapConnection,
   params: IDeleteFunctionIncludeParams,
 ): Promise<IAdtWireResponse> {
-  if (!params.function_group_name) {
-    throw new Error('function_group_name is required');
-  }
-  if (!params.include_name) {
-    throw new Error('include_name is required');
-  }
-
   const uri = objectUri(params.function_group_name, params.include_name);
 
   const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
@@ -121,13 +114,6 @@ export async function deleteFunctionInclude(
   connection: IAbapConnection,
   params: IDeleteFunctionIncludeParams,
 ): Promise<IAdtWireResponse> {
-  if (!params.function_group_name) {
-    throw new Error('function_group_name is required');
-  }
-  if (!params.include_name) {
-    throw new Error('include_name is required');
-  }
-
   const uri = objectUri(params.function_group_name, params.include_name);
   const transportTag = params.transport_request?.trim()
     ? `<del:transportNumber>${params.transport_request}</del:transportNumber>`

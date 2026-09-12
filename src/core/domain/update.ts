@@ -10,130 +10,43 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_DOMAIN } from '../../constants/contentTypes';
-import {
-  encodeSapObjectName,
-  limitDescription,
-  writeQuery,
-} from '../../utils/internalUtils';
+import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
-import {
-  extractXmlString,
-  patchIf,
-  patchXmlAttribute,
-  patchXmlBlock,
-  patchXmlElement,
-  patchXmlElementAttribute,
-} from '../../utils/xmlPatch';
 import type { IUpdateDomainParams } from './types';
 
 /**
- * Patch current domain XML with updated values.
- * Only modifies fields that are explicitly provided in args.
- */
-function patchDomainXml(currentXml: string, args: IUpdateDomainParams): string {
-  let xml = currentXml;
-
-  // Description
-  if (args.description) {
-    const description = limitDescription(args.description);
-    xml = patchXmlAttribute(xml, 'adtcore:description', description);
-  }
-
-  // Type information
-  xml = patchIf(xml, args.datatype, (x, val) =>
-    patchXmlElement(x, 'doma:datatype', val),
-  );
-  xml = patchIf(xml, args.length, (x, val) =>
-    patchXmlElement(x, 'doma:length', String(val)),
-  );
-  xml = patchIf(xml, args.decimals, (x, val) =>
-    patchXmlElement(x, 'doma:decimals', String(val)),
-  );
-
-  // Output information
-  if (args.conversion_exit !== undefined) {
-    xml = patchXmlElement(
-      xml,
-      'doma:conversionExit',
-      args.conversion_exit || '',
-    );
-  }
-  if (args.sign_exists !== undefined) {
-    xml = patchXmlElement(xml, 'doma:signExists', String(args.sign_exists));
-  }
-  if (args.lowercase !== undefined) {
-    xml = patchXmlElement(xml, 'doma:lowercase', String(args.lowercase));
-  }
-
-  // Value table
-  if (args.value_table !== undefined) {
-    xml = patchXmlElementAttribute(
-      xml,
-      'doma:valueTableRef',
-      'adtcore:name',
-      args.value_table || '',
-    );
-  }
-
-  // Fixed values — replace entire block
-  if (args.fixed_values !== undefined) {
-    if (args.fixed_values && args.fixed_values.length > 0) {
-      const fixValueItems = args.fixed_values
-        .map(
-          (fv) =>
-            `      <doma:fixValue>\n        <doma:low>${fv.low}</doma:low>\n        <doma:text>${fv.text}</doma:text>\n      </doma:fixValue>`,
-        )
-        .join('\n');
-      const fixValuesBlock = `<doma:fixValues>\n${fixValueItems}\n    </doma:fixValues>`;
-      xml = patchXmlBlock(xml, 'doma:fixValues', fixValuesBlock);
-    } else {
-      xml = patchXmlBlock(xml, 'doma:fixValues', '<doma:fixValues/>');
-    }
-  }
-
-  return xml;
-}
-
-/**
- * Update domain with new data (read-modify-write pattern)
+ * Write the document the caller built.
  *
- * NOTE: Requires stateful session mode enabled via connection.setSessionType("stateful")
+ * **One request.** This used to GET the current document, patch the fields
+ * named in `params` into it, and PUT the result — two requests in one member,
+ * and a merge whose rules nobody outside could change. A caller reads the
+ * document with the member that reads it, edits it, and passes it here, which
+ * is also where the guarantee that it is valid belongs.
+ *
+ * So `params` carries what the *request* needs — the name, the transport — and
+ * nothing that used to be merged into the body.
+ *
+ * **The whole content, every time.** This is a replace, never a merge. Read
+ * what the object holds, change what you mean to change, and pass the result:
+ * anything left out is gone, because nothing is read here to keep it.
  */
 export async function updateDomain(
   connection: IAbapConnection,
   args: IUpdateDomainParams,
+  document: string,
   lockHandle?: string,
 ): Promise<IAdtWireResponse> {
   const domainNameEncoded = encodeSapObjectName(args.domain_name.toLowerCase());
-
-  // 1. GET current XML
-  const currentResponse = await connection.makeAdtRequest({
-    url: `/sap/bc/adt/ddic/domains/${domainNameEncoded}`,
-    method: 'GET',
-    timeout: getTimeout('default'),
-    headers: { Accept: ACCEPT_DOMAIN },
-  });
-  const currentXml = extractXmlString(
-    currentResponse.data,
-    `domain ${args.domain_name}`,
-  );
-
-  // 2. Patch only changed fields
-  const updatedXml = patchDomainXml(currentXml, args);
-
-  // 3. PUT
   const url = `/sap/bc/adt/ddic/domains/${domainNameEncoded}${writeQuery(lockHandle, args.transport_request)}`;
 
-  const headers: Record<string, string> = {
-    Accept: ACCEPT_DOMAIN,
-    'Content-Type': 'application/vnd.sap.adt.domains.v2+xml; charset=utf-8',
-  };
-
-  return await connection.makeAdtRequest({
+  return connection.makeAdtRequest({
     url,
     method: 'PUT',
     timeout: getTimeout('default'),
-    data: updatedXml,
-    headers,
+    data: document,
+    headers: {
+      Accept: ACCEPT_DOMAIN,
+      'Content-Type': 'application/vnd.sap.adt.domains.v2+xml; charset=utf-8',
+    },
   });
 }

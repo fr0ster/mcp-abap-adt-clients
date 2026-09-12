@@ -114,6 +114,24 @@ export function recogniseFailure(error: unknown): IAdtError {
 }
 
 /**
+ * The failure strategy that never finds one.
+ *
+ * Every exchange that produced an answer comes back as a success carrying that
+ * answer, refusals included, so a caller can read the body themselves — a 403
+ * with an exception document is the document, not an `IAdtError` with the
+ * document buried a field down.
+ *
+ * This package ships no reading that turns such a body into a verdict. Which
+ * documents count as a refusal depends on the system and on what the caller is
+ * about to do, so the decision is theirs and this is how they take all of it.
+ *
+ * `answering` still fails a request that returned nothing at all. There is no
+ * answer to read, and a success built from none would be a lie the type cannot
+ * catch.
+ */
+export const nothingIsARefusal: IAnalyse<IAdtError> = () => ADT_NO_FAILURE;
+
+/**
  * Run one request and compose the two strategies over its answer.
  *
  * The three arguments are the three things involved and nothing else: the

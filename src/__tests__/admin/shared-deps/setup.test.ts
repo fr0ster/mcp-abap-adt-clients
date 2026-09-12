@@ -16,6 +16,7 @@ import type {
   ISessionLifecycleAware,
 } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
+import { activationStatusIn } from '../../../../scripts/lib/activationRun';
 import type { AdtClient } from '../../../clients/AdtClient';
 import { orThrow } from '../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
@@ -244,10 +245,27 @@ describe('Admin: Setup shared dependencies', () => {
           `Group activating ${groupActivationObjects.length} objects: ${groupActivationObjects.map((o) => `${o.type}:${o.name}`).join(', ')}`,
         );
         try {
-          await orThrow(
-            client.getUtils().activateObjectsGroup(groupActivationObjects),
+          // Start, then wait: setup that carried on after the POST would build
+          // the next object against a system still activating the last one.
+          const utils = client.getUtils();
+          const runId = await orThrow(
+            utils.activateObjectsGroup(groupActivationObjects),
           );
-          testsLogger.info('Group activation completed successfully');
+          let runStatus = '';
+          const runDeadline = Date.now() + 180_000;
+          while (runStatus !== 'finished' && Date.now() < runDeadline) {
+            const run = await orThrow(
+              utils.getActivationRun(runId, { withLongPolling: true }),
+            );
+            runStatus = activationStatusIn(String(run));
+            if (runStatus === 'error' || runStatus === 'failed') {
+              throw new Error(`activation run ${runId} ended as ${runStatus}`);
+            }
+          }
+          if (runStatus !== 'finished') {
+            throw new Error(`activation run ${runId} did not finish in time`);
+          }
+          testsLogger.info(`Group activation run ${runId} finished`);
         } catch (error) {
           const msg = error instanceof Error ? error.message : String(error);
           testsLogger.error(`Group activation failed: ${msg}`);
@@ -311,11 +329,24 @@ describe('Admin: Setup shared dependencies', () => {
           `Still inactive, activating: ${firstPass.map((o) => `${o.type}:${o.name}`).join(', ')}`,
         );
         try {
-          await client
-            .getUtils()
-            .activateObjectsGroup(
+          // Waited for, because the inactive list is read immediately below:
+          // asking what is still inactive while the activation is running
+          // answers about the moment before it.
+          const utils = client.getUtils();
+          const runId = await orThrow(
+            utils.activateObjectsGroup(
               firstPass.map((o) => ({ type: o.type, name: o.name })),
+            ),
+          );
+          let runStatus = '';
+          const runDeadline = Date.now() + 180_000;
+          while (runStatus !== 'finished' && Date.now() < runDeadline) {
+            const run = await orThrow(
+              utils.getActivationRun(runId, { withLongPolling: true }),
             );
+            runStatus = activationStatusIn(String(run));
+            if (runStatus === 'error' || runStatus === 'failed') break;
+          }
         } catch (error) {
           const msg = error instanceof Error ? error.message : String(error);
           testsLogger.error(`Closing activation failed: ${msg}`);

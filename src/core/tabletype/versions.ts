@@ -12,8 +12,7 @@ export async function getTableTypeVersions(
   connection: IAbapConnection,
   config: Partial<ITableTypeConfig>,
 ): Promise<ObjectVersion[]> {
-  if (!config.tableTypeName) throw new Error('tableTypeName is required');
-  const encodedName = encodeSapObjectName(config.tableTypeName);
+  const encodedName = encodeSapObjectName(config.tableTypeName as string);
   const url = `/sap/bc/adt/ddic/tabletypes/${encodedName}/source/main/versions`;
   try {
     const res = await connection.makeAdtRequest({

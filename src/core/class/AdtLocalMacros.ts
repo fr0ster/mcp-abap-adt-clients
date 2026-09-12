@@ -87,12 +87,6 @@ export class AdtLocalMacros<R extends IClassResults = typeof classDocuments>
 
     // Nothing was asked of the server yet, so there is no answer to describe:
     // a missing required argument is the caller's mistake and it throws.
-    if (!config.className) {
-      throw new Error('Class name is required for validation');
-    }
-    if (!config.macrosCode) {
-      throw new Error('Macros code is required for validation');
-    }
 
     return answering(
       () =>
@@ -116,10 +110,6 @@ export class AdtLocalMacros<R extends IClassResults = typeof classDocuments>
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
-
-    if (!config.className) {
-      throw new Error('Class name is required');
-    }
 
     // No 404 special case any more: ADT answers a read for an include that was
     // never written with 200 and an empty body, so absence was never a status
@@ -152,6 +142,10 @@ export class AdtLocalMacros<R extends IClassResults = typeof classDocuments>
    * say the member locked, checked, wrote and unlocked; that chain came out
    * when a member became one request, and a reader chasing an unreleased lock
    * would have looked here and stopped.
+   *
+   * **The whole content, every time.** This is a replace, never a merge. Read
+   * what the object holds, change what you mean to change, and pass the result:
+   * anything left out is gone, because nothing is read here to keep it.
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<ILocalMacrosConfig>,
@@ -160,16 +154,10 @@ export class AdtLocalMacros<R extends IClassResults = typeof classDocuments>
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    if (!config.className) {
-      throw new Error('Class name is required');
-    }
     // An empty string is source: writing it is how the include is emptied
     // (see delete()). Only its absence is an error.
-    if (config.macrosCode === undefined && options?.sourceCode === undefined) {
-      throw new Error('Macros code is required');
-    }
 
-    const name = config.className;
+    const name = config.className as string;
     const source = options?.sourceCode ?? config.macrosCode ?? '';
 
     return answering(
@@ -200,10 +188,6 @@ export class AdtLocalMacros<R extends IClassResults = typeof classDocuments>
     config: Partial<ILocalMacrosConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
-    if (!config.className) {
-      throw new Error('Class name is required');
-    }
-
     return await this.update({ ...config, macrosCode: '' }, options);
   }
 
@@ -215,13 +199,6 @@ export class AdtLocalMacros<R extends IClassResults = typeof classDocuments>
   ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
-
-    if (!config.className) {
-      throw new Error('Class name is required');
-    }
-    if (!config.macrosCode) {
-      throw new Error('Macros code is required');
-    }
 
     return answering(
       () =>
@@ -241,8 +218,7 @@ export class AdtLocalMacros<R extends IClassResults = typeof classDocuments>
   async getVersions(
     config: Partial<ILocalMacrosConfig>,
   ): Promise<IAdtResponse<ObjectVersion[]>> {
-    if (!config.className) throw new Error('className is required');
-    const name = config.className;
+    const name = config.className as string;
     return answering(
       async () => ({
         data: await this.getIncludeVersions(name, 'macros'),

@@ -12,6 +12,11 @@ import { getTimeout } from '../../utils/timeouts';
 import type { ICreateFeatureToggleParams } from './types';
 import { buildFeatureToggleXml } from './xmlBuilder';
 
+/** *
+ * **The whole content, every time.** This is a replace, never a merge. Read
+ * what the object holds, change what you mean to change, and pass the result:
+ * anything left out is gone, because nothing is read here to keep it.
+ */
 export async function updateFeatureToggle(
   connection: IAbapConnection,
   params: ICreateFeatureToggleParams,
@@ -33,7 +38,7 @@ export async function updateFeatureToggle(
       // No `X-sap-adt-sessiontype` here. A write is stateless — Eclipse sends
       // it that way, carrying only `lockHandle` and `corrNr` — and the header
       // was set on the request while the connection's own mode was stateless,
-      // so the connector never knew: measured on the trial, this PUT went out
+      // so the connector never knew: measured , this PUT went out
       // labelled stateful without the `sap-adt-request-id` the connector adds
       // in that mode. What the server takes during a request that runs inside
       // the session is held by that session, which is what

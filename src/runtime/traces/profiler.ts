@@ -66,9 +66,6 @@ function escapeXmlAttr(value: string): string {
 
 function toTraceId(value: string): string {
   const trimmed = value.trim();
-  if (!trimmed) {
-    throw new Error('Trace ID is required');
-  }
   const marker = '/sap/bc/adt/runtime/traces/abaptraces/';
   const markerIndex = trimmed.indexOf(marker);
   if (markerIndex >= 0) {
@@ -91,9 +88,6 @@ function toTraceId(value: string): string {
 }
 
 export function normalizeProfilerTraceId(traceIdOrUri: string): string {
-  if (!traceIdOrUri) {
-    throw new Error('Trace ID is required');
-  }
   return toTraceId(String(traceIdOrUri));
 }
 
@@ -208,7 +202,7 @@ const TRACE_ID_REGEX =
  * Named for the FEED, not for "requests", because the two are different
  * collections and the old name pointed at the wrong one. A trace REQUEST
  * schedules a measurement and is consumed by the run that fulfils it; the
- * finished trace lands in `/runtime/traces/abaptraces`. Measured on E19 right
+ * finished trace lands in `/runtime/traces/abaptraces`. Measured right
  * after a profiled run, the requests feed answered 200 with 345 bytes and no
  * entries while the traces feed held 95KB of them — and a test that paired this
  * function with `listTraceRequests()`, exactly as the name invited, could never
@@ -268,7 +262,7 @@ const ID_IN_URI = /abaptraces\/([A-Za-z0-9]{16,})(?:\/|$)/;
 /**
  * The traces in a feed, in the order the server listed them.
  *
- * Position is NOT age: measured on E19, the feed's first entries were from
+ * Position is NOT age: measured the feed's first entries were from
  * 06:09 while its last were eight days older, so "the first id in the document"
  * — which is all a regex over the whole body can give — is a trace chosen at
  * random as far as the caller is concerned. Reading the entries out properly is
@@ -577,10 +571,6 @@ export async function getTraceRequestsByUri(
   connection: IAbapConnection,
   uri: string,
 ): Promise<IAdtWireResponse> {
-  if (!uri) {
-    throw new Error('URI is required');
-  }
-
   const url = `/sap/bc/adt/runtime/traces/abaptraces/requests?uri=${encodeURIComponent(uri)}`;
 
   return connection.makeAdtRequest({

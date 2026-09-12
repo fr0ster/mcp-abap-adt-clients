@@ -138,13 +138,10 @@ export class AdtCdsUnitTest<
       return super.validate(config, options);
     }
 
-    const name = config.className;
+    const name = config.className as string;
     // The validation endpoint requires `packagename`; without it the server
     // answers 400, so this cannot be left to the wire.
-    if (!config.packageName) {
-      throw new Error('Package name is required for validation');
-    }
-    const packageName = config.packageName;
+    const packageName = config.packageName as string;
 
     return answering(
       () =>
@@ -173,7 +170,7 @@ export class AdtCdsUnitTest<
       return super.create(config, options);
     }
 
-    const name = config.className;
+    const name = config.className as string;
     this.className = name;
 
     return this.adtClass.create(
@@ -259,9 +256,6 @@ export class AdtCdsUnitTest<
     }
 
     const className = testsOrClassName;
-    if (!className) {
-      throw new Error('Class name is required');
-    }
 
     this.logger?.info?.('Starting unit test run for object:', className);
     const answer = await answering(

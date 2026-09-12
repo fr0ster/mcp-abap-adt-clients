@@ -25,10 +25,6 @@ export async function checkDeletion(
 ): Promise<IAdtWireResponse> {
   const { service_definition_name } = params;
 
-  if (!service_definition_name) {
-    throw new Error('service_definition_name is required');
-  }
-
   const encodedName = encodeSapObjectName(service_definition_name);
   const objectUri = `/sap/bc/adt/ddic/srvd/sources/${encodedName}`;
 
@@ -61,10 +57,6 @@ export async function deleteServiceDefinition(
   params: IDeleteServiceDefinitionParams,
 ): Promise<IAdtWireResponse> {
   const { service_definition_name, transport_request } = params;
-
-  if (!service_definition_name) {
-    throw new Error('service_definition_name is required');
-  }
 
   const encodedName = encodeSapObjectName(service_definition_name);
   const objectUri = `/sap/bc/adt/ddic/srvd/sources/${encodedName}`;

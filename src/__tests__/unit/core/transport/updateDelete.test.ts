@@ -68,26 +68,29 @@ const connectionOver = (bodyFor: (url: string) => string) => {
 };
 
 describe('AdtRequest.update()', () => {
-  it('issues exactly GET then PUT, both to the item URL, with the new description in the PUT body', async () => {
+  it('issues exactly one PUT, to the item URL, carrying the document given', async () => {
     const { connection, calls } = connectionOver(() => TRANSPORT_ITEM_XML);
+
+    // The caller reads the request, patches the one mutable field, and passes
+    // the whole document. Since 19.0.0 the read is theirs: a member that read
+    // and wrote was two requests and a merge nobody outside could change.
+    const edited = TRANSPORT_ITEM_XML.replace(
+      /tm:desc="[^"]*"/,
+      'tm:desc="New description"',
+    );
 
     await new AdtRequest(connection).updateMetadata({
       transportNumber: 'TRLK900438',
-      description: 'New description',
+      document: edited,
     });
 
-    expect(calls).toHaveLength(2);
-
-    expect(calls[0].method).toBe('GET');
+    expect(calls).toHaveLength(1);
+    expect(calls[0].method).toBe('PUT');
     expect(calls[0].url).toBe(ITEM_URL);
-
-    expect(calls[1].method).toBe('PUT');
-    expect(calls[1].url).toBe(ITEM_URL);
-    expect(String(calls[1].data)).toContain('tm:desc="New description"');
-    // Every other field from the GET survives the patch — read-modify-write,
-    // not a body rebuilt from scratch.
-    expect(String(calls[1].data)).toContain('tm:owner="CB9900000000"');
-    expect(String(calls[1].data)).toContain('tm:number="TRLK900438"');
+    expect(String(calls[0].data)).toContain('tm:desc="New description"');
+    // Everything else the caller kept is still there — because they kept it.
+    expect(String(calls[0].data)).toContain('tm:owner="CB9900000000"');
+    expect(String(calls[0].data)).toContain('tm:number="TRLK900438"');
   });
 
   it('touches neither the collection nor the search-configuration endpoint', async () => {
@@ -104,28 +107,18 @@ describe('AdtRequest.update()', () => {
     }
   });
 
-  it('rejects without a description before any request goes out', async () => {
+  it('sends what it was given, and judges none of it', async () => {
+    // No guard on the document. A caller who passes nothing writes nothing, and
+    // the server says what it thinks of that — this package does not answer for
+    // it. What the caller must guarantee is that the document is valid.
     const { connection, calls } = connectionOver(() => TRANSPORT_ITEM_XML);
 
-    await expect(
-      new AdtRequest(connection).updateMetadata({
-        transportNumber: 'TRLK900438',
-      }),
-    ).rejects.toThrow(/description/i);
+    await new AdtRequest(connection).updateMetadata({
+      transportNumber: 'TRLK900438',
+    });
 
-    expect(calls).toHaveLength(0);
-  });
-
-  it('rejects without a transport number before any request goes out', async () => {
-    const { connection, calls } = connectionOver(() => TRANSPORT_ITEM_XML);
-
-    await expect(
-      new AdtRequest(connection).updateMetadata({
-        description: 'New description',
-      }),
-    ).rejects.toThrow(/transport request number/i);
-
-    expect(calls).toHaveLength(0);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].method).toBe('PUT');
   });
 });
 
@@ -151,13 +144,15 @@ describe('AdtRequest.delete()', () => {
     }
   });
 
-  it('rejects without a transport number before any request goes out', async () => {
+  it('sends the delete with what it was given, and judges none of it', async () => {
+    // No guard on the number since 19.0.0: the URL is built from what was
+    // given and the server answers. A caller who names nothing gets the
+    // server's words, which a strategy can read.
     const { connection, calls } = connectionOver(() => TRANSPORT_ITEM_XML);
 
-    await expect(new AdtRequest(connection).delete({})).rejects.toThrow(
-      /transport request number/i,
-    );
+    await new AdtRequest(connection).delete({});
 
-    expect(calls).toHaveLength(0);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].method).toBe('DELETE');
   });
 });

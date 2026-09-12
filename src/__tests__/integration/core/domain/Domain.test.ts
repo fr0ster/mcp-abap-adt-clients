@@ -18,6 +18,7 @@ import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IDomainConfig } from '../../../../core/domain';
 import { getDomain } from '../../../../core/domain/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { patchXmlAttribute } from '../../../../utils/xmlPatch';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { expectResult } from '../../../helpers/contract';
 import {
@@ -173,6 +174,12 @@ describe('Domain (using AdtClient)', () => {
         }
 
         await tester.flowTestAuto({
+          updateTakesDocument: (current) =>
+            patchXmlAttribute(
+              current,
+              'adtcore:description',
+              `${config.description || ''} (updated)`.slice(0, 60),
+            ),
           updateConfig: {
             domainName: config.domainName,
             packageName: config.packageName,

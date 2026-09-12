@@ -12,12 +12,8 @@ export async function getFunctionModuleVersions(
   connection: IAbapConnection,
   config: Partial<IFunctionModuleConfig>,
 ): Promise<ObjectVersion[]> {
-  if (!config.functionGroupName)
-    throw new Error('functionGroupName is required');
-  if (!config.functionModuleName)
-    throw new Error('functionModuleName is required');
-  const encodedGroup = encodeSapObjectName(config.functionGroupName);
-  const encodedName = encodeSapObjectName(config.functionModuleName);
+  const encodedGroup = encodeSapObjectName(config.functionGroupName as string);
+  const encodedName = encodeSapObjectName(config.functionModuleName as string);
   const url = `/sap/bc/adt/functions/groups/${encodedGroup}/fmodules/${encodedName}/source/main/versions`;
   try {
     const res = await connection.makeAdtRequest({

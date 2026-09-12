@@ -15,6 +15,10 @@ import { getTimeout } from '../../utils/timeouts';
  * Requires class to be locked first
  *
  * NOTE: Requires stateful session mode enabled via connection.setSessionType("stateful")
+ *
+ * **The whole content, every time.** This is a replace, never a merge. Read
+ * what the object holds, change what you mean to change, and pass the result:
+ * anything left out is gone, because nothing is read here to keep it.
  */
 export async function updateBehaviorImplementation(
   connection: IAbapConnection,
@@ -23,10 +27,6 @@ export async function updateBehaviorImplementation(
   lockHandle?: string,
   transportRequest?: string,
 ): Promise<IAdtWireResponse> {
-  if (!sourceCode) {
-    throw new Error('sourceCode is required');
-  }
-
   const encodedName = encodeSapObjectName(className).toLowerCase();
   const url = `/sap/bc/adt/oo/classes/${encodedName}/includes/implementations${writeQuery(lockHandle, transportRequest)}`;
 

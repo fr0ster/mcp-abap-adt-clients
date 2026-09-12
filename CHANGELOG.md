@@ -5,6 +5,127 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [19.0.0] - 2026-09-12
+
+**BREAKING — this package stops deciding anything.**
+
+Two rules produced every change, and both were the design's stated intent. The
+verdict on a response belongs to the consumer, because the strategies are
+injected so that decision is theirs. And one member issues one endpoint call,
+because a member that sends several has already chosen an order and cannot be
+given a reading at all — `IResultStrategy` takes one answer.
+
+Needs `@mcp-abap-adt/interfaces` 44.0.0.
+
+Full migration: [`docs/usage/MIGRATION-19.md`](docs/usage/MIGRATION-19.md).
+
+### Removed — readings that produced a verdict
+
+`activationRefusal`, `validationRefusal`, `deletionRefusal` — the three failure
+strategies, unwired from the 81 call sites where they were the default.
+`parseCheckRunResponse` and the `CheckMessage` shape. `parseDeletionCheck`,
+`assertDeletable`, `DeletionNotPermittedError`, `assertActivationSucceeded`.
+`withRefusalDetection` — see Changed. `waitForCleanCheckRun`, which polled a
+check run until the report came back empty and judged every answer on the way.
+
+Their source is recoverable at the `18.0.2` tag.
+
+### Removed — members that made several requests
+
+The package walks `getPackageContents`, `getPackageContentsList`,
+`getPackageHierarchy`; the object walks `getIncludesList`,
+`listFunctionModules`, `listFunctionGroupIncludes`; and the sequences
+`getWhereUsedList`, `AdtClass.updateTestClasses`, `updateClassWithCheck`,
+`AdtAtc.run`, `runWithProfiling` on both executors.
+
+Every single-request step they were built from stays, and the migration shows
+the sequence for each. `AdtMessageClassMessage.writeClass` is the one exception:
+a message is a row inside its class's document, and no endpoint writes one.
+
+### Added
+
+- `nothingIsARefusal` — the one failure strategy here, and it finds none. Every
+  exchange that produced an answer comes back as a success carrying it.
+- `withRequestTrace` — the mechanical half of the old connection wrapper: it
+  puts `{ method, url }` back on an answer the connection normalised it off, on
+  both the returning and the throwing path.
+- `whereUsedReferences` — the reference-list shape the old walker returned,
+  offered by name rather than imposed. Not a default.
+- `getTableColumns`, `getActivationRun`, `getActivationResults`, `activationRunId`,
+  `extractRunId`,
+  `AdtAtc.resolveCheckVariant`, `AdtAtc.createWorklist`, `AdtAtc.startRun` — the
+  steps promoted so a caller can compose what the removed members joined.
+- `pullLink` on `IAbapGitRepoStatus`, because a caller who cannot see it cannot
+  start a pull.
+
+### Changed
+
+- **The default `analyse` is none.** An ADT refusal delivered inside a `2xx` now
+  arrives as a success carrying that document. A transport failure is still a
+  failure, carrying its response and its request.
+- **Eighteen `check.ts` modules return their report** instead of raising. A
+  check run that finds a syntax error is a check run that worked, and the throw
+  cost the findings, the line numbers and the T100 keys. The `ddl` and
+  `accessControl` retries went with them: both were waits on the server.
+- **`update` writes the whole content, on every type.** It always did — ADT's
+  `PUT` replaces — but six types hid it by fetching the current document and
+  patching the config's named fields into it: domain, package, dataElement,
+  tableType, transport and functionGroup. They take `config.document` now, and
+  the patch helpers went with the read. For source-bearing types nothing
+  changed; what changed is that the rule is now stated, in the migration note,
+  the README, the API reference and the doc comment of every `update`. An
+  incomplete write does not announce itself — the server accepts a document that
+  says less, and the object becomes what was sent.
+- **`pull` is one POST** and answers nothing, like `link` and `unlink`.
+  `IAbapGitPullResult` held a `finalStatus` and an `errorLog`, both products of
+  the polling.
+- **`getTableContents` posts the statement it is given.**
+- **A create no longer reads `/core/http/systeminformation`** to fill
+  `masterSystem` and `responsible`. Both come from the config, and that read
+  swallowed its own failure and answered `null`.
+- **454 input guards are gone.** The field was already required in the type; the
+  guard added a string this package invented, thrown out of a member whose
+  contract promises an `IAdtResponse`. **One stays**, on the `create` of the 25
+  handlers whose object lives in a package: an object created without one cannot
+  be removed through ADT at all.
+- **Three validations stop reading a status.** `metadataExtension` and
+  `behaviorImplementation` caught a `400` and handed the response back as a
+  success; `behaviorDefinition` replaced the error with a sentence this package
+  invented, losing the response. All three now let the exchange through as it
+  came. One status cannot be the rule: recorded in `corpus/adt/`, a name already
+  taken answers `400` with an `exc:exception` for a class, a domain and a table,
+  and `200` with `<SEVERITY>ERROR</SEVERITY>` for a DDL source and a function
+  group. A caller who reads a taken name as a success says so in `analyse`,
+  which receives the document either way.
+- **Notes name no system.** 51 references to the system an observation came from
+  are gone across 32 files; the observations and their dates stay.
+
+### Changed — every member of `AdtUtils` takes a reading
+
+`IUtilResults` grew from five slots to twenty: one for each member that makes a
+request.
+
+The fifteen added are not a widening. Those members were typed
+`IAdtResponse<string>` in the contract until `@mcp-abap-adt/interfaces` 44.0.0,
+so the contract had chosen the document and no reading could have been offered
+for them. Now each result is a type parameter, and every one is filled from the
+injected set:
+
+`whereUsedScope`, `folders`, `objectStructure`, `activation`, `run`, `results`,
+`deletionCheck`, `deletion`, `query`, `columns`, `contents`, `discovery`,
+`source`, `metadata`, `include`.
+
+`modifyWhereUsedScope`, `supportsSourceCode` and `getObjectSourceUri` take none
+and never will: they make no request, so there is no answer for a strategy to
+read.
+
+### Unchanged
+
+**No member answers differently.** Every one of the fifteen new slots defaults
+to the shape that member already produced — `rawDocument` for fourteen of them,
+and `activationRunId` for `activateObjectsGroup`, which is what it already
+applied. `wireItself` still hands back the whole exchange.
+
 ## [18.0.2] - 2026-09-08
 
 **Documentation only — what `FINDING_STATS` counts, measured twice instead of

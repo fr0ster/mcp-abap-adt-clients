@@ -16,6 +16,7 @@ import type {
   ISessionLifecycleAware,
 } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
+import { selectEveryColumn } from '../../../../scripts/lib/tableSelect';
 import type { AdtClient } from '../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import { expectResult } from '../../helpers/contract';
@@ -129,6 +130,9 @@ describe('Shared - getTableContents', () => {
         client.getUtils().getTableContents({
           table_name: tableName,
           max_rows: maxRows,
+          // The statement is the caller's since 19.0.0. This one reproduces
+          // what the member used to build for itself.
+          sql_query: await selectEveryColumn(connection, tableName),
         }),
       ),
       'table contents',
@@ -186,6 +190,7 @@ describe('Shared - getTableContents', () => {
       await withAcceptHandling(
         client.getUtils().getTableContents({
           table_name: tableName,
+          sql_query: await selectEveryColumn(connection, tableName),
         }),
       ),
       'table contents',
@@ -222,11 +227,19 @@ describe('Shared - getTableContents', () => {
       return;
     }
 
-    logTestStep('validate error if table name is missing', testsLogger);
-    await expect(
-      client.getUtils().getTableContents({
-        table_name: '',
-      }),
-    ).rejects.toThrow('Table name is required');
+    // No guard on the name any more: the URL is built from what was given and
+    // the server answers. What comes back is the server's words, which a
+    // strategy can read — the sentence this package used to compose was not.
+    logTestStep('an empty table name is answered by the server', testsLogger);
+    const answer = await client.getUtils().getTableContents({
+      table_name: '',
+      sql_query: 'SELECT 1 FROM T000',
+    });
+
+    expect(answer.ok).toBe(false);
+    if (answer.ok) throw new Error('expected the server to refuse');
+    testsLogger.info?.(
+      `📛 ${answer.getError().origin}: ${answer.getError().message}`,
+    );
   });
 });

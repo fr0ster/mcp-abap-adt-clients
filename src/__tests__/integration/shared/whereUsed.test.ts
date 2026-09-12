@@ -14,6 +14,8 @@ import type {
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
 import { AdtUtils } from '../../../core/shared/AdtUtils';
+import type { IWhereUsedListResult } from '../../../core/shared/utilResults';
+import { whereUsedReferences } from '../../../core/shared/utilResults';
 import { orThrow } from '../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import { expectResult } from '../../helpers/contract';
@@ -337,7 +339,7 @@ describe('Shared - getWhereUsed', () => {
     }
   }, 60000); // Increased timeout to 60s for table where-used queries which can be slow
 
-  it('should throw error if object name is missing', async () => {
+  it('answers a missing object name rather than throwing', async () => {
     if (!hasConfig) {
       testsLogger.warn?.(
         '⚠️ Skipping test: No .env file or SAP configuration found',
@@ -361,16 +363,20 @@ describe('Shared - getWhereUsed', () => {
       return;
     }
 
-    logTestStep('validate error if object name is missing', testsLogger);
-    await expect(
-      new AdtUtils(connection, testsLogger).getWhereUsed({
-        object_name: '',
-        object_type: 'class',
-      }),
-    ).rejects.toThrow('Object name is required');
+    // The member answers the contract. It used to throw a sentence this
+    // package invented about a parameter; 19.0.0 removed that guard, so an
+    // empty name is asked of the server and the server's own refusal comes
+    // back inside `IAdtResponse`.
+    logTestStep('an empty object name is answered, not thrown', testsLogger);
+    const noName = await new AdtUtils(connection, testsLogger).getWhereUsed({
+      object_name: '',
+      object_type: 'class',
+    });
+    expect(noName.ok).toBe(false);
+    expect(noName.ok ? '' : noName.getError().message).toBeTruthy();
   });
 
-  it('should throw error if object type is missing', async () => {
+  it('answers a missing object type rather than throwing', async () => {
     if (!hasConfig) {
       testsLogger.warn?.(
         '⚠️ Skipping test: No .env file or SAP configuration found',
@@ -394,13 +400,13 @@ describe('Shared - getWhereUsed', () => {
       return;
     }
 
-    logTestStep('validate error if object type is missing', testsLogger);
-    await expect(
-      new AdtUtils(connection, testsLogger).getWhereUsed({
-        object_name: 'TEST',
-        object_type: '',
-      }),
-    ).rejects.toThrow('Object type is required');
+    logTestStep('an empty object type is answered, not thrown', testsLogger);
+    const noType = await new AdtUtils(connection, testsLogger).getWhereUsed({
+      object_name: 'TEST',
+      object_type: '',
+    });
+    expect(noType.ok).toBe(false);
+    expect(noType.ok ? '' : noType.getError().message).toBeTruthy();
   });
 
   it('should get where-used list with parsed results', async () => {
@@ -447,17 +453,33 @@ describe('Shared - getWhereUsed', () => {
     // `getWhereUsedList` builds its own scope from flags instead, so it cannot
     // stand in here — see the CHANGELOG entry for the gap and what closes it.
     const utils = new AdtUtils(connection, testsLogger);
-    const result = await orThrow(
-      utils.getWhereUsedList({
+
+    // The composed sequence: scope, edit, search, read. The reading is named,
+    // because `whereUsed` answers the document by default.
+    const scope = String(
+      (await orThrow(
+        utils.getWhereUsedScope({
+          object_name: objectName,
+          object_type: objectType,
+        }),
+      )) ?? '',
+    );
+    const document = await orThrow(
+      utils.getWhereUsed({
         object_name: objectName,
         object_type: objectType,
-        enableAllTypes: enableAllTypes,
+        scopeXml: enableAllTypes
+          ? utils.modifyWhereUsedScope(scope, { enableAll: true })
+          : scope,
       }),
     );
+    const result: IWhereUsedListResult = whereUsedReferences({
+      data: String(document),
+    } as never);
 
     expect(result).toBeDefined();
-    expect(result.objectName).toBe(objectName);
-    expect(result.objectType).toBe(objectType);
+    // `objectName`/`objectType` are no longer on the shape: a reading sees the
+    // answer and the document does not name what was searched. The caller does.
     expect(typeof result.totalReferences).toBe('number');
     expect(Array.isArray(result.references)).toBe(true);
 
@@ -586,14 +608,36 @@ describe('Shared - getWhereUsed', () => {
     // stand in here — see the CHANGELOG entry for the gap and what closes it.
     const utils = new AdtUtils(connection, testsLogger);
 
+    // The three calls a caller composes since 19.0.0, in place of the member
+    // that used to make them: fetch the scope, edit it, search with it. The
+    // reading is named rather than default — `whereUsed` answers the document.
+    const scopeOf = async (): Promise<string> =>
+      String(
+        (await orThrow(
+          utils.getWhereUsedScope({
+            object_name: objectName,
+            object_type: objectType,
+          }),
+        )) ?? '',
+      );
+
+    const searchWith = async (
+      scopeXml?: string,
+    ): Promise<IWhereUsedListResult> => {
+      const document = await orThrow(
+        utils.getWhereUsed({
+          object_name: objectName,
+          object_type: objectType,
+          ...(scopeXml ? { scopeXml } : {}),
+        }),
+      );
+      return whereUsedReferences({ data: String(document) } as never);
+    };
+
     // Step 1: search ALL types — the "select all" baseline.
     logTestStep('where-used: ALL types (baseline)', testsLogger);
-    const all = await orThrow(
-      utils.getWhereUsedList({
-        object_name: objectName,
-        object_type: objectType,
-        enableAllTypes: true,
-      }),
+    const all = await searchWith(
+      utils.modifyWhereUsedScope(await scopeOf(), { enableAll: true }),
     );
     const allTypes = [...new Set(all.references.map((r) => r.type))].sort();
     testsLogger.info?.(
@@ -610,12 +654,8 @@ describe('Shared - getWhereUsed', () => {
     // Step 2a (KEEP): narrow to a type that IS referenced — count is unchanged
     // for that type, and no other type leaks in.
     logTestStep(`where-used: ONLY [${keepType}] (present)`, testsLogger);
-    const kept = await orThrow(
-      utils.getWhereUsedList({
-        object_name: objectName,
-        object_type: objectType,
-        enableOnlyTypes: [keepType],
-      }),
+    const kept = await searchWith(
+      utils.modifyWhereUsedScope(await scopeOf(), { enableOnly: [keepType] }),
     );
     const keptTypes = [...new Set(kept.references.map((r) => r.type))].sort();
     testsLogger.info?.(
@@ -638,15 +678,9 @@ describe('Shared - getWhereUsed', () => {
     // guarantees enableOnlyTypes actually selects a searchable type, so a zero
     // result proves the filter excluded the referenced type rather than simply
     // selecting nothing.
-    const scopeResponse = await orThrow(
-      utils.getWhereUsedScope({
-        object_name: objectName,
-        object_type: objectType,
-      }),
-    );
     const scopeTypes = [
       ...new Set(
-        [...String(scopeResponse).matchAll(/name="([^"]+)"/g)].map((m) => m[1]),
+        [...(await scopeOf()).matchAll(/name="([^"]+)"/g)].map((m) => m[1]),
       ),
     ];
     const absentType = scopeTypes.find((t) => !allTypes.includes(t));
@@ -655,11 +689,9 @@ describe('Shared - getWhereUsed', () => {
     );
     if (absentType) {
       logTestStep(`where-used: ONLY [${absentType}] (absent)`, testsLogger);
-      const excluded = await orThrow(
-        utils.getWhereUsedList({
-          object_name: objectName,
-          object_type: objectType,
-          enableOnlyTypes: [absentType],
+      const excluded = await searchWith(
+        utils.modifyWhereUsedScope(await scopeOf(), {
+          enableOnly: [absentType],
         }),
       );
       testsLogger.info?.(

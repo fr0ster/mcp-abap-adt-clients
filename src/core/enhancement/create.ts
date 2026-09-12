@@ -82,16 +82,6 @@ export async function create(
   args: ICreateEnhancementParams,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
-  if (!args.enhancement_name) {
-    throw new Error('enhancement_name is required');
-  }
-  if (!args.enhancement_type) {
-    throw new Error('enhancement_type is required');
-  }
-  if (!args.package_name) {
-    throw new Error('package_name is required');
-  }
-
   const url = `${getEnhancementBaseUrl(args.enhancement_type)}${args.transport_request ? `?corrNr=${args.transport_request}` : ''}`;
 
   const metadataXml = buildCreateXml(args, args.masterSystem, args.responsible);

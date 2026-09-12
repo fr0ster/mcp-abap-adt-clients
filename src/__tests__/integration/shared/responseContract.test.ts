@@ -28,6 +28,8 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type {
   IAbapConnection,
+  IAdtError,
+  IAnalyse,
   ILogger,
   ISessionLifecycleAware,
 } from '@mcp-abap-adt/interfaces';
@@ -226,24 +228,34 @@ describe('Response contract - 17.0.0', () => {
         );
         return;
       }
-      logTestStep(`package hierarchy for ${NEVER_EXISTS}`, testsLogger);
+      logTestStep(`node structure for ${NEVER_EXISTS}`, testsLogger);
 
-      const answer = await client.getUtils().getPackageHierarchy(NEVER_EXISTS);
+      const answer = await client
+        .getUtils()
+        .fetchNodeStructure('DEVC/K', NEVER_EXISTS);
 
-      // The sharpest case in this file. "There is nothing in it" and "there is
-      // no such thing" are different answers, and a parser that finds no nodes
-      // reports the first for both. That is how a logon page from an expired
-      // session read as "the package is empty".
-      if (answer.ok) {
-        const tree = answer.getResult().value;
-        throw new Error(
-          `a package that does not exist answered a result: ${JSON.stringify(tree).slice(0, 200)}`,
-        );
-      }
+      // The sharpest case in this file, and since 19.0.0 it is a statement
+      // about the endpoint rather than about a verdict this package gives.
+      //
+      // `/repository/nodestructure` answers 200 with an **empty body** for a
+      // package that does not exist, and 200 with a tree for one that does.
+      // "There is nothing in it" and "there is no such thing" arrive
+      // byte-identical, so nothing below the caller can tell them apart — which
+      // is how a logon page from an expired session once read as an empty
+      // package.
+      //
+      // The walk that used to raise for this left with the other multi-request
+      // members. A caller who needs the distinction makes it here, on the body,
+      // and `scripts/lib/packageWalk.ts` shows one doing exactly that.
+      expect(answer.ok).toBe(true);
+      if (!answer.ok) throw new Error('expected an answer to read');
 
-      expect(answer.getError().message.length).toBeGreaterThan(0);
+      const body = String(
+        (answer.getResult().value as { data?: unknown })?.data ?? '',
+      );
+      expect(body.trim().length).toBe(0);
       testsLogger.info?.(
-        `📛 ${answer.getError().origin}: ${answer.getError().message}`,
+        `📛 ${NEVER_EXISTS} answered 200 with ${body.length} bytes — absence and emptiness are the same document`,
       );
     }, 60000);
   });
@@ -288,36 +300,50 @@ describe('Response contract - 17.0.0', () => {
       }
     }, 60000);
 
-    it('surfaces a refusal on a write rather than reporting success', async () => {
+    it('hands a refusal on a write to the caller, who names it', async () => {
       if (!hasConfig) {
         logTestSkip(
           testsLogger,
-          'surfaces a refusal on a write rather than reporting success',
+          'hands a refusal on a write to the caller, who names it',
           'No SAP configuration',
         );
         return;
       }
       logTestStep(`activate ${NEVER_EXISTS}`, testsLogger);
 
-      // A write is where reporting success on a refusal costs something: the
-      // caller believes an object was activated, and it was not.
+      // **This is what 19.0.0 changed, and the assertion is the change.**
       //
-      // No throw/no-throw dance any more. The refusal is in the answer — that
-      // is the whole change — so the test reads it there, and a library that
-      // went back to reporting success would fail on the first line.
-      const answer = await client
+      // ADT answers a failed activation with `200` and a checklist carrying
+      // `<msg type="E">`. Until 19.0.0 this package read that document and
+      // called it a failure. It no longer reads bodies at all, so the exchange
+      // arrives as a success carrying the checklist, and whether the checklist
+      // means "not activated" is the caller's to decide.
+      const unjudged = await client
         .getClass()
         .activate({ className: NEVER_EXISTS });
 
-      expect(answer.ok).toBe(false);
-      if (answer.ok) throw new Error('expected a failure');
+      expect(unjudged.ok).toBe(true);
+      if (!unjudged.ok) throw new Error('expected the answer, not a verdict');
+      const document = String(unjudged.getResult().value ?? '');
+      expect(document.length).toBeGreaterThan(0);
 
-      const failure = answer.getError();
-      testsLogger.info?.(
-        `📛 [${failure.origin}] ${failure.message.slice(0, 120)}`,
-      );
+      // And here the caller decides, with the strategy this package stopped
+      // shipping. A consumer builds theirs from their own corpus of answers;
+      // this one is deliberately crude, because its shape is not the point.
+      const refusalIsAFailure: IAnalyse<IAdtError> = (verdict, answer) =>
+        /type="?E"?/.test(String(answer?.data ?? ''))
+          ? { origin: 'refusal', message: String(answer?.data ?? '') }
+          : verdict;
+
+      const judged = await client
+        .getClass()
+        .activate({ className: NEVER_EXISTS }, { analyse: refusalIsAFailure });
+
+      expect(judged.ok).toBe(false);
+      if (judged.ok) throw new Error('expected the caller to decide');
+      const failure = judged.getError();
+      expect(failure.origin).toBe('refusal');
       expect(failure.message.length).toBeGreaterThan(0);
-      expect(['connection', 'refusal']).toContain(failure.origin);
     }, 60000);
   });
 });

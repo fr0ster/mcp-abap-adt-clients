@@ -8,14 +8,9 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_TRANSPORT } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { noopLogger } from '../../utils/noopLogger';
 import { getTimeout } from '../../utils/timeouts';
-import { AdtUtils } from '../shared/AdtUtils';
+import { objectMetadataWire, objectSourceWire } from '../shared/objectWire';
 import type { IReadOptions } from '../shared/types';
-
-function getUtils(connection: IAbapConnection): AdtUtils {
-  return new AdtUtils(connection, noopLogger);
-}
 
 /**
  * Get ABAP program metadata (without source code)
@@ -25,7 +20,8 @@ export async function getProgramMetadata(
   programName: string,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  return getUtils(connection).objectMetadataWire(
+  return objectMetadataWire(
+    connection,
     'program',
     programName,
     undefined,
@@ -42,7 +38,8 @@ export async function getProgramSource(
   version?: 'active' | 'inactive',
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  return getUtils(connection).objectSourceWire(
+  return objectSourceWire(
+    connection,
     'program',
     programName,
     undefined,

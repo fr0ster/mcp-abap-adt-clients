@@ -52,7 +52,7 @@ Additional factory methods follow the same shape — a config in, a contract bac
 
 ```typescript
 // Authorization Field (SUSO / AUTH) — DDIC-style, XML-only.
-// Available on modern on-prem (E19+) and cloud MDD; absent on legacy systems.
+// Available on modern on-prem (ABAP Platform 2022+) and cloud MDD; absent on legacy systems.
 // Endpoint: /sap/bc/adt/aps/iam/auth/{name}
 await client.getAuthorizationField().create({
   authorizationFieldName: 'ZAUTHF01',
@@ -80,7 +80,7 @@ const source = await fincl.readSource({
 });
 
 // Feature Toggle (FTG2/FT) — SAP feature-gate artifact with JSON source payload.
-// Available on modern on-prem and cloud MDD; absent on legacy kernels (E77).
+// Available on modern on-prem and cloud MDD; absent on legacy kernels (BASIS < 7.50).
 // Endpoint: /sap/bc/adt/sfw/featuretoggles/{name}
 // Factory returns IFeatureToggleObject — extends IAdtObject<IFeatureToggleConfig,
 // IFeatureToggleState> and adds five domain methods (switchOn, switchOff,
@@ -90,7 +90,7 @@ const toggle = client.getFeatureToggle();
 
 // --- 1. Create a custom feature toggle ---
 // CREATE typically requires SAP_DEVELOPER-equivalent authorization. On cloud
-// trial systems FTG2/FT creation is usually SAP-reserved — expect HTTP 403.
+// On some systems FTG2/FT creation is SAP-reserved — expect HTTP 403.
 // On modern on-prem (BASIS ≥ 7.50) with developer auth, this works.
 await toggle.create({
   featureToggleName: 'ZMY_FEATURE',
@@ -247,7 +247,7 @@ Contract notes:
 |-------------|-----------------|--------------------------|---------------------|-------------------------------------------|
 | Modern on-prem (BASIS ≥ 7.50) | ✅ with S_DEVELOP | ✅ with lock + transport | ✅ with transport | ✅ |
 | Cloud MDD | ⚠️ usually SAP-reserved; HTTP 403 for customer creation | ⚠️ typically limited to SAP-provided toggles | ⚠️ depends on toggle's `configurable` flag | ✅ against SAP-provided toggles |
-| Legacy (BASIS < 7.50, e.g. E77) | ❌ endpoint absent | ❌ | ❌ | ❌ |
+| Legacy (BASIS < 7.50, BASIS < 7.50) | ❌ endpoint absent | ❌ | ❌ | ❌ |
 
 ### AbapGit (ADT-integrated)
 
@@ -300,27 +300,38 @@ await abapGit.link({
   branchName: 'refs/heads/main',
 });
 
-// Pull — awaits the async server-side job. AbortSignal stops only the
-// client-side wait loop; the server may still be running.
-try {
-  const result = await abapGit.pull({
-    package: 'ZMY_PKG',
-    pollIntervalMs: 2000,
-    maxPollDurationMs: 600_000,
-    onProgress: (s) => console.log(`status: ${s.status} — ${s.statusText}`),
-  });
-  if (result.finalStatus.status === 'E' || result.finalStatus.status === 'A') {
-    console.error('pull failed:', result.errorLog);
-  }
-} catch (err: any) {
-  // AbortError / TimeoutError carry lastKnownStatus when a read succeeded
-  // before the client gave up waiting. The server-side job may still be
-  // running — poll getRepo(package) until status !== 'R' before retrying.
-  if (err.name === 'AbortError' || err.name === 'TimeoutError') {
-    console.warn('pull wait stopped:', err.lastKnownStatus);
-  } else {
-    throw err;
-  }
+// Pull — one POST, to the link `listRepos` reported. It does not wait.
+const repos = await abapGit.listRepos();
+if (!repos.ok) throw new Error(repos.getError().message);
+const linked = repos.getResult().value.find((r) => r.package === 'ZMY_PKG');
+if (!linked?.pullLink) throw new Error('ZMY_PKG reports no pull link');
+
+const started = await abapGit.pull({
+  package: 'ZMY_PKG',
+  pullLink: linked.pullLink,
+  branchName: 'refs/heads/main',
+});
+if (!started.ok) throw new Error(started.getError().message);
+
+// The wait is yours: how long, how often, and what to do when it does not
+// finish. Until 19.0.0 `pull` ran this loop, and an AbortSignal passed to it
+// stopped only this loop — never the server's job. Written here, that is
+// visible instead of explained.
+// Read once before testing the condition: `linked` was fetched before the POST,
+// so its status says nothing about this pull.
+const deadline = Date.now() + 600_000;
+let status = (await abapGit.getRepo('ZMY_PKG')).getResult().value;
+while (status.status === 'R' && Date.now() < deadline) {
+  await new Promise((resolve) => setTimeout(resolve, 2000));
+  const answer = await abapGit.getRepo('ZMY_PKG');
+  if (!answer.ok) throw new Error(answer.getError().message);
+  status = answer.getResult().value;
+  console.log(`status: ${status.status} — ${status.statusText}`);
+}
+
+if (status.status === 'E' || status.status === 'A') {
+  const log = await abapGit.getErrorLog('ZMY_PKG');
+  console.error('pull failed:', log.ok ? log.getResult().value : log.getError());
 }
 
 // Read status without triggering a pull
@@ -338,9 +349,9 @@ const log = await abapGit.getErrorLog('ZMY_PKG');
 await abapGit.unlink({ package: 'ZMY_PKG' });
 ```
 
-**Availability.** ADT-integrated abapGit ships with SAP BTP ABAP Environment (Steampunk) and modern on-prem from ABAP Platform 2022+. Legacy kernels (E77 and older) do not expose `/sap/bc/adt/abapgit/*`. This is **not** the community abapGit that installs via SE38 — that one is a separate ABAP program with its own UI and does not go through ADT.
+**Availability.** ADT-integrated abapGit ships with SAP BTP ABAP Environment (Steampunk) and modern on-prem from ABAP Platform 2022+. Legacy kernels (BASIS < 7.50) do not expose `/sap/bc/adt/abapgit/*`. This is **not** the community abapGit that installs via SE38 — that one is a separate ABAP program with its own UI and does not go through ADT.
 
-**Async pull contract.** The server-side pull continues independently of the client-side wait. If you abort or hit `maxPollDurationMs`, the thrown `AbortError` / `TimeoutError` carries `lastKnownStatus` (when the last `listRepos` succeeded before the client gave up). The client **must** poll `getRepo(package)` until `status !== 'R'` before re-issuing `pull` or `unlink`. Retrying `pull` while the previous server-side job is still `R` is unsupported and fails fast.
+**Async pull contract.** `pull` starts the server-side job and answers. The job then runs on its own, and nothing you do on this side stops it — which is why the wait above is written in your code rather than hidden in a member with a timeout option. Poll `getRepo(package)` until `status !== 'R'` before re-issuing `pull` or `unlink`: starting a second pull while the first is still `R` is unsupported and fails fast.
 
 **Content-type version.** Defaults to `v3` for sapcli compatibility. Cloud MDD advertises `v4`; consumers can opt in via `new AdtAbapGitClient(conn, logger, { contentTypeVersion: 'v4' })`.
 
@@ -501,54 +512,86 @@ created.getResult().value.transportNumber;   // 'DEVK900123'
 created.getResult().value.owner;             // the task's owner
 ```
 
-### What `update()` refuses to write
+### `update()` writes the whole content
 
-Five object types — `domain`, `dataElement`, `package`, `tabletype`,
-`functionGroup` — update by **read-modify-write**: GET the current XML, patch the
-changed fields into it, PUT it back. Building the XML from scratch would drop
-fields the client does not model (`abapLanguageVersion` and friends), so the
-server's own body is the base.
+**Every type, every time: `update` replaces. It never merges.**
 
-That makes the read a hard dependency, and ADT answers a read of a not-yet-ready
-object with **HTTP 200 and an empty body** — never a 404. Since **10.1.0** such a
-read fails instead of being patched and sent:
+ADT's `PUT` overwrites what the object holds, and this package sends what you
+hand it. Read the object, change what you mean to change, pass the result.
+Anything you leave out is gone, because nothing is read on your behalf to keep
+it.
 
+What "the whole content" is depends on the type, and on nothing else:
+
+| types | the whole content | passed as |
+|---|---|---|
+| class, program, interface, DDL, and the other source-bearing types | the full source | `options.sourceCode` |
+| domain, package, dataElement, tableType, transport, functionGroup | the object's own document | `config.document` |
+
+```typescript
+// A source type. Sending one method body replaces the class with that body.
+const current = await client.getClass().read({ className: 'ZCL_X' }, 'active');
+const edited = addAMethod(String(current.getResult().value));
+
+const handle = (await client.getClass().lock({ className: 'ZCL_X' })).getResult().value;
+await client.getClass().update({ className: 'ZCL_X' }, { sourceCode: edited, lockHandle: handle });
+await client.getClass().unlock({ className: 'ZCL_X' }, handle);
+
+// A document type. Same shape, different noun.
+const doc = await client.getDomain().readMetadata({ domainName: 'ZD' });
+const patched = patchTheDescription(String(doc.getResult().value), 'new');
+
+const lock = (await client.getDomain().lock({ domainName: 'ZD' })).getResult().value;
+await client.getDomain().updateMetadata({ domainName: 'ZD', document: patched }, { lockHandle: lock });
+await client.getDomain().unlock({ domainName: 'ZD' }, lock);
 ```
-XmlPatchError: Cannot update domain ZAC_DOM01: the read returned an empty body.
+
+**Until 19.0.0 the six document types hid this.** They fetched the current
+document, patched the config's named fields into it, and PUT the result — so a
+caller could pass a description alone and the rest survived. That read is gone,
+along with the patch helpers (`patchDomainXml` and its four siblings) and the
+`XmlPatchError` this section used to describe. The object is not read on your
+behalf any more, so nothing preserves what you omit.
+
+**An incomplete write does not announce itself.** The server accepts a valid
+document that happens to say less, and the object becomes what you sent. Only an
+*empty* body draws a `400`. This is the failure mode to watch for when porting
+from 18.x.
+
+**Validity is yours to guarantee, and the server's to rule on.** This package
+does not inspect what you pass and could not usefully: whether a document is
+complete depends on what your system accepts, which is a question it answers
+itself, on the write, in its own words. So there is no guard here to catch a
+short document — which is exactly why a caller has to know the rule.
+
+One read-modify-write stays, and it is the one no endpoint can replace:
+`AdtMessageClassMessage` writes a message that is a row inside its class's
+document.
+
+### What `activate()` answers, and who judges it
+
+`/sap/bc/adt/activation` answers **HTTP 200 even when activation fails**, so the
+verdict is in the body. **This package no longer reads it.**
+
+Until 19.0.0 it applied a rule of its own — a response carrying `<msg type="E">`
+was a failure — and threw. That strategy is gone, with its two siblings. An
+activation now comes back as a success carrying the checklist, and turning that
+into a failure is the `analyse` you pass:
+
+```typescript
+await client.getClass().activate({ className: 'ZCL_X' }, {
+  analyse: (verdict, answer) =>
+    /type="E"/.test(String(answer?.data ?? ''))
+      ? { origin: 'refusal', message: String(answer?.data) }
+      : verdict,
+});
 ```
 
-Before, the patch found nothing to replace, returned the body unchanged
-silently, and the PUT went out without the field — which the server rejected
-with a message pointing nowhere near the cause (`The description is missing`).
-A slow system now surfaces as a read error naming the object.
+Build yours from your own corpus of answers rather than from the sketch above.
+The measurements below are what this package saw before it stopped judging, and
+they are offered as evidence, not as a rule.
 
-**A patch that cannot find its target throws.** A caller reaches a patch only
-when it intends the change, so "no match" means the PUT would not carry what was
-asked for.
-
-**One deliberate exception.** Setting an attribute on an element that is present
-without it *adds* the attribute rather than failing, because ADT emits exactly
-that for an unset reference:
-
-| ADT returns | meaning |
-|---|---|
-| `<doma:valueTableRef/>` | domain with no value table |
-| `<pak:superPackage/>` | package with no parent |
-
-So `value_table` and `super_package` now take effect when set for the first
-time; they were silently ignored before. If your code passes `super_package` on
-a root package and relied on it doing nothing, it now moves the package.
-
-### What `activate()` treats as a failure
-
-`/sap/bc/adt/activation` answers **HTTP 200 even when activation fails**, so the verdict
-has to be read out of the body. The rule the client applies:
-
-> An activation failed if, and only if, the response carries an error-severity
-> `<msg type="E">`. The thrown message quotes SAP's own text.
-
-`activationExecuted="false"` is **not** a failure signal, despite how it reads. Probed
-against a live system:
+`activationExecuted="false"` is **not** a failure signal, despite how it reads:
 
 | scenario | HTTP | `activationExecuted` | `msg` |
 |---|---|---|---|
@@ -566,9 +609,9 @@ consumer reading these responses directly should branch on the messages, not the
 A lock held by another session is an HTTP 403 (`User … is currently editing …`) and
 surfaces as a rejected request, never as a body to inspect.
 
-Empty, unparseable, or unrecognized bodies are treated as success — object types differ
-in the shape of their success body, and inferring failure from an unfamiliar one would
-turn working calls into errors.
+Object types differ in the shape of their success body, which is why inferring a
+failure from an unfamiliar one turns working calls into errors — and why the
+judgement moved to the caller, who knows which types they are activating.
 
 ### Accept Negotiation
 
@@ -685,6 +728,12 @@ the interface each satisfies (`IClassResults`, …). The three building blocks a
 `rawDocument` (the body as it arrived), `nothing` (for a member ADT answers with
 nothing worth reading, such as an unlock) and `wireItself`.
 
+**A set covers every member that makes a request.** `utilDocuments` is the
+largest, at twenty slots — one for each member of `AdtUtils` that reaches ADT.
+The three that reach nothing (`modifyWhereUsedScope`, `supportsSourceCode`,
+`getObjectSourceUri`) have no slot, because a strategy reads an answer and they
+have none.
+
 **Chosen once, not per call.** That fits how these consumers work: a backup tool
 wants documents whole for everything it touches, a script wants two fields from
 every read, an MCP server picks by what its model is about to do — and none of
@@ -722,7 +771,22 @@ and what you are about to do, so you write the `analyse` and this package stays
 out of it.
 
 Omit `analyse` and you still get a failure when the transport itself failed,
-carrying the response and the request it arrived on.
+carrying the response and the request it arrived on. Pass `nothingIsARefusal`
+and you do not even get that: every exchange that produced an answer comes back
+as a success carrying it, so a `403` and its document are yours to read.
+
+```typescript
+import { nothingIsARefusal, wireItself } from '@mcp-abap-adt/adt-clients';
+
+const cls = client.getClass({ ...classDocuments, source: wireItself });
+const answer = await cls.read(config, 'active', { analyse: nothingIsARefusal });
+if (answer.ok) {
+  const exchange = answer.getResult().value; // status, headers, body
+}
+```
+
+A request that never completed is still a failure — there is no answer to read,
+and a success built from none would be a lie.
 
 ### Service bindings: publishing is the editing
 

@@ -17,6 +17,7 @@ import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IFunctionGroupConfig } from '../../../../core/functionGroup';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { patchXmlAttribute } from '../../../../utils/xmlPatch';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { expectResult } from '../../../helpers/contract';
 import { presenceOf } from '../../../helpers/objectPresence';
@@ -220,6 +221,12 @@ describe('FunctionGroup (using AdtClient)', () => {
         }
 
         await tester.flowTestAuto({
+          updateTakesDocument: (current) =>
+            patchXmlAttribute(
+              current,
+              'adtcore:description',
+              `${config.description || ''} (updated)`.slice(0, 60),
+            ),
           updateConfig: {
             functionGroupName: config.functionGroupName,
             packageName: config.packageName,

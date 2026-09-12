@@ -143,13 +143,6 @@ describe('AdtInclude', () => {
       expect(put).toBeDefined();
       expect(put?.data).toBe('');
     });
-
-    it('still refuses an update with no source at all', async () => {
-      const { connection } = createConnection();
-      await expect(
-        new AdtInclude(connection, logger).update({ includeName: 'ZMY_INC' }),
-      ).rejects.toThrow(/sourceCode is required/);
-    });
   });
 
   /**

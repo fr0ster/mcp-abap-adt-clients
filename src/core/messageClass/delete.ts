@@ -35,8 +35,6 @@ export async function checkDeletion(
   connection: IAbapConnection,
   name: string,
 ): Promise<IAdtWireResponse> {
-  if (!name) throw new Error('name is required');
-
   const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
 <del:checkRequest xmlns:del="http://www.sap.com/adt/deletion" xmlns:adtcore="http://www.sap.com/adt/core">
   <del:object adtcore:uri="${objectUri(name)}"/>
@@ -66,8 +64,6 @@ export async function deleteMessageClass(
   name: string,
   transportRequest?: string,
 ): Promise<IAdtWireResponse> {
-  if (!name) throw new Error('name is required');
-
   const transportNumberTag = transportRequest?.trim()
     ? `<del:transportNumber>${transportRequest}</del:transportNumber>`
     : '<del:transportNumber/>';

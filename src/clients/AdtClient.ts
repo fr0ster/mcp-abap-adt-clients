@@ -29,7 +29,6 @@ import type {
   IAdtMetadataReadable,
   IAdtMetadataUpdatable,
   IAdtObjectAccess,
-  IAdtPackageBrowsing,
   IAdtReadable,
   IAdtRepositoryStructure,
   IAdtRequest,
@@ -204,10 +203,7 @@ import { AdtUtils } from '../core/shared/AdtUtils';
 import { type LockFailure, LockRegistry } from '../core/shared/LockRegistry';
 import type { ObjectVersion } from '../core/shared/results';
 import { type IUtilResults, utilDocuments } from '../core/shared/utilResultSet';
-import type {
-  IPackageContentItem,
-  IWhereUsedListResult,
-} from '../core/shared/utilResults';
+import type { IWhereUsedListResult } from '../core/shared/utilResults';
 import {
   AdtStructure,
   type IStructureConfig,
@@ -2013,15 +2009,34 @@ export class AdtClient {
     results: R,
   ): IAdtInformationSystem<
     ReturnType<R['search']>,
-    IWhereUsedListResult,
+    ReturnType<R['whereUsed']>,
+    ReturnType<R['whereUsedScope']>,
+    ReturnType<R['folders']>,
     ReturnType<R['types']>
   > &
-    IAdtRepositoryStructure<ReturnType<R['node']>> &
-    IAdtPackageBrowsing<IPackageContentItem[]> &
-    IAdtGroupLifecycle<ReturnType<R['inactive']>> &
-    IAdtDataPreview &
-    IAdtDiscovery &
-    IAdtObjectAccess;
+    IAdtRepositoryStructure<
+      ReturnType<R['node']>,
+      ReturnType<R['objectStructure']>
+    > &
+    IAdtGroupLifecycle<
+      ReturnType<R['inactive']>,
+      ReturnType<R['activation']>,
+      ReturnType<R['run']>,
+      ReturnType<R['results']>,
+      ReturnType<R['deletionCheck']>,
+      ReturnType<R['deletion']>
+    > &
+    IAdtDataPreview<
+      ReturnType<R['query']>,
+      ReturnType<R['columns']>,
+      ReturnType<R['contents']>
+    > &
+    IAdtDiscovery<ReturnType<R['discovery']>> &
+    IAdtObjectAccess<
+      ReturnType<R['source']>,
+      ReturnType<R['metadata']>,
+      ReturnType<R['include']>
+    >;
   getUtils<R extends IUtilResults = typeof utilDocuments>(
     results: R = utilDocuments as unknown as R,
   ): AdtUtils<R> {

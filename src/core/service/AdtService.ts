@@ -1,5 +1,6 @@
 import type {
   AdtNoFailure,
+  GeneratedServiceType,
   IAbapConnection,
   IAdtActivatable,
   IAdtCheckable,
@@ -20,6 +21,7 @@ import type {
   IAnalyse,
   ILogger,
   IResultStrategy,
+  ServiceBindingVariant,
 } from '@mcp-abap-adt/interfaces';
 import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces';
 import {
@@ -76,7 +78,7 @@ import { resolveBindingVariant, serviceDocuments } from './types';
  *
  * Nobody read it. The member answered the document and a caller who checked
  * only `ok` learned that the request completed, never what it did — which is
- * the shape this release removes everywhere else. Measured on the trial
+ * the shape this release removes everywhere else. Measured
  * 2026-09-05: the POST takes ~130s of server time and then says exactly this.
  *
  * Conservative in the same way as its neighbours: a body with no `SEVERITY` is
@@ -150,10 +152,7 @@ export class AdtServiceBinding<
 
   /** The binding name, or the caller's mistake. */
   private name(config: Partial<IServiceBindingConfig>): string {
-    if (!config.bindingName) {
-      throw new Error('bindingName is required');
-    }
-    return config.bindingName;
+    return config.bindingName as string;
   }
 
   private static encodeName(name: string): string {
@@ -166,13 +165,13 @@ export class AdtServiceBinding<
     const { bindingType, bindingVersion, bindingCategory } =
       resolveBindingVariant(params.bindingVariant);
     const masterLanguage = params.masterLanguage ?? 'EN';
-    const masterSystem = params.masterSystem;
+    const masterSystem = params.masterSystem as string;
     const responsible = params.responsible;
     const escapedDescription = params.description.replace(/"/g, '&quot;');
     const escapedBindingName = params.bindingName.toUpperCase();
     const escapedPackageName = params.packageName.toUpperCase();
     const escapedServiceName = params.serviceName.toUpperCase();
-    const escapedServiceVersion = params.serviceVersion;
+    const escapedServiceVersion = params.serviceVersion as string;
     const escapedServiceDefinition = params.serviceDefinitionName.toUpperCase();
 
     const masterSystemAttr = masterSystem
@@ -221,7 +220,7 @@ export class AdtServiceBinding<
     // decided to.
     timeout?: number,
   ): Promise<IAdtWireResponse> {
-    // **The document Eclipse sends**, captured on the cloud trial: the target is
+    // **The document Eclipse sends**, captured on one system: the target is
     // named by *type* — `SCGR`, a service group — and by name, with no
     // `adtcore:uri`. This library used to send the binding's URI instead, and
     // the server accepted it; "the server accepted it" and "this is what the
@@ -266,7 +265,7 @@ export class AdtServiceBinding<
     // decided to.
     timeout?: number,
   ): Promise<IAdtWireResponse> {
-    // **The document Eclipse sends**, captured on the cloud trial: the target is
+    // **The document Eclipse sends**, captured on one system: the target is
     // named by *type* — `SCGR`, a service group — and by name, with no
     // `adtcore:uri`. This library used to send the binding's URI instead, and
     // the server accepted it; "the server accepted it" and "this is what the
@@ -315,16 +314,7 @@ export class AdtServiceBinding<
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const name = this.name(config);
-    if (!config.serviceDefinitionName) {
-      throw new Error('serviceDefinitionName is required for validation');
-    }
-    if (!config.packageName) {
-      throw new Error('packageName is required for validation');
-    }
-    if (!config.bindingVariant) {
-      throw new Error('bindingVariant is required for validation');
-    }
-    const packageName = config.packageName;
+    const packageName = config.packageName as string;
     return answering(
       () =>
         this.transportCheckRequest(connection, {
@@ -349,34 +339,40 @@ export class AdtServiceBinding<
     config: Omit<IServiceBindingConfig, 'sourceCode'> & { sourceCode?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    // **The one guard this package keeps, and only on a create.**
+    //
+    // An object created without a package is the single thing `delete()` cannot
+    // undo: the deletion check resolves through the package, so it answers
+    // "Object does not exist" while the name stays taken for good, and clearing
+    // it is SAP GUI territory. Everywhere else a missing field produces a
+    // request the server answers, which is a reading a strategy can take. Here
+    // it produces a state with no way out through ADT at all.
+    if (!config.packageName) {
+      throw new Error(
+        'packageName is required for create: an object created without one cannot be deleted through ADT',
+      );
+    }
+
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const name = this.name(config);
-    if (!config.packageName) throw new Error('packageName is required');
-    if (!config.description) throw new Error('description is required');
-    if (!config.serviceDefinitionName) {
-      throw new Error('serviceDefinitionName is required');
-    }
-    if (!config.serviceName) throw new Error('serviceName is required');
-    if (!config.serviceVersion) throw new Error('serviceVersion is required');
-    if (!config.bindingVariant) throw new Error('bindingVariant is required');
-    const packageName = config.packageName;
+    const packageName = config.packageName as string;
     const description = config.description;
-    const serviceName = config.serviceName;
+    const serviceName = config.serviceName as string;
     const serviceVersion = config.serviceVersion;
-    const serviceDefinitionName = config.serviceDefinitionName;
+    const serviceDefinitionName = config.serviceDefinitionName as string;
     const bindingVariant = config.bindingVariant;
     return answering(
       () =>
         this.createRequest(connection, {
           bindingName: name,
           packageName,
-          description,
+          description: description as string,
           serviceDefinitionName,
           serviceName,
-          serviceVersion,
-          bindingVariant,
+          serviceVersion: serviceVersion as string,
+          bindingVariant: bindingVariant as ServiceBindingVariant,
           masterLanguage: config.masterLanguage,
           masterSystem: config.masterSystem,
           responsible: config.responsible,
@@ -448,6 +444,10 @@ export class AdtServiceBinding<
    * all: the job carries neither. The job takes ~133 seconds on the systems
    * measured, so pass `options.timeout` unless the 120s default is enough,
    * which it is not.
+   *
+   * **The whole content, every time.** This is a replace, never a merge. Read
+   * what the object holds, change what you mean to change, and pass the result:
+   * anything left out is gone, because nothing is read here to keep it.
    */
   async update<E extends IAdtError = IAdtError>(
     // **Narrower than `IAdtUpdatable` gives every other type, on purpose.**
@@ -464,9 +464,6 @@ export class AdtServiceBinding<
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const name = this.name(config);
-    if (!config.desiredPublicationState) {
-      throw new Error('desiredPublicationState is required');
-    }
     // `serviceType` selects the endpoint and comes from the caller. It used to
     // be derived from the binding's own document, along with the service name
     // and version — by a read that made this member two requests. The read is
@@ -475,13 +472,7 @@ export class AdtServiceBinding<
     // Checked here, where the config makes it optional, so the params type
     // below can require it: the demand belongs in one place, and a type is the
     // place a caller sees it.
-    const serviceType = config.serviceType;
-    if (!serviceType) {
-      throw new Error(
-        `serviceType is required to publish or unpublish ${name}: it selects ` +
-          "the endpoint, 'odatav2' or 'odatav4'.",
-      );
-    }
+    const serviceType = config.serviceType as string;
     const desiredPublicationState = config.desiredPublicationState;
 
     return answering(
@@ -489,7 +480,7 @@ export class AdtServiceBinding<
         this.updateRequest(connection, {
           bindingName: name,
           desiredPublicationState,
-          serviceType,
+          serviceType: serviceType as GeneratedServiceType,
           // The contract has always offered this; it used to stop here.
           timeout: options?.timeout,
         }),
@@ -507,7 +498,7 @@ export class AdtServiceBinding<
    *
    * **Publishing is what editing a service binding is** — it is not edited any
    * other way — so this is the lock a publication takes. Measured from Eclipse
-   * (ADT 3.60.3) on the trial, 2026-09-05: `_action=LOCK&accessMode=MODIFY` on a
+   * (ADT 3.60.3) , 2026-09-05: `_action=LOCK&accessMode=MODIFY` on a
    * stateful session before the job, and `_action=UNLOCK&lockHandle=…` when the
    * editor closes.
    *
@@ -672,10 +663,7 @@ export class AdtServiceBinding<
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const name = this.name(config);
-    if (!config.packageName) {
-      throw new Error('packageName is required for transport check');
-    }
-    const packageName = config.packageName;
+    const packageName = config.packageName as string;
 
     return answering(
       () =>
@@ -740,13 +728,6 @@ export class AdtServiceBinding<
     connection: IAbapConnection,
     params: ITransportCheckServiceBindingParams,
   ): Promise<IAdtWireResponse> {
-    if (!params.objectName) {
-      throw new Error('objectName is required');
-    }
-    if (!params.packageName) {
-      throw new Error('packageName is required');
-    }
-
     return connection.makeAdtRequest({
       url: '/sap/bc/adt/cts/transportchecks',
       method: 'POST',
@@ -763,44 +744,17 @@ export class AdtServiceBinding<
     connection: IAbapConnection,
     params: ICreateServiceBindingParams,
   ): Promise<IAdtWireResponse> {
-    if (!params.bindingName) {
-      throw new Error('bindingName is required');
-    }
-    if (!params.packageName) {
-      throw new Error('packageName is required');
-    }
-    if (!params.description) {
-      throw new Error('description is required');
-    }
-    if (!params.serviceDefinitionName) {
-      throw new Error('serviceDefinitionName is required');
-    }
-    if (!params.serviceName) {
-      throw new Error('serviceName is required');
-    }
-    if (!params.serviceVersion) {
-      throw new Error('serviceVersion is required');
-    }
-    if (!params.bindingVariant) {
-      throw new Error('bindingVariant is required');
-    }
-
-    const systemInfo = await getSystemInformation(connection);
+    // The language, the master system and the author come from what the caller
+    // gave, or from the system context they set on this client. They used to
+    // fall back to `/core/http/systeminformation`, which made a create two
+    // requests — and that read answered `null` on its own failure, so the
+    // fallback could silently be no value at all.
     const createParams: ICreateServiceBindingParams = {
       ...params,
       masterLanguage:
-        params.masterLanguage ??
-        this.systemContext.masterLanguage ??
-        systemInfo?.language ??
-        'EN',
-      masterSystem:
-        params.masterSystem ??
-        this.systemContext.masterSystem ??
-        systemInfo?.systemID,
-      responsible:
-        params.responsible ??
-        this.systemContext.responsible ??
-        systemInfo?.userName,
+        params.masterLanguage ?? this.systemContext.masterLanguage ?? 'EN',
+      masterSystem: params.masterSystem ?? this.systemContext.masterSystem,
+      responsible: params.responsible ?? this.systemContext.responsible,
     };
 
     const queryParams = params.transportRequest
@@ -826,10 +780,6 @@ export class AdtServiceBinding<
     connection: IAbapConnection,
     params: IReadServiceBindingParams,
   ): Promise<IAdtWireResponse> {
-    if (!params.bindingName) {
-      throw new Error('bindingName is required');
-    }
-
     return connection.makeAdtRequest({
       url: `/sap/bc/adt/businessservices/bindings/${AdtServiceBinding.encodeName(params.bindingName)}`,
       method: 'GET',
@@ -863,12 +813,6 @@ export class AdtServiceBinding<
     connection: IAbapConnection,
     params: IServiceBindingPublicationParams,
   ): Promise<IAdtWireResponse> {
-    if (!params.bindingName) {
-      throw new Error('bindingName is required');
-    }
-    if (!params.desiredPublicationState) {
-      throw new Error('desiredPublicationState is required');
-    }
     if (params.desiredPublicationState === 'unchanged') {
       // A caller error rather than a request: `update` on a binding *is* the
       // publication change, so asking it for no change is asking for nothing.
@@ -884,7 +828,7 @@ export class AdtServiceBinding<
     // second request. `ODATA_V4_*` and `ODATA_V2_*` binding variants map to the
     // two service types, so a caller that knows its binding knows this, and the
     // params type requires it rather than this function checking again.
-    const serviceType = params.serviceType;
+    const serviceType = params.serviceType as string;
 
     this.logger?.info?.(
       `ServiceBinding ${params.desiredPublicationState}: ${params.bindingName}`,
@@ -893,12 +837,12 @@ export class AdtServiceBinding<
 
     return params.desiredPublicationState === 'published'
       ? this.publishByServiceType(
-          serviceType,
+          serviceType as 'odatav2' | 'odatav4',
           params.bindingName,
           params.timeout,
         )
       : this.unpublishByServiceType(
-          serviceType,
+          serviceType as 'odatav2' | 'odatav4',
           params.bindingName,
           params.timeout,
         );
@@ -908,10 +852,6 @@ export class AdtServiceBinding<
     connection: IAbapConnection,
     params: IDeleteServiceBindingParams,
   ): Promise<IAdtWireResponse> {
-    if (!params.bindingName) {
-      throw new Error('bindingName is required');
-    }
-
     return connection.makeAdtRequest({
       url: '/sap/bc/adt/deletion/delete',
       method: 'POST',
@@ -928,10 +868,6 @@ export class AdtServiceBinding<
     connection: IAbapConnection,
     params: ICheckServiceBindingParams,
   ): Promise<IAdtWireResponse> {
-    if (!params.bindingName) {
-      throw new Error('bindingName is required');
-    }
-
     const version = params.version ?? 'inactive';
     const bindingUri = `/sap/bc/adt/businessservices/bindings/${AdtServiceBinding.encodeName(params.bindingName)}`;
     const xml = `<?xml version="1.0" encoding="UTF-8"?><chkrun:checkObjectList xmlns:chkrun="http://www.sap.com/adt/checkrun" xmlns:adtcore="http://www.sap.com/adt/core"><chkrun:checkObject adtcore:uri="${bindingUri}" chkrun:version="${version}"/></chkrun:checkObjectList>`;
@@ -952,10 +888,6 @@ export class AdtServiceBinding<
     connection: IAbapConnection,
     params: IActivateServiceBindingParams,
   ): Promise<IAdtWireResponse> {
-    if (!params.bindingName) {
-      throw new Error('bindingName is required');
-    }
-
     const preauditRequested =
       params.preauditRequested === undefined ? true : params.preauditRequested;
     const bindingUri = `/sap/bc/adt/businessservices/bindings/${AdtServiceBinding.encodeName(params.bindingName)}`;
@@ -987,19 +919,6 @@ export class AdtServiceBinding<
     connection: IAbapConnection,
     params: IGenerateServiceBindingParams,
   ): Promise<IAdtWireResponse> {
-    if (!params.bindingName) {
-      throw new Error('bindingName is required');
-    }
-    if (!params.serviceName) {
-      throw new Error('serviceName is required');
-    }
-    if (!params.serviceVersion) {
-      throw new Error('serviceVersion is required');
-    }
-    if (!params.serviceDefinitionName) {
-      throw new Error('serviceDefinitionName is required');
-    }
-
     const path = params.serviceType === 'odatav2' ? 'odatav2' : 'odatav4';
     const accept =
       params.serviceType === 'odatav2'
@@ -1048,13 +967,6 @@ export class AdtServiceBinding<
     connection: IAbapConnection,
     params: IServiceGroupParams,
   ): Promise<IAdtWireResponse> {
-    if (!params.objectname) {
-      throw new Error('objectname is required');
-    }
-    if (!params.serviceType) {
-      throw new Error('serviceType is required');
-    }
-
     const query = buildQueryString({
       servicename: params.servicename,
       serviceversion: params.serviceversion,
@@ -1087,10 +999,6 @@ export class AdtServiceBinding<
     connection: IAbapConnection,
     params: IClassifyServiceBindingParams,
   ): Promise<IAdtWireResponse> {
-    if (!params.objectname) {
-      throw new Error('objectname is required');
-    }
-
     const classifyQs = buildQueryString({
       objectname: params.objectname,
       bindtype: params.bindtype,

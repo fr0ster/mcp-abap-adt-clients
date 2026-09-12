@@ -31,10 +31,6 @@ export async function getInclude(
   connection: IAbapConnection,
   includeName: string,
 ): Promise<IAdtWireResponse> {
-  if (!includeName) {
-    throw new Error('Include name is required');
-  }
-
   const encodedName = encodeSapObjectName(includeName.toLowerCase());
   const url = `/sap/bc/adt/programs/includes/${encodedName}/source/main`;
 

@@ -12,8 +12,9 @@ import type {
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
+import type { IWalkedNode } from '../../../../scripts/lib/packageWalk';
+import { walkPackage } from '../../../../scripts/lib/packageWalk';
 import type { AdtClient } from '../../../clients/AdtClient';
-import type { IPackageHierarchyNode } from '../../../core/shared/utilResults';
 import { failed } from '../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import type { TestableObject } from '../../helpers/BaseTester';
@@ -54,9 +55,11 @@ class PackageHierarchyObject
   implements TestableObject<IPackageHierarchyParams>
 {
   private client: AdtClient;
+  private connection: IAbapConnection;
 
-  constructor(client: AdtClient) {
+  constructor(client: AdtClient, connection: IAbapConnection) {
     this.client = client;
+    this.connection = connection;
   }
 
   /** Every member this resource does not have — answered, not thrown. */
@@ -80,11 +83,21 @@ class PackageHierarchyObject
 
   read(
     config: Partial<IPackageHierarchyParams>,
-  ): Promise<IAdtResponse<IPackageHierarchyNode>> {
+  ): Promise<IAdtResponse<IWalkedNode>> {
     if (!config.package_name) {
       return Promise.reject(new Error('package_name required'));
     }
-    return this.client.getUtils().getPackageHierarchy(config.package_name);
+    // The walk a consumer writes, over the single-request member that stayed.
+    // See scripts/lib/packageWalk.ts for why it is not a member.
+    return walkPackage(this.connection, config.package_name).then(
+      (tree) =>
+        ({
+          ok: true,
+          getResult: () => ({
+            value: tree as unknown as IWalkedNode,
+          }),
+        }) as unknown as IAdtResponse<IWalkedNode>,
+    );
   }
 
   readMetadata() {
@@ -126,7 +139,10 @@ describe('Shared - getPackageHierarchy', () => {
       hasConfig = true;
       isCloudSystem = await isCloudEnvironment(connection);
 
-      const packageHierarchyObject = new PackageHierarchyObject(client);
+      const packageHierarchyObject = new PackageHierarchyObject(
+        client,
+        connection,
+      );
       tester = new BaseTester(
         packageHierarchyObject,
         'PackageHierarchy',
@@ -211,10 +227,17 @@ describe('Shared - getPackageHierarchy', () => {
       try {
         const result = (await tester.readTest(config, {
           skipReadMetadata: true,
-        })) as IPackageHierarchyNode;
+        })) as IWalkedNode;
         expect(result?.name).toBeDefined();
         expect(result?.name).toBe(config.package_name.toUpperCase());
         expect(result?.type).toBeDefined();
+        // The walk stopped raising on an empty level in 19.0.0 — an existing
+        // but empty package answers zero bytes, so the raise was wrong about
+        // the one cause it named. That makes an empty tree indistinguishable
+        // from a broken walk unless the test says otherwise, and it did not:
+        // it asserted the root's own name and type and nothing below them.
+        expect(result.isPackage).toBe(true);
+        expect(result.children.length).toBeGreaterThan(0);
         logTestSuccess(testsLogger, testName);
       } catch (error: any) {
         if (error?.response?.status === 406) {

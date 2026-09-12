@@ -31,10 +31,6 @@ export async function checkPackageDeletion(
   connection: IAbapConnection,
   params: IDeletePackageParams,
 ): Promise<IAdtWireResponse> {
-  if (!params.package_name) {
-    throw new Error('package_name is required');
-  }
-
   const encodedName = encodeSapObjectName(params.package_name.toLowerCase());
   const objectUri = `/sap/bc/adt/packages/${encodedName}`;
 
@@ -178,10 +174,6 @@ export async function deletePackage(
   connection: IAbapConnection,
   params: IDeletePackageParams,
 ): Promise<IAdtWireResponse> {
-  if (!params.package_name) {
-    throw new Error('package_name is required');
-  }
-
   const encodedName = encodeSapObjectName(params.package_name.toLowerCase());
   const objectUri = `/sap/bc/adt/packages/${encodedName}`;
 

@@ -21,10 +21,6 @@ export async function checkDeletion(
 ): Promise<IAdtWireResponse> {
   const { access_control_name } = params;
 
-  if (!access_control_name) {
-    throw new Error('access_control_name is required');
-  }
-
   const encodedName = encodeSapObjectName(access_control_name);
   const objectUri = `/sap/bc/adt/acm/dcl/sources/${encodedName}`;
 
@@ -57,10 +53,6 @@ export async function deleteAccessControl(
   params: IDeleteAccessControlParams,
 ): Promise<IAdtWireResponse> {
   const { access_control_name, transport_request } = params;
-
-  if (!access_control_name) {
-    throw new Error('access_control_name is required');
-  }
 
   const encodedName = encodeSapObjectName(access_control_name);
   const objectUri = `/sap/bc/adt/acm/dcl/sources/${encodedName}`;

@@ -37,18 +37,6 @@ const LOCK_XML =
   '<asx:abap xmlns:asx="http://www.sap.com/abapxml"><asx:values><DATA><LOCK_HANDLE>LH1</LOCK_HANDLE></DATA></asx:values></asx:abap>';
 
 describe('AdtScalarFunctionImplementation handler', () => {
-  it('create() requires scalarFunctionName', async () => {
-    const { conn } = makeConn(() => ({ data: '' }));
-    const h = new AdtScalarFunctionImplementation(conn);
-    await expect(
-      h.create({
-        implementationName: 'ZI',
-        packageName: 'ZP',
-        description: 'd',
-      } as any),
-    ).rejects.toThrow(/scalar function/i);
-  });
-
   it('create() is metadata-only (one POST, no lock/update)', async () => {
     const { conn, calls } = makeConn(() => ({ data: '' }));
     const h = new AdtScalarFunctionImplementation(conn);

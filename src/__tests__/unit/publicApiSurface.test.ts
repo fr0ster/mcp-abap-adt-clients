@@ -182,7 +182,10 @@ const RUNTIME_EXPORTS = [
   'metadataExtensionDocuments',
   'namedItems',
   'nodeContents',
+  'activationRunId',
+  'extractRunId',
   'nothing',
+  'nothingIsARefusal',
   'packageDocuments',
   'parseCreatedTransport',
   'programDocuments',
@@ -199,6 +202,7 @@ const RUNTIME_EXPORTS = [
   'transportDocuments',
   'unitTestDocuments',
   'utilDocuments',
+  'whereUsedReferences',
   'wireItself',
 ];
 

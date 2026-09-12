@@ -1,13 +1,15 @@
 import type {
   IAbapConnection,
   IAdtResponse,
+  IAdtRunnable,
   ILogger,
   IProfilerTraceParameters,
   IProgramExecuteWithProfilerOptions,
   IProgramExecuteWithProfilingOptions,
   IProgramExecuteWithProfilingResult,
   IProgramExecutionTarget,
-  IProgramExecutor,
+  IRunnableWithProfiler,
+  ITraceScheduling,
 } from '@mcp-abap-adt/interfaces';
 import { runProgram } from '../../core/program/run';
 import type { INamedItem } from '../../core/shared/utilResults';
@@ -18,9 +20,24 @@ import { rawDocument } from '../../utils/resultStrategy';
 import { getTimeout } from '../../utils/timeouts';
 import { TraceScheduling } from '../traceScheduling';
 
+/**
+ * **Not `IProgramExecutor` since 19.0.0.** That composite includes
+ * `IRunnableWithProfiling`, whose `runWithProfiling` scheduled a trace, ran the
+ * program under it, and answered both — three requests in one member, with the
+ * order fixed here. The three atoms below are what this class offers; a caller
+ * who wants the old member writes `scheduleTrace`, then `runWithProfiler` with
+ * the id it answered. The composite stays in the contract for an implementation
+ * that joins them.
+ */
 export class ProgramExecutor
   implements
-    IProgramExecutor<string, INamedItem[], ITraceRequestEntry[], string>
+    IAdtRunnable<IProgramExecutionTarget, string>,
+    IRunnableWithProfiler<
+      IProgramExecutionTarget,
+      string,
+      IProgramExecuteWithProfilerOptions
+    >,
+    ITraceScheduling<INamedItem[], ITraceRequestEntry[], string>
 {
   private readonly connection: IAbapConnection;
   private readonly scheduling: TraceScheduling;
@@ -49,9 +66,6 @@ export class ProgramExecutor
   ): Promise<IAdtResponse<string>> => this.scheduling.scheduleTrace(options);
 
   async run(target: IProgramExecutionTarget): Promise<IAdtResponse<string>> {
-    if (!target.programName) {
-      throw new Error('Program name is required');
-    }
     return answering(
       () => runProgram(this.connection, target.programName),
       rawDocument,
@@ -62,42 +76,7 @@ export class ProgramExecutor
     target: IProgramExecutionTarget,
     options: IProgramExecuteWithProfilerOptions,
   ): Promise<IAdtResponse<string>> {
-    if (!target.programName) {
-      throw new Error('Program name is required');
-    }
-    if (!options.profilerId) {
-      throw new Error('profilerId is required');
-    }
     return this.runWithProfilerId(target.programName, options.profilerId);
-  }
-
-  async runWithProfiling(
-    target: IProgramExecutionTarget,
-    options: IProgramExecuteWithProfilingOptions = {},
-  ): Promise<IAdtResponse<IProgramExecuteWithProfilingResult<string>>> {
-    if (!target.programName) {
-      throw new Error('Program name is required');
-    }
-
-    const normalizedProgramName = encodeSapObjectName(
-      target.programName,
-    ).toUpperCase();
-
-    const scheduled = await this.scheduleTrace(options.profilerParameters);
-    if (!scheduled.ok) {
-      // The measurement could not be configured, so there is nothing to run
-      // under it — the scheduling's own failure is the answer.
-      return failed(scheduled.getError());
-    }
-    const profilerId = scheduled.getResult().value;
-    const run = await this.runWithProfilerId(normalizedProgramName, profilerId);
-    if (!run.ok) return failed(run.getError());
-
-    // The trace is written asynchronously after the program completes, so this
-    // returns without one — the same thing the class executor now does, and the
-    // reason both results have the same shape. Find it later with
-    // `IProfiler.list()`, comparing against the ids seen before the run.
-    return succeeded({ run: run.getResult().value, profilerId });
   }
 
   private async runWithProfilerId(

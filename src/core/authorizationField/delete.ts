@@ -31,10 +31,6 @@ export async function checkDeletion(
   connection: IAbapConnection,
   params: IDeleteAuthorizationFieldParams,
 ): Promise<IAdtWireResponse> {
-  if (!params.authorization_field_name) {
-    throw new Error('authorization_field_name is required');
-  }
-
   const uri = objectUri(params.authorization_field_name);
 
   const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
@@ -61,10 +57,6 @@ export async function deleteAuthorizationField(
   connection: IAbapConnection,
   params: IDeleteAuthorizationFieldParams,
 ): Promise<IAdtWireResponse> {
-  if (!params.authorization_field_name) {
-    throw new Error('authorization_field_name is required');
-  }
-
   const uri = objectUri(params.authorization_field_name);
   const transportTag = params.transport_request?.trim()
     ? `<del:transportNumber>${params.transport_request}</del:transportNumber>`

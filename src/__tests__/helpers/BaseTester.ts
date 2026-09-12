@@ -68,6 +68,18 @@ export interface IFlowTestOptions {
   sourceCode?: string;
   xmlContent?: string;
   updateConfig?: any;
+  /**
+   * This type's write takes a complete document.
+   *
+   * Six types stopped fetching-and-patching inside `update` in 19.0.0 — domain,
+   * package, dataElement, tableType, transport and functionGroup. The read, the
+   * edit and the lock window are the caller's now, so this harness performs
+   * them, which is what a consumer performs.
+   *
+   * `true` writes back what was read. A function receives the current document
+   * and returns the one to write, which is where a test changes a field.
+   */
+  updateTakesDocument?: boolean | ((current: string) => string);
   activateOnCreate?: boolean;
   activateOnUpdate?: boolean;
   timeout?: number;
@@ -1027,6 +1039,27 @@ export class BaseTester<TConfig, TState = unknown> {
           );
         }
 
+        // The read-modify-write a document update needs, in the order the
+        // migration note prescribes: read, edit, then lock. Reading inside the
+        // lock window would be this harness inventing a sequence the library no
+        // longer performs.
+        let documentToWrite: string | undefined;
+        if (options?.updateTakesDocument) {
+          const current = await readMetadata(
+            'read document (before update)',
+            false,
+          );
+          // Not checked for emptiness, and deliberately. Whether what was
+          // read is a complete document is not something this side can know —
+          // the server is the only one that knows what it will accept, and it
+          // says so in its own words. A guard here would answer that question
+          // on its behalf and be wrong the first time it disagreed.
+          documentToWrite =
+            typeof options.updateTakesDocument === 'function'
+              ? options.updateTakesDocument(current ?? '')
+              : (current ?? '');
+        }
+
         currentStep = 'update';
         logTestStep(currentStep, this.logger);
         const updateOptions: IAdtOperationOptions = {
@@ -1042,7 +1075,13 @@ export class BaseTester<TConfig, TState = unknown> {
         };
         expectResult(
           (await this.updateUnderLock(
-            { ...config, ...options.updateConfig } as Partial<TConfig>,
+            {
+              ...config,
+              ...options.updateConfig,
+              ...(documentToWrite === undefined
+                ? {}
+                : { document: documentToWrite }),
+            } as Partial<TConfig>,
             updateOptions,
           )) as IAdtResponse<unknown>,
           'update',

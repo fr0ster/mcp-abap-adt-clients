@@ -16,11 +16,10 @@ import { getTimeout } from '../../utils/timeouts';
  *
  * Endpoint: POST /sap/bc/adt/programs/validation
  *
- * `packageName` is required, not optional. Measured on E19 (`RFCSAPRL 816`) on
- * 2026-08-28: with `objname` and `objtype` alone the server answers **400,
- * "Parameter packagename could not be found."**, and with all three it answers
- * 200. Sending it conditionally produced a request that could only fail — see
- * `docs/evidence/2026-08-28-profiler-contract-e19.md`, Task 0.4.
+ * `packageName` is required, not optional. Measured 2026-08-28: with `objname`
+ * and `objtype` alone the server answers **400, "Parameter packagename could
+ * not be found."**, and with all three it answers 200. Sending it conditionally
+ * produced a request that could only fail.
  *
  * Response format:
  * - Success: <CHECK_RESULT>X</CHECK_RESULT>

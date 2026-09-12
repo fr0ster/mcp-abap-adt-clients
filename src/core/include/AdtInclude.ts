@@ -40,10 +40,7 @@ import { unlockInclude } from './unlock';
 import { uploadIncludeSource } from './update';
 
 function requireName(config: Partial<IIncludeConfig>): string {
-  if (!config.includeName) {
-    throw new Error('includeName is required');
-  }
-  return config.includeName;
+  return config.includeName as string;
 }
 
 export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
@@ -89,14 +86,11 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const includeName = requireName(config);
-    if (!config.packageName) {
-      throw new Error('packageName is required for validation');
-    }
 
     const params = new URLSearchParams({
       objname: includeName.toUpperCase(),
       objtype: 'PROG/I',
-      packagename: config.packageName.toUpperCase(),
+      packagename: (config.packageName as string).toUpperCase(),
     });
     if (config.description) {
       params.set('description', config.description);
@@ -127,13 +121,24 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
     config: Omit<IIncludeConfig, 'sourceCode'> & { sourceCode?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+    // **The one guard this package keeps, and only on a create.**
+    //
+    // An object created without a package is the single thing `delete()` cannot
+    // undo: the deletion check resolves through the package, so it answers
+    // "Object does not exist" while the name stays taken for good, and clearing
+    // it is SAP GUI territory. Everywhere else a missing field produces a
+    // request the server answers, which is a reading a strategy can take. Here
+    // it produces a state with no way out through ADT at all.
+    if (!config.packageName) {
+      throw new Error(
+        'packageName is required for create: an object created without one cannot be deleted through ADT',
+      );
+    }
+
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const includeName = requireName(config);
-    if (!config.packageName) {
-      throw new Error('packageName is required to create an include');
-    }
     return answering(
       () =>
         create(
@@ -191,6 +196,10 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
    * `options.sourceCode` wins over the config's. `options.lockHandle` means the
    * caller already holds the lock and manages it — this then writes only, and
    * neither locks nor unlocks. Activation is `options.activateOnUpdate`.
+   *
+   * **The whole content, every time.** This is a replace, never a merge. Read
+   * what the object holds, change what you mean to change, and pass the result:
+   * anything left out is gone, because nothing is read here to keep it.
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IIncludeConfig>,
@@ -207,11 +216,6 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
     // syntax check compiles a source that is not on the server yet, so it has
     // nowhere else to arrive.
     const sourceCode = options?.sourceCode;
-    if (sourceCode === undefined) {
-      throw new Error(
-        'sourceCode is required to update an include — pass it in the config or in options',
-      );
-    }
     const includeName = requireName(config);
 
     return answering(
@@ -219,7 +223,7 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
         uploadIncludeSource(
           connection,
           includeName,
-          sourceCode,
+          sourceCode as string,
           options?.lockHandle,
           config.transportRequest,
         ),
@@ -318,7 +322,7 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
    * Close the lock window, and the session mode with it.
    *
    * `lock()` sets stateful; only this puts it back. It did not, and the session
-   * stayed stateful for everything that followed — measured on E19, the four
+   * stayed stateful for everything that followed — measured the four
    * requests after an include's unlock all went out stateful: the read, the
    * **activation**, the read after it, and the deletion. Every other type here
    * pairs the two calls; this one set stateful and never cleared it.

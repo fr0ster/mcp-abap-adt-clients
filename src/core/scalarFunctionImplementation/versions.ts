@@ -12,10 +12,8 @@ export async function getScalarFunctionImplementationVersions(
   connection: IAbapConnection,
   config: Partial<IScalarFunctionImplementationConfig>,
 ): Promise<ObjectVersion[]> {
-  if (!config.implementationName)
-    throw new Error('implementationName is required');
   const encodedName = encodeSapObjectName(
-    config.implementationName.toLowerCase(),
+    (config.implementationName as string).toLowerCase(),
   );
   const url = `/sap/bc/adt/ddic/dsfi/${encodedName}/source/main/versions`;
   try {

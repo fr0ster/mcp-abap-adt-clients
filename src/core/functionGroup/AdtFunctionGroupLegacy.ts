@@ -27,10 +27,7 @@ export class AdtFunctionGroupLegacy<
     config: Partial<IFunctionGroupConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
-    if (!config.functionGroupName) {
-      throw new Error('Function group name is required');
-    }
-    const name = config.functionGroupName;
+    const name = config.functionGroupName as string;
 
     const objectUrl = `/sap/bc/adt/functions/groups/${name.toLowerCase()}`;
     return answering(

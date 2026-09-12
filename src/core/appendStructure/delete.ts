@@ -20,8 +20,6 @@ export async function checkDeletion(
   connection: IAbapConnection,
   params: IDeleteAppendStructureParams,
 ): Promise<IAdtWireResponse> {
-  if (!params.append_structure_name)
-    throw new Error('append_structure_name is required');
   const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
 <del:checkRequest xmlns:del="http://www.sap.com/adt/deletion" xmlns:adtcore="http://www.sap.com/adt/core">
   <del:object adtcore:uri="${objectUri(params.append_structure_name)}"/>
@@ -42,8 +40,6 @@ export async function deleteAppendStructure(
   connection: IAbapConnection,
   params: IDeleteAppendStructureParams,
 ): Promise<IAdtWireResponse> {
-  if (!params.append_structure_name)
-    throw new Error('append_structure_name is required');
   const transportNumberTag = params.transport_request?.trim()
     ? `<del:transportNumber>${params.transport_request}</del:transportNumber>`
     : '<del:transportNumber/>';

@@ -20,8 +20,6 @@ export async function checkDeletion(
   connection: IAbapConnection,
   params: IDeleteScalarFunctionImplementationParams,
 ): Promise<IAdtWireResponse> {
-  if (!params.implementation_name)
-    throw new Error('implementation_name is required');
   const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
 <del:checkRequest xmlns:del="http://www.sap.com/adt/deletion" xmlns:adtcore="http://www.sap.com/adt/core">
   <del:object adtcore:uri="${objectUri(params.implementation_name)}"/>
@@ -42,8 +40,6 @@ export async function deleteScalarFunctionImplementation(
   connection: IAbapConnection,
   params: IDeleteScalarFunctionImplementationParams,
 ): Promise<IAdtWireResponse> {
-  if (!params.implementation_name)
-    throw new Error('implementation_name is required');
   const transportNumberTag = params.transport_request?.trim()
     ? `<del:transportNumber>${params.transport_request}</del:transportNumber>`
     : '<del:transportNumber/>';

@@ -12,8 +12,7 @@ export async function getStructureVersions(
   connection: IAbapConnection,
   config: Partial<IStructureConfig>,
 ): Promise<ObjectVersion[]> {
-  if (!config.structureName) throw new Error('structureName is required');
-  const encodedName = encodeSapObjectName(config.structureName);
+  const encodedName = encodeSapObjectName(config.structureName as string);
   const url = `/sap/bc/adt/ddic/structures/${encodedName}/source/main/versions`;
   try {
     const res = await connection.makeAdtRequest({

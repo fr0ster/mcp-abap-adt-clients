@@ -20,10 +20,6 @@ export async function runProgram(
   programName: string,
   _sessionId?: string,
 ): Promise<IAdtWireResponse> {
-  if (!programName?.trim()) {
-    throw new Error('programName is required');
-  }
-
   const normalizedName = encodeSapObjectName(programName).toUpperCase();
 
   return connection.makeAdtRequest({

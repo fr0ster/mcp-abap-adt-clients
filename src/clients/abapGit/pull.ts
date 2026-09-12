@@ -1,68 +1,42 @@
 import type {
   IAbapConnection,
   IAbapGitPullArgs,
+  IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces';
 import {
   CT_ABAPGIT_REPO_V3,
   CT_ABAPGIT_REPO_V4,
 } from '../../constants/contentTypes';
 import { getTimeout } from '../../utils/timeouts';
-import { getErrorLog } from './getErrorLog';
-import { listRepos } from './listRepos';
-import { pollUntilTerminal } from './poll';
-import type { IAbapGitPullResult, IAbapGitRepoStatus } from './types';
 import { buildPullBody } from './xmlBuilder';
 
+/**
+ * Start a pull — one POST to the link the caller passes.
+ *
+ * **It does not wait, and it does not look the link up.** This listed the
+ * repositories to find the pull link, posted, polled the repository until its
+ * status left `R`, and read the error log if the status said to. Four requests
+ * in one member, and three decisions the caller could not reach: how long to
+ * wait, how often to ask, and what a failed status means.
+ *
+ * The caller lists the repositories once, keeps the link, posts here, then
+ * polls `getRepo` on their own terms. The abort that used to be passed in
+ * stopped this client's own `sleep` and never the server's job; leaving their
+ * own loop says so in their own code.
+ */
 export async function pullRepo(
   connection: IAbapConnection,
-  args: IAbapGitPullArgs<IAbapGitRepoStatus>,
+  args: IAbapGitPullArgs,
   contentTypeVersion: 'v3' | 'v4' = 'v3',
-): Promise<IAbapGitPullResult> {
-  const repos = await listRepos(connection);
-  const match = repos.find(
-    (r) => r.package.toUpperCase() === args.package.toUpperCase(),
-  );
-  if (!match) {
-    throw new Error(
-      `abapGit repository for package '${args.package}' not found`,
-    );
-  }
-  if (!match.atomLinks.pullLink) {
-    throw new Error(
-      `abapGit repository '${args.package}': response missing pull_link atom link`,
-    );
-  }
-
-  const resolvedBranch = args.branchName ?? match.branchName;
+): Promise<IAdtWireResponse> {
   const ct =
     contentTypeVersion === 'v4' ? CT_ABAPGIT_REPO_V4 : CT_ABAPGIT_REPO_V3;
 
-  await connection.makeAdtRequest({
+  return connection.makeAdtRequest({
     method: 'POST',
-    url: match.atomLinks.pullLink,
+    url: args.pullLink,
     timeout: getTimeout('default'),
     headers: { 'Content-Type': ct, Accept: ct },
-    data: buildPullBody(args, resolvedBranch),
+    data: buildPullBody(args, args.branchName),
   });
-
-  const terminal: IAbapGitRepoStatus = await pollUntilTerminal(
-    connection,
-    args.package,
-    {
-      pollIntervalMs: args.pollIntervalMs,
-      maxPollDurationMs: args.maxPollDurationMs,
-      signal: args.signal,
-      onProgress: args.onProgress,
-    },
-  );
-
-  const result: IAbapGitPullResult = { finalStatus: terminal };
-  if (terminal.status === 'E' || terminal.status === 'A') {
-    try {
-      result.errorLog = await getErrorLog(connection, args.package);
-    } catch {
-      // Error log is best-effort. If it fails, return the result without it.
-    }
-  }
-  return result;
 }

@@ -18,6 +18,7 @@ import type {
   ISessionLifecycleAware,
 } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
+import { activationStatusIn } from '../../../../scripts/lib/activationRun';
 import type { AdtClient } from '../../../clients/AdtClient';
 import { orThrow } from '../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
@@ -528,22 +529,42 @@ define structure ${structureName} {
           { type: 'TABL/DS', name: structureName },
         ];
 
-        // Step 4: Group activation - activate all objects together
-        // The document, not a status: group activation answers `chkl:messages`
-        // inside a 200 whether or not it worked, so the status was never the
-        // verdict — and a refusal now comes back as the failure half instead.
-        const activationResult = expectResult(
-          await client
-            .getUtils()
-            .activateObjectsGroup(objectsToActivate, false),
-          'group activation',
+        // Step 4: start the run, wait for it, read what it produced.
+        //
+        // Three calls since 19.0.0, because they are three requests. A run id
+        // on its own is not success: it says the server accepted the work, and
+        // the results document is what says how the work went. A fixed sleep in
+        // its place was a guess about someone else's system.
+        const utils = client.getUtils();
+        const runId = expectResult(
+          await utils.activateObjectsGroup(objectsToActivate, false),
+          'activation run id',
         );
-        expect(typeof activationResult).toBe('string');
-        testsLogger.info?.('✅ Group activation completed successfully');
+        expect(runId).toBeTruthy();
 
-        // Wait a bit for activation to fully complete
-        await new Promise((resolve) =>
-          setTimeout(resolve, getOperationDelay('activate', testCase) || 2000),
+        // The wait is this test's. `activateObjectsGroup` is the POST and
+        // answers the run id; `finished` is what this test needs, and `error`
+        // or `failed` is what it must not accept as one.
+        let runStatus = '';
+        const runDeadline = Date.now() + 120_000;
+        while (runStatus !== 'finished' && Date.now() < runDeadline) {
+          const run = expectResult(
+            await utils.getActivationRun(runId, { withLongPolling: true }),
+            'activation run status',
+          );
+          runStatus = activationStatusIn(String(run));
+          if (runStatus === 'error' || runStatus === 'failed') {
+            throw new Error(`activation run ${runId} ended as ${runStatus}`);
+          }
+        }
+        expect(runStatus).toBe('finished');
+
+        const results = expectResult(
+          await utils.getActivationResults(runId),
+          'activation results',
+        );
+        testsLogger.info?.(
+          `✅ run ${runId} finished; results: ${String(results).slice(0, 120)}`,
         );
 
         logTestSuccess(testsLogger, 'Group Activation - full workflow');

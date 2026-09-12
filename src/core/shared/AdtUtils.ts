@@ -81,7 +81,6 @@ import type {
   IAdtInformationSystem,
   IAdtObjectAccess,
   IAdtOperationOptions,
-  IAdtPackageBrowsing,
   IAdtRepositoryStructure,
   IAdtResponse,
   IAdtWireResponse,
@@ -93,30 +92,34 @@ import { answering, answeringValue } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { withRequestTrace } from '../../utils/requestTrace';
-import { rawDocument } from '../../utils/resultStrategy';
 import { getTimeout } from '../../utils/timeouts';
 import { getAllTypes as getAllTypesUtil } from './allTypes';
 import { getDiscovery as getDiscoveryUtil } from './discovery';
-import { listFunctionGroupIncludes } from './functionGroupIncludesList';
-import { listFunctionModules } from './functionModulesList';
 import { fetchInactiveObjects } from './getInactiveObjects';
-import { activateObjectsGroup } from './groupActivation';
+import {
+  activateObjectsGroup,
+  getActivationResults,
+  getActivationRun,
+} from './groupActivation';
 import { checkDeletionGroup, deleteObjectsGroup } from './groupDeletion';
 import { getInclude as getIncludeUtil } from './include';
-import { getIncludesList } from './includesList';
 import { fetchNodeStructure as fetchNodeStructureUtil } from './nodeStructure';
 import { getObjectStructure as getObjectStructureUtil } from './objectStructure';
-import { getPackageContentsList } from './packageContentsList';
-import { getPackageHierarchy } from './packageHierarchy';
+import {
+  getMetadataAcceptHeader,
+  getObjectMetadataUri,
+  getObjectSourceUri,
+  objectMetadataWire,
+  objectSourceWire,
+  supportsSourceCode,
+} from './objectWire';
 // Import utility functions
 import { searchObjects } from './search';
 import { getSqlQuery } from './sqlQuery';
-import { getTableContents } from './tableContents';
+import { getTableColumns, getTableContents } from './tableContents';
 import { getVirtualFoldersContents } from './virtualFolders';
 import {
-  assertWhereUsedTarget,
   getWhereUsed,
-  getWhereUsedList,
   getWhereUsedScope,
   modifyWhereUsedScope,
 } from './whereUsed';
@@ -146,18 +149,12 @@ import type {
   AdtSourceObjectType,
   IGetDiscoveryParams,
   IGetNodeContentsOptions,
-  IGetPackageContentsListOptions,
-  IGetPackageContentsOptions,
-  IGetPackageHierarchyOptions,
   IGetSqlQueryParams,
   IGetTableContentsParams,
   IGetVirtualFoldersContentsParams,
-  IGetWhereUsedListParams,
   IGetWhereUsedParams,
   IGetWhereUsedScopeParams,
   IObjectReference,
-  IPackageContentItem,
-  IPackageHierarchyNode,
   IReadOptions,
   ISearchObjectsParams,
   IWhereUsedListResult,
@@ -182,40 +179,56 @@ import { type IUtilResults, utilDocuments } from './utilResultSet';
  * and until it does, the information system is the one this class answers to,
  * because that is what `getUtils()` hands out.
  *
- * **The members not in any atom stay on the class**, and this paragraph used to
- * describe them wrongly in two ways worth naming, since both were caught in
- * review rather than by anything here.
- *
- * It named `getPackageContents` as the one outside the contract. It is the one
- * *inside* it — `IAdtPackageBrowsing` declares exactly that member — and
- * `getPackageContentsList`, which it called the contract-shaped sibling, is the
- * extra. Backwards. What is true: `searchObjects` and `getWhereUsed` have
- * contract-shaped siblings (`search`, `getWhereUsedList`) over the same
- * endpoint, and `getPackageContents` delegates to `getPackageContentsList` —
- * one endpoint answered by two public members, which decision 16 says it should
- * not be.
+ * **The package walk is gone, and with it `IAdtPackageBrowsing`.** A walk is
+ * one node-structure request per object type plus a descent into subpackages,
+ * so `IResultStrategy` — which takes one answer — could never be given for it,
+ * and the class shipped one member per reading instead: a flat list and a tree.
+ * That is the growth the strategy axis exists to prevent. The walk is assembled
+ * by the caller over `fetchNodeStructure`, which is a single request and keeps
+ * its `node` reading. The atom stays in `@mcp-abap-adt/interfaces` for whoever
+ * implements it; this class no longer claims it.
  *
  * And it said a caller who needs another shape "passes a parser" to the sibling.
  * The parser overloads went in 30.0.0, when the reading became something
- * injected once rather than passed per call. There is no way to ask for another
- * shape from these members today: `IUtilResults` carries readings for `search`,
- * `types` and `node` only, and the package, where-used and inactive-object
- * members build their value from several requests through `answeringValue`,
- * which no strategy sees.
+ * injected once rather than passed per call — and since 19.0.0 there is nothing
+ * left that a reading cannot reach. Every member below that makes a request
+ * takes its shape from a slot of `IUtilResults`, all twenty of them. The three
+ * that take none — `modifyWhereUsedScope`, `supportsSourceCode` and
+ * `getObjectSourceUri` — make no request, so there is no answer for a strategy
+ * to read.
  */
 export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
   implements
     IAdtInformationSystem<
       ReturnType<R['search']>,
-      IWhereUsedListResult,
+      ReturnType<R['whereUsed']>,
+      ReturnType<R['whereUsedScope']>,
+      ReturnType<R['folders']>,
       ReturnType<R['types']>
     >,
-    IAdtRepositoryStructure<ReturnType<R['node']>>,
-    IAdtPackageBrowsing<IPackageContentItem[]>,
-    IAdtGroupLifecycle<ReturnType<R['inactive']>>,
-    IAdtDataPreview,
-    IAdtDiscovery,
-    IAdtObjectAccess
+    IAdtRepositoryStructure<
+      ReturnType<R['node']>,
+      ReturnType<R['objectStructure']>
+    >,
+    IAdtGroupLifecycle<
+      ReturnType<R['inactive']>,
+      ReturnType<R['activation']>,
+      ReturnType<R['run']>,
+      ReturnType<R['results']>,
+      ReturnType<R['deletionCheck']>,
+      ReturnType<R['deletion']>
+    >,
+    IAdtDataPreview<
+      ReturnType<R['query']>,
+      ReturnType<R['columns']>,
+      ReturnType<R['contents']>
+    >,
+    IAdtDiscovery<ReturnType<R['discovery']>>,
+    IAdtObjectAccess<
+      ReturnType<R['source']>,
+      ReturnType<R['metadata']>,
+      ReturnType<R['include']>
+    >
 {
   protected connection: IAbapConnection;
   private logger: ILogger;
@@ -224,7 +237,7 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
     connection: IAbapConnection,
     logger: ILogger,
     // The one cast in this file, and it is on the default. See AdtClass.
-    private readonly results: R = utilDocuments as unknown as R,
+    protected readonly results: R = utilDocuments as unknown as R,
   ) {
     // Wrapped once, here, where a connection enters the library. The wrapper
     // puts the request back on the answer and reads nothing: what a body means
@@ -268,10 +281,10 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    */
   async getVirtualFoldersContents(
     params: IGetVirtualFoldersContentsParams,
-  ): Promise<IAdtResponse<string>> {
+  ): Promise<IAdtResponse<ReturnType<R['folders']>>> {
     return answering(
       () => getVirtualFoldersContents(this.connection, params),
-      rawDocument,
+      this.results.folders as IResultStrategy<ReturnType<R['folders']>>,
     );
   }
 
@@ -309,15 +322,12 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    */
   async getWhereUsedScope(
     params: IGetWhereUsedScopeParams,
-  ): Promise<IAdtResponse<string>> {
-    // Before `answering`, not inside the request: a missing name is the
-    // caller's mistake, and classified inside it comes back as
-    // `origin: 'connection'` — advice to check a network nothing reached.
-    assertWhereUsedTarget(params);
-
+  ): Promise<IAdtResponse<ReturnType<R['whereUsedScope']>>> {
     return answering(
       () => getWhereUsedScope(this.connection, params),
-      rawDocument,
+      this.results.whereUsedScope as IResultStrategy<
+        ReturnType<R['whereUsedScope']>
+      >,
     );
   }
 
@@ -398,41 +408,11 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    */
   async getWhereUsed(
     params: IGetWhereUsedParams,
-  ): Promise<IAdtResponse<string>> {
-    assertWhereUsedTarget(params);
-
-    return answering(() => getWhereUsed(this.connection, params), rawDocument);
-  }
-
-  /**
-   * Get where-used references with parsed results
-   *
-   * This is a convenience method that combines scope fetching, search execution,
-   * and XML parsing into a single call with structured output.
-   *
-   * @param params - Where-used list parameters
-   * @returns Parsed where-used results with references list
-   *
-   * @example
-   * ```typescript
-   * const result = await utils.getWhereUsedList({
-   *   object_name: 'ZMY_TABLE',
-   *   object_type: 'table',
-   *   enableAllTypes: true
-   * });
-   *
-   * console.log(`Found ${result.totalReferences} references`);
-   * for (const ref of result.references) {
-   *   console.log(`${ref.name} (${ref.type}) in package ${ref.packageName}`);
-   * }
-   * ```
-   */
-  async getWhereUsedList(
-    params: IGetWhereUsedListParams,
-  ): Promise<IAdtResponse<IWhereUsedListResult>> {
-    assertWhereUsedTarget(params);
-
-    return answeringValue(() => getWhereUsedList(this.connection, params));
+  ): Promise<IAdtResponse<ReturnType<R['whereUsed']>>> {
+    return answering(
+      () => getWhereUsed(this.connection, params),
+      this.results.whereUsed as IResultStrategy<ReturnType<R['whereUsed']>>,
+    );
   }
 
   /**
@@ -459,13 +439,61 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    * @param preauditRequested - Whether to request pre-audit
    * @returns Activation result
    */
+  /**
+   * Start an activation run — `/activation/runs`.
+   *
+   * One POST. It answers the **run id**, not the body: the server puts it in
+   * `Location` and the body carries nothing a caller needs, while both members
+   * that continue the sequence — {@link getActivationRun} and
+   * {@link getActivationResults} — take an id.
+   *
+   * `activationRunId` is the **default** for the `activation` slot, and it is
+   * exported: a caller who keeps the exchange passes `wireItself` instead and
+   * pulls the id out later, and `extractRunId` reads a `Location` value
+   * directly.
+   */
   async activateObjectsGroup(
     objects: IObjectReference[],
     preauditRequested: boolean = false,
-  ): Promise<IAdtResponse<string>> {
+  ): Promise<IAdtResponse<ReturnType<R['activation']>>> {
     return answering(
       () => activateObjectsGroup(this.connection, objects, preauditRequested),
-      rawDocument,
+      this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
+    );
+  }
+
+  /**
+   * What an activation run produced — `/activation/results/{runId}`.
+   *
+   * One request. {@link activateObjectsGroup} starts the run and answers; the
+   * run id is in its `Location` header, and `extractRunId` reads it. How long
+   * to wait before asking for the results is the caller's decision, which is
+   * why this is a separate member rather than a step inside that one.
+   */
+  /**
+   * What an activation run is doing — `/activation/runs/{runId}`.
+   *
+   * One request. `withLongPolling` holds it open on the server rather than
+   * answering immediately, so a caller waits without a tight loop. What the
+   * document's `runs:status` means — and which value ends their wait — is
+   * theirs to read.
+   */
+  async getActivationRun(
+    runId: string,
+    options?: { withLongPolling?: boolean },
+  ): Promise<IAdtResponse<ReturnType<R['run']>>> {
+    return answering(
+      () => getActivationRun(this.connection, runId, options),
+      this.results.run as IResultStrategy<ReturnType<R['run']>>,
+    );
+  }
+
+  async getActivationResults(
+    runId: string,
+  ): Promise<IAdtResponse<ReturnType<R['results']>>> {
+    return answering(
+      () => getActivationResults(this.connection, runId),
+      this.results.results as IResultStrategy<ReturnType<R['results']>>,
     );
   }
 
@@ -477,10 +505,12 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    */
   async checkDeletionGroup(
     objects: IObjectReference[],
-  ): Promise<IAdtResponse<string>> {
+  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>>> {
     return answering(
       () => checkDeletionGroup(this.connection, objects),
-      rawDocument,
+      this.results.deletionCheck as IResultStrategy<
+        ReturnType<R['deletionCheck']>
+      >,
     );
   }
 
@@ -494,10 +524,10 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
   async deleteObjectsGroup(
     objects: IObjectReference[],
     transportRequest?: string,
-  ): Promise<IAdtResponse<string>> {
+  ): Promise<IAdtResponse<ReturnType<R['deletion']>>> {
     return answering(
       () => deleteObjectsGroup(this.connection, objects, transportRequest),
-      rawDocument,
+      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
     );
   }
 
@@ -517,7 +547,7 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
     objectName: string,
     functionGroup?: string,
     options?: IReadOptions,
-  ): Promise<IAdtResponse<string>> {
+  ): Promise<IAdtResponse<ReturnType<R['metadata']>>> {
     // Built here, not inside the request: `getObjectMetadataUri` refuses a type
     // it has no resource for, and that is the caller's mistake. Classified
     // inside `answering` it would come back as `origin: 'connection'`, pointing
@@ -526,51 +556,15 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
 
     return answering(
       () =>
-        this.objectMetadataWire(objectType, objectName, functionGroup, options),
-      rawDocument,
-    );
-  }
-
-  /**
-   * The metadata answer itself, for callers inside this package.
-   *
-   * The contract member above answers a document, because that is what a
-   * consumer of {@link IAdtObjectAccess} reads. The per-type request functions
-   * need the answer whole — status and headers included — so that the handler
-   * can apply *its* consumer's strategy to it, and reading it here would throw
-   * that away and make them read it back out of a string.
-   */
-  async objectMetadataWire(
-    objectType: AdtObjectType,
-    objectName: string,
-    functionGroup?: string,
-    options?: IReadOptions,
-  ): Promise<IAdtWireResponse> {
-    let uri = getObjectMetadataUri(objectType, objectName, functionGroup);
-    const params = [];
-    if (options?.version) {
-      params.push(`version=${options.version}`);
-    }
-    if (options?.withLongPolling) {
-      params.push('withLongPolling=true');
-    }
-    if (params.length > 0) {
-      uri += `?${params.join('&')}`;
-    }
-    const acceptHeader = options?.accept ?? getMetadataAcceptHeader(objectType);
-    return makeAdtRequestWithAcceptNegotiation(
-      this.connection,
-      {
-        url: uri,
-        method: 'GET',
-        timeout: getTimeout('default'),
-        headers: {
-          Accept: acceptHeader,
-        },
-      },
-      {
-        logger: this.logger,
-      },
+        objectMetadataWire(
+          this.connection,
+          objectType,
+          objectName,
+          functionGroup,
+          options,
+          this.logger,
+        ),
+      this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
     );
   }
 
@@ -593,7 +587,7 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
     functionGroup?: string,
     version?: 'active' | 'inactive',
     options?: IReadOptions,
-  ): Promise<IAdtResponse<string>> {
+  ): Promise<IAdtResponse<ReturnType<R['source']>>> {
     // Raised before anything is asked, rather than dressed as a verdict about
     // the server: a type with no source resource, and a function module with no
     // function group, are both the caller's mistake. `getObjectSourceUri` is
@@ -609,56 +603,16 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
 
     return answering(
       () =>
-        this.objectSourceWire(
+        objectSourceWire(
+          this.connection,
           objectType,
           objectName,
           functionGroup,
           version,
           options,
+          this.logger,
         ),
-      rawDocument,
-    );
-  }
-
-  /** The source answer itself — see {@link objectMetadataWire}. */
-  async objectSourceWire(
-    objectType: AdtSourceObjectType,
-    objectName: string,
-    functionGroup?: string,
-    version?: 'active' | 'inactive',
-    options?: IReadOptions,
-  ): Promise<IAdtWireResponse> {
-    if (!supportsSourceCode(objectType)) {
-      throw new Error(
-        `Object type ${objectType} does not support source code reading`,
-      );
-    }
-
-    let uri = getObjectSourceUri(
-      objectType,
-      objectName,
-      functionGroup,
-      version,
-    );
-    if (options?.withLongPolling) {
-      const separator = uri.includes('?') ? '&' : '?';
-      uri += `${separator}withLongPolling=true`;
-    }
-
-    const acceptHeader = options?.accept ?? 'text/plain';
-    return makeAdtRequestWithAcceptNegotiation(
-      this.connection,
-      {
-        url: uri,
-        method: 'GET',
-        timeout: getTimeout('default'),
-        headers: {
-          Accept: acceptHeader,
-        },
-      },
-      {
-        logger: this.logger,
-      },
+      this.results.source as IResultStrategy<ReturnType<R['source']>>,
     );
   }
 
@@ -697,12 +651,29 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    * @param params - SQL query parameters
    * @returns Query result
    */
-  async getSqlQuery(params: IGetSqlQueryParams): Promise<IAdtResponse<string>> {
-    if (!params.sql_query) {
-      throw new Error('SQL query is required');
-    }
+  async getSqlQuery(
+    params: IGetSqlQueryParams,
+  ): Promise<IAdtResponse<ReturnType<R['query']>>> {
+    return answering(
+      () => getSqlQuery(this.connection, params),
+      this.results.query as IResultStrategy<ReturnType<R['query']>>,
+    );
+  }
 
-    return answering(() => getSqlQuery(this.connection, params), rawDocument);
+  /**
+   * The columns a DDIC entity has — `/datapreview/ddic/{name}/metadata`.
+   *
+   * One request. It exists because {@link getTableContents} no longer makes it:
+   * the statement is the caller's, and this is where they learn what they may
+   * name in it.
+   */
+  async getTableColumns(
+    tableName: string,
+  ): Promise<IAdtResponse<ReturnType<R['columns']>>> {
+    return answering(
+      () => getTableColumns(this.connection, tableName),
+      this.results.columns as IResultStrategy<ReturnType<R['columns']>>,
+    );
   }
 
   /**
@@ -714,14 +685,10 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    */
   async getTableContents(
     params: IGetTableContentsParams,
-  ): Promise<IAdtResponse<string>> {
-    if (!params.table_name) {
-      throw new Error('Table name is required');
-    }
-
+  ): Promise<IAdtResponse<ReturnType<R['contents']>>> {
     return answering(
       () => getTableContents(this.connection, params),
-      rawDocument,
+      this.results.contents as IResultStrategy<ReturnType<R['contents']>>,
     );
   }
 
@@ -733,10 +700,10 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    */
   async discovery(
     params: IGetDiscoveryParams = {},
-  ): Promise<IAdtResponse<string>> {
+  ): Promise<IAdtResponse<ReturnType<R['discovery']>>> {
     return answering(
       () => getDiscoveryUtil(this.connection, params),
-      rawDocument,
+      this.results.discovery as IResultStrategy<ReturnType<R['discovery']>>,
     );
   }
 
@@ -775,174 +742,6 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
   }
 
   /**
-   * Get list of includes for ABAP object
-   *
-   * Recursively discovers and lists all include files within an ABAP program or include.
-   *
-   * @param objectName - Object name (program or include)
-   * @param objectType - Object type: 'PROG/P' | 'PROG/I' | 'FUGR' | 'CLAS/OC'
-   * @param timeout - Optional timeout in milliseconds (default: 30000)
-   * @returns Array of include names
-   *
-   * @example
-   * ```typescript
-   * const includes = await utils.getIncludesList('ZMY_PROGRAM', 'PROG/P');
-   * // Returns: ['ZMY_INCLUDE1', 'ZMY_INCLUDE2', ...]
-   * ```
-   */
-  async getIncludesList(
-    objectName: string,
-    objectType: 'PROG/P' | 'PROG/I' | 'FUGR' | 'CLAS/OC',
-    timeout: number = 30000,
-  ): Promise<IAdtResponse<string[]>> {
-    if (!objectName) {
-      throw new Error('Object name is required');
-    }
-
-    return answeringValue(() =>
-      getIncludesList(this.connection, objectName, objectType, timeout),
-    );
-  }
-
-  /**
-   * List the function modules of a function group.
-   *
-   * @example
-   * const fms = await utils.listFunctionModules('ZMY_FUGR');
-   * // Returns: ['Z_MY_FM1', 'Z_MY_FM2']
-   */
-  async listFunctionModules(
-    functionGroupName: string,
-  ): Promise<IAdtResponse<string[]>> {
-    if (!functionGroupName) {
-      throw new Error('Function group name is required');
-    }
-
-    return answeringValue(() =>
-      listFunctionModules(this.connection, functionGroupName),
-    );
-  }
-
-  /**
-   * List the includes of a function group (TOP, UXX collector, custom includes).
-   *
-   * Complements listFunctionModules: includes hold code that is not part of any
-   * function module (global data/types in TOP, FORM routines in custom includes),
-   * so a complete function-group backup needs them.
-   *
-   * @example
-   * const includes = await utils.listFunctionGroupIncludes('ZMY_FUGR');
-   * // Returns: ['LZMY_FUGRTOP', 'LZMY_FUGRUXX', ...]
-   */
-  async listFunctionGroupIncludes(
-    functionGroupName: string,
-  ): Promise<IAdtResponse<string[]>> {
-    if (!functionGroupName) {
-      throw new Error('Function group name is required');
-    }
-
-    return answeringValue(() =>
-      listFunctionGroupIncludes(this.connection, functionGroupName),
-    );
-  }
-
-  /**
-   * Get package contents as raw XML
-   *
-   * Low-level method that retrieves package contents as raw XML response.
-   * For most use cases, prefer getPackageContentsList() or getPackageHierarchy().
-   *
-   * @param packageName - Package name
-   * @returns Axios response with XML containing package contents
-   *
-   * @example
-   * ```typescript
-   * const response = await utils.getPackageContents('ZMY_PACKAGE');
-   * // Response contains XML with objects in the package
-   * ```
-   */
-  async getPackageContents(
-    packageName: string,
-    options?: IGetPackageContentsOptions,
-  ): Promise<IAdtResponse<IPackageContentItem[]>> {
-    // The contract asks what a package holds, not which requests were made to
-    // find out — so this is the flat listing, which is the answer to that
-    // question. The single node-structure request that used to stand in for it
-    // answered one level of a tree and left the caller to walk the rest.
-    return answeringValue(() =>
-      getPackageContentsList(
-        this.connection,
-        packageName,
-        { includeDescriptions: options?.withShortDescriptions },
-        this.logger,
-      ),
-    );
-  }
-
-  /**
-   * Get package contents as a flat list
-   *
-   * Returns all objects in a package as a flat array. This is a convenient
-   * wrapper that fetches all object categories and returns them in a single list.
-   *
-   * @param packageName - Package name
-   * @param options - Optional options for fetching
-   * @returns Array of package content items
-   *
-   * @example
-   * ```typescript
-   * const items = await utils.getPackageContentsList('ZMY_PACKAGE');
-   * // Returns: [{ name: 'ZCL_MY_CLASS', type: 'CLAS/OC', description: '...' }, ...]
-   *
-   * // Include subpackage contents recursively
-   * const allItems = await utils.getPackageContentsList('ZMY_PACKAGE', {
-   *   includeSubpackages: true,
-   * });
-   * ```
-   */
-  async getPackageContentsList(
-    packageName: string,
-    options?: IGetPackageContentsListOptions,
-  ): Promise<IAdtResponse<IPackageContentItem[]>> {
-    return answeringValue(() =>
-      getPackageContentsList(
-        this.connection,
-        packageName,
-        options,
-        this.logger,
-      ),
-    );
-  }
-
-  /**
-   * Get package hierarchy as a tree structure
-   *
-   * Builds a tree of package contents and subpackages using node structure.
-   *
-   * @param packageName - Package name
-   * @param options - Optional hierarchy options
-   * @returns Root tree node for the package hierarchy
-   *
-   * @example
-   * ```typescript
-   * const tree = await utils.getPackageHierarchy('ZMY_PACKAGE', {
-   *   includeSubpackages: true,
-   *   maxDepth: 5,
-   *   includeDescriptions: true,
-   * });
-   * // tree contains package, subpackages, and objects in a hierarchy
-   * ```
-   */
-  async getPackageHierarchy(
-    packageName: string,
-    options?: IGetPackageHierarchyOptions,
-  ): Promise<IAdtResponse<IPackageHierarchyNode>> {
-    return answeringValue(() =>
-      getPackageHierarchy(this.connection, packageName, options, this.logger),
-    );
-  }
-
-  /**
    * Get object structure from ADT repository
    *
    * Retrieves ADT object structure as compact JSON tree.
@@ -959,17 +758,12 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
   async getObjectStructure(
     objectType: string,
     objectName: string,
-  ): Promise<IAdtResponse<string>> {
-    if (!objectType) {
-      throw new Error('Object type is required');
-    }
-    if (!objectName) {
-      throw new Error('Object name is required');
-    }
-
+  ): Promise<IAdtResponse<ReturnType<R['objectStructure']>>> {
     return answering(
       () => getObjectStructureUtil(this.connection, objectType, objectName),
-      rawDocument,
+      this.results.objectStructure as IResultStrategy<
+        ReturnType<R['objectStructure']>
+      >,
     );
   }
 
@@ -987,14 +781,12 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
    * const sourceCode = response.data; // Include source code
    * ```
    */
-  async getInclude(includeName: string): Promise<IAdtResponse<string>> {
-    if (!includeName) {
-      throw new Error('Include name is required');
-    }
-
+  async getInclude(
+    includeName: string,
+  ): Promise<IAdtResponse<ReturnType<R['include']>>> {
     return answering(
       () => getIncludeUtil(this.connection, includeName),
-      rawDocument,
+      this.results.include as IResultStrategy<ReturnType<R['include']>>,
     );
   }
 
@@ -1024,171 +816,4 @@ export class AdtUtils<R extends IUtilResults = typeof utilDocuments>
       this.results.types as IResultStrategy<ReturnType<R['types']>>,
     );
   }
-}
-
-function getObjectMetadataUri(
-  objectType: AdtObjectType,
-  objectName: string,
-  functionGroup?: string,
-): string {
-  const encodedName = encodeSapObjectName(objectName);
-
-  switch (objectType.toLowerCase()) {
-    case 'class':
-    case 'clas/oc':
-      return `/sap/bc/adt/oo/classes/${encodedName}`;
-    case 'program':
-    case 'prog/p':
-      return `/sap/bc/adt/programs/programs/${encodedName}`;
-    case 'interface':
-    case 'intf/if':
-      return `/sap/bc/adt/oo/interfaces/${encodedName}`;
-    case 'functionmodule':
-    case 'fugr/ff': {
-      if (!functionGroup) {
-        throw new Error('Function group is required for function module');
-      }
-      const encodedGroup = encodeSapObjectName(functionGroup);
-      return `/sap/bc/adt/functions/groups/${encodedGroup}/fmodules/${encodedName}`;
-    }
-    case 'view':
-    case 'ddls/df':
-      return `/sap/bc/adt/ddic/ddl/sources/${encodedName}`;
-    case 'structure':
-    case 'stru/dt':
-      return `/sap/bc/adt/ddic/structures/${encodedName}`;
-    case 'table':
-    case 'tabl/dt':
-      return `/sap/bc/adt/ddic/tables/${encodedName}`;
-    case 'tabletype':
-    case 'ttyp/df':
-      return `/sap/bc/adt/ddic/tabletypes/${encodedName}`;
-    case 'domain':
-    case 'doma/dd':
-      return `/sap/bc/adt/ddic/domains/${encodedName}`;
-    case 'dataelement':
-    case 'dtel':
-      return `/sap/bc/adt/ddic/dataelements/${encodedName}`;
-    case 'functiongroup':
-    case 'fugr':
-      return `/sap/bc/adt/functions/groups/${encodedName}`;
-    case 'package':
-    case 'devc/k':
-      return `/sap/bc/adt/packages/${encodedName}`;
-    default:
-      throw new Error(`Unsupported object type for metadata: ${objectType}`);
-  }
-}
-
-function getMetadataAcceptHeader(objectType: AdtObjectType): string {
-  const type = objectType.toLowerCase();
-
-  switch (type) {
-    case 'class':
-    case 'clas/oc':
-      return ACCEPT_CLASS;
-    case 'interface':
-    case 'intf/if':
-      return ACCEPT_INTERFACE;
-    case 'table':
-    case 'tabl/dt':
-      return ACCEPT_TABLE;
-    case 'tabletype':
-    case 'ttyp/df':
-      return ACCEPT_TABLE_TYPE;
-    case 'domain':
-    case 'doma/dd':
-      return ACCEPT_DOMAIN;
-    case 'dataelement':
-    case 'dtel':
-      return ACCEPT_DATA_ELEMENT;
-    case 'structure':
-    case 'stru/dt':
-      return ACCEPT_STRUCTURE;
-    case 'view':
-    case 'ddls/df':
-      return CT_VIEW;
-    case 'program':
-    case 'prog/p':
-      return ACCEPT_PROGRAM;
-    case 'functiongroup':
-    case 'fugr':
-      return ACCEPT_FUNCTION_GROUP;
-    case 'functionmodule':
-    case 'fugr/ff':
-      return ACCEPT_FUNCTION_MODULE;
-    case 'package':
-    case 'devc/k':
-      return ACCEPT_PACKAGE;
-    default:
-      return 'application/xml';
-  }
-}
-
-function getObjectSourceUri(
-  objectType: AdtSourceObjectType,
-  objectName: string,
-  functionGroup?: string,
-  version?: 'active' | 'inactive',
-): string {
-  const encodedName = encodeSapObjectName(objectName);
-  const versionParam = version ? `?version=${version}` : '';
-
-  switch (objectType.toLowerCase()) {
-    case 'class':
-    case 'clas/oc':
-      return `/sap/bc/adt/oo/classes/${encodedName}/source/main${versionParam}`;
-    case 'program':
-    case 'prog/p':
-      return `/sap/bc/adt/programs/programs/${encodedName}/source/main${versionParam}`;
-    case 'interface':
-    case 'intf/if':
-      return `/sap/bc/adt/oo/interfaces/${encodedName}/source/main${versionParam}`;
-    case 'functionmodule':
-    case 'fugr/ff': {
-      if (!functionGroup) {
-        throw new Error('Function group is required for function module');
-      }
-      const encodedGroup = encodeSapObjectName(functionGroup);
-      return `/sap/bc/adt/functions/groups/${encodedGroup}/fmodules/${encodedName}/source/main${versionParam}`;
-    }
-    case 'view':
-    case 'ddls/df':
-      return `/sap/bc/adt/ddic/ddl/sources/${encodedName}/source/main${versionParam}`;
-    case 'structure':
-    case 'stru/dt':
-      return `/sap/bc/adt/ddic/structures/${encodedName}/source/main${versionParam}`;
-    case 'table':
-    case 'tabl/dt':
-      return `/sap/bc/adt/ddic/tables/${encodedName}/source/main${versionParam}`;
-    case 'tabletype':
-    case 'ttyp/df':
-      return `/sap/bc/adt/ddic/tabletypes/${encodedName}/source/main${versionParam}`;
-    default:
-      throw new Error(
-        `Object type ${objectType} does not support source code reading`,
-      );
-  }
-}
-
-function supportsSourceCode(objectType: AdtObjectType): boolean {
-  const supportedTypes = [
-    'class',
-    'clas/oc',
-    'program',
-    'prog/p',
-    'interface',
-    'intf/if',
-    'functionmodule',
-    'fugr/ff',
-    'view',
-    'ddls/df',
-    'structure',
-    'stru/dt',
-    'table',
-    'tabl/dt',
-    'tabletype',
-    'ttyp/df',
-  ];
-  return supportedTypes.includes(objectType.toLowerCase());
 }

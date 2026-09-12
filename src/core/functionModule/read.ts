@@ -8,14 +8,9 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_TRANSPORT } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { noopLogger } from '../../utils/noopLogger';
 import { getTimeout } from '../../utils/timeouts';
-import { AdtUtils } from '../shared/AdtUtils';
+import { objectMetadataWire, objectSourceWire } from '../shared/objectWire';
 import type { IReadOptions } from '../shared/types';
-
-function getUtils(connection: IAbapConnection): AdtUtils {
-  return new AdtUtils(connection, noopLogger);
-}
 
 /**
  * Get ABAP function module metadata (without source code)
@@ -26,7 +21,8 @@ export async function getFunctionMetadata(
   functionGroup: string,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  return getUtils(connection).objectMetadataWire(
+  return objectMetadataWire(
+    connection,
     'functionmodule',
     functionName,
     functionGroup,
@@ -48,7 +44,8 @@ export async function getFunctionSource(
   version?: 'active' | 'inactive',
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  return getUtils(connection).objectSourceWire(
+  return objectSourceWire(
+    connection,
     'functionmodule',
     functionName,
     functionGroup,

@@ -79,6 +79,13 @@ export { serviceDefinitionDocuments } from './core/serviceDefinition/types';
 /** The reading of `/activation/inactiveobjects`, injectable since 18.0.0. */
 export { inactiveObjects } from './core/shared/getInactiveObjects';
 /**
+ * The run id out of a started activation's `Location` value.
+ *
+ * Exported beside `activationRunId`, for a caller whose own reading keeps the
+ * exchange and pulls the id out later.
+ */
+export { extractRunId } from './core/shared/groupActivation';
+/**
  * What a deletion check answers, named once for every result set that carries a
  * `deletionCheck` strategy. It is a different document from `check`'s.
  */
@@ -88,13 +95,9 @@ export type { IUtilResults } from './core/shared/utilResultSet';
 export { utilDocuments } from './core/shared/utilResultSet';
 export type {
   IAdtObjectHit,
-  IGetPackageContentsListOptions,
-  IGetPackageHierarchyOptions,
   IInactiveObjectsResponse,
   INamedItem,
   IObjectReference,
-  IPackageContentItem,
-  IPackageHierarchyNode,
   IRepositoryNodeChild,
   IRepositoryNodeContents,
   IRepositoryObjectNode,
@@ -105,9 +108,11 @@ export type {
   PackageHierarchySupportedType,
 } from './core/shared/utilResults';
 export {
+  activationRunId,
   namedItems,
   nodeContents,
   searchHits,
+  whereUsedReferences,
 } from './core/shared/utilResults';
 export type { IStructureResults } from './core/structure/types';
 export { structureDocuments } from './core/structure/types';
@@ -156,5 +161,13 @@ export { unitTestDocuments } from './core/unitTest/types';
  * if (!answer.ok) answer.getError().t100;   // typed, no cast
  * ```
  */
+/**
+ * The one failure strategy here, and it finds none.
+ *
+ * Paired with `wireItself` it hands back every exchange that produced an
+ * answer, refusals included, so the caller reads the body rather than being
+ * told what it meant.
+ */
+export { nothingIsARefusal } from './utils/adtResponse';
 /** The readings this package ships, as building blocks for your own sets. */
 export { nothing, rawDocument, wireItself } from './utils/resultStrategy';
