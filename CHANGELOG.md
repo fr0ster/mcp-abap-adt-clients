@@ -1,6 +1,13 @@
 # @mcp-abap-adt/adt-clients – Changelog
 
-All notable changes to this package are documented here.  
+All notable changes to this package are documented here.
+
+**This repository holds more than one package.** This file is `adt-clients`',
+which still lives at the root; `packages/adt-strategies` keeps its own
+[`CHANGELOG.md`](packages/adt-strategies/CHANGELOG.md) and its own tags
+(`adt-strategies@<version>`, not `v<version>`). When `adt-clients` moves into
+`packages/` too, this file becomes the repository's.
+  
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
