@@ -105,7 +105,8 @@
     "pretest": "npm run test:check:integration && npm run --silent check:config",
     "prepublishOnly": "npm run build",
     "prepare": "husky",
-    "check:config": "node scripts/check-config-drift.js"
+    "check:config": "node scripts/check-config-drift.js",
+    "corpus:capture": "npx ts-node scripts/capture-adt-corpus.ts"
   },
   "engines": {
     "node": ">=18.0.0"
