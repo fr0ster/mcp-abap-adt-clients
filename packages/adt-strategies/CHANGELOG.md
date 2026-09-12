@@ -1,11 +1,17 @@
 # @mcp-abap-adt/adt-strategies
 
-Per-package entries. The repository's full narrative for a change that spans
-packages lives in the root [`CHANGELOG.md`](../../CHANGELOG.md), which is
-`@mcp-abap-adt/adt-clients`' own until that package moves into `packages/` too.
+This package's own changelog, and the only one that describes it.
 
-Released under tags of the form `adt-strategies@<version>` — deliberately not
-`v<version>`, which is `adt-clients`' scheme and fires its release workflow.
+**Every package here keeps its own, because the versions move independently.**
+`adt-clients` is at 19.0.0 while this starts at 0.1.0, so a shared file would
+list entries against versions this package never had. A monorepo that bumps all
+its packages together can have a single changelog; this one cannot.
+`adt-clients`' is at the [repository root](../../CHANGELOG.md) for now, because
+that package still lives there.
+
+Tags follow the same rule: these releases are tagged
+`adt-strategies@<version>`, never `v<version>` — that scheme is `adt-clients`'
+and fires its release workflow.
 
 ## [0.1.0] - 2026-09-12
 

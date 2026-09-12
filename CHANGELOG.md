@@ -2,11 +2,18 @@
 
 All notable changes to this package are documented here.
 
-**This repository holds more than one package.** This file is `adt-clients`',
-which still lives at the root; `packages/adt-strategies` keeps its own
-[`CHANGELOG.md`](packages/adt-strategies/CHANGELOG.md) and its own tags
-(`adt-strategies@<version>`, not `v<version>`). When `adt-clients` moves into
-`packages/` too, this file becomes the repository's.
+**This repository holds more than one package, and each keeps its own
+changelog.** This file is `adt-clients`', which still lives at the root;
+`packages/adt-strategies` has [its own](packages/adt-strategies/CHANGELOG.md).
+
+There is no repository-wide changelog and there will not be one. The versions
+here move independently — `adt-clients` is at 19.0.0 while `adt-strategies`
+starts at 0.1.0 — so a single file would be a list of entries most readers have
+to skip, against versions their package never had. A monorepo that bumps every
+package together can have one; this one cannot. Tags follow the same rule:
+`v<version>` is `adt-clients`', `adt-strategies@<version>` is the other's.
+
+When `adt-clients` moves into `packages/`, this file goes with it.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
