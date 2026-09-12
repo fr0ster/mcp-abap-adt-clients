@@ -59,9 +59,30 @@ message in the document, normalised. SAP spells severity three ways and carries
 a T100 key in exactly one of the forms; the reading flattens that so a caller
 matching on `type === 'E'` does not have to know which carrier they got.
 
-The readings underneath are exported too — `readActivationRefusal` and its
-siblings, pure functions over a document — for a caller assembling their own
-strategy rather than taking one.
+### The whole surface
+
+| export | what it is |
+|---|---|
+| `analyseActivation` | `<chkl:messages>` — a `<msg type="E">` is the verdict, `activationExecuted="false"` is not |
+| `analyseCheck` | `<chkrun:checkRunReports>` — the status first, then the messages |
+| `analyseDeletion` | `del:isDeleted` and `del:isDeletable`, both attributes on a `200` |
+| `analyseValidation` | name admissibility: two families answer with a body, three with the status |
+| `analyseUnitTest` | `aunit:runResult` — alerts on the method that failed |
+| `analyseException` | `<exc:exception>`, wherever it arrives |
+| `analyseAny` | dispatches on the root element when the form is not known in advance |
+| `readActivationRefusal`, `readCheckRunRefusal`, `readDeletionRefusal`, `readValidationRefusal`, `readUnitTestRefusal`, `readExceptionRefusal`, `readAdtRefusal` | the readings underneath — pure functions over a document, answering `AdtRefusal` or `null` |
+| `isIndeterminateWalkAnswer` | says an empty node structure cannot be read: an empty package and one that does not exist answer identically |
+| `asItCame` | the answer unchanged |
+| `rawOf` | `answer.data` as text, without pretending an object was ever a string |
+| `AdtMessage`, `AdtRefusal`, `IAdtMessageFailure` | the shapes those produce |
+
+**Use a named strategy where the form is known.** `analyseAny` answers `null`
+for a document it does not recognise, and `null` here means "not a failure" — so
+a form nobody wrote a reading for passes as a success.
+
+**A reading answers `null` for two different things**: a document that is not a
+refusal, and a document of a form it was not written for. A caller who needs to
+tell those apart calls the specific reading rather than the dispatcher.
 
 **The result axis has exactly one member**, `asItCame`: the answer unchanged,
 XML or ABAP text alike. Shaping a result is the consumer's decision — which

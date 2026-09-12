@@ -559,7 +559,13 @@ export function readUnitTestRefusal(document: unknown): AdtRefusal | null {
  * pre-check may disregard it.
  */
 export function isIndeterminateWalkAnswer(document: unknown): boolean {
-  return document === '' || document === undefined || document === null;
+  if (document === undefined || document === null) return true;
+  // Whitespace counts, and the reason is that two pieces of code in this
+  // repository disagreed about it: `scripts/lib/packageWalk.ts` trims before
+  // testing, this did not. Measured, the server answers zero bytes — so the
+  // whitespace case is defensive rather than observed, and the two should at
+  // least be defensive the same way.
+  return typeof document === 'string' && document.trim() === '';
 }
 
 // ---------------------------------------------------------------------------

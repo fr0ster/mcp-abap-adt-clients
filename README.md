@@ -399,6 +399,13 @@ complete is a question only your system can answer, and it answers it — in its
 own words, on the write. That is why the rule above is worth knowing rather than
 relying on being caught.
 
+**No error strategy ships in this package**, and that is the design: whether an
+answer is a failure depends on which object types you touch and what you were
+doing. If you have no opinion yet,
+[`@mcp-abap-adt/adt-strategies`](packages/adt-strategies) has one — defaults
+derived from recorded ADT answers, each tested against the refusal it came from
+and the success it must be told apart from.
+
 Full detail: [`docs/usage/MIGRATION-19.md`](docs/usage/MIGRATION-19.md). Every
 sequence 19.0.0 handed back to the consumer is written out under
 [`examples/`](examples), one file per removed member.
