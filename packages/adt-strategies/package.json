@@ -1,0 +1,45 @@
+{
+  "name": "@mcp-abap-adt/adt-strategies",
+  "version": "0.1.0",
+  "description": "Default result and failure strategies for @mcp-abap-adt/adt-clients, derived from recorded ADT answers",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "COPYING"
+  ],
+  "scripts": {
+    "clean": "node -e \"const fs=require('fs');try{fs.rmSync('dist',{recursive:true,force:true})}catch{}\"",
+    "build": "npm run --silent clean && npx tsc -p tsconfig.json",
+    "test": "npx jest -c jest.config.js",
+    "prepack": "npm run --silent build"
+  },
+  "keywords": [
+    "abap",
+    "sap",
+    "adt",
+    "strategies"
+  ],
+  "author": "Oleksii Kyslytsia <oleksij.kyslytsja@gmail.com>",
+  "license": "LGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fr0ster/mcp-abap-adt-clients.git",
+    "directory": "packages/adt-strategies"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@mcp-abap-adt/interfaces": "^44.0.0",
+    "fast-xml-parser": "^5.9.3"
+  }
+}

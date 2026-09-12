@@ -56,6 +56,9 @@
     "LICENSE",
     "COPYING"
   ],
+  "workspaces": [
+    "packages/*"
+  ],
   "keywords": [
     "abap",
     "sap",
@@ -80,11 +83,11 @@
   "scripts": {
     "chrono": "./tools/version-stats.sh",
     "clean": "node -e \"const fs=require('fs');['dist','tsconfig.tsbuildinfo'].forEach(p=>{try{fs.rmSync(p,{recursive:true,force:true})}catch{}})\"",
-    "lint": "npx biome check --write src",
-    "lint:check": "npx biome check src && npm run --silent check:docs",
+    "lint": "npx biome check --write src packages",
+    "lint:check": "npx biome check src packages && npm run --silent check:docs",
     "check:docs": "node scripts/check-doc-imports.js",
-    "format": "npx biome format --write src",
-    "build": "npm run --silent clean && npx biome check src --diagnostic-level=error && npx tsc -p tsconfig.json",
+    "format": "npx biome format --write src packages",
+    "build": "npm run --silent clean && npx biome check src packages --diagnostic-level=error && npx tsc -p tsconfig.json",
     "build:fast": "npx tsc -p tsconfig.json",
     "test:init": "node -e \"const fs=require('fs'),s='src/__tests__/helpers/test-config.yaml',t=s+'.template';if(fs.existsSync(s)){console.log(s+' already exists, skipping (use test:reinit to overwrite)')}else{fs.copyFileSync(t,s);console.log('Created '+s+' — edit lines marked CHANGE')}\"",
     "test:reinit": "node -e \"const fs=require('fs'),s='src/__tests__/helpers/test-config.yaml',t=s+'.template';fs.copyFileSync(t,s);console.log('Recreated '+s+' from template')\"",
@@ -106,7 +109,9 @@
     "prepublishOnly": "npm run build",
     "prepare": "husky",
     "check:config": "node scripts/check-config-drift.js",
-    "corpus:capture": "npx ts-node scripts/capture-adt-corpus.ts"
+    "corpus:capture": "npx ts-node scripts/capture-adt-corpus.ts",
+    "build:packages": "npm run build --workspaces --if-present",
+    "test:packages": "npm test --workspaces --if-present"
   },
   "engines": {
     "node": ">=18.0.0"

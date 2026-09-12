@@ -112,6 +112,12 @@ Build both from the corpus above, against the types and the system you actually
 use. Reading this package's source will tell you what it does; it will not tell
 you what your server says.
 
+**If you have no opinion yet**, `@mcp-abap-adt/adt-strategies` has one. It lives
+in this repository under `packages/adt-strategies`: one failure strategy per
+document form above, each tested against the refusal it came from *and* the
+success it has to be told apart from, plus `asItCame` for the result axis. It
+collects error strategies and nothing else — shaping a result is yours.
+
 ## See also
 
 - [`MIGRATION-19.md`](MIGRATION-19.md) — what moved to the consumer in 19.0.0

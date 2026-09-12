@@ -30,6 +30,13 @@ calls members this release removed — `getPackageContents`,
 will not compile there once that repository upgrades. Take this file, or apply
 the same repairs.
 
+## What is built from it
+
+`packages/adt-strategies` — the default failure strategies, one per recorded
+refusal form, each tested against the file it came from and against the recorded
+success it must be distinguished from. Those tests need no SAP system: the
+corpus is the fixture.
+
 ## Collecting
 
 ```bash
