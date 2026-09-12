@@ -16,10 +16,12 @@
 # subset rather than everything, which is what a repository that bumps all its
 # packages together would do.
 #
-# **Two-factor authentication.** npm asks for a one-time password on publish. It
-# normally opens a browser and waits, but that needs a terminal it can take over,
-# and it does not always get one from inside a script — the failure is `EOTP`,
-# with a URL printed and no wait. Two ways through:
+# **Two-factor authentication.** npm asks for a one-time password on publish and
+# opens a browser to collect it. That needs stdin to still be the terminal, which
+# is why the loop below reads its list on descriptor 3 — the first version read
+# it on stdin, and npm found the leftover list bytes where it expected a person.
+#
+# If the browser flow is unavailable, pass the code instead:
 #
 #   npm run release:publish -- --otp 123456    # a code from your authenticator
 #   npm publish --workspace @mcp-abap-adt/adt-strategies --access public
@@ -96,7 +98,13 @@ npm run --silent build:packages
 PUBLISHED=0
 SKIPPED=0
 
-while IFS='|' read -r name dir; do
+# **`<&3`, and this is the whole reason the first real run failed.** A
+# `while read` loop fed by a here-string takes the list as its stdin, so every
+# command inside the body inherits it — and `npm publish` asking for a one-time
+# password found the leftover bytes of the package list instead of a terminal.
+# It printed the authentication URL and gave up in the same breath. Reading the
+# list on descriptor 3 leaves stdin where it was.
+while IFS='|' read -r name dir <&3; do
   [ -n "$name" ] || continue
   version="$(node -p "require('./$dir/package.json').version")"
   echo
@@ -135,7 +143,7 @@ while IFS='|' read -r name dir; do
     exit 1
   fi
   PUBLISHED=$((PUBLISHED + 1))
-done <<< "$ORDER"
+done 3<<< "$ORDER"
 
 echo
 if [ "$DRY" = "1" ]; then
