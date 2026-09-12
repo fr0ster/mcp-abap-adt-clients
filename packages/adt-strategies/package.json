@@ -17,8 +17,10 @@
     "COPYING"
   ],
   "scripts": {
-    "build": "npx tsc -p tsconfig.json",
-    "test": "npx jest -c jest.config.js"
+    "clean": "node -e \"const fs=require('fs');try{fs.rmSync('dist',{recursive:true,force:true})}catch{}\"",
+    "build": "npm run --silent clean && npx tsc -p tsconfig.json",
+    "test": "npx jest -c jest.config.js",
+    "prepack": "npm run --silent build"
   },
   "keywords": [
     "abap",

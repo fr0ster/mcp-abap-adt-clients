@@ -23,19 +23,48 @@ jobs:
       - name: Install dependencies
         run: npm ci
       
+      # `src packages`, not `src`. This repository became a workspace root when
+      # `packages/adt-strategies` was added, and a gate that lints only the
+      # root package is a gate that reports success about half the tree.
       - name: Run Biome lint
-        run: npx biome check src --diagnostic-level=error
-      
+        run: npx biome check src packages --diagnostic-level=error
+
       - name: Type check
         run: npx tsc -p tsconfig.json --noEmit
-      
+
+      # Tests, scripts and examples are type-checked by their own configs. The
+      # root one covers `src` alone, so a script or an example naming a member
+      # that no longer exists compiled nowhere until this step existed.
+      - name: Type check tests, scripts and examples
+        run: npm run test:check
+
       - name: Build
         run: npm run build
-      
+
+      - name: Build workspace packages
+        run: npm run build:packages
+
+      # No SAP system here, so the integration suites are out of reach — but
+      # the unit suites are not, and they carry every invariant this release
+      # is built on. `MCP_ENV_PATH` points at nothing so the preflight skips
+      # instead of aborting the run.
+      - name: Unit tests
+        run: MCP_ENV_PATH=/tmp/nonexistent-env npx jest src/__tests__/unit
+
+      # The strategies package is tested entirely against the recorded answers
+      # in `corpus/adt/`, so it needs no system at all.
+      - name: Workspace package tests
+        run: npm run test:packages
+
+      - name: Documentation imports
+        run: npm run check:docs
+
       - name: Summary
         if: success()
         run: |
           echo "✅ All checks passed!"
-          echo "- Biome lint: OK"
-          echo "- TypeScript: OK"
-          echo "- Build: OK"
+          echo "- Biome lint (src + packages): OK"
+          echo "- TypeScript, root and test configs: OK"
+          echo "- Build, root and workspaces: OK"
+          echo "- Unit tests and workspace tests: OK"
+          echo "- Documentation imports: OK"
