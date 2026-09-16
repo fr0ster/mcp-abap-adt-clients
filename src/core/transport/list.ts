@@ -51,16 +51,33 @@ export async function listTransports(
   });
 }
 
-/** The saved transport searches this system holds. One request, parsed. */
-export async function getTransportSearchConfigurations(
+/**
+ * The saved transport searches this system holds. One request, unread.
+ *
+ * Separate from the parse below so the answer can reach a caller's own
+ * `analyse` before anything is made of it — `AdtRequest.searchConfigurations()`
+ * hands this to `answering()`, the same way every other member's low level is
+ * handed over. Without it the only way to this endpoint was a member that had
+ * already decided what the answer meant.
+ *
+ * Without this exact `Accept` the endpoint answers **406**.
+ */
+export async function requestTransportSearchConfigurations(
   connection: IAbapConnection,
-): Promise<ITransportSearchConfiguration[]> {
-  const response = await connection.makeAdtRequest({
+): Promise<IAdtWireResponse> {
+  return connection.makeAdtRequest({
     url: TRANSPORT_SEARCH_CONFIGURATIONS_URL,
     method: 'GET',
     timeout: getTimeout('default'),
     headers: { Accept: ACCEPT_TRANSPORT_CONFIGURATIONS },
   });
+}
+
+/** The same request, parsed — what the internal resolver needs. */
+export async function getTransportSearchConfigurations(
+  connection: IAbapConnection,
+): Promise<ITransportSearchConfiguration[]> {
+  const response = await requestTransportSearchConfigurations(connection);
 
   return parseSearchConfigurations(response.data);
 }
