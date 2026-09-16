@@ -231,22 +231,49 @@ export function readExceptionRefusal(document: unknown): AdtRefusal | null {
 /**
  * `chkl:messages`, what `POST /activation` answers.
  *
- * Fixtures: `refusal-activation-fails` (200, `activationExecuted="false"` plus a
- * `msg` of type `E`) and `activation-success-verdict` (200,
- * `activationExecuted="true"`, no messages).
+ * Fixtures: `refusal-activation-fails` (200, `activationExecuted="false"` plus
+ * a `msg` of type `E`), `activation-success-verdict` (200,
+ * `activationExecuted="true"`, no messages) and
+ * `activation-nothing-to-activate` (200, `activationExecuted="false"`,
+ * `generationExecuted="true"`, no messages).
  *
- * **Two signals, not one, and that is deliberate.** adt-clients' shipped
- * `activationRefusal` keys on a `msg` of type `E` alone and ignores the
- * attribute. That agrees with both corpus cases, because the failing one
- * carries both. It leaves a hole either side of them: an activation SAP
- * declined without attaching an `E` would be read as a success.
+ * **Two signals, and the second one only counts with a message beside it.**
+ * `activationExecuted` says whether ADT did any work; the messages say whether
+ * the work succeeded. So:
  *
- * `activationExecuted="false"` is SAP stating that nothing was activated. A
- * caller who asked to activate and was told nothing was activated has not
- * succeeded, whether or not SAP explained itself, so the attribute is a refusal
- * on its own. The request carries `preauditRequested=true` and adt-clients does
- * not re-post, so this is the member's final answer and not an intermediate
- * state — checked in `activateObjectInSession`.
+ * | `activationExecuted` | `msg type="E"` | verdict |
+ * |---|---|---|
+ * | `true`  | none | activated |
+ * | `true`  | present | refused, the messages explain it |
+ * | `false` | present | refused, the messages explain it |
+ * | `false` | **none** | **nothing needed activating** |
+ *
+ * **The last row is measured, and it used to be read as a refusal.** An
+ * earlier version of this function took the attribute as a refusal on its own,
+ * "whether or not SAP explained itself". That is one reading too many, and it
+ * made every no-op activation answer an error. Measured on a trial system
+ * (2026-09-16), three ways, all answering the identical document:
+ *
+ * - activating a class a second time, straight after an activation that
+ *   answered `activationExecuted="true"` — captured as the third fixture above;
+ * - activating a function group straight after creating one, because a
+ *   function group is created active: `adtcore:version="active"` stands on its
+ *   metadata before any activation is asked for;
+ * - both of those through a consumer's tools, which is how it surfaced.
+ *
+ * The reading that the request was accepted and is still running is ruled out
+ * by the contrast: when SAP does have work, it answers
+ * `activationExecuted="true"` in the same request rather than deferring behind
+ * a 200. This library's own `activationUtils.ts` recorded the same finding
+ * from its own probe before the strategies moved here — "class already active |
+ * 200 | false | none" — and concluded that only an `E` message is a failure
+ * signal.
+ *
+ * The hole the old reading was guarding against is real but narrower than it
+ * was drawn: an activation SAP declines **and says nothing about** is
+ * indistinguishable, in this document, from one it had no work for. Between
+ * answering "failed" for every already-active object and "fine" for a silent
+ * decline nobody has ever observed, this takes the measured case.
  */
 export function readActivationRefusal(document: unknown): AdtRefusal | null {
   const root = parseXml(document)?.messages;
@@ -269,18 +296,24 @@ export function readActivationRefusal(document: unknown): AdtRefusal | null {
 
   if (activated && errors.length === 0) return null;
 
+  // Nothing was activated and nothing was said about it: SAP had no work.
+  // See the table above — this is the one row the attribute alone decides,
+  // and it decides it in the object's favour.
+  if (!activated && messages.length === 0) return null;
+
   const explanation = errors.length
     ? errors.map((m) => m.text).join('; ')
-    : 'SAP reported activationExecuted="false" and gave no reason';
+    : `Activation did not run and SAP attached no error: ${messages
+        .map((m) => `${m.type}: ${m.text}`)
+        .join('; ')}`;
 
   return {
     form: 'activation',
     message: `Activation failed: ${explanation}`,
-    // `messages` is documented as never empty, and this branch was the one
-    // place it could be: `activationExecuted="false"` with no `<msg>` at all
-    // put the explanation in `message` and left the list bare, so a caller
-    // reading only `messages` — which the type invites — saw nothing wrong.
-    messages: messages.length ? messages : [{ type: 'E', text: explanation }],
+    // `messages` is documented as never empty, and it cannot be here: the
+    // branch that used to leave it bare — no messages at all — now answers
+    // `null` above, so anything reaching this point carried at least one.
+    messages,
   };
 }
 
