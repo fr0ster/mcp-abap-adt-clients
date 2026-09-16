@@ -23,15 +23,18 @@ import type {
   IAdtDataPreview,
   IAdtDeletable,
   IAdtDiscovery,
+  IAdtError,
   IAdtGroupLifecycle,
   IAdtInformationSystem,
   IAdtLockable,
   IAdtMetadataReadable,
   IAdtMetadataUpdatable,
   IAdtObjectAccess,
+  IAdtOperationOptions,
   IAdtReadable,
   IAdtRepositoryStructure,
   IAdtRequest,
+  IAdtResponse,
   IAdtRunnable,
   IAdtSystemContext,
   IAdtTransportAware,
@@ -744,6 +747,29 @@ export type IEnhancementContract<R extends IEnhancementResults> = IAdtCreatable<
   IAdtLockable<IEnhancementConfig> &
   IAdtTransportAware<IEnhancementConfig, ReturnType<R['transport']>> &
   IAdtVersionable<IEnhancementConfig, ObjectVersion[], string>;
+/**
+ * Listing the saved searches a transport listing runs.
+ *
+ * **Why this capability is declared here rather than beside `list()`.**
+ * `list()` lives in `IAdtRequest`, in `@mcp-abap-adt/interfaces`, and that is
+ * where this member belongs and where it should end up. It is not there yet
+ * for a reason that has nothing to do with the design: that package is at
+ * 45.0.0 and this one depends on `^44.0.0`, a major apart. Adding the member
+ * there would tie a transport fix to a major dependency bump and everything
+ * that comes with it.
+ *
+ * Declared here, `client.getRequest().searchConfigurations()` type-checks for
+ * a consumer today — which it did not when the member existed on the
+ * implementation alone, reachable at runtime and invisible to the compiler.
+ * Promoting it into `IAdtRequest` later is a type move with no behaviour in
+ * it, and this declaration goes when it happens.
+ */
+export interface IAdtTransportSearchable<TConfigurations> {
+  searchConfigurations<E extends IAdtError = IAdtError>(
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<TConfigurations, E>>;
+}
+
 export type IRequestContract<R extends ITransportResults> = IAdtCreatable<
   ITransportConfig,
   ReturnType<R['created']>
@@ -758,7 +784,8 @@ export type IRequestContract<R extends ITransportResults> = IAdtCreatable<
     ReturnType<R['deleted']>,
     ReturnType<R['deletionCheck']>
   > &
-  IAdtRequest<ReturnType<R['list']>>;
+  IAdtRequest<ReturnType<R['list']>> &
+  IAdtTransportSearchable<ReturnType<NonNullable<R['searchConfigurations']>>>;
 export type ILocalTestClassContract<R extends IClassResults> = IAdtReadable<
   ILocalTestClassConfig,
   ReturnType<R['source']>

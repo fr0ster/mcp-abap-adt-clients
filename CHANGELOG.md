@@ -62,6 +62,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   followed by `list({ configUri })` makes the same two requests `list()` alone
   makes, with the first one now the caller's.
 
+- **`IAdtTransportSearchable<TConfigurations>`, and `IRequestContract` carries
+  it.** Without this the member was on the implementation and invisible to the
+  compiler: `client.getRequest()` answers `IRequestContract`, and a consumer
+  writing the call from the documentation got `TS2339: Property
+  'searchConfigurations' does not exist`. The capability belongs beside
+  `list()` in `IAdtRequest`, in `@mcp-abap-adt/interfaces`, and should move
+  there — it is declared in this package instead because that one is at 45.0.0
+  while this depends on `^44.0.0`, so putting it there would tie a transport
+  fix to a major dependency bump. A test reaches the member through
+  `client.getRequest()`, so the contract cannot lose it silently: the test file
+  stops compiling.
+
 - **A `searchConfigurations` slot on `ITransportResults`**, so that member's
   reading is injected like every other. **Optional, where every other slot is
   required** — it arrived after 19.0.0, and making it required would stop a

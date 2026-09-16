@@ -15,6 +15,7 @@ import type {
   ITransportSearchConfiguration,
 } from '@mcp-abap-adt/interfaces';
 import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces';
+import { AdtClient } from '../../../../clients/AdtClient';
 import { AdtRequest } from '../../../../core/transport/AdtRequest';
 import { transportDocuments } from '../../../../core/transport/types';
 
@@ -52,6 +53,40 @@ const answering = (body: string, status = 200) =>
     statusText: 'OK',
     headers: {},
   }) as unknown as IAdtWireResponse;
+
+/**
+ * Through `client.getRequest()`, which is the only way a consumer has one.
+ *
+ * The member existed on `AdtRequest` before this test did, and was invisible
+ * from outside: `getRequest()` answers `IRequestContract`, an intersection of
+ * capability types, and the new member was in none of them. The call below
+ * ran at runtime and failed to compile — `TS2339: Property
+ * 'searchConfigurations' does not exist on type 'IRequestContract<…>'` — which
+ * is what the documented example would have done in a consumer's editor.
+ *
+ * This test is therefore two checks in one: the call works, and this file
+ * compiles. Drop `IAdtTransportSearchable` from the contract and `ts-jest`
+ * fails the suite before a single assertion runs.
+ */
+describe('the contract a consumer actually holds', () => {
+  it('reaches searchConfigurations through client.getRequest()', async () => {
+    const { connection, calls } = connectionOver(() =>
+      answering(CONFIGURATIONS),
+    );
+
+    const answer = await new AdtClient(connection)
+      .getRequest()
+      .searchConfigurations();
+
+    if (!answer.ok) throw new Error('expected the configurations');
+    const configurations = answer.getResult()
+      .value as ITransportSearchConfiguration[];
+    expect(configurations).toHaveLength(1);
+    expect(calls[0].url).toBe(
+      '/sap/bc/adt/cts/transportrequests/searchconfiguration/configurations',
+    );
+  });
+});
 
 describe('AdtRequest.searchConfigurations', () => {
   it('asks the configurations endpoint once, with the type it answers', async () => {
