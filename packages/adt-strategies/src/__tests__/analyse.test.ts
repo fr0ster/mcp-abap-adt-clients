@@ -87,6 +87,15 @@ describe('each strategy separates its refusal from its success', () => {
     expect(verdict.messages[0].text.length).toBeGreaterThan(0);
   });
 
+  it('an activation with nothing to activate is no failure', () => {
+    expect(
+      analyseActivation(
+        ADT_NO_FAILURE,
+        answerFor('activation-nothing-to-activate'),
+      ),
+    ).toBe(ADT_NO_FAILURE);
+  });
+
   it('keeps the T100 key where the carrier supplies one', () => {
     const verdict = failed(
       analyseException(

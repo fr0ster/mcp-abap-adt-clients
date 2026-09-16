@@ -231,22 +231,59 @@ export function readExceptionRefusal(document: unknown): AdtRefusal | null {
 /**
  * `chkl:messages`, what `POST /activation` answers.
  *
- * Fixtures: `refusal-activation-fails` (200, `activationExecuted="false"` plus a
- * `msg` of type `E`) and `activation-success-verdict` (200,
- * `activationExecuted="true"`, no messages).
+ * Fixtures: `refusal-activation-fails` (200, `activationExecuted="false"` plus
+ * a `msg` of type `E`), `activation-success-verdict` (200,
+ * `activationExecuted="true"`, no messages) and
+ * `activation-nothing-to-activate` (200, `activationExecuted="false"`,
+ * `generationExecuted="true"`, no messages).
  *
- * **Two signals, not one, and that is deliberate.** adt-clients' shipped
- * `activationRefusal` keys on a `msg` of type `E` alone and ignores the
- * attribute. That agrees with both corpus cases, because the failing one
- * carries both. It leaves a hole either side of them: an activation SAP
- * declined without attaching an `E` would be read as a success.
+ * **Two signals, and the second one only counts with a message beside it.**
+ * `activationExecuted` says whether ADT did any work; the messages say whether
+ * the work succeeded. So:
  *
- * `activationExecuted="false"` is SAP stating that nothing was activated. A
- * caller who asked to activate and was told nothing was activated has not
- * succeeded, whether or not SAP explained itself, so the attribute is a refusal
- * on its own. The request carries `preauditRequested=true` and adt-clients does
- * not re-post, so this is the member's final answer and not an intermediate
- * state — checked in `activateObjectInSession`.
+ * | `activationExecuted` | `msg` | verdict |
+ * |---|---|---|
+ * | `"true"`  | none, or none of type `E` | activated |
+ * | `"true"`  | a type `E` | refused, the messages explain it |
+ * | `"false"` | any | refused, the messages explain it |
+ * | `"false"` | **none** | **nothing needed activating** |
+ * | absent | any | refused, the messages explain it |
+ * | absent | none | refused: the document says nothing at all |
+ *
+ * **The attribute is read as three states, not as a boolean.** Absent is not
+ * `false`: a checklist that carries no `activationExecuted` — or no
+ * `chkl:properties` — has told us nothing, and the no-op row below is
+ * measured for SAP writing `false`, never for SAP writing nothing. The last
+ * row is the only place this reading composes a sentence instead of quoting
+ * one, and what it composes is a statement about the document rather than a
+ * verdict about the object.
+ *
+ * **The last row is measured, and it used to be read as a refusal.** An
+ * earlier version of this function took the attribute as a refusal on its own,
+ * "whether or not SAP explained itself". That is one reading too many, and it
+ * made every no-op activation answer an error. Measured on a trial system
+ * (2026-09-16), three ways, all answering the identical document:
+ *
+ * - activating a class a second time, straight after an activation that
+ *   answered `activationExecuted="true"` — captured as the third fixture above;
+ * - activating a function group straight after creating one, because a
+ *   function group is created active: `adtcore:version="active"` stands on its
+ *   metadata before any activation is asked for;
+ * - both of those through a consumer's tools, which is how it surfaced.
+ *
+ * The reading that the request was accepted and is still running is ruled out
+ * by the contrast: when SAP does have work, it answers
+ * `activationExecuted="true"` in the same request rather than deferring behind
+ * a 200. This library's own `activationUtils.ts` recorded the same finding
+ * from its own probe before the strategies moved here — "class already active |
+ * 200 | false | none" — and concluded that only an `E` message is a failure
+ * signal.
+ *
+ * The hole the old reading was guarding against is real but narrower than it
+ * was drawn: an activation SAP declines **and says nothing about** is
+ * indistinguishable, in this document, from one it had no work for. Between
+ * answering "failed" for every already-active object and "fine" for a silent
+ * decline nobody has ever observed, this takes the measured case.
  */
 export function readActivationRefusal(document: unknown): AdtRefusal | null {
   const root = parseXml(document)?.messages;
@@ -267,19 +304,36 @@ export function readActivationRefusal(document: unknown): AdtRefusal | null {
   const executed = root.properties?.['@activationExecuted'];
   const activated = executed === 'true' || executed === true;
 
+  // Read as the three states it has, not as a boolean. `!activated` is also
+  // true for a document that carries no `activationExecuted` at all — or no
+  // `chkl:properties` — and the measurement below is of SAP writing `false`,
+  // not of SAP writing nothing. Collapsing the two would hand an unreadable
+  // answer the verdict earned by a measured one.
+  const declaredNotActivated = executed === 'false' || executed === false;
+
   if (activated && errors.length === 0) return null;
+
+  // Declared not activated, and nothing said about it: SAP had no work. See
+  // the table above — the one row the attribute alone decides, and it decides
+  // it in the object's favour.
+  if (declaredNotActivated && messages.length === 0) return null;
 
   const explanation = errors.length
     ? errors.map((m) => m.text).join('; ')
-    : 'SAP reported activationExecuted="false" and gave no reason';
+    : messages.length
+      ? `Activation did not run and SAP attached no error: ${messages
+          .map((m) => `${m.type}: ${m.text}`)
+          .join('; ')}`
+      : 'SAP answered an activation checklist carrying neither an activationExecuted verdict nor a message';
 
   return {
     form: 'activation',
     message: `Activation failed: ${explanation}`,
-    // `messages` is documented as never empty, and this branch was the one
-    // place it could be: `activationExecuted="false"` with no `<msg>` at all
-    // put the explanation in `message` and left the list bare, so a caller
-    // reading only `messages` — which the type invites — saw nothing wrong.
+    // `messages` is documented as never empty. Every refusal built from a
+    // document that said something carries what it said; the one that says
+    // nothing at all — no verdict attribute, no message — carries the
+    // sentence above, which is a statement about the document rather than an
+    // invented verdict about the object.
     messages: messages.length ? messages : [{ type: 'E', text: explanation }],
   };
 }

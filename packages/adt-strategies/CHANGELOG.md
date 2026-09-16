@@ -13,6 +13,69 @@ Tags follow the same rule: these releases are tagged
 `adt-strategies@<version>`, never `v<version>` — that scheme is `adt-clients`'
 and fires its release workflow.
 
+## [0.2.0] - 2026-09-16
+
+### Fixed
+
+- **`analyseActivation` no longer calls a no-op activation a failure.** SAP
+  answers `POST /activation` with `activationExecuted="false"`,
+  `generationExecuted="true"` and **no `msg` at all** when the object is
+  already active — it had nothing to do, and said so. `readActivationRefusal`
+  treated the attribute as a refusal on its own, "whether or not SAP explained
+  itself", so every such call answered an error.
+
+  **The documentation in this repository already said otherwise**, which is
+  the clearest statement of the defect: `docs/usage/CLIENT_API_REFERENCE.md`
+  carries a probe table headed "`activationExecuted="false"` is **not** a
+  failure signal"; `docs/usage/TROUBLESHOOTING.md` has a section called
+  "Activation reports `activationExecuted="false"` and nothing is wrong";
+  `docs/usage/OBJECT_LIFECYCLE.md` says the flag "on its own does not separate
+  'nothing to do' from 'refused'"; and this package's own 0.1.0 entry below
+  describes `analyseActivation` as "a `<msg type="E">` is the verdict,
+  `activationExecuted="false"` is not". The implementation was the only place
+  that disagreed.
+
+  Measured again before changing it, on a trial system (2026-09-16), three
+  ways, all answering the identical document: activating a class a second time
+  straight after an activation that answered `activationExecuted="true"`;
+  activating a function group straight after creating one, because a function
+  group is created active (`adtcore:version="active"` before anything is
+  activated); and both of those through a consumer's tools, which is how it
+  surfaced — two integration suites failing on objects that were never in
+  trouble. The reading that the request was accepted and is still running is
+  ruled out by the contrast: when SAP does have work it answers
+  `activationExecuted="true"` in the same request.
+
+  The verdict now reads: a `msg` of type `E` refuses, whatever the attribute
+  says; `activationExecuted="false"` with any message refuses and quotes it;
+  `activationExecuted="false"` with none is a no-op and answers
+  `ADT_NO_FAILURE`.
+
+  **The attribute is read as three states, not as a boolean.** Absent is not
+  `false`. A checklist carrying no `activationExecuted` at all has told us
+  nothing, and the measurement above is of SAP writing `false` — never of SAP
+  writing nothing. Such a document still refuses: with the messages it
+  carried, or, when it carried none either, with a sentence saying so. That
+  last case is the one place this reading composes a sentence instead of
+  quoting one, and what it composes is a statement about the document rather
+  than a verdict about the object.
+
+  `messages` is still never empty on a refusal, and the invented sentence it
+  used to be filled with — "SAP reported activationExecuted=false and gave no
+  reason" — is gone from the case it was wrong for. It was announcing a
+  failure for an object that was simply already active; that document now
+  answers `null`, and every message on a refusal built from a document that
+  said something is one read out of it.
+
+### Added
+
+- **`activation-nothing-to-activate` in the corpus** — the third activation
+  document, and the only one that can show this. The two that were there both
+  agree with the old reading (one carries an `E`, the other reports
+  `activationExecuted="true"`), which is how it survived. Captured with the
+  same collector as the rest, from the consumer repository's run, and copied
+  here per `corpus/README.md`'s "it exists in two places, on purpose".
+
 ## [0.1.0] - 2026-09-12
 
 First release. The defaults `adt-clients` refuses to ship.

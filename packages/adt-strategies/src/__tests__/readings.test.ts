@@ -79,6 +79,42 @@ describe('each reading, against its own pair', () => {
     expect(read(documentOf(allowed))).toBeNull();
   });
 
+  /**
+   * The third activation document, and the row of the table in
+   * `readActivationRefusal` that the other two cannot show:
+   * `activationExecuted="false"` with no messages at all.
+   *
+   * Captured by activating an already-active class — SAP had nothing to do and
+   * said so. Both other fixtures agree with a reading that treats the bare
+   * attribute as a refusal, which is how that reading survived; this one does
+   * not.
+   */
+  it('activation: nothing to activate is not a refusal', () => {
+    const document = documentOf('activation-nothing-to-activate');
+    expect(document).toContain('activationExecuted="false"');
+    expect(document).not.toContain('<msg');
+
+    expect(readActivationRefusal(document)).toBeNull();
+  });
+
+  /**
+   * The attribute is not ignored either. A declined activation that explains
+   * itself with anything at all is still a refusal — what changed is that the
+   * explanation has to exist.
+   */
+  it('activation: not activated, and SAP said something — still a refusal', () => {
+    const warned =
+      '<?xml version="1.0" encoding="utf-8"?><chkl:messages xmlns:chkl="http://www.sap.com/abapxml/checklist"><chkl:properties checkExecuted="true" activationExecuted="false" generationExecuted="false"/><msg type="W" objDescr="Class ZCL_X"><shortText><txt>Object is locked in another session</txt></shortText></msg></chkl:messages>';
+
+    const found = readActivationRefusal(warned);
+    expect(found).not.toBeNull();
+    expect(found?.form).toBe('activation');
+    // No `E` among them, so the message is built from what there was rather
+    // than from a sentence about the attribute.
+    expect(found?.message).toContain('Object is locked in another session');
+    expect(found?.messages).toHaveLength(1);
+  });
+
   it('the unit-test reading, whose refusal is three steps away', () => {
     const failing = stepsOf('refusal-unittest-run-failing');
     const passing = stepsOf('unittest-run-passing');
@@ -269,19 +305,75 @@ describe('a deletion answer naming several objects', () => {
 
 describe('an activation that reports no reason', () => {
   /**
-   * `messages` is documented as never empty. This branch was the one place it
-   * could be: `activationExecuted="false"` with no `<msg>` at all put the
-   * explanation in `message` and left the list bare — so a caller reading only
-   * `messages`, which the type invites, saw nothing wrong with a failed
-   * activation.
+   * This used to assert the opposite, and it is worth saying why it flipped.
+   *
+   * `messages` is documented as never empty, and `activationExecuted="false"`
+   * with no `<msg>` at all was the one branch that could leave it bare — so
+   * the reading filled it with a sentence of its own ("SAP reported
+   * activationExecuted=false and gave no reason") to keep the promise. That
+   * fixed the type and left the verdict wrong: the document means SAP had
+   * nothing to activate, and the invented `E` announced a failure that had not
+   * happened.
+   *
+   * The promise is kept a better way now. The branch that could produce an
+   * empty list answers `null` instead, so nothing reaching the refusal path
+   * carries fewer than one message and none of them is composed here.
    */
-  it('still carries a message, because the type promises one', () => {
+  it('is not a refusal, and so has no message to promise', () => {
     const silent =
       '<?xml version="1.0" encoding="utf-8"?><chkl:messages xmlns:chkl="http://www.sap.com/abapxml/checklist"><chkl:properties checkExecuted="true" activationExecuted="false" generationExecuted="false"/></chkl:messages>';
-    const found = readActivationRefusal(silent);
+
+    expect(readActivationRefusal(silent)).toBeNull();
+  });
+
+  /**
+   * Absent is not `false`, and the distinction is the whole reason the no-op
+   * branch is safe.
+   *
+   * `activationExecuted="false"` is measured: SAP wrote it, with nothing
+   * beside it, for an object that needed no activation. A checklist that
+   * carries no `activationExecuted` has been measured for nothing. Reading
+   * the attribute as a boolean collapses the two and hands the second the
+   * verdict earned by the first.
+   */
+  it('activation: a properties element without the attribute is not a no-op', () => {
+    const noVerdict =
+      '<?xml version="1.0" encoding="utf-8"?><chkl:messages xmlns:chkl="http://www.sap.com/abapxml/checklist"><chkl:properties checkExecuted="true"/></chkl:messages>';
+
+    const found = readActivationRefusal(noVerdict);
+
     expect(found).not.toBeNull();
-    expect(found?.messages.length).toBeGreaterThan(0);
+    expect(found?.form).toBe('activation');
+    // Nothing is quoted because nothing was said. The sentence describes the
+    // document, and this is the one place this reading composes one rather
+    // than repeating SAP.
+    expect(found?.message).toContain('neither an activationExecuted verdict');
+    expect(found?.messages).toHaveLength(1);
     expect(found?.messages[0].type).toBe('E');
-    expect(found?.messages[0].text).toContain('gave no reason');
+  });
+
+  it('activation: no verdict but a message — the message is the account', () => {
+    const noProperties =
+      '<?xml version="1.0" encoding="utf-8"?><chkl:messages xmlns:chkl="http://www.sap.com/abapxml/checklist"><msg type="E"><shortText><txt>Object is locked in another session</txt></shortText></msg></chkl:messages>';
+
+    const found = readActivationRefusal(noProperties);
+
+    expect(found?.message).toContain('Object is locked in another session');
+    expect(found?.message).not.toContain('neither an activationExecuted');
+    expect(found?.messages).toHaveLength(1);
+  });
+
+  it('every refusal this reading builds carries the messages it read', () => {
+    for (const document of [
+      documentOf('refusal-activation-fails'),
+      '<?xml version="1.0" encoding="utf-8"?><chkl:messages xmlns:chkl="http://www.sap.com/abapxml/checklist"><chkl:properties activationExecuted="false"/><msg type="W"><shortText><txt>Locked elsewhere</txt></shortText></msg></chkl:messages>',
+    ]) {
+      const found = readActivationRefusal(document);
+      expect(found?.messages.length).toBeGreaterThan(0);
+      // Read, not composed: every message text is in the document it came from.
+      for (const message of found?.messages ?? []) {
+        expect(document).toContain(message.text);
+      }
+    }
   });
 });
