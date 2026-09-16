@@ -24,6 +24,58 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [19.1.0] - 2026-09-16
+
+### Added
+
+- **`AdtRequest.searchConfigurations(options?)` — where a `configUri` comes
+  from.** A transport listing is a saved search, and `list()` resolves one
+  itself when it is not given a `configUri`. That resolution was unreachable
+  in both directions a caller might need it:
+
+  - **its answer could not be read.** The request happens inside a member
+    called for something else, behind a `protected` method, so a caller's
+    `analyse` never saw it and their result strategy never shaped it. A
+    refusal from `/searchconfiguration/configurations` arrived as a throw out
+    of `list()`.
+  - **its verdict could not be acted on.** On a system holding several saved
+    searches the resolver throws — rightly, since the payload carries no
+    default marker — and tells the caller to pass a `configUri` explicitly,
+    while `getTransportSearchConfigurations()` was documented as "internal to
+    `list()`'s resolution step and not part of the public surface". The advice
+    named no supported way to follow it. The consumer that hit this reached
+    the URL with a raw request of its own, which is this library failing at
+    its job rather than the consumer misusing it.
+
+  One request, the caller's strategies over it, and the choice theirs:
+
+  ```typescript
+  const request = client.getRequest();
+  const configurations = await request.searchConfigurations({ analyse });
+  if (!configurations.ok) return configurations.getError();
+  for (const { uri } of configurations.getResult().value) {
+    await request.list({ configUri: uri });
+  }
+  ```
+
+  `list()` is untouched, and so is its request count: `searchConfigurations()`
+  followed by `list({ configUri })` makes the same two requests `list()` alone
+  makes, with the first one now the caller's.
+
+- **A `searchConfigurations` slot on `ITransportResults`**, so that member's
+  reading is injected like every other. **Optional, where every other slot is
+  required** — it arrived after 19.0.0, and making it required would stop a
+  hand-written result set compiling over a member it never had. Left out, the
+  shipped `parseSearchConfigurations` reads it: the same reading the internal
+  resolver has always used.
+
+- **`requestTransportSearchConfigurations(connection)`** in the transport low
+  level — the same request as `getTransportSearchConfigurations`, answering
+  the wire response instead of a parse, so the answer can reach a strategy
+  before anything is made of it. The parsing sibling stays for the internal
+  resolver.
+
+
 ## [19.0.0] - 2026-09-12
 
 **BREAKING — this package stops deciding anything.**
