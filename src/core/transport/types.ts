@@ -10,7 +10,6 @@
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces';
 import { rawDocument } from '../../utils/resultStrategy';
 import { parseCreatedTransport } from './parseCreatedTransport';
-import { parseSearchConfigurations } from './parseSearchConfigurations';
 import { parseTransportTree } from './parseTransportTree';
 
 // Types defined in @mcp-abap-adt/interfaces
@@ -128,16 +127,6 @@ export interface ITransportResults {
   readonly deleted: IResultStrategy<unknown>;
   /** What a deletion check answers: `del:checkResponse`. */
   readonly deletionCheck: IResultStrategy<unknown>;
-  /**
-   * What the saved-search listing answers.
-   *
-   * **Optional, where every slot above is required, and deliberately so.**
-   * This member arrived after 19.0.0; making its slot required would stop a
-   * hand-written result set compiling over a member it never had. Left out, the
-   * shipped `parseSearchConfigurations` reads it — the same reading the
-   * internal resolver has always used.
-   */
-  readonly searchConfigurations?: IResultStrategy<unknown>;
 }
 
 /**
@@ -152,5 +141,4 @@ export const transportDocuments = {
   metadataUpdated: rawDocument,
   deleted: rawDocument,
   deletionCheck: rawDocument,
-  searchConfigurations: (answer) => parseSearchConfigurations(answer.data),
 } satisfies ITransportResults;
