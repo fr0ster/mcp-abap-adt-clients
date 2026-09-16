@@ -45,7 +45,11 @@ import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { createTransport } from './create';
 import { deleteTransport } from './delete';
-import { getTransportSearchConfigurations, listTransports } from './list';
+import {
+  getTransportSearchConfigurations,
+  listTransports,
+  requestTransportSearchConfigurations,
+} from './list';
 import { getTransport } from './read';
 import {
   type ITransportConfig,
@@ -189,6 +193,60 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
     return answering(
       () => listTransports(this.connection, { configUri }),
       this.results.list as IResultStrategy<ReturnType<R['list']>>,
+    );
+  }
+
+  /**
+   * The saved transport searches this system holds.
+   *
+   * **Why this is public, when `resolveSearchConfiguration` below is not.**
+   * A listing is a saved search, and `list()` will resolve one itself when it
+   * is not given a `configUri`. That resolution is deliberately opinionated —
+   * one configuration is used, several are refused rather than guessed between
+   * — and both halves of that opinion are unreachable from outside:
+   *
+   * - **its answer cannot be read.** The request happens inside a member
+   *   called for something else, so a caller's `analyse` never sees it and
+   *   their result strategy never shapes it. A refusal from this endpoint
+   *   arrives as a throw out of `list()`.
+   * - **its verdict cannot be acted on.** On a system holding several saved
+   *   searches the resolver throws, telling the caller to pass a `configUri`
+   *   explicitly — and gives them no supported way to find one. The consumer
+   *   that hit this reached the URL with a raw request of its own, which is
+   *   the library failing at its job rather than the consumer misusing it.
+   *
+   * So: one request, the caller's strategies in charge of it, and the choice
+   * theirs to make. `list({ configUri })` then costs exactly one request,
+   * which is what it costs today with the resolution hidden inside it.
+   *
+   * ```typescript
+   * const request = client.getRequest();
+   * const configurations = await request.searchConfigurations({ analyse });
+   * if (!configurations.ok) return configurations.getError();
+   * for (const { uri } of configurations.getResult().value) {
+   *   const listed = await request.list({ configUri: uri });
+   * }
+   * ```
+   *
+   * The default reading is `parseSearchConfigurations` — exactly as much of
+   * the document as it takes to address a configuration, which is what the
+   * internal resolver has always used. Inject `searchConfigurations` in the
+   * result set to read it differently.
+   */
+  async searchConfigurations<E extends IAdtError = IAdtError>(
+    options?: IAdtOperationOptions<E>,
+  ): Promise<
+    IAdtResponse<ReturnType<NonNullable<R['searchConfigurations']>>, E>
+  > {
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    return answering(
+      () => requestTransportSearchConfigurations(connection),
+      (this.results.searchConfigurations ??
+        transportDocuments.searchConfigurations) as IResultStrategy<
+        ReturnType<NonNullable<R['searchConfigurations']>>
+      >,
+      options?.analyse,
     );
   }
 
