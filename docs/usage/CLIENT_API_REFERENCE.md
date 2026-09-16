@@ -384,15 +384,49 @@ console.log(listState.listResult?.data);
 
 // Pass configUri explicitly to pick a specific saved search, or to skip
 // resolution altogether (required on a batch client — see below).
-// getTransportSearchConfigurations() itself is internal to list()'s
-// resolution step and is not part of the public surface — discover the
-// available searches in Eclipse (Project Explorer → transport view) and copy
-// the configuration's href, or catch the "N transport search configurations"
-// error thrown by list() with no argument, which names every available href.
 await client.getRequest().list({
   configUri: '/sap/bc/adt/cts/transportrequests/searchconfigurations/<id>',
 });
+
+// Where a configUri comes from: ask. searchConfigurations() is one request,
+// with your analyse over its answer and your reading of its document.
+const request = client.getRequest();
+const configurations = await request.searchConfigurations({ analyse });
+if (!configurations.ok) return configurations.getError();
+
+for (const { uri } of configurations.getResult().value) {
+  const listed = await request.list({ configUri: uri });
+}
 ```
+
+#### `searchConfigurations()` — where a `configUri` comes from
+
+`list()` with no argument resolves one itself, and that resolution is
+opinionated: one configuration is used, several are refused rather than
+guessed between. Both halves of that opinion used to be out of a caller's
+reach — the request happened inside a member called for something else, so no
+`analyse` saw its answer and no result strategy shaped it; and on a system
+holding several saved searches the refusal told the caller to "pass configUri
+explicitly" without giving them a supported way to find one.
+
+`searchConfigurations(options?)` is that way. One request, the caller's
+strategies in charge of it, and the choice theirs to make:
+
+| | requests |
+|---|---|
+| `list()` | two: the configurations, then the list |
+| `searchConfigurations()` + `list({ configUri })` | two, the same two, both yours |
+| `list({ configUri })` alone | one |
+
+The default reading is `parseSearchConfigurations` — as much of the document
+as it takes to address a configuration (`uri`, `etag`, and the configuration's
+own attributes unrenamed), which is what the internal resolver has always
+used. Inject a `searchConfigurations` strategy in the result set to read the
+document differently; the slot is optional, so a result set written before
+this member existed still compiles.
+
+Nothing about `list()` changes. A caller who never needs to choose can keep
+calling it with no argument.
 
 **On a batch client**, `configUri` is required. Resolving "no argument" needs
 a response from `getTransportSearchConfigurations()`, and a batch connection
