@@ -326,6 +326,43 @@ describe('an activation that reports no reason', () => {
     expect(readActivationRefusal(silent)).toBeNull();
   });
 
+  /**
+   * Absent is not `false`, and the distinction is the whole reason the no-op
+   * branch is safe.
+   *
+   * `activationExecuted="false"` is measured: SAP wrote it, with nothing
+   * beside it, for an object that needed no activation. A checklist that
+   * carries no `activationExecuted` has been measured for nothing. Reading
+   * the attribute as a boolean collapses the two and hands the second the
+   * verdict earned by the first.
+   */
+  it('activation: a properties element without the attribute is not a no-op', () => {
+    const noVerdict =
+      '<?xml version="1.0" encoding="utf-8"?><chkl:messages xmlns:chkl="http://www.sap.com/abapxml/checklist"><chkl:properties checkExecuted="true"/></chkl:messages>';
+
+    const found = readActivationRefusal(noVerdict);
+
+    expect(found).not.toBeNull();
+    expect(found?.form).toBe('activation');
+    // Nothing is quoted because nothing was said. The sentence describes the
+    // document, and this is the one place this reading composes one rather
+    // than repeating SAP.
+    expect(found?.message).toContain('neither an activationExecuted verdict');
+    expect(found?.messages).toHaveLength(1);
+    expect(found?.messages[0].type).toBe('E');
+  });
+
+  it('activation: no verdict but a message — the message is the account', () => {
+    const noProperties =
+      '<?xml version="1.0" encoding="utf-8"?><chkl:messages xmlns:chkl="http://www.sap.com/abapxml/checklist"><msg type="E"><shortText><txt>Object is locked in another session</txt></shortText></msg></chkl:messages>';
+
+    const found = readActivationRefusal(noProperties);
+
+    expect(found?.message).toContain('Object is locked in another session');
+    expect(found?.message).not.toContain('neither an activationExecuted');
+    expect(found?.messages).toHaveLength(1);
+  });
+
   it('every refusal this reading builds carries the messages it read', () => {
     for (const document of [
       documentOf('refusal-activation-fails'),

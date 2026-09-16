@@ -51,11 +51,21 @@ and fires its release workflow.
   `activationExecuted="false"` with none is a no-op and answers
   `ADT_NO_FAILURE`.
 
-  `messages` is still never empty on a refusal, and now without a composed
-  sentence: the branch that used to invent "SAP reported
-  activationExecuted=false and gave no reason" to satisfy that promise is the
-  branch that now answers `null`, so every message on a refusal is one read
-  out of the document.
+  **The attribute is read as three states, not as a boolean.** Absent is not
+  `false`. A checklist carrying no `activationExecuted` at all has told us
+  nothing, and the measurement above is of SAP writing `false` — never of SAP
+  writing nothing. Such a document still refuses: with the messages it
+  carried, or, when it carried none either, with a sentence saying so. That
+  last case is the one place this reading composes a sentence instead of
+  quoting one, and what it composes is a statement about the document rather
+  than a verdict about the object.
+
+  `messages` is still never empty on a refusal, and the invented sentence it
+  used to be filled with — "SAP reported activationExecuted=false and gave no
+  reason" — is gone from the case it was wrong for. It was announcing a
+  failure for an object that was simply already active; that document now
+  answers `null`, and every message on a refusal built from a document that
+  said something is one read out of it.
 
 ### Added
 

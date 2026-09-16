@@ -241,12 +241,22 @@ export function readExceptionRefusal(document: unknown): AdtRefusal | null {
  * `activationExecuted` says whether ADT did any work; the messages say whether
  * the work succeeded. So:
  *
- * | `activationExecuted` | `msg type="E"` | verdict |
+ * | `activationExecuted` | `msg` | verdict |
  * |---|---|---|
- * | `true`  | none | activated |
- * | `true`  | present | refused, the messages explain it |
- * | `false` | present | refused, the messages explain it |
- * | `false` | **none** | **nothing needed activating** |
+ * | `"true"`  | none, or none of type `E` | activated |
+ * | `"true"`  | a type `E` | refused, the messages explain it |
+ * | `"false"` | any | refused, the messages explain it |
+ * | `"false"` | **none** | **nothing needed activating** |
+ * | absent | any | refused, the messages explain it |
+ * | absent | none | refused: the document says nothing at all |
+ *
+ * **The attribute is read as three states, not as a boolean.** Absent is not
+ * `false`: a checklist that carries no `activationExecuted` — or no
+ * `chkl:properties` — has told us nothing, and the no-op row below is
+ * measured for SAP writing `false`, never for SAP writing nothing. The last
+ * row is the only place this reading composes a sentence instead of quoting
+ * one, and what it composes is a statement about the document rather than a
+ * verdict about the object.
  *
  * **The last row is measured, and it used to be read as a refusal.** An
  * earlier version of this function took the attribute as a refusal on its own,
@@ -294,26 +304,37 @@ export function readActivationRefusal(document: unknown): AdtRefusal | null {
   const executed = root.properties?.['@activationExecuted'];
   const activated = executed === 'true' || executed === true;
 
+  // Read as the three states it has, not as a boolean. `!activated` is also
+  // true for a document that carries no `activationExecuted` at all — or no
+  // `chkl:properties` — and the measurement below is of SAP writing `false`,
+  // not of SAP writing nothing. Collapsing the two would hand an unreadable
+  // answer the verdict earned by a measured one.
+  const declaredNotActivated = executed === 'false' || executed === false;
+
   if (activated && errors.length === 0) return null;
 
-  // Nothing was activated and nothing was said about it: SAP had no work.
-  // See the table above — this is the one row the attribute alone decides,
-  // and it decides it in the object's favour.
-  if (!activated && messages.length === 0) return null;
+  // Declared not activated, and nothing said about it: SAP had no work. See
+  // the table above — the one row the attribute alone decides, and it decides
+  // it in the object's favour.
+  if (declaredNotActivated && messages.length === 0) return null;
 
   const explanation = errors.length
     ? errors.map((m) => m.text).join('; ')
-    : `Activation did not run and SAP attached no error: ${messages
-        .map((m) => `${m.type}: ${m.text}`)
-        .join('; ')}`;
+    : messages.length
+      ? `Activation did not run and SAP attached no error: ${messages
+          .map((m) => `${m.type}: ${m.text}`)
+          .join('; ')}`
+      : 'SAP answered an activation checklist carrying neither an activationExecuted verdict nor a message';
 
   return {
     form: 'activation',
     message: `Activation failed: ${explanation}`,
-    // `messages` is documented as never empty, and it cannot be here: the
-    // branch that used to leave it bare — no messages at all — now answers
-    // `null` above, so anything reaching this point carried at least one.
-    messages,
+    // `messages` is documented as never empty. Every refusal built from a
+    // document that said something carries what it said; the one that says
+    // nothing at all — no verdict attribute, no message — carries the
+    // sentence above, which is a statement about the document rather than an
+    // invented verdict about the object.
+    messages: messages.length ? messages : [{ type: 'E', text: explanation }],
   };
 }
 
