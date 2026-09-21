@@ -453,20 +453,22 @@ describe('AdtRequest', () => {
             testsLogger,
           );
           const domain = client.getDomain();
-          // Both the object and any entry a previous run left behind: the
-          // object may be gone while its registration is not, and it is the
-          // registration that holds the name.
-          await domain.delete({
-            domainName,
-            transportRequest: sharedRequest,
-          });
-          // Measured 2026-09-21 and not yet explained: the request holds no
-          // entry for this name immediately before the run and none
-          // immediately after, yet this finds one here, after the delete
-          // above — so the delete appears to register it. A raw
-          // `DELETE …?corrNr=` of a name that does not exist answers 400 and
-          // registers nothing, so it is not simply that. Clearing it is right
-          // either way; the wording says what was seen, not why.
+
+          // **Never delete blindly here.** This used to call `delete` first,
+          // to clear whatever a broken run had left — and that call was what
+          // created the leftover it then found. Measured 2026-09-21, on a
+          // request holding no entry for the name: the deletion service
+          // answers `200` for an object that does not exist, says *"Release
+          // transport … to remove the object directory entry"*, and registers
+          // the entry. Deleting nothing takes the name hostage.
+          //
+          // (A raw `DELETE` on the object's own URI answers 400 and registers
+          // nothing. The library deletes through
+          // `POST /sap/bc/adt/deletion/delete`, which is the one that does
+          // this.)
+          //
+          // So: clear an entry if one is there, and only delete the object
+          // once it is known to exist.
           const stale = await findEntry(sharedRequest, domainName);
           if (stale) {
             testsLogger.info?.(
@@ -476,6 +478,17 @@ describe('AdtRequest', () => {
               name: domainName,
               type: 'DOMA',
               position: stale.position,
+            });
+          }
+
+          // A previous run may have left the object itself, not just an entry.
+          // Read before deleting, for the reason above: a delete aimed at
+          // nothing is what registers the name.
+          if ((await domain.readMetadata({ domainName })).ok) {
+            testsLogger.info?.(`${domainName} still exists — deleting it`);
+            await domain.delete({
+              domainName,
+              transportRequest: sharedRequest,
             });
           }
 
