@@ -20,7 +20,10 @@ import type {
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import type { ITransportObjectEntry } from '../../../../core/transport/parseObjectEntries';
-import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import {
+  getSystemInformation,
+  isCloudEnvironment,
+} from '../../../../utils/systemInfo';
 import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
@@ -408,18 +411,55 @@ describe('AdtRequest', () => {
             testsLogger.warn?.(`actionlogs refused: ${log.getError().message}`);
           }
 
-          // **The owner is named because the server will not choose one.**
+          // **The owner is named because the server will not choose one**, and
+          // the two systems answer "who is that" in different places.
+          //
+          // `SAP_USERNAME` is the configured one and wins where it is set: it
+          // is what an on-premise session is opened with, and naming it is
+          // also how a caller asks for a task owned by somebody else. This
+          // block read it alone, which was enough until the suite met BTP
+          // ABAP — a JWT session has no such variable, so `tm:targetuser=""`
+          // went out and the server answered `400 ExceptionInvalidData`. This
+          // PR's own defect, re-created by the suite that proves it fixed, and
+          // reported as a pass because the refusal returned early.
+          //
+          // `getSystemInformation` fills that gap and **only that gap**: it
+          // reads `/sap/bc/adt/core/http/systeminformation`, which is a cloud
+          // endpoint. On-premise there is nothing there, the helper answers
+          // `null`, and the configured name is what is left — which is the
+          // one that was right there all along.
+          //
+          // `createTask` itself asks neither. A member here does not spend a
+          // second request to fill in an argument, which is exactly why the
+          // contract makes the caller name the user. A test is that caller.
           logTestStep('create a task under it', testsLogger);
-          const targetUser = (process.env.SAP_USERNAME || '').toUpperCase();
+          const targetUser =
+            (process.env.SAP_USERNAME || '').toUpperCase() ||
+            (await getSystemInformation(connection))?.userName ||
+            '';
+          if (!targetUser) {
+            logTestSkip(
+              testsLogger,
+              label,
+              'SAP_USERNAME is unset and the system named no user — ' +
+                'createTask cannot be measured without an owner',
+            );
+            return;
+          }
+          testsLogger.info?.(`the task will be owned by ${targetUser}`);
           const task = await request.createTask(transportNumber as string, {
             targetUser,
           });
           if (!task.ok) {
             // A system that organises no tasks has answered, and that is the
             // measurement. Without one there is nothing to hang an object on,
-            // so the round trip below cannot run.
-            testsLogger.warn?.(`newtask refused: ${task.getError().message}`);
-            logTestSuccess(testsLogger, label);
+            // so the round trip below cannot run — and this is a SKIP, not a
+            // pass: nothing below it was measured.
+            logTestSkip(
+              testsLogger,
+              label,
+              `newtask refused: ${task.getError().message}`,
+            );
             return;
           }
           taskNumber = (task.getResult().value as { transportNumber: string })
@@ -432,10 +472,11 @@ describe('AdtRequest', () => {
 
           const packageName = resolvePackageName(undefined);
           if (!packageName) {
-            testsLogger.warn?.(
-              'no package configured — skipping the round trip',
+            logTestSkip(
+              testsLogger,
+              label,
+              'no package configured — the round trip cannot run',
             );
-            logTestSuccess(testsLogger, label);
             return;
           }
 
@@ -454,10 +495,11 @@ describe('AdtRequest', () => {
           // which is also the only state ADT will delete.
           const sharedRequest = resolveTransportRequest(undefined);
           if (!sharedRequest) {
-            testsLogger.warn?.(
-              'no default_transport configured — skipping the round trip',
+            logTestSkip(
+              testsLogger,
+              label,
+              'no default_transport configured — the round trip cannot run',
             );
-            logTestSuccess(testsLogger, label);
             return;
           }
 
@@ -514,10 +556,11 @@ describe('AdtRequest', () => {
             length: 4,
           } as any);
           if (!madeIt.ok) {
-            testsLogger.warn?.(
+            logTestSkip(
+              testsLogger,
+              label,
               `could not create ${domainName}: ${madeIt.getError().message}`,
             );
-            logTestSuccess(testsLogger, label);
             return;
           }
           await domain.delete({ domainName, transportRequest: sharedRequest });
@@ -526,11 +569,13 @@ describe('AdtRequest', () => {
           const entry = await findEntry(sharedRequest, domainName);
           if (entry === undefined) {
             // The system detached it by itself; there is nothing to remove and
-            // nothing this member could be measured against.
-            testsLogger.warn?.(
+            // nothing this member could be measured against. A skip, because
+            // `removeObject` was never called.
+            logTestSkip(
+              testsLogger,
+              label,
               `${domainName} left no entry under ${sharedRequest} — nothing to remove`,
             );
-            logTestSuccess(testsLogger, label);
             return;
           }
           testsLogger.info?.(
