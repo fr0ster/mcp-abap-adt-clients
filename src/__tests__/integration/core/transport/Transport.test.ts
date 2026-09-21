@@ -305,38 +305,29 @@ describe('AdtRequest', () => {
         skipReason = 'Test case disabled or not found';
     });
 
-    /** The `tm:position` of an entry in a task document, or undefined. */
-    const positionOf = (document: string, name: string): string | undefined => {
-      for (const entry of document.match(/<tm:abap_object\s[^>]*?\/?>/g) ??
-        []) {
-        if (new RegExp(`tm:name="${name}"`).test(entry)) {
-          return entry.match(/tm:position="([^"]*)"/)?.[1];
-        }
-      }
-      return undefined;
-    };
-
-    /**
-     * `readMetadata` is enough to see the entries. An earlier version issued
-     * the GET by hand with
-     * `application/vnd.sap.adt.transportorganizer.v1+xml`, on the belief that
-     * `getTransport` sends no `Accept` and so gets a thinner representation.
-     * Measured 2026-09-21, the same URL with and without that header: 55549
-     * bytes and 88 `tm:abap_object` either way, byte for byte. The header
-     * changes nothing.
-     */
-    const documentOf = async (number: string): Promise<string> => {
-      const answer = await client.getRequest().readMetadata({
-        transportNumber: number,
-      });
-      return answer.ok ? String(answer.getResult().value ?? '') : '';
+    /** The entries `readObjects` lists on one request or task. */
+    const objectsOn = async (
+      number: string,
+    ): Promise<Array<{ name: string; position: string }>> => {
+      const answer = await client.getRequest().readObjects(number);
+      return answer.ok
+        ? (answer.getResult().value as Array<{
+            name: string;
+            position: string;
+          }>)
+        : [];
     };
 
     /** The task numbers under a request, in document order. */
-    const tasksOf = (document: string): string[] =>
-      (document.match(/<tm:task\s[^>]*?>/g) ?? [])
+    const tasksOf = async (number: string): Promise<string[]> => {
+      const answer = await client.getRequest().readMetadata({
+        transportNumber: number,
+      });
+      const document = answer.ok ? String(answer.getResult().value ?? '') : '';
+      return (document.match(/<tm:task\s[^>]*?>/g) ?? [])
         .map((t) => t.match(/tm:number="([^"]*)"/)?.[1])
         .filter((n): n is string => Boolean(n));
+    };
 
     /**
      * Where an object's entry actually sits — **on a task, never on the
@@ -353,9 +344,9 @@ describe('AdtRequest', () => {
       requestNumber: string,
       name: string,
     ): Promise<{ task: string; position: string } | undefined> => {
-      for (const task of tasksOf(await documentOf(requestNumber))) {
-        const position = positionOf(await documentOf(task), name);
-        if (position !== undefined) return { task, position };
+      for (const task of await tasksOf(requestNumber)) {
+        const entry = (await objectsOn(task)).find((o) => o.name === name);
+        if (entry) return { task, position: entry.position };
       }
       return undefined;
     };
@@ -533,8 +524,8 @@ describe('AdtRequest', () => {
           });
           expect(removed.ok).toBe(true);
 
-          const after = await documentOf(entry.task);
-          expect(positionOf(after, domainName)).toBeUndefined();
+          const after = await objectsOn(entry.task);
+          expect(after.find((o) => o.name === domainName)).toBeUndefined();
 
           logTestSuccess(testsLogger, label);
         } catch (error: any) {

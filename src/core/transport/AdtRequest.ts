@@ -543,12 +543,19 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
    * The objects this request or task holds, each with its `tm:position`.
    *
    * **Read this before {@link removeObject}, because that is where the
-   * position comes from.** Nothing else here answers one: `readMetadata`
-   * sends no `Accept`, and the representation the server picks for a request
-   * that names none carries no `tm:abap_object` at all — measured against an
-   * on-premise system, 2026-09-21. This member asks for
-   * `application/vnd.sap.adt.transportorganizer.v1+xml`, which is the one
-   * that lists them.
+   * position comes from.** Nothing else here answers one as a value:
+   * `readMetadata` hands back the document and leaves the caller to dig
+   * `tm:position` out of it by hand, which is the parsing this member exists
+   * to do — it answers entries, each with a `position` that is there.
+   *
+   * It is *not* that `readMetadata` cannot see them. That was said here on
+   * the belief that sending no `Accept` gets a thinner representation, and it
+   * is wrong: measured against an on-premise system, 2026-09-21, the same URL
+   * with and without
+   * `application/vnd.sap.adt.transportorganizer.v1+xml` — 95411 bytes and 166
+   * `tm:abap_object` for a request, 55549 and 88 for a task, byte for byte
+   * identical either way. The header changes nothing; the parsing is the
+   * point.
    *
    * It is also the re-read that confirms a removal, beside
    * {@link readActionLog}: the action's own answer merely repeats what it was

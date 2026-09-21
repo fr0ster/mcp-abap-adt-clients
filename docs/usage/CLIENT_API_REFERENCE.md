@@ -470,14 +470,15 @@ had:
   answered `200` with the usual echo document, and re-reading the task found
   all twenty-two still on it. The same documents carrying `tm:position`
   removed every one. `readObjects()` is where the number comes from.
-- **`readObjects()` is a different representation, not a different
-  resource.** `readMetadata()` sends no `Accept`, and what the server picks
-  for a request naming none carries no `tm:abap_object` at all — so the
-  positions cannot be read out of it however the result is parsed. This member
-  asks for `application/vnd.sap.adt.transportorganizer.v1+xml`, and its
-  default reading answers the entries rather than the document: a caller left
-  to find a position in XML would be doing by regex what the member exists to
-  do.
+- **`readObjects()` exists for the parsing, not for the representation.** Its
+  default reading answers the entries as values, each with the `position`
+  `removeObject()` needs, rather than a document to dig through. The header it
+  sends changes nothing: measured against an on-premise system, 2026-09-21,
+  the same URL with and without
+  `application/vnd.sap.adt.transportorganizer.v1+xml` came back byte for byte
+  identical — 95411 bytes and 166 `tm:abap_object` for a request, 55549 and 88
+  for a task. `readMetadata()` sees the same entries; it just hands you the
+  XML.
 - **A `200` from `removeObject()` is not evidence.** The endpoint echoes
   whatever it was asked, for an entry that exists and for one that never did.
   `readActionLog()`, or a re-read of the task, is what says a removal landed.

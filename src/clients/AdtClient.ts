@@ -785,6 +785,26 @@ export interface IAdtTransportSearchable<TConfigurations> {
  * `IAdtTransportSearchable` stays declared below until it makes the same
  * journey; moving it is a type change with no behaviour in it.
  */
+/**
+ * `readObjects`, which `IAdtTransportObjectActions` does not carry.
+ *
+ * Declared here for the reason the comment above describes and
+ * `IAdtTransportSearchable` still lives by: the member shipped in this package
+ * ahead of `@mcp-abap-adt/interfaces-adt`, whose 1.2.0 knows the other four
+ * and not this one. Without the declaration it exists at runtime and is
+ * invisible to a consumer's compiler — `client.getRequest().readObjects(...)`
+ * does not type-check, which is how this was found.
+ *
+ * It moves out when that package next moves; the move is a type change with no
+ * behaviour in it.
+ */
+export interface IAdtTransportObjectListing<TObjects> {
+  readObjects<E extends IAdtError = IAdtError>(
+    transportNumber: string,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<TObjects, E>>;
+}
+
 export type IRequestContract<R extends ITransportResults> = IAdtCreatable<
   ITransportConfig,
   ReturnType<R['created']>
@@ -806,7 +826,8 @@ export type IRequestContract<R extends ITransportResults> = IAdtCreatable<
     ReturnType<NonNullable<R['addedObject']>>,
     ReturnType<NonNullable<R['createdTask']>>,
     ReturnType<NonNullable<R['actionLog']>>
-  >;
+  > &
+  IAdtTransportObjectListing<ReturnType<NonNullable<R['objects']>>>;
 export type ILocalTestClassContract<R extends IClassResults> = IAdtReadable<
   ILocalTestClassConfig,
   ReturnType<R['source']>

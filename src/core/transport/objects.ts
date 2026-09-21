@@ -202,19 +202,19 @@ export async function readTransportActionLog(
 /**
  * The objects a request or task holds — the reading `removeObject` needs.
  *
- * **A different representation of the same resource, not a different
- * resource.** `getTransport` sends no `Accept` at all, and what the server
- * picks for a request that names none carries no `tm:abap_object` in it:
- * measured against an on-premise system, 2026-09-21, the same URL read twice
- * in one session answered with the object list only when
- * `application/vnd.sap.adt.transportorganizer.v1+xml` was asked for. So this
- * is its own member rather than an option on `readMetadata`, whose payload is
- * what a caller already has strategies parsing.
+ * **It exists for the parsing, not for the representation.**
+ * `removeObjectFromTransport` requires a `tm:position`, and nothing else here
+ * hands one back as a value — a caller would be digging it out of XML by
+ * regex, which is the layering this member prevents.
  *
- * It exists because `removeObjectFromTransport` requires a `tm:position` and
- * nothing else here hands one back. Without it a caller would have to go
- * around this library and assemble the request themselves — the layering it
- * exists to prevent.
+ * It asks for `application/vnd.sap.adt.transportorganizer.v1+xml`, and that
+ * is what the endpoint answers anyway. This comment used to say the header is
+ * what makes the entries appear — that `getTransport`, sending no `Accept`,
+ * gets a representation without `tm:abap_object`. Measured against an
+ * on-premise system, 2026-09-21: the same URL with the header and without it,
+ * 95411 bytes and 166 `tm:abap_object` for a request, 55549 and 88 for a
+ * task, byte for byte identical. The header settles nothing here; sending it
+ * is simply naming what this member wants.
  */
 export async function readTransportObjects(
   connection: IAbapConnection,
