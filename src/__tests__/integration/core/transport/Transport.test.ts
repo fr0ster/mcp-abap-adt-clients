@@ -411,29 +411,37 @@ describe('AdtRequest', () => {
             testsLogger.warn?.(`actionlogs refused: ${log.getError().message}`);
           }
 
-          // **The owner is named because the server will not choose one**,
-          // and the system is asked who that is.
+          // **The owner is named because the server will not choose one**, and
+          // the two systems answer "who is that" in different places.
           //
-          // This read `SAP_USERNAME`, which only exists where the connection
-          // is made with a user and a password. Against BTP ABAP the session
-          // is a JWT and the variable is unset, so `tm:targetuser=""` went out
-          // and the server answered `400 ExceptionInvalidData` — this PR's own
-          // defect, re-created by the suite that proves it is fixed, and
+          // `SAP_USERNAME` is the configured one and wins where it is set: it
+          // is what an on-premise session is opened with, and naming it is
+          // also how a caller asks for a task owned by somebody else. This
+          // block read it alone, which was enough until the suite met BTP
+          // ABAP — a JWT session has no such variable, so `tm:targetuser=""`
+          // went out and the server answered `400 ExceptionInvalidData`. This
+          // PR's own defect, re-created by the suite that proves it fixed, and
           // reported as a pass because the refusal returned early.
           //
-          // `getSystemInformation` answers `userName` for the session in hand.
-          // `createTask` will not call it — a member here does not spend a
-          // second request to fill in an argument — but a test may, and this
-          // is exactly the caller the contract says must name the user.
+          // `getSystemInformation` fills that gap and **only that gap**: it
+          // reads `/sap/bc/adt/core/http/systeminformation`, which is a cloud
+          // endpoint. On-premise there is nothing there, the helper answers
+          // `null`, and the configured name is what is left — which is the
+          // one that was right there all along.
+          //
+          // `createTask` itself asks neither. A member here does not spend a
+          // second request to fill in an argument, which is exactly why the
+          // contract makes the caller name the user. A test is that caller.
           logTestStep('create a task under it', testsLogger);
           const targetUser =
+            (process.env.SAP_USERNAME || '').toUpperCase() ||
             (await getSystemInformation(connection))?.userName ||
-            (process.env.SAP_USERNAME || '').toUpperCase();
+            '';
           if (!targetUser) {
             logTestSkip(
               testsLogger,
               label,
-              'the system named no user and SAP_USERNAME is unset — ' +
+              'SAP_USERNAME is unset and the system named no user — ' +
                 'createTask cannot be measured without an owner',
             );
             return;
