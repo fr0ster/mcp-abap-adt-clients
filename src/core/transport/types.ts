@@ -101,6 +101,28 @@ export interface ITransportTree {
   requests: ITransportTreeRequest[];
 }
 
+/**
+ * One object entry in a request or task, as the CTS object directory holds it.
+ *
+ * `pgmid` defaults to `R3TR` where it is left out — every capture of these
+ * actions carried that, and it is what a workbench object is. `description`
+ * and `position` are written only when given: the `removeobject` capture sent
+ * both and the `addobject` one sent neither, and nothing measured says the
+ * server needs either, so this client does not invent them.
+ */
+export interface IAbapObjectEntry {
+  /** `tm:name` — the object's name, e.g. `ZCL_MY_CLASS`. */
+  name: string;
+  /** `tm:type` — the CTS object type, e.g. `CLAS`, `FUGR`, `TABL`. */
+  type: string;
+  /** `tm:pgmid` — `R3TR` unless the caller says otherwise. */
+  pgmid?: string;
+  /** `tm:obj_desc` — the description ADT shows beside the entry. */
+  description?: string;
+  /** `tm:position` — the entry's position in the task, e.g. `000025`. */
+  position?: string;
+}
+
 /** One strategy per member of a transport-request implementation. */
 export interface ITransportResults {
   /**
@@ -138,6 +160,25 @@ export interface ITransportResults {
    * internal resolver has always used.
    */
   readonly searchConfigurations?: IResultStrategy<unknown>;
+  /**
+   * What detaching an object answers.
+   *
+   * **Optional, like `searchConfigurations` above and for the same reason:**
+   * a hand-written result set from before these members existed must keep
+   * compiling. The document is echoed back untouched by default — it repeats
+   * the object that was asked about and says nothing else, so the reading that
+   * confirms a removal is `readActionLog`, not this.
+   */
+  readonly removedObject?: IResultStrategy<unknown>;
+  /** What attaching an object answers. Optional, as above. */
+  readonly addedObject?: IResultStrategy<unknown>;
+  /**
+   * What creating a task answers: the new number, the way `created` answers a
+   * new request's. Optional, as above.
+   */
+  readonly createdTask?: IResultStrategy<unknown>;
+  /** What the action log answers. Optional, as above. */
+  readonly actionLog?: IResultStrategy<unknown>;
 }
 
 /**
@@ -153,4 +194,11 @@ export const transportDocuments = {
   deleted: rawDocument,
   deletionCheck: rawDocument,
   searchConfigurations: (answer) => parseSearchConfigurations(answer.data),
+  removedObject: rawDocument,
+  addedObject: rawDocument,
+  // The same reading as `created`: a task is a request resource, and its
+  // number arrives the same way — in `Location`, with the body carrying it
+  // too.
+  createdTask: (answer) => parseCreatedTransport(answer.data),
+  actionLog: rawDocument,
 } satisfies ITransportResults;

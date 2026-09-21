@@ -233,6 +233,7 @@ import {
 } from '../core/transformation';
 import {
   AdtRequest,
+  type IAbapObjectEntry,
   type ITransportConfig,
   type ITransportResults,
   transportDocuments,
@@ -770,6 +771,48 @@ export interface IAdtTransportSearchable<TConfigurations> {
   ): Promise<IAdtResponse<TConfigurations, E>>;
 }
 
+/**
+ * The three user actions on a request's object list, and its action log.
+ *
+ * **Declared here for the same reason as `IAdtTransportSearchable` above**:
+ * `@mcp-abap-adt/interfaces` is a major ahead of what this package depends on,
+ * and tying a transport capability to that bump would hold it hostage. These
+ * belong in `IAdtRequest` eventually; moving them is a type change with no
+ * behaviour in it.
+ *
+ * **Why they are members at all.** The listing already hands a caller every
+ * `atom:link` a request and its tasks carry — `release`, `addobject`,
+ * `newtask` — precisely so they follow an href rather than assemble a URL.
+ * Following one meant a raw `PUT` with a hand-built `tm:root` and a
+ * `useraction` attribute, which is the gap `searchConfigurations()` closed for
+ * the listing itself.
+ */
+export interface IAdtTransportObjectActions<
+  TRemoved,
+  TAdded,
+  TTask,
+  TActionLog,
+> {
+  removeObject<E extends IAdtError = IAdtError>(
+    transportNumber: string,
+    object: IAbapObjectEntry,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<TRemoved, E>>;
+  addObject<E extends IAdtError = IAdtError>(
+    transportNumber: string,
+    object: IAbapObjectEntry,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<TAdded, E>>;
+  createTask<E extends IAdtError = IAdtError>(
+    transportNumber: string,
+    options?: { targetUser?: string } & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<TTask, E>>;
+  readActionLog<E extends IAdtError = IAdtError>(
+    transportNumber: string,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<TActionLog, E>>;
+}
+
 export type IRequestContract<R extends ITransportResults> = IAdtCreatable<
   ITransportConfig,
   ReturnType<R['created']>
@@ -785,7 +828,13 @@ export type IRequestContract<R extends ITransportResults> = IAdtCreatable<
     ReturnType<R['deletionCheck']>
   > &
   IAdtRequest<ReturnType<R['list']>> &
-  IAdtTransportSearchable<ReturnType<NonNullable<R['searchConfigurations']>>>;
+  IAdtTransportSearchable<ReturnType<NonNullable<R['searchConfigurations']>>> &
+  IAdtTransportObjectActions<
+    ReturnType<NonNullable<R['removedObject']>>,
+    ReturnType<NonNullable<R['addedObject']>>,
+    ReturnType<NonNullable<R['createdTask']>>,
+    ReturnType<NonNullable<R['actionLog']>>
+  >;
 export type ILocalTestClassContract<R extends IClassResults> = IAdtReadable<
   ILocalTestClassConfig,
   ReturnType<R['source']>
