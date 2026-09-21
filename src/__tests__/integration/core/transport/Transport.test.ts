@@ -271,6 +271,126 @@ describe('AdtRequest', () => {
     );
   });
 
+  /**
+   * The object list and the tasks — what a request can be told to do.
+   *
+   * These four members arrived in 20.0.0 and had nothing live behind them:
+   * the system this repository is usually run against is ABAP Cloud and the
+   * capture that motivated them came from an on-premise one, through Eclipse.
+   * A member nobody has called against a server is a guess with tests around
+   * it.
+   *
+   * **Written to measure rather than to pass.** A system that refuses one of
+   * these is a system that answered, and the answer is recorded and the block
+   * moves on: `newtask` in particular may or may not mean anything where
+   * tasks are not how work is organised. What is NOT tolerated is a throw, a
+   * hang, or a success with nothing in it — `createTask` answering an empty
+   * number is exactly the defect review caught before this test existed.
+   *
+   * Nothing here touches an object that is not ours: the request is created
+   * by this block and deleted in its cleanup.
+   */
+  describe('Object list and tasks', () => {
+    let transportNumber: string | null = null;
+    let skipReason: string | null = null;
+
+    beforeAll(() => {
+      skipReason = hasConfig ? null : 'No SAP configuration';
+      if (!getEnabledTestCase('create_transport', 'builder_transport'))
+        skipReason = 'Test case disabled or not found';
+    });
+
+    it(
+      'creates a task, reads the action log, and answers for an object it does not hold',
+      async () => {
+        const label = 'AdtRequest - object list and tasks';
+        logTestStart(testsLogger, label, {
+          name: 'object_list_and_tasks',
+          params: {},
+        });
+
+        if (skipReason) {
+          logTestSkip(testsLogger, label, skipReason);
+          return;
+        }
+
+        const testCase = getEnabledTestCase(
+          'create_transport',
+          'builder_transport',
+        );
+        const request = client.getRequest();
+
+        try {
+          logTestStep('create the request this block works in', testsLogger);
+          const created = expectResult(
+            await request.create(buildConfig(testCase) as any),
+            'create transport request',
+          );
+          transportNumber = created.transportNumber || null;
+          expect(transportNumber).toMatch(/\S/);
+          if (transportNumber) createdTransports.push(transportNumber);
+
+          // **The action log, first, because it is read-only.** It is also
+          // what confirms a `removeObject` later: that member's own answer
+          // only echoes the object it was asked about.
+          logTestStep('read the action log', testsLogger);
+          const log = await request.readActionLog(transportNumber as string);
+          if (log.ok) {
+            const document = String(log.getResult().value ?? '');
+            testsLogger.info?.(
+              `actionlogs answered ${document.length} characters`,
+            );
+            expect(document.length).toBeGreaterThan(0);
+          } else {
+            // Recorded, not failed: a system that does not serve this
+            // resource has told us so, and that is the measurement.
+            testsLogger.warn?.(`actionlogs refused: ${log.getError().message}`);
+          }
+
+          logTestStep('create a task under it', testsLogger);
+          const task = await request.createTask(transportNumber as string);
+          if (task.ok) {
+            const number = (
+              task.getResult().value as { transportNumber: string }
+            ).transportNumber;
+            // The defect this test exists for: a task whose number is `''`
+            // passes `ok` and is useless to everything afterwards.
+            expect(number).toMatch(/\S/);
+            testsLogger.info?.(`newtask answered ${number}`);
+            createdTransports.push(number);
+          } else {
+            testsLogger.warn?.(`newtask refused: ${task.getError().message}`);
+          }
+
+          // **An object the request does not hold.** Asserting the success
+          // path would mean attaching a real object to a real request on a
+          // shared system, and taking its CTS lock with it. What can be
+          // measured safely is that the member reaches the server and the
+          // server's verdict comes back as a verdict — not as a throw.
+          logTestStep('remove an object it does not hold', testsLogger);
+          const removed = await request.removeObject(
+            transportNumber as string,
+            { name: 'ZZ_NOT_IN_THIS_REQUEST', type: 'CLAS' },
+          );
+          testsLogger.info?.(
+            removed.ok
+              ? 'removeobject answered a success for an object not in the request'
+              : `removeobject refused: ${removed.getError().message}`,
+          );
+          expect(typeof removed.ok).toBe('boolean');
+
+          logTestSuccess(testsLogger, label);
+        } catch (error: any) {
+          logTestError(testsLogger, label, error);
+          throw error;
+        } finally {
+          logTestEnd(testsLogger, label);
+        }
+      },
+      getTimeout('test'),
+    );
+  });
+
   describe('List transports', () => {
     it(
       'should list transport requests through a saved search configuration',
