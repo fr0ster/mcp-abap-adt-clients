@@ -243,7 +243,18 @@ describe('BehaviorImplementation (using AdtClient)', () => {
             try {
               expectResult(
                 await bimpl.update(
-                  { className: config.className },
+                  {
+                    className: config.className,
+                    // **The request travels with the write.** Dropping it here
+                    // cost nothing while the test package was local, because
+                    // nothing was registered in CTS. Under a transportable
+                    // package the class is registered at create time, and a
+                    // source write carrying no `corrNr` is refused: `409
+                    // CTS_WBO_API 019`, "Object LIMU CLSD … is already locked
+                    // in request …" — naming the very request this suite works
+                    // in.
+                    transportRequest: config.transportRequest,
+                  },
                   {
                     lockHandle: locked,
                     sourceCode: mainSourceFor(

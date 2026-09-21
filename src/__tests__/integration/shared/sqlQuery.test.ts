@@ -218,11 +218,22 @@ describe('Shared - getSqlQuery', () => {
       return;
     }
 
+    // **An empty query is refused, and the refusal is the server's.**
+    //
+    // This asserted `rejects.toThrow('SQL query is required')`, which pinned
+    // two things that are both gone. Since "the verdict on a response belongs
+    // to the consumer" (#142) a refusal is answered rather than thrown — the
+    // old expectation failed with `Resolved to value: {"getError": [Function],
+    // "ok": false}`, the refusal happening exactly as intended and reported as
+    // a failure. And the message was a client-side guard this library no
+    // longer invents: the empty query goes to the server, which answers 400.
+    //
+    // So what is asserted is what is true — it is refused — and not the
+    // wording of a check that no longer exists.
     logTestStep('validate error if SQL query is missing', testsLogger);
-    await expect(
-      client.getUtils().getSqlQuery({
-        sql_query: '',
-      }),
-    ).rejects.toThrow('SQL query is required');
+    const answer = await client.getUtils().getSqlQuery({ sql_query: '' });
+    if (answer.ok) throw new Error('expected an empty query to be refused');
+    expect(answer.getError().message).toMatch(/\S/);
+    testsLogger.info?.(`empty query refused: ${answer.getError().message}`);
   });
 });

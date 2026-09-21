@@ -234,6 +234,11 @@ describe('ServiceBinding (using AdtClient)', () => {
     let parentTransportLayer = params.transport_layer;
     let parentApplicationComponent = params.application_component;
     let parentResponsible = params.responsible;
+    /** The parent's own `pak:recordChanges`, when it states one. */
+    let parentRecordChanges: boolean | undefined =
+      typeof params.record_changes === 'boolean'
+        ? params.record_changes
+        : undefined;
 
     try {
       const parentState = expectResult(
@@ -264,6 +269,12 @@ describe('ServiceBinding (using AdtClient)', () => {
           attributes?.['@_pak:packageType'] ??
           attributes?.['@_packageType'] ??
           'development';
+        if (parentRecordChanges === undefined) {
+          const stated =
+            attributes?.['@_pak:recordChanges'] ??
+            attributes?.['@_recordChanges'];
+          if (stated !== undefined) parentRecordChanges = stated === 'true';
+        }
         parentTransportLayer =
           parentTransportLayer ??
           transportLayer?.['@_pak:name'] ??
@@ -323,6 +334,12 @@ describe('ServiceBinding (using AdtClient)', () => {
         transportLayer: parentTransportLayer,
         applicationComponent: parentApplicationComponent,
         responsible: parentResponsible,
+        // **A package on a transport layer has to record changes.** Without
+        // this the create is refused with `TR 432`, "Change recording must be
+        // activated for package …", and the only symptom here was the package
+        // never becoming readable. It inherits the parent's setting where the
+        // parent states one, and a transport layer means yes either way.
+        recordChanges: parentRecordChanges ?? Boolean(parentTransportLayer),
         transportRequest: resolveTransportRequest(params.transport_request),
       });
     } catch (error: any) {

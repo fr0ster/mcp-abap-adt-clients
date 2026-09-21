@@ -293,6 +293,14 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
       package_type: config.packageType,
       responsible: config.responsible,
       record_changes: config.recordChanges ?? false,
+      // **Without this the request never reaches the URL.** `updatePackage`
+      // appends `corrNr` when it is given one, and this field was the only
+      // thing missing between a caller's `transportRequest` and that query
+      // parameter. A local package never noticed; a package that records
+      // changes refuses the PUT outright — measured against an on-premise
+      // system, 2026-09-21: `400 SADT_RESOURCE 017`, "Parameter corrNr could
+      // not be found."
+      transport_request: config.transportRequest,
     };
 
     return answering(
