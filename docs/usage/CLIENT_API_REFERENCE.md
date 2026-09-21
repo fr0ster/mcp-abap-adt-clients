@@ -448,7 +448,11 @@ const entry = listed.ok
   : undefined;
 
 // Free a name: detach the entry from the TASK that holds it.
-if (entry) await request.removeObject('E19K905942', { ...entry });
+// `position` is optional on a listed entry: one the server described without
+// it cannot be removed, and the compiler asks rather than sending an empty
+// value that would remove nothing while answering 200.
+if (entry?.position)
+  await request.removeObject('E19K905942', { ...entry, position: entry.position });
 
 // Confirm it: the action's own answer only echoes what it was asked.
 const log = await request.readActionLog('E19K905942');

@@ -118,6 +118,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
     reading walks the document for `tm:abap_object` rather than addressing a
     path, because only the elements and their attributes were measured, not
     where in the tree they sit.
+
+    `position` is **optional** on a listed entry. Every entry measured carried
+    one, but filling a missing `tm:position` with `''` — which this did — is
+    the one answer the member must never give: `''` satisfies `removeObject`'s
+    required `position`, so the call compiles, reaches the server and removes
+    nothing while answering `200`. That is the defect these members exist to
+    end, re-created by the reading added to prevent it. Left optional, such an
+    entry is still reported — the request does hold the object — and cannot be
+    spread into `removeObject` without the caller deciding what to do.
   - **`addObject(task, object, options?)`** — the same shape, the other
     action. Refused when the object is held by an unrelated task, with
     `SCTS_ADT_MSG 009` and a longtext naming the holder: *"There are no links

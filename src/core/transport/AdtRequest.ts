@@ -566,7 +566,11 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
    * const entry = listed.ok
    *   ? listed.getResult().value.find((o) => o.name === 'ZCL_X')
    *   : undefined;
-   * if (entry) await request.removeObject(task, { ...entry });
+   * // `position` is optional on a listed entry — an entry the server
+   * // described without one cannot be removed, and the compiler says so
+   * // rather than letting an invented `''` reach the server.
+   * if (entry?.position)
+   *   await request.removeObject(task, { ...entry, position: entry.position });
    * ```
    */
   async readObjects<E extends IAdtError = IAdtError>(

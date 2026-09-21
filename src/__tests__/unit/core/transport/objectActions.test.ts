@@ -382,6 +382,39 @@ describe('readObjects', () => {
     expect(answer.getResult().value[0].position).toBe('000025');
   });
 
+  /**
+   * **An entry the server described without a position is not removable, and
+   * the reading must not pretend otherwise.**
+   *
+   * This filled a missing `tm:position` with `''`, under a type that declared
+   * it required. That is the one answer this member must never give: `''`
+   * satisfies `removeObject`'s `position: string`, so the call compiles,
+   * reaches the server, and removes nothing while answering `200` — the
+   * defect these members exist to end, re-created by the reading added to
+   * prevent it. The entry is still reported, because the request does hold
+   * the object; only the position it does not have is left undefined.
+   */
+  it('leaves a missing position undefined rather than blanking it', async () => {
+    const { connection } = connectionOver(() =>
+      answering(
+        '<?xml version="1.0" encoding="UTF-8"?>' +
+          '<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:number="E19K905942">' +
+          '<tm:request><tm:task tm:number="E19K905943">' +
+          '<tm:abap_object tm:pgmid="R3TR" tm:type="CLAS" tm:name="ZCL_NO_POS"/>' +
+          '</tm:task></tm:request></tm:root>',
+      ),
+    );
+
+    const answer = await new AdtRequest(connection).readObjects('E19K905942');
+
+    if (!answer.ok) throw new Error('expected the list');
+    const [entry] = answer.getResult().value;
+    expect(entry.name).toBe('ZCL_NO_POS');
+    expect(entry.position).toBeUndefined();
+    // The shape that used to come back, and must not again.
+    expect(entry.position).not.toBe('');
+  });
+
   /** An empty request is a request with nothing in it, not a failure. */
   it('answers an empty list when the request holds nothing', async () => {
     const { connection } = connectionOver(() =>

@@ -19,6 +19,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
+import type { ITransportObjectEntry } from '../../../../core/transport/parseObjectEntries';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { expectResult } from '../../../helpers/contract';
 import {
@@ -305,17 +306,19 @@ describe('AdtRequest', () => {
         skipReason = 'Test case disabled or not found';
     });
 
-    /** The entries `readObjects` lists on one request or task. */
+    /**
+     * The entries `readObjects` lists on one request or task.
+     *
+     * No cast: the member's own type is what this asserts against. Casting
+     * `position` to `string` here would put back, in the test, exactly the
+     * claim the reading refuses to make — and the suite would keep passing
+     * over an entry the server described without one.
+     */
     const objectsOn = async (
       number: string,
-    ): Promise<Array<{ name: string; position: string }>> => {
+    ): Promise<ITransportObjectEntry[]> => {
       const answer = await client.getRequest().readObjects(number);
-      return answer.ok
-        ? (answer.getResult().value as Array<{
-            name: string;
-            position: string;
-          }>)
-        : [];
+      return answer.ok ? answer.getResult().value : [];
     };
 
     /** The task numbers under a request, in document order. */
@@ -346,7 +349,17 @@ describe('AdtRequest', () => {
     ): Promise<{ task: string; position: string } | undefined> => {
       for (const task of await tasksOf(requestNumber)) {
         const entry = (await objectsOn(task)).find((o) => o.name === name);
-        if (entry) return { task, position: entry.position };
+        if (!entry) continue;
+        // An entry with no position is a measurement, not a thing to remove:
+        // every one seen so far has carried one, and passing an invented
+        // position would be the silent no-op this block exists to catch.
+        if (entry.position === undefined) {
+          testsLogger.warn?.(
+            `${name} is listed on ${task} without a tm:position — not removable`,
+          );
+          continue;
+        }
+        return { task, position: entry.position };
       }
       return undefined;
     };

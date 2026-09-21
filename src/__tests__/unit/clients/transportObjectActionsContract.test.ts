@@ -42,6 +42,26 @@ import type { AdtClient } from '../../../clients/AdtClient';
 
   // An entry being added does not exist yet, so it has no position to give.
   c.getRequest().addObject('E19K905942', { name: 'ZCL_X', type: 'CLAS' });
+
+  // **A listed entry is not removable on sight.** `readObjects` answers
+  // `position?: string`, because an entry the server described without one
+  // exists and filling it with `''` would be a call that removes nothing
+  // while reporting success. Spreading an entry straight into `removeObject`
+  // therefore does not compile: the caller is asked what to do about the
+  // entry that has no position.
+  void (async () => {
+    const listed = await c.getRequest().readObjects('E19K905942');
+    if (!listed.ok) return;
+    const [entry] = listed.getResult().value;
+    // @ts-expect-error position is optional on a listed entry, required here
+    await c.getRequest().removeObject('E19K905942', { ...entry });
+
+    // Narrowed, it compiles — and that narrowing is the point.
+    if (entry.position !== undefined)
+      await c
+        .getRequest()
+        .removeObject('E19K905942', { ...entry, position: entry.position });
+  })();
 };
 
 it('the transport object-action contract compiles as asserted', () =>
