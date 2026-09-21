@@ -115,6 +115,7 @@ describe('removeObject', () => {
     await new AdtRequest(connection).removeObject('E19K905942', {
       name: 'ZCL_X',
       type: 'CLAS',
+      position: '000001',
     });
 
     expect(calls[0].headers?.['Content-Type']).toBe('text/plain');
@@ -123,17 +124,28 @@ describe('removeObject', () => {
     );
   });
 
-  it('writes no obj_desc or position when it was given none', async () => {
+  /**
+   * **`tm:position` is what makes the call do anything, so it always goes
+   * out.** Measured on E19, 2026-09-21, against task `E19K901046`: 22 objects
+   * asked for by `type` and `name` alone each answered `200` with the usual
+   * echo document, and re-reading the task found all 22 still on it. The same
+   * documents carrying `tm:position` — and nothing else added — removed every
+   * one, 22 down to 0, each confirmed by a re-read.
+   *
+   * `obj_desc` stays optional, because it is decoration either way.
+   */
+  it('always writes the position, since without it the server no-ops', async () => {
     const { connection, calls } = connectionOver(() => answering(REMOVED));
 
     await new AdtRequest(connection).removeObject('E19K905942', {
       name: 'ZCL_X',
       type: 'CLAS',
+      position: '000007',
     });
 
     const body = String(calls[0].data);
+    expect(body).toContain('tm:position="000007"');
     expect(body).not.toContain('tm:obj_desc');
-    expect(body).not.toContain('tm:position');
     // pgmid is the one default, because a workbench object is R3TR.
     expect(body).toContain('tm:pgmid="R3TR"');
   });
@@ -144,6 +156,7 @@ describe('removeObject', () => {
     await new AdtRequest(connection).removeObject('E19K905942', {
       name: 'ZCL_X',
       type: 'CLAS',
+      position: '000001',
       description: 'Fix "quoted" & <angled>',
     });
 
@@ -223,7 +236,9 @@ describe('createTask', () => {
   it('answers the new number, which is the point of calling it', async () => {
     const { connection } = connectionOver(() => answering(NEW_TASK, 201));
 
-    const answer = await new AdtRequest(connection).createTask('E19K905941');
+    const answer = await new AdtRequest(connection).createTask('E19K905941', {
+      targetUser: 'OKYSLYTSIA',
+    });
 
     if (!answer.ok) throw new Error('expected the task');
     const created = answer.getResult().value as {
@@ -234,14 +249,31 @@ describe('createTask', () => {
     expect(created.uri).toBe('/sap/bc/adt/cts/transportrequests/E19K907073');
   });
 
-  it('leaves the target user out when not given, so the server decides', async () => {
+  /**
+   * **The attribute always goes out, because the server will not fill it in.**
+   * This test asserted the opposite — that omitting `tm:targetuser` left the
+   * choice to the server — and an on-premise run (E19, 2026-09-21) measured
+   * what that actually costs:
+   *
+   * ```
+   * 400  SCTS_ADT_MSG 009
+   * User  does not exist in the system (or locked)
+   * ```
+   *
+   * Two spaces after `User`: the name resolved to empty. The same call
+   * carrying the attribute answered 200 and a task number. Eclipse sends it on
+   * every `newtask`, which is why no capture of Eclipse could show the gap.
+   */
+  it('always names the target user, since the server will not choose one', async () => {
     const { connection, calls } = connectionOver(() =>
-      answering(NEW_TASK, 201),
+      answering(NEW_TASK, 200),
     );
 
-    await new AdtRequest(connection).createTask('E19K905941');
+    await new AdtRequest(connection).createTask('E19K905941', {
+      targetUser: 'OKYSLYTSIA',
+    });
 
-    expect(String(calls[0].data)).not.toContain('tm:targetuser');
+    expect(String(calls[0].data)).toContain('tm:targetuser="OKYSLYTSIA"');
   });
 });
 
@@ -285,9 +317,18 @@ describe('the contract a consumer actually holds', () => {
     const request = new AdtClient(connection).getRequest();
     const object = { name: 'ZCL_X', type: 'CLAS' };
 
-    expect((await request.removeObject('E19K905942', object)).ok).toBe(true);
+    expect(
+      (
+        await request.removeObject('E19K905942', {
+          ...object,
+          position: '000001',
+        })
+      ).ok,
+    ).toBe(true);
     expect((await request.addObject('E19K905942', object)).ok).toBe(true);
-    expect((await request.createTask('E19K905941')).ok).toBe(true);
+    expect(
+      (await request.createTask('E19K905941', { targetUser: 'OKYSLYTSIA' })).ok,
+    ).toBe(true);
     expect((await request.readActionLog('E19K905942')).ok).toBe(true);
     expect(calls).toHaveLength(4);
   });

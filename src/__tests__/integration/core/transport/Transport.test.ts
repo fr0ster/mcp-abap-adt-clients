@@ -45,6 +45,7 @@ import {
 const {
   getEnabledTestCase,
   getTestCaseDefinition,
+  resolvePackageName,
 } = require('../../../helpers/test-helper');
 const { getTimeout } = require('../../../helpers/test-helper');
 
@@ -274,24 +275,27 @@ describe('AdtRequest', () => {
   /**
    * The object list and the tasks — what a request can be told to do.
    *
-   * These four members arrived in 20.0.0 and had nothing live behind them:
-   * the system this repository is usually run against is ABAP Cloud and the
-   * capture that motivated them came from an on-premise one, through Eclipse.
-   * A member nobody has called against a server is a guess with tests around
-   * it.
+   * These four members arrived in 20.0.0 with nothing live behind them, and
+   * the first on-premise run found two of them broken in ways their unit
+   * tests could not see, because both defects answer `200`:
    *
-   * **Written to measure rather than to pass.** A system that refuses one of
-   * these is a system that answered, and the answer is recorded and the block
-   * moves on: `newtask` in particular may or may not mean anything where
-   * tasks are not how work is organised. What is NOT tolerated is a throw, a
-   * hang, or a success with nothing in it — `createTask` answering an empty
-   * number is exactly the defect review caught before this test existed.
+   * - `createTask` sent no `tm:targetuser` and the server resolved the owner
+   *   to an empty name — `400 SCTS_ADT_MSG 009`, *"User  does not exist"*.
+   * - `removeObject` sent no `tm:position` and the server removed nothing
+   *   while answering the usual echo document. Twenty-two objects were asked
+   *   for by name, twenty-two answers said `200`, and twenty-two entries were
+   *   still on the task afterwards.
    *
-   * Nothing here touches an object that is not ours: the request is created
-   * by this block and deleted in its cleanup.
+   * **So this block round-trips rather than asserting `ok`.** It creates one
+   * request, creates an object in it, deletes that object — leaving the CTS
+   * entry that is the whole reason `removeObject` exists — and then removes
+   * the entry and *re-reads the task to prove it is gone*. An answer is not
+   * evidence here; the next read is.
+   *
+   * It creates exactly one request and one task, and deletes both. Nothing it
+   * touches belongs to anyone else.
    */
   describe('Object list and tasks', () => {
-    let transportNumber: string | null = null;
     let skipReason: string | null = null;
 
     beforeAll(() => {
@@ -300,8 +304,39 @@ describe('AdtRequest', () => {
         skipReason = 'Test case disabled or not found';
     });
 
+    /** The `tm:position` of an entry in a task document, or undefined. */
+    const positionOf = (document: string, name: string): string | undefined => {
+      for (const entry of document.match(/<tm:abap_object\s[^>]*?\/?>/g) ??
+        []) {
+        if (new RegExp(`tm:name="${name}"`).test(entry)) {
+          return entry.match(/tm:position="([^"]*)"/)?.[1];
+        }
+      }
+      return undefined;
+    };
+
+    /**
+     * **Read with the transport-organizer media type, not through
+     * `readMetadata`.** `getTransport` sends no `Accept` at all, and the
+     * representation the server then picks carries no `tm:abap_object` — the
+     * object list this block is here to watch is simply absent from it.
+     * Measured 2026-09-21: the same URL with
+     * `application/vnd.sap.adt.transportorganizer.v1+xml` returns the entries.
+     */
+    const taskDocument = async (number: string): Promise<string> => {
+      const answer = await connection.makeAdtRequest({
+        url: `/sap/bc/adt/cts/transportrequests/${number}`,
+        method: 'GET',
+        timeout: getTimeout('default'),
+        headers: {
+          Accept: 'application/vnd.sap.adt.transportorganizer.v1+xml',
+        },
+      });
+      return String(answer.data ?? '');
+    };
+
     it(
-      'creates a task, reads the action log, and answers for an object it does not hold',
+      'creates a task, frees an object name, and proves the entry is gone',
       async () => {
         const label = 'AdtRequest - object list and tasks';
         logTestStart(testsLogger, label, {
@@ -319,6 +354,9 @@ describe('AdtRequest', () => {
           'builder_transport',
         );
         const request = client.getRequest();
+        const domainName = 'ZAC_TRQ_DOMA01';
+        let taskNumber: string | null = null;
+        let transportNumber: string | null = null;
 
         try {
           logTestStep('create the request this block works in', testsLogger);
@@ -330,54 +368,102 @@ describe('AdtRequest', () => {
           expect(transportNumber).toMatch(/\S/);
           if (transportNumber) createdTransports.push(transportNumber);
 
-          // **The action log, first, because it is read-only.** It is also
-          // what confirms a `removeObject` later: that member's own answer
-          // only echoes the object it was asked about.
+          // Read-only, and the record a `removeObject` lands in later.
           logTestStep('read the action log', testsLogger);
           const log = await request.readActionLog(transportNumber as string);
           if (log.ok) {
-            const document = String(log.getResult().value ?? '');
-            testsLogger.info?.(
-              `actionlogs answered ${document.length} characters`,
+            expect(String(log.getResult().value ?? '').length).toBeGreaterThan(
+              0,
             );
-            expect(document.length).toBeGreaterThan(0);
           } else {
-            // Recorded, not failed: a system that does not serve this
-            // resource has told us so, and that is the measurement.
             testsLogger.warn?.(`actionlogs refused: ${log.getError().message}`);
           }
 
+          // **The owner is named because the server will not choose one.**
           logTestStep('create a task under it', testsLogger);
-          const task = await request.createTask(transportNumber as string);
-          if (task.ok) {
-            const number = (
-              task.getResult().value as { transportNumber: string }
-            ).transportNumber;
-            // The defect this test exists for: a task whose number is `''`
-            // passes `ok` and is useless to everything afterwards.
-            expect(number).toMatch(/\S/);
-            testsLogger.info?.(`newtask answered ${number}`);
-            createdTransports.push(number);
-          } else {
+          const targetUser = (process.env.SAP_USERNAME || '').toUpperCase();
+          const task = await request.createTask(transportNumber as string, {
+            targetUser,
+          });
+          if (!task.ok) {
+            // A system that organises no tasks has answered, and that is the
+            // measurement. Without one there is nothing to hang an object on,
+            // so the round trip below cannot run.
             testsLogger.warn?.(`newtask refused: ${task.getError().message}`);
+            logTestSuccess(testsLogger, label);
+            return;
+          }
+          taskNumber = (task.getResult().value as { transportNumber: string })
+            .transportNumber;
+          if (taskNumber) createdTransports.unshift(taskNumber);
+          // A task whose number is `''` passes `ok` and is useless to
+          // everything after it — the defect review caught once already.
+          expect(taskNumber).toMatch(/\S/);
+          testsLogger.info?.(`newtask answered ${taskNumber}`);
+
+          const packageName = resolvePackageName(undefined);
+          if (!packageName) {
+            testsLogger.warn?.(
+              'no package configured — skipping the round trip',
+            );
+            logTestSuccess(testsLogger, label);
+            return;
           }
 
-          // **An object the request does not hold.** Asserting the success
-          // path would mean attaching a real object to a real request on a
-          // shared system, and taking its CTS lock with it. What can be
-          // measured safely is that the member reaches the server and the
-          // server's verdict comes back as a verdict — not as a throw.
-          logTestStep('remove an object it does not hold', testsLogger);
-          const removed = await request.removeObject(
-            transportNumber as string,
-            { name: 'ZZ_NOT_IN_THIS_REQUEST', type: 'CLAS' },
+          // **An object of our own, so the entry we detach is ours.** It is
+          // created in the task above and deleted immediately: what stays
+          // behind is the CTS entry, which is exactly the state that blocks
+          // the name from being used again.
+          logTestStep(
+            'create an object in the task, then delete it',
+            testsLogger,
           );
-          testsLogger.info?.(
-            removed.ok
-              ? 'removeobject answered a success for an object not in the request'
-              : `removeobject refused: ${removed.getError().message}`,
-          );
-          expect(typeof removed.ok).toBe('boolean');
+          const domain = client.getDomain();
+          await domain.delete({ domainName, transportRequest: taskNumber });
+          const madeIt = await domain.create({
+            domainName,
+            packageName,
+            transportRequest: taskNumber,
+            description: 'AdtRequest object-list round trip',
+            datatype: 'CHAR',
+            length: 4,
+          } as any);
+          if (!madeIt.ok) {
+            testsLogger.warn?.(
+              `could not create ${domainName}: ${madeIt.getError().message}`,
+            );
+            logTestSuccess(testsLogger, label);
+            return;
+          }
+          await domain.delete({ domainName, transportRequest: taskNumber });
+
+          logTestStep('find the entry the deletion left behind', testsLogger);
+          const before = await taskDocument(taskNumber as string);
+          const position = positionOf(before, domainName);
+          if (position === undefined) {
+            // The system detached it by itself; there is nothing to remove and
+            // nothing this member could be measured against.
+            testsLogger.warn?.(
+              `${domainName} left no entry on ${taskNumber} — nothing to remove`,
+            );
+            logTestSuccess(testsLogger, label);
+            return;
+          }
+          testsLogger.info?.(`entry sits at position ${position}`);
+
+          // **The removal, and then the proof.** `ok` here means the document
+          // was understood, not that an entry went away — the re-read is what
+          // says so.
+          logTestStep('remove the entry, then re-read the task', testsLogger);
+          const removed = await request.removeObject(taskNumber as string, {
+            name: domainName,
+            type: 'DOMA',
+            position,
+          });
+          expect(removed.ok).toBe(true);
+
+          const after = await taskDocument(taskNumber as string);
+          expect(positionOf(after, domainName)).toBeUndefined();
 
           logTestSuccess(testsLogger, label);
         } catch (error: any) {

@@ -459,18 +459,35 @@ const task = await request.createTask('E19K905941', { targetUser: 'OKYSLYTSIA' }
 await request.addObject('E19K907073', { name: 'Z_CL_000001', type: 'CLAS' });
 ```
 
-Three things worth knowing before the first call:
+Four things worth knowing before the first call, three of them measured
+against an on-premise system on 2026-09-21 — the first run these members ever
+had:
 
+- **`position` is required, and it is what makes `removeObject()` do
+  anything.** Twenty-two objects asked for by `type` and `name` alone each
+  answered `200` with the usual echo document, and re-reading the task found
+  all twenty-two still on it. The same documents carrying `tm:position`
+  removed every one. Read the number from the task's own listing.
+- **A `200` from `removeObject()` is not evidence.** The endpoint echoes
+  whatever it was asked, for an entry that exists and for one that never did.
+  `readActionLog()`, or a re-read of the task, is what says a removal landed.
+- **`targetUser` is required for `createTask()`.** Left out, the server
+  resolves the owner to an empty name and refuses: `400 SCTS_ADT_MSG 009`,
+  *"User  does not exist in the system (or locked)"* — two spaces, because the
+  name was empty. Eclipse sends the attribute on every `newtask`, which is why
+  no capture of Eclipse showed the gap. This client cannot fill it in: the
+  connection does not say who is authenticated, and asking would cost a second
+  request.
 - **Objects live on tasks, so address the task**, not the request above it.
   `createTask()` answers a number that is itself a request resource — it
   reads, writes and releases like one.
-- **`addObject()` is refused when the object is held by an unrelated task**,
-  with `SCTS_ADT_MSG 009` and a longtext naming the holder: *"There are no
-  links to this request/task."* That is a third lock flavour, distinct from
-  the enqueue lock and from the request-versus-task one, and it is the
-  server's verdict to read rather than a state the client checks for first.
-- **`pgmid` defaults to `R3TR`**; `obj_desc` and `position` are sent only when
-  given, because no measurement says the server needs them.
+
+`addObject()` is refused when the object is held by an unrelated task, with
+`SCTS_ADT_MSG 009` and a longtext naming the holder: *"There are no links to
+this request/task."* That is a third lock flavour, distinct from the enqueue
+lock and from the request-versus-task one, and it is the server's verdict to
+read rather than a state the client checks for first. `pgmid` defaults to
+`R3TR`, and `obj_desc` is sent only when given.
 
 `IAbapObjectEntry`, the type those two members take, comes from
 `@mcp-abap-adt/interfaces` — import it from there, or from

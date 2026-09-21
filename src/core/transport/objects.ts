@@ -55,9 +55,9 @@ const attribute = (value: string): string =>
 /**
  * The `tm:root` both object actions send.
  *
- * `tm:position` and `tm:obj_desc` are written only when given. The capture
- * carried both on `removeobject` and neither on `addobject`, and no
- * measurement says whether the server needs them, so neither is invented here.
+ * `tm:position` and `tm:obj_desc` are written only when given. `obj_desc` is
+ * decoration; `tm:position` is not, and {@link removeObjectFromTransport} says
+ * why it now insists on one.
  */
 function userActionDocument(
   number: string,
@@ -88,11 +88,24 @@ function userActionDocument(
  *
  * Addressed at the **task** that holds the object, not at the request above
  * it: that is what the capture did, and a request's objects live on its tasks.
+ *
+ * **`object.position` is what identifies the entry, and without it the server
+ * does nothing while saying it did.** Measured against an on-premise system,
+ * 2026-09-21: 22 objects were removed from one task by `pgmid`/`type`/`name`
+ * alone. All 22 answered `200` with the usual echo document — and all 22 were
+ * still on the task afterwards. Adding `tm:position` and nothing else
+ * made every one of them land, confirmed by re-reading the task after each
+ * call (22 → 0). The number comes from the task's own listing, as
+ * `tm:position` on the `tm:abap_object` being removed.
+ *
+ * This is why the member's answer is not evidence: a `200` here means the
+ * request was understood, not that an entry went away. `readTransportActionLog`
+ * — or a re-read of the task — is the confirmation.
  */
 export async function removeObjectFromTransport(
   connection: IAbapConnection,
   transportNumber: string,
-  object: IAbapObjectEntry,
+  object: IAbapObjectEntry & { position: string },
 ): Promise<IAdtWireResponse> {
   return connection.makeAdtRequest({
     url: requestUrl(transportNumber),
@@ -129,25 +142,40 @@ export async function addObjectToTransport(
 /**
  * Create a task under a request — `useraction="newtask"`.
  *
- * Answers 201 with the new number in `Location`, and the task is itself a
- * request resource at the same endpoint shape: it can be read, written to and
- * released like one.
+ * Answers 200 with the new number both in `Location` and as `tm:number` on the
+ * root, and the task is itself a request resource at the same endpoint shape:
+ * it can be read, written to and released like one.
+ *
+ * **`targetUser` is required, and that is measured.** It was optional when
+ * this shipped, on the reasoning that the server would decide whose task it is
+ * when the attribute was absent. It does not. Omitting `tm:targetuser` was
+ * sent to an on-premise system, 2026-09-21, and answered:
+ *
+ * ```
+ * 400  SCTS_ADT_MSG 009
+ * User  does not exist in the system (or locked)
+ * ```
+ *
+ * — two spaces after `User`, because the name it resolved was empty. The same
+ * call carrying `tm:targetuser` answered 200 with a task number. Eclipse sends
+ * the attribute on every `newtask`, which is why no capture showed the gap.
+ *
+ * Nothing here defaults it: `IAbapConnection` does not expose who is
+ * authenticated, and finding out would cost a second request — which is the
+ * one thing a member of this library does not do.
  */
 export async function createTransportTask(
   connection: IAbapConnection,
   transportNumber: string,
-  targetUser?: string,
+  targetUser: string,
 ): Promise<IAdtWireResponse> {
-  const user =
-    targetUser === undefined ? '' : ` tm:targetuser="${attribute(targetUser)}"`;
-
   return connection.makeAdtRequest({
     url: `${requestUrl(transportNumber)}/tasks`,
     method: 'POST',
     timeout: getTimeout('default'),
     data:
       '<?xml version="1.0" encoding="ASCII"?>\n' +
-      `<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:number="${attribute(transportNumber)}"${user} tm:useraction="newtask"/>`,
+      `<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:number="${attribute(transportNumber)}" tm:targetuser="${attribute(targetUser)}" tm:useraction="newtask"/>`,
     headers: USER_ACTION_HEADERS,
   });
 }
