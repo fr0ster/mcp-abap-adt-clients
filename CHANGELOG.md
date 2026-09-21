@@ -84,6 +84,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   `searchConfigurations` is: a hand-written result set from before these
   members existed keeps compiling.
 
+  **`parseCreatedTransport` reads two shapes now.** A created request carries
+  its fields on `tm:request` inside the root; a created *task* carries them on
+  the root itself and has no `tm:request` at all. Read the old way,
+  `createTask()` answered `transportNumber: ''` for every task — a number
+  nothing can be done with, handed back as a success. The root stands in where
+  the request element is absent; a request document is unaffected, since its
+  root carries none of those attributes.
+
+  `IAbapObjectEntry` is exported from the package, beside `ICreatedTransport`
+  and the tree types. A parameter type a caller cannot name is a parameter
+  they cannot build.
+
   `IAdtTransportObjectActions` is declared in this package rather than in
   `@mcp-abap-adt/interfaces`, exactly as `IAdtTransportSearchable` was and for
   the same reason — that package is a major ahead of what this one depends on,

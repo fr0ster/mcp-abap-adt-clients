@@ -213,6 +213,27 @@ describe('createTask', () => {
     expect(body).toContain('tm:targetuser="OKYSLYTSIA"');
   });
 
+  /**
+   * **The number, not just the 200.** This asserted `answer.ok` alone, and a
+   * task whose number is `''` passes that: `parseCreatedTransport` read
+   * `tm:number` off `tm:request`, and a `newtask` answer has no `tm:request`
+   * — it carries the attributes on the root. So every task ever created came
+   * back with an empty number, reported as a success. Found in review.
+   */
+  it('answers the new number, which is the point of calling it', async () => {
+    const { connection } = connectionOver(() => answering(NEW_TASK, 201));
+
+    const answer = await new AdtRequest(connection).createTask('E19K905941');
+
+    if (!answer.ok) throw new Error('expected the task');
+    const created = answer.getResult().value as {
+      transportNumber: string;
+      uri?: string;
+    };
+    expect(created.transportNumber).toBe('E19K907073');
+    expect(created.uri).toBe('/sap/bc/adt/cts/transportrequests/E19K907073');
+  });
+
   it('leaves the target user out when not given, so the server decides', async () => {
     const { connection, calls } = connectionOver(() =>
       answering(NEW_TASK, 201),
