@@ -26,6 +26,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [20.0.0] - 2026-09-21
 
+### Changed — `@mcp-abap-adt/interfaces` ^46.0.0
+
+- **The contract a consumer holds agrees with the object behind it.** 20.0.0
+  was built against 45.1.0, where `createTask`'s options argument and
+  `removeObject`'s `position` were both optional and `readObjects` did not
+  exist at all. So `getRequest()` handed back a type that permitted
+  `createTask(n)` and `removeObject(n, { name, type })` — the two calls the
+  first server run had just measured to be impossible — while hiding the
+  member added to answer them. The implementation required what the contract
+  did not, a disagreement only a consumer finds, and only at runtime.
+
+  `interfaces-adt` 2.0.0 / `interfaces` 46.0.0 carry all three, so
+  `IRequestContract` names the fifth type argument and the local
+  `IAdtTransportObjectListing` — declared here for one commit while the
+  contract caught up — is gone.
+
+  Both wrong shapes are pinned as `@ts-expect-error` in
+  `src/__tests__/unit/clients/transportObjectActionsContract.test.ts`: if
+  either requirement is loosened, the directive errors as unused and the build
+  says so.
+
 ### Changed — the contracts these members need moved to their own package
 
 - **Needs `@mcp-abap-adt/interfaces` 45.1.0**, up from 44.0.0. That package
@@ -85,16 +106,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
     with `readObjects` — is what confirms the removal landed. **`position` is
     required**: see the measurement below.
   - **`readObjects(task, options?)`** — the entries the request or task holds,
-    each with the `tm:position` `removeObject` needs. A `GET` asking for
-    `application/vnd.sap.adt.transportorganizer.v1+xml`, which is a different
-    representation of the resource `readMetadata` already reads — that one
-    sends no `Accept`, and what the server picks for a request naming none
-    carries no `tm:abap_object` at all. Its default reading answers the
-    entries rather than the document, unlike its siblings: a caller left to
-    find a position in XML would be doing by regex what the member exists to
-    do. The reading walks the document for `tm:abap_object` rather than
-    addressing a path, because only the elements and their attributes were
-    measured, not where in the tree they sit.
+    each with the `tm:position` `removeObject` needs. **It exists for the
+    parsing, not for the request.** This first said `readMetadata` sends no
+    `Accept` and therefore gets a representation carrying no `tm:abap_object`,
+    so the positions could not be read from it however it was parsed. Measured
+    against an on-premise system — the same URL with the header and without —
+    that is false: 95411 bytes and 166 `tm:abap_object` for a request, 55549
+    and 88 for a task, byte for byte either way. The header settles nothing.
+    What this member gives a caller is entries whose `position` is a value,
+    where `readMetadata` gives a document they would have to regex. The
+    reading walks the document for `tm:abap_object` rather than addressing a
+    path, because only the elements and their attributes were measured, not
+    where in the tree they sit.
   - **`addObject(task, object, options?)`** — the same shape, the other
     action. Refused when the object is held by an unrelated task, with
     `SCTS_ADT_MSG 009` and a longtext naming the holder: *"There are no links
