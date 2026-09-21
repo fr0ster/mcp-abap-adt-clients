@@ -12,6 +12,7 @@ export type { IAbapObjectEntry } from '@mcp-abap-adt/interfaces';
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces';
 import { rawDocument } from '../../utils/resultStrategy';
 import { parseCreatedTransport } from './parseCreatedTransport';
+import { parseObjectEntries } from './parseObjectEntries';
 import { parseSearchConfigurations } from './parseSearchConfigurations';
 import { parseTransportTree } from './parseTransportTree';
 
@@ -159,6 +160,16 @@ export interface ITransportResults {
   readonly createdTask?: IResultStrategy<unknown>;
   /** What the action log answers. Optional, as above. */
   readonly actionLog?: IResultStrategy<unknown>;
+  /**
+   * What the object list answers. Optional, as above.
+   *
+   * **Parsed by default, where its siblings hand the document back.** They can
+   * afford to: the document they echo is the answer. This one exists so that
+   * `removeObject` has a `tm:position` to be given, and a caller left to find
+   * that in a document would be regexing XML — which is what this member was
+   * added to stop.
+   */
+  readonly objects?: IResultStrategy<unknown>;
 }
 
 /**
@@ -181,4 +192,5 @@ export const transportDocuments = {
   // too.
   createdTask: (answer) => parseCreatedTransport(answer.data),
   actionLog: rawDocument,
+  objects: (answer) => parseObjectEntries(answer.data),
 } satisfies ITransportResults;

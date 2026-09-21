@@ -19,6 +19,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
+import type { ITransportObjectEntry } from '../../../../core/transport/parseObjectEntries';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { expectResult } from '../../../helpers/contract';
 import {
@@ -45,6 +46,8 @@ import {
 const {
   getEnabledTestCase,
   getTestCaseDefinition,
+  resolvePackageName,
+  resolveTransportRequest,
 } = require('../../../helpers/test-helper');
 const { getTimeout } = require('../../../helpers/test-helper');
 
@@ -265,6 +268,297 @@ describe('AdtRequest', () => {
           }
 
           logTestEnd(testsLogger, 'AdtRequest - full workflow');
+        }
+      },
+      getTimeout('test'),
+    );
+  });
+
+  /**
+   * The object list and the tasks — what a request can be told to do.
+   *
+   * These four members arrived in 20.0.0 with nothing live behind them, and
+   * the first on-premise run found two of them broken in ways their unit
+   * tests could not see, because both defects answer `200`:
+   *
+   * - `createTask` sent no `tm:targetuser` and the server resolved the owner
+   *   to an empty name — `400 SCTS_ADT_MSG 009`, *"User  does not exist"*.
+   * - `removeObject` sent no `tm:position` and the server removed nothing
+   *   while answering the usual echo document. Twenty-two objects were asked
+   *   for by name, twenty-two answers said `200`, and twenty-two entries were
+   *   still on the task afterwards.
+   *
+   * **So this block round-trips rather than asserting `ok`.** It creates one
+   * request, creates an object in it, deletes that object — leaving the CTS
+   * entry that is the whole reason `removeObject` exists — and then removes
+   * the entry and *re-reads the task to prove it is gone*. An answer is not
+   * evidence here; the next read is.
+   *
+   * It creates exactly one request and one task, and deletes both. Nothing it
+   * touches belongs to anyone else.
+   */
+  describe('Object list and tasks', () => {
+    let skipReason: string | null = null;
+
+    beforeAll(() => {
+      skipReason = hasConfig ? null : 'No SAP configuration';
+      if (!getEnabledTestCase('create_transport', 'builder_transport'))
+        skipReason = 'Test case disabled or not found';
+    });
+
+    /**
+     * The entries `readObjects` lists on one request or task.
+     *
+     * No cast: the member's own type is what this asserts against. Casting
+     * `position` to `string` here would put back, in the test, exactly the
+     * claim the reading refuses to make — and the suite would keep passing
+     * over an entry the server described without one.
+     */
+    const objectsOn = async (
+      number: string,
+    ): Promise<ITransportObjectEntry[]> => {
+      const answer = await client.getRequest().readObjects(number);
+      return answer.ok ? answer.getResult().value : [];
+    };
+
+    /** The task numbers under a request, in document order. */
+    const tasksOf = async (number: string): Promise<string[]> => {
+      const answer = await client.getRequest().readMetadata({
+        transportNumber: number,
+      });
+      const document = answer.ok ? String(answer.getResult().value ?? '') : '';
+      return (document.match(/<tm:task\s[^>]*?>/g) ?? [])
+        .map((t) => t.match(/tm:number="([^"]*)"/)?.[1])
+        .filter((n): n is string => Boolean(n));
+    };
+
+    /**
+     * Where an object's entry actually sits — **on a task, never on the
+     * request above it**.
+     *
+     * The request's document *shows* its tasks' entries, which is why this
+     * block once read one there and addressed `removeObject` at the request.
+     * The server refused, and said exactly why: *"Entry R3TR DOMA … does not
+     * exist in request/task E19K9071xx"* — `SCTS_ADT_MSG 009`, for an entry
+     * plainly visible in the document it was just read from. It belongs to
+     * the task, and only the task can detach it.
+     */
+    const findEntry = async (
+      requestNumber: string,
+      name: string,
+    ): Promise<{ task: string; position: string } | undefined> => {
+      for (const task of await tasksOf(requestNumber)) {
+        const entry = (await objectsOn(task)).find((o) => o.name === name);
+        if (!entry) continue;
+        // An entry with no position is a measurement, not a thing to remove:
+        // every one seen so far has carried one, and passing an invented
+        // position would be the silent no-op this block exists to catch.
+        if (entry.position === undefined) {
+          testsLogger.warn?.(
+            `${name} is listed on ${task} without a tm:position — not removable`,
+          );
+          continue;
+        }
+        return { task, position: entry.position };
+      }
+      return undefined;
+    };
+
+    it(
+      'creates a task, frees an object name, and proves the entry is gone',
+      async () => {
+        const label = 'AdtRequest - object list and tasks';
+        logTestStart(testsLogger, label, {
+          name: 'object_list_and_tasks',
+          params: {},
+        });
+
+        if (skipReason) {
+          logTestSkip(testsLogger, label, skipReason);
+          return;
+        }
+
+        const testCase = getEnabledTestCase(
+          'create_transport',
+          'builder_transport',
+        );
+        const request = client.getRequest();
+        const domainName = 'ZAC_TRQ_DOMA01';
+        let taskNumber: string | null = null;
+        let transportNumber: string | null = null;
+
+        try {
+          logTestStep('create the request this block works in', testsLogger);
+          const created = expectResult(
+            await request.create(buildConfig(testCase) as any),
+            'create transport request',
+          );
+          transportNumber = created.transportNumber || null;
+          expect(transportNumber).toMatch(/\S/);
+          if (transportNumber) createdTransports.push(transportNumber);
+
+          // Read-only, and the record a `removeObject` lands in later.
+          logTestStep('read the action log', testsLogger);
+          const log = await request.readActionLog(transportNumber as string);
+          if (log.ok) {
+            expect(String(log.getResult().value ?? '').length).toBeGreaterThan(
+              0,
+            );
+          } else {
+            testsLogger.warn?.(`actionlogs refused: ${log.getError().message}`);
+          }
+
+          // **The owner is named because the server will not choose one.**
+          logTestStep('create a task under it', testsLogger);
+          const targetUser = (process.env.SAP_USERNAME || '').toUpperCase();
+          const task = await request.createTask(transportNumber as string, {
+            targetUser,
+          });
+          if (!task.ok) {
+            // A system that organises no tasks has answered, and that is the
+            // measurement. Without one there is nothing to hang an object on,
+            // so the round trip below cannot run.
+            testsLogger.warn?.(`newtask refused: ${task.getError().message}`);
+            logTestSuccess(testsLogger, label);
+            return;
+          }
+          taskNumber = (task.getResult().value as { transportNumber: string })
+            .transportNumber;
+          if (taskNumber) createdTransports.unshift(taskNumber);
+          // A task whose number is `''` passes `ok` and is useless to
+          // everything after it — the defect review caught once already.
+          expect(taskNumber).toMatch(/\S/);
+          testsLogger.info?.(`newtask answered ${taskNumber}`);
+
+          const packageName = resolvePackageName(undefined);
+          if (!packageName) {
+            testsLogger.warn?.(
+              'no package configured — skipping the round trip',
+            );
+            logTestSuccess(testsLogger, label);
+            return;
+          }
+
+          // **The object goes into the suite's ONE request, not the throwaway
+          // above.** This used to create it in the task it had just made, and
+          // that is what poisoned the name: every run registered
+          // `ZAC_TRQ_DOMA01` in a fresh request, and the first run whose
+          // cleanup did not finish left the name locked in a dead one —
+          // `CTS_WBO_API 020`, "already locked in request E19K9071xx", on
+          // every run after it, with no request left that anyone would think
+          // to look in.
+          //
+          // In the configured request the leftover is harmless and
+          // self-healing: the entry sits where the next run looks for it, and
+          // the next run detaches it. The throwaway request above stays empty,
+          // which is also the only state ADT will delete.
+          const sharedRequest = resolveTransportRequest(undefined);
+          if (!sharedRequest) {
+            testsLogger.warn?.(
+              'no default_transport configured — skipping the round trip',
+            );
+            logTestSuccess(testsLogger, label);
+            return;
+          }
+
+          logTestStep(
+            'create an object in the shared request, then delete it',
+            testsLogger,
+          );
+          const domain = client.getDomain();
+
+          // **Never delete blindly here.** This used to call `delete` first,
+          // to clear whatever a broken run had left — and that call was what
+          // created the leftover it then found. Measured 2026-09-21, on a
+          // request holding no entry for the name: the deletion service
+          // answers `200` for an object that does not exist, says *"Release
+          // transport … to remove the object directory entry"*, and registers
+          // the entry. Deleting nothing takes the name hostage.
+          //
+          // (A raw `DELETE` on the object's own URI answers 400 and registers
+          // nothing. The library deletes through
+          // `POST /sap/bc/adt/deletion/delete`, which is the one that does
+          // this.)
+          //
+          // So: clear an entry if one is there, and only delete the object
+          // once it is known to exist.
+          const stale = await findEntry(sharedRequest, domainName);
+          if (stale) {
+            testsLogger.info?.(
+              `an entry for ${domainName} is present at ${stale.task}/${stale.position} — clearing it`,
+            );
+            await request.removeObject(stale.task, {
+              name: domainName,
+              type: 'DOMA',
+              position: stale.position,
+            });
+          }
+
+          // A previous run may have left the object itself, not just an entry.
+          // Read before deleting, for the reason above: a delete aimed at
+          // nothing is what registers the name.
+          if ((await domain.readMetadata({ domainName })).ok) {
+            testsLogger.info?.(`${domainName} still exists — deleting it`);
+            await domain.delete({
+              domainName,
+              transportRequest: sharedRequest,
+            });
+          }
+
+          const madeIt = await domain.create({
+            domainName,
+            packageName,
+            transportRequest: sharedRequest,
+            description: 'AdtRequest object-list round trip',
+            datatype: 'CHAR',
+            length: 4,
+          } as any);
+          if (!madeIt.ok) {
+            testsLogger.warn?.(
+              `could not create ${domainName}: ${madeIt.getError().message}`,
+            );
+            logTestSuccess(testsLogger, label);
+            return;
+          }
+          await domain.delete({ domainName, transportRequest: sharedRequest });
+
+          logTestStep('find the entry the deletion left behind', testsLogger);
+          const entry = await findEntry(sharedRequest, domainName);
+          if (entry === undefined) {
+            // The system detached it by itself; there is nothing to remove and
+            // nothing this member could be measured against.
+            testsLogger.warn?.(
+              `${domainName} left no entry under ${sharedRequest} — nothing to remove`,
+            );
+            logTestSuccess(testsLogger, label);
+            return;
+          }
+          testsLogger.info?.(
+            `entry sits on task ${entry.task} at position ${entry.position}`,
+          );
+
+          // **The removal, and then the proof.** `ok` here means the document
+          // was understood, not that an entry went away — the re-read is what
+          // says so. Addressed at the TASK: the request above it shows the
+          // entry and refuses to detach it, saying the entry "does not exist"
+          // in itself.
+          logTestStep('remove the entry, then re-read the task', testsLogger);
+          const removed = await request.removeObject(entry.task, {
+            name: domainName,
+            type: 'DOMA',
+            position: entry.position,
+          });
+          expect(removed.ok).toBe(true);
+
+          const after = await objectsOn(entry.task);
+          expect(after.find((o) => o.name === domainName)).toBeUndefined();
+
+          logTestSuccess(testsLogger, label);
+        } catch (error: any) {
+          logTestError(testsLogger, label, error);
+          throw error;
+        } finally {
+          logTestEnd(testsLogger, label);
         }
       },
       getTimeout('test'),

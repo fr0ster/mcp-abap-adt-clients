@@ -428,7 +428,7 @@ this member existed still compiles.
 Nothing about `list()` changes. A caller who never needs to choose can keep
 calling it with no argument.
 
-#### The object list: `removeObject()`, `addObject()`, `createTask()`
+#### The object list: `readObjects()`, `removeObject()`, `addObject()`, `createTask()`
 
 Deleting an ABAP object does not free its name. The CTS object-directory entry
 stays on the request that carried it — SAP says so as it happens: *"Release
@@ -441,12 +441,18 @@ SE09 by hand.
 ```typescript
 const request = client.getRequest();
 
+// What the task holds, each entry with the position the removal needs.
+const listed = await request.readObjects('E19K905942');
+const entry = listed.ok
+  ? listed.getResult().value.find((o) => o.name === 'ZMCP_BLD_FGR_H1')
+  : undefined;
+
 // Free a name: detach the entry from the TASK that holds it.
-await request.removeObject('E19K905942', {
-  name: 'ZMCP_BLD_FGR_H1',
-  type: 'FUGR',
-  position: '000025',
-});
+// `position` is optional on a listed entry: one the server described without
+// it cannot be removed, and the compiler asks rather than sending an empty
+// value that would remove nothing while answering 200.
+if (entry?.position)
+  await request.removeObject('E19K905942', { ...entry, position: entry.position });
 
 // Confirm it: the action's own answer only echoes what it was asked.
 const log = await request.readActionLog('E19K905942');
@@ -459,18 +465,44 @@ const task = await request.createTask('E19K905941', { targetUser: 'OKYSLYTSIA' }
 await request.addObject('E19K907073', { name: 'Z_CL_000001', type: 'CLAS' });
 ```
 
-Three things worth knowing before the first call:
+Four things worth knowing before the first call, three of them measured
+against an on-premise system on 2026-09-21 — the first run these members ever
+had:
 
+- **`position` is required, and it is what makes `removeObject()` do
+  anything.** Twenty-two objects asked for by `type` and `name` alone each
+  answered `200` with the usual echo document, and re-reading the task found
+  all twenty-two still on it. The same documents carrying `tm:position`
+  removed every one. `readObjects()` is where the number comes from.
+- **`readObjects()` exists for the parsing, not for the representation.** Its
+  default reading answers the entries as values, each with the `position`
+  `removeObject()` needs, rather than a document to dig through. The header it
+  sends changes nothing: measured against an on-premise system, 2026-09-21,
+  the same URL with and without
+  `application/vnd.sap.adt.transportorganizer.v1+xml` came back byte for byte
+  identical — 95411 bytes and 166 `tm:abap_object` for a request, 55549 and 88
+  for a task. `readMetadata()` sees the same entries; it just hands you the
+  XML.
+- **A `200` from `removeObject()` is not evidence.** The endpoint echoes
+  whatever it was asked, for an entry that exists and for one that never did.
+  `readActionLog()`, or a re-read of the task, is what says a removal landed.
+- **`targetUser` is required for `createTask()`.** Left out, the server
+  resolves the owner to an empty name and refuses: `400 SCTS_ADT_MSG 009`,
+  *"User  does not exist in the system (or locked)"* — two spaces, because the
+  name was empty. Eclipse sends the attribute on every `newtask`, which is why
+  no capture of Eclipse showed the gap. This client cannot fill it in: the
+  connection does not say who is authenticated, and asking would cost a second
+  request.
 - **Objects live on tasks, so address the task**, not the request above it.
   `createTask()` answers a number that is itself a request resource — it
   reads, writes and releases like one.
-- **`addObject()` is refused when the object is held by an unrelated task**,
-  with `SCTS_ADT_MSG 009` and a longtext naming the holder: *"There are no
-  links to this request/task."* That is a third lock flavour, distinct from
-  the enqueue lock and from the request-versus-task one, and it is the
-  server's verdict to read rather than a state the client checks for first.
-- **`pgmid` defaults to `R3TR`**; `obj_desc` and `position` are sent only when
-  given, because no measurement says the server needs them.
+
+`addObject()` is refused when the object is held by an unrelated task, with
+`SCTS_ADT_MSG 009` and a longtext naming the holder: *"There are no links to
+this request/task."* That is a third lock flavour, distinct from the enqueue
+lock and from the request-versus-task one, and it is the server's verdict to
+read rather than a state the client checks for first. `pgmid` defaults to
+`R3TR`, and `obj_desc` is sent only when given.
 
 `IAbapObjectEntry`, the type those two members take, comes from
 `@mcp-abap-adt/interfaces` — import it from there, or from

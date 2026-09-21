@@ -784,6 +784,14 @@ export interface IAdtTransportSearchable<TConfigurations> {
  *
  * `IAdtTransportSearchable` stays declared below until it makes the same
  * journey; moving it is a type change with no behaviour in it.
+ *
+ * `readObjects` made that journey immediately. It shipped here ahead of the
+ * contract and was declared beside `IAdtTransportSearchable` for one commit —
+ * where `client.getRequest().readObjects(...)` compiles and a consumer holding
+ * `IAdtTransportObjectActions` sees four members. `interfaces-adt` 2.0.0 took
+ * it, together with the two parameters the first server run made required, so
+ * the fifth type argument below is that member's reading and the local
+ * declaration is gone.
  */
 export type IRequestContract<R extends ITransportResults> = IAdtCreatable<
   ITransportConfig,
@@ -805,7 +813,8 @@ export type IRequestContract<R extends ITransportResults> = IAdtCreatable<
     ReturnType<NonNullable<R['removedObject']>>,
     ReturnType<NonNullable<R['addedObject']>>,
     ReturnType<NonNullable<R['createdTask']>>,
-    ReturnType<NonNullable<R['actionLog']>>
+    ReturnType<NonNullable<R['actionLog']>>,
+    ReturnType<NonNullable<R['objects']>>
   >;
 export type ILocalTestClassContract<R extends IClassResults> = IAdtReadable<
   ILocalTestClassConfig,

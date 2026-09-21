@@ -54,6 +54,7 @@ import {
   addObjectToTransport,
   createTransportTask,
   readTransportActionLog,
+  readTransportObjects,
   removeObjectFromTransport,
 } from './objects';
 import { getTransport } from './read';
@@ -412,12 +413,21 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
    * const log = await request.readActionLog('E19K905942');
    * ```
    *
-   * The answer echoes the object that was asked about and nothing else, so
-   * {@link readActionLog} is what confirms the removal happened.
+   * **`position` is required, and it is what makes the call do anything.**
+   * Measured against an on-premise system, 2026-09-21: 22 objects asked by
+   * `type` and `name`
+   * alone all answered `200`, with the usual echo document, and all 22 were
+   * still on the task afterwards. The same document carrying `tm:position`
+   * removed every one. Read the number from the task's listing —
+   * `tm:position` on the entry — rather than counting the rows yourself.
+   *
+   * The answer echoes the object that was asked about and nothing else, so a
+   * `200` is not evidence: {@link readActionLog}, or a re-read of the task, is
+   * what confirms the removal happened.
    */
   async removeObject<E extends IAdtError = IAdtError>(
     transportNumber: string,
-    object: IAbapObjectEntry,
+    object: IAbapObjectEntry & { position: string },
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<NonNullable<R['removedObject']>>, E>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -469,12 +479,20 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
    *
    * The new task is itself a request resource at the same endpoint shape: it
    * reads, writes and releases like one, and {@link removeObject} addresses
-   * it directly. `targetUser` is left out of the body when not given, so the
-   * server decides whose task it is.
+   * it directly.
+   *
+   * **`targetUser` is required.** It was optional when this shipped, on the
+   * reasoning that the server would pick an owner when the attribute was
+   * absent. Measured against an on-premise system it does not: the body
+   * without `tm:targetuser` came back `400 SCTS_ADT_MSG 009`, *"User  does not
+   * exist in the system (or locked)"* — an empty name — and the same call
+   * carrying it answered 200 with a task number. This client cannot fill it
+   * in: the connection does not say who is authenticated, and asking would
+   * cost a second request.
    */
   async createTask<E extends IAdtError = IAdtError>(
     transportNumber: string,
-    options?: { targetUser?: string } & IAdtOperationOptions<E>,
+    options: { targetUser: string } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<NonNullable<R['createdTask']>>, E>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -484,7 +502,7 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
     );
     return answering(
       () =>
-        createTransportTask(connection, transportNumber, options?.targetUser),
+        createTransportTask(connection, transportNumber, options.targetUser),
       (this.results.createdTask ??
         transportDocuments.createdTask) as IResultStrategy<
         ReturnType<NonNullable<R['createdTask']>>
@@ -516,6 +534,59 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
       (this.results.actionLog ??
         transportDocuments.actionLog) as IResultStrategy<
         ReturnType<NonNullable<R['actionLog']>>
+      >,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * The objects this request or task holds, each with its `tm:position`.
+   *
+   * **Read this before {@link removeObject}, because that is where the
+   * position comes from.** Nothing else here answers one as a value:
+   * `readMetadata` hands back the document and leaves the caller to dig
+   * `tm:position` out of it by hand, which is the parsing this member exists
+   * to do — it answers entries, each with a `position` that is there.
+   *
+   * It is *not* that `readMetadata` cannot see them. That was said here on
+   * the belief that sending no `Accept` gets a thinner representation, and it
+   * is wrong: measured against an on-premise system, 2026-09-21, the same URL
+   * with and without
+   * `application/vnd.sap.adt.transportorganizer.v1+xml` — 95411 bytes and 166
+   * `tm:abap_object` for a request, 55549 and 88 for a task, byte for byte
+   * identical either way. The header changes nothing; the parsing is the
+   * point.
+   *
+   * It is also the re-read that confirms a removal, beside
+   * {@link readActionLog}: the action's own answer merely repeats what it was
+   * asked, so an entry being gone from this list is the evidence.
+   *
+   * ```ts
+   * const listed = await request.readObjects(task);
+   * const entry = listed.ok
+   *   ? listed.getResult().value.find((o) => o.name === 'ZCL_X')
+   *   : undefined;
+   * // `position` is optional on a listed entry — an entry the server
+   * // described without one cannot be removed, and the compiler says so
+   * // rather than letting an invented `''` reach the server.
+   * if (entry?.position)
+   *   await request.removeObject(task, { ...entry, position: entry.position });
+   * ```
+   */
+  async readObjects<E extends IAdtError = IAdtError>(
+    transportNumber: string,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<NonNullable<R['objects']>>, E>> {
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    this.logger?.info?.(
+      'Reading the object list of transport request:',
+      transportNumber,
+    );
+    return answering(
+      () => readTransportObjects(connection, transportNumber),
+      (this.results.objects ?? transportDocuments.objects) as IResultStrategy<
+        ReturnType<NonNullable<R['objects']>>
       >,
       options?.analyse,
     );
