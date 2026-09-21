@@ -20,7 +20,10 @@ import type {
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import type { ITransportObjectEntry } from '../../../../core/transport/parseObjectEntries';
-import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import {
+  getSystemInformation,
+  isCloudEnvironment,
+} from '../../../../utils/systemInfo';
 import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
@@ -408,18 +411,47 @@ describe('AdtRequest', () => {
             testsLogger.warn?.(`actionlogs refused: ${log.getError().message}`);
           }
 
-          // **The owner is named because the server will not choose one.**
+          // **The owner is named because the server will not choose one**,
+          // and the system is asked who that is.
+          //
+          // This read `SAP_USERNAME`, which only exists where the connection
+          // is made with a user and a password. Against BTP ABAP the session
+          // is a JWT and the variable is unset, so `tm:targetuser=""` went out
+          // and the server answered `400 ExceptionInvalidData` — this PR's own
+          // defect, re-created by the suite that proves it is fixed, and
+          // reported as a pass because the refusal returned early.
+          //
+          // `getSystemInformation` answers `userName` for the session in hand.
+          // `createTask` will not call it — a member here does not spend a
+          // second request to fill in an argument — but a test may, and this
+          // is exactly the caller the contract says must name the user.
           logTestStep('create a task under it', testsLogger);
-          const targetUser = (process.env.SAP_USERNAME || '').toUpperCase();
+          const targetUser =
+            (await getSystemInformation(connection))?.userName ||
+            (process.env.SAP_USERNAME || '').toUpperCase();
+          if (!targetUser) {
+            logTestSkip(
+              testsLogger,
+              label,
+              'the system named no user and SAP_USERNAME is unset — ' +
+                'createTask cannot be measured without an owner',
+            );
+            return;
+          }
+          testsLogger.info?.(`the task will be owned by ${targetUser}`);
           const task = await request.createTask(transportNumber as string, {
             targetUser,
           });
           if (!task.ok) {
             // A system that organises no tasks has answered, and that is the
             // measurement. Without one there is nothing to hang an object on,
-            // so the round trip below cannot run.
-            testsLogger.warn?.(`newtask refused: ${task.getError().message}`);
-            logTestSuccess(testsLogger, label);
+            // so the round trip below cannot run — and this is a SKIP, not a
+            // pass: nothing below it was measured.
+            logTestSkip(
+              testsLogger,
+              label,
+              `newtask refused: ${task.getError().message}`,
+            );
             return;
           }
           taskNumber = (task.getResult().value as { transportNumber: string })
@@ -432,10 +464,11 @@ describe('AdtRequest', () => {
 
           const packageName = resolvePackageName(undefined);
           if (!packageName) {
-            testsLogger.warn?.(
-              'no package configured — skipping the round trip',
+            logTestSkip(
+              testsLogger,
+              label,
+              'no package configured — the round trip cannot run',
             );
-            logTestSuccess(testsLogger, label);
             return;
           }
 
@@ -454,10 +487,11 @@ describe('AdtRequest', () => {
           // which is also the only state ADT will delete.
           const sharedRequest = resolveTransportRequest(undefined);
           if (!sharedRequest) {
-            testsLogger.warn?.(
-              'no default_transport configured — skipping the round trip',
+            logTestSkip(
+              testsLogger,
+              label,
+              'no default_transport configured — the round trip cannot run',
             );
-            logTestSuccess(testsLogger, label);
             return;
           }
 
@@ -514,10 +548,11 @@ describe('AdtRequest', () => {
             length: 4,
           } as any);
           if (!madeIt.ok) {
-            testsLogger.warn?.(
+            logTestSkip(
+              testsLogger,
+              label,
               `could not create ${domainName}: ${madeIt.getError().message}`,
             );
-            logTestSuccess(testsLogger, label);
             return;
           }
           await domain.delete({ domainName, transportRequest: sharedRequest });
@@ -526,11 +561,13 @@ describe('AdtRequest', () => {
           const entry = await findEntry(sharedRequest, domainName);
           if (entry === undefined) {
             // The system detached it by itself; there is nothing to remove and
-            // nothing this member could be measured against.
-            testsLogger.warn?.(
+            // nothing this member could be measured against. A skip, because
+            // `removeObject` was never called.
+            logTestSkip(
+              testsLogger,
+              label,
               `${domainName} left no entry under ${sharedRequest} — nothing to remove`,
             );
-            logTestSuccess(testsLogger, label);
             return;
           }
           testsLogger.info?.(
