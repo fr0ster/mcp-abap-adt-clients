@@ -29,7 +29,16 @@
 # The second runs npm directly, where the browser flow works. An automation
 # token (npmjs.com → Access Tokens → Granular, "Automation") skips the prompt
 # altogether and is what CI would use.
-set -uo pipefail
+# **`-e`, and the reason it was missing matters.** Without it a failed build
+# did not stop the run: `npm run build` could exit non-zero — leaving `dist`
+# holding whatever the previous build left there — and the script would go on
+# to publish that. Caught while dry-running 20.0.0, where a stale
+# `node_modules` made `tsc` fail with "has no exported member
+# 'IAdtTransportObjectActions'" and the run still reported "would publish".
+#
+# A publish is the one step where continuing past an error is worse than
+# stopping: what goes to npm cannot be taken back, only superseded.
+set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
@@ -92,8 +101,15 @@ console.log(out.join('\n'));
 ")
 
 echo ">>> Clean rebuild before publish"
-npm run --silent build
-npm run --silent build:packages
+if ! npm run --silent build; then
+  echo "publish: the build failed. Nothing was published — dist holds whatever" >&2
+  echo "the previous build left, and that is not what this version is." >&2
+  exit 1
+fi
+if ! npm run --silent build:packages; then
+  echo "publish: the workspace packages failed to build. Nothing was published." >&2
+  exit 1
+fi
 
 PUBLISHED=0
 SKIPPED=0
@@ -125,14 +141,17 @@ while IFS='|' read -r name dir <&3; do
   # Abort on the first failure. Continuing would publish a dependent on top of
   # a dependency that never made it, and an unusable release set is worse than
   # a partial one you know about.
+  # `|| status=$?`, not a bare call: under `set -e` a failed publish would end
+  # the script here, and the operator would lose the two things below that tell
+  # them where the release stands and what to do about EOTP.
+  status=0
   if [ "$dir" = "." ]; then
     # shellcheck disable=SC2086
-    npm publish --access public $OTP_ARGS
+    npm publish --access public $OTP_ARGS || status=$?
   else
     # shellcheck disable=SC2086
-    npm publish --workspace "$name" --access public $OTP_ARGS
+    npm publish --workspace "$name" --access public $OTP_ARGS || status=$?
   fi
-  status=$?
   if [ "$status" -ne 0 ]; then
     echo "!!! $name@$version failed to publish — stopping here." >&2
     echo "    Published so far: $PUBLISHED. Nothing after this was attempted." >&2
