@@ -13,6 +13,25 @@ Tags follow the same rule: these releases are tagged
 `adt-strategies@<version>`, never `v<version>` — that scheme is `adt-clients`'
 and fires its release workflow.
 
+## [0.3.0] - 2026-09-21
+
+### Changed
+
+- **Needs `@mcp-abap-adt/interfaces` 45.1.0**, up from 44.0.0 — the same move
+  `adt-clients` makes in 20.0.0, and it has to happen together.
+
+  These two packages are installed side by side: a caller passes a strategy
+  from here into a member there, and both name `IAdtError` and `AdtNoFailure`
+  in that signature. Left on 44.0.0 while the other moved to 45.1.0, npm
+  installs both — `packages/adt-strategies/node_modules/@mcp-abap-adt/interfaces`
+  at 44.0.0 beneath a 45.1.0 at the root — and a consumer gets two
+  declarations of every contract. TypeScript reconciles that for interfaces
+  and does not for enums, which is the whole reason the other package's
+  release is a major.
+
+  Caught in review of fr0ster/mcp-abap-adt-clients#151, where the root package
+  had moved and this one had not.
+
 ## [0.2.0] - 2026-09-16
 
 ### Fixed

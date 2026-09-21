@@ -428,6 +428,60 @@ this member existed still compiles.
 Nothing about `list()` changes. A caller who never needs to choose can keep
 calling it with no argument.
 
+#### The object list: `removeObject()`, `addObject()`, `createTask()`
+
+Deleting an ABAP object does not free its name. The CTS object-directory entry
+stays on the request that carried it — SAP says so as it happens: *"Release
+transport … to remove the object directory entry."* Until that entry is
+detached, creating the same name again is refused with `CTS_WBO_API 019`,
+**even when the same request is passed as `corrNr`**. Before these members the
+ways out were releasing the whole request, shipping everything else in it, or
+SE09 by hand.
+
+```typescript
+const request = client.getRequest();
+
+// Free a name: detach the entry from the TASK that holds it.
+await request.removeObject('E19K905942', {
+  name: 'ZMCP_BLD_FGR_H1',
+  type: 'FUGR',
+  position: '000025',
+});
+
+// Confirm it: the action's own answer only echoes what it was asked.
+const log = await request.readActionLog('E19K905942');
+// → "OKYSLYTSIA deleted following object R3TR FUGR ZMCP_BLD_FGR_H1"
+
+// A task of your own under a shared request, to work in without touching it.
+const task = await request.createTask('E19K905941', { targetUser: 'OKYSLYTSIA' });
+
+// And the other direction.
+await request.addObject('E19K907073', { name: 'Z_CL_000001', type: 'CLAS' });
+```
+
+Three things worth knowing before the first call:
+
+- **Objects live on tasks, so address the task**, not the request above it.
+  `createTask()` answers a number that is itself a request resource — it
+  reads, writes and releases like one.
+- **`addObject()` is refused when the object is held by an unrelated task**,
+  with `SCTS_ADT_MSG 009` and a longtext naming the holder: *"There are no
+  links to this request/task."* That is a third lock flavour, distinct from
+  the enqueue lock and from the request-versus-task one, and it is the
+  server's verdict to read rather than a state the client checks for first.
+- **`pgmid` defaults to `R3TR`**; `obj_desc` and `position` are sent only when
+  given, because no measurement says the server needs them.
+
+`IAbapObjectEntry`, the type those two members take, comes from
+`@mcp-abap-adt/interfaces` — import it from there, or from
+`@mcp-abap-adt/interfaces-adt` directly, rather than from this package.
+
+`removedObject`, `addedObject`, `createdTask` and `actionLog` are optional
+slots in the result set — a result set written before these members existed
+still compiles. The defaults hand the document back untouched, except
+`createdTask`, which reads the new number the way `created` reads a new
+request's.
+
 **On a batch client**, `configUri` is required. Resolving "no argument" needs
 a response from `getTransportSearchConfigurations()`, and a batch connection
 cannot deliver one until `batchExecute()` runs — so `batch.getRequest().list()`

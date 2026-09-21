@@ -50,8 +50,15 @@ import {
   listTransports,
   requestTransportSearchConfigurations,
 } from './list';
+import {
+  addObjectToTransport,
+  createTransportTask,
+  readTransportActionLog,
+  removeObjectFromTransport,
+} from './objects';
 import { getTransport } from './read';
 import {
+  type IAbapObjectEntry,
   type ITransportConfig,
   type ITransportResults,
   transportDocuments,
@@ -377,6 +384,139 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
     return answering(
       () => deleteTransport(connection, number),
       this.results.deleted as IResultStrategy<ReturnType<R['deleted']>>,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * Detach one object from a request or task — ADT's `removeobject`.
+   *
+   * **The gap this closes.** Deleting an object leaves its CTS
+   * object-directory entry on the request that carried it, and SAP says so at
+   * the time: *"Release transport … to remove the object directory entry."*
+   * Until the entry goes, creating the same name again is refused with
+   * `CTS_WBO_API 019` — even passing that same request as `corrNr`. Before
+   * this member the ways out were releasing the whole request, shipping
+   * everything else in it, or SE09 by hand.
+   *
+   * **Addressed at the task**, not at the request above it: objects live on
+   * tasks, and that is what the captured exchange did.
+   *
+   * ```typescript
+   * const request = client.getRequest();
+   * await request.removeObject('E19K905942', {
+   *   name: 'ZMCP_BLD_FGR_H1',
+   *   type: 'FUGR',
+   *   position: '000025',
+   * });
+   * const log = await request.readActionLog('E19K905942');
+   * ```
+   *
+   * The answer echoes the object that was asked about and nothing else, so
+   * {@link readActionLog} is what confirms the removal happened.
+   */
+  async removeObject<E extends IAdtError = IAdtError>(
+    transportNumber: string,
+    object: IAbapObjectEntry,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<NonNullable<R['removedObject']>>, E>> {
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    this.logger?.info?.(
+      `Removing ${object.type} ${object.name} from transport request ${transportNumber}`,
+    );
+    return answering(
+      () => removeObjectFromTransport(connection, transportNumber, object),
+      (this.results.removedObject ??
+        transportDocuments.removedObject) as IResultStrategy<
+        ReturnType<NonNullable<R['removedObject']>>
+      >,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * Attach one object to a request or task — ADT's `addobject`.
+   *
+   * **Refused when the object is held elsewhere**, with `SCTS_ADT_MSG 009` and
+   * a longtext naming the task that holds it: *"There are no links to this
+   * request/task."* That is a third lock flavour — not the enqueue lock, not
+   * the request-versus-task one — and it is the server's verdict to read,
+   * not a state this client checks for beforehand.
+   */
+  async addObject<E extends IAdtError = IAdtError>(
+    transportNumber: string,
+    object: IAbapObjectEntry,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<NonNullable<R['addedObject']>>, E>> {
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    this.logger?.info?.(
+      `Adding ${object.type} ${object.name} to transport request ${transportNumber}`,
+    );
+    return answering(
+      () => addObjectToTransport(connection, transportNumber, object),
+      (this.results.addedObject ??
+        transportDocuments.addedObject) as IResultStrategy<
+        ReturnType<NonNullable<R['addedObject']>>
+      >,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * Create a task under a request — ADT's `newtask`.
+   *
+   * The new task is itself a request resource at the same endpoint shape: it
+   * reads, writes and releases like one, and {@link removeObject} addresses
+   * it directly. `targetUser` is left out of the body when not given, so the
+   * server decides whose task it is.
+   */
+  async createTask<E extends IAdtError = IAdtError>(
+    transportNumber: string,
+    options?: { targetUser?: string } & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<NonNullable<R['createdTask']>>, E>> {
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    this.logger?.info?.(
+      'Creating task under transport request:',
+      transportNumber,
+    );
+    return answering(
+      () =>
+        createTransportTask(connection, transportNumber, options?.targetUser),
+      (this.results.createdTask ??
+        transportDocuments.createdTask) as IResultStrategy<
+        ReturnType<NonNullable<R['createdTask']>>
+      >,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * What has happened to this request — ADT's `actionlogs`.
+   *
+   * One `log:entry` per lifecycle event: created, object added, object
+   * deleted, owner changed. Read-only, and the only way to confirm that a
+   * {@link removeObject} landed, since that action's own answer merely repeats
+   * what it was asked.
+   */
+  async readActionLog<E extends IAdtError = IAdtError>(
+    transportNumber: string,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<NonNullable<R['actionLog']>>, E>> {
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    this.logger?.info?.(
+      'Reading action log of transport request:',
+      transportNumber,
+    );
+    return answering(
+      () => readTransportActionLog(connection, transportNumber),
+      (this.results.actionLog ??
+        transportDocuments.actionLog) as IResultStrategy<
+        ReturnType<NonNullable<R['actionLog']>>
+      >,
       options?.analyse,
     );
   }

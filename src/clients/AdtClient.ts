@@ -38,6 +38,7 @@ import type {
   IAdtRunnable,
   IAdtSystemContext,
   IAdtTransportAware,
+  IAdtTransportObjectActions,
   IAdtUpdatable,
   IAdtValidatable,
   IAdtVersionable,
@@ -770,6 +771,20 @@ export interface IAdtTransportSearchable<TConfigurations> {
   ): Promise<IAdtResponse<TConfigurations, E>>;
 }
 
+/**
+ * `IAdtTransportObjectActions` and `IAbapObjectEntry` are imported, not
+ * declared.
+ *
+ * They were declared here for one release, beside `IAdtTransportSearchable`
+ * below and for the same reason: `@mcp-abap-adt/interfaces` was a major ahead
+ * of what this package depended on, and tying a transport capability to that
+ * bump would have held it hostage. That is settled — the dependency is
+ * `^45.1.0`, the contracts live in `@mcp-abap-adt/interfaces-adt` 1.2.0 where
+ * they belong, and the facade re-exports them.
+ *
+ * `IAdtTransportSearchable` stays declared below until it makes the same
+ * journey; moving it is a type change with no behaviour in it.
+ */
 export type IRequestContract<R extends ITransportResults> = IAdtCreatable<
   ITransportConfig,
   ReturnType<R['created']>
@@ -785,7 +800,13 @@ export type IRequestContract<R extends ITransportResults> = IAdtCreatable<
     ReturnType<R['deletionCheck']>
   > &
   IAdtRequest<ReturnType<R['list']>> &
-  IAdtTransportSearchable<ReturnType<NonNullable<R['searchConfigurations']>>>;
+  IAdtTransportSearchable<ReturnType<NonNullable<R['searchConfigurations']>>> &
+  IAdtTransportObjectActions<
+    ReturnType<NonNullable<R['removedObject']>>,
+    ReturnType<NonNullable<R['addedObject']>>,
+    ReturnType<NonNullable<R['createdTask']>>,
+    ReturnType<NonNullable<R['actionLog']>>
+  >;
 export type ILocalTestClassContract<R extends IClassResults> = IAdtReadable<
   ILocalTestClassConfig,
   ReturnType<R['source']>

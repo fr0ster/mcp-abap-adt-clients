@@ -7,6 +7,8 @@
  * beside {@link parseTransportTree}, the reading that builds it.
  */
 
+export type { IAbapObjectEntry } from '@mcp-abap-adt/interfaces';
+
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces';
 import { rawDocument } from '../../utils/resultStrategy';
 import { parseCreatedTransport } from './parseCreatedTransport';
@@ -138,6 +140,25 @@ export interface ITransportResults {
    * internal resolver has always used.
    */
   readonly searchConfigurations?: IResultStrategy<unknown>;
+  /**
+   * What detaching an object answers.
+   *
+   * **Optional, like `searchConfigurations` above and for the same reason:**
+   * a hand-written result set from before these members existed must keep
+   * compiling. The document is echoed back untouched by default — it repeats
+   * the object that was asked about and says nothing else, so the reading that
+   * confirms a removal is `readActionLog`, not this.
+   */
+  readonly removedObject?: IResultStrategy<unknown>;
+  /** What attaching an object answers. Optional, as above. */
+  readonly addedObject?: IResultStrategy<unknown>;
+  /**
+   * What creating a task answers: the new number, the way `created` answers a
+   * new request's. Optional, as above.
+   */
+  readonly createdTask?: IResultStrategy<unknown>;
+  /** What the action log answers. Optional, as above. */
+  readonly actionLog?: IResultStrategy<unknown>;
 }
 
 /**
@@ -153,4 +174,11 @@ export const transportDocuments = {
   deleted: rawDocument,
   deletionCheck: rawDocument,
   searchConfigurations: (answer) => parseSearchConfigurations(answer.data),
+  removedObject: rawDocument,
+  addedObject: rawDocument,
+  // The same reading as `created`: a task is a request resource, and its
+  // number arrives the same way — in `Location`, with the body carrying it
+  // too.
+  createdTask: (answer) => parseCreatedTransport(answer.data),
+  actionLog: rawDocument,
 } satisfies ITransportResults;

@@ -24,6 +24,109 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [20.0.0] - 2026-09-21
+
+### Changed — the contracts these members need moved to their own package
+
+- **Needs `@mcp-abap-adt/interfaces` 45.1.0**, up from 44.0.0. That package
+  split its contracts into four in 45.0.0 and became a facade that re-exports
+  them; nothing a consumer imports disappeared and no contract changed shape,
+  but the dependency graph did, and a consumer holding 44 alongside this
+  package would have two declarations of every type — which TypeScript
+  reconciles for interfaces and does not for enums.
+
+  This is why the release is a major. The API below is additive.
+
+- **`IAbapObjectEntry` and `IAdtTransportObjectActions` are imported, not
+  declared here.** They were declared in `AdtClient.ts` for one release,
+  beside `IAdtTransportSearchable` and for the same stated reason: the
+  interfaces package was a major ahead, and tying a transport capability to
+  that bump would have held it hostage. It is not ahead any more —
+  `@mcp-abap-adt/interfaces-adt` 1.2.0 carries both, which is where a request
+  parameter and a capability contract belong.
+
+  `IAdtTransportSearchable` stays declared locally until it makes the same
+  journey. `core/transport` re-exports `IAbapObjectEntry` so a caller reaching
+  for it there still finds it, and the package no longer exports a second
+  declaration of its own.
+
+### Added
+
+- **The three user actions on a request's object list, and its action log.**
+  `AdtRequest` gains `removeObject`, `addObject`, `createTask` and
+  `readActionLog`.
+
+  Deleting an ABAP object does not free its name: the CTS object-directory
+  entry stays on the request that carried it, and SAP says so as it happens —
+  *"Release transport … to remove the object directory entry."* Until that
+  entry is detached, creating the same name again is refused with
+  `CTS_WBO_API 019`, **even when the same request is passed as `corrNr`**. The
+  ways out were releasing the whole request and shipping everything else in
+  it, or SE09 by hand. That is what found this: an on-premise integration
+  suite where two shared function groups became permanently unusable
+  (consumer-side report, fr0ster/mcp-abap-adt#221).
+
+  The library was already half-committed to these. `ITransportTreeLink` keeps
+  every `atom:link` a request and its tasks carry and says why — *"so a caller
+  follows an href rather than assembling a URL by convention"* — and
+  `ITransportTreeTask.links` keeps them in document order for the same reason.
+  So the operation URIs were handed over on purpose, with nothing that could
+  act on one: following an href meant a raw `PUT` with a hand-built `tm:root`
+  and a `useraction` attribute. Which is the gap `searchConfigurations()`
+  closed for the listing itself in 19.1.0.
+
+  Every request shape here is a capture, from Eclipse ADT 3.60.0 against an
+  on-premise system on 2026-09-21, and the tests assert what that server was
+  sent and answered rather than what looks tidy:
+
+  - **`removeObject(task, object, options?)`** — `useraction="removeobject"`,
+    addressed at the **task**, since objects live on tasks. Its answer merely
+    echoes the object it was asked about, so `readActionLog` is what confirms
+    the removal landed.
+  - **`addObject(task, object, options?)`** — the same shape, the other
+    action. Refused when the object is held by an unrelated task, with
+    `SCTS_ADT_MSG 009` and a longtext naming the holder: *"There are no links
+    to this request/task."* A third lock flavour, distinct from the enqueue
+    lock and from the request-versus-task one — the server's verdict to read,
+    not a state this client checks for first.
+  - **`createTask(request, { targetUser? })`** — `useraction="newtask"`,
+    answering 201 with the number in `Location`. The task is itself a request
+    resource at the same endpoint shape.
+  - **`readActionLog(request, options?)`** — one `log:entry` per lifecycle
+    event: created, object added, object deleted, owner changed.
+
+  `pgmid` defaults to `R3TR`, and `obj_desc` and `position` are written only
+  when given: the `removeobject` capture carried both and the `addobject` one
+  carried neither, and nothing measured says the server needs them, so this
+  client does not invent them. Both `PUT`s go out as `Content-Type:
+  text/plain` with the transport-organizer `Accept` — a pairing that looks
+  wrong for an XML body, is what Eclipse sends, and is pinned in a test so it
+  is not "corrected" by someone reading only the body.
+
+  `removedObject`, `addedObject`, `createdTask` and `actionLog` are
+  **optional** slots in `ITransportResults`, for the same reason
+  `searchConfigurations` is: a hand-written result set from before these
+  members existed keeps compiling.
+
+  **`parseCreatedTransport` reads two shapes now.** A created request carries
+  its fields on `tm:request` inside the root; a created *task* carries them on
+  the root itself and has no `tm:request` at all. Read the old way,
+  `createTask()` answered `transportNumber: ''` for every task — a number
+  nothing can be done with, handed back as a success. The root stands in where
+  the request element is absent; a request document is unaffected, since its
+  root carries none of those attributes.
+
+  `IAbapObjectEntry` is exported from the package, beside `ICreatedTransport`
+  and the tree types. A parameter type a caller cannot name is a parameter
+  they cannot build.
+
+  `IAdtTransportObjectActions` is declared in this package rather than in
+  `@mcp-abap-adt/interfaces`, exactly as `IAdtTransportSearchable` was and for
+  the same reason — that package is a major ahead of what this one depends on,
+  and tying a transport capability to that bump would hold it hostage. Without
+  it the members would exist at runtime and be invisible to a consumer's
+  compiler.
+
 ## [19.1.0] - 2026-09-16
 
 ### Added

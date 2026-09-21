@@ -55,7 +55,24 @@ export function parseCreatedTransport(document: unknown): ICreatedTransport {
     );
   }
 
-  const request = root['tm:request'] ?? {};
+  /**
+   * **Two shapes answer this reading, and the fields sit at different
+   * depths.** A created REQUEST carries them on `tm:request` inside the root;
+   * a created TASK — `useraction="newtask"` — carries them on the root
+   * itself, which has no `tm:request` at all:
+   *
+   * ```xml
+   * <tm:root … tm:useraction="tasks" tm:number="E19K907073"
+   *            tm:uri="/sap/bc/adt/cts/transportrequests/E19K907073"/>
+   * ```
+   *
+   * Read from `tm:request` alone this answered `transportNumber: ''` for
+   * every task ever created — a number nothing can be done with, handed back
+   * as a success. So the root stands in where the request element is absent,
+   * and a request document is read exactly as before: its root carries none
+   * of these attributes, so the fallback never fires for one.
+   */
+  const request = root['tm:request'] ?? root;
   const task = request['tm:task'] ?? {};
   const text = (value: unknown): string | undefined =>
     value === undefined || value === null ? undefined : String(value);
