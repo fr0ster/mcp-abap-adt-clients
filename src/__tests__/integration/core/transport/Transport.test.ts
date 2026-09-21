@@ -46,6 +46,7 @@ const {
   getEnabledTestCase,
   getTestCaseDefinition,
   resolvePackageName,
+  resolveTransportRequest,
 } = require('../../../helpers/test-helper');
 const { getTimeout } = require('../../../helpers/test-helper');
 
@@ -316,23 +317,47 @@ describe('AdtRequest', () => {
     };
 
     /**
-     * **Read with the transport-organizer media type, not through
-     * `readMetadata`.** `getTransport` sends no `Accept` at all, and the
-     * representation the server then picks carries no `tm:abap_object` — the
-     * object list this block is here to watch is simply absent from it.
-     * Measured 2026-09-21: the same URL with
-     * `application/vnd.sap.adt.transportorganizer.v1+xml` returns the entries.
+     * `readMetadata` is enough to see the entries. An earlier version issued
+     * the GET by hand with
+     * `application/vnd.sap.adt.transportorganizer.v1+xml`, on the belief that
+     * `getTransport` sends no `Accept` and so gets a thinner representation.
+     * Measured 2026-09-21, the same URL with and without that header: 55549
+     * bytes and 88 `tm:abap_object` either way, byte for byte. The header
+     * changes nothing.
      */
-    const taskDocument = async (number: string): Promise<string> => {
-      const answer = await connection.makeAdtRequest({
-        url: `/sap/bc/adt/cts/transportrequests/${number}`,
-        method: 'GET',
-        timeout: getTimeout('default'),
-        headers: {
-          Accept: 'application/vnd.sap.adt.transportorganizer.v1+xml',
-        },
+    const documentOf = async (number: string): Promise<string> => {
+      const answer = await client.getRequest().readMetadata({
+        transportNumber: number,
       });
-      return String(answer.data ?? '');
+      return answer.ok ? String(answer.getResult().value ?? '') : '';
+    };
+
+    /** The task numbers under a request, in document order. */
+    const tasksOf = (document: string): string[] =>
+      (document.match(/<tm:task\s[^>]*?>/g) ?? [])
+        .map((t) => t.match(/tm:number="([^"]*)"/)?.[1])
+        .filter((n): n is string => Boolean(n));
+
+    /**
+     * Where an object's entry actually sits — **on a task, never on the
+     * request above it**.
+     *
+     * The request's document *shows* its tasks' entries, which is why this
+     * block once read one there and addressed `removeObject` at the request.
+     * The server refused, and said exactly why: *"Entry R3TR DOMA … does not
+     * exist in request/task E19K9071xx"* — `SCTS_ADT_MSG 009`, for an entry
+     * plainly visible in the document it was just read from. It belongs to
+     * the task, and only the task can detach it.
+     */
+    const findEntry = async (
+      requestNumber: string,
+      name: string,
+    ): Promise<{ task: string; position: string } | undefined> => {
+      for (const task of tasksOf(await documentOf(requestNumber))) {
+        const position = positionOf(await documentOf(task), name);
+        if (position !== undefined) return { task, position };
+      }
+      return undefined;
     };
 
     it(
@@ -410,20 +435,63 @@ describe('AdtRequest', () => {
             return;
           }
 
-          // **An object of our own, so the entry we detach is ours.** It is
-          // created in the task above and deleted immediately: what stays
-          // behind is the CTS entry, which is exactly the state that blocks
-          // the name from being used again.
+          // **The object goes into the suite's ONE request, not the throwaway
+          // above.** This used to create it in the task it had just made, and
+          // that is what poisoned the name: every run registered
+          // `ZAC_TRQ_DOMA01` in a fresh request, and the first run whose
+          // cleanup did not finish left the name locked in a dead one —
+          // `CTS_WBO_API 020`, "already locked in request E19K9071xx", on
+          // every run after it, with no request left that anyone would think
+          // to look in.
+          //
+          // In the configured request the leftover is harmless and
+          // self-healing: the entry sits where the next run looks for it, and
+          // the next run detaches it. The throwaway request above stays empty,
+          // which is also the only state ADT will delete.
+          const sharedRequest = resolveTransportRequest(undefined);
+          if (!sharedRequest) {
+            testsLogger.warn?.(
+              'no default_transport configured — skipping the round trip',
+            );
+            logTestSuccess(testsLogger, label);
+            return;
+          }
+
           logTestStep(
-            'create an object in the task, then delete it',
+            'create an object in the shared request, then delete it',
             testsLogger,
           );
           const domain = client.getDomain();
-          await domain.delete({ domainName, transportRequest: taskNumber });
+          // Both the object and any entry a previous run left behind: the
+          // object may be gone while its registration is not, and it is the
+          // registration that holds the name.
+          await domain.delete({
+            domainName,
+            transportRequest: sharedRequest,
+          });
+          // Measured 2026-09-21 and not yet explained: the request holds no
+          // entry for this name immediately before the run and none
+          // immediately after, yet this finds one here, after the delete
+          // above — so the delete appears to register it. A raw
+          // `DELETE …?corrNr=` of a name that does not exist answers 400 and
+          // registers nothing, so it is not simply that. Clearing it is right
+          // either way; the wording says what was seen, not why.
+          const stale = await findEntry(sharedRequest, domainName);
+          if (stale) {
+            testsLogger.info?.(
+              `an entry for ${domainName} is present at ${stale.task}/${stale.position} — clearing it`,
+            );
+            await request.removeObject(stale.task, {
+              name: domainName,
+              type: 'DOMA',
+              position: stale.position,
+            });
+          }
+
           const madeIt = await domain.create({
             domainName,
             packageName,
-            transportRequest: taskNumber,
+            transportRequest: sharedRequest,
             description: 'AdtRequest object-list round trip',
             datatype: 'CHAR',
             length: 4,
@@ -435,34 +503,37 @@ describe('AdtRequest', () => {
             logTestSuccess(testsLogger, label);
             return;
           }
-          await domain.delete({ domainName, transportRequest: taskNumber });
+          await domain.delete({ domainName, transportRequest: sharedRequest });
 
           logTestStep('find the entry the deletion left behind', testsLogger);
-          const before = await taskDocument(taskNumber as string);
-          const position = positionOf(before, domainName);
-          if (position === undefined) {
+          const entry = await findEntry(sharedRequest, domainName);
+          if (entry === undefined) {
             // The system detached it by itself; there is nothing to remove and
             // nothing this member could be measured against.
             testsLogger.warn?.(
-              `${domainName} left no entry on ${taskNumber} — nothing to remove`,
+              `${domainName} left no entry under ${sharedRequest} — nothing to remove`,
             );
             logTestSuccess(testsLogger, label);
             return;
           }
-          testsLogger.info?.(`entry sits at position ${position}`);
+          testsLogger.info?.(
+            `entry sits on task ${entry.task} at position ${entry.position}`,
+          );
 
           // **The removal, and then the proof.** `ok` here means the document
           // was understood, not that an entry went away — the re-read is what
-          // says so.
+          // says so. Addressed at the TASK: the request above it shows the
+          // entry and refuses to detach it, saying the entry "does not exist"
+          // in itself.
           logTestStep('remove the entry, then re-read the task', testsLogger);
-          const removed = await request.removeObject(taskNumber as string, {
+          const removed = await request.removeObject(entry.task, {
             name: domainName,
             type: 'DOMA',
-            position,
+            position: entry.position,
           });
           expect(removed.ok).toBe(true);
 
-          const after = await taskDocument(taskNumber as string);
+          const after = await documentOf(entry.task);
           expect(positionOf(after, domainName)).toBeUndefined();
 
           logTestSuccess(testsLogger, label);
