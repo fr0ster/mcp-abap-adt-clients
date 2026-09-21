@@ -198,3 +198,32 @@ export async function readTransportActionLog(
     headers: { Accept: 'application/vnd.sap.adt.logs+xml' },
   });
 }
+
+/**
+ * The objects a request or task holds — the reading `removeObject` needs.
+ *
+ * **A different representation of the same resource, not a different
+ * resource.** `getTransport` sends no `Accept` at all, and what the server
+ * picks for a request that names none carries no `tm:abap_object` in it:
+ * measured against an on-premise system, 2026-09-21, the same URL read twice
+ * in one session answered with the object list only when
+ * `application/vnd.sap.adt.transportorganizer.v1+xml` was asked for. So this
+ * is its own member rather than an option on `readMetadata`, whose payload is
+ * what a caller already has strategies parsing.
+ *
+ * It exists because `removeObjectFromTransport` requires a `tm:position` and
+ * nothing else here hands one back. Without it a caller would have to go
+ * around this library and assemble the request themselves — the layering it
+ * exists to prevent.
+ */
+export async function readTransportObjects(
+  connection: IAbapConnection,
+  transportNumber: string,
+): Promise<IAdtWireResponse> {
+  return connection.makeAdtRequest({
+    url: requestUrl(transportNumber),
+    method: 'GET',
+    timeout: getTimeout('default'),
+    headers: { Accept: ACCEPT_TRANSPORT },
+  });
+}

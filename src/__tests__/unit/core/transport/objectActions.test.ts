@@ -50,6 +50,26 @@ const ACTION_LOG =
   '<log:entry log:text="OKYSLYTSIA deleted following object R3TR FUGR ZMCP_BLD_FGR_H1"/>' +
   '</log:log>';
 
+/**
+ * The object list, as the organizer representation carries it.
+ *
+ * Modelled on the `removeobject` echo above, which is the one document of
+ * this media type that was captured whole: the same `tm:abap_object`
+ * attributes, on more than one entry and under a task. What the reading
+ * depends on is that the elements are there and carry `tm:position` — both
+ * measured — and not where in the tree they sit, which is why it walks.
+ */
+const OBJECT_LIST =
+  '<?xml version="1.0" encoding="UTF-8"?>' +
+  '<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:number="E19K905942">' +
+  '<tm:request tm:desc="a request" tm:target="">' +
+  '<tm:task tm:number="E19K905943" tm:owner="OKYSLYTSIA">' +
+  '<tm:abap_object tm:pgmid="R3TR" tm:type="FUGR" tm:name="ZMCP_BLD_FGR_H1" ' +
+  'tm:obj_desc="Function Group" tm:position="000025" tm:lock_status="" tm:img_activity=""/>' +
+  '<tm:abap_object tm:pgmid="R3TR" tm:type="CLAS" tm:name="ZCL_X" ' +
+  'tm:position="000026" tm:lock_status="L" tm:img_activity=""/>' +
+  '</tm:task></tm:request></tm:root>';
+
 const connectionOver = (
   answer: (options: IAbapRequestOptions) => IAdtWireResponse,
 ) => {
@@ -301,6 +321,102 @@ describe('readActionLog', () => {
  * `IRequestContract` and `ts-jest` fails the suite before an assertion runs —
  * which is what a consumer's editor would have shown them.
  */
+describe('readObjects', () => {
+  it('asks for the representation that carries the list', async () => {
+    const { connection, calls } = connectionOver(() => answering(OBJECT_LIST));
+
+    await new AdtRequest(connection).readObjects('E19K905942');
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].method).toBe('GET');
+    expect(calls[0].url).toBe('/sap/bc/adt/cts/transportrequests/E19K905942');
+    // **The whole reason this is not `readMetadata`.** That reader sends no
+    // `Accept`, and what the server picks for a request naming none carries
+    // no `tm:abap_object` at all — measured on an on-premise system,
+    // 2026-09-21.
+    expect(calls[0].headers?.Accept).toBe(
+      'application/vnd.sap.adt.transportorganizer.v1+xml',
+    );
+  });
+
+  it('answers the entries with the positions removeObject needs', async () => {
+    const { connection } = connectionOver(() => answering(OBJECT_LIST));
+
+    const answer = await new AdtRequest(connection).readObjects('E19K905942');
+
+    if (!answer.ok) throw new Error('expected the list');
+    const entries = answer.getResult().value;
+    expect(entries).toEqual([
+      {
+        name: 'ZMCP_BLD_FGR_H1',
+        type: 'FUGR',
+        pgmid: 'R3TR',
+        description: 'Function Group',
+        position: '000025',
+        lockStatus: undefined,
+        imageActivity: undefined,
+      },
+      {
+        name: 'ZCL_X',
+        type: 'CLAS',
+        pgmid: 'R3TR',
+        description: undefined,
+        position: '000026',
+        lockStatus: 'L',
+        imageActivity: undefined,
+      },
+    ]);
+  });
+
+  /**
+   * A position is `000025`, and a parser that reads attribute values as
+   * numbers hands back `25` — which the server is then sent back, naming
+   * nothing. Pinned, because the default for the parser used here is on.
+   */
+  it('keeps the position a string, leading zeros and all', async () => {
+    const { connection } = connectionOver(() => answering(OBJECT_LIST));
+
+    const answer = await new AdtRequest(connection).readObjects('E19K905942');
+
+    if (!answer.ok) throw new Error('expected the list');
+    expect(answer.getResult().value[0].position).toBe('000025');
+  });
+
+  /** An empty request is a request with nothing in it, not a failure. */
+  it('answers an empty list when the request holds nothing', async () => {
+    const { connection } = connectionOver(() =>
+      answering(
+        '<?xml version="1.0" encoding="UTF-8"?>' +
+          '<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:number="E19K905942">' +
+          '<tm:request tm:desc="empty"><tm:long_desc/></tm:request></tm:root>',
+      ),
+    );
+
+    const answer = await new AdtRequest(connection).readObjects('E19K905942');
+
+    if (!answer.ok) throw new Error('expected the list');
+    expect(answer.getResult().value).toEqual([]);
+  });
+
+  /**
+   * The reading walks for `tm:abap_object` rather than addressing a path,
+   * because where the elements sit differs: a request holds its objects on
+   * its tasks, a task holds them directly, and a user action echoes one under
+   * `tm:request`. Only the elements were measured, so only they are relied on.
+   */
+  it('finds the entries wherever the document keeps them', async () => {
+    const { connection } = connectionOver(() => answering(REMOVED));
+
+    const answer = await new AdtRequest(connection).readObjects('E19K905942');
+
+    if (!answer.ok) throw new Error('expected the list');
+    const entries = answer.getResult().value;
+    expect(entries).toHaveLength(1);
+    expect(entries[0].name).toBe('ZMCP_BLD_FGR_H1');
+    expect(entries[0].position).toBe('000025');
+  });
+});
+
 describe('the contract a consumer actually holds', () => {
   it('reaches all four through client.getRequest()', async () => {
     const { connection, calls } = connectionOver((options) =>

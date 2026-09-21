@@ -52,9 +52,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ### Added
 
-- **The three user actions on a request's object list, and its action log.**
-  `AdtRequest` gains `removeObject`, `addObject`, `createTask` and
-  `readActionLog`.
+- **The three user actions on a request's object list, its action log, and
+  the reading that lists it.** `AdtRequest` gains `removeObject`, `addObject`,
+  `createTask`, `readActionLog` and `readObjects`.
 
   Deleting an ABAP object does not free its name: the CTS object-directory
   entry stays on the request that carried it, and SAP says so as it happens —
@@ -81,29 +81,58 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
   - **`removeObject(task, object, options?)`** — `useraction="removeobject"`,
     addressed at the **task**, since objects live on tasks. Its answer merely
-    echoes the object it was asked about, so `readActionLog` is what confirms
-    the removal landed.
+    echoes the object it was asked about, so `readActionLog` — or a re-read
+    with `readObjects` — is what confirms the removal landed. **`position` is
+    required**: see the measurement below.
+  - **`readObjects(task, options?)`** — the entries the request or task holds,
+    each with the `tm:position` `removeObject` needs. A `GET` asking for
+    `application/vnd.sap.adt.transportorganizer.v1+xml`, which is a different
+    representation of the resource `readMetadata` already reads — that one
+    sends no `Accept`, and what the server picks for a request naming none
+    carries no `tm:abap_object` at all. Its default reading answers the
+    entries rather than the document, unlike its siblings: a caller left to
+    find a position in XML would be doing by regex what the member exists to
+    do. The reading walks the document for `tm:abap_object` rather than
+    addressing a path, because only the elements and their attributes were
+    measured, not where in the tree they sit.
   - **`addObject(task, object, options?)`** — the same shape, the other
     action. Refused when the object is held by an unrelated task, with
     `SCTS_ADT_MSG 009` and a longtext naming the holder: *"There are no links
     to this request/task."* A third lock flavour, distinct from the enqueue
     lock and from the request-versus-task one — the server's verdict to read,
     not a state this client checks for first.
-  - **`createTask(request, { targetUser? })`** — `useraction="newtask"`,
-    answering 201 with the number in `Location`. The task is itself a request
-    resource at the same endpoint shape.
+  - **`createTask(request, { targetUser })`** — `useraction="newtask"`,
+    answering 200 with the number both in `Location` and as `tm:number` on the
+    root. The task is itself a request resource at the same endpoint shape.
+    **`targetUser` is required**: see below.
   - **`readActionLog(request, options?)`** — one `log:entry` per lifecycle
     event: created, object added, object deleted, owner changed.
 
-  `pgmid` defaults to `R3TR`, and `obj_desc` and `position` are written only
-  when given: the `removeobject` capture carried both and the `addobject` one
-  carried neither, and nothing measured says the server needs them, so this
-  client does not invent them. Both `PUT`s go out as `Content-Type:
-  text/plain` with the transport-organizer `Accept` — a pairing that looks
-  wrong for an XML body, is what Eclipse sends, and is pinned in a test so it
-  is not "corrected" by someone reading only the body.
+  **Two of these signatures were refuted by the first run against a server**,
+  before any of it shipped, and the members below say what the captures could
+  not. Eclipse sends every attribute on every call, so no capture of Eclipse
+  could show which of them were load-bearing.
 
-  `removedObject`, `addedObject`, `createdTask` and `actionLog` are
+  - **`removeObject` requires `object.position`.** Twenty-two objects asked
+    for by `pgmid`/`type`/`name` alone each answered `200` with the usual echo
+    document, and a re-read of the task found all twenty-two still on it. The
+    same documents carrying `tm:position` removed every one, 22 down to 0,
+    each confirmed by a re-read. A `200` from this endpoint remains no
+    evidence of anything.
+  - **`createTask` requires `targetUser`.** Without `tm:targetuser` the server
+    resolves the owner to an empty name and refuses: `400 SCTS_ADT_MSG 009`,
+    *"User  does not exist in the system (or locked)"* — two spaces. The same
+    call carrying it answered 200 and a task number. This client cannot fill
+    it in: the connection does not say who is authenticated, and asking would
+    cost a second request.
+
+  `pgmid` defaults to `R3TR`, and `obj_desc` is written only when given —
+  decoration either way. Both `PUT`s go out as `Content-Type: text/plain` with
+  the transport-organizer `Accept` — a pairing that looks wrong for an XML
+  body, is what Eclipse sends, and is pinned in a test so it is not
+  "corrected" by someone reading only the body.
+
+  `removedObject`, `addedObject`, `createdTask`, `actionLog` and `objects` are
   **optional** slots in `ITransportResults`, for the same reason
   `searchConfigurations` is: a hand-written result set from before these
   members existed keeps compiling.

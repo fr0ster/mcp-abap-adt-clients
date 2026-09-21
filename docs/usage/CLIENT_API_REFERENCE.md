@@ -428,7 +428,7 @@ this member existed still compiles.
 Nothing about `list()` changes. A caller who never needs to choose can keep
 calling it with no argument.
 
-#### The object list: `removeObject()`, `addObject()`, `createTask()`
+#### The object list: `readObjects()`, `removeObject()`, `addObject()`, `createTask()`
 
 Deleting an ABAP object does not free its name. The CTS object-directory entry
 stays on the request that carried it — SAP says so as it happens: *"Release
@@ -441,12 +441,14 @@ SE09 by hand.
 ```typescript
 const request = client.getRequest();
 
+// What the task holds, each entry with the position the removal needs.
+const listed = await request.readObjects('E19K905942');
+const entry = listed.ok
+  ? listed.getResult().value.find((o) => o.name === 'ZMCP_BLD_FGR_H1')
+  : undefined;
+
 // Free a name: detach the entry from the TASK that holds it.
-await request.removeObject('E19K905942', {
-  name: 'ZMCP_BLD_FGR_H1',
-  type: 'FUGR',
-  position: '000025',
-});
+if (entry) await request.removeObject('E19K905942', { ...entry });
 
 // Confirm it: the action's own answer only echoes what it was asked.
 const log = await request.readActionLog('E19K905942');
@@ -467,7 +469,15 @@ had:
   anything.** Twenty-two objects asked for by `type` and `name` alone each
   answered `200` with the usual echo document, and re-reading the task found
   all twenty-two still on it. The same documents carrying `tm:position`
-  removed every one. Read the number from the task's own listing.
+  removed every one. `readObjects()` is where the number comes from.
+- **`readObjects()` is a different representation, not a different
+  resource.** `readMetadata()` sends no `Accept`, and what the server picks
+  for a request naming none carries no `tm:abap_object` at all — so the
+  positions cannot be read out of it however the result is parsed. This member
+  asks for `application/vnd.sap.adt.transportorganizer.v1+xml`, and its
+  default reading answers the entries rather than the document: a caller left
+  to find a position in XML would be doing by regex what the member exists to
+  do.
 - **A `200` from `removeObject()` is not evidence.** The endpoint echoes
   whatever it was asked, for an entry that exists and for one that never did.
   `readActionLog()`, or a re-read of the task, is what says a removal landed.

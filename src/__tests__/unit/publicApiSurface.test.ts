@@ -188,6 +188,7 @@ const RUNTIME_EXPORTS = [
   'nothingIsARefusal',
   'packageDocuments',
   'parseCreatedTransport',
+  'parseObjectEntries',
   'programDocuments',
   'rawDocument',
   'scalarFunctionDocuments',

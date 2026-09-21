@@ -54,6 +54,7 @@ import {
   addObjectToTransport,
   createTransportTask,
   readTransportActionLog,
+  readTransportObjects,
   removeObjectFromTransport,
 } from './objects';
 import { getTransport } from './read';
@@ -533,6 +534,48 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
       (this.results.actionLog ??
         transportDocuments.actionLog) as IResultStrategy<
         ReturnType<NonNullable<R['actionLog']>>
+      >,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * The objects this request or task holds, each with its `tm:position`.
+   *
+   * **Read this before {@link removeObject}, because that is where the
+   * position comes from.** Nothing else here answers one: `readMetadata`
+   * sends no `Accept`, and the representation the server picks for a request
+   * that names none carries no `tm:abap_object` at all — measured against an
+   * on-premise system, 2026-09-21. This member asks for
+   * `application/vnd.sap.adt.transportorganizer.v1+xml`, which is the one
+   * that lists them.
+   *
+   * It is also the re-read that confirms a removal, beside
+   * {@link readActionLog}: the action's own answer merely repeats what it was
+   * asked, so an entry being gone from this list is the evidence.
+   *
+   * ```ts
+   * const listed = await request.readObjects(task);
+   * const entry = listed.ok
+   *   ? listed.getResult().value.find((o) => o.name === 'ZCL_X')
+   *   : undefined;
+   * if (entry) await request.removeObject(task, { ...entry });
+   * ```
+   */
+  async readObjects<E extends IAdtError = IAdtError>(
+    transportNumber: string,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<NonNullable<R['objects']>>, E>> {
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    this.logger?.info?.(
+      'Reading the object list of transport request:',
+      transportNumber,
+    );
+    return answering(
+      () => readTransportObjects(connection, transportNumber),
+      (this.results.objects ?? transportDocuments.objects) as IResultStrategy<
+        ReturnType<NonNullable<R['objects']>>
       >,
       options?.analyse,
     );

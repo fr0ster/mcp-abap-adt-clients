@@ -124,6 +124,7 @@ export type { ITransformationResults } from './core/transformation/types';
 export { transformationDocuments } from './core/transformation/types';
 export type {
   ICreatedTransport,
+  ITransportObjectEntry,
   ITransportTree,
   ITransportTreeLink,
   ITransportTreeNode,
