@@ -1,0 +1,645 @@
+
+===== wire log opened 2026-09-21T16:47:43.338Z =====
+
+===== wire log opened 2026-09-21T16:47:44.627Z =====
+
+GET /sap/bc/adt/core/discovery
+  Accept                : application/atomsvc+xml
+  Authorization         : <redacted>
+  sap-adt-connection-id : 6f3d65d2-42a0-4692-84f7-e17ada00d877
+  sap-adt-request-id    : a871dd1faabd4e94be53a577b5bb3d43
+  X-sap-adt-profiling   : server-time
+  X-SAP-Client          : 100
+  <- 200 OK
+     content-length      : 486
+     content-type        : application/atomsvc+xml
+     sap-adt-saplb       : onprem_SID_00
+     sap-authenticated   : true
+     sap-cache-control   : +0
+     sap-isc-uagent      : 0
+     sap-perf-fesrec     : 19734.000000
+     sap-server          : true
+     x-sap-adt-profiling : server-time=8202
+     body: <?xml version="1.0" encoding="utf-8"?><app:service xmlns:app="http://www.w3.org/2007/app" xmlns:atom="http://www.w3.org/2005/Atom"><app:workspace><atom:title>Compatibility</atom:title><app:collection href="/sap/bc/adt/compatibility/graph"><atom:title>Compatibility graph</atom:title><atom:category term="graph" scheme="http://www.sap.com/adt/categories/compatibility"/><adtcomp:templateLinks xmlns:adtcomp="http://www.sap.com/adt/compatibility"/></app:collection></app:workspace><app:workspace><atom:title>Push Channel</atom:title><app:collection href="/sap/bc/apc/sap/adt"><atom:title>APC Endpoint</atom:title><atom:category term="pushchannel" scheme="http://www.sap.com/adt/categories/system/communication/services"/><adtcomp:templateLinks xmlns:adtcomp="http://www.sap.com/adt/compatibility"><adtcomp:templateLink rel="pushchannel" template="wss://onprem.example:44300/sap/bc/apc/sap/adt?channel=amc://system_channels/progress_indicator&amp;channel=amc://adt/request_scoped_messages{&amp;connectionId}"/><adtcomp:templateLink rel="pushchannel-variable-uri-authority" template="wss://{+uriAuthority}/sap/bc/apc/sap/adt?channel=amc://system_channels/progress_indicator&amp;channel=amc://adt/request_scoped_messages{&amp;connectionId}"/></adtcomp:templateLinks></app:collection></app:workspace><app:workspace><atom:title>ADT Batch Resource</atom:title><app:collection href="/sap/bc/adt/communication/batch"><atom:title>ADT Batch Resource</atom:title><app:accept>multipart/mixed</app:accept><atom:category term="batch" scheme="http://www.sap.com/adt/categories/system/communication/services"/><adtcomp:templateLinks xmlns:adtcomp="http://www.sap.com/adt/compatibility"/></app:collection></app:workspace><app:workspace><atom:title>ADT Background Run Resources</atom:title><app:collection href="/sap/bc/adt/communication/bgruns/runs"><atom:title>ADT Background Run Resource</atom:title><app:accept>application/http</app:accept><atom:category term="backgroundruns" scheme="http://www.sap.com/adt/categories/system/communication/services"/><adtcomp:templateLinks xmlns:adtcomp="http://www.sap.com/adt/compatibility"/></app:collection></app:workspace></app:service>
+
+GET /sap/bc/adt/packages/test_ac_shr_pkg?version=active
+  Accept                : application/vnd.sap.adt.packages.v2+xml, application/vnd.sap.adt.packages.v1+xml
+  Authorization         : <redacted>
+  sap-adt-connection-id : 6f3d65d2-42a0-4692-84f7-e17ada00d877
+  sap-adt-request-id    : 50ab8f70ae694b06afd7f16f9c81b753
+  X-sap-adt-profiling   : server-time
+  X-SAP-Client          : 100
+  <- 200 OK
+     content-length      : 998
+     content-type        : application/vnd.sap.adt.packages.v2+xml; charset=utf-8
+     etag                : 20260818210000001application/vnd.sap.adt.packages.v2+xmlWV6T2Z0QpOsvzHKi0vDL0YwT7pQ=
+     last-modified       : Tue, 18 Aug 2026 21:00:00 GMT
+     sap-adt-saplb       : onprem_SID_00
+     sap-authenticated   : true
+     sap-cache-control   : +0
+     sap-isc-uagent      : 0
+     sap-perf-fesrec     : 41685.000000
+     sap-server          : true
+     x-sap-adt-profiling : server-time=37104
+     body: <?xml version="1.0" encoding="utf-8"?><pak:package adtcore:responsible="TESTUSER" adtcore:masterLanguage="EN" adtcore:masterSystem="E19" adtcore:name="TEST_AC_SHR_PKG" adtcore:type="DEVC/K" adtcore:changedAt="2026-08-18T21:00:00Z" adtcore:version="active" adtcore:createdAt="2026-08-18T21:00:00Z" adtcore:changedBy="TESTUSER" adtcore:createdBy="TESTUSER" adtcore:description="Shared test dependencies package" adtcore:descriptionTextLimit="60" adtcore:language="EN" xmlns:pak="http://www.sap.com/adt/packages" xmlns:adtcore="http://www.sap.com/adt/core"><atom:link href="versions" rel="http://www.sap.com/adt/relations/versions" title="Historic versions" xmlns:atom="http://www.w3.org/2005/Atom"/><atom:link href="/sap/bc/adt/repository/informationsystem/abaplanguageversions?uri=%2Fsap%2Fbc%2Fadt%2Fpackages%2Ftest_ac_shr_pkg" rel="http://www.sap.com/adt/relations/informationsystem/abaplanguageversions" type="application/vnd.sap.adt.nameditems.v1+xml" title="Allowed ABAP language versions" xmlns:atom="http://www.w3.org/2005/Atom"/><atom:link href="/sap/bc/adt/vit/wb/object_type/devck/object_name/TEST_AC_SHR_PKG" rel="self" type="application/vnd.sap.sapgui" title="Representation in SAP Gui" xmlns:atom="http://www.w3.org/2005/Atom"/><atom:link href="/sap/bc/adt/packages/valuehelps/applicationcomponents" rel="applicationcomponents" type="application/vnd.sap.adt.nameditems.v1+xml" title="Application Components Value Help" xmlns:atom="http://www.w3.org/2005/Atom"/><atom:link href="/sap/bc/adt/packages/valuehelps/softwarecomponents" rel="softwarecomponents" type="application/vnd.sap.adt.nameditems.v1+xml" title="Software Components Value Help" xmlns:atom="http://www.w3.org/2005/Atom"/><atom:link href="/sap/bc/adt/packages/valuehelps/transportlayers" rel="transportlayers" type="application/vnd.sap.adt.nameditems.v1+xml" title="Transport Layers Value Help" xmlns:atom="http://www.w3.org/2005/Atom"/><atom:link href="/sap/bc/adt/packages/valuehelps/translationrelevances" rel="translationrelevances" type="application/vnd.sap.adt.nameditems.v1+xml" title="Transport Relevances Value Help" xmlns:atom="http://www.w3.org/2005/Atom"/><atom:link href="/sap/bc/adt/packages/valuehelps/abaplanguageversions" rel="abaplanguageversions" type="application/vnd.sap.adt.nameditems.v1+xml" title="ABAP Language Version Value Help" xmlns:atom="http://www.w3.org/2005/Atom"/><atom:link href="/sap/bc/adt/checkruns{?reporters}" rel="supportsPackageCheckActions" type="application/vnd.sap.adt.checkobjects+xml" title="Supports Package Check actions" xmlns:atom="http://www.w3.org/2005/Atom"/><atom:link href="./test_ac_shr_pkg" rel="http://www.sap.com/adt/relations/source" type="text/html" title="Landing Page (HTML)" xmlns:atom="http://www.w3.org/2005/Atom"/><adtcore:packageRef adtcore:uri="/sap/bc/adt/packages/test_ac_shr_pkg" adtcore:type="DEVC/K" adtcore:name="TEST_AC_SHR_PKG" adtcore:description="Shared test dependencies package"/><pak:attributes pak:packageType="development" pak:isPackageTypeEditable="false" pak:isAddingObjectsAllowed="false" pak:isAddingObjectsAllowedEditable="true" pak:isEncapsulated="false" pak:isEncapsulationEditable="false" pak:isEncapsulationVisible="false" pak:recordChanges="false" pak:isRecordChangesEditable="true" pak:isSwitchVisible="false" pak:languageVersion="" pak:isLanguageVersionVisible="true" pak:isLanguageVersionEditable="true"/><pak:superPackage adtcore:uri="/sap/bc/adt/packages/test_mcp" adtcore:type="DEVC/K" adtcore:name="TEST_MCP" adtcore:description="MCP test"/><pak:applicationComponent pak:name="" pak:description="No application component assigned" pak:isVisible="false" pak:isEditable="false"/><pak:transport><pak:softwareComponent pak:name="LOCAL" pak:description="Local Developments (No Automatic Transport)" pak:type="L" pak:typeDescription="Local customer developments (standard)" pak:isVisible="true" pak:isEditable="false"/><pak:transportLayer pak:name="" pak:description="" pak:isVisible="true" pak:isEditable="false"/></pak:transport><pak:useAccesses pak:isVisible="false"/><pak:packageInterfaces pak:isVisible="false"/><pak:subPackages/></pak:package>
+
+GET /sap/bc/adt/oo/classes/ZAC_BP_SHR_BIMP_DDLS/source/main
+  Accept                : text/plain
+  Authorization         : <redacted>
+  sap-adt-connection-id : 6f3d65d2-42a0-4692-84f7-e17ada00d877
+  sap-adt-request-id    : 10a82dc844cf4dd9835a7a8b188c9da2
+  X-sap-adt-profiling   : server-time
+  X-SAP-Client          : 100
+  <- 404 Request failed with status code 404
+     content-length      : 576
+     content-type        : application/xml
+     sap-adt-saplb       : onprem_SID_00
+     sap-authenticated   : true
+     sap-cache-control   : +0
+     sap-isc-uagent      : 0
+     sap-perf-fesrec     : 13608.000000
+     sap-server          : true
+     x-sap-adt-profiling : server-time=8662
+     body: <?xml version="1.0" encoding="utf-8"?><exc:exception xmlns:exc="http://www.sap.com/abapxml/types/communicationframework"><namespace id="com.sap.adt"/><type id="ExceptionResourceNotFound"/><message lang="EN">Resource CLASS ZAC_BP_SHR_BIMP_DDLS does not exist.</message><localizedMessage lang="EN">Resource CLASS ZAC_BP_SHR_BIMP_DDLS does not exist.</localizedMessage><properties><entry key="T100KEY-ID">SADT_RESOURCE</entry><entry key="T100KEY-NO">002</entry><entry key="T100KEY-V1">CLASS</entry><entry key="T100KEY-V2">ZAC_BP_SHR_BIMP_DDLS</entry></properties></exc:exception>
+
+GET /sap/bc/adt/ddic/tables/ZAC_SHR_ITABL/source/main
+  Accept                : text/plain
+  Authorization         : <redacted>
+  sap-adt-connection-id : 6f3d65d2-42a0-4692-84f7-e17ada00d877
+  sap-adt-request-id    : c9a7191bdd404efd977f2fedc94e432d
+  X-sap-adt-profiling   : server-time
+  X-SAP-Client          : 100
+  <- 200 OK
+     content-length      : 368
+     content-type        : text/plain; charset=utf-8
+     etag                : 20260921164029001text/plain2
+     last-modified       : Mon, 21 Sep 2026 16:40:29 GMT
+     sap-adt-saplb       : onprem_SID_00
+     sap-authenticated   : true
+     sap-cache-control   : +0
+     sap-isc-uagent      : 0
+     sap-perf-fesrec     : 47112.000000
+     sap-server          : true
+     x-sap-adt-profiling : server-time=43005
+     body: @EndUserText.label : 'Shared table for BehaviorImplementation'
+@AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
+@AbapCatalog.tableCategory : #TRANSPARENT
+@AbapCatalog.deliveryClass : #A
+@AbapCatalog.dataMaintenance : #RESTRICTED
+define table zac_shr_itabl {
+
+  key client : abap.clnt not null;
+  key fld1   : abap.char(10) not null;
+  fld2       : abap.char(50);
+
+}
+
+POST /sap/bc/adt/ddic/tables/ZAC_SHR_ITABL?_action=LOCK&accessMode=MODIFY
+  Accept                : application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9
+  Authorization         : <redacted>
+  sap-adt-connection-id : 6f3d65d2-42a0-4692-84f7-e17ada00d877
+  sap-adt-request-id    : ad64dbe0a6204b94b37b1c855949acc5
+  x-csrf-token          : <redacted>
+  X-sap-adt-profiling   : server-time
+  x-sap-adt-sessiontype : stateful
+  X-SAP-Client          : 100
+  <- 200 OK
+     content-length      : 323
+     content-type        : application/vnd.sap.as+xml; charset=utf-8; dataname=com.sap.adt.lock.Result
+     sap-adt-saplb       : onprem_SID_00
+     sap-authenticated   : true
+     sap-cache-control   : +0
+     sap-isc-uagent      : 0
+     sap-perf-fesrec     : 39344.000000
+     sap-server          : true
+     set-cookie          : sap-contextid=<redacted>; path=/sap/bc/adt; HttpOnly
+     x-sap-adt-profiling : server-time=34887
+     body: <?xml version="1.0" encoding="utf-8"?><asx:abap version="1.0" xmlns:asx="http://www.sap.com/abapxml"><asx:values><DATA><LOCK_HANDLE>2C66EB10D716C51BEA4DFE14D49FEDE6CFFF556C</LOCK_HANDLE><CORRNR/><CORRUSER/><CORRTEXT/><IS_LOCAL>X</IS_LOCAL><IS_LINK_UP/><MODIFICATION_SUPPORT/><SCOPE_MESSAGES/></DATA></asx:values></asx:abap>
+
+PUT /sap/bc/adt/ddic/tables/zac_shr_itabl/source/main?lockHandle=2C66EB10D716C51BEA4DFE14D49FEDE6CFFF556C&corrNr=E19K907111
+  Accept                : text/plain
+  Authorization         : <redacted>
+  Content-Type          : text/plain; charset=utf-8
+  sap-adt-connection-id : 6f3d65d2-42a0-4692-84f7-e17ada00d877
+  sap-adt-request-id    : 1f2d89dc82054e45b792540195eb8062
+  x-csrf-token          : <redacted>
+  X-sap-adt-profiling   : server-time
+  X-SAP-Client          : 100
+  body: @EndUserText.label : 'Shared table for BehaviorImplementation'
+@AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
+@AbapCatalog.tableCategory : #TRANSPARENT
+@AbapCatalog.deliveryClass : #A
+@AbapCatalog.dataMaintenance : #RESTRICTED
+define table zac_shr_itabl {
+  key client : abap.clnt not null;
+  key fld1   : abap.char(10) not null;
+  fld2       : abap.char(50);
+}
+
+  <- 200 OK
+     content-length      : 368
+     content-type        : text/plain; charset=utf-8
+     etag                : 20260921164745000text/plain2
+     sap-adt-saplb       : onprem_SID_00
+     sap-authenticated   : true
+     sap-cache-control   : +0
+     sap-isc-uagent      : 0
+     sap-perf-fesrec     : 128390.000000
+     sap-server          : true
+     x-sap-adt-profiling : server-time=126261
+     body: @EndUserText.label : 'Shared table for BehaviorImplementation'
+@AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
+@AbapCatalog.tableCategory : #TRANSPARENT
+@AbapCatalog.deliveryClass : #A
+@AbapCatalog.dataMaintenance : #RESTRICTED
+define table zac_shr_itabl {
+
+  key client : abap.clnt not null;
+  key fld1   : abap.char(10) not null;
+  fld2       : abap.char(50);
+
+}
+
+POST /sap/bc/adt/ddic/tables/ZAC_SHR_ITABL?_action=UNLOCK&lockHandle=2C66EB10D716C51BEA4DFE14D49FEDE6CFFF556C
+  Accept                : application/xml, application/json, text/plain, */*
+  Authorization         : <redacted>
+  sap-adt-connection-id : 6f3d65d2-42a0-4692-84f7-e17ada00d877
+  sap-adt-request-id    : e408e59fe8be4781bdbb9aff740d6ed6
+  x-csrf-token          : <redacted>
+  X-sap-adt-profiling   : server-time
+  x-sap-adt-sessiontype : stateful
+  X-SAP-Client          : 100
+  <- 200 OK
+     content-length      : 0
+     sap-adt-saplb       : onprem_SID_00
+     sap-authenticated   : true
+     sap-cache-control   : +0
+     sap-isc-uagent      : 0
+     sap-perf-fesrec     : 8993.000000
+     sap-server          : true
+     x-sap-adt-profiling : server-time=6959
+
+POST /sap/bc/adt/activation?method=activate&preauditRequested=true
+  Accept                : application/xml
+  Authorization         : <redacted>
+  Content-Type          : application/vnd.sap.adt.activation+xml
+  sap-adt-connection-id : 6f3d65d2-42a0-4692-84f7-e17ada00d877
+  sap-adt-request-id    : 0174ad8aa8384b34ad12561bbc84e9ef
+  x-csrf-token          : <redacted>
+  X-sap-adt-profiling   : server-time
+  X-SAP-Client          : 100
+  body: <?xml version="1.0" encoding="UTF-8"?>
+<adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core">
+  <adtcore:objectReference adtcore:uri="/sap/bc/adt/ddic/tables/ZAC_SHR_ITABL" adtcore:name="ZAC_SHR_ITABL"/>
+</adtcore:objectReferences>
+  <- 200 OK
+     content-length      : 211
+     content-type        : application/xml; charset=utf-8
+     sap-adt-saplb       : onprem_SID_00
+     sap-authenticated   : true
+     sap-cache-control   : +0
+     sap-isc-uagent      : 0
+     sap-perf-fesrec     : 816594.000000
+     sap-server          : true
+     x-sap-adt-profiling : server-time=814744
+     body: <?xml version="1.0" encoding="utf-8"?><chkl:messages xmlns:chkl="http://www.sap.com/abapxml/checklist"><chkl:properties checkExecuted="true" activationExecuted="true" generationExecuted="false"/></chkl:messages>
+
+GET /sap/bc/adt/ddic/ddl/sources/ZAC_SHR_BIMP_DDLS/source/main
+  Accept                : text/plain
+  Authorization         : <redacted>
+  sap-adt-connection-id : 6f3d65d2-42a0-4692-84f7-e17ada00d877
+  sap-adt-request-id    : 1c0b786cb60740b4aae293197f59f0ec
+  X-sap-adt-profiling   : server-time
+  X-SAP-Client          : 100
+  <- 200 OK
+     content-length      : 213
+     content-type        : text/plain; charset=utf-8
+     etag                : 202609211640300011
+     last-modified       : Mon, 21 Sep 2026 16:40:30 GMT
+     sap-adt-saplb       : onprem_SID_00
+     sap-authenticated   : true
+     sap-cache-control   : +0
+     sap-isc-uagent      : 0
+     sap-perf-fesrec     : 14137.000000
+     sap-server          : true
+     x-sap-adt-profiling : server-time=11861
+     body: @EndUserText.label : 'Shared root view for BehaviorImplementation'
+@AccessControl.authorizationCheck : #NOT_REQUIRED
+define root view entity ZAC_SHR_BIMP_DDLS
+  as select from zac_shr_itabl
+{
+  key fld1,
+  fld2
+}
+
+
+POST /sap/bc/adt/ddic/ddl/sources/zac_shr_bimp_ddls?_action=LOCK&accessMode=MODIFY
+  Accept                : application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9
+  Authorization         : <redacted>
+  sap-adt-connection-id : 6f3d65d2-42a0-4692-84f7-e17ada00d877
+  sap-adt-request-id    : 91b39006a3f0489fb1d3e6417b6ac910
+  x-csrf-token          : <redacted>
+  X-sap-adt-profiling   : server-time
+  x-sap-adt-sessiontype : stateful
+  X-SAP-Client          : 100
+  <- 200 OK
+     content-length      : 323
+     content-type        : application/vnd.sap.as+xml; charset=utf-8; dataname=com.sap.adt.lock.Result
+     sap-adt-saplb       : onprem_SID_00
+     sap-authenticated   : true
+     sap-cache-control   : +0
+     sap-isc-uagent      : 0
+     sap-perf-fesrec     : 11317.000000
+     sap-server          : true
+     x-sap-adt-profiling : server-time=9472
+     body: <?xml version="1.0" encoding="utf-8"?><asx:abap version="1.0" xmlns:asx="http://www.sap.com/abapxml"><asx:values><DATA><LOCK_HANDLE>3F22800AFCC6EACBD3FDF51D5AC6A85E27ED1151</LOCK_HANDLE><CORRNR/><CORRUSER/><CORRTEXT/><IS_LOCAL>X</IS_LOCAL><IS_LINK_UP/><MODIFICATION_SUPPORT/><SCOPE_MESSAGES/></DATA></asx:values></asx:abap>
+
+PUT /sap/bc/adt/ddic/ddl/sources/zac_shr_bimp_ddls/source/main?lockHandle=3F22800AFCC6EACBD3FDF51D5AC6A85E27ED1151&corrNr=E19K907111
+  Accept                : text/plain
+  Authorization         : <redacted>
+  Content-Type          : text/plain; charset=utf-8
+  sap-adt-connection-id : 6f3d65d2-42a0-4692-84f7-e17ada00d877
+  sap-adt-request-id    : 29ec82271dc84e7093b96fe6ae0c09a7
+  x-csrf-token          : <redacted>
+  X-sap-adt-profiling   : server-time
+  X-SAP-Client          : 100
+  body: @EndUserText.label : 'Shared root view for BehaviorImplementation'
+@AccessControl.authorizationCheck : #NOT_REQUIRED
+define root view entity ZAC_SHR_BIMP_DDLS
+  as select from zac_shr_itabl
+{
+  key fld1,
+  fld2
+}
+
+  <- 200 OK
+     content-length      : 0
+     etag                : 202609211647460001
+     sap-adt-saplb       : onprem_SID_00
+     sap-authenticated   : true
+     sap-cache-control   : +0
+     sap-isc-uagent      : 0
+     sap-perf-fesrec     : 41039.000000
+     sap-server          : true
+     x-sap-adt-profiling : server-time=39175
+
+POST /sap/bc/adt/ddic/ddl/sources/zac_shr_bimp_ddls?_action=UNLOCK&lockHandle=3F22800AFCC6EACBD3FDF51D5AC6A85E27ED1151
+  Accept                : application/xml, application/json, text/plain, */*
+  Authorization         : <redacted>
+  sap-adt-connection-id : 6f3d65d2-42a0-4692-84f7-e17ada00d877
+  sap-adt-request-id    : fdf42266bf834369b99564bdaf3ca5f8
+  x-csrf-token          : <redacted>
+  X-sap-adt-profiling   : server-time
+  x-sap-adt-sessiontype : stateful
+  X-SAP-Client          : 100
+  <- 200 OK
+     content-length      : 0
+     sap-adt-saplb       : onprem_SID_00
+     sap-authenticated   : true
+     sap-cache-control   : +0
+     sap-isc-uagent      : 0
+     sap-perf-fesrec     : 4578.000000
+     sap-server          : true
+     x-sap-adt-profiling : server-time=2497
+
+POST /sap/bc/adt/activation?method=activate&preauditRequested=true
+  Accept                : application/xml
+  Authorization         : <redacted>
+  Content-Type          : application/vnd.sap.adt.activation+xml
+  sap-adt-connection-id : 6f3d65d2-42a0-4692-84f7-e17ada00d877
+  sap-adt-request-id    : e31da0282b8a4664a537bf83bf254d95
+  x-csrf-token          : <redacted>
+  X-sap-adt-profiling   : server-time
+  X-SAP-Client          : 100
+  body: <?xml version="1.0" encoding="UTF-8"?>
+<adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core">
+  <adtcore:objectReference adtcore:uri="/sap/bc/adt/ddic/ddl/sources/zac_shr_bimp_ddls" adtcore:name="ZAC_SHR_BIMP_DDLS"/>
+</adtcore:objectReferences>
+  <- 200 OK
+     content-length      : 500
+     content-type        : application/xml; charset=utf-8
+     sap-adt-saplb       : onprem_SID_00
+     sap-authenticated   : true
+     sap-cache-control   : +0
+     sap-isc-uagent      : 0
+     sap-perf-fesrec     : 1053060.000000
+     sap-server          : true
+     x-sap-adt-profiling : server-time=1050855
+     body: <?xml version="1.0" encoding="utf-8"?><chkl:messages xmlns:chkl="http://www.sap.com/abapxml/checklist"><chkl:properties checkExecuted="true" activationExecuted="true" generationExecuted="false"/><msg objDescr="Data Definition ZAC_SHR_BIMP_DDLS" type="W" line="1" href="/sap/bc/adt/ddic/ddl/sources/zac_shr_bimp_ddls/source/main#start=1,21" code="SDDIC_DDLA_ANNOCHECK(017)" forceSupported="true"><shortText><txt>Annotation value 'Shared root view for BehaviorImplementation' length (43) too long. Type must be 'String(40)'.</txt></shortText><t100Key msgid="SDDIC_DDLA_ANNOCHECK" msgno="017" msgv1="Shared root view for BehaviorImplementation" msgv2="43" msgv3="String(40)"/><atom:link href="/sap/bc/adt/vit/ddic/logs/db/ACTDDLSZAC_SHR_BIMP_DDLS" rel="http://www.sap.com/adt/relations/ddic/activationlog" type="application/vnd.sap.sapgui" xmlns:atom="http://www.w3.org/2005/Atom"/><atom:link href="/sap/bc/adt/ddic/logs/db/ACTDDLSZAC_SHR_BIMP_DDLS" rel="http://www.sap.com/adt/relations/ddic/activationlog" type="application/vnd.sap.adt.logs+xml" xmlns:atom="http://www.w3.org/2005/Atom"/><atom:link href="/sap/bc/adt/vit/ddic/logs/db/DELDDLSZAC_SHR_BIMP_DDLS" rel="http://www.sap.com/adt/relations/ddic/deletionlog" type="application/vnd.sap.sapgui" xmlns:atom="http://www.w3.org/2005/Atom"/><atom:link href="/sap/bc/adt/ddic/logs/db/DELDDLSZAC_SHR_BIMP_DDLS" rel="http://www.sap.com/adt/relations/ddic/deletionlog" type="application/vnd.sap.adt.logs+xml" xmlns:atom="http://www.w3.org/2005/Atom"/></msg></chkl:messages>
+
+GET /sap/bc/adt/bo/behaviordefinitions/zac_shr_bimp_ddls/source/main?version=active
+  Accept                : text/plain
+  Authorization         : <redacted>
+  sap-adt-connection-id : 6f3d65d2-42a0-4692-84f7-e17ada00d877
+  sap-adt-request-id    : 9e7c834c74b149549202e55b085caa08
+  X-sap-adt-profiling   : server-time
+  X-SAP-Client          : 100
+  <- 200 OK
+     content-length      : 232
+     content-type        : text/plain; charset=utf-8
+     etag                : 20260921164031001text/plain_mN3M1vOD9cFOeJZSWVaV8+jhJQQ=
+     last-modified       : Mon, 21 Sep 2026 16:40:31 GMT
+     sap-adt-saplb       : onprem_SID_00
+     sap-authenticated   : true
+     sap-cache-control   : +0
+     sap-isc-uagent      : 0
+     sap-perf-fesrec     : 14852.000000
+     sap-server          : true
+     x-sap-adt-profiling : server-time=12824
+     body: managed implementation in class zac_bp_shr_bimp_ddls unique;
+strict ( 2 );
+
+define behavior for ZAC_SHR_BIMP_DDLS
+persistent table zac_shr_itabl
+lock master
+authorization master ( instance, global )
+{
+  create;
+  update;
+  delete;
+}
+
+POST /sap/bc/adt/bo/behaviordefinitions/zac_shr_bimp_ddls?_action=LOCK&accessMode=MODIFY
+  Accept                : application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9
+  Authorization         : <redacted>
+  Content-Type          : application/xml
+  sap-adt-connection-id : 6f3d65d2-42a0-4692-84f7-e17ada00d877
+  sap-adt-request-id    : c75cb21a145a4e64aa533d7756d747c5
+  x-csrf-token          : <redacted>
+  X-sap-adt-profiling   : server-time
+  x-sap-adt-sessiontype : stateful
+  X-SAP-Client          : 100
+  body: <?xml version="1.0" encoding="UTF-8"?><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
+  <asx:values>
+    <DATA>
+      <LOCK_HANDLE/>
+      <CORRNR/>
+      <CORRUSER/>
+      <CORRTEXT/>
+      <IS_LOCAL>X</IS_LOCAL>
+      <IS_LINK_UP/>
+      <MODIFICATION_SUPPORT/>
+      <SCOPE_MESSAGES/>
+    </DATA>
+  </asx:values>
+</asx:abap>
+  <- 200 OK
+     content-length      : 323
+     content-type        : application/vnd.sap.as+xml; charset=utf-8; dataname=com.sap.adt.lock.Result
+     sap-adt-saplb       : onprem_SID_00
+     sap-authenticated   : true
+     sap-cache-control   : +0
+     sap-isc-uagent      : 0
+     sap-perf-fesrec     : 10054.000000
+     sap-server          : true
+     x-sap-adt-profiling : server-time=8308
+     body: <?xml version="1.0" encoding="utf-8"?><asx:abap version="1.0" xmlns:asx="http://www.sap.com/abapxml"><asx:values><DATA><LOCK_HANDLE>43843A2045E440DCFD17755203F2A942EFD5122D</LOCK_HANDLE><CORRNR/><CORRUSER/><CORRTEXT/><IS_LOCAL>X</IS_LOCAL><IS_LINK_UP/><MODIFICATION_SUPPORT/><SCOPE_MESSAGES/></DATA></asx:values></asx:abap>
+
+PUT /sap/bc/adt/bo/behaviordefinitions/zac_shr_bimp_ddls/source/main?lockHandle=43843A2045E440DCFD17755203F2A942EFD5122D&corrNr=E19K907111
+  Accept                : text/plain
+  Authorization         : <redacted>
+  Content-Type          : text/plain; charset=utf-8
+  sap-adt-connection-id : 6f3d65d2-42a0-4692-84f7-e17ada00d877
+  sap-adt-request-id    : 38c04dc1ee9f468caf2270c0e777efc8
+  x-csrf-token          : <redacted>
+  X-sap-adt-profiling   : server-time
+  X-SAP-Client          : 100
+  body: managed implementation in class zac_bp_shr_bimp_ddls unique;
+strict ( 2 );
+
+define behavior for ZAC_SHR_BIMP_DDLS
+persistent table zac_shr_itabl
+lock master
+authorization master ( instance, global )
+{
+  create;
+  update;
+  delete;
+}
+
+  <- 200 OK
+     content-length      : 232
+     content-type        : text/plain; charset=utf-8
+     etag                : 20260921164748000text/plain_mN3M1vOD9cFOeJZSWVaV8+jhJQQ=
+     sap-adt-saplb       : onprem_SID_00
+     sap-authenticated   : true
+     sap-cache-control   : +0
+     sap-isc-uagent      : 0
+     sap-perf-fesrec     : 91756.000000
+     sap-server          : true
+     x-sap-adt-profiling : server-time=89982
+     body: managed implementation in class zac_bp_shr_bimp_ddls unique;
+strict ( 2 );
+
+define behavior for ZAC_SHR_BIMP_DDLS
+persistent table zac_shr_itabl
+lock master
+authorization master ( instance, global )
+{
+  create;
+  update;
+  delete;
+}
+
+POST /sap/bc/adt/bo/behaviordefinitions/zac_shr_bimp_ddls?_action=UNLOCK&lockHandle=43843A2045E440DCFD17755203F2A942EFD5122D
+  Accept                : application/xml, application/json, text/plain, */*
+  Authorization         : <redacted>
+  sap-adt-connection-id : 6f3d65d2-42a0-4692-84f7-e17ada00d877
+  sap-adt-request-id    : 86c0642fd9e24155b7ca5af6dd4d006f
+  x-csrf-token          : <redacted>
+  X-sap-adt-profiling   : server-time
+  x-sap-adt-sessiontype : stateful
+  X-SAP-Client          : 100
+  <- 200 OK
+     content-length      : 0
+     sap-adt-saplb       : onprem_SID_00
+     sap-authenticated   : true
+     sap-cache-control   : +0
+     sap-isc-uagent      : 0
+     sap-perf-fesrec     : 4043.000000
+     sap-server          : true
+     x-sap-adt-profiling : server-time=2026
+
+POST /sap/bc/adt/activation?method=activate&preauditRequested=true
+  Accept                : application/xml
+  Authorization         : <redacted>
+  Content-Type          : application/vnd.sap.adt.activation+xml
+  sap-adt-connection-id : 6f3d65d2-42a0-4692-84f7-e17ada00d877
+  sap-adt-request-id    : 6c2aef7f884e402497dfe971e04c2ee6
+  x-csrf-token          : <redacted>
+  X-sap-adt-profiling   : server-time
+  X-SAP-Client          : 100
+  body: <?xml version="1.0" encoding="UTF-8"?>
+<adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core">
+  <adtcore:objectReference adtcore:uri="/sap/bc/adt/bo/behaviordefinitions/zac_shr_bimp_ddls" adtcore:name="ZAC_SHR_BIMP_DDLS"/>
+</adtcore:objectReferences>
+  <- 200 OK
+     content-length      : 944
+     content-type        : application/xml; charset=utf-8
+     sap-adt-saplb       : onprem_SID_00
+     sap-authenticated   : true
+     sap-cache-control   : +0
+     sap-isc-uagent      : 0
+     sap-perf-fesrec     : 444960.000000
+     sap-server          : true
+     x-sap-adt-profiling : server-time=443519
+     body: <?xml version="1.0" encoding="utf-8"?><chkl:messages xmlns:chkl="http://www.sap.com/abapxml/checklist"><chkl:properties checkExecuted="true" activationExecuted="true" generationExecuted="true"/><msg objDescr="Behavior Definition ZAC_SHR_BIMP_DDLS" type="W" line="1" href="/sap/bc/adt/bo/behaviordefinitions/zac_shr_bimp_ddls/source/main#start=1,32;end=1,52" code="+BDL(054)" forceSupported="true"><shortText><txt>Class "ZAC_BP_SHR_BIMP_DDLS" does not exist.</txt></shortText><atom:link href="art.syntax:+BDL054" rel="http://www.sap.com/adt/categories/quickfixes" xmlns:atom="http://www.w3.org/2005/Atom"/></msg><msg objDescr="Behavior Definition ZAC_SHR_BIMP_DDLS" type="W" line="2" href="/sap/bc/adt/bo/behaviordefinitions/zac_shr_bimp_ddls/source/main#start=4,20;end=4,37" code="+BDL(389)" forceSupported="true"><shortText><txt>The key field "FLD1" should be flagged as "readonly" or "readonly:update".</txt></shortText></msg></chkl:messages>
+
+POST /sap/bc/adt/oo/validation/objectname?objname=ZAC_BP_SHR_BIMP_DDLS&objtype=CLAS%2FOC&packagename=ZAC_TEST_PKG&description=BehaviorImplementation+for+ZAC_SHR_BIMP_DDLS&behaviorDefinition=ZAC_SHR_BIMP_DDLS
+  Accept                : application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.oo.clifname.check
+  Authorization         : <redacted>
+  sap-adt-connection-id : 6f3d65d2-42a0-4692-84f7-e17ada00d877
+  sap-adt-request-id    : b9b52aef05b44cb2a821da6afde66819
+  x-csrf-token          : <redacted>
+  X-sap-adt-profiling   : server-time
+  X-SAP-Client          : 100
+  <- 200 OK
+     content-length      : 180
+     content-type        : application/vnd.sap.as+xml; charset=utf-8; dataname=com.sap.adt.oo.clifname.check
+     sap-adt-saplb       : onprem_SID_00
+     sap-authenticated   : true
+     sap-cache-control   : +0
+     sap-isc-uagent      : 0
+     sap-perf-fesrec     : 39409.000000
+     sap-server          : true
+     x-sap-adt-profiling : server-time=37373
+     body: <?xml version="1.0" encoding="utf-8"?><asx:abap version="1.0" xmlns:asx="http://www.sap.com/abapxml"><asx:values><DATA><CHECK_RESULT>X</CHECK_RESULT></DATA></asx:values></asx:abap>
+
+POST /sap/bc/adt/oo/classes?corrNr=E19K907111
+  Accept                : application/vnd.sap.adt.oo.classes.v4+xml
+  Authorization         : <redacted>
+  Content-Type          : application/vnd.sap.adt.oo.classes.v4+xml
+  sap-adt-connection-id : 6f3d65d2-42a0-4692-84f7-e17ada00d877
+  sap-adt-request-id    : ad1528aa3ed64088b116c745be367950
+  x-csrf-token          : <redacted>
+  X-sap-adt-profiling   : server-time
+  X-SAP-Client          : 100
+  body: <?xml version="1.0" encoding="UTF-8"?><class:abapClass xmlns:class="http://www.sap.com/adt/oo/classes" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="BehaviorImplementation for ZAC_SHR_BIMP_DDLS" adtcore:language="EN" adtcore:name="ZAC_BP_SHR_BIMP_DDLS" adtcore:type="CLAS/OC" adtcore:masterLanguage="EN" class:final="false" class:visibility="public">
+
+
+
+  <adtcore:packageRef adtcore:name="ZAC_TEST_PKG"/>
+
+
+
+  
+
+
+
+
+
+  <class:include adtcore:name="CLAS/OC" adtcore:type="CLAS/OC" class:includeType="testclasses"/>
+
+
+
+  <class:superClassRef/>
+
+
+
+</class:abapClass>
+  <- 200 OK
+     content-length      : 0
+     sap-adt-saplb       : onprem_SID_00
+     sap-authenticated   : true
+     sap-cache-control   : +0
+     sap-isc-uagent      : 0
+     sap-perf-fesrec     : 476859.000000
+     sap-server          : true
+     x-sap-adt-profiling : server-time=473840
+
+POST /sap/bc/adt/oo/classes/zac_bp_shr_bimp_ddls?_action=LOCK&accessMode=MODIFY
+  Accept                : application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9
+  Authorization         : <redacted>
+  sap-adt-connection-id : 6f3d65d2-42a0-4692-84f7-e17ada00d877
+  sap-adt-request-id    : 409f3bc695f8446ab077ab7c140ee95a
+  x-csrf-token          : <redacted>
+  X-sap-adt-profiling   : server-time
+  x-sap-adt-sessiontype : stateful
+  X-SAP-Client          : 100
+  <- 200 OK
+     content-length      : 469
+     content-type        : application/vnd.sap.as+xml; charset=utf-8; dataname=com.sap.adt.lock.Result2
+     sap-adt-saplb       : onprem_SID_00
+     sap-authenticated   : true
+     sap-cache-control   : +0
+     sap-isc-uagent      : 0
+     sap-perf-fesrec     : 17782.000000
+     sap-server          : true
+     x-sap-adt-profiling : server-time=15709
+     body: <?xml version="1.0" encoding="utf-8"?><asx:abap version="1.0" xmlns:asx="http://www.sap.com/abapxml"><asx:values><DATA><LOCK_HANDLE>6DC2987B7180B562CCC82BD7D37C7249561388E5</LOCK_HANDLE><CORRNR>E19K907111</CORRNR><CORRUSER>TESTUSER</CORRUSER><CORRTEXT>adt-clients integration tests</CORRTEXT><IS_LOCAL/><IS_LINK_UP/><MODIFICATION_SUPPORT>NoModification</MODIFICATION_SUPPORT><LINK_UP_MODE/><CORR_LOCKS/><CORR_CONTENTS/><SCOPE_MESSAGES/></DATA></asx:values></asx:abap>
+
+PUT /sap/bc/adt/oo/classes/zac_bp_shr_bimp_ddls/source/main?lockHandle=6DC2987B7180B562CCC82BD7D37C7249561388E5
+  Accept                : text/plain
+  Authorization         : <redacted>
+  Content-Type          : text/plain; charset=utf-8
+  sap-adt-connection-id : 6f3d65d2-42a0-4692-84f7-e17ada00d877
+  sap-adt-request-id    : 66b149f38e7044f28e8a857474bc6a91
+  x-csrf-token          : <redacted>
+  X-sap-adt-profiling   : server-time
+  X-SAP-Client          : 100
+  body: CLASS ZAC_BP_SHR_BIMP_DDLS DEFINITION PUBLIC ABSTRACT FINAL FOR BEHAVIOR OF ZAC_SHR_BIMP_DDLS.
+
+ENDCLASS.
+
+CLASS ZAC_BP_SHR_BIMP_DDLS IMPLEMENTATION.
+
+ENDCLASS.
+  <- 409 Request failed with status code 409
+     content-length      : 674
+     content-type        : application/xml
+     sap-adt-saplb       : onprem_SID_00
+     sap-authenticated   : true
+     sap-cache-control   : +0
+     sap-isc-uagent      : 0
+     sap-perf-fesrec     : 49617.000000
+     sap-server          : true
+     x-sap-adt-profiling : server-time=47863
+     body: <?xml version="1.0" encoding="utf-8"?><exc:exception xmlns:exc="http://www.sap.com/abapxml/types/communicationframework"><namespace id="com.sap.adt"/><type id="ExceptionResourceLockConflict"/><message lang="EN">Object LIMU CLSD ZAC_BP_SHR_BIMP_DDLS is already locked in request E19K907111 of user TESTUSER</message><localizedMessage lang="EN">Object LIMU CLSD ZAC_BP_SHR_BIMP_DDLS is already locked in request E19K907111 of user TESTUSER</localizedMessage><properties><entry key="LONGTEXT">&lt;HTML&gt;&lt;HEAD&gt;&lt;TITLE&gt;Conversion of SAPscript Text CTS_WBO_API019 to HTML&lt;/TITLE&gt;&lt;META http-equiv="Content-Type" content="text/html; charset=utf-8"&gt;&lt;/HEAD&gt;&lt;BODY&gt;&lt;P&gt;&lt;STRONG&gt;Object LIMU CLSD ZAC_BP_SHR_BIMP_DDLS is already locked in request E19K907111 of user TESTUSER&lt;/STRONG&gt;&lt;/P&gt;&lt;P&gt;Message No. CTS_WBO_API019&lt;/P&gt;&lt;P&gt;&lt;STRONG&gt;Diagnosis&lt;/STRONG&gt;&lt;/P&gt;&lt;P&gt;The object LIMU CLSD ZAC_BP_SHR_BIMP_DDLS cannot be edited under a new request, since it is already locked in the request E19K907111 for user TESTUSER.&lt;/P&gt;&lt;P&gt;&lt;STRONG&gt;System Response&lt;/STRONG&gt;&lt;/P&gt;&lt;P&gt;The editing of the object LIMU CLSD ZAC_BP_SHR_BIMP_DDLS is canceled.&lt;/P&gt;&lt;P&gt;&lt;STRONG&gt;Procedure&lt;/STRONG&gt;&lt;/P&gt;&lt;P&gt;You have several options:&lt;/P&gt;&lt;UL&gt;&lt;LI&gt;Edit the object in the request E19K907111. If necessary, contact the owner TESTUSER and use your own task under request E19K907111.&lt;/LI&gt;&lt;/UL&gt;&lt;P&gt;Release the request E19K907111 with all its tasks. If necessary, contact the owner TESTUSER. You can then edit the object under a new request.&lt;/P&gt;&lt;P&gt;&lt;/P&gt;&lt;P&gt;&lt;/P&gt;&lt;/BODY&gt;&lt;/HTML&gt;(E19K907111 ).</entry><entry key="T100KEY-ID">CTS_WBO_API</entry><entry key="T100KEY-NO">019</entry><entry key="T100KEY-V1">LIMU CLSD ZAC_BP_SHR_BIMP_DDLS</entry><entry key="T100KEY-V3">E19K907111</entry><entry key="T100KEY-V4">TESTUSER</entry></properties></exc:exception>
+
+POST /sap/bc/adt/oo/classes/zac_bp_shr_bimp_ddls?_action=UNLOCK&lockHandle=6DC2987B7180B562CCC82BD7D37C7249561388E5
+  Accept                : application/xml, application/json, text/plain, */*
+  Authorization         : <redacted>
+  sap-adt-connection-id : 6f3d65d2-42a0-4692-84f7-e17ada00d877
+  sap-adt-request-id    : 52a5520fde4944a48a2d4bd10c6ac8aa
+  x-csrf-token          : <redacted>
+  X-sap-adt-profiling   : server-time
+  x-sap-adt-sessiontype : stateful
+  X-SAP-Client          : 100
+  <- 200 OK
+     content-length      : 0
+     sap-adt-saplb       : onprem_SID_00
+     sap-authenticated   : true
+     sap-cache-control   : +0
+     sap-isc-uagent      : 0
+     sap-perf-fesrec     : 3417.000000
+     sap-server          : true
+     x-sap-adt-profiling : server-time=1640
+
+POST /sap/bc/adt/deletion/delete
+  Accept                : application/vnd.sap.adt.deletion.response.v1+xml
+  Authorization         : <redacted>
+  Content-Type          : application/vnd.sap.adt.deletion.request.v1+xml
+  sap-adt-connection-id : 6f3d65d2-42a0-4692-84f7-e17ada00d877
+  sap-adt-request-id    : 938a4f23916c4a4497f79fff932ed738
+  x-csrf-token          : <redacted>
+  X-sap-adt-profiling   : server-time
+  X-SAP-Client          : 100
+  body: <?xml version="1.0" encoding="UTF-8"?>
+<del:deletionRequest xmlns:del="http://www.sap.com/adt/deletion" xmlns:adtcore="http://www.sap.com/adt/core">
+  <del:object adtcore:uri="/sap/bc/adt/oo/classes/ZAC_BP_SHR_BIMP_DDLS">
+    <del:transportNumber>E19K907111</del:transportNumber>
+  </del:object>
+</del:deletionRequest>
+  <- 200 OK
+     content-length      : 433
+     content-type        : application/vnd.sap.adt.deletion.response.v1+xml; charset=utf-8
+     sap-adt-saplb       : onprem_SID_00
+     sap-authenticated   : true
+     sap-cache-control   : +0
+     sap-isc-uagent      : 0
+     sap-perf-fesrec     : 435020.000000
+     sap-server          : true
+     x-sap-adt-profiling : server-time=433157
+     body: <?xml version="1.0" encoding="utf-8"?><del:deletionResult xmlns:del="http://www.sap.com/adt/deletion"><del:object del:isDeleted="true" adtcore:uri="/sap/bc/adt/oo/classes/ZAC_BP_SHR_BIMP_DDLS" adtcore:type="CLAS/OC" adtcore:name="ZAC_BP_SHR_BIMP_DDLS" adtcore:packageName="ZAC_TEST_PKG" xmlns:adtcore="http://www.sap.com/adt/core"><del:message del:priority="0" del:type="S"><del:text/></del:message></del:object></del:deletionResult>
+
+===== wire log opened 2026-09-21T16:47:57.188Z =====
