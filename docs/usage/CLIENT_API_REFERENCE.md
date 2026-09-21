@@ -472,6 +472,10 @@ Three things worth knowing before the first call:
 - **`pgmid` defaults to `R3TR`**; `obj_desc` and `position` are sent only when
   given, because no measurement says the server needs them.
 
+`IAbapObjectEntry`, the type those two members take, comes from
+`@mcp-abap-adt/interfaces` — import it from there, or from
+`@mcp-abap-adt/interfaces-adt` directly, rather than from this package.
+
 `removedObject`, `addedObject`, `createdTask` and `actionLog` are optional
 slots in the result set — a result set written before these members existed
 still compiles. The defaults hand the document back untouched, except

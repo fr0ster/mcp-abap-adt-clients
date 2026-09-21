@@ -24,7 +24,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
-## [19.2.0] - 2026-09-21
+## [20.0.0] - 2026-09-21
+
+### Changed — the contracts these members need moved to their own package
+
+- **Needs `@mcp-abap-adt/interfaces` 45.1.0**, up from 44.0.0. That package
+  split its contracts into four in 45.0.0 and became a facade that re-exports
+  them; nothing a consumer imports disappeared and no contract changed shape,
+  but the dependency graph did, and a consumer holding 44 alongside this
+  package would have two declarations of every type — which TypeScript
+  reconciles for interfaces and does not for enums.
+
+  This is why the release is a major. The API below is additive.
+
+- **`IAbapObjectEntry` and `IAdtTransportObjectActions` are imported, not
+  declared here.** They were declared in `AdtClient.ts` for one release,
+  beside `IAdtTransportSearchable` and for the same stated reason: the
+  interfaces package was a major ahead, and tying a transport capability to
+  that bump would have held it hostage. It is not ahead any more —
+  `@mcp-abap-adt/interfaces-adt` 1.2.0 carries both, which is where a request
+  parameter and a capability contract belong.
+
+  `IAdtTransportSearchable` stays declared locally until it makes the same
+  journey. `core/transport` re-exports `IAbapObjectEntry` so a caller reaching
+  for it there still finds it, and the package no longer exports a second
+  declaration of its own.
 
 ### Added
 

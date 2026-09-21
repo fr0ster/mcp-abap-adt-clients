@@ -123,7 +123,6 @@ export { tableTypeDocuments } from './core/tabletype/types';
 export type { ITransformationResults } from './core/transformation/types';
 export { transformationDocuments } from './core/transformation/types';
 export type {
-  IAbapObjectEntry,
   ICreatedTransport,
   ITransportTree,
   ITransportTreeLink,

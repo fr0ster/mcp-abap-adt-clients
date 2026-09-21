@@ -7,6 +7,8 @@
  * beside {@link parseTransportTree}, the reading that builds it.
  */
 
+export type { IAbapObjectEntry } from '@mcp-abap-adt/interfaces';
+
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces';
 import { rawDocument } from '../../utils/resultStrategy';
 import { parseCreatedTransport } from './parseCreatedTransport';
@@ -99,28 +101,6 @@ export interface ITransportTreeRequest {
 export interface ITransportTree {
   attributes: Record<string, string | undefined>;
   requests: ITransportTreeRequest[];
-}
-
-/**
- * One object entry in a request or task, as the CTS object directory holds it.
- *
- * `pgmid` defaults to `R3TR` where it is left out — every capture of these
- * actions carried that, and it is what a workbench object is. `description`
- * and `position` are written only when given: the `removeobject` capture sent
- * both and the `addobject` one sent neither, and nothing measured says the
- * server needs either, so this client does not invent them.
- */
-export interface IAbapObjectEntry {
-  /** `tm:name` — the object's name, e.g. `ZCL_MY_CLASS`. */
-  name: string;
-  /** `tm:type` — the CTS object type, e.g. `CLAS`, `FUGR`, `TABL`. */
-  type: string;
-  /** `tm:pgmid` — `R3TR` unless the caller says otherwise. */
-  pgmid?: string;
-  /** `tm:obj_desc` — the description ADT shows beside the entry. */
-  description?: string;
-  /** `tm:position` — the entry's position in the task, e.g. `000025`. */
-  position?: string;
 }
 
 /** One strategy per member of a transport-request implementation. */

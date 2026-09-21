@@ -38,6 +38,7 @@ import type {
   IAdtRunnable,
   IAdtSystemContext,
   IAdtTransportAware,
+  IAdtTransportObjectActions,
   IAdtUpdatable,
   IAdtValidatable,
   IAdtVersionable,
@@ -233,7 +234,6 @@ import {
 } from '../core/transformation';
 import {
   AdtRequest,
-  type IAbapObjectEntry,
   type ITransportConfig,
   type ITransportResults,
   transportDocuments,
@@ -772,47 +772,19 @@ export interface IAdtTransportSearchable<TConfigurations> {
 }
 
 /**
- * The three user actions on a request's object list, and its action log.
+ * `IAdtTransportObjectActions` and `IAbapObjectEntry` are imported, not
+ * declared.
  *
- * **Declared here for the same reason as `IAdtTransportSearchable` above**:
- * `@mcp-abap-adt/interfaces` is a major ahead of what this package depends on,
- * and tying a transport capability to that bump would hold it hostage. These
- * belong in `IAdtRequest` eventually; moving them is a type change with no
- * behaviour in it.
+ * They were declared here for one release, beside `IAdtTransportSearchable`
+ * below and for the same reason: `@mcp-abap-adt/interfaces` was a major ahead
+ * of what this package depended on, and tying a transport capability to that
+ * bump would have held it hostage. That is settled — the dependency is
+ * `^45.1.0`, the contracts live in `@mcp-abap-adt/interfaces-adt` 1.2.0 where
+ * they belong, and the facade re-exports them.
  *
- * **Why they are members at all.** The listing already hands a caller every
- * `atom:link` a request and its tasks carry — `release`, `addobject`,
- * `newtask` — precisely so they follow an href rather than assemble a URL.
- * Following one meant a raw `PUT` with a hand-built `tm:root` and a
- * `useraction` attribute, which is the gap `searchConfigurations()` closed for
- * the listing itself.
+ * `IAdtTransportSearchable` stays declared below until it makes the same
+ * journey; moving it is a type change with no behaviour in it.
  */
-export interface IAdtTransportObjectActions<
-  TRemoved,
-  TAdded,
-  TTask,
-  TActionLog,
-> {
-  removeObject<E extends IAdtError = IAdtError>(
-    transportNumber: string,
-    object: IAbapObjectEntry,
-    options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<TRemoved, E>>;
-  addObject<E extends IAdtError = IAdtError>(
-    transportNumber: string,
-    object: IAbapObjectEntry,
-    options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<TAdded, E>>;
-  createTask<E extends IAdtError = IAdtError>(
-    transportNumber: string,
-    options?: { targetUser?: string } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<TTask, E>>;
-  readActionLog<E extends IAdtError = IAdtError>(
-    transportNumber: string,
-    options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<TActionLog, E>>;
-}
-
 export type IRequestContract<R extends ITransportResults> = IAdtCreatable<
   ITransportConfig,
   ReturnType<R['created']>
