@@ -7,9 +7,16 @@
 # ┌──────────────────────────────────────────────────────────────────┐
 # │  PREREQUISITE (do this BEFORE running any tests):                │
 # │                                                                  │
-# │  Create the root package manually in your SAP system (ADT/SE80) │
-# │  e.g. ZADT_BLD_PKG03. Tests do NOT create this package —        │
-# │  they only create objects INSIDE it.                             │
+# │  Create the root package manually in your SAP system (ADT/SE80). │
+# │  Tests do NOT create this package — they only create objects     │
+# │  INSIDE it. Every value below written as <LIKE_THIS> is a        │
+# │  placeholder: the file will not run until you replace it.        │
+# │                                                                  │
+# │  ON-PREM: make that package TRANSPORTABLE — software component,  │
+# │  transport layer, change recording ON — and give it ONE request  │
+# │  that is never released. A local package registers nothing in    │
+# │  CTS, so transport defects stay invisible and suites pass on a   │
+# │  lie; a second request meets CTS_WBO_API 019 on the first write. │
 # │                                                                  │
 # │  REQUIRED CHANGES (edit these after copying):                    │
 # │                                                                  │
@@ -19,7 +26,9 @@
 # │  4. shared_dependencies.super_package — parent package           │
 # │                                                                  │
 # │  ON-PREM ONLY (if creating packages):                            │
-# │  5. create_package.transport_layer    — e.g. "ZE19"             │
+# │  5. create_package.transport_layer    — e.g. "Z<SID>"            │
+# │  6. create_transport.target_system    — the transport target,    │
+# │     without slashes; create() adds them itself                   │
 # └──────────────────────────────────────────────────────────────────┘
 #
 # IMPORTANT: Object Naming Convention
@@ -109,8 +118,18 @@ environment:
   system: "onprem"                            # ← CHANGE: "onprem" or "cloud". Stated, never guessed —
                                               #   the two manage sessions differently and the server
                                               #   cannot be asked which it is.
-  default_package: "ZADT_TEST"               # ← CHANGE: your dev package (Z*/Y*) or "$TMP" for local
+  default_package: "<DEV_PACKAGE>"             # ← CHANGE: your dev package (Z*/Y*) or "$TMP" for local
+                                              #   ON-PREM: make it TRANSPORTABLE — a software component,
+                                              #   a transport layer, and change recording ON. A local
+                                              #   package registers nothing in CTS, so every transport
+                                              #   defect stays invisible and four suites pass on a lie.
   default_transport: ""                       # ← CHANGE: transport request (leave "" for $TMP/local packages)
+                                              #   ON-PREM: ONE request, reused by every run and never
+                                              #   released. An object stays registered in the request
+                                              #   that created it, so a second request meets
+                                              #   `CTS_WBO_API 019` on the first write. It must carry a
+                                              #   transport TARGET, or creating anything in a package on
+                                              #   a transport layer is refused with `CTS_WBO_API 048`.
   default_master_system: ""                   # ← CHANGE: SAP system ID (on-prem only, cloud gets it automatically)
   default_master_language: ""                 # Master/original language for created objects (e.g. "DE", "ZH"). "" → EN. Must be a language installed on the system, else SAP normalizes it to the system default.
   skip_cleanup: false    # Skip cleanup after test (objects left for analysis) - can be overridden per test case
@@ -123,9 +142,9 @@ environment:
 # Naming convention: ZAC_SHR_{COMPONENT}_{OBJTYPE}
 shared_dependencies:
   package: "ZAC_SHR_PKG"
-  super_package: "ZADT_TEST"                 # ← CHANGE: parent package (same as environment.default_package)
-  software_component: ""                     # e.g., HOME (leave empty for cloud)
-  transport_layer: ""                        # e.g., ZE19 (leave empty for cloud)
+  super_package: "<DEV_PACKAGE>"              # ← CHANGE: parent package (same as environment.default_package)
+  software_component: ""                     # ← CHANGE (on-prem): e.g. HOME (leave empty for cloud)
+  transport_layer: ""                        # ← CHANGE (on-prem): e.g. Z<SID> (leave empty for cloud)
 
   domains:
     - name: "ZAC_SHR_GA_DOM"
@@ -1000,13 +1019,18 @@ create_package:
       available_in: ["onprem", "cloud"]
       description: "Package reserved for AdtPackage tests"
       params:
-        package_name: "ZADT_TEST"                 # ← CHANGE: parent package (existing, must be structure/main type)
+        package_name: "<DEV_PACKAGE>"              # ← CHANGE: parent package (existing, must be structure/main type)
         test_package: "ZAC_INNER_PKG02"    # Package created by the test
         description: "AdtPackage workflow package"
         updated_description: "AdtPackage workflow package - updated"  # Description for update operation
         package_type: "development"             # Optional: development, main, structure, etc.
         software_component: "HOME"              # ← CHANGE: on-prem "HOME", cloud "ZLOCAL"
-        transport_layer: ""                        # ← CHANGE (on-prem only): transport layer, e.g. "ZE19"
+        record_changes: true                    # A package under a transportable parent MUST record
+                                                #   changes, or create is refused with `TR 432`,
+                                                #   "Change recording must be activated for package …"
+                                                #   — and the symptom is the package never becoming
+                                                #   readable, which reads like a timing problem.
+        transport_layer: ""                        # ← CHANGE (on-prem only): transport layer, e.g. "Z<SID>"
         # transport_request: ""                 # Uses environment.default_transport if omitted
 
 # Create Domain
@@ -1651,6 +1675,13 @@ create_transport:
       description: "Transport reserved for AdtRequest tests"
       params:
         description: "AdtRequest workflow transport"
+        target_system: ""                     # ← CHANGE (on-prem): the transport target WITHOUT slashes,
+                                              #   as SE10 shows it between them — `AdtRequest.create`
+                                              #   adds the slashes itself, so "/FOO/" here is wrong.
+                                              #   This block creates one request and deletes it again, and
+                                              #   without a target it cannot carry an object out of a
+                                              #   package on a transport layer: `CTS_WBO_API 048`,
+                                              #   "Request … does not have transport target /…/".
         # package_name: "ZAC_PKG01"
 
 # Create Behavior Definition
