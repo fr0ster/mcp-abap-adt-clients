@@ -2182,6 +2182,97 @@ async function ensureSharedPackage(client, logger) {
  */
 
 /**
+ * Read the document a document-only type's update has to send back.
+ *
+ * **A read that answers nothing is not a document.** ADT answers a read of an
+ * object that is not ready yet with HTTP 200 and an empty body, and patching
+ * that would assemble a document out of air — which is how a write ends up
+ * shipping without the field it was supposed to carry, and the server gets
+ * blamed for refusing it. An empty body is a failure here, named for the
+ * object, and retried a few times because "not ready yet" passes.
+ */
+async function readDocumentForUpdate(read, what, logger) {
+  let last = '';
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    const answer = await read();
+    if (!answer.ok) {
+      const failure = answer.getError();
+      throw new Error(`${what} failed [${failure.origin}]: ${failure.message}`);
+    }
+    last = String(answer.getResult().value ?? '');
+    if (last.trim() !== '') return last;
+    logger?.debug?.(`${what} came back empty (attempt ${attempt}), retrying`);
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+  throw new Error(
+    `${what} came back empty three times — ADT answers a read of an object ` +
+      'that is not ready with 200 and no body, and there is nothing to patch',
+  );
+}
+
+/**
+ * The configured shape, patched into the document the server just gave us.
+ *
+ * **The create makes a shell and the update is what gives it a type.** A
+ * domain's POST carries the description, the language and the package
+ * reference, and nothing else — `<doma:datatype/>` comes back empty and
+ * `<doma:length>` reads `000000`. Passing `datatype` and `length` to the update
+ * as loose fields did nothing either: since 19.0.0 the update writes
+ * `config.document` and merges nothing, so a config without one PUT
+ * `undefined`. Every shared domain has been sitting there with no data type.
+ *
+ * Lengths are written as the six digits the server itself serialises, rather
+ * than the bare number the pre-19.0.0 merge used, so the document goes back in
+ * the shape it came out.
+ */
+function domainDocumentFor(current, depConfig) {
+  // Required here rather than at the top: this module is loaded by plain node
+  // as well as by ts-jest, and only the latter can resolve a TypeScript path.
+  const {
+    patchIf,
+    patchXmlAttribute,
+    patchXmlElement,
+  } = require('../../utils/xmlPatch');
+  let xml = patchXmlAttribute(
+    current,
+    'adtcore:description',
+    (depConfig.description || 'Shared test domain').slice(0, 60),
+  );
+  xml = patchXmlElement(xml, 'doma:datatype', depConfig.datatype || 'CHAR');
+  xml = patchXmlElement(
+    xml,
+    'doma:length',
+    String(depConfig.length || 10).padStart(6, '0'),
+  );
+  return patchIf(xml, depConfig.decimals, (x, val) =>
+    patchXmlElement(x, 'doma:decimals', String(val).padStart(6, '0')),
+  );
+}
+
+/** The same, for a data element: its type kind and the domain it points at. */
+function dataElementDocumentFor(current, depConfig) {
+  const {
+    patchXmlAttribute,
+    patchXmlElement,
+  } = require('../../utils/xmlPatch');
+  let xml = patchXmlAttribute(
+    current,
+    'adtcore:description',
+    (depConfig.description || 'Shared test data element').slice(0, 60),
+  );
+  const typeKind = depConfig.type_kind || 'domain';
+  xml = patchXmlElement(xml, 'dtel:typeKind', typeKind);
+  if (typeKind === 'domain' && depConfig.domain_name) {
+    xml = patchXmlElement(
+      xml,
+      'dtel:typeName',
+      String(depConfig.domain_name).toUpperCase(),
+    );
+  }
+  return xml;
+}
+
+/**
  * Update source and activate an existing shared dependency.
  * Called when object exists but may have outdated or inactive source.
  */
@@ -2495,33 +2586,42 @@ async function ensureSharedDependency(client, type, name, logger) {
       // reads back.
       try {
         if (type === 'domains') {
+          // Read, edit, then lock — the order the migration note prescribes.
+          // Reading inside the lock window would invent a sequence the library
+          // no longer performs.
+          const current = await readDocumentForUpdate(
+            () => client.getDomain().readMetadata({ domainName: name }),
+            `read shared domain ${name}`,
+            logger,
+          );
           mustSucceed(
             await writeAndActivate(
               client.getDomain(),
               {
                 domainName: name,
                 packageName,
-                description: depConfig.description || 'Shared test domain',
-                datatype: depConfig.datatype || 'CHAR',
-                length: depConfig.length || 10,
                 transportRequest,
+                document: domainDocumentFor(current, depConfig),
               },
               undefined,
             ),
             `shared domain update ${name}`,
           );
         } else {
+          const current = await readDocumentForUpdate(
+            () =>
+              client.getDataElement().readMetadata({ dataElementName: name }),
+            `read shared data element ${name}`,
+            logger,
+          );
           mustSucceed(
             await writeAndActivate(
               client.getDataElement(),
               {
                 dataElementName: name,
                 packageName,
-                description:
-                  depConfig.description || 'Shared test data element',
-                typeKind: depConfig.type_kind || 'domain',
-                typeName: depConfig.domain_name,
                 transportRequest,
+                document: dataElementDocumentFor(current, depConfig),
               },
               undefined,
             ),
@@ -2562,7 +2662,16 @@ async function ensureSharedDependency(client, type, name, logger) {
       );
       // A domain carries no source: create only makes the shell, update fills
       // in the type, and without that step it stays an empty object with no
-      // data type at all.
+      // data type at all. Which is what happened, for as long as the fields
+      // were passed here as fields: the update writes `config.document` and
+      // merges nothing, so a config without one sent `undefined` and the shell
+      // stayed a shell. The document the create just answered is read back,
+      // patched, and written whole.
+      const createdDomain = await readDocumentForUpdate(
+        () => client.getDomain().readMetadata({ domainName: name }),
+        `read shared domain ${name} after create`,
+        logger,
+      );
       mustSucceed(
         await writeAndActivate(
           client.getDomain(),
@@ -2574,10 +2683,8 @@ async function ensureSharedDependency(client, type, name, logger) {
             // then the object existed and the reconcile branch — which does pass
             // it — took over. A defect only a fresh system ever sees.
             packageName,
-            description: depConfig.description || 'Shared test domain',
-            datatype: depConfig.datatype || 'CHAR',
-            length: depConfig.length || 10,
             transportRequest,
+            document: domainDocumentFor(createdDomain, depConfig),
           },
           undefined,
         ),
@@ -2595,6 +2702,11 @@ async function ensureSharedDependency(client, type, name, logger) {
         }),
         `shared dataelement create ${name}`,
       );
+      const createdElement = await readDocumentForUpdate(
+        () => client.getDataElement().readMetadata({ dataElementName: name }),
+        `read shared data element ${name} after create`,
+        logger,
+      );
       mustSucceed(
         await writeAndActivate(
           client.getDataElement(),
@@ -2603,10 +2715,8 @@ async function ensureSharedDependency(client, type, name, logger) {
             // Same omission as the domain above, and the same fresh-system-only
             // failure waiting behind it.
             packageName,
-            description: depConfig.description || 'Shared test data element',
-            typeKind: depConfig.type_kind || 'domain',
-            typeName: depConfig.domain_name,
             transportRequest,
+            document: dataElementDocumentFor(createdElement, depConfig),
           },
           undefined,
         ),
@@ -3000,6 +3110,8 @@ function resetSharedDependencyCache() {
 }
 
 module.exports = {
+  domainDocumentFor,
+  dataElementDocumentFor,
   loadTestConfig,
   getSessionConfig,
   getEnabledTestCase,

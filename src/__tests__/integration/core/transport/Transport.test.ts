@@ -24,6 +24,7 @@ import {
   getSystemInformation,
   isCloudEnvironment,
 } from '../../../../utils/systemInfo';
+import { patchXmlElement } from '../../../../utils/xmlPatch';
 import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
@@ -556,9 +557,7 @@ describe('AdtRequest', () => {
             packageName,
             transportRequest: sharedRequest,
             description: 'AdtRequest object-list round trip',
-            datatype: 'CHAR',
-            length: 4,
-          } as any);
+          });
           if (!madeIt.ok) {
             logTestSkip(
               testsLogger,
@@ -567,6 +566,66 @@ describe('AdtRequest', () => {
             );
             return;
           }
+
+          // **The create makes a shell, and only the update gives it a type.**
+          // `datatype` and `length` used to be passed to `create`, which does
+          // not send them: its POST carries the description, the language and
+          // the package reference, and nothing else. The recorded answer shows
+          // what comes back — `<doma:datatype/>` empty, `<doma:length>000000`.
+          // So every run registered a domain with no data type at all, and the
+          // `as any` was what let the two dead fields through the compiler.
+          //
+          // The update is a replace, never a merge: since 19.0.0 nothing is
+          // read on this side to merge into, so the caller sends the WHOLE
+          // document. Read it, fill the two elements in, write it back.
+          logTestStep(`give ${domainName} its data type`, testsLogger);
+          const shell = await domain.readMetadata({ domainName });
+          const shellDocument = String(shell.ok ? shell.getResult().value : '');
+          if (shellDocument.trim() === '') {
+            // A 200 with an empty body is how ADT answers a read of something
+            // not ready yet, and patching that would build a document out of
+            // nothing. Nothing below can run without it.
+            logTestSkip(
+              testsLogger,
+              label,
+              `${domainName} was created but its document read back empty`,
+            );
+            return;
+          }
+          const typed = patchXmlElement(
+            patchXmlElement(shellDocument, 'doma:datatype', 'CHAR'),
+            'doma:length',
+            '000004',
+          );
+          const domainLock = await domain.lock({ domainName });
+          if (!domainLock.ok) {
+            logTestSkip(
+              testsLogger,
+              label,
+              `could not lock ${domainName}: ${domainLock.getError().message}`,
+            );
+            return;
+          }
+          const domainHandle = domainLock.getResult().value;
+          try {
+            const typedIn = await domain.updateMetadata(
+              {
+                domainName,
+                packageName,
+                transportRequest: sharedRequest,
+                document: typed,
+              },
+              { lockHandle: domainHandle },
+            );
+            if (!typedIn.ok) {
+              testsLogger.warn?.(
+                `${domainName} kept its empty type: ${typedIn.getError().message}`,
+              );
+            }
+          } finally {
+            await domain.unlock({ domainName }, domainHandle);
+          }
+
           await domain.delete({ domainName, transportRequest: sharedRequest });
 
           logTestStep('find the entry the deletion left behind', testsLogger);
