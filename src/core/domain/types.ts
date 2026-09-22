@@ -122,6 +122,13 @@ export interface ICreateDomainParams {
   masterSystem?: string;
   responsible?: string;
   masterLanguage?: string;
+  /**
+   * What the domain is, carried in `doma:content` when any of the three is
+   * given. Give none and the body is byte for byte the one that carried none.
+   */
+  datatype?: string;
+  length?: number;
+  decimals?: number;
 }
 
 export interface IDeleteDomainParams {

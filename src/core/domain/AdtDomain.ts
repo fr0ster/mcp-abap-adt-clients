@@ -163,6 +163,11 @@ export class AdtDomain<R extends IDomainResults = typeof domainDocuments>
           package_name: config.packageName as string,
           transport_request: config.transportRequest,
           description: config.description as string,
+          // Sent now, not merely accepted: see `create.ts` for the measurement
+          // and for why an absent field leaves the body unchanged.
+          datatype: config.datatype,
+          length: config.length,
+          decimals: config.decimals,
           masterSystem: this.systemContext.masterSystem,
           responsible: this.systemContext.responsible,
           masterLanguage:
