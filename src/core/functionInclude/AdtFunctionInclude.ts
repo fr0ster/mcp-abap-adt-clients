@@ -28,7 +28,6 @@ import type {
   IAdtUpdatable,
   IAdtValidatable,
   IAdtVersionable,
-  ICreateFunctionIncludeParams,
   ILogger,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces';
@@ -49,6 +48,7 @@ import {
 import { lockFunctionInclude } from './lock';
 import { readFunctionInclude } from './read';
 import { readFunctionIncludeSource } from './readSource';
+import type { ICreateFunctionIncludeParams } from './types';
 import {
   functionIncludeDocuments,
   type IFunctionIncludeConfig,
@@ -146,8 +146,6 @@ export class AdtFunctionInclude<
       include_name: config.includeName,
       description: config.description,
       transport_request: config.transportRequest,
-      master_system: config.masterSystem ?? this.systemContext.masterSystem,
-      responsible: config.responsible ?? this.systemContext.responsible,
     };
   }
 

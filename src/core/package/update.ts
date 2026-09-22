@@ -9,11 +9,11 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-  IUpdatePackageParams,
 } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_PACKAGE, CT_PACKAGE } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
+import type { IUpdatePackageParams } from './types';
 
 /**
  * Write the document the caller built.
