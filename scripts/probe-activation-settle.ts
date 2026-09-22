@@ -53,33 +53,24 @@
  * already says `runs:status="finished" runs:progressPercentage="100"`. So the
  * shape exists, and for this workload it completes within the first read too.
  *
- * **And the surprise: activating a group does not clear `FUGR/F` here.** After
- * the first activation the group's own entry stayed on the list through every
- * run, while both endpoints insisted there was nothing to do —
- * `checkExecuted="false" activationExecuted="false" generationExecuted="true"`,
- * zero `msg` children, from `/activation` and from `results/{id}` alike. The
- * entry reads `ioc:deleted="false"`, `adtcore:type="FUGR/F"`, and an empty
- * `<ioc:transport/>`. So on this system a repair that activates the group
- * removes the regenerated `SAPL<group>` and leaves the group itself listed —
- * and neither `ok` nor `activationExecuted` can tell you that, which is the
- * whole reason the list is read here instead of the answer.
+ * **And which activation clears which entry.** Creating an include puts THREE
+ * things on the list: `FUGR/F <group>`, the include, and the regenerated
+ * `SAPL<group>`. Activating the GROUP clears only the last of them — the other
+ * two stay, and stay through seconds of polling, with both endpoints reporting
+ * nothing left to do. Activating the INCLUDE clears the include **and the
+ * group's own entry with it**, 3 cycles out of 3.
  *
- * PR #157 measured both entries clearing on an on-premise system. Whether the
- * difference is the system or the object's history is open, and this probe is
- * how to settle it there: run it and read step [7].
+ * So `FUGR/F` is not stuck and this is not a cloud quirk: the group's entry
+ * waits for the parts underneath it, and the group's activation does not reach
+ * them. An earlier reading of these runs called it "scope, not timing" and
+ * left it there — which was measuring the probe's own leftovers, since an
+ * include it had created and not activated was holding the group's entry open
+ * the whole time. With nothing inactive underneath, the group's activation
+ * clears the group.
  *
- * **The cycles say the same thing from nine more observations.** Creating an
- * include puts two entries on the list — the include itself and the regenerated
- * `SAPL<group>`. Activating the group answers `activationExecuted="true"` in
- * 748–1386ms, and on the read taken straight after, 526–965ms later,
- * `SAPL<group>` is **always** already gone: 9 cycles out of 9, over two runs.
- * Nothing about this endpoint ever answered ahead of its own work.
- *
- * What stays behind is the include, and it stays for good: polled for ~5.5s in
- * each of four cycles, it never cleared. That is scope rather than timing — the
- * POST names the GROUP, and an include under it is its own object with its own
- * activation. Which is the lesson for the repair in PR #157: activating the
- * group is not the same as activating what was written inside it.
+ * Which is what the repair in PR #157 does, and why it is right: a suite hands
+ * back a group whose include it has already deleted, and activating the group
+ * is then the whole of the work.
  *
  * The first version of this loop is worth keeping in mind. It rewrote an
  * existing include instead of creating one, which regenerates nothing, watched
@@ -252,18 +243,20 @@ async function main(): Promise<void> {
     }
     say('');
 
-    // Writing an include is what the FunctionInclude suite does, and what makes
-    // the server regenerate `SAPL<group>`. It is therefore the state the
-    // question is actually about — not a freshly created group, which is
-    // inactive for a simpler reason.
-    say('[4] make it inactive by writing an include');
+    // **Creating an include is what regenerates `SAPL<group>`; rewriting one
+    // is not.** The first version of this step wrote a source into the include
+    // whatever its state, which measured nothing — the cycles in [10] show a
+    // rewrite leaves the list untouched — and destroyed whatever an existing
+    // include held, with no copy kept anywhere. So this creates, and never
+    // writes into an include it did not create.
+    say('[4] make it inactive by creating an include');
     const existing = await client
       .getFunctionInclude()
       .readMetadata({ functionGroupName: group, includeName: include });
-    if (
-      !existing.ok ||
-      String(existing.getResult().value ?? '').trim() === ''
-    ) {
+    if (existing.ok && String(existing.getResult().value ?? '').trim() !== '') {
+      say(`  ${include} is already there and is left exactly as it is`);
+      say('  (nothing is written into an include this probe did not create)');
+    } else {
       const madeInclude = await client.getFunctionInclude().create({
         functionGroupName: group,
         includeName: include,
@@ -272,34 +265,10 @@ async function main(): Promise<void> {
       });
       say(`  include create ok=${madeInclude.ok}`);
       if (!madeInclude.ok) say(`  refused: ${madeInclude.getError().message}`);
-    } else {
-      say('  include already there');
     }
-
-    const lock = await client
-      .getFunctionInclude()
-      .lock({ functionGroupName: group, includeName: include });
-    if (!lock.ok) {
-      say(`  lock refused: ${lock.getError().message}`);
-      say('VERDICT: cannot probe — could not write the include');
-      return;
-    }
-    const lockHandle = lock.getResult().value;
-    const stamp = new Date().toISOString();
-    const written = await client.getFunctionInclude().update(
-      { functionGroupName: group, includeName: include, transportRequest },
-      {
-        lockHandle,
-        sourceCode: `*&---------------------------------------------------------------------*\n*& Include ${include}\n*&---------------------------------------------------------------------*\nDATA: gv_probe TYPE string VALUE '${stamp}'.\n`,
-      },
-    );
-    say(`  write ok=${written.ok}`);
-    await client
-      .getFunctionInclude()
-      .unlock({ functionGroupName: group, includeName: include }, lockHandle);
     say('');
 
-    say('[5] inactive list after the write');
+    say('[5] inactive list after that');
     const dirtied = stillListed(await inactiveNames(connection), group);
     say(`  ours: ${dirtied.join(', ') || '(none)'}`);
     if (dirtied.length === 0) {
@@ -517,6 +486,28 @@ async function main(): Promise<void> {
             );
           }
         }
+        // **Which activation clears which entry.** The group's own activation
+        // leaves the include listed, and the group's entry with it. So the
+        // cycle now activates the INCLUDE too and reads the list again: if
+        // both go at that point, `FUGR/F` was never stuck — it was waiting for
+        // the part underneath it, and the repair a suite owes a borrowed group
+        // is to activate what it wrote, not the container.
+        const includeAnswer = await client
+          .getFunctionInclude()
+          .activate({ functionGroupName: group, includeName: probeInclude });
+        const afterInclude = stillListed(
+          await inactiveNames(connection),
+          group,
+        );
+        const includeGone = !(await inactiveNames(connection)).some((n) =>
+          n.endsWith(probeInclude),
+        );
+        say(
+          `           then activating the include itself: ok=${includeAnswer.ok}` +
+            ` | include gone=${includeGone}` +
+            ` | group entries left: ${afterInclude.join(', ') || '(none)'}`,
+        );
+
         cycleWork.push({ appeared, left, lingering });
 
         const removed = await client.getFunctionInclude().delete({
@@ -590,10 +581,13 @@ async function main(): Promise<void> {
           say(
             `  ${neverSettled.length} never cleared within the budget: ${names}.`,
           );
-          say('  Nothing that waits this long is waiting. Those entries are');
-          say('  outside what this POST activates — scope, not timing. The');
-          say('  activation this probe sends names the GROUP, and an include');
-          say('  under it is its own object with its own activation.');
+          say('  Nothing that waits this long is waiting — this is scope, not');
+          say('  timing: the POST names the GROUP, and an include under it is');
+          say('  its own object with its own activation. The per-cycle line');
+          say(
+            '  above says what activating the include then cleared, which on',
+          );
+          say("  the measured runs was the include AND the group's own entry.");
         }
       }
     }

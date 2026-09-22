@@ -2415,6 +2415,12 @@ async function updateAndActivateShared(
  * which comes back inactive, and the module's branch activates the module,
  * not the group.
  *
+ * **Answers the state, not the request.** `true` here means the group is off
+ * the inactive list, which took two requests to establish and is the only
+ * claim worth making: a caller uses this answer to decide whether the
+ * dependency may be cached as verified, and caching an activation that did not
+ * land writes down exactly what this exists to remove.
+ *
  * A refusal is logged rather than thrown: this is a dependency being made
  * ready, and a suite that reads the group should not go red because the group
  * could not be activated — it should fail on what it was actually testing.
@@ -2428,14 +2434,50 @@ async function activateSharedFunctionGroup(
   const answer = await client
     .getFunctionGroup()
     .activate({ functionGroupName: name, transportRequest });
-  if (answer.ok) {
-    logger?.info?.(`Shared function group ${name} activated`);
-  } else {
+  if (!answer.ok) {
     logger?.warn?.(
       `Shared function group ${name} could not be activated: ${answer.getError().message}`,
     );
+    return false;
   }
-  return answer.ok;
+
+  // **The POST answering is not the group being active.** No `analyse` is
+  // passed, so `ok` means the request came back — and ADT puts a refusal inside
+  // a 200, which makes `ok` true for "activated" and for "will not activate"
+  // alike. Measured with `scripts/probe-activation-settle.ts` on the cloud
+  // trial: `activationExecuted="true"`, no `msg` children, and `FUGR/F` still
+  // on the inactive list afterwards — the exact state this repair exists to
+  // remove, about to be recorded as removed.
+  //
+  // So the list decides. It is the only resource that answers "is it active
+  // NOW", and reading it straight after the POST is sound because that POST
+  // does its work before it answers — nine cycles of nine, same probe.
+  const listed = await client.getUtils().getInactiveObjects();
+  if (!listed.ok) {
+    logger?.warn?.(
+      `Shared function group ${name} was activated, but the inactive list ` +
+        `could not be read to confirm it: ${listed.getError().message}`,
+    );
+    return false;
+  }
+
+  // The group and the main program the server regenerates for it — both were
+  // on the list when this defect was found, and either one left behind is a
+  // group the next suite inherits broken.
+  const wanted = [name.toUpperCase(), `SAPL${name.toUpperCase()}`];
+  const stillInactive = (listed.getResult().value?.objects ?? []).filter((o) =>
+    wanted.includes(String(o.name ?? '').toUpperCase()),
+  );
+  if (stillInactive.length > 0) {
+    logger?.warn?.(
+      `Shared function group ${name} answered an activation but is still ` +
+        `inactive: ${stillInactive.map((o) => `${o.type} ${o.name}`).join(', ')}`,
+    );
+    return false;
+  }
+
+  logger?.info?.(`Shared function group ${name} activated`);
+  return true;
 }
 
 async function ensureSharedDependency(client, type, name, logger) {
@@ -2688,8 +2730,10 @@ async function ensureSharedDependency(client, type, name, logger) {
     // `FUGR/F ZAC_SHR_FUGR` and `FUGR/I SAPLZAC_SHR_FUGR` — every run left
     // them so, and every run passed.
     //
-    // Activation is idempotent, so this costs one request and asserts nothing
-    // about how the group got into that state.
+    // Activation is idempotent, so this asserts nothing about how the group got
+    // into that state. It costs two requests, not one: the second reads the
+    // inactive list, because the answer to the first says only that the server
+    // replied — see `activateSharedFunctionGroup`.
     //
     // A refusal is not cached as verified. The cache is what makes the next
     // call skip this check outright, so caching a group that could not be
