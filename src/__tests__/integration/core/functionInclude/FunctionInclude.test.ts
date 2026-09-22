@@ -29,6 +29,7 @@ import {
 import {
   createConnectionLogger,
   createLibraryLogger,
+  createRunIntegrityLogger,
   createTestsLogger,
 } from '../../../helpers/testLogger';
 import { logTestSkip, logTestStep } from '../../../helpers/testProgressLogger';
@@ -170,7 +171,12 @@ describe('FunctionInclude (using AdtClient)', () => {
    * suite to read it inherits that.
    *
    * A refusal is logged rather than thrown: the tests here already ran, and
-   * their verdict is not this cleanup's to overturn.
+   * their verdict is not this cleanup's to overturn. But it is logged where it
+   * can be seen — `createRunIntegrityLogger`, not `testsLogger`, which answers
+   * `emptyLogger` unless someone set `DEBUG_ADT_TESTS` beforehand. A shared
+   * group left inactive is a fact about the run, not a diagnostic: the suite
+   * it breaks is the next one, and without the line that reads as the next
+   * suite being at fault.
    *
    * The repair goes BEFORE `tester.afterAll()`, which releases the connection.
    * On a run that shares one session it is a no-op and the order would not
@@ -188,7 +194,7 @@ describe('FunctionInclude (using AdtClient)', () => {
           client,
           functionGroupName,
           undefined,
-          testsLogger,
+          createRunIntegrityLogger(),
         );
       }
     } finally {

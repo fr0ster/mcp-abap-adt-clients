@@ -202,6 +202,14 @@ async function main(): Promise<void> {
   const connection = await createTestConnection(logger);
   const client = new AdtClient(connection, logger);
 
+  // **What this run created, this run takes away.** An include left behind is
+  // not merely untidy: it is inactive, it holds the group's own `FUGR/F` entry
+  // open, and the next run then measures that instead of what it came to
+  // measure. This probe has already been wrong once for exactly that reason —
+  // an earlier reading called the group's entry stuck on cloud while the
+  // leftover was holding it.
+  let weCreatedTheInclude = false;
+
   try {
     say(`probe-activation-settle — group ${group}, include ${include}`);
     say(`  objects live in package ${packageName}`);
@@ -257,6 +265,7 @@ async function main(): Promise<void> {
       say(`  ${include} is already there and is left exactly as it is`);
       say('  (nothing is written into an include this probe did not create)');
     } else {
+      weCreatedTheInclude = true;
       const madeInclude = await client.getFunctionInclude().create({
         functionGroupName: group,
         includeName: include,
@@ -592,6 +601,23 @@ async function main(): Promise<void> {
       }
     }
   } finally {
+    if (weCreatedTheInclude) {
+      say(`[cleanup] removing ${include}, which this run created`);
+      const removed = await client.getFunctionInclude().delete({
+        functionGroupName: group,
+        includeName: include,
+        transportRequest,
+      });
+      say(`  delete ok=${removed.ok}`);
+      if (!removed.ok) say(`  refused: ${removed.getError().message}`);
+      // Deleting an include regenerates `SAPL<group>` in its turn, so the
+      // group is activated once more — otherwise the tidy-up leaves behind the
+      // very thing it was tidying.
+      const settled = await activateFunctionGroup(connection, group);
+      say(`  group activated again: status ${settled.status}`);
+      const left = stillListed(await inactiveNames(connection), group);
+      say(`  list on the way out: ${left.join(', ') || '(clear)'}`);
+    }
     await releaseTestConnection(connection);
   }
 }
