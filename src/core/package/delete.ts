@@ -7,7 +7,6 @@ import type {
   IAbapConnection,
   IAdtError,
   IAdtWireResponse,
-  IDeletePackageParams,
 } from '@mcp-abap-adt/interfaces';
 import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
@@ -20,6 +19,7 @@ import {
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { requestOf } from '../../utils/requestTrace';
 import { getTimeout } from '../../utils/timeouts';
+import type { IDeletePackageParams } from './types';
 
 /**
  * Check if package can be deleted (deletion check)

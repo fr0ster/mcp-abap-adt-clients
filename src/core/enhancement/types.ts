@@ -31,13 +31,6 @@ export const ENHANCEMENT_TYPE_CODES: Record<EnhancementType, string> = {
 /**
  * Low-level function parameters (snake_case) — defined in @mcp-abap-adt/interfaces
  */
-export type {
-  ICheckEnhancementParams,
-  ICreateEnhancementParams,
-  IDeleteEnhancementParams,
-  IUpdateEnhancementParams,
-  IValidateEnhancementParams,
-} from '@mcp-abap-adt/interfaces';
 
 /**
  * Get ADT base URL for enhancement type
@@ -157,3 +150,55 @@ export const enhancementDocuments = {
   transport: rawDocument,
   deletionCheck: rawDocument,
 } satisfies IEnhancementResults;
+
+/**
+ * The shapes below describe the argument of the request builders in this
+ * module, and they used to be declared in `@mcp-abap-adt/interfaces`. Nobody
+ * outside this package ever accepted them — no parameter, field or return
+ * anywhere else was typed by one — and being nobody's contract is how 85 of
+ * their fields came to be ignored by the very code that took them, for
+ * releases, unnoticed. They live here now, beside the function that reads
+ * them, which is the only place that can keep them honest. See decision 30 in
+ * the interfaces repository.
+ */
+
+export interface ICheckEnhancementParams {
+  enhancement_name: string;
+  enhancement_type: EnhancementType;
+  version?: 'active' | 'inactive';
+  source_code?: string;
+}
+
+export interface ICreateEnhancementParams {
+  enhancement_name: string;
+  enhancement_type: EnhancementType;
+  description?: string;
+  package_name: string;
+  transport_request?: string;
+  enhancement_spot?: string;
+  badi_definition?: string;
+  masterSystem?: string;
+  responsible?: string;
+  masterLanguage?: string;
+}
+
+export interface IDeleteEnhancementParams {
+  enhancement_name: string;
+  enhancement_type: EnhancementType;
+  transport_request?: string;
+}
+
+export interface IUpdateEnhancementParams {
+  enhancement_name: string;
+  enhancement_type: EnhancementType;
+  source_code: string;
+  lock_handle: string;
+  transport_request?: string;
+}
+
+export interface IValidateEnhancementParams {
+  enhancement_name: string;
+  enhancement_type: EnhancementType;
+  package_name?: string;
+  description?: string;
+}

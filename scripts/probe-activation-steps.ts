@@ -10,8 +10,10 @@
  * exchange — status, headers, body, untruncated — because a summary is where
  * the interesting part goes missing.
  *
- * The object is a class in `$TMP`: local, no transport, nothing shared, and
- * cheap to throw away.
+ * The object is a class of its own, cheap to throw away. Where it is written —
+ * the package, and the transport if that package needs one — comes from
+ * `test-config.yaml` through the same resolver the suites use, never from a
+ * literal here.
  *
  *   npx ts-node scripts/probe-activation-steps.ts create   ZAC_ACT_PROBE
  *   npx ts-node scripts/probe-activation-steps.ts look     ZAC_ACT_PROBE
@@ -56,7 +58,23 @@ if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath, quiet: true });
 }
 
-const PACKAGE = process.env.PROBE_PACKAGE || '$TMP';
+// Package and transport come from `test-config.yaml`, through the same
+// resolver the suites use — never from a literal in a script. A probe that
+// invents a package writes objects somewhere nobody configured, and the
+// configuration is where this repository states what may be written to.
+const testHelper = require('../src/__tests__/helpers/test-helper');
+const fromConfig = (): { packageName: string; transportRequest: string } => ({
+  packageName: testHelper.resolvePackageName(undefined) ?? '',
+  transportRequest: testHelper.resolveTransportRequest(undefined) ?? '',
+});
+
+const CONFIGURED = fromConfig();
+const PACKAGE = process.env.PROBE_PACKAGE || CONFIGURED.packageName;
+// A configured package may require a transport, and then a create without one
+// is refused before it starts. Taken from the same configuration as the
+// package, for the same reason: where an object may be written, and under which
+// request, is the configuration's to state.
+const TRANSPORT = process.env.PROBE_TRANSPORT || CONFIGURED.transportRequest;
 
 const say = (line = ''): void => {
   // biome-ignore lint/suspicious/noConsole: a probe reports to whoever ran it
@@ -169,10 +187,17 @@ async function main(): Promise<void> {
     // Only the create places the object, so only the create names a package.
     // Printing it on every step said `$TMP` above an activation that had
     // nothing to do with a package, which is a log that misleads its reader.
-    if (step === 'create') say(`    package ${PACKAGE}, no transport`);
+    if (step === 'create')
+      say(
+        `    package ${PACKAGE}, transport ${TRANSPORT || '(none configured)'}`,
+      );
     say();
 
-    if (step === 'create') {
+    if (step === 'create' && !PACKAGE) {
+      say('no package: set PROBE_PACKAGE, or `default_package` in');
+      say('src/__tests__/helpers/test-config.yaml. This probe will not guess.');
+      process.exitCode = 1;
+    } else if (step === 'create') {
       // No activation, by design: the object is left inactive so the next step
       // can be watched from both sides.
       try {
@@ -181,6 +206,7 @@ async function main(): Promise<void> {
           class_name: className,
           package_name: PACKAGE,
           description: 'Activation probe (safe to delete)',
+          transport_request: TRANSPORT || undefined,
         });
         report('POST /sap/bc/adt/oo/classes', wire, Date.now() - started);
       } catch (error) {
@@ -240,7 +266,10 @@ async function main(): Promise<void> {
       await inactiveList(connection);
     } else if (step === 'delete') {
       try {
-        const wire = await deleteClass(connection, { class_name: className });
+        const wire = await deleteClass(connection, {
+          class_name: className,
+          transport_request: TRANSPORT || undefined,
+        });
         report('DELETE the class', wire);
       } catch (error) {
         reportFailure('DELETE the class', error);

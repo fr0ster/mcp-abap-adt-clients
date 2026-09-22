@@ -18,7 +18,6 @@ import { parseTransportTree } from './parseTransportTree';
 
 // Types defined in @mcp-abap-adt/interfaces
 export type {
-  ICreateTransportParams,
   IListTransportsParams,
   ITransportConfig,
 } from '@mcp-abap-adt/interfaces';
@@ -194,3 +193,21 @@ export const transportDocuments = {
   actionLog: rawDocument,
   objects: (answer) => parseObjectEntries(answer.data),
 } satisfies ITransportResults;
+
+/**
+ * The shapes below describe the argument of the request builders in this
+ * module, and they used to be declared in `@mcp-abap-adt/interfaces`. Nobody
+ * outside this package ever accepted them — no parameter, field or return
+ * anywhere else was typed by one — and being nobody's contract is how 85 of
+ * their fields came to be ignored by the very code that took them, for
+ * releases, unnoticed. They live here now, beside the function that reads
+ * them, which is the only place that can keep them honest. See decision 30 in
+ * the interfaces repository.
+ */
+
+export interface ICreateTransportParams {
+  transport_type?: string;
+  description: string;
+  target_system?: string;
+  owner?: string;
+}

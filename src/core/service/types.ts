@@ -17,22 +17,10 @@ import { rawDocument } from '../../utils/resultStrategy';
 export type {
   DesiredPublicationState,
   GeneratedServiceType,
-  IActivateServiceBindingParams,
-  ICheckServiceBindingParams,
-  IClassifyServiceBindingParams,
   ICreateAndGenerateServiceBindingParams,
   ICreateAndGenerateServiceBindingParamsLegacy,
   ICreateServiceBindingParams,
-  IDeleteServiceBindingParams,
-  IGenerateServiceBindingParams,
-  IGetServiceBindingODataParams,
-  IPublishODataV2Params,
-  IReadServiceBindingParams,
   IServiceBindingConfig,
-  ITransportCheckServiceBindingParams,
-  IUnpublishODataV2Params,
-  IUpdateServiceBindingParams,
-  IValidateServiceBindingParams,
   ServiceBindingType,
   ServiceBindingVariant,
   ServiceBindingVersion,
@@ -198,4 +186,92 @@ export interface IServiceGroupParams {
   servicename?: string;
   serviceversion?: string;
   srvdname?: string;
+}
+
+/**
+ * The shapes below describe the argument of the request builders in this
+ * module, and they used to be declared in `@mcp-abap-adt/interfaces`. Nobody
+ * outside this package ever accepted them — no parameter, field or return
+ * anywhere else was typed by one — and being nobody's contract is how 85 of
+ * their fields came to be ignored by the very code that took them, for
+ * releases, unnoticed. They live here now, beside the function that reads
+ * them, which is the only place that can keep them honest. See decision 30 in
+ * the interfaces repository.
+ */
+
+export interface IActivateServiceBindingParams {
+  bindingName: string;
+  preauditRequested?: boolean;
+}
+
+export interface ICheckServiceBindingParams {
+  bindingName: string;
+  version?: 'active' | 'inactive';
+}
+
+export interface IClassifyServiceBindingParams {
+  objectname: string;
+  bindtype?: string;
+  bindtypeversion?: string;
+  repositoryid?: string;
+  servicename?: string;
+  serviceversion?: string;
+}
+
+export interface IDeleteServiceBindingParams {
+  bindingName: string;
+  transportRequest?: string;
+}
+
+export interface IGenerateServiceBindingParams {
+  serviceType: GeneratedServiceType;
+  bindingName: string;
+  serviceName: string;
+  serviceVersion: string;
+  serviceDefinitionName: string;
+}
+
+export interface IGetServiceBindingODataParams {
+  objectname: string;
+  servicename?: string;
+  serviceversion?: string;
+  srvdname?: string;
+}
+
+export interface IPublishODataV2Params {
+  servicename: string;
+  serviceversion?: string;
+}
+
+export interface IReadServiceBindingParams {
+  bindingName: string;
+  version?: 'active' | 'inactive';
+}
+
+export interface ITransportCheckServiceBindingParams {
+  objectName: string;
+  packageName: string;
+  description?: string;
+  operation?: 'I' | 'U' | 'D';
+}
+
+export interface IUnpublishODataV2Params {
+  servicename: string;
+  serviceversion?: string;
+}
+
+export interface IUpdateServiceBindingParams {
+  bindingName: string;
+  desiredPublicationState: DesiredPublicationState;
+  serviceType: GeneratedServiceType;
+  serviceName: string;
+  serviceVersion?: string;
+}
+
+export interface IValidateServiceBindingParams {
+  objname: string;
+  serviceDefinition: string;
+  serviceBindingVersion?: string;
+  description?: string;
+  package?: string;
 }

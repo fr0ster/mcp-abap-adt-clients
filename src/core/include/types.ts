@@ -93,3 +93,18 @@ export const includeDocuments = {
   updated: nothing,
   deletionCheck: rawDocument,
 } satisfies IIncludeResults;
+
+/**
+ * The shape of the create builder's argument, formerly in
+ * `@mcp-abap-adt/interfaces`. See decision 30 there: nobody outside this
+ * package accepted it, and it belongs beside the function that reads it.
+ */
+export interface ICreateIncludeParams {
+  includeName: string;
+  description?: string;
+  packageName: string;
+  transportRequest?: string;
+  masterSystem?: string;
+  responsible?: string;
+  masterLanguage?: string;
+}

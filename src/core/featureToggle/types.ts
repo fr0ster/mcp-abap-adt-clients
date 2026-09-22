@@ -15,8 +15,6 @@ import { rawDocument } from '../../utils/resultStrategy';
 
 // Types defined in @mcp-abap-adt/interfaces
 export type {
-  ICreateFeatureToggleParams,
-  IDeleteFeatureToggleParams,
   IFeatureToggleAttribute,
   IFeatureToggleConfig,
   IFeatureToggleHeader,
@@ -25,7 +23,6 @@ export type {
   IFeatureToggleReleasePlan,
   IFeatureToggleRollout,
   IFeatureToggleSource,
-  IToggleFeatureToggleParams,
 } from '@mcp-abap-adt/interfaces';
 
 /** What a toggle can be, as SFW reports it. */
@@ -133,3 +130,35 @@ export const featureToggleDocuments = {
   deletionCheck: rawDocument,
   metadataUpdated: rawDocument,
 } satisfies IFeatureToggleResults;
+
+/**
+ * The shapes below describe the argument of the request builders in this
+ * module, and they used to be declared in `@mcp-abap-adt/interfaces`. Nobody
+ * outside this package ever accepted them — no parameter, field or return
+ * anywhere else was typed by one — and being nobody's contract is how 85 of
+ * their fields came to be ignored by the very code that took them, for
+ * releases, unnoticed. They live here now, beside the function that reads
+ * them, which is the only place that can keep them honest. See decision 30 in
+ * the interfaces repository.
+ */
+
+export interface ICreateFeatureToggleParams {
+  feature_toggle_name: string;
+  description?: string;
+  package_name: string;
+  transport_request?: string;
+  master_system?: string;
+  responsible?: string;
+}
+
+export interface IDeleteFeatureToggleParams {
+  feature_toggle_name: string;
+  transport_request?: string;
+}
+
+export interface IToggleFeatureToggleParams {
+  feature_toggle_name: string;
+  state: 'on' | 'off';
+  is_user_specific: boolean;
+  transport_request?: string;
+}
