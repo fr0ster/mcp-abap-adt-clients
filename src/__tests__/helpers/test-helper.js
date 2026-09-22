@@ -2590,15 +2590,30 @@ async function ensureSharedDependency(client, type, name, logger) {
     //
     // Activation is idempotent, so this costs one request and asserts nothing
     // about how the group got into that state.
-    if (type === 'function_groups') {
-      await activateSharedFunctionGroup(client, name, transportRequest, logger);
-    }
-    _verifiedDependencies[cacheKey] = true;
+    //
+    // A refusal is not cached as verified. The cache is what makes the next
+    // call skip this check outright, so caching a group that could not be
+    // activated would write down exactly the state this change exists to
+    // remove — and the next call is the one chance left to fix it.
+    const ready =
+      type !== 'function_groups' ||
+      (await activateSharedFunctionGroup(
+        client,
+        name,
+        transportRequest,
+        logger,
+      ));
+    if (ready) _verifiedDependencies[cacheKey] = true;
     return { existed: true, created: false };
   }
 
   // Create the object (high-level create does full chain: validate → create → lock → update → unlock → activate)
   logger?.info?.(`Creating shared ${type} ${name}...`);
+  // Set by the function-group branch alone, and only to say the group was
+  // created but is still inactive — enough to keep the object and withhold the
+  // cache entry, so the next call looks at the group again instead of taking
+  // it on trust.
+  let activationRefused = false;
   try {
     if (type === 'domains') {
       mustSucceed(
@@ -2903,7 +2918,12 @@ async function ensureSharedDependency(client, type, name, logger) {
           verify.ok && String(verify.getResult().value ?? '').trim() !== '';
         if (!arrived) throw createErr;
       }
-      await activateSharedFunctionGroup(client, name, transportRequest, logger);
+      activationRefused = !(await activateSharedFunctionGroup(
+        client,
+        name,
+        transportRequest,
+        logger,
+      ));
     } else if (type === 'function_modules') {
       mustSucceed(
         await client.getFunctionModule().create({
@@ -3025,7 +3045,7 @@ async function ensureSharedDependency(client, type, name, logger) {
       }
     }
     logger?.info?.(`Created shared ${type} ${name}`);
-    _verifiedDependencies[cacheKey] = true;
+    if (!activationRefused) _verifiedDependencies[cacheKey] = true;
     return { existed: false, created: true };
   } catch (error) {
     if (

@@ -171,20 +171,33 @@ describe('FunctionInclude (using AdtClient)', () => {
    *
    * A refusal is logged rather than thrown: the tests here already ran, and
    * their verdict is not this cleanup's to overturn.
+   *
+   * The repair goes BEFORE `tester.afterAll()`, which releases the connection.
+   * On a run that shares one session it is a no-op and the order would not
+   * show, but under `PER_FILE_SESSION=1` the file owns its session and that
+   * call ends it — and the request below would then go out on a connection
+   * nobody holds, turning the repair into a failure at the one moment there is
+   * nothing left to repair it with.
    */
   afterAll(async () => {
-    await tester?.afterAll()();
-
-    if (!hasConfig || !client) return;
     const functionGroupName =
       tester?.getTestCaseDefinition()?.params?.function_group_name;
-    if (!functionGroupName) return;
-    await activateSharedFunctionGroup(
-      client,
-      functionGroupName,
-      undefined,
-      testsLogger,
-    );
+    try {
+      if (hasConfig && client && functionGroupName) {
+        await activateSharedFunctionGroup(
+          client,
+          functionGroupName,
+          undefined,
+          testsLogger,
+        );
+      }
+    } finally {
+      // `finally`, because releasing the connection is the part that must
+      // happen either way: the repair answers rather than throws, but the
+      // request carrying that answer can still fail outright, and a session
+      // this file owns would then stay open for the rest of the run.
+      await tester?.afterAll()();
+    }
   });
 
   describe('Full workflow', () => {
