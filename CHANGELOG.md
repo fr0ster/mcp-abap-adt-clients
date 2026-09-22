@@ -24,6 +24,63 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [21.0.0] - 2026-09-22
+
+### Removed — `@mcp-abap-adt/interfaces` ^48.0.0
+
+- **The parameter shapes moved here, where the code that reads them lives.** 84
+  `ICreate*Params` / `IUpdate*Params` types left the contract in
+  `interfaces-adt` 3.0.0 and are declared in their own module's `types.ts`
+  instead. They describe the argument of the request builders in the same
+  folder; a search of every dependent repository found them imported by nobody,
+  and twelve that *are* imported stayed behind.
+
+  Being nobody's contract is how they came to lie. **85 of their fields were
+  ignored by the very code that took them**: a domain created with
+  `datatype: 'CHAR', length: 10` came back with `<doma:datatype/>` empty, and
+  SAP refused to activate it — `DO(251) Data type ' ' does not exist`, measured
+  on a cloud trial beside a domain whose type was in the request body, which
+  activated with no messages at all. Whether a field is honoured is decided in
+  this package, which is now also where it is declared.
+
+  The compiler found every place this package was handing those fields over:
+  **44 forwarding lines in five files**, `AdtDataElement.updateMetadata` alone
+  passing nineteen.
+
+- **46 fields left 16 `IXxxConfig` types** in `interfaces-adt` 4.0.0 — the types
+  a consumer writes against. Two were worse than a dropped value: `onLock` was
+  declared on nine types and invoked on one, so a caller who passed a callback
+  was promised a call that never came; `sessionId` was declared on five and read
+  by none, the locks it was meant for taking a parameter named `_sessionId`.
+
+  `IDomainConfig` loses the eight that say what a domain *is*,
+  `IDataElementConfig` its type name and four labels, `IStructureConfig` its
+  `fields` and `includes` (a structure is built from its `ddlCode`),
+  `IFunctionModuleConfig` a `packageName` a module takes from its group,
+  `ITableTypeConfig` the row-type kind, the access type and the primary-key
+  pair.
+
+### Migration
+
+- **If you imported one of the 84 parameter types**, declare it yourself. They
+  were never re-exported from this package's `src/index.ts`, so a consumer that
+  only used the public surface is unaffected.
+- **If you set one of the 46 config fields**, stop: it was being dropped before
+  and nothing you send changes. Not setting an optional field compiles against
+  both 47.0.0 and 48.0.0, so the edit can be made before upgrading.
+- **A domain, a data element, a table type and their neighbours take their
+  shape through `document`.** Read the object with `readMetadata`, patch what
+  you mean to change, and pass the result to `updateMetadata` — the update is a
+  replace, not a merge. `docs/usage/OBJECT_LIFECYCLE.md` shows the sequence.
+
+### Fixed
+
+- **A table type's create keeps the description it was given.** Trimming the
+  update's dead fields took `description` out of the create call as well, where
+  `createTableType` does read it — an object created in between would have been
+  described by its own name. Caught in review before release.
+
+
 ## [20.0.0] - 2026-09-21
 
 ### Changed — `@mcp-abap-adt/interfaces` ^46.0.0

@@ -66,9 +66,19 @@ both: a function include, a scalar function implementation and a feature toggle.
 // a class — has a source
 await client.getClass().update({ className }, { sourceCode, lockHandle });
 
-// a domain — is its document
-await client.getDomain().updateMetadata({ domainName, datatype: 'CHAR' }, { lockHandle });
+// a domain — is its document, and the document is what you send
+const current = await client.getDomain().readMetadata({ domainName });
+const document = patched(current.getResult().value); // yours to edit
+await client.getDomain().updateMetadata({ domainName, document }, { lockHandle });
 ```
+
+**The whole document, every time.** An update is a replace, not a merge: read
+what the object holds, change what you mean to change, and pass the result.
+Fields such as a domain's data type used to sit beside `document` in the config
+and were never sent — the create did not carry them either, so an object built
+that way came back with `<doma:datatype/>` empty and SAP refused to activate it.
+They are gone as of `@mcp-abap-adt/interfaces-adt` 4.0.0; the document is the
+only channel, and it always was.
 
 This replaced a shape where one atom demanded both members from every type, and
 eight of them answered `read` and `readMetadata` with the **identical request** —
