@@ -265,13 +265,21 @@ async function main(): Promise<void> {
       say(`  ${include} is already there and is left exactly as it is`);
       say('  (nothing is written into an include this probe did not create)');
     } else {
-      weCreatedTheInclude = true;
       const madeInclude = await client.getFunctionInclude().create({
         functionGroupName: group,
         includeName: include,
         description: 'Probe include',
         transportRequest,
       });
+      // **Only a create that succeeded earns the right to delete.** Setting
+      // this before the call meant a refused create still armed the cleanup,
+      // and the cleanup would then remove an include this run did not make.
+      // Which is not a far-fetched path: the read above answers absence and a
+      // not-ready object with the same 200, so the branch can be taken over an
+      // include that is already there, the create refuses it as existing, and
+      // the tidy-up deletes somebody's object. The same destruction the write
+      // was taken out for, re-entering through the clean-up.
+      weCreatedTheInclude = madeInclude.ok;
       say(`  include create ok=${madeInclude.ok}`);
       if (!madeInclude.ok) say(`  refused: ${madeInclude.getError().message}`);
     }
@@ -519,17 +527,25 @@ async function main(): Promise<void> {
 
         cycleWork.push({ appeared, left, lingering });
 
-        const removed = await client.getFunctionInclude().delete({
-          functionGroupName: group,
-          includeName: probeInclude,
-          transportRequest,
-        });
-        if (!removed.ok) {
-          say(
-            `           cleanup: delete refused — ${removed.getError().message}`,
-          );
+        // Same rule as step [4]: the cycle removes the include only if its own
+        // create made one. A refused create means something is already there
+        // under that name, and deleting it would be this probe destroying an
+        // object it never owned.
+        if (made.ok) {
+          const removed = await client.getFunctionInclude().delete({
+            functionGroupName: group,
+            includeName: probeInclude,
+            transportRequest,
+          });
+          if (!removed.ok) {
+            say(
+              `           cleanup: delete refused — ${removed.getError().message}`,
+            );
+          }
+          await activateFunctionGroup(connection, group);
+        } else {
+          say('           cleanup: nothing to remove, the create was refused');
         }
-        await activateFunctionGroup(connection, group);
       }
       say('');
     }
