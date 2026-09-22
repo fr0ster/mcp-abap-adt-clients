@@ -102,6 +102,16 @@ if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath, quiet: true });
 }
 
+// Package and transport come from `test-config.yaml`, through the same
+// resolver the suites use — never from a literal in a script. A probe that
+// invents a package writes objects somewhere nobody configured, and the
+// configuration is where this repository states what may be written to.
+const testHelper = require('../src/__tests__/helpers/test-helper');
+const fromConfig = (): { packageName: string; transportRequest: string } => ({
+  packageName: testHelper.resolvePackageName(undefined) ?? '',
+  transportRequest: testHelper.resolveTransportRequest(undefined) ?? '',
+});
+
 const PERIOD_MS = Number(process.env.PROBE_PERIOD_MS ?? 500);
 const BUDGET_MS = Number(process.env.PROBE_BUDGET_MS ?? 30000);
 const CYCLES = Number(process.env.PROBE_CYCLES ?? 0);
@@ -195,8 +205,17 @@ async function main(): Promise<void> {
     process.argv.slice(2);
   const group = (groupArg || 'ZAC_PROBE_FUGR').toUpperCase();
   const include = (includeArg || `L${group}Z99`).toUpperCase();
-  const packageName = packageArg || process.env.SAP_PACKAGE || 'ZADT_BLD_PKG03';
-  const transportRequest = transportArg || process.env.SAP_TRANSPORT || '';
+  const configured = fromConfig();
+  const packageName = packageArg || configured.packageName;
+  const transportRequest = transportArg || configured.transportRequest;
+  if (!packageName) {
+    say('no package: name one as the third argument, or set `default_package`');
+    say(
+      'in src/__tests__/helpers/test-config.yaml. This probe will not guess.',
+    );
+    process.exitCode = 1;
+    return;
+  }
 
   const logger = createConnectionLogger();
   const connection = await createTestConnection(logger);

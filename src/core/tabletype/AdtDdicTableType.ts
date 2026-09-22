@@ -159,6 +159,7 @@ export class AdtDdicTableType<
         createTableType(connection, {
           tabletype_name: name,
           package_name: config.packageName as string,
+          description: config.description,
           transport_request: config.transportRequest,
           masterSystem: this.systemContext.masterSystem,
           responsible: this.systemContext.responsible,

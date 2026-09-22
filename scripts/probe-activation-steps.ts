@@ -56,7 +56,17 @@ if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath, quiet: true });
 }
 
-const PACKAGE = process.env.PROBE_PACKAGE || '$TMP';
+// Package and transport come from `test-config.yaml`, through the same
+// resolver the suites use — never from a literal in a script. A probe that
+// invents a package writes objects somewhere nobody configured, and the
+// configuration is where this repository states what may be written to.
+const testHelper = require('../src/__tests__/helpers/test-helper');
+const fromConfig = (): { packageName: string; transportRequest: string } => ({
+  packageName: testHelper.resolvePackageName(undefined) ?? '',
+  transportRequest: testHelper.resolveTransportRequest(undefined) ?? '',
+});
+
+const PACKAGE = process.env.PROBE_PACKAGE || fromConfig().packageName;
 
 const say = (line = ''): void => {
   // biome-ignore lint/suspicious/noConsole: a probe reports to whoever ran it
@@ -172,7 +182,11 @@ async function main(): Promise<void> {
     if (step === 'create') say(`    package ${PACKAGE}, no transport`);
     say();
 
-    if (step === 'create') {
+    if (step === 'create' && !PACKAGE) {
+      say('no package: set PROBE_PACKAGE, or `default_package` in');
+      say('src/__tests__/helpers/test-config.yaml. This probe will not guess.');
+      process.exitCode = 1;
+    } else if (step === 'create') {
       // No activation, by design: the object is left inactive so the next step
       // can be watched from both sides.
       try {

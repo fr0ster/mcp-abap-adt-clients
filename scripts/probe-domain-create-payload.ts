@@ -58,6 +58,11 @@ if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath, quiet: true });
 }
 
+// Package and transport come from `test-config.yaml`, through the same resolver
+// the suites use — never from a literal in a script. A probe that invents a
+// package writes objects somewhere nobody configured.
+const testHelper = require('../src/__tests__/helpers/test-helper');
+
 const say = (line = ''): void => {
   // biome-ignore lint/suspicious/noConsole: a probe reports to whoever ran it
   console.log(line);
@@ -109,21 +114,31 @@ function bodyWithType(
 </doma:domain>`;
 }
 
+/**
+ * **Only what this run made.** An earlier version deleted whatever stood under
+ * the probe's names before starting, and again in `finally`, without asking who
+ * put it there. The names are fixed, so a domain somebody else had created
+ * under one of them would have been destroyed by a measurement. Now an occupied
+ * name stops the run, and the clean-up removes a domain only if this run's own
+ * create answered for it.
+ */
+async function exists(
+  connection: IAbapConnection,
+  name: string,
+): Promise<boolean> {
+  try {
+    const answer = await getDomain(connection, name);
+    return String(answer.data ?? '').trim() !== '';
+  } catch {
+    return false;
+  }
+}
+
 async function removeIt(
   connection: IAbapConnection,
   name: string,
   transportRequest: string,
 ): Promise<void> {
-  try {
-    const exists = await getDomain(connection, name);
-    if (String(exists.data ?? '').trim() === '') {
-      say(`[cleanup] ${name}: nothing there`);
-      return;
-    }
-  } catch {
-    say(`[cleanup] ${name}: nothing there`);
-    return;
-  }
   try {
     const wire = await deleteDomain(connection, {
       domain_name: name,
@@ -137,21 +152,40 @@ async function removeIt(
 
 async function main(): Promise<void> {
   const [packageArg, transportArg] = process.argv.slice(2);
-  const packageName = packageArg || process.env.SAP_PACKAGE || 'ZADT_BLD_PKG03';
-  const transportRequest = transportArg || process.env.SAP_TRANSPORT || '';
+  const packageName =
+    packageArg || (testHelper.resolvePackageName(undefined) ?? '');
+  const transportRequest =
+    transportArg || (testHelper.resolveTransportRequest(undefined) ?? '');
+  if (!packageName) {
+    say('no package: name one as the first argument, or set `default_package`');
+    say(
+      'in src/__tests__/helpers/test-config.yaml. This probe will not guess.',
+    );
+    process.exitCode = 1;
+    return;
+  }
   const A = 'ZAC_DOMPAY_A';
   const B = 'ZAC_DOMPAY_B';
 
   const logger = createConnectionLogger();
   const connection = await createTestConnection(logger);
+  // What the clean-up is allowed to delete: filled in as each create answers.
+  const made: string[] = [];
 
   try {
     say(`probe-domain-create-payload — ${A} and ${B} in ${packageName}`);
     say();
 
-    // Start from nothing, so what is measured is a create and not a leftover.
-    await removeIt(connection, A, transportRequest);
-    await removeIt(connection, B, transportRequest);
+    // A name already in use belongs to somebody, and this probe will not find
+    // out the hard way whether that somebody is a previous run of itself.
+    for (const name of [A, B]) {
+      if (await exists(connection, name)) {
+        say(`${name} already exists — refusing to touch it.`);
+        say('Pass different names, or delete it yourself if it is a leftover.');
+        process.exitCode = 1;
+        return;
+      }
+    }
     say();
 
     say(`[A] created the way the library creates one — no type in the POST`);
@@ -171,6 +205,7 @@ async function main(): Promise<void> {
         }),
         Date.now() - started,
       );
+      made.push(A);
     } catch (error) {
       reportFailure('POST /sap/bc/adt/ddic/domains', error);
     }
@@ -210,6 +245,7 @@ async function main(): Promise<void> {
         wire,
         Date.now() - started,
       );
+      made.push(B);
     } catch (error) {
       reportFailure('POST /sap/bc/adt/ddic/domains (with content)', error);
     }
@@ -239,8 +275,7 @@ async function main(): Promise<void> {
     say('  and belong out of the contract.');
     say();
   } finally {
-    await removeIt(connection, A, transportRequest);
-    await removeIt(connection, B, transportRequest);
+    for (const name of made) await removeIt(connection, name, transportRequest);
     await releaseTestConnection(connection);
   }
 }
