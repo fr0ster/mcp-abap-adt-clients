@@ -103,11 +103,8 @@ describe('Domain lock registry (using AdtClient)', () => {
           packageName,
           transportRequest: resolver.getTransportRequest(),
           description: params.description,
-          datatype: params.datatype || 'CHAR',
           length: params.length || 5,
           decimals: params.decimals,
-          lowercase: params.lowercase,
-          sign_exists: params.sign_exists,
         };
       }
       hasConfig = true;

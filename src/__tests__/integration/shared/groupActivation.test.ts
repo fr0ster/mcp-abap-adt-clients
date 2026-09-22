@@ -381,7 +381,6 @@ describe('Group Activation (Shared)', () => {
             packageName: packageName,
             description:
               testCase.params.description || `Test domain for group activation`,
-            datatype: testCase.params.domain_datatype || 'CHAR',
             length: testCase.params.domain_length || 10,
             decimals: testCase.params.domain_decimals || 0,
             transportRequest: transportRequest,
