@@ -2182,6 +2182,97 @@ async function ensureSharedPackage(client, logger) {
  */
 
 /**
+ * Read the document a document-only type's update has to send back.
+ *
+ * **A read that answers nothing is not a document.** ADT answers a read of an
+ * object that is not ready yet with HTTP 200 and an empty body, and patching
+ * that would assemble a document out of air — which is how a write ends up
+ * shipping without the field it was supposed to carry, and the server gets
+ * blamed for refusing it. An empty body is a failure here, named for the
+ * object, and retried a few times because "not ready yet" passes.
+ */
+async function readDocumentForUpdate(read, what, logger) {
+  let last = '';
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    const answer = await read();
+    if (!answer.ok) {
+      const failure = answer.getError();
+      throw new Error(`${what} failed [${failure.origin}]: ${failure.message}`);
+    }
+    last = String(answer.getResult().value ?? '');
+    if (last.trim() !== '') return last;
+    logger?.debug?.(`${what} came back empty (attempt ${attempt}), retrying`);
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+  throw new Error(
+    `${what} came back empty three times — ADT answers a read of an object ` +
+      'that is not ready with 200 and no body, and there is nothing to patch',
+  );
+}
+
+/**
+ * The configured shape, patched into the document the server just gave us.
+ *
+ * **The create makes a shell and the update is what gives it a type.** A
+ * domain's POST carries the description, the language and the package
+ * reference, and nothing else — `<doma:datatype/>` comes back empty and
+ * `<doma:length>` reads `000000`. Passing `datatype` and `length` to the update
+ * as loose fields did nothing either: since 19.0.0 the update writes
+ * `config.document` and merges nothing, so a config without one PUT
+ * `undefined`. Every shared domain has been sitting there with no data type.
+ *
+ * Lengths are written as the six digits the server itself serialises, rather
+ * than the bare number the pre-19.0.0 merge used, so the document goes back in
+ * the shape it came out.
+ */
+function domainDocumentFor(current, depConfig) {
+  // Required here rather than at the top: this module is loaded by plain node
+  // as well as by ts-jest, and only the latter can resolve a TypeScript path.
+  const {
+    patchIf,
+    patchXmlAttribute,
+    patchXmlElement,
+  } = require('../../utils/xmlPatch');
+  let xml = patchXmlAttribute(
+    current,
+    'adtcore:description',
+    (depConfig.description || 'Shared test domain').slice(0, 60),
+  );
+  xml = patchXmlElement(xml, 'doma:datatype', depConfig.datatype || 'CHAR');
+  xml = patchXmlElement(
+    xml,
+    'doma:length',
+    String(depConfig.length || 10).padStart(6, '0'),
+  );
+  return patchIf(xml, depConfig.decimals, (x, val) =>
+    patchXmlElement(x, 'doma:decimals', String(val).padStart(6, '0')),
+  );
+}
+
+/** The same, for a data element: its type kind and the domain it points at. */
+function dataElementDocumentFor(current, depConfig) {
+  const {
+    patchXmlAttribute,
+    patchXmlElement,
+  } = require('../../utils/xmlPatch');
+  let xml = patchXmlAttribute(
+    current,
+    'adtcore:description',
+    (depConfig.description || 'Shared test data element').slice(0, 60),
+  );
+  const typeKind = depConfig.type_kind || 'domain';
+  xml = patchXmlElement(xml, 'dtel:typeKind', typeKind);
+  if (typeKind === 'domain' && depConfig.domain_name) {
+    xml = patchXmlElement(
+      xml,
+      'dtel:typeName',
+      String(depConfig.domain_name).toUpperCase(),
+    );
+  }
+  return xml;
+}
+
+/**
  * Update source and activate an existing shared dependency.
  * Called when object exists but may have outdated or inactive source.
  */
@@ -2310,6 +2401,83 @@ async function updateAndActivateShared(
     return;
   }
   logger?.info?.(`Shared ${type} ${name} updated and activated`);
+}
+
+/**
+ * Bring a shared function group to active, whether it was just created or was
+ * already there.
+ *
+ * **Why a group needs this and the other ten types do not.** Every other
+ * shared type carries a `source`, so the reconciliation path writes it and
+ * activates in one move. A function group has none — it is a container — and
+ * the branch that creates one simply stopped after the POST. Meanwhile
+ * creating a function module inside it makes SAP regenerate `SAPL<group>`,
+ * which comes back inactive, and the module's branch activates the module,
+ * not the group.
+ *
+ * **Answers the state, not the request.** `true` here means the group is off
+ * the inactive list, which took two requests to establish and is the only
+ * claim worth making: a caller uses this answer to decide whether the
+ * dependency may be cached as verified, and caching an activation that did not
+ * land writes down exactly what this exists to remove.
+ *
+ * A refusal is logged rather than thrown: this is a dependency being made
+ * ready, and a suite that reads the group should not go red because the group
+ * could not be activated — it should fail on what it was actually testing.
+ */
+async function activateSharedFunctionGroup(
+  client,
+  name,
+  transportRequest,
+  logger,
+) {
+  const answer = await client
+    .getFunctionGroup()
+    .activate({ functionGroupName: name, transportRequest });
+  if (!answer.ok) {
+    logger?.warn?.(
+      `Shared function group ${name} could not be activated: ${answer.getError().message}`,
+    );
+    return false;
+  }
+
+  // **The POST answering is not the group being active.** No `analyse` is
+  // passed, so `ok` means the request came back — and ADT puts a refusal inside
+  // a 200, which makes `ok` true for "activated" and for "will not activate"
+  // alike. Measured with `scripts/probe-activation-settle.ts` on the cloud
+  // trial: `activationExecuted="true"`, no `msg` children, and `FUGR/F` still
+  // on the inactive list afterwards — the exact state this repair exists to
+  // remove, about to be recorded as removed.
+  //
+  // So the list decides. It is the only resource that answers "is it active
+  // NOW", and reading it straight after the POST is sound because that POST
+  // does its work before it answers — nine cycles of nine, same probe.
+  const listed = await client.getUtils().getInactiveObjects();
+  if (!listed.ok) {
+    logger?.warn?.(
+      `Shared function group ${name} was activated, but the inactive list ` +
+        `could not be read to confirm it: ${listed.getError().message}`,
+    );
+    return false;
+  }
+
+  // The group and the main program the server regenerates for it — both were
+  // on the list when this defect was found, and either one left behind is a
+  // group the next suite inherits broken.
+  const wanted = [name.toUpperCase(), `SAPL${name.toUpperCase()}`];
+  const stillInactive = (listed.getResult().value?.objects ?? []).filter((o) =>
+    wanted.includes(String(o.name ?? '').toUpperCase()),
+  );
+  if (stillInactive.length > 0) {
+    logger?.warn?.(
+      `Shared function group ${name} answered an activation but is still ` +
+        `inactive: ${stillInactive.map((o) => `${o.type} ${o.name}`).join(', ')}`,
+    );
+    return false;
+  }
+
+  logger?.info?.(`Shared function group ${name} activated`);
+  return true;
 }
 
 async function ensureSharedDependency(client, type, name, logger) {
@@ -2495,33 +2663,42 @@ async function ensureSharedDependency(client, type, name, logger) {
       // reads back.
       try {
         if (type === 'domains') {
+          // Read, edit, then lock — the order the migration note prescribes.
+          // Reading inside the lock window would invent a sequence the library
+          // no longer performs.
+          const current = await readDocumentForUpdate(
+            () => client.getDomain().readMetadata({ domainName: name }),
+            `read shared domain ${name}`,
+            logger,
+          );
           mustSucceed(
             await writeAndActivate(
               client.getDomain(),
               {
                 domainName: name,
                 packageName,
-                description: depConfig.description || 'Shared test domain',
-                datatype: depConfig.datatype || 'CHAR',
-                length: depConfig.length || 10,
                 transportRequest,
+                document: domainDocumentFor(current, depConfig),
               },
               undefined,
             ),
             `shared domain update ${name}`,
           );
         } else {
+          const current = await readDocumentForUpdate(
+            () =>
+              client.getDataElement().readMetadata({ dataElementName: name }),
+            `read shared data element ${name}`,
+            logger,
+          );
           mustSucceed(
             await writeAndActivate(
               client.getDataElement(),
               {
                 dataElementName: name,
                 packageName,
-                description:
-                  depConfig.description || 'Shared test data element',
-                typeKind: depConfig.type_kind || 'domain',
-                typeName: depConfig.domain_name,
                 transportRequest,
+                document: dataElementDocumentFor(current, depConfig),
               },
               undefined,
             ),
@@ -2541,12 +2718,46 @@ async function ensureSharedDependency(client, type, name, logger) {
     } else {
       logger?.info?.(`Shared ${type} ${name} already exists`);
     }
-    _verifiedDependencies[cacheKey] = true;
+    // **A function group that exists can still be inactive, and nothing else
+    // here would notice.** Creating a function module inside a group makes SAP
+    // regenerate the group's main include, which comes back inactive; the
+    // module's own branch activates the module and not the group above it. A
+    // group carries no `source`, so the reconciliation above never runs for
+    // one, and `already exists` was the whole of the check.
+    //
+    // Measured on an on-premise system, 2026-09-22: after a green run of all
+    // 192 suites, `GET /sap/bc/adt/activation/inactiveobjects` still listed
+    // `FUGR/F ZAC_SHR_FUGR` and `FUGR/I SAPLZAC_SHR_FUGR` — every run left
+    // them so, and every run passed.
+    //
+    // Activation is idempotent, so this asserts nothing about how the group got
+    // into that state. It costs two requests, not one: the second reads the
+    // inactive list, because the answer to the first says only that the server
+    // replied — see `activateSharedFunctionGroup`.
+    //
+    // A refusal is not cached as verified. The cache is what makes the next
+    // call skip this check outright, so caching a group that could not be
+    // activated would write down exactly the state this change exists to
+    // remove — and the next call is the one chance left to fix it.
+    const ready =
+      type !== 'function_groups' ||
+      (await activateSharedFunctionGroup(
+        client,
+        name,
+        transportRequest,
+        logger,
+      ));
+    if (ready) _verifiedDependencies[cacheKey] = true;
     return { existed: true, created: false };
   }
 
   // Create the object (high-level create does full chain: validate → create → lock → update → unlock → activate)
   logger?.info?.(`Creating shared ${type} ${name}...`);
+  // Set by the function-group branch alone, and only to say the group was
+  // created but is still inactive — enough to keep the object and withhold the
+  // cache entry, so the next call looks at the group again instead of taking
+  // it on trust.
+  let activationRefused = false;
   try {
     if (type === 'domains') {
       mustSucceed(
@@ -2562,7 +2773,16 @@ async function ensureSharedDependency(client, type, name, logger) {
       );
       // A domain carries no source: create only makes the shell, update fills
       // in the type, and without that step it stays an empty object with no
-      // data type at all.
+      // data type at all. Which is what happened, for as long as the fields
+      // were passed here as fields: the update writes `config.document` and
+      // merges nothing, so a config without one sent `undefined` and the shell
+      // stayed a shell. The document the create just answered is read back,
+      // patched, and written whole.
+      const createdDomain = await readDocumentForUpdate(
+        () => client.getDomain().readMetadata({ domainName: name }),
+        `read shared domain ${name} after create`,
+        logger,
+      );
       mustSucceed(
         await writeAndActivate(
           client.getDomain(),
@@ -2574,10 +2794,8 @@ async function ensureSharedDependency(client, type, name, logger) {
             // then the object existed and the reconcile branch — which does pass
             // it — took over. A defect only a fresh system ever sees.
             packageName,
-            description: depConfig.description || 'Shared test domain',
-            datatype: depConfig.datatype || 'CHAR',
-            length: depConfig.length || 10,
             transportRequest,
+            document: domainDocumentFor(createdDomain, depConfig),
           },
           undefined,
         ),
@@ -2595,6 +2813,11 @@ async function ensureSharedDependency(client, type, name, logger) {
         }),
         `shared dataelement create ${name}`,
       );
+      const createdElement = await readDocumentForUpdate(
+        () => client.getDataElement().readMetadata({ dataElementName: name }),
+        `read shared data element ${name} after create`,
+        logger,
+      );
       mustSucceed(
         await writeAndActivate(
           client.getDataElement(),
@@ -2603,10 +2826,8 @@ async function ensureSharedDependency(client, type, name, logger) {
             // Same omission as the domain above, and the same fresh-system-only
             // failure waiting behind it.
             packageName,
-            description: depConfig.description || 'Shared test data element',
-            typeKind: depConfig.type_kind || 'domain',
-            typeName: depConfig.domain_name,
             transportRequest,
+            document: dataElementDocumentFor(createdElement, depConfig),
           },
           undefined,
         ),
@@ -2851,6 +3072,12 @@ async function ensureSharedDependency(client, type, name, logger) {
           verify.ok && String(verify.getResult().value ?? '').trim() !== '';
         if (!arrived) throw createErr;
       }
+      activationRefused = !(await activateSharedFunctionGroup(
+        client,
+        name,
+        transportRequest,
+        logger,
+      ));
     } else if (type === 'function_modules') {
       mustSucceed(
         await client.getFunctionModule().create({
@@ -2972,7 +3199,7 @@ async function ensureSharedDependency(client, type, name, logger) {
       }
     }
     logger?.info?.(`Created shared ${type} ${name}`);
-    _verifiedDependencies[cacheKey] = true;
+    if (!activationRefused) _verifiedDependencies[cacheKey] = true;
     return { existed: false, created: true };
   } catch (error) {
     if (
@@ -3000,6 +3227,9 @@ function resetSharedDependencyCache() {
 }
 
 module.exports = {
+  activateSharedFunctionGroup,
+  domainDocumentFor,
+  dataElementDocumentFor,
   loadTestConfig,
   getSessionConfig,
   getEnabledTestCase,

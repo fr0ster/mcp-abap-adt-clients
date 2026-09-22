@@ -29,6 +29,7 @@ import {
 import {
   createConnectionLogger,
   createLibraryLogger,
+  createRunIntegrityLogger,
   createTestsLogger,
 } from '../../../helpers/testLogger';
 import { logTestSkip, logTestStep } from '../../../helpers/testProgressLogger';
@@ -41,6 +42,7 @@ const {
   ensureSharedPackage,
   ensureSharedDependency,
   getSharedDependenciesConfig,
+  activateSharedFunctionGroup,
 } = require('../../../helpers/test-helper');
 
 const envPath =
@@ -155,7 +157,54 @@ describe('FunctionInclude (using AdtClient)', () => {
     }
   });
 
-  afterAll(() => tester?.afterAll()());
+  /**
+   * **Writing an include leaves the group above it inactive.** SAP regenerates
+   * `SAPL<group>` whenever an include inside it is written, and the
+   * regenerated main program comes back inactive. Activating the include does
+   * not activate the group, so this suite borrowed a shared function group and
+   * handed it back broken.
+   *
+   * Measured on an on-premise system, 2026-09-22, in isolation: the group
+   * active before the suite, and `FUGR/F ZAC_SHR_FUGR` with
+   * `FUGR/I SAPLZAC_SHR_FUGR` on the inactive list after it — while the suite
+   * itself reported two passing tests. It is a shared dependency, so the next
+   * suite to read it inherits that.
+   *
+   * A refusal is logged rather than thrown: the tests here already ran, and
+   * their verdict is not this cleanup's to overturn. But it is logged where it
+   * can be seen — `createRunIntegrityLogger`, not `testsLogger`, which answers
+   * `emptyLogger` unless someone set `DEBUG_ADT_TESTS` beforehand. A shared
+   * group left inactive is a fact about the run, not a diagnostic: the suite
+   * it breaks is the next one, and without the line that reads as the next
+   * suite being at fault.
+   *
+   * The repair goes BEFORE `tester.afterAll()`, which releases the connection.
+   * On a run that shares one session it is a no-op and the order would not
+   * show, but under `PER_FILE_SESSION=1` the file owns its session and that
+   * call ends it — and the request below would then go out on a connection
+   * nobody holds, turning the repair into a failure at the one moment there is
+   * nothing left to repair it with.
+   */
+  afterAll(async () => {
+    const functionGroupName =
+      tester?.getTestCaseDefinition()?.params?.function_group_name;
+    try {
+      if (hasConfig && client && functionGroupName) {
+        await activateSharedFunctionGroup(
+          client,
+          functionGroupName,
+          undefined,
+          createRunIntegrityLogger(),
+        );
+      }
+    } finally {
+      // `finally`, because releasing the connection is the part that must
+      // happen either way: the repair answers rather than throws, but the
+      // request carrying that answer can still fail outright, and a session
+      // this file owns would then stay open for the rest of the run.
+      await tester?.afterAll()();
+    }
+  });
 
   describe('Full workflow', () => {
     beforeEach(async () => {
