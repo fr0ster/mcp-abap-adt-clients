@@ -159,7 +159,6 @@ export class AdtDdicTableType<
         createTableType(connection, {
           tabletype_name: name,
           package_name: config.packageName as string,
-          description: config.description,
           transport_request: config.transportRequest,
           masterSystem: this.systemContext.masterSystem,
           responsible: this.systemContext.responsible,
@@ -235,12 +234,6 @@ export class AdtDdicTableType<
           connection,
           {
             tabletype_name: name,
-            description: config.description,
-            row_type_name: source as string,
-            row_type_kind: config.rowTypeKind || 'dictionaryType',
-            access_type: config.accessType || 'standard',
-            primary_key_definition: config.primaryKeyDefinition || 'standard',
-            primary_key_kind: config.primaryKeyKind || 'nonUnique',
             transport_request: config.transportRequest,
           },
           // The document the caller built; the fields above describe a create.

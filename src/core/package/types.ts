@@ -12,12 +12,7 @@ import type { IResultStrategy } from '@mcp-abap-adt/interfaces';
 import { rawDocument } from '../../utils/resultStrategy';
 
 // Types defined in @mcp-abap-adt/interfaces
-export type {
-  ICreatePackageParams,
-  IDeletePackageParams,
-  IPackageConfig,
-  IUpdatePackageParams,
-} from '@mcp-abap-adt/interfaces';
+export type { IPackageConfig } from '@mcp-abap-adt/interfaces';
 
 /**
  * What the create answers: the package's metadata document.
@@ -103,3 +98,40 @@ export const packageDocuments = {
   transport: rawDocument,
   deletionCheck: rawDocument,
 } satisfies IPackageResults;
+
+/**
+ * The shapes below describe the argument of the request builders in this
+ * module, and they used to be declared in `@mcp-abap-adt/interfaces`. Nobody
+ * outside this package ever accepted them — no parameter, field or return
+ * anywhere else was typed by one — and being nobody's contract is how 85 of
+ * their fields came to be ignored by the very code that took them, for
+ * releases, unnoticed. They live here now, beside the function that reads
+ * them, which is the only place that can keep them honest. See decision 30 in
+ * the interfaces repository.
+ */
+
+export interface ICreatePackageParams {
+  package_name: string;
+  description?: string;
+  super_package: string;
+  package_type?: string;
+  software_component?: string;
+  transport_layer?: string;
+  transport_request?: string;
+  application_component?: string;
+  responsible?: string;
+  master_system?: string;
+  /** Master/original language (e.g. "EN", "DE"). Defaults to EN when unset. */
+  master_language?: string;
+  record_changes: boolean;
+}
+
+export interface IDeletePackageParams {
+  package_name: string;
+  transport_request?: string;
+}
+
+export interface IUpdatePackageParams {
+  package_name: string;
+  transport_request?: string;
+}

@@ -170,7 +170,6 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
             description: config.description,
             superclass: config.superclass,
             final: config.final,
-            abstract: config.abstract,
             create_protected: config.createProtected,
             master_system:
               config.masterSystem ?? this.systemContext.masterSystem,

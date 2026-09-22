@@ -131,7 +131,6 @@ export class AdtFeatureToggle<
       transport_request: config.transportRequest,
       master_system: config.masterSystem ?? this.systemContext.masterSystem,
       responsible: config.responsible ?? this.systemContext.responsible,
-      source: config.source,
     };
   }
 

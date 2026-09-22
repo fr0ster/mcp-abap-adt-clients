@@ -12,12 +12,7 @@ import type { IResultStrategy } from '@mcp-abap-adt/interfaces';
 import { rawDocument } from '../../utils/resultStrategy';
 
 // Types defined in @mcp-abap-adt/interfaces
-export type {
-  ICreateStructureParams,
-  IDeleteStructureParams,
-  IStructureConfig,
-  IUpdateStructureParams,
-} from '@mcp-abap-adt/interfaces';
+export type { IStructureConfig } from '@mcp-abap-adt/interfaces';
 
 /**
  * What the create answers: the structure's metadata document.
@@ -102,3 +97,35 @@ export const structureDocuments = {
   transport: rawDocument,
   deletionCheck: rawDocument,
 } satisfies IStructureResults;
+
+/**
+ * The shapes below describe the argument of the request builders in this
+ * module, and they used to be declared in `@mcp-abap-adt/interfaces`. Nobody
+ * outside this package ever accepted them — no parameter, field or return
+ * anywhere else was typed by one — and being nobody's contract is how 85 of
+ * their fields came to be ignored by the very code that took them, for
+ * releases, unnoticed. They live here now, beside the function that reads
+ * them, which is the only place that can keep them honest. See decision 30 in
+ * the interfaces repository.
+ */
+
+export interface ICreateStructureParams {
+  structureName: string;
+  description: string;
+  packageName: string;
+  transportRequest?: string;
+  masterSystem?: string;
+  responsible?: string;
+  masterLanguage?: string;
+}
+
+export interface IDeleteStructureParams {
+  structure_name: string;
+  transport_request?: string;
+}
+
+export interface IUpdateStructureParams {
+  structureName: string;
+  ddlCode: string;
+  transportRequest?: string;
+}

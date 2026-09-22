@@ -15,11 +15,7 @@ import type { IResultStrategy } from '@mcp-abap-adt/interfaces';
 import { nothing, rawDocument } from '../../utils/resultStrategy';
 
 // Types defined in @mcp-abap-adt/interfaces
-export type {
-  IClassConfig,
-  ICreateClassParams,
-  IDeleteClassParams,
-} from '@mcp-abap-adt/interfaces';
+export type { IClassConfig } from '@mcp-abap-adt/interfaces';
 
 /**
  * What ADT answers when a class is created.
@@ -123,3 +119,33 @@ export const classDocuments = {
   updated: nothing,
   deletionCheck: rawDocument,
 } satisfies IClassResults;
+
+/**
+ * The shapes below describe the argument of the request builders in this
+ * module, and they used to be declared in `@mcp-abap-adt/interfaces`. Nobody
+ * outside this package ever accepted them — no parameter, field or return
+ * anywhere else was typed by one — and being nobody's contract is how 85 of
+ * their fields came to be ignored by the very code that took them, for
+ * releases, unnoticed. They live here now, beside the function that reads
+ * them, which is the only place that can keep them honest. See decision 30 in
+ * the interfaces repository.
+ */
+
+export interface ICreateClassParams {
+  class_name: string;
+  description?: string;
+  package_name: string;
+  transport_request?: string;
+  master_system?: string;
+  responsible?: string;
+  masterLanguage?: string;
+  superclass?: string;
+  final?: boolean;
+  create_protected?: boolean;
+  template_xml?: string;
+}
+
+export interface IDeleteClassParams {
+  class_name: string;
+  transport_request?: string;
+}

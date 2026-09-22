@@ -15,11 +15,11 @@ import type {
   IAbapConnection,
   IAdtContentTypes,
   IAdtWireResponse,
-  ICreateIncludeParams,
 } from '@mcp-abap-adt/interfaces';
 import { limitDescription } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import { escapeXmlAttr } from '../../utils/xml';
+import type { ICreateIncludeParams } from './types';
 
 /** Measured on the includes collection; the programs one advertises a different type. */
 export const CT_INCLUDE = 'application/vnd.sap.adt.programs.includes.v2+xml';

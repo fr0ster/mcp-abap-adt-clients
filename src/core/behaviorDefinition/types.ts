@@ -8,7 +8,10 @@
  * says only that it is answered.
  */
 
-import type { IResultStrategy } from '@mcp-abap-adt/interfaces';
+import type {
+  BehaviorDefinitionImplementationType,
+  IResultStrategy,
+} from '@mcp-abap-adt/interfaces';
 
 /**
  * The check reporters ADT accepts for a behavior definition.
@@ -28,9 +31,6 @@ import { rawDocument } from '../../utils/resultStrategy';
 export type {
   BehaviorDefinitionImplementationType,
   IBehaviorDefinitionConfig,
-  IBehaviorDefinitionCreateParams,
-  IBehaviorDefinitionValidationParams,
-  IUpdateBehaviorDefinitionParams,
 } from '@mcp-abap-adt/interfaces';
 
 /**
@@ -116,3 +116,59 @@ export const behaviorDefinitionDocuments = {
   transport: rawDocument,
   deletionCheck: rawDocument,
 } satisfies IBehaviorDefinitionResults;
+
+/**
+ * The shapes below describe the argument of the request builders in this
+ * module, and they used to be declared in `@mcp-abap-adt/interfaces`. Nobody
+ * outside this package ever accepted them — no parameter, field or return
+ * anywhere else was typed by one — and being nobody's contract is how 85 of
+ * their fields came to be ignored by the very code that took them, for
+ * releases, unnoticed. They live here now, beside the function that reads
+ * them, which is the only place that can keep them honest. See decision 30 in
+ * the interfaces repository.
+ */
+
+/**
+ * Parameters for creating a behavior definition
+ */
+export interface IBehaviorDefinitionCreateParams {
+  /** Name of the behavior definition */
+  name: string;
+  /** Description */
+  description: string;
+  /** Package name */
+  package: string;
+  /** Implementation type */
+  implementationType: BehaviorDefinitionImplementationType;
+  /** Language (default: EN) */
+  language?: string;
+  /** Responsible user */
+  responsible?: string;
+  /** Master system */
+  masterSystem?: string;
+  /** Transport request number */
+  transportRequest?: string;
+}
+
+/**
+ * Parameters for validating a behavior definition before creation
+ */
+export interface IBehaviorDefinitionValidationParams {
+  /** Name of the behavior definition object */
+  objname: string;
+  /** Root entity name */
+  rootEntity: string;
+  /** Description of the behavior definition */
+  description: string;
+  /** Package name where the object will be created */
+  package: string;
+  /** Implementation type (Managed, Unmanaged, Abstract, Projection) */
+  implementationType: BehaviorDefinitionImplementationType;
+}
+
+export interface IUpdateBehaviorDefinitionParams {
+  name: string;
+  sourceCode: string;
+  lockHandle: string;
+  transportRequest?: string;
+}
