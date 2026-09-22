@@ -30,21 +30,32 @@ if (fs.existsSync(envPath)) {
 // biome-ignore lint/suspicious/noConsole: a probe reports to whoever ran it
 const say = (line: string) => console.log(line);
 
-async function main(): Promise<void> {
+/** Answers what could not be read, so the caller can say so and exit on it. */
+async function main(): Promise<string[]> {
   const number = process.argv[2];
   if (!number) {
     say('usage: probe-request-entries.ts <REQUEST NUMBER>');
-    return;
+    return ['no request number given'];
   }
   const logger = createConnectionLogger();
   const connection = await createTestConnection(logger);
   try {
     const request = new AdtClient(connection, logger).getRequest();
 
+    // **A count nobody could read is not a count.** Every refusal below is
+    // collected rather than passed over, because the question this answers —
+    // "what does that request hold right now" — is one an empty answer looks
+    // exactly like. A request that does not exist, a user who may not read it
+    // and an endpoint that failed all produce "0", and a probe that prints
+    // that and exits 0 has told its reader something untrue.
+    const unread: string[] = [];
+
     const listed = await request.readObjects(number);
     say(`\n${number} — readObjects on the REQUEST`);
-    if (!listed.ok) say(`  refused: ${listed.getError().message}`);
-    else {
+    if (!listed.ok) {
+      say(`  refused: ${listed.getError().message}`);
+      unread.push(`readObjects ${number}: ${listed.getError().message}`);
+    } else {
       const entries = listed.getResult().value;
       say(`  ${entries.length} entr${entries.length === 1 ? 'y' : 'ies'}`);
       for (const e of entries)
@@ -54,9 +65,15 @@ async function main(): Promise<void> {
     }
 
     const metadata = await request.readMetadata({ transportNumber: number });
-    const document = metadata.ok
-      ? String(metadata.getResult().value ?? '')
-      : '';
+    if (!metadata.ok) {
+      // Not `0 task(s)`: the document was never read, so how many tasks it
+      // names is unknown and stays unknown.
+      say(`\n${number} — the request document could not be read`);
+      say(`  refused: ${metadata.getError().message}`);
+      unread.push(`readMetadata ${number}: ${metadata.getError().message}`);
+      return unread;
+    }
+    const document = String(metadata.getResult().value ?? '');
     const tasks = (document.match(/<tm:task\s[^>]*?>/g) ?? [])
       .map((t) => t.match(/tm:number="([^"]*)"/)?.[1])
       .filter((n): n is string => Boolean(n));
@@ -69,6 +86,7 @@ async function main(): Promise<void> {
       const onTask = await request.readObjects(task);
       if (!onTask.ok) {
         say(`  ${task}: refused: ${onTask.getError().message}`);
+        unread.push(`readObjects ${task}: ${onTask.getError().message}`);
         continue;
       }
       const entries = onTask.getResult().value;
@@ -80,13 +98,22 @@ async function main(): Promise<void> {
           `    ${e.pgmid ?? '?'} ${e.type} ${e.name}  position=${e.position ?? '(none)'}`,
         );
     }
+    return unread;
   } finally {
     await releaseTestConnection(connection as never);
   }
 }
 
-main().catch((error) => {
-  // biome-ignore lint/suspicious/noConsole: a probe reports to whoever ran it
-  console.error(error);
-  process.exit(1);
-});
+main()
+  .then((unread) => {
+    if (unread.length === 0) return;
+    say(`\n${unread.length} read(s) did not answer:`);
+    for (const line of unread) say(`  ${line}`);
+    say('The counts above are what was readable, not what the request holds.');
+    process.exitCode = 1;
+  })
+  .catch((error) => {
+    // biome-ignore lint/suspicious/noConsole: a probe reports to whoever ran it
+    console.error(error);
+    process.exit(1);
+  });
