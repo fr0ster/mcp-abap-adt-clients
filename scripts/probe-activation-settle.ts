@@ -67,6 +67,26 @@
  * PR #157 measured both entries clearing on an on-premise system. Whether the
  * difference is the system or the object's history is open, and this probe is
  * how to settle it there: run it and read step [7].
+ *
+ * **The cycles say the same thing from nine more observations.** Creating an
+ * include puts two entries on the list — the include itself and the regenerated
+ * `SAPL<group>`. Activating the group answers `activationExecuted="true"` in
+ * 748–1386ms, and on the read taken straight after, 526–965ms later,
+ * `SAPL<group>` is **always** already gone: 9 cycles out of 9, over two runs.
+ * Nothing about this endpoint ever answered ahead of its own work.
+ *
+ * What stays behind is the include, and it stays for good: polled for ~5.5s in
+ * each of four cycles, it never cleared. That is scope rather than timing — the
+ * POST names the GROUP, and an include under it is its own object with its own
+ * activation. Which is the lesson for the repair in PR #157: activating the
+ * group is not the same as activating what was written inside it.
+ *
+ * The first version of this loop is worth keeping in mind. It rewrote an
+ * existing include instead of creating one, which regenerates nothing, watched
+ * for a name it had guessed in advance, saw no work in six cycles — and printed
+ * SYNCHRONOUS anyway, over zero observations. Hence both rules now in the code:
+ * the work is whatever the list difference says it is, and a run with no work
+ * concludes nothing.
  */
 
 import * as fs from 'node:fs';
@@ -93,6 +113,7 @@ if (fs.existsSync(envPath)) {
 
 const PERIOD_MS = Number(process.env.PROBE_PERIOD_MS ?? 500);
 const BUDGET_MS = Number(process.env.PROBE_BUDGET_MS ?? 30000);
+const CYCLES = Number(process.env.PROBE_CYCLES ?? 0);
 
 const say = (line: string): void => {
   // biome-ignore lint/suspicious/noConsole: a probe reports to whoever ran it
@@ -414,6 +435,105 @@ async function main(): Promise<void> {
       say('');
     }
 
+    // **One observation is not a measurement**, and the first version of this
+    // loop proved it: it rewrote the include's source, watched for `SAPL<group>`
+    // by name, found nothing inactive in six cycles, and still printed
+    // SYNCHRONOUS — over zero observations. Two things were wrong. Rewriting an
+    // existing include does not regenerate the main program; **creating** one
+    // does, which is why the very first run saw it and none of the later ones
+    // did. And watching for names guessed in advance cannot see work that lands
+    // somewhere else.
+    //
+    // So a cycle now creates the include, takes the whole list before and
+    // after, and calls the difference the work — whatever it turns out to be.
+    // Then it activates and re-reads at once: an entry that has already gone on
+    // that read was finished before the POST answered. The include is deleted
+    // again at the end of the cycle, so the next one starts where this began.
+    const cycleWork: Array<{
+      appeared: string[];
+      left: string[];
+      lingering: string[];
+    }> = [];
+    if (CYCLES > 0) {
+      say(
+        `[10] ${CYCLES} cycle(s) of create \u2192 activate \u2192 read at once`,
+      );
+      const probeInclude = `L${group}Z98`.toUpperCase();
+      for (let n = 1; n <= CYCLES; n += 1) {
+        const before = new Set(await inactiveNames(connection));
+        const made = await client.getFunctionInclude().create({
+          functionGroupName: group,
+          includeName: probeInclude,
+          description: 'Probe include (created and deleted per cycle)',
+          transportRequest,
+        });
+        const appeared = (await inactiveNames(connection)).filter(
+          (name) => !before.has(name),
+        );
+
+        const t0 = Date.now();
+        const answer = await activateFunctionGroup(connection, group);
+        const postMs = Date.now() - t0;
+        const executed =
+          /activationExecuted="([^"]*)"/.exec(String(answer.data ?? ''))?.[1] ??
+          '(absent)';
+
+        const readAt = Date.now();
+        const now = new Set(await inactiveNames(connection));
+        const readMs = Date.now() - readAt;
+        const left = appeared.filter((name) => now.has(name));
+
+        say(
+          `  cycle ${n}: create=${made.ok} | went inactive: ${appeared.join(', ') || '(nothing)'}`,
+        );
+        say(
+          `           POST ${postMs}ms activationExecuted=${executed}` +
+            ` | read +${readMs}ms, still inactive: ${left.join(', ') || '(none of them)'}`,
+        );
+
+        // **Still listed is not the same as not finished.** An entry that is
+        // still there can be one the POST had not got to yet, or one this POST
+        // was never going to touch, and only waiting separates them: a lag
+        // clears on its own, a scope does not. So anything left over is polled
+        // for the budget before the cycle says which it was.
+        let lingering = left;
+        if (left.length > 0) {
+          const waitStart = Date.now();
+          for (;;) {
+            if (Date.now() - waitStart + PERIOD_MS > BUDGET_MS) break;
+            await new Promise((r) => setTimeout(r, PERIOD_MS));
+            const listed = new Set(await inactiveNames(connection));
+            lingering = left.filter((name) => listed.has(name));
+            if (lingering.length === 0) {
+              say(
+                `           cleared on its own after ${Date.now() - waitStart}ms`,
+              );
+              break;
+            }
+          }
+          if (lingering.length > 0) {
+            say(
+              `           still listed after ${Date.now() - waitStart}ms: ${lingering.join(', ')}`,
+            );
+          }
+        }
+        cycleWork.push({ appeared, left, lingering });
+
+        const removed = await client.getFunctionInclude().delete({
+          functionGroupName: group,
+          includeName: probeInclude,
+          transportRequest,
+        });
+        if (!removed.ok) {
+          say(
+            `           cleanup: delete refused — ${removed.getError().message}`,
+          );
+        }
+        await activateFunctionGroup(connection, group);
+      }
+      say('');
+    }
+
     say('VERDICT');
     if (settledAt === null) {
       say(`  still listed after ${BUDGET_MS}ms and ${reads} read(s).`);
@@ -428,6 +548,54 @@ async function main(): Promise<void> {
       );
       say('  The POST answers before the work is finished: ASYNCHRONOUS, and');
       say(`  ${settledAt}ms is the measured lag on this system.`);
+    }
+    if (cycleWork.length) {
+      const withWork = cycleWork.filter((c) => c.appeared.length > 0);
+      const unfinished = withWork.filter((c) => c.left.length > 0);
+      say('');
+      say(
+        `  ${withWork.length} of ${cycleWork.length} cycle(s) put something on the list for the activation to do.`,
+      );
+      if (withWork.length === 0) {
+        // The refusal to conclude is the point. A cycle where nothing went
+        // inactive cannot distinguish an activation that finished instantly
+        // from one that never ran, and counting those as evidence is how the
+        // first version of this loop printed a verdict over zero observations.
+        say('  None of them is evidence either way: with nothing to activate,');
+        say('  a finished POST and an absent one look the same. Not proven.');
+      } else if (unfinished.length === 0) {
+        say(
+          `  In all ${withWork.length}, everything that went inactive was gone on the read`,
+        );
+        say(
+          '  taken straight after the POST. The work finishes inside the request:',
+        );
+        say('  SYNCHRONOUS.');
+      } else {
+        const settledLate = unfinished.filter((c) => c.lingering.length === 0);
+        const neverSettled = unfinished.filter((c) => c.lingering.length > 0);
+        say(
+          `  ${unfinished.length} of them still had entries listed on that read.`,
+        );
+        if (settledLate.length > 0) {
+          say(
+            `  ${settledLate.length} cleared later with no further request: that is a LAG,`,
+          );
+          say('  and the per-cycle line above has the milliseconds.');
+        }
+        if (neverSettled.length > 0) {
+          const names = [
+            ...new Set(neverSettled.flatMap((c) => c.lingering)),
+          ].join(', ');
+          say(
+            `  ${neverSettled.length} never cleared within the budget: ${names}.`,
+          );
+          say('  Nothing that waits this long is waiting. Those entries are');
+          say('  outside what this POST activates — scope, not timing. The');
+          say('  activation this probe sends names the GROUP, and an include');
+          say('  under it is its own object with its own activation.');
+        }
+      }
     }
   } finally {
     await releaseTestConnection(connection);
