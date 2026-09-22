@@ -178,8 +178,6 @@ describe('Domain (using AdtClient)', () => {
             domainName: config.domainName,
             packageName: config.packageName,
             description: config.description || '',
-            length: config.length,
-            decimals: config.decimals,
           },
         });
       },

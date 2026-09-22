@@ -381,8 +381,6 @@ describe('Group Activation (Shared)', () => {
             packageName: packageName,
             description:
               testCase.params.description || `Test domain for group activation`,
-            length: testCase.params.domain_length || 10,
-            decimals: testCase.params.domain_decimals || 0,
             transportRequest: transportRequest,
           });
           domainCreated = true;
@@ -434,7 +432,6 @@ describe('Group Activation (Shared)', () => {
               testCase.params.description ||
               `Test data element for group activation`,
             typeKind: testCase.params.data_element_type_kind || 'domain',
-            typeName: domainName, // Reference to domain
             transportRequest: transportRequest,
           });
           dataElementCreated = true;

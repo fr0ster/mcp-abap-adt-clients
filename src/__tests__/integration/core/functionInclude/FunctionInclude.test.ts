@@ -112,8 +112,6 @@ describe('FunctionInclude (using AdtClient)', () => {
             description: params.description,
             transportRequest,
             sourceCode: params.source_code,
-            masterSystem: resolveMasterSystem(params.master_system),
-            responsible: process.env.SAP_USERNAME || process.env.SAP_USER,
           };
           if (packageName) {
             (cfg as any).packageName = packageName;

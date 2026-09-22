@@ -246,7 +246,6 @@ describe('FunctionModule (using AdtClient)', () => {
           updateConfig: {
             functionModuleName: config.functionModuleName,
             functionGroupName: config.functionGroupName,
-            packageName: config.packageName,
             description: config.description || '',
             sourceCode: sourceCode,
           },

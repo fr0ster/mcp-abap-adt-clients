@@ -1309,8 +1309,6 @@ async function main(): Promise<void> {
           domainName: CREATE_DOMAIN_NAME,
           packageName: devPackage,
           description: 'corpus create capture (safe to delete)',
-          datatype: 'CHAR',
-          length: 10,
         });
       });
 
