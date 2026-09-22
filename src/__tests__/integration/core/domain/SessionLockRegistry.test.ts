@@ -101,7 +101,6 @@ describe('Session lock registry (using AdtClient)', () => {
           packageName: domainPackage,
           transportRequest: domainResolver.getTransportRequest(),
           description: dp.description,
-          datatype: dp.datatype || 'CHAR',
           length: dp.length || 5,
           decimals: dp.decimals,
         };
@@ -125,10 +124,6 @@ describe('Session lock registry (using AdtClient)', () => {
           dataType: ep.data_type || 'CHAR',
           length: ep.length,
           decimals: ep.decimals,
-          shortLabel: ep.short_label,
-          mediumLabel: ep.medium_label,
-          longLabel: ep.long_label,
-          headingLabel: ep.heading_label,
         } as IDataElementConfig;
       }
 

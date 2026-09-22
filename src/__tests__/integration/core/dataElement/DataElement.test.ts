@@ -169,12 +169,7 @@ describe('DataElement (using AdtClient)', () => {
       dataType: params.data_type,
       length: params.length,
       decimals: params.decimals,
-      shortLabel: params.short_label,
-      mediumLabel: params.medium_label,
-      longLabel: params.long_label,
-      headingLabel: params.heading_label,
       typeKind: params.type_kind,
-      typeName: params.type_name,
     };
   }
 
@@ -398,12 +393,7 @@ describe('DataElement (using AdtClient)', () => {
               dataType: config.dataType,
               length: config.length,
               decimals: config.decimals,
-              shortLabel: config.shortLabel,
-              mediumLabel: config.mediumLabel,
-              longLabel: config.longLabel,
-              headingLabel: config.headingLabel,
               typeKind: config.typeKind,
-              typeName: config.typeName,
             },
           });
 

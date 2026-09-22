@@ -114,14 +114,8 @@ describe('Domain (using AdtClient)', () => {
             packageName,
             transportRequest,
             description: params.description,
-            datatype: params.datatype || 'CHAR',
             length: params.length || 10,
             decimals: params.decimals,
-            conversion_exit: params.conversion_exit,
-            lowercase: params.lowercase,
-            sign_exists: params.sign_exists,
-            value_table: params.value_table,
-            fixed_values: params.fixed_values,
           };
         },
         ensureObjectReady: async (domainName: string) => {
@@ -184,7 +178,6 @@ describe('Domain (using AdtClient)', () => {
             domainName: config.domainName,
             packageName: config.packageName,
             description: config.description || '',
-            datatype: config.datatype,
             length: config.length,
             decimals: config.decimals,
           },

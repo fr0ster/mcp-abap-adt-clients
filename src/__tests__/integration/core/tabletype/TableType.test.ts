@@ -114,10 +114,6 @@ describe('TableType (using AdtClient)', () => {
             description: params.description,
             // TableType is XML-based (like Domain/DataElement), uses structure as rowType
             rowTypeName: params.row_type_name,
-            rowTypeKind: params.row_type_kind || 'dictionaryType',
-            accessType: params.access_type || 'standard',
-            primaryKeyDefinition: params.primary_key_definition || 'standard',
-            primaryKeyKind: params.primary_key_kind || 'nonUnique',
           };
         },
         ensureObjectReady: async (tableTypeName: string) => {
@@ -182,10 +178,6 @@ describe('TableType (using AdtClient)', () => {
                 packageName: config.packageName,
                 description: config.description || '',
                 rowTypeName: config.rowTypeName,
-                rowTypeKind: config.rowTypeKind,
-                accessType: config.accessType,
-                primaryKeyDefinition: config.primaryKeyDefinition,
-                primaryKeyKind: config.primaryKeyKind,
               }
             : undefined,
         });

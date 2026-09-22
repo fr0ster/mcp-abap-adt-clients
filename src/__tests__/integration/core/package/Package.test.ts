@@ -129,7 +129,6 @@ describe('Package (using AdtClient)', () => {
             packageName: testPackage,
             superPackage: parentPackage,
             description: params.description,
-            updatedDescription: params.updated_description,
             packageType: params.package_type || 'development',
             softwareComponent: params.software_component,
             transportLayer: params.transport_layer,

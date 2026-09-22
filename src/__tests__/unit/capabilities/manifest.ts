@@ -850,7 +850,6 @@ export const HANDLERS = {
     config: {
       dataElementName: 'ZGUARD_DTEL',
       typeKind: 'domain',
-      typeName: 'ZGUARD_DOM',
       packageName: '$TMP',
       description: 'guard',
     },
