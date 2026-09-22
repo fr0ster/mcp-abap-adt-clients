@@ -2312,6 +2312,41 @@ async function updateAndActivateShared(
   logger?.info?.(`Shared ${type} ${name} updated and activated`);
 }
 
+/**
+ * Bring a shared function group to active, whether it was just created or was
+ * already there.
+ *
+ * **Why a group needs this and the other ten types do not.** Every other
+ * shared type carries a `source`, so the reconciliation path writes it and
+ * activates in one move. A function group has none — it is a container — and
+ * the branch that creates one simply stopped after the POST. Meanwhile
+ * creating a function module inside it makes SAP regenerate `SAPL<group>`,
+ * which comes back inactive, and the module's branch activates the module,
+ * not the group.
+ *
+ * A refusal is logged rather than thrown: this is a dependency being made
+ * ready, and a suite that reads the group should not go red because the group
+ * could not be activated — it should fail on what it was actually testing.
+ */
+async function activateSharedFunctionGroup(
+  client,
+  name,
+  transportRequest,
+  logger,
+) {
+  const answer = await client
+    .getFunctionGroup()
+    .activate({ functionGroupName: name, transportRequest });
+  if (answer.ok) {
+    logger?.info?.(`Shared function group ${name} activated`);
+  } else {
+    logger?.warn?.(
+      `Shared function group ${name} could not be activated: ${answer.getError().message}`,
+    );
+  }
+  return answer.ok;
+}
+
 async function ensureSharedDependency(client, type, name, logger) {
   const cacheKey = `${type}:${name}`;
   if (_verifiedDependencies[cacheKey]) {
@@ -2540,6 +2575,23 @@ async function ensureSharedDependency(client, type, name, logger) {
       }
     } else {
       logger?.info?.(`Shared ${type} ${name} already exists`);
+    }
+    // **A function group that exists can still be inactive, and nothing else
+    // here would notice.** Creating a function module inside a group makes SAP
+    // regenerate the group's main include, which comes back inactive; the
+    // module's own branch activates the module and not the group above it. A
+    // group carries no `source`, so the reconciliation above never runs for
+    // one, and `already exists` was the whole of the check.
+    //
+    // Measured on an on-premise system, 2026-09-22: after a green run of all
+    // 192 suites, `GET /sap/bc/adt/activation/inactiveobjects` still listed
+    // `FUGR/F ZAC_SHR_FUGR` and `FUGR/I SAPLZAC_SHR_FUGR` — every run left
+    // them so, and every run passed.
+    //
+    // Activation is idempotent, so this costs one request and asserts nothing
+    // about how the group got into that state.
+    if (type === 'function_groups') {
+      await activateSharedFunctionGroup(client, name, transportRequest, logger);
     }
     _verifiedDependencies[cacheKey] = true;
     return { existed: true, created: false };
@@ -2851,6 +2903,7 @@ async function ensureSharedDependency(client, type, name, logger) {
           verify.ok && String(verify.getResult().value ?? '').trim() !== '';
         if (!arrived) throw createErr;
       }
+      await activateSharedFunctionGroup(client, name, transportRequest, logger);
     } else if (type === 'function_modules') {
       mustSucceed(
         await client.getFunctionModule().create({
@@ -3000,6 +3053,7 @@ function resetSharedDependencyCache() {
 }
 
 module.exports = {
+  activateSharedFunctionGroup,
   loadTestConfig,
   getSessionConfig,
   getEnabledTestCase,

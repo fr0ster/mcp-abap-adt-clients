@@ -41,6 +41,7 @@ const {
   ensureSharedPackage,
   ensureSharedDependency,
   getSharedDependenciesConfig,
+  activateSharedFunctionGroup,
 } = require('../../../helpers/test-helper');
 
 const envPath =
@@ -155,7 +156,36 @@ describe('FunctionInclude (using AdtClient)', () => {
     }
   });
 
-  afterAll(() => tester?.afterAll()());
+  /**
+   * **Writing an include leaves the group above it inactive.** SAP regenerates
+   * `SAPL<group>` whenever an include inside it is written, and the
+   * regenerated main program comes back inactive. Activating the include does
+   * not activate the group, so this suite borrowed a shared function group and
+   * handed it back broken.
+   *
+   * Measured on an on-premise system, 2026-09-22, in isolation: the group
+   * active before the suite, and `FUGR/F ZAC_SHR_FUGR` with
+   * `FUGR/I SAPLZAC_SHR_FUGR` on the inactive list after it — while the suite
+   * itself reported two passing tests. It is a shared dependency, so the next
+   * suite to read it inherits that.
+   *
+   * A refusal is logged rather than thrown: the tests here already ran, and
+   * their verdict is not this cleanup's to overturn.
+   */
+  afterAll(async () => {
+    await tester?.afterAll()();
+
+    if (!hasConfig || !client) return;
+    const functionGroupName =
+      tester?.getTestCaseDefinition()?.params?.function_group_name;
+    if (!functionGroupName) return;
+    await activateSharedFunctionGroup(
+      client,
+      functionGroupName,
+      undefined,
+      testsLogger,
+    );
+  });
 
   describe('Full workflow', () => {
     beforeEach(async () => {
