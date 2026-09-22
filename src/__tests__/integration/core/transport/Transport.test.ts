@@ -446,7 +446,7 @@ describe('AdtRequest', () => {
             );
             return;
           }
-          testsLogger.info?.(`the task will be owned by ${targetUser}`);
+          logTestStep(`the task will be owned by ${targetUser}`, testsLogger);
           const task = await request.createTask(transportNumber as string, {
             targetUser,
           });
@@ -468,7 +468,7 @@ describe('AdtRequest', () => {
           // A task whose number is `''` passes `ok` and is useless to
           // everything after it — the defect review caught once already.
           expect(taskNumber).toMatch(/\S/);
-          testsLogger.info?.(`newtask answered ${taskNumber}`);
+          logTestStep(`newtask answered ${taskNumber}`, testsLogger);
 
           const packageName = resolvePackageName(undefined);
           if (!packageName) {
@@ -526,8 +526,9 @@ describe('AdtRequest', () => {
           // once it is known to exist.
           const stale = await findEntry(sharedRequest, domainName);
           if (stale) {
-            testsLogger.info?.(
+            logTestStep(
               `an entry for ${domainName} is present at ${stale.task}/${stale.position} — clearing it`,
+              testsLogger,
             );
             await request.removeObject(stale.task, {
               name: domainName,
@@ -540,7 +541,10 @@ describe('AdtRequest', () => {
           // Read before deleting, for the reason above: a delete aimed at
           // nothing is what registers the name.
           if ((await domain.readMetadata({ domainName })).ok) {
-            testsLogger.info?.(`${domainName} still exists — deleting it`);
+            logTestStep(
+              `${domainName} still exists — deleting it`,
+              testsLogger,
+            );
             await domain.delete({
               domainName,
               transportRequest: sharedRequest,
@@ -578,8 +582,9 @@ describe('AdtRequest', () => {
             );
             return;
           }
-          testsLogger.info?.(
+          logTestStep(
             `entry sits on task ${entry.task} at position ${entry.position}`,
+            testsLogger,
           );
 
           // **The removal, and then the proof.** `ok` here means the document
