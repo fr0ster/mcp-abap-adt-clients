@@ -268,8 +268,6 @@ describe('Package (using AdtClient)', () => {
             packageName: config.packageName,
             superPackage: config.superPackage,
             description: config.description || '',
-            updatedDescription:
-              config.updatedDescription || config.description || '',
             packageType: config.packageType,
             softwareComponent: config.softwareComponent,
             transportLayer: config.transportLayer,

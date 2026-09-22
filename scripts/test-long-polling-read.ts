@@ -105,8 +105,6 @@ async function testLongPollingRead() {
         await client.getDomain().create({
           domainName: testDomainName,
           packageName: packageName,
-          datatype: 'CHAR',
-          length: 10,
           description: 'Test domain for long polling',
         });
         const createTime = Date.now() - createStartTime;
@@ -183,8 +181,6 @@ async function testLongPollingRead() {
         await client.getDomain().create({
           domainName: testDomainName2,
           packageName: packageName,
-          datatype: 'CHAR',
-          length: 10,
           description: 'Test domain for long polling comparison',
         });
         const createTime2 = Date.now() - createStartTime2;
