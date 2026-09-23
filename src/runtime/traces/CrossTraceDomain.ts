@@ -3,8 +3,8 @@ import type {
   IAdtResponse,
   ICrossTrace,
   IListCrossTracesOptions,
-  ILogger,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { answering } from '../../utils/adtResponse';
 import { rawDocument } from '../../utils/resultStrategy';
 import {

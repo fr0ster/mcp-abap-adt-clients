@@ -260,7 +260,7 @@ import {
   TokenAuthProvider,
 } from '@mcp-abap-adt/connection';
 import { AdtAbapGitClient } from '@mcp-abap-adt/adt-clients';
-import type { IAdtAbapGitClient } from '@mcp-abap-adt/interfaces';
+import type { IAdtAbapGitClient } from '@mcp-abap-adt/interfaces-adt';
 
 // abapGit needs cloud or ABAP Platform 2022+, so the cloud connector and the
 // cloud wire — the one that asks for a session at
@@ -360,7 +360,7 @@ await abapGit.unlink({ package: 'ZMY_PKG' });
 `client.getRequest()` returns **`IAdtRequest`** — the contract, not the class, since 16.1.0. That is what makes the compiler check the handler: `AdtRequest` has to satisfy the interface at the factory, so a method removed from it fails the build there rather than only where something happens to call it. It also means a consumer can substitute their own handler, or intersect the contract with their own types. To name the type, import it from the contract package — this one does not re-export interface types:
 
 ```typescript
-import type { IAdtRequest } from '@mcp-abap-adt/interfaces';
+import type { IAdtRequest } from '@mcp-abap-adt/interfaces-adt';
 
 const requests: IAdtRequest = client.getRequest();
 ```
@@ -781,7 +781,7 @@ await client.getClass().read({ className: 'ZCL_TEST' }, undefined);
 `AdtUtils.readObjectMetadata` and `AdtUtils.readObjectSource` enforce strict object types to prevent invalid inputs like `view:ZOBJ`.
 
 ```typescript
-import type { AdtObjectType, AdtSourceObjectType } from '@mcp-abap-adt/interfaces';
+import type { AdtObjectType, AdtSourceObjectType } from '@mcp-abap-adt/interfaces-adt';
 
 const utils = client.getUtils();
 const metadataType: AdtObjectType = 'DDLS/DF';
@@ -886,7 +886,7 @@ contract naming one would be describing an implementation.
 a failure can depend on what you are doing:
 
 ```typescript
-import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces';
+import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces-adt';
 
 await client.getClass().read({ className: 'ZCL_X' }, 'active', {
   analyse: (verdict, answer) =>
@@ -1082,7 +1082,7 @@ Since 12.0.0 a handler whose object has none carries neither method — `getDoma
 and the unit-test handlers. The call does not compile, rather than throwing at runtime.
 
 ```typescript
-import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
+import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 
 const listed = await client.getClass().getVersions({ className: 'ZCL_MY_CLASS' });
 if (!listed.ok) throw new Error(listed.getError().message);

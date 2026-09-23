@@ -1,4 +1,4 @@
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
 import { create } from '../../../core/functionGroup/create';
 import type { ICreateFunctionGroupParams } from '../../../core/functionGroup/types';
 

@@ -14,7 +14,7 @@ Primary public entry points:
 - `AdtAbapGitClient` - standalone client (not a factory on `AdtClient`) wrapping the SAP-official ADT-integrated abapGit (`/sap/bc/adt/abapgit/*`); available on cloud and modern on-prem (ABAP Platform 2022+).
 
 Design constraint:
-- External integrations are interface-driven via `@mcp-abap-adt/interfaces` (`IAbapConnection`, `ILogger`, `IAdtObject`, `IWebSocketTransport`, etc.).
+- External integrations are interface-driven, and since 22.0.0 the contracts come from the packages that declare them rather than from the `@mcp-abap-adt/interfaces` facade: `IAbapConnection` and the capability atoms from `@mcp-abap-adt/interfaces-adt`, `ILogger` from `-utils`, `IWebSocketTransport` from `-network`, `IAuthProvider` from `-auth`.
 
 ## Layered Structure
 
@@ -215,10 +215,10 @@ Common behaviors in implementations:
 
 ## Type System and Exports
 
-**Types are defined once, in `@mcp-abap-adt/interfaces` (`^17.1.0`).** As of 7.5.0 this package declares no type it shares with the contract package. Each `src/core/<object>/types.ts` is a re-export surface:
+**Types are defined once, in the contract packages** — `@mcp-abap-adt/interfaces-adt` `^7.0.0` and its three siblings. As of 7.5.0 this package declares no type it shares with them, and since 22.0.0 it imports from each by name instead of through the deprecated facade: 135 names, 126 of them ADT, 6 network, 2 utils, 1 auth. Each `src/core/<object>/types.ts` is a re-export surface:
 
 ```ts
-export type { ICreateClassParams, IClassConfig } from '@mcp-abap-adt/interfaces';
+export type { IClassConfig, ICreateClassParams } from '@mcp-abap-adt/interfaces-adt';
 ```
 
 The `IXxxState` half of every pair is gone: a member answers one value and a
@@ -230,7 +230,7 @@ replacement reading would not produce is neither.
 
 Rationale: the two packages previously held independent copies of the same interfaces, and they drifted silently — a field required on one side and optional on the other produced no error anywhere. A single definition site makes that class of bug impossible.
 
-**Honest capability types (8.0.0, finished in 12.0.0).** The fat `IAdtObject` contract is split into capability atoms in `@mcp-abap-adt/interfaces` (`IAdtCreatable`, `IAdtReadable`, `IAdtMetadataReadable`, `IAdtUpdatable`, `IAdtMetadataUpdatable`, `IAdtDeletable`, `IAdtValidatable`, `IAdtCheckable`, `IAdtActivatable`, `IAdtLockable`, `IAdtVersionable`, `IAdtTransportAware`) — and since interfaces 29.0.0 there is nothing above them: `IAdtObject`, `IAdtCrud`, `IAdtModifiable` and `IAdtSourceObject` were removed for forcing one result type on members that answer different things. Each `Adt<Object>` class `implements` only the atoms it genuinely supports, and `AdtClient.getXxx()` return types are narrowed to that honest set, so calling a capability a handler lacks (`getDomain().getVersions()`) is a compile error rather than a runtime throw.
+**Honest capability types (8.0.0, finished in 12.0.0).** The fat `IAdtObject` contract is split into capability atoms in `@mcp-abap-adt/interfaces-adt` (`IAdtCreatable`, `IAdtReadable`, `IAdtMetadataReadable`, `IAdtUpdatable`, `IAdtMetadataUpdatable`, `IAdtDeletable`, `IAdtValidatable`, `IAdtCheckable`, `IAdtActivatable`, `IAdtLockable`, `IAdtVersionable`, `IAdtTransportAware`) — and since interfaces 29.0.0 there is nothing above them: `IAdtObject`, `IAdtCrud`, `IAdtModifiable` and `IAdtSourceObject` were removed for forcing one result type on members that answer different things. Each `Adt<Object>` class `implements` only the atoms it genuinely supports, and `AdtClient.getXxx()` return types are narrowed to that honest set, so calling a capability a handler lacks (`getDomain().getVersions()`) is a compile error rather than a runtime throw.
 
 Since **12.0.0** the claim is enforced rather than asserted. Every stub that threw is gone — not narrowed, deleted — including the last three handlers whose composites lived in the interfaces package (`transport`, `featureToggle`, `serviceBinding`). Four class-include handlers lost `create()`, because an include is not created: it exists because its class does, and writing source into it is `update`. They no longer extend `AdtClass` either — a shared `AdtClassMemberBase` gives them the container's lock, activation, metadata, transport and include version history and nothing else, so their declared type and their runtime shape agree.
 
@@ -244,13 +244,13 @@ Package root (`src/index.ts`) exports:
   one `IXxxResults` + `<type>Documents` pair per object type, and the shapes the
   shipped readings build,
 - shared utility type unions (`AdtObjectType`, `AdtSourceObjectType`, ...) — likewise re-exported,
-- core interfaces re-exported from `@mcp-abap-adt/interfaces`.
+- core interfaces re-exported from `@mcp-abap-adt/interfaces-adt`.
 
 What stays declared locally, and why:
 - **Runtime (value) exports** — these are code, not contract: `ENHANCEMENT_TYPE_CODES` and the enhancement URL helpers (`src/core/enhancement/types.ts`), `resolveBindingVariant` / `SERVICE_BINDING_VARIANT_MAP` (`src/core/service/types.ts`).
-- **`AdtContentTypesBase` / `AdtContentTypesModern`** — the two shipped header-set implementations (354 lines, 38 methods). They `implements IAdtContentTypes` from `@mcp-abap-adt/interfaces`; the interface itself is not declared here.
+- **`AdtContentTypesBase` / `AdtContentTypesModern`** — the two shipped header-set implementations (354 lines, 38 methods). They `implements IAdtContentTypes` from `@mcp-abap-adt/interfaces-adt`; the interface itself is not declared here.
 
-**Contract consolidation (11.0.0).** As of 11.0.0 adt-clients declares no contract type at all, not even the ones a consumer needs only to configure or call this package's own clients: `IAdtClientOptions`, `IAdtSystemContext`, `IAdtContentTypes`, `IAdtHeaders`, the three `IBatch*` shapes, the twelve abapGit types, the ten executor types, and the five debugger types all moved to `@mcp-abap-adt/interfaces`. Import them from there; the names and shapes are unchanged. Internal low-level helpers are intentionally not part of root API.
+**Contract consolidation (11.0.0).** As of 11.0.0 adt-clients declares no contract type at all, not even the ones a consumer needs only to configure or call this package's own clients: `IAdtClientOptions`, `IAdtSystemContext`, `IAdtContentTypes`, `IAdtHeaders`, the three `IBatch*` shapes, the twelve abapGit types, the ten executor types, and the five debugger types all moved to the contract packages — `@mcp-abap-adt/interfaces-adt` for all of these. Import them from there; the names and shapes are unchanged. Internal low-level helpers are intentionally not part of root API.
 
 ## Testing Architecture
 
@@ -279,7 +279,7 @@ Runtime coverage snapshot:
 ## Extension Rules for New Features
 
 When adding a new ADT object type:
-1. **Define the types in `@mcp-abap-adt/interfaces` first**, release it, then consume it here. Do not declare params/config/state locally — that is what caused the drift resolved in 7.5.0. `src/core/<object>/types.ts` should contain only re-exports (plus any genuine runtime helpers).
+1. **Define the types in the contract package first** — `@mcp-abap-adt/interfaces-adt`, or the sibling that owns them — release it, then consume it here. Do not declare params/config/state locally — that is what caused the drift resolved in 7.5.0. `src/core/<object>/types.ts` should contain only re-exports (plus any genuine runtime helpers).
 2. Create `src/core/<object>/` low-level endpoint modules.
 3. Implement `Adt<Object>.ts` as `IAdtObject` facade.
 4. Add factory method in `AdtClient`.

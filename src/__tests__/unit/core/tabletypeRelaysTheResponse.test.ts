@@ -1,4 +1,4 @@
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
 import { updateTableType } from '../../../core/tabletype/update';
 
 const DOCUMENT =

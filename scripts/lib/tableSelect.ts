@@ -10,7 +10,7 @@
  * unchanged behaviour needs. A caller who wants something else writes something
  * else; that is the point of the split.
  */
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
 import { getTableColumns } from '../../src/core/shared/tableContents';
 
 /** Column names out of the metadata document. */

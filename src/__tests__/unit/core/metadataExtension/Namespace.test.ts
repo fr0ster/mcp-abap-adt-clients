@@ -7,7 +7,7 @@
  * break the ADT path. The encoded form must be `%2fnsp%2fc_test`.
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
 import { activateMetadataExtension } from '../../../../core/metadataExtension/activate';
 import { deleteMetadataExtension } from '../../../../core/metadataExtension/delete';
 import { lockMetadataExtension } from '../../../../core/metadataExtension/lock';

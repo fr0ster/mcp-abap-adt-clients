@@ -3,8 +3,8 @@ import type {
   IAdtResponse,
   IAtcLog,
   IGetCheckFailureLogsOptions,
-  ILogger,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { answering } from '../../utils/adtResponse';
 import { rawDocument } from '../../utils/resultStrategy';
 import { getCheckFailureLogs, getExecutionLog } from './logs';

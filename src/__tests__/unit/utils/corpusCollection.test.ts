@@ -1,4 +1,4 @@
-import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces';
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt';
 import { answering, nothingIsARefusal } from '../../../utils/adtResponse';
 import { wireItself } from '../../../utils/resultStrategy';
 

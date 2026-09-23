@@ -46,11 +46,11 @@ import type {
   IClassUnitTestDefinition,
   IClassUnitTestRunOptions,
   IIncludeConfig,
-  ILogger,
   ISessionLifecycleAware,
   ITestRunInformation,
-} from '@mcp-abap-adt/interfaces';
-import { ADT_SESSION_ERROR } from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
+import { ADT_SESSION_ERROR } from '@mcp-abap-adt/interfaces-adt';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
   AdtAccessControl,
   accessControlDocuments,

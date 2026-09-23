@@ -10,7 +10,7 @@ import { XMLParser } from 'fast-xml-parser';
  * documents serve every family.
  *
  * **Why these are plain functions and not `IAnalyse` implementations yet.** The
- * injectable contract lives in `@mcp-abap-adt/interfaces` 39, and this
+ * injectable contract lives in `@mcp-abap-adt/interfaces-adt`, and this
  * repository is still on 13 until the stack is raised. The substance of an
  * error strategy is reading the document; wrapping a reading as
  * `(verdict, answer) => verdict === ADT_NO_FAILURE ? read(answer.data) ?? ADT_NO_FAILURE : verdict`

@@ -7,9 +7,9 @@
  * beside {@link parseTransportTree}, the reading that builds it.
  */
 
-export type { IAbapObjectEntry } from '@mcp-abap-adt/interfaces';
+export type { IAbapObjectEntry } from '@mcp-abap-adt/interfaces-adt';
 
-import type { IResultStrategy } from '@mcp-abap-adt/interfaces';
+import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
 import { rawDocument } from '../../utils/resultStrategy';
 import { parseCreatedTransport } from './parseCreatedTransport';
 import { parseObjectEntries } from './parseObjectEntries';
@@ -20,7 +20,7 @@ import { parseTransportTree } from './parseTransportTree';
 export type {
   IListTransportsParams,
   ITransportConfig,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 
 /**
  * One container a request was nested under — `tm:workbench`, `tm:target`,

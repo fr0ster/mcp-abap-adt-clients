@@ -9,7 +9,7 @@
  * Nothing here reaches outside itself; `ILogger` is a type and erases.
  */
 
-import type { ILogger } from '@mcp-abap-adt/interfaces';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 
 /** A URI template under test, and who proposes it. */
 export interface ITemplate {

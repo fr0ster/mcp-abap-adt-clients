@@ -14,7 +14,7 @@ import type {
   ITraceEntry,
   ITraceState,
   ITraceView,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 
 export interface ITraceProgramRef {
   name: string;

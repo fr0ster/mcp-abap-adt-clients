@@ -41,7 +41,7 @@
  * entry reader looks in both places.
  */
 
-import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces';
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt';
 import { XMLParser } from 'fast-xml-parser';
 import type { INamedItem } from '../../core/shared/utilResults';
 import type {

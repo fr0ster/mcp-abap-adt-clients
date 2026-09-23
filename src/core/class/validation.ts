@@ -5,7 +5,7 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import { ACCEPT_VALIDATION_CLASS_NAME } from '../../constants/contentTypes';
 import { getTimeout } from '../../utils/timeouts';
 

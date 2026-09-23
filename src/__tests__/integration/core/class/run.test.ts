@@ -10,7 +10,7 @@ import * as path from 'node:path';
 import type {
   IAbapConnection,
   ISessionLifecycleAware,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import * as dotenv from 'dotenv';
 import { runClass } from '../../../../core/class/run';
 import {

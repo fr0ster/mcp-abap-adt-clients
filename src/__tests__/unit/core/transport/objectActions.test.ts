@@ -12,11 +12,13 @@
  * as `corrNr`. The ways out were releasing the whole request — shipping
  * everything else in it — or SE09 by hand.
  */
+
 import type {
   IAbapConnection,
   IAbapRequestOptions,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
+import { ADT_TASK_TYPE } from '@mcp-abap-adt/interfaces-adt';
 import { AdtClient } from '../../../../clients/AdtClient';
 import { AdtRequest } from '../../../../core/transport/AdtRequest';
 
@@ -467,7 +469,10 @@ describe('changeTaskType', () => {
   it('nests the type under tm:task, which is what the server reads', async () => {
     const { connection, calls } = connectionOver(() => answering(REMOVED));
 
-    await new AdtRequest(connection).changeTaskType('E19K905943', 'S');
+    await new AdtRequest(connection).changeTaskType(
+      'E19K905943',
+      ADT_TASK_TYPE.developmentCorrection,
+    );
 
     expect(calls).toHaveLength(1);
     expect(calls[0].method).toBe('PUT');
@@ -485,7 +490,10 @@ describe('changeTaskType', () => {
   it('carries the headers its user-action siblings carry', async () => {
     const { connection, calls } = connectionOver(() => answering(REMOVED));
 
-    await new AdtRequest(connection).changeTaskType('E19K905943', 'R');
+    await new AdtRequest(connection).changeTaskType(
+      'E19K905943',
+      ADT_TASK_TYPE.repair,
+    );
 
     expect(calls[0].headers?.['Content-Type']).toBe('text/plain');
     expect(calls[0].headers?.Accept).toBe(

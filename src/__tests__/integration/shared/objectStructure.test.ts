@@ -8,9 +8,9 @@
 import type {
   IAbapConnection,
   IAdtResponse,
-  ILogger,
-} from '@mcp-abap-adt/interfaces';
-import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
+import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtClient } from '../../../clients/AdtClient';
 import { failed } from '../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../utils/systemInfo';

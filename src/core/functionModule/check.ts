@@ -6,7 +6,7 @@ import type {
   IAbapConnection,
   IAdtContentTypes,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import {
   ACCEPT_CHECK_MESSAGES,
   CT_CHECK_OBJECTS,

@@ -1,4 +1,7 @@
-import type { IAdtResponse, IAdtVersionable } from '@mcp-abap-adt/interfaces';
+import type {
+  IAdtResponse,
+  IAdtVersionable,
+} from '@mcp-abap-adt/interfaces-adt';
 import { answering } from '../../../utils/adtResponse';
 import { rawDocument } from '../../../utils/resultStrategy';
 import type { ObjectVersion } from '../results';

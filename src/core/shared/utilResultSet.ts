@@ -29,7 +29,7 @@
  * both cases.
  */
 
-import type { IResultStrategy } from '@mcp-abap-adt/interfaces';
+import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
 import { rawDocument } from '../../utils/resultStrategy';
 import { inactiveObjects } from './getInactiveObjects';
 import {

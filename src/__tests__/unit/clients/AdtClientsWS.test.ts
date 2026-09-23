@@ -4,7 +4,7 @@ import type {
   IWebSocketMessageEnvelope,
   IWebSocketMessageHandler,
   IWebSocketTransport,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-network';
 import { AdtClientsWS } from '../../../clients/AdtClientsWS';
 
 class MockWebSocketTransport implements IWebSocketTransport {

@@ -11,14 +11,14 @@
 import type {
   IResultStrategy,
   TransformationType,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import { rawDocument } from '../../utils/resultStrategy';
 
 // Types defined in @mcp-abap-adt/interfaces
 export type {
   ITransformationConfig,
   TransformationType,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 
 /**
  * What the create answers: the transformation's metadata document.

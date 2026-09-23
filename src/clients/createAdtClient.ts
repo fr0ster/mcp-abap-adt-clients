@@ -14,8 +14,8 @@
 import type {
   IAbapConnection,
   IAdtClientOptions,
-  ILogger,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { isModernAdtSystem } from '../utils/systemInfo';
 import { AdtClient } from './AdtClient';
 import { AdtClientLegacy } from './AdtClientLegacy';

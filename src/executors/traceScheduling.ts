@@ -16,7 +16,7 @@ import type {
   IAdtResponse,
   IProfilerTraceParameters,
   ITraceScheduling,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import type { INamedItem } from '../core/shared/utilResults';
 import {
   createTraceParameters,

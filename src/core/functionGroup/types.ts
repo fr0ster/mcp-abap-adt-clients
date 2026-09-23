@@ -8,11 +8,11 @@
  * says only that it is answered.
  */
 
-import type { IResultStrategy } from '@mcp-abap-adt/interfaces';
+import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
 import { rawDocument } from '../../utils/resultStrategy';
 
 // Types defined in @mcp-abap-adt/interfaces
-export type { IFunctionGroupConfig } from '@mcp-abap-adt/interfaces';
+export type { IFunctionGroupConfig } from '@mcp-abap-adt/interfaces-adt';
 
 /**
  * What `POST /sap/bc/adt/functions/groups` answers: the created group's

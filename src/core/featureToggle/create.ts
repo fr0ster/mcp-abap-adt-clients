@@ -1,7 +1,7 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import {
   ACCEPT_FEATURE_TOGGLE_METADATA,
   CT_FEATURE_TOGGLE_METADATA,

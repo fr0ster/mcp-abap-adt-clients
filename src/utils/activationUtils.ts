@@ -9,7 +9,7 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import { CT_ACTIVATION } from '../constants/contentTypes';
 import { encodeSapObjectName } from './internalUtils';
 import { getTimeout } from './timeouts';

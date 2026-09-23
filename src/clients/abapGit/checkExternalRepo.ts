@@ -1,7 +1,7 @@
 import type {
   IAbapConnection,
   IAbapGitExternalRepoCredentials,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import {
   ACCEPT_ABAPGIT_EXTERNAL_REPO_INFO_RESPONSE_V2,
   CT_ABAPGIT_EXTERNAL_REPO_INFO_REQUEST_V2,

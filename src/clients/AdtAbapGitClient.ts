@@ -20,8 +20,8 @@ import type {
   IAdtAbapGitClient,
   IAdtAbapGitClientOptions,
   IAdtResponse,
-  ILogger,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { answeringValue, failed, succeeded } from '../utils/adtResponse';
 import { checkExternalRepo } from './abapGit/checkExternalRepo';
 import { getErrorLog } from './abapGit/getErrorLog';

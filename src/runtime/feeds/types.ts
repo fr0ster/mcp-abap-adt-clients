@@ -1,4 +1,4 @@
-import type { IAbapTimestamp } from '@mcp-abap-adt/interfaces';
+import type { IAbapTimestamp } from '@mcp-abap-adt/interfaces-adt';
 
 /**
  * Feeds Domain Data Types.
@@ -18,7 +18,7 @@ export type {
   IAbapTimestamp,
   IFeedQueryOptions,
   IFeedRepository,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 
 export interface IFeedEntry {
   id: string;

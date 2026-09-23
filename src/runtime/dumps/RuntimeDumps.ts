@@ -1,11 +1,11 @@
 import type {
   IAbapConnection,
   IAdtResponse,
-  ILogger,
   IRuntimeDumpReadOptions,
   IRuntimeDumps,
   IRuntimeDumpsListOptions,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { answering } from '../../utils/adtResponse';
 import { rawDocument } from '../../utils/resultStrategy';
 import {

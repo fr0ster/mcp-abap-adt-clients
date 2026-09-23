@@ -26,7 +26,7 @@ import type {
   IAbapConnection,
   IIncludeConfig,
   ISessionLifecycleAware,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../clients/AdtClient';
 import { getIncludeSource } from '../../core/include';

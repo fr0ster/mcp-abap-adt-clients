@@ -23,9 +23,9 @@ import type {
   IAdtSystemContext,
   IAdtTransportAware,
   IAdtValidatable,
-  ILogger,
   IResultStrategy,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
@@ -227,15 +227,15 @@ export class AdtDomain<R extends IDomainResults = typeof domainDocuments>
 
     const name = this.name(config);
 
-    // **Both channels, and the options win.** The contract says this twice
-    // and differently: `IAdtMetadataUpdatable.updateMetadata` documents
-    // `options` as "`source` for the body", while `IDomainConfig.source` says
-    // a caller "reads the document … and passes it here" — the config. This
-    // used to read the config only, so the call the atom documents sent
-    // `undefined`. Reading both costs nothing and makes neither sentence a
-    // lie; which of the two the contract keeps is a decision for
-    // `mcp-abap-adt-interfaces`, not something to settle by silently
-    // preferring one here.
+    // **The body is `options.source`, and there is nowhere else to read it
+    // from.** The contract used to say where a write's body goes twice and
+    // differently — the capability atom put it in the options, this type's
+    // config told the caller to pass it there — so this read the config only
+    // and the documented call sent `undefined`. It then read both, and said
+    // that choosing was the contract's job. `interfaces-adt` 7.0.0 chose
+    // (decision 33) and took `source` off this config: nothing but the write
+    // ever read it, since this type has no `check` or `validate` that
+    // compiles a source the server does not hold yet.
     //
     // The fields beside it describe a create; on an update nothing here merges
     // them into a document, because nothing is read to merge them into.
@@ -248,7 +248,7 @@ export class AdtDomain<R extends IDomainResults = typeof domainDocuments>
             package_name: config.packageName as string,
             transport_request: config.transportRequest,
           } as Parameters<typeof updateDomain>[1],
-          (options?.source ?? config.source) as string,
+          options?.source as string,
           options?.lockHandle,
         ),
       this.results.metadataUpdated as IResultStrategy<

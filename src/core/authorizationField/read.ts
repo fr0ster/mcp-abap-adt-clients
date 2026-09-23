@@ -6,13 +6,13 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
   IReadOptions,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import { ACCEPT_AUTHORIZATION_FIELD } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
 // Declared once, in the contract — see core/functionInclude/read.ts.
-export type { IReadOptions } from '@mcp-abap-adt/interfaces';
+export type { IReadOptions } from '@mcp-abap-adt/interfaces-adt';
 
 /**
  * Read an authorization field (metadata-only, no source).

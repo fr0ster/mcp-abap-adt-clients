@@ -34,7 +34,7 @@ import {
   type IAbapConnection,
   type ISapConfig,
   type ISessionLifecycleAware,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import { type AdtStub, startAdtStub } from './adtStubServer';
 
 // These tests talk to a local stub and finish in well under a second. The suite

@@ -1,7 +1,7 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import { getScalarFunctionSource } from '../../../../core/scalarFunction/read';
 import { unlockScalarFunction } from '../../../../core/scalarFunction/unlock';
 import { updateScalarFunction } from '../../../../core/scalarFunction/update';

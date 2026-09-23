@@ -16,7 +16,7 @@
 import type {
   IObjectReference,
   IResultStrategy,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import { XMLParser } from 'fast-xml-parser';
 import { parseNamedItems } from './allTypes';
 import { extractRunId } from './groupActivation';
@@ -85,7 +85,7 @@ export interface IWhereUsedListResult {
  * The copy here extended `IAdtObjectHit`, a result shape, deriving an input from
  * an output and picking up a `packageName` that nothing reads.
  */
-export type { IObjectReference } from '@mcp-abap-adt/interfaces';
+export type { IObjectReference } from '@mcp-abap-adt/interfaces-adt';
 
 /** What the inactive-objects listing answers, read. */
 export interface IInactiveObjectsResponse {

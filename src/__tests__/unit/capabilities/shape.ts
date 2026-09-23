@@ -35,7 +35,7 @@ import type {
   IAdtUpdatable,
   IAdtValidatable,
   IAdtVersionable,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import type { Atom, HANDLERS } from './manifest';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */

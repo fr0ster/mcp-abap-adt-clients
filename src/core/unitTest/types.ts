@@ -9,7 +9,7 @@
 import type {
   IAdtWireResponse,
   IResultStrategy,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import { headerValueToString } from '../../utils/internalUtils';
 import { rawDocument } from '../../utils/resultStrategy';
 
@@ -19,7 +19,7 @@ export type {
   IClassUnitTestDefinition,
   IClassUnitTestRunOptions,
   IUnitTestConfig,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 
 /**
  * The id of a started run, read out of the answer.

@@ -7,7 +7,7 @@
  * Library code must never do this; a script is exactly where it belongs.
  */
 
-import type { IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 
 export function resultOf<T>(answer: IAdtResponse<T>): T {
   if (!answer.ok) {

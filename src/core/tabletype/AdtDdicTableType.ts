@@ -25,9 +25,9 @@ import type {
   IAdtTransportAware,
   IAdtValidatable,
   IAdtVersionable,
-  ILogger,
   IResultStrategy,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
@@ -237,9 +237,9 @@ export class AdtDdicTableType<
             tabletype_name: name,
             transport_request: config.transportRequest,
           },
-          // The document the caller built, from either channel — see
+          // The document the caller built, from the options — see
           // `AdtDomain.updateMetadata`; the fields above describe a create.
-          (options?.source ?? config.source) as string,
+          options?.source as string,
           options?.lockHandle,
         ),
       this.results.metadataUpdated as IResultStrategy<

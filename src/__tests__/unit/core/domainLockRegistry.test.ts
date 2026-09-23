@@ -7,7 +7,8 @@
  * come from test-config.yaml via TestConfigResolver — never hardcoded.
  */
 
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AdtDomain } from '../../../core/domain/AdtDomain';
 import { LockRegistry } from '../../../core/shared/LockRegistry';
 import { expectFailure, expectResult } from '../../helpers/contract';

@@ -5,7 +5,7 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import { activateObjectInSession } from '../../utils/activationUtils';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 

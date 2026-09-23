@@ -15,7 +15,7 @@ import type {
   IProfilerTraceHitListOptions,
   IProfilerTraceParameters,
   IProfilerTraceStatementsOptions,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import { XMLParser } from 'fast-xml-parser';
 import {
   ACCEPT_TRACE_CALLTREE,
@@ -34,7 +34,7 @@ export type {
   IProfilerTraceHitListOptions,
   IProfilerTraceParameters,
   IProfilerTraceStatementsOptions,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 
 export const DEFAULT_PROFILER_TRACE_PARAMETERS: Omit<
   IProfilerTraceParameters,

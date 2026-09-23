@@ -1,4 +1,4 @@
-import type { ILogger } from '@mcp-abap-adt/interfaces';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 
 export interface TestProgressLogger {
   info?: (...args: any[]) => void;

@@ -6,7 +6,7 @@
  * member it touches, and none of them changes its mind between `create` and
  * `read` of the same object.
  */
-import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces';
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt';
 import { classDocuments } from '../../../core/class/types';
 
 const wire = (data: string): IAdtWireResponse => ({

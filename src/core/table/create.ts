@@ -6,7 +6,7 @@ import type {
   HttpError,
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import { ACCEPT_TABLE, CT_TABLE } from '../../constants/contentTypes';
 import { limitDescription, safeStringify } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';

@@ -20,7 +20,8 @@
  * request would still return the caller's type and still compile.
  */
 
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AdtUtils } from '../../../core/shared/AdtUtils';
 import { utilDocuments } from '../../../core/shared/utilResultSet';
 import { expectResult } from '../../helpers/contract';

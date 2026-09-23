@@ -7,7 +7,7 @@
  * exists because the first published shape could not express a walk.
  */
 
-import type { ILogger } from '@mcp-abap-adt/interfaces';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { parseNamedItems } from '../../../core/shared/allTypes';
 import { toNodeContents } from '../../../core/shared/nodeStructure';
 import { AdtParseError } from '../../../utils/adtErrors';

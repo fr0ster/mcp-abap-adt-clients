@@ -71,7 +71,16 @@ This package is responsible for:
 
 This package interacts with external packages **ONLY through interfaces**:
 
-- **`@mcp-abap-adt/interfaces`** (`^17.1.0`): The contract package — the single definition site for every public type this package exposes (see [Type System](#type-system)). This is the one runtime dependency whose *types* are part of this package's public API.
+- **The contract packages** — the single definition site for every public type this package exposes (see [Type System](#type-system)). Their *types* are part of this package's public API; import them from the package that declares the name you need, not from the deprecated `@mcp-abap-adt/interfaces` facade:
+
+  | package | what this package takes from it | names |
+  |---|---|---|
+  | [`@mcp-abap-adt/interfaces-adt`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-adt) `^7.0.0` | `IAbapConnection`, the capability atoms, every object's config, `ADT_TASK_TYPE` | 126 |
+  | [`@mcp-abap-adt/interfaces-network`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-network) `^1.0.0` | `IWebSocketTransport` and its four companions, `ITimeoutConfig` | 6 |
+  | [`@mcp-abap-adt/interfaces-utils`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-utils) `^1.0.0` | `ILogger`, `LogLevel` | 2 |
+  | [`@mcp-abap-adt/interfaces-auth`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-auth) `^1.1.0` | `IAuthProvider` | 1 |
+
+  Taking them by name is what keeps a consumer off the facade's release rate: `interfaces-utils` has had one release ever, and a package that needs only `ILogger` should move at that pace rather than at ADT's.
 - **`@mcp-abap-adt/connection`**: Uses the `IAbapConnection` interface for HTTP requests — does not know about the concrete connection implementation. It is a **dev** dependency; consumers supply their own implementation.
 - **No other direct package dependencies**: all remaining interactions happen through well-defined interfaces
 
@@ -256,7 +265,7 @@ for (const ref of references.references) {
 
 ```typescript
 import { AdtClientsWS } from '@mcp-abap-adt/adt-clients';
-import type { IWebSocketTransport } from '@mcp-abap-adt/interfaces';
+import type { IWebSocketTransport } from '@mcp-abap-adt/interfaces-network';
 
 const transport: IWebSocketTransport = createYourTransport();
 const wsClient = new AdtClientsWS(transport, console, {
@@ -305,7 +314,7 @@ console.log(runWithProfilingResult.profilerId);
 `readObjectMetadata` and `readObjectSource` accept strict object type unions to prevent invalid inputs like `view:ZOBJ`.
 
 ```typescript
-import type { AdtObjectType, AdtSourceObjectType } from '@mcp-abap-adt/interfaces';
+import type { AdtObjectType, AdtSourceObjectType } from '@mcp-abap-adt/interfaces-adt';
 
 await utils.readObjectMetadata('DDLS/DF' satisfies AdtObjectType, 'ZOK_I_CDS_TEST');
 await utils.readObjectSource('view' satisfies AdtSourceObjectType, 'ZOK_I_CDS_TEST');
@@ -568,7 +577,7 @@ The other half of the same idea is `analyse`, per call, because *whether* an
 answer is a failure can depend on what you are doing:
 
 ```typescript
-import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces';
+import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces-adt';
 
 // An empty read is absence here, and the caller says so.
 await client.getClass().read(
@@ -724,7 +733,7 @@ Since **7.5.0**, every public type is **defined once**, in `@mcp-abap-adt/interf
 **Import them from the package that owns them:**
 
 ```typescript
-import type { IClassConfig, IProgramConfig } from '@mcp-abap-adt/interfaces';
+import type { IClassConfig, IProgramConfig } from '@mcp-abap-adt/interfaces-adt';
 ```
 
 The `IXxxState` half of every pair is gone: a member answers a value and a
@@ -906,7 +915,7 @@ DEBUG_ADT_TESTS=true npm test
 All clients accept a unified `ILogger` interface:
 
 ```typescript
-import type { ILogger } from '@mcp-abap-adt/interfaces';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AdtClient } from '@mcp-abap-adt/adt-clients';
 
 // Custom logger example

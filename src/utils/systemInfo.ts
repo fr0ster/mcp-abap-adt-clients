@@ -5,7 +5,7 @@
 import type {
   IAbapConnection,
   IAdtContentTypes,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import {
   AdtContentTypesBase,
   AdtContentTypesModern,

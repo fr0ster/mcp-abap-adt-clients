@@ -6,7 +6,7 @@ import type {
   HttpError,
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import { encodeSapObjectName, safeStringify } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 

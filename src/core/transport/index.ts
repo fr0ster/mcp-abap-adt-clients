@@ -11,7 +11,6 @@ export {
   readTransportActionLog,
   readTransportObjects,
   removeObjectFromTransport,
-  type TransportTaskType,
 } from './objects';
 export type { ICreatedTransport } from './parseCreatedTransport';
 export { parseCreatedTransport } from './parseCreatedTransport';

@@ -35,7 +35,7 @@ import * as path from 'node:path';
 import type {
   IAdtMetadataReadable,
   IAdtReadable,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import * as dotenv from 'dotenv';
 import {
   createTestConnection,

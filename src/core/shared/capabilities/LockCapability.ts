@@ -1,4 +1,4 @@
-import type { IAdtLockable, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type { IAdtLockable, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { answering } from '../../../utils/adtResponse';
 import { nothing } from '../../../utils/resultStrategy';
 import type { ICapabilityContext, ILockStrategy } from './types';

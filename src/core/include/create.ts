@@ -15,7 +15,7 @@ import type {
   IAbapConnection,
   IAdtContentTypes,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import { limitDescription } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import { escapeXmlAttr } from '../../utils/xml';

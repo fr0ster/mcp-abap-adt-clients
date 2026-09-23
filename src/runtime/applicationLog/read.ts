@@ -12,11 +12,11 @@ import type {
   IAdtWireResponse,
   IGetApplicationLogObjectOptions,
   IGetApplicationLogSourceOptions,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import { getTimeout } from '../../utils/timeouts';
 
 // Declared once, in the contract; re-exported so importers here are unchanged.
-export type { IGetApplicationLogObjectOptions } from '@mcp-abap-adt/interfaces';
+export type { IGetApplicationLogObjectOptions } from '@mcp-abap-adt/interfaces-adt';
 
 /**
  * Get application log object properties
@@ -54,7 +54,7 @@ export async function getApplicationLogObject(
 }
 
 // Declared once, in the contract; re-exported so importers here are unchanged.
-export type { IGetApplicationLogSourceOptions } from '@mcp-abap-adt/interfaces';
+export type { IGetApplicationLogSourceOptions } from '@mcp-abap-adt/interfaces-adt';
 
 /**
  * Get application log object source

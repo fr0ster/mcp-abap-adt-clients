@@ -151,7 +151,7 @@ export { unitTestDocuments } from './core/unitTest/types';
  * replaced:
  *
  * ```typescript
- * import type { IAdtError, IAnalyse } from '@mcp-abap-adt/interfaces';
+ * import type { IAdtError, IAnalyse } from '@mcp-abap-adt/interfaces-adt';
  *
  * interface IT100Failure extends IAdtError {
  *   readonly t100: { msgid: string; msgno: string };

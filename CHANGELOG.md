@@ -24,6 +24,51 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+### Changed — the contract packages, by name
+
+- **BREAKING: the `@mcp-abap-adt/interfaces` facade is gone from this package.**
+  It takes `@mcp-abap-adt/interfaces-adt` `^7.0.0`, `-network` `^1.0.0`,
+  `-utils` `^1.0.0` and `-auth` `^1.1.0` directly. 729 import and re-export
+  statements across 694 files were repointed; all 135 names resolved — 126 to
+  `-adt`, 6 to `-network`, 2 to `-utils`, 1 to `-auth`, and **none** needed the
+  facade.
+
+  **Why it matters to a consumer, measured.** Every symbol the facade forwards
+  is already marked *"@deprecated Import from …"*, and forwarding is what
+  couples a consumer to everyone else's release rate: the facade has had 48
+  majors, `interfaces-adt` 5, `-auth` 1, `-utils` and `-network` none. Across
+  the sibling repositories the effect is not churn but **freezing** — they sit
+  on facade majors 2, 5, 7, 11, 39 and 46 because one step costs them every
+  other package's history.
+
+  A consumer of this package imports the contract itself (this package
+  re-exports none of it), so the change reaches them as an import path at
+  their next dependency update.
+
+- **BREAKING: the six document writes read `options.source` only.** 21.0.0's
+  successor shipped them reading `options?.source ?? config.source`, because
+  the contract said where a write's body goes twice and differently. It chose
+  in `interfaces-adt` 7.0.0 — decision 33 — and took `source` off
+  `IDomainConfig`, `IDataElementConfig`, `IPackageConfig`, `ITableTypeConfig`,
+  `IFunctionGroupConfig` and `ITransportConfig`, so the fallback had nothing
+  left to read.
+
+  ```diff
+  - await domain.updateMetadata({ domainName, source: edited }, { lockHandle });
+  + await domain.updateMetadata({ domainName }, { source: edited, lockHandle });
+  ```
+
+  A `check` or `validate` still takes its source in the config: it compiles
+  text the server does not hold yet and has no options channel. Those six types
+  have no such member, which is why they are the six.
+
+- **`TransportTaskType` is gone; `AdtTaskType` and `ADT_TASK_TYPE` come from
+  the contract.** The local alias repeated a union the contract declared
+  inline, because there was no name to import. There is now, and the letters
+  are SAP's: `changeTaskType(task, ADT_TASK_TYPE.developmentCorrection)`. Not a
+  break at the type level — the alias and the union are mutually assignable —
+  but the export `TransportTaskType` is removed.
+
 ### Added
 
 - **`AdtRequest.changeTaskType(task, type)`** — a task is created without a

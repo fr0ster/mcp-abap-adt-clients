@@ -15,7 +15,7 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import { AdtCdsUnitTest } from '../../../../core/unitTest/AdtCdsUnitTest';
 import { AdtUnitTest } from '../../../../core/unitTest/AdtUnitTest';
 import { expectFailure, expectResult } from '../../../helpers/contract';

@@ -9,7 +9,8 @@ import type {
   IAbapConnection,
   IAbapRequestOptions,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+  ITransportConfig,
+} from '@mcp-abap-adt/interfaces-adt';
 import { AdtRequest } from '../../../../core/transport/AdtRequest';
 
 const ITEM_URL = '/sap/bc/adt/cts/transportrequests/TRLK900438';
@@ -95,46 +96,20 @@ describe('AdtRequest.update()', () => {
   });
 
   /**
-   * **Both channels reach the body, and the options win.** The contract says
-   * where the body goes twice and differently — `IAdtMetadataUpdatable`
-   * documents `options` as "`source` for the body", `ITransportConfig.source`
-   * says the caller "passes it here" — so an implementation that reads one of
-   * them makes the other sentence a lie. This one reads both, and these two
-   * cases are what keeps that true.
+   * **One channel, and the type is what enforces it.**
+   *
+   * Two tests stood here, pinning that the body could arrive in the config as
+   * well as in the options and that the options won. They were the right
+   * tests while the contract said where the body goes twice and differently —
+   * the capability atom put it in the options, `ITransportConfig.source` told
+   * the caller to pass it there. `interfaces-adt` 7.0.0 chose the options
+   * (decision 33) and took the field off the config, so the config form no
+   * longer compiles and there is nothing left to assert about precedence.
    */
-  it('takes the document from the config as well', async () => {
-    const { connection, calls } = connectionOver(() => TRANSPORT_ITEM_XML);
-    const edited = TRANSPORT_ITEM_XML.replace(
-      /tm:desc="[^"]*"/,
-      'tm:desc="From the config"',
-    );
-
-    await new AdtRequest(connection).updateMetadata({
-      transportNumber: 'TRLK900438',
-      source: edited,
-    });
-
-    expect(String(calls[0].data)).toContain('tm:desc="From the config"');
-  });
-
-  it('prefers the options when both carry one', async () => {
-    const { connection, calls } = connectionOver(() => TRANSPORT_ITEM_XML);
-    const fromConfig = TRANSPORT_ITEM_XML.replace(
-      /tm:desc="[^"]*"/,
-      'tm:desc="From the config"',
-    );
-    const fromOptions = TRANSPORT_ITEM_XML.replace(
-      /tm:desc="[^"]*"/,
-      'tm:desc="From the options"',
-    );
-
-    await new AdtRequest(connection).updateMetadata(
-      { transportNumber: 'TRLK900438', source: fromConfig },
-      { source: fromOptions },
-    );
-
-    expect(String(calls[0].data)).toContain('tm:desc="From the options"');
-    expect(String(calls[0].data)).not.toContain('From the config');
+  it('refuses a body the config has no field for', () => {
+    // @ts-expect-error the payload is `options.source`; a config has no `source`
+    const wrong: Partial<ITransportConfig> = { source: '<tm:root/>' };
+    expect(wrong).toBeDefined();
   });
 
   it('touches neither the collection nor the search-configuration endpoint', async () => {

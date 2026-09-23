@@ -11,7 +11,7 @@
  */
 
 // Types defined in @mcp-abap-adt/interfaces
-export type { IBehaviorImplementationConfig } from '@mcp-abap-adt/interfaces';
+export type { IBehaviorImplementationConfig } from '@mcp-abap-adt/interfaces-adt';
 export {
   classDocuments,
   type IClassResults,

@@ -1,4 +1,5 @@
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { ClassExecutor, ProgramExecutor } from '../executors';
 import { withRequestTrace } from '../utils/requestTrace';
 

@@ -22,10 +22,10 @@ import type {
   IAdtResponse,
   IAdtSystemContext,
   IListTransportsOptions,
-  ILogger,
   IResultStrategy,
-} from '@mcp-abap-adt/interfaces';
-import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
+import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { answering, failed } from '../../utils/adtResponse';
 import { AdtRequest } from './AdtRequest';
 import { getTransportLegacy, listTransportsLegacy } from './readLegacy';

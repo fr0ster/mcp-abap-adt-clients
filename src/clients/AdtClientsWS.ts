@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import type {
-  ILogger,
   IWebSocketConnectOptions,
   IWebSocketMessageEnvelope,
   IWebSocketMessageHandler,
   IWebSocketTransport,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-network';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 
 export interface IAdtClientsWSRequestOptions {
   correlationId?: string;

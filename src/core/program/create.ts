@@ -6,7 +6,7 @@ import type {
   IAbapConnection,
   IAdtContentTypes,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import { CT_PROGRAM } from '../../constants/contentTypes';
 import { limitDescription } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';

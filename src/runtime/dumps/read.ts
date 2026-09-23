@@ -12,7 +12,7 @@ import type {
   IAdtWireResponse,
   IRuntimeDumpReadOptions,
   IRuntimeDumpsListOptions,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import { getTimeout } from '../../utils/timeouts';
 
 // Declared once, in the contract; re-exported so importers here are unchanged.
@@ -22,7 +22,7 @@ export type {
   IRuntimeDumpReadOptions,
   IRuntimeDumpReadView,
   IRuntimeDumpsListOptions,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 
 function normalizeDumpId(dumpId: string): string {
   const normalized = dumpId?.trim();

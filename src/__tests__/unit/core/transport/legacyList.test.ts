@@ -9,7 +9,7 @@ import type {
   IAbapConnection,
   IAbapRequestOptions,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import { AdtRequestLegacy } from '../../../../core/transport/AdtRequestLegacy';
 import { expectFailure, expectResult } from '../../../helpers/contract';
 

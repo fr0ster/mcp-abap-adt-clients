@@ -10,7 +10,7 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import { getTimeout } from '../../utils/timeouts';
 import { CT_INCLUDE } from './create';
 import { includeUrl } from './lock';

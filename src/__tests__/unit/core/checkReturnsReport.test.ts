@@ -1,7 +1,7 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import { checkAccessControl } from '../../../core/accessControl/check';
 import { checkClass } from '../../../core/class/check';
 import { checkDdl } from '../../../core/ddl/check';

@@ -13,7 +13,7 @@
  * crude, because its shape is not the point.
  */
 
-import type { IAdtError, IAnalyse } from '@mcp-abap-adt/interfaces';
+import type { IAdtError, IAnalyse } from '@mcp-abap-adt/interfaces-adt';
 import type { AdtClient } from '../src/clients/AdtClient';
 
 export const activationRefusal: IAnalyse<IAdtError> = (verdict, answer) => {

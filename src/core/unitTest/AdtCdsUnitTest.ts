@@ -21,10 +21,10 @@ import type {
   IAdtWireResponse,
   ICdsTestDoubleCheckable,
   ICdsUnitTestConfig,
-  ILogger,
   IResultStrategy,
-} from '@mcp-abap-adt/interfaces';
-import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
+import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces-adt';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { XMLParser } from 'fast-xml-parser';
 import { answering } from '../../utils/adtResponse';
 import { requestOf } from '../../utils/requestTrace';

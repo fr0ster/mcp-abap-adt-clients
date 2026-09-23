@@ -14,8 +14,11 @@
  * now, is identical on a legacy system.
  */
 
-import type { IAdtResponse, IResultStrategy } from '@mcp-abap-adt/interfaces';
-import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
+import type {
+  IAdtResponse,
+  IResultStrategy,
+} from '@mcp-abap-adt/interfaces-adt';
+import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import { answering, failed } from '../../utils/adtResponse';
 import { AdtUnitTest } from './AdtUnitTest';
 import { startClassUnitTestRunLegacy } from './runLegacy';

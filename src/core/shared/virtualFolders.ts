@@ -7,7 +7,7 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import {
   ACCEPT_VIRTUAL_FOLDERS,
   CT_VIRTUAL_FOLDERS,

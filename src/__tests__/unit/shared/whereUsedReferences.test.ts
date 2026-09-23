@@ -11,7 +11,7 @@
  * `404` — a caller writes those, over `getWhereUsedScope`,
  * `modifyWhereUsedScope` and `getWhereUsed`.
  */
-import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces';
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt';
 import { whereUsedReferences } from '../../../core/shared/utilResults';
 
 const wire = (data: string): IAdtWireResponse =>

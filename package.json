@@ -120,7 +120,10 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "@mcp-abap-adt/interfaces": "^50.0.0",
+    "@mcp-abap-adt/interfaces-adt": "^7.0.0",
+    "@mcp-abap-adt/interfaces-auth": "^1.1.0",
+    "@mcp-abap-adt/interfaces-network": "^1.0.0",
+    "@mcp-abap-adt/interfaces-utils": "^1.0.0",
     "@mcp-abap-adt/logger": "^0.3.1",
     "axios": "^1.18.1",
     "fast-xml-parser": "^5.9.3"

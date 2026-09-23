@@ -19,11 +19,11 @@ import type {
   IAdtValidatable,
   IAdtWireResponse,
   IAnalyse,
-  ILogger,
   IResultStrategy,
   ServiceBindingVariant,
-} from '@mcp-abap-adt/interfaces';
-import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
+import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces-adt';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
   ACCEPT_CHECK_MESSAGES,
   ACCEPT_DELETION,

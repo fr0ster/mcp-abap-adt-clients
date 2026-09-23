@@ -23,9 +23,9 @@ import type {
   IAdtUpdatable,
   IAdtValidatable,
   ILocalTypesConfig,
-  ILogger,
   IResultStrategy,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import type { LockRegistry } from '../shared/LockRegistry';
@@ -38,7 +38,7 @@ import { getClassImplementationsInclude } from './read';
 import { classDocuments, type IClassResults } from './types';
 
 // Types defined in @mcp-abap-adt/interfaces
-export type { ILocalTypesConfig } from '@mcp-abap-adt/interfaces';
+export type { ILocalTypesConfig } from '@mcp-abap-adt/interfaces-adt';
 
 /**
  * Not `IAdtDeletable`, and that is the honest shape rather than an omission.

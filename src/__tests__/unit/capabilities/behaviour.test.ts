@@ -20,7 +20,7 @@ import type {
   IAbapConnection,
   IAdtResponse,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import { AdtClient } from '../../../clients/AdtClient';
 import { createLibraryLogger } from '../../helpers/testLogger';
 import type { RequestSpec } from './manifest';

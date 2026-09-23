@@ -11,14 +11,14 @@
 import type {
   IResultStrategy,
   ScalarFunctionEngine,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import { rawDocument } from '../../utils/resultStrategy';
 
 // Types defined in @mcp-abap-adt/interfaces
 export type {
   IScalarFunctionImplementationConfig,
   ScalarFunctionEngine,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 
 /**
  * What the create answers: the implementation's metadata document.

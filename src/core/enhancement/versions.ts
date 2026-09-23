@@ -1,7 +1,7 @@
 import type {
   EnhancementType,
   IAbapConnection,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import { getTimeout } from '../../utils/timeouts';
 import type { ObjectVersion } from '../shared/results';
 import { parseVersionsFeed, throwVersionsError } from '../shared/versions';

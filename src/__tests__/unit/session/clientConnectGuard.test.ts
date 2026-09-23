@@ -14,7 +14,7 @@ import {
   ADT_SESSION_ERROR,
   type IAbapConnection,
   type IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import { AdtClient } from '../../../clients/AdtClient';
 
 // These tests talk to a local stub and finish in well under a second. The suite

@@ -1,4 +1,4 @@
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
 import { DdicActivation } from '../../../runtime/ddic/DdicActivation';
 
 describe('DdicActivation', () => {

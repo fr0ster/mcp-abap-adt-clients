@@ -1,7 +1,7 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import { create } from '../../../../core/authorizationField/create';
 import { updateAuthorizationField } from '../../../../core/authorizationField/update';
 import { buildAuthorizationFieldXml } from '../../../../core/authorizationField/xmlBuilder';

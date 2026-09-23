@@ -6,7 +6,7 @@
  * the consumer's business.
  */
 
-import type { ITransportSearchConfiguration } from '@mcp-abap-adt/interfaces';
+import type { ITransportSearchConfiguration } from '@mcp-abap-adt/interfaces-adt';
 import { XMLParser } from 'fast-xml-parser';
 
 const xmlParser = new XMLParser({
