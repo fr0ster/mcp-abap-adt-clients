@@ -85,9 +85,24 @@ four packages directly already.
 
 ### 4. `mcp-abap-adt-proxy` → `network@^1.1.0`, `adt@^8.0.0`
 
-The only repository whose *imports* must move rather than just its ranges: it
-reads header names, and every header name is in `interfaces-network` now. It is
-already direct on both packages, so this is a repoint plus two bumps.
+The only repository whose *imports* must move rather than just its ranges, and a
+transparent proxy, so what moves is headers. Measured: it takes **11** names from
+`interfaces-adt`, of which **nine are header names** now in
+`interfaces-network` —
+
+```
+HEADER_BTP_DESTINATION   HEADER_MCP_URL          HEADER_SAP_CLIENT
+HEADER_SAP_DESTINATION   HEADER_SAP_DESTINATION_SERVICE
+HEADER_SAP_JWT_TOKEN     HEADER_SAP_PASSWORD     HEADER_SAP_REFRESH_TOKEN
+HEADER_SAP_UAA_CLIENT_SECRET
+```
+
+— and the two that stay are real ADT-side contracts: `IAuthorizationConfig` and
+`ITokenRefresher`. It already imports six header names from `-network`, so nine
+move from one import statement to the other in six files: `src/index.ts`,
+`src/proxy/btpProxy.ts`, `src/router/requestInterceptor.ts` and three tests.
+
+Both packages are already declared, so the rest is two range bumps.
 
 ### 5. The rest, by how much each frees
 
