@@ -12,7 +12,7 @@ repositories a step frees.
 
 **`mcp-abap-adt` is not part of this plan.** It is being migrated on its own,
 and it is not an argument for any ordering here: what it needs from this family
-is a released `adt-clients`, which is step 2. Its own facade imports and the five
+is a released `adt-clients`, which is step 3. Its own facade imports and the five
 names that exist in no package are that migration's work, not this one's — they
 are recorded at the bottom so the measurement is not lost, and for no other
 reason.
@@ -30,8 +30,9 @@ reason.
 
 ## Where every repository stands
 
-Measured 2026-09-23 by resolving each repository's imports against what the four
-packages export. The `.wt-mcp-*` directories are worktrees of `mcp-abap-adt`,
+Measured 2026-09-23 by resolving each repository's imports against what all five
+contract packages export — `interfaces-adt`, `-auth`, `-calm`, `-network` and
+`-utils`. The `.wt-mcp-*` directories are worktrees of `mcp-abap-adt`,
 not repositories, and are not listed.
 
 | repository | declares | names it imports | resolves to |
@@ -83,7 +84,8 @@ for `adt-clients` 22.0.0 already went through that tree.
 `adt-clients` consumes it from the registry, so this step is not finished until
 the connector is published — the range bump alone changes nothing downstream.
 
-Small in itself: it takes the four packages directly already.
+Small in itself: it already takes four of the five directly — `adt`, `auth`,
+`network` and `utils`; it has no use for `calm`.
 
 ### 3. `mcp-abap-adt-clients` → `interfaces-adt@^8.0.0`, and the connector
 
