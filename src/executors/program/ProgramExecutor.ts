@@ -2,7 +2,6 @@ import type {
   IAbapConnection,
   IAdtResponse,
   IAdtRunnable,
-  ILogger,
   IProfilerTraceParameters,
   IProgramExecuteWithProfilerOptions,
   IProgramExecuteWithProfilingOptions,
@@ -10,7 +9,8 @@ import type {
   IProgramExecutionTarget,
   IRunnableWithProfiler,
   ITraceScheduling,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { runProgram } from '../../core/program/run';
 import type { INamedItem } from '../../core/shared/utilResults';
 import type { ITraceRequestEntry } from '../../runtime/traces/types';

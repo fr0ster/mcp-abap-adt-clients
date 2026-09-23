@@ -11,7 +11,8 @@
  * to whoever wants a list. Built over `fetchNodeStructure`, which is one
  * request and keeps its reading.
  */
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
   fetchNodeStructure,
   parseNodeStructure,

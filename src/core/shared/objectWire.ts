@@ -17,9 +17,9 @@ import type {
   AdtSourceObjectType,
   IAbapConnection,
   IAdtWireResponse,
-  ILogger,
   IReadOptions,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
   ACCEPT_CLASS,
   ACCEPT_DATA_ELEMENT,

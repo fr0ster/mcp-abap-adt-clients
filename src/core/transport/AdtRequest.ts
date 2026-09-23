@@ -23,6 +23,7 @@
  */
 
 import type {
+  AdtTaskType,
   IAbapConnection,
   IAdtCreatable,
   IAdtCreateOptions,
@@ -37,10 +38,10 @@ import type {
   IAdtTransportObjectActions,
   IDeferredResponseConnection,
   IListTransportsOptions,
-  ILogger,
   IResultStrategy,
-} from '@mcp-abap-adt/interfaces';
-import { TRANSPORT_SEARCH_CONFIGURATIONS_URL } from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
+import { TRANSPORT_SEARCH_CONFIGURATIONS_URL } from '@mcp-abap-adt/interfaces-adt';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { TransportSearchConfigurationMissing } from '../../utils/adtErrors';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
@@ -58,7 +59,6 @@ import {
   readTransportActionLog,
   readTransportObjects,
   removeObjectFromTransport,
-  type TransportTaskType,
 } from './objects';
 import { getTransport } from './read';
 import {
@@ -332,12 +332,7 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
 
     this.logger?.info?.('Updating transport request:', number);
     return answering(
-      () =>
-        updateTransport(
-          connection,
-          number,
-          (options?.source ?? config.source) as string,
-        ),
+      () => updateTransport(connection, number, options?.source as string),
       this.results.metadataUpdated as IResultStrategy<
         ReturnType<R['metadataUpdated']>
       >,
@@ -567,7 +562,7 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
    * caller assigns it here.
    *
    * ```ts
-   * await request.changeTaskType(task, 'S'); // Development/Correction
+   * await request.changeTaskType(task, ADT_TASK_TYPE.developmentCorrection);
    * ```
    *
    * `'S'`, `'R'` and `'X'` are the measured vocabulary; `'Q'` is a
@@ -580,7 +575,7 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
    */
   async changeTaskType<E extends IAdtError = IAdtError>(
     taskNumber: string,
-    type: TransportTaskType,
+    type: AdtTaskType,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<NonNullable<R['taskTypeChanged']>>, E>> {
     const connection = withCallTimeout(this.connection, options?.timeout);

@@ -1,7 +1,7 @@
 import type {
   IAbapConnection,
   IAbapGitLinkArgs,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import {
   CT_ABAPGIT_REPO_V3,
   CT_ABAPGIT_REPO_V4,

@@ -13,7 +13,10 @@
  * mentioned `getTransaction` was its own doc comment and this refusal of it.
  */
 
-import type { IAdtResponse, IResultStrategy } from '@mcp-abap-adt/interfaces';
+import type {
+  IAdtResponse,
+  IResultStrategy,
+} from '@mcp-abap-adt/interfaces-adt';
 import { buildObjectUri } from '../../utils/activationUtils';
 import { answering, failed } from '../../utils/adtResponse';
 import { getTimeout } from '../../utils/timeouts';

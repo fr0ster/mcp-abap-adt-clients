@@ -10,7 +10,7 @@
  * These two exist so the failure message is the server's own sentence.
  */
 
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 
 /**
  * The value, failing the test with what SAP said when there is none.

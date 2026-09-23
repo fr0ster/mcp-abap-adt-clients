@@ -16,7 +16,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import * as dotenv from 'dotenv';
 import {
   createTestConnection,

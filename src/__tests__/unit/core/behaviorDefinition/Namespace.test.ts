@@ -7,7 +7,7 @@
  * that break the ADT path. The encoded form must be `%2fnsp%2fr_test`.
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
 import { lock, lockForUpdate } from '../../../../core/behaviorDefinition/lock';
 import { unlock } from '../../../../core/behaviorDefinition/unlock';
 import { update } from '../../../../core/behaviorDefinition/update';

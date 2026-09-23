@@ -42,9 +42,9 @@ import type {
   IAbapConnection,
   IAdtError,
   IAnalyse,
-  ILogger,
   ISessionLifecycleAware,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtClient } from '../../../clients/AdtClient';
 import {
   createTestAdtClient,

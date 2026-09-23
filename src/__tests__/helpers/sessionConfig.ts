@@ -17,10 +17,10 @@ import {
 import type {
   IAbapConnection,
   IAdtClientOptions,
-  IAuthProvider,
-  ILogger,
   ISessionLifecycleAware,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
+import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtClient } from '../../clients/AdtClient';
 import { AdtClientLegacy } from '../../clients/AdtClientLegacy';
 import { createAdtClient } from '../../clients/createAdtClient';

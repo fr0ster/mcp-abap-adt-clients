@@ -3,8 +3,8 @@ import type {
   IAbapConnection,
   IAbapRequestOptions,
   IAdtWireResponse,
-  ILogger,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 
 const acceptCache = new Map<string, string>();
 const contentTypeCache = new Map<string, string>();

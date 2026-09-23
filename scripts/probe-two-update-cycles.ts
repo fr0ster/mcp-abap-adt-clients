@@ -42,7 +42,10 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtResponse,
+} from '@mcp-abap-adt/interfaces-adt';
 import * as dotenv from 'dotenv';
 import {
   createTestAdtClient,

@@ -5,7 +5,7 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import { CT_FUNCTION_MODULE } from '../../constants/contentTypes';
 import {
   encodeSapObjectName,

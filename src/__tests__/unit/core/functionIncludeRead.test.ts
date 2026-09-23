@@ -1,4 +1,4 @@
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
 import { AdtFunctionInclude } from '../../../core/functionInclude/AdtFunctionInclude';
 import { expectResult } from '../../helpers/contract';
 

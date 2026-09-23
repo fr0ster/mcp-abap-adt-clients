@@ -19,7 +19,8 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IDomainConfig } from '../../../../core/domain';
@@ -132,11 +133,10 @@ describe('Domain lock registry (using AdtClient)', () => {
           await getDomain(connection, config.domainName);
         } catch (error: any) {
           if (error?.response?.status === 404) {
-            // `create` takes the config without its `source`: the POST
-            // carries a metadata document and no payload, and the contract
-            // says so at the type.
-            const { source: _notCreates, ...createConfig } = config;
-            await client.getDomain().create(createConfig);
+            // A domain's config has no `source` since interfaces-adt
+            // 7.0.0 — the body of a write is `options.source` — so there
+            // is nothing to strip before a create any more.
+            await client.getDomain().create(config);
           } else {
             throw error;
           }

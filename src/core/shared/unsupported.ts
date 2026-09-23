@@ -1,4 +1,4 @@
-import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
+import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import { AdtOperationError } from '../../utils/adtErrors';
 
 /** Throw a typed "operation not supported for this object type" error. */

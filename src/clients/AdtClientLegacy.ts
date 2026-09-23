@@ -16,8 +16,8 @@
 import type {
   IAbapConnection,
   IAdtClientOptions,
-  ILogger,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { classDocuments, type IClassResults } from '../core/class';
 import { AdtClassLegacy } from '../core/class/AdtClassLegacy';
 import { ddlDocuments, type IDdlResults } from '../core/ddl';

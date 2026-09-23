@@ -1,4 +1,4 @@
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
 import { create as createBehaviorDefinition } from '../../../core/behaviorDefinition/create';
 import { createMetadataExtension } from '../../../core/metadataExtension/create';
 import { AdtPackage } from '../../../core/package/AdtPackage';

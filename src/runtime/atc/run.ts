@@ -16,7 +16,7 @@ import type {
   AtcObjectType,
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import {
   ACCEPT_ATC_CUSTOMIZING,
   ACCEPT_ATC_RUN_RESPONSE,

@@ -1,8 +1,8 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
-import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
+import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import { AdtScalarFunction } from '../../../../core/scalarFunction/AdtScalarFunction';
 import { expectFailure, expectResult } from '../../../helpers/contract';
 

@@ -21,7 +21,7 @@
  * It is the library declining to translate a refusal into a fact.
  */
 
-import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces';
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt';
 import { XMLParser } from 'fast-xml-parser';
 
 const parser = new XMLParser({

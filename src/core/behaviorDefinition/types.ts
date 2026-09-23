@@ -11,7 +11,7 @@
 import type {
   BehaviorDefinitionImplementationType,
   IResultStrategy,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 
 /**
  * The check reporters ADT accepts for a behavior definition.
@@ -31,7 +31,7 @@ import { rawDocument } from '../../utils/resultStrategy';
 export type {
   BehaviorDefinitionImplementationType,
   IBehaviorDefinitionConfig,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 
 /**
  * What the create answers: the definition's metadata document.

@@ -18,7 +18,7 @@
  * These utilities are for consumers who want manual checking.
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
 import { ACCEPT_DISCOVERY } from '../constants/contentTypes';
 import { getTimeout } from './timeouts';
 

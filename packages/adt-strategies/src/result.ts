@@ -17,7 +17,7 @@
 import type {
   IAdtWireResponse,
   IResultStrategy,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 
 /**
  * `answer.data` as text, without pretending an object was ever a string.

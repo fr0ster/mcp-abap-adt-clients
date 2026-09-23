@@ -10,7 +10,7 @@
  * your system's answers, so it is read here rather than decided for you.
  */
 
-import type { IObjectReference } from '@mcp-abap-adt/interfaces';
+import type { IObjectReference } from '@mcp-abap-adt/interfaces-adt';
 import type { AdtClient } from '../src/clients/AdtClient';
 
 const statusIn = (document: string): string =>

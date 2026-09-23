@@ -11,11 +11,11 @@
  * says only that it is answered.
  */
 
-import type { IResultStrategy } from '@mcp-abap-adt/interfaces';
+import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
 import { nothing, rawDocument } from '../../utils/resultStrategy';
 
 // Types defined in @mcp-abap-adt/interfaces
-export type { IClassConfig } from '@mcp-abap-adt/interfaces';
+export type { IClassConfig } from '@mcp-abap-adt/interfaces-adt';
 
 /**
  * What ADT answers when a class is created.

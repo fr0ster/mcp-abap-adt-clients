@@ -20,7 +20,7 @@
  * `ExceptionResourceAlreadyExists`.
  */
 
-import type { IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 
 export type ObjectPresence =
   | { present: true }

@@ -23,7 +23,7 @@ export type {
   IReadOptions,
   ISearchObjectsParams,
   IVirtualFoldersPreselection,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 
 // The shapes this package's readings build.
 export type {

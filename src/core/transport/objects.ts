@@ -27,9 +27,10 @@
  */
 
 import type {
+  AdtTaskType,
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import { ACCEPT_TRANSPORT } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -229,17 +230,6 @@ export async function readTransportObjects(
 }
 
 /**
- * The task types CTS accepts, as `changetasktype` reads them.
- *
- * It repeats the union `IAdtTransportObjectActions.changeTaskType` declares
- * inline, because the contract gives it no name to import. `AdtRequest`
- * declares that interface, so the member cannot go missing — but a narrowing
- * on either side would pass, method parameters being bivariant. If a fourth
- * type is ever measured, the contract is where it is named first.
- */
-export type TransportTaskType = 'S' | 'R' | 'X';
-
-/**
  * Give a task its type — `useraction="changetasktype"`.
  *
  * **A task is born without one.** Measured against BTP ABAP, 2026-09-23:
@@ -274,7 +264,7 @@ export type TransportTaskType = 'S' | 'R' | 'X';
 export async function changeTransportTaskType(
   connection: IAbapConnection,
   taskNumber: string,
-  type: TransportTaskType,
+  type: AdtTaskType,
 ): Promise<IAdtWireResponse> {
   const number = attribute(taskNumber);
   return connection.makeAdtRequest({

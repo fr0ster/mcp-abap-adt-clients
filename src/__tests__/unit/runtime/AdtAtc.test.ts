@@ -18,7 +18,7 @@ import type {
   IAbapConnection,
   IAtcRunOptions,
   IAtcRunTarget,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import { AdtAtc } from '../../../runtime/atc/AdtAtc';
 import { expectResult } from '../../helpers/contract';
 

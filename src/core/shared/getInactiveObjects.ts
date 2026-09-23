@@ -6,7 +6,7 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
   IResultStrategy,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import { XMLParser } from 'fast-xml-parser';
 import { getTimeout } from '../../utils/timeouts';
 import type { IInactiveObjectsResponse, IObjectReference } from './types';

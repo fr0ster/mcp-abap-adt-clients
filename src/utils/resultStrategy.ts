@@ -16,7 +16,7 @@
 import type {
   IAdtWireResponse,
   IResultStrategy,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 
 /**
  * The body as it arrived.

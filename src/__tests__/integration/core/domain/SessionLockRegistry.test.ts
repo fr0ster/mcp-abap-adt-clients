@@ -17,7 +17,8 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IDataElementConfig } from '../../../../core/dataElement';
@@ -152,9 +153,9 @@ describe('Session lock registry (using AdtClient)', () => {
         await getDomain(connection, domainConfig.domainName);
       } catch (error: any) {
         if (error?.response?.status === 404) {
-          const { source: _domainSourceIsNotCreates, ...domainCreateConfig } =
-            domainConfig;
-          await client.getDomain().create(domainCreateConfig);
+          // Neither config carries a `source` since interfaces-adt 7.0.0 —
+          // a write's body is `options.source` — so nothing is stripped here.
+          await client.getDomain().create(domainConfig);
         } else {
           throw error;
         }
@@ -163,11 +164,7 @@ describe('Session lock registry (using AdtClient)', () => {
         await getDataElement(connection, dataElementConfig.dataElementName);
       } catch (error: any) {
         if (error?.response?.status === 404) {
-          const {
-            source: _dataElementSourceIsNotCreates,
-            ...dataElementCreateConfig
-          } = dataElementConfig;
-          await client.getDataElement().create(dataElementCreateConfig);
+          await client.getDataElement().create(dataElementConfig);
         } else {
           throw error;
         }

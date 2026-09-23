@@ -9,13 +9,13 @@
  * - enhsxsb: BAdI Enhancement Spot
  */
 
-import type { EnhancementType } from '@mcp-abap-adt/interfaces';
+import type { EnhancementType } from '@mcp-abap-adt/interfaces-adt';
 
 // Types defined in @mcp-abap-adt/interfaces
 export type {
   EnhancementType,
   IEnhancementConfig,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 
 /**
  * Enhancement object type codes for ADT
@@ -67,7 +67,7 @@ export function isSpotType(type: EnhancementType): boolean {
   return type === 'enhsxs' || type === 'enhsxsb';
 }
 
-import type { IResultStrategy } from '@mcp-abap-adt/interfaces';
+import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
 import { rawDocument } from '../../utils/resultStrategy';
 
 /**

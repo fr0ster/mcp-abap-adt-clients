@@ -10,8 +10,8 @@ import type {
   IAbapConnection,
   IAdtResponse,
   IAdtWireResponse,
-  ILogger,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AdtClient } from '../../../clients/AdtClient';
 import { classDocuments } from '../../../core/class/types';
 

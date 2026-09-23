@@ -10,7 +10,7 @@
  * *a* state, and what that state looks like is this implementation's to name.
  */
 
-import type { IResultStrategy } from '@mcp-abap-adt/interfaces';
+import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
 import { rawDocument } from '../../utils/resultStrategy';
 
 // Types defined in @mcp-abap-adt/interfaces
@@ -23,7 +23,7 @@ export type {
   IFeatureToggleReleasePlan,
   IFeatureToggleRollout,
   IFeatureToggleSource,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 
 /** What a toggle can be, as SFW reports it. */
 export type FeatureToggleState = 'on' | 'off' | 'undefined';

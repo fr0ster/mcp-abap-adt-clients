@@ -18,7 +18,7 @@ import type {
   IAbapConnection,
   IAbapRequestOptions,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import { AdtRequest } from '../../../../core/transport/AdtRequest';
 import { expectResult } from '../../../helpers/contract';
 

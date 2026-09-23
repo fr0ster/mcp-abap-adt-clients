@@ -1,4 +1,4 @@
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
 import { ACCEPT_ABAPGIT_REPOS_V2 } from '../../constants/contentTypes';
 import { getTimeout } from '../../utils/timeouts';
 import { type IRepoEntityParsed, parseRepoList } from './xmlParser';

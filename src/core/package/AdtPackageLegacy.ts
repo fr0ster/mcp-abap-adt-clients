@@ -5,8 +5,8 @@
  * endpoint exists in discovery but does not return usable results over RFC.
  */
 
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
-import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import { failed } from '../../utils/adtResponse';
 import { AdtPackage } from './AdtPackage';
 import type { IPackageResults, packageDocuments } from './types';

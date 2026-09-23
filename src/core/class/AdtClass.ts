@@ -40,9 +40,9 @@ import type {
   IAdtValidatable,
   IAdtVersionable,
   IAdtWireResponse,
-  ILogger,
   IResultStrategy,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { answering } from '../../utils/adtResponse';
 import { safeErrorMessage } from '../../utils/internalUtils';
 import type { LockRegistry } from '../shared/LockRegistry';

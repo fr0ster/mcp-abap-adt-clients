@@ -6,7 +6,8 @@
  * returned value now, so an unguarded early return would leave the object locked
  * on the server and the session stateful, and nothing would say so.
  */
-import type { IAdtResponse, ILogger } from '@mcp-abap-adt/interfaces';
+import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { chain } from '../../../core/shared/chain';
 import { failed, succeeded } from '../../../utils/adtResponse';
 

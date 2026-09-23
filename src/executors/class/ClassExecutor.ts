@@ -6,11 +6,11 @@ import type {
   IClassExecuteWithProfilingOptions,
   IClassExecuteWithProfilingResult,
   IClassExecutionTarget,
-  ILogger,
   IProfilerTraceParameters,
   IRunnableWithProfiler,
   ITraceScheduling,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { runClass } from '../../core/class/run';
 import type { INamedItem } from '../../core/shared/utilResults';
 import type { ITraceRequestEntry } from '../../runtime/traces/types';

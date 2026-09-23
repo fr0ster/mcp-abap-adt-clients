@@ -3,7 +3,7 @@
  * Verifies active vs inactive version query handling across object types.
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
 import { AdtUtils } from '../../../core/shared/AdtUtils';
 import { noopLogger } from '../../../utils/noopLogger';
 import { createTestsLogger } from '../../helpers/testLogger';

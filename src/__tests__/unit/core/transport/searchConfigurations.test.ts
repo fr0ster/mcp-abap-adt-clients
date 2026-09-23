@@ -13,8 +13,8 @@ import type {
   IAdtError,
   IAdtWireResponse,
   ITransportSearchConfiguration,
-} from '@mcp-abap-adt/interfaces';
-import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
+import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces-adt';
 import { AdtClient } from '../../../../clients/AdtClient';
 import { AdtRequest } from '../../../../core/transport/AdtRequest';
 import { transportDocuments } from '../../../../core/transport/types';

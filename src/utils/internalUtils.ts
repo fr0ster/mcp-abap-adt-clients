@@ -3,7 +3,7 @@
  * These are private utilities used internally by client classes
  */
 
-import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces';
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt';
 
 type AdtHeaderValue = IAdtWireResponse['headers'][string];
 

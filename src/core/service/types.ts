@@ -2,7 +2,7 @@ import type {
   GeneratedServiceType as GST,
   IResultStrategy,
   IServiceBindingConfig as ISBC,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import {
   type DesiredPublicationState,
   type GeneratedServiceType,
@@ -10,7 +10,7 @@ import {
   type ServiceBindingType,
   type ServiceBindingVariant,
   type ServiceBindingVersion,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import { rawDocument } from '../../utils/resultStrategy';
 
 // Types defined in @mcp-abap-adt/interfaces
@@ -24,8 +24,8 @@ export type {
   ServiceBindingType,
   ServiceBindingVariant,
   ServiceBindingVersion,
-} from '@mcp-abap-adt/interfaces';
-export { SERVICE_BINDING_VARIANT_MAP } from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
+export { SERVICE_BINDING_VARIANT_MAP } from '@mcp-abap-adt/interfaces-adt';
 
 export function resolveBindingVariant(variant: ServiceBindingVariant): {
   bindingType: ServiceBindingType;

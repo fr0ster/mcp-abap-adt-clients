@@ -1,4 +1,4 @@
-import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
+import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import { XMLParser } from 'fast-xml-parser';
 import { AdtOperationError } from '../../utils/adtErrors';
 import type { ObjectVersion } from './results';

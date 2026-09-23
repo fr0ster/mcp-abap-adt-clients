@@ -14,7 +14,7 @@
  * grows a field per special case is worse than one that doesn't, and a consumer
  * who wants this structured supplies their own `analyse`.
  */
-import type { ILogger } from '@mcp-abap-adt/interfaces';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { chain } from '../../../core/shared/chain';
 import { failed } from '../../../utils/adtResponse';
 

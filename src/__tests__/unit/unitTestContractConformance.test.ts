@@ -27,7 +27,7 @@ import type {
   IClassUnitTestRunOptions,
   ITestRunInformation,
   IUnitTestConfig,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import type { AdtClient } from '../../clients/AdtClient';
 import type { AdtCdsUnitTest, AdtUnitTest } from '../../core/unitTest';
 

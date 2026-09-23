@@ -7,7 +7,8 @@
  * package for a research branch — how a debug session is meant to work over
  * ADT is not measured yet — and the accessors left with them.
  */
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AdtRuntimeClient } from '../../../clients/AdtRuntimeClient';
 import { ApplicationLog } from '../../../runtime/applicationLog/ApplicationLog';
 import { AdtAtc } from '../../../runtime/atc/AdtAtc';

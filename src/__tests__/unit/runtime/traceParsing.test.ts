@@ -13,7 +13,7 @@
  * in our logic regardless of what SAP sends.
  */
 
-import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces';
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt';
 import {
   compareRecordedAt,
   parseDbAccesses,

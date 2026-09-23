@@ -9,9 +9,9 @@ import type {
   IAbapConnection,
   IAdtOperationOptions,
   IAdtResponse,
-  ILogger,
-} from '@mcp-abap-adt/interfaces';
-import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
+import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { IWalkedNode } from '../../../../scripts/lib/packageWalk';
 import { walkPackage } from '../../../../scripts/lib/packageWalk';
 import type { AdtClient } from '../../../clients/AdtClient';

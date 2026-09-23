@@ -24,9 +24,9 @@ import type {
   IAdtSystemContext,
   IAdtTransportAware,
   IAdtValidatable,
-  ILogger,
   IResultStrategy,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
@@ -238,11 +238,11 @@ export class AdtDataElement<
             data_element_name: name,
             transport_request: config.transportRequest,
           },
-          // The document the caller built, from either channel — see
-          // `AdtDomain.updateMetadata` for why both are read. The fields
+          // The document the caller built, from the options — see
+          // `AdtDomain.updateMetadata` for why that is the only channel. The fields
           // beside it describe a create; on an update nothing merges them into
           // a body here.
-          (options?.source ?? config.source) as string,
+          options?.source as string,
           options?.lockHandle,
         ),
       this.results.metadataUpdated as IResultStrategy<

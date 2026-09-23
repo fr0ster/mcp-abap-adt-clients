@@ -10,7 +10,7 @@ import type {
   IAdtOperationOptions,
   IAdtResponse,
   IResultStrategy,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import { answering } from '../../utils/adtResponse';
 import { deleteObjectDirect } from '../shared/deleteLegacy';
 import { AdtFunctionGroup } from './AdtFunctionGroup';

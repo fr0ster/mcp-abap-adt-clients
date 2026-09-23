@@ -11,7 +11,7 @@ import type { SapConfig } from '@mcp-abap-adt/connection';
 import type {
   IAbapConnection,
   ISessionLifecycleAware,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
 import type { AdtObjectType } from '../../../core/shared/types';

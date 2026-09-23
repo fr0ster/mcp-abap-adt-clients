@@ -37,12 +37,15 @@ import type {
   IAdtUpdatable,
   IAdtValidatable,
   IAdtWireResponse,
-  ILogger,
   IResultStrategy,
   ITestRunInformation,
   IUnitTestResultOptions,
-} from '@mcp-abap-adt/interfaces';
-import { ADT_NO_FAILURE, AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
+import {
+  ADT_NO_FAILURE,
+  AdtObjectErrorCodes,
+} from '@mcp-abap-adt/interfaces-adt';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { answering } from '../../utils/adtResponse';
 import { requestOf } from '../../utils/requestTrace';
 import { AdtClass, AdtLocalTestClass } from '../class';

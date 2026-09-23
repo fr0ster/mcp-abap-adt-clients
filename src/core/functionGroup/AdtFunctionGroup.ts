@@ -30,9 +30,9 @@ import type {
   IAdtSystemContext,
   IAdtTransportAware,
   IAdtValidatable,
-  ILogger,
   IResultStrategy,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
@@ -247,13 +247,13 @@ export class AdtFunctionGroup<
             lock_handle: options?.lockHandle as string,
             transport_request: config.transportRequest,
           } as Parameters<typeof updateFunctionGroup>[1],
-          // The document the caller built, from either channel — see
-          // `AdtDomain.updateMetadata` for why both are read.
+          // The document the caller built, from the options — see
+          // `AdtDomain.updateMetadata` for why that is the only channel.
           //
           // The description used to be merged
           // into a document read here, inside a lock window opened here; both
           // the read and the window are theirs now.
-          (options?.source ?? config.source) as string,
+          options?.source as string,
           this.contentTypes,
         ),
       this.results.metadataUpdated as IResultStrategy<

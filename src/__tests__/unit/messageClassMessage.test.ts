@@ -1,7 +1,7 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import { AdtMessageClassMessage } from '../../core/messageClass/AdtMessageClassMessage';
 import { parseMessageClass } from '../../core/messageClass/xml';
 import { noopLogger } from '../../utils/noopLogger';

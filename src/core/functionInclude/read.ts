@@ -6,7 +6,7 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
   IReadOptions,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import { ACCEPT_FUNCTION_INCLUDE } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -14,7 +14,7 @@ import { getTimeout } from '../../utils/timeouts';
 // Declared once, in the contract. The copy here carried only
 // `withLongPolling`, while `accept` is read in 54 places and `version` in 16 —
 // a second type under the same name, narrower by omission rather than by intent.
-export type { IReadOptions } from '@mcp-abap-adt/interfaces';
+export type { IReadOptions } from '@mcp-abap-adt/interfaces-adt';
 
 /**
  * Read a function include (metadata only, no source).

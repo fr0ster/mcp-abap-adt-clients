@@ -33,7 +33,7 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import { ACCEPT_DELETION, CT_DELETION } from '../../constants/contentTypes';
 import { getTimeout } from '../../utils/timeouts';
 import { includeUrl } from './lock';

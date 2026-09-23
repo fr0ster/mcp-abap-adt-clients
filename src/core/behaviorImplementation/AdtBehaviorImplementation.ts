@@ -28,9 +28,9 @@ import type {
   IAdtUpdatable,
   IAdtValidatable,
   IAdtVersionable,
-  ILogger,
   IResultStrategy,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { getSystemInformation } from '../../utils/systemInfo';

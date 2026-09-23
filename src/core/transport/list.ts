@@ -11,8 +11,8 @@ import type {
   IAdtWireResponse,
   IListTransportsParams,
   ITransportSearchConfiguration,
-} from '@mcp-abap-adt/interfaces';
-import { TRANSPORT_SEARCH_CONFIGURATIONS_URL } from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
+import { TRANSPORT_SEARCH_CONFIGURATIONS_URL } from '@mcp-abap-adt/interfaces-adt';
 import {
   ACCEPT_TRANSPORT_CONFIGURATIONS,
   ACCEPT_TRANSPORT_LIST,

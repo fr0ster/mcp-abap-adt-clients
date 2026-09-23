@@ -5,7 +5,7 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import { ACCEPT_PACKAGE, CT_PACKAGE } from '../../constants/contentTypes';
 import { buildQueryString, limitDescription } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';

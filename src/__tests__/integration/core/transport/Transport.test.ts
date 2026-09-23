@@ -14,9 +14,10 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type {
   IAbapConnection,
-  ILogger,
   ISessionLifecycleAware,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
+import { ADT_TASK_TYPE } from '@mcp-abap-adt/interfaces-adt';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import type { ITransportObjectEntry } from '../../../../core/transport/parseObjectEntries';
@@ -521,7 +522,10 @@ describe('AdtRequest', () => {
           logTestStep('give the task a type', testsLogger);
           const typeBefore = (await taskTypeOf(taskNumber)).type;
           expectResult(
-            await request.changeTaskType(taskNumber, 'S'),
+            await request.changeTaskType(
+              taskNumber,
+              ADT_TASK_TYPE.developmentCorrection,
+            ),
             'give the task its type',
           );
           const typeAfter = (await taskTypeOf(taskNumber)).type;

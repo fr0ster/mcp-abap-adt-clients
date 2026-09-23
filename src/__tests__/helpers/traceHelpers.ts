@@ -14,7 +14,8 @@
  * long anybody is willing to wait.
  */
 
-import type { ILogger, IProfilerListOptions } from '@mcp-abap-adt/interfaces';
+import type { IProfilerListOptions } from '@mcp-abap-adt/interfaces-adt';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { Profiler } from '../../runtime/traces/ProfilerDomain';
 import { compareRecordedAt } from '../../runtime/traces/traceParsing';
 import { expectResult } from './contract';

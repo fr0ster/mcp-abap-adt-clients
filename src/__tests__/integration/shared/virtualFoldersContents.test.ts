@@ -11,9 +11,9 @@ import type {
   IAbapConnection,
   IAdtResponse,
   IGetVirtualFoldersContentsParams,
-  ILogger,
-} from '@mcp-abap-adt/interfaces';
-import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
+import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
 import { failed } from '../../../utils/adtResponse';

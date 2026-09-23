@@ -6,8 +6,8 @@ import type {
   HttpError,
   IAbapConnection,
   IAdtWireResponse,
-  ILogger,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
 import { encodeSapObjectName, safeStringify } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';

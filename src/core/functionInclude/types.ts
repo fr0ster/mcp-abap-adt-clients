@@ -8,14 +8,14 @@
  * says only that it is answered.
  */
 
-import type { IResultStrategy } from '@mcp-abap-adt/interfaces';
+import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
 
 export type { IDeleteFunctionIncludeParams } from './delete';
 
 import { rawDocument } from '../../utils/resultStrategy';
 
 // Types defined in @mcp-abap-adt/interfaces
-export type { IFunctionIncludeConfig } from '@mcp-abap-adt/interfaces';
+export type { IFunctionIncludeConfig } from '@mcp-abap-adt/interfaces-adt';
 
 /**
  * What the create answers: the include's `finclude` metadata document.

@@ -24,11 +24,8 @@
  * An error raised *by* cleanup is logged, never propagated: a failing unlock must
  * not replace the reason the chain failed, which is what the caller needs.
  */
-import type {
-  IAdtError,
-  IAdtResponse,
-  ILogger,
-} from '@mcp-abap-adt/interfaces';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { failed, recogniseFailure, succeeded } from '../../utils/adtResponse';
 import { safeErrorMessage } from '../../utils/internalUtils';
 

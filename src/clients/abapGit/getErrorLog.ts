@@ -1,4 +1,4 @@
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
 import { CT_ABAPGIT_REPO_OBJECT_V2 } from '../../constants/contentTypes';
 import { getTimeout } from '../../utils/timeouts';
 import { listRepos } from './listRepos';

@@ -13,7 +13,7 @@
  *   const className = resolver.getParam('class_name');
  */
 
-import type { ILogger } from '@mcp-abap-adt/interfaces';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 
 const {
   getTestCaseDefinition,

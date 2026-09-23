@@ -22,9 +22,9 @@ import type {
   IAdtResponse,
   IAdtSystemContext,
   IAdtValidatable,
-  ILogger,
   IResultStrategy,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';

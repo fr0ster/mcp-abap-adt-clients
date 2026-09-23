@@ -1,4 +1,4 @@
-import { ADT_NO_FAILURE, type IAdtError } from '@mcp-abap-adt/interfaces';
+import { ADT_NO_FAILURE, type IAdtError } from '@mcp-abap-adt/interfaces-adt';
 import {
   analyseActivation,
   analyseAny,

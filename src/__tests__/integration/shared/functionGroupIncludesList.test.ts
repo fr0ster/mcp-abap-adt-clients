@@ -11,9 +11,9 @@ import * as path from 'node:path';
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import type {
   IAbapConnection,
-  ILogger,
   ISessionLifecycleAware,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import { functionGroupChildren } from '../../../../scripts/lib/functionGroupChildren';
 import type { AdtClient } from '../../../clients/AdtClient';

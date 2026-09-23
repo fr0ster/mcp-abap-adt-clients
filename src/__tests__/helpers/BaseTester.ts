@@ -40,9 +40,10 @@ import type {
   IAdtResponse,
   IAdtUpdatable,
   IAdtValidatable,
-  ILogger,
-} from '@mcp-abap-adt/interfaces';
-import { AdtObjectErrorCodes, LogLevel } from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
+import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import { LogLevel } from '@mcp-abap-adt/interfaces-utils';
 import { getTimeout } from '../../utils/timeouts';
 import { expectResult } from './contract';
 import { recycleTestSession, releaseTestConnection } from './sessionConfig';

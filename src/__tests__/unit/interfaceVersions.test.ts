@@ -1,7 +1,7 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import { getInterfaceVersions } from '../../core/interface/versions';
 
 const FEED = `<?xml version="1.0"?><atom:feed xmlns:atom="http://www.w3.org/2005/Atom"><atom:title>Version List of ZIF (INTF)</atom:title><atom:entry><atom:content type="text/plain" src="/sap/bc/adt/oo/interfaces/zif/source/main/versions/1/00000/content"/><atom:id>00000</atom:id></atom:entry></atom:feed>`;
