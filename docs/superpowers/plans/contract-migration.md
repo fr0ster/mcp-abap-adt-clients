@@ -62,26 +62,51 @@ facade left in the tree. It imports exactly `ILogger` and `LogLevel`.
 Do this first. It is the cheapest step in the plan, and the only one that cleans
 `adt-clients`' tree without `adt-clients` changing at all.
 
-### 2. `mcp-abap-adt-clients` → `interfaces-adt@^8.0.0`
+### 2. `mcp-abap-connection` → `interfaces-adt@^8.0.0`, then publish it
+
+On `^6.0.0`, two majors behind, and **this has to come before `adt-clients`'
+release, not after it.** `adt-clients` takes the connector as a dev dependency
+and every SAP run goes through it, so until the connector moves, the run that
+validates an `adt-clients` release is a run against a contract two majors old.
+
+That is not hypothetical — it is the tree today:
+
+```
+node_modules/@mcp-abap-adt/interfaces-adt                        7.0.0
+node_modules/@mcp-abap-adt/connection/node_modules/…/interfaces-adt   6.0.0
+```
+
+Two copies, because `adt-clients` declares `^7.0.0` and the connector `^6.0.0`.
+npm nests the older one rather than failing, so nothing announces it; the SAP run
+for `adt-clients` 22.0.0 already went through that tree.
+
+`adt-clients` consumes it from the registry, so this step is not finished until
+the connector is published — the range bump alone changes nothing downstream.
+
+Small in itself: it takes the four packages directly already.
+
+### 3. `mcp-abap-adt-clients` → `interfaces-adt@^8.0.0`, and the connector
 
 Already direct on all four. It uses no header name and nothing from Cloud ALM,
-and `IAdtWireResponse`/`IAdtHeaderValue` kept their names and shapes, so this is
-a range bump plus `npm install`. Verify with `npm run build`, the unit suites and
-a full SAP run.
+and `IAdtWireResponse`/`IAdtHeaderValue` kept their names and shapes, so the
+contract half is a range bump plus `npm install`.
 
-**Blocked on nothing.** `mcp-abap-adt` consumes it and is waiting for the
-release, which is a reason to do it promptly — not a reason for it to be second.
-It is second because everything else in this plan is smaller.
+Bump the connector's range with it, then **check the tree holds one copy of each
+package before running anything** — `find node_modules -path "*interfaces-adt/package.json"`
+answers it in one line, and it is the check whose absence let the duplication
+above go unnoticed.
+
+Verify with `npm run build`, the unit suites, and a full SAP run *after* both
+bumps. That run is what a release rests on, so it has to be run against the
+tree the release names.
 
 > The merged 22.0.0 work is still untagged: `package.json` says 21.0.0 and the
-> version number is the maintainer's to give. That release and this bump can be
-> the same one.
+> version number is the maintainer's to give. That release and these bumps can
+> be the same one.
 
-### 3. `mcp-abap-connection` → `interfaces-adt@^8.0.0`
-
-On `^6.0.0`, two majors behind. `adt-clients` runs its tests through it, so a
-stale contract here is a stale contract in its test tree. Small: it takes the
-four packages directly already.
+**Blocked on step 2.** `mcp-abap-adt` consumes this release and is waiting for
+it, which is a reason to move promptly — not a reason to release it before the
+tree it was tested in is the tree it ships against.
 
 ### 4. `mcp-abap-adt-proxy` → `network@^1.1.0`, `adt@^8.0.0`
 
@@ -178,5 +203,10 @@ facade version it is pinned to.
 - No repository in this plan declares `@mcp-abap-adt/interfaces`.
 - No `node_modules` tree under `~/prj` holds a copy of it — which requires step 1,
   since the logger is what puts one there.
+- **One copy of each contract package per tree**, checked rather than assumed:
+  `find node_modules -path "*interfaces-*/package.json"` and read the versions.
+  Two copies is what a range one major behind looks like, npm nests the older
+  one silently, and this plan exists partly because that went unnoticed in
+  `adt-clients` for a whole release cycle.
 - Every repository's build and test suite green on its own terms; a full SAP run
   for `adt-clients`.
