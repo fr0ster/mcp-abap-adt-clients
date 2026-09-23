@@ -130,7 +130,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.4",
-    "@mcp-abap-adt/connection": "^9.1.0",
+    "@mcp-abap-adt/connection": "^9.2.0",
     "@mcp-abap-adt/interfaces-auth-sap": "^1.0.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^25.3.3",
