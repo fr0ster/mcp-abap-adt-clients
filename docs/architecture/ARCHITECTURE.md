@@ -14,7 +14,7 @@ Primary public entry points:
 - `AdtAbapGitClient` - standalone client (not a factory on `AdtClient`) wrapping the SAP-official ADT-integrated abapGit (`/sap/bc/adt/abapgit/*`); available on cloud and modern on-prem (ABAP Platform 2022+).
 
 Design constraint:
-- External integrations are interface-driven, and since 22.0.0 the contracts come from the packages that declare them rather than from the `@mcp-abap-adt/interfaces` facade: `IAbapConnection` and the capability atoms from `@mcp-abap-adt/interfaces-adt`, `ILogger` from `-utils`, `IWebSocketTransport` from `-network`, `IAuthProvider` from `-auth`.
+- External integrations are interface-driven, and since 22.0.0 the contracts come from the packages that declare them rather than from the `@mcp-abap-adt/interfaces` facade, which is now deleted: `IAbapConnection`, the capability atoms and `ITimeoutConfig` from `@mcp-abap-adt/interfaces-adt`, `ILogger`/`LogLevel`/`XmlNode` from `-utils`, `IWebSocketTransport` and `HttpError` from `-network`, `IAuthProvider` from `-auth`, and `ISapConfig` from `-auth-sap` in one unit test.
 
 ## Layered Structure
 
@@ -215,7 +215,7 @@ Common behaviors in implementations:
 
 ## Type System and Exports
 
-**Types are defined once, in the contract packages** — `@mcp-abap-adt/interfaces-adt` `^7.0.0` and its three siblings. As of 7.5.0 this package declares no type it shares with them, and since 22.0.0 it imports from each by name instead of through the deprecated facade: 135 names, 126 of them ADT, 6 network, 2 utils, 1 auth. Each `src/core/<object>/types.ts` is a re-export surface:
+**Types are defined once, in the contract packages** — `@mcp-abap-adt/interfaces-adt` `^9.0.0` and its siblings. As of 7.5.0 this package declares no type it shares with them, and since 22.0.0 it imports from each by name instead of through the facade, which is now deleted: **189 distinct names — 178 ADT, 6 network, 3 utils, 1 auth, and 1 `ISapConfig` from `-auth-sap` in a unit test.** Each `src/core/<object>/types.ts` is a re-export surface:
 
 ```ts
 export type { IClassConfig, ICreateClassParams } from '@mcp-abap-adt/interfaces-adt';

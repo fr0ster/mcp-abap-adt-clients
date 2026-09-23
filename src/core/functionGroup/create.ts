@@ -3,11 +3,11 @@
  */
 
 import type {
-  HttpError,
   IAbapConnection,
   IAdtContentTypes,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt';
+import type { HttpError } from '@mcp-abap-adt/interfaces-network';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { CT_FUNCTION_GROUP } from '../../constants/contentTypes';
 import { limitDescription, safeStringify } from '../../utils/internalUtils';

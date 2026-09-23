@@ -27,11 +27,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 ### Changed — the contract packages, by name
 
 - **BREAKING: the `@mcp-abap-adt/interfaces` facade is gone from this package.**
-  It takes `@mcp-abap-adt/interfaces-adt` `^7.0.0`, `-network` `^1.0.0`,
-  `-utils` `^1.0.0` and `-auth` `^1.1.0` directly. 729 import and re-export
-  statements across 694 files were repointed; all 135 names resolved — 126 to
-  `-adt`, 6 to `-network`, 2 to `-utils`, 1 to `-auth`, and **none** needed the
-  facade.
+  It takes `@mcp-abap-adt/interfaces-adt` `^9.0.0`, `-network` `^2.0.0`,
+  `-utils` `^1.1.0` and `-auth` `^1.2.0` directly, plus `-auth-sap` `^1.0.0` as
+  a **dev** dependency, for the one unit test that builds an `ISapConfig`. 729
+  import and re-export statements across 694 files were repointed; all names
+  resolved and **none** needed the facade, which is now deleted — npm serves
+  51.0.0 to anyone pinned to it and nothing further ships there.
+
+  Re-measured against the released packages: **189 distinct names — 178 from
+  `-adt`, 6 `-network`, 3 `-utils`, 1 `-auth`, 1 `-auth-sap`.**
+
+- **Three contracts changed package, and this release follows them.**
+  `interfaces-adt` 9.0.0 moved everything that is not ADT out, so:
+
+  | name | was | is | why |
+  |---|---|---|---|
+  | `HttpError` | `-adt` | `-network` | nothing about an HTTP failure is ABAP; 14 files here import it |
+  | `XmlNode` | `-adt` | `-utils` | a parser's output shape is not an ADT contract |
+  | `ITimeoutConfig` | `-network` | `-adt` | its `csrf` field names an SAP operation, not a transport primitive |
+
+  17 files repointed, nothing renamed and no shape changed, so a consumer that
+  imports these names from this package's dependencies changes an import path
+  and nothing else. The packages were resolved from each one's installed
+  `dist/index.d.ts` rather than from a list written by hand.
 
   **Why it matters to a consumer, measured.** Every symbol the facade forwards
   is already marked *"@deprecated Import from …"*, and forwarding is what
