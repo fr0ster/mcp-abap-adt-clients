@@ -6,9 +6,16 @@
 npm still serves 51.0.0 to everyone pinned to it, so nothing is broken and
 nothing is urgent — but no contract change reaches a consumer until it moves.
 
-**Priority is `@mcp-abap-adt/adt-clients` and `mcp-abap-adt`.** So the order
-below is not "most consumers first": it is *what unblocks those two first*, then
-the rest by how many repositories a step frees.
+**Priority is `@mcp-abap-adt/adt-clients`.** So the order below is not "most
+consumers first": it is *what unblocks it*, then the rest by how many
+repositories a step frees.
+
+**`mcp-abap-adt` is not part of this plan.** It is being migrated on its own,
+and it is not an argument for any ordering here: what it needs from this family
+is a released `adt-clients`, which is step 2. Its own facade imports and the five
+names that exist in no package are that migration's work, not this one's — they
+are recorded at the bottom so the measurement is not lost, and for no other
+reason.
 
 ## What is on the registry
 
@@ -32,7 +39,6 @@ not repositories, and are not listed.
 | `mcp-abap-adt-clients` | **direct**, `adt@^7.0.0` | — | needs `^8.0.0` |
 | `mcp-abap-connection` | **direct**, `adt@^6.0.0` | — | needs `^8.0.0` |
 | `mcp-abap-adt-proxy` | **direct**, `adt@^6.0.0`, `network@^1.0.0` | — | header names moved: needs `network@^1.1.0` and its imports repointed |
-| `mcp-abap-adt` | facade `^46.0.1` | 39 | adt 32, utils 2, **5 that exist nowhere** |
 | `mcp-abap-adt-header-validator` | facade `^0.1.16` | 24 | **network 17**, adt 7 |
 | `mcp-abap-adt-auth-providers` | facade `^11.6.0` | 18 | adt 17, utils 1 |
 | `mcp-abap-adt-auth-broker` | facade `^2.3.0` | 11 | adt 10, utils 1 |
@@ -49,12 +55,12 @@ not repositories, and are not listed.
 ### 1. `mcp-abap-adt-logger` → `interfaces-utils@^1.0.0`
 
 **One line, and it cleans eleven trees.** The logger is a dependency of eleven
-repositories **including both priorities**, and it drags `interfaces@^39.0.0`
-into every one of their `node_modules`. In `adt-clients` that nested copy is the
-last facade in the tree. It imports exactly `ILogger` and `LogLevel`.
+repositories, `adt-clients` among them, and it drags `interfaces@^39.0.0` into
+every one of their `node_modules`. In `adt-clients` that nested copy is the last
+facade left in the tree. It imports exactly `ILogger` and `LogLevel`.
 
-Do this first. It is the cheapest step in the plan and the only one that touches
-both priority repositories without either of them changing.
+Do this first. It is the cheapest step in the plan, and the only one that cleans
+`adt-clients`' tree without `adt-clients` changing at all.
 
 ### 2. `mcp-abap-adt-clients` → `interfaces-adt@^8.0.0`
 
@@ -63,7 +69,9 @@ and `IAdtWireResponse`/`IAdtHeaderValue` kept their names and shapes, so this is
 a range bump plus `npm install`. Verify with `npm run build`, the unit suites and
 a full SAP run.
 
-**Blocked on nothing. Blocks the server**, which consumes it.
+**Blocked on nothing.** `mcp-abap-adt` consumes it and is waiting for the
+release, which is a reason to do it promptly — not a reason for it to be second.
+It is second because everything else in this plan is smaller.
 
 > The merged 22.0.0 work is still untagged: `package.json` says 21.0.0 and the
 > version number is the maintainer's to give. That release and this bump can be
@@ -71,37 +79,17 @@ a full SAP run.
 
 ### 3. `mcp-abap-connection` → `interfaces-adt@^8.0.0`
 
-On `^6.0.0`, two majors behind. Both priority repositories run their tests
-through it, so a stale contract here is a stale contract in their test trees.
-Small: it takes four packages directly already.
+On `^6.0.0`, two majors behind. `adt-clients` runs its tests through it, so a
+stale contract here is a stale contract in its test tree. Small: it takes the
+four packages directly already.
 
-### 4. `mcp-abap-adt` → the four packages, and the five orphans
-
-The priority consumer, and the only repository with real work in it.
-
-- 32 names from `interfaces-adt`, 2 from `interfaces-utils` — an import path.
-- **Five names exist in no package**: `IAdtObject`, `IClassState`,
-  `ICdsUnitTestState`, `IBehaviorDefinitionValidationParams`,
-  `IPackageContentItem`. They were removed at earlier majors and survive only in
-  the facade version the server is pinned to.
-  - **Three are dead imports** — `IClassState`, `ICdsUnitTestState`,
-    `IBehaviorDefinitionValidationParams` are imported and never used. Delete
-    the import.
-  - `IAdtObject` is used in 4 files (`handlers/.../*Version*`) and 1 test. It was
-    the fat composite removed in interfaces 29.0.0; the capability atoms replace
-    it, and `adt-clients`' factory return types are the honest narrowed sets.
-  - `IPackageContentItem` is used in 1 file (`lib/search-source/packageEnumerator.ts`).
-    A reading shape; the consumer declares its own now.
-- Do it **after** step 2, so the server moves to the new `adt-clients` and the
-  new contract in one migration rather than two.
-
-### 5. `mcp-abap-adt-proxy` → `network@^1.1.0`, `adt@^8.0.0`
+### 4. `mcp-abap-adt-proxy` → `network@^1.1.0`, `adt@^8.0.0`
 
 The only repository whose *imports* must move rather than just its ranges: it
 reads header names, and every header name is in `interfaces-network` now. It is
 already direct on both packages, so this is a repoint plus two bumps.
 
-### 6. The rest, by how much each frees
+### 5. The rest, by how much each frees
 
 | repository | work |
 |---|---|
@@ -111,6 +99,30 @@ already direct on both packages, so this is a repoint plus two bumps.
 | `mcp-abap-adt-auth-broker`, `-auth-stores`, `-auth-providers` | mostly `adt`, one `utils` each. **They stay coupled to ADT's release rate**, because the auth and store contracts are in `interfaces-adt` — see below |
 | `mcp-abap-adt-gcts-client` | 3 `adt`, 1 `utils` |
 | `cloud-llm-hub` | 5 `network`, 2 `adt`, 1 `utils` |
+
+## What reviews each step
+
+**`adt-clients` is reviewed. The rest are repoints, and `tsc` is the reviewer.**
+Every repository here has a `build` script, so an import that resolves nowhere,
+or a name taken from the wrong package, fails to compile — constants included,
+since `HEADER_*`, `CALM_SERVICES` and `ADT_NO_FAILURE` are values.
+
+Five have no CI — `logger`, `header-validator`, `calm-client`, `calm-server`,
+`reports-server` — so there `npm run build` before pushing *is* the check.
+
+**What a compiler cannot catch is a name that still exists and changed shape**,
+and the pins differ enormously in how much contract history each step crosses:
+
+| repository | jump |
+|---|---|
+| `adt-clients`, `mcp-abap-connection`, `mcp-abap-adt-proxy` | `adt@^6`/`^7` → `^8` — one or two majors, both read |
+| `mcp-abap-adt-logger` | facade `^39` → `utils@^1`, but the two names it takes have never changed |
+| `header-validator` `^0.1.16`, `auth-broker` `^2.3.0`, `auth-stores` `^5.0.0`, `calm-*` / `gcts` / `reports` `^7.x`, `cloud-llm-hub` `^11.3.0` | **40+ contract majors** |
+
+Every name all of them import resolves against today's packages — that was
+measured. It proves the names exist, not that they mean the same thing. So for
+the last row the insurance is each repository's own tests after the build; where
+there are none, one manual pass over the main path.
 
 ## What this plan does not fix
 
@@ -130,13 +142,26 @@ and still track ADT's releases.
 **Do it after the migration, not during.** Moving contracts while eleven
 repositories are mid-migration means each of them migrating twice.
 
+## `mcp-abap-adt`, recorded and not planned
+
+Not this plan's work — kept because the measurement was made and would otherwise
+be repeated. Facade `^46.0.1`, 39 names: 32 from `interfaces-adt`, 2 from
+`interfaces-utils`, and **five that exist in no package**, surviving only in the
+facade version it is pinned to.
+
+- **Three are dead imports** — `IClassState`, `ICdsUnitTestState` and
+  `IBehaviorDefinitionValidationParams` are imported and never used.
+- `IAdtObject` is used in 4 files (`handlers/.../*Version*`) and 1 test: the fat
+  composite removed in interfaces 29.0.0, replaced by the capability atoms, with
+  `adt-clients`' factory return types as the honest narrowed sets.
+- `IPackageContentItem` is used in 1 file
+  (`lib/search-source/packageEnumerator.ts`): a reading shape the consumer
+  declares itself now.
+
 ## Done means
 
-- No repository declares `@mcp-abap-adt/interfaces`.
+- No repository in this plan declares `@mcp-abap-adt/interfaces`.
 - No `node_modules` tree under `~/prj` holds a copy of it — which requires step 1,
   since the logger is what puts one there.
-- Every repository's build, typecheck and test suite green on its own terms; a
-  full SAP run for `adt-clients` and `mcp-abap-adt`.
-- The five orphan names are gone from `mcp-abap-adt`, and what replaced each one
-  is written down — the composite and the reading shape especially, because
-  "deleted at a major" is not an answer to "so what do I use".
+- Every repository's build and test suite green on its own terms; a full SAP run
+  for `adt-clients`.
