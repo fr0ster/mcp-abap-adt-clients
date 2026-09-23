@@ -134,7 +134,7 @@ export class AdtCdsUnitTest<
     config: Partial<ICdsUnitTestConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
-    if (!(config.className && config.classTemplate && config.testClassSource)) {
+    if (!(config.className && config.classTemplate && config.source)) {
       return super.validate(config, options);
     }
 
@@ -157,16 +157,25 @@ export class AdtCdsUnitTest<
   }
 
   /**
-   * Create the test class from a CDS template, and write the tests into it.
+   * Create the test class from a CDS template.
    *
    * Without a template there is no CDS-specific chain: creating the container
-   * class and writing the tests into it is what the parent does.
+   * class is what the parent does. The tests go in afterwards, through
+   * {@link update}, under the caller's lock.
+   *
+   * **The template is what selects this path, and it is the only thing that
+   * can.** This used to require a source as well — `className && classTemplate
+   * && testClassSource` — and the source was then never used in the branch
+   * below, which posts the class and nothing else. `IAdtCreatable.create`
+   * excludes the payload from its config as of `interfaces-adt` 6.0.0, so that
+   * condition could no longer be met by anyone and the template path became
+   * unreachable. The template alone says what this create is for.
    */
   override async create<E extends IAdtError = IAdtError>(
-    config: Omit<ICdsUnitTestConfig, 'sourceCode'> & { sourceCode?: never },
+    config: Omit<ICdsUnitTestConfig, 'source'> & { source?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
-    if (!(config.className && config.classTemplate && config.testClassSource)) {
+    if (!(config.className && config.classTemplate)) {
       return super.create(config, options);
     }
 
@@ -190,13 +199,13 @@ export class AdtCdsUnitTest<
    * Replace the tests, and activate the container after the write.
    *
    * The forced activation is the difference from the parent: a CDS test class
-   * that is written but not активated cannot be run.
+   * that is written but not activated cannot be run.
    */
   override async update<E extends IAdtError = IAdtError>(
     config: Partial<ICdsUnitTestConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
-    if (!(config.className && config.testClassSource)) {
+    if (!(config.className && config.source)) {
       return super.update(config, options);
     }
 
@@ -204,7 +213,7 @@ export class AdtCdsUnitTest<
     return this.adtLocalTestClass.update(
       {
         className: config.className,
-        testClassCode: config.testClassSource,
+        source: config.source,
         transportRequest: config.transportRequest,
       },
       options,

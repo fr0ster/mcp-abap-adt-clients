@@ -128,7 +128,7 @@ export class AdtFunctionGroup<
 
   /** Create the function group. */
   async create<E extends IAdtError = IAdtError>(
-    config: Omit<IFunctionGroupConfig, 'sourceCode'> & { sourceCode?: never },
+    config: Omit<IFunctionGroupConfig, 'source'> & { source?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     // **The one guard this package keeps, and only on a create.**
@@ -250,7 +250,7 @@ export class AdtFunctionGroup<
           // The document the caller built. The description used to be merged
           // into a document read here, inside a lock window opened here; both
           // the read and the window are theirs now.
-          config.document as string,
+          config.source as string,
           this.contentTypes,
         ),
       this.results.metadataUpdated as IResultStrategy<

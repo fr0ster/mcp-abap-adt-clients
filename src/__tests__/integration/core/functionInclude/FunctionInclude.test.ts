@@ -111,7 +111,7 @@ describe('FunctionInclude (using AdtClient)', () => {
             includeName: params.include_name,
             description: params.description,
             transportRequest,
-            sourceCode: params.source_code,
+            source: params.source_code,
           };
           if (packageName) {
             (cfg as any).packageName = packageName;
@@ -284,18 +284,16 @@ describe('FunctionInclude (using AdtClient)', () => {
         }
 
         const testCase = tester.getTestCaseDefinition();
-        const sourceCode =
-          testCase?.params?.source_code || config.sourceCode || '';
-        const updateSourceCode =
-          testCase?.params?.update_source_code || sourceCode;
+        const source = testCase?.params?.source_code || config.source || '';
+        const updateSourceCode = testCase?.params?.update_source_code || source;
 
         await tester.flowTestAuto({
-          sourceCode,
+          source,
           updateConfig: {
             functionGroupName: config.functionGroupName,
             includeName: config.includeName,
             description: `${config.description || 'Function include'} (updated)`,
-            sourceCode: updateSourceCode,
+            source: updateSourceCode,
           },
         });
       },

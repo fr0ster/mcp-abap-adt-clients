@@ -160,6 +160,14 @@ export interface ITransportResults {
   /** What the action log answers. Optional, as above. */
   readonly actionLog?: IResultStrategy<unknown>;
   /**
+   * What giving a task its type answers. Optional, as above.
+   *
+   * The document back is the organizer's own echo, so `rawDocument` like its
+   * user-action siblings — and like them, a `200` says the request was
+   * understood. A re-read is what shows the type.
+   */
+  readonly taskTypeChanged?: IResultStrategy<unknown>;
+  /**
    * What the object list answers. Optional, as above.
    *
    * **Parsed by default, where its siblings hand the document back.** They can
@@ -191,6 +199,7 @@ export const transportDocuments = {
   // too.
   createdTask: (answer) => parseCreatedTransport(answer.data),
   actionLog: rawDocument,
+  taskTypeChanged: rawDocument,
   objects: (answer) => parseObjectEntries(answer.data),
 } satisfies ITransportResults;
 

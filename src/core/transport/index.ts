@@ -6,10 +6,12 @@ export { AdtRequest, hasDeferredResponses } from './AdtRequest';
 export { AdtRequestLegacy } from './AdtRequestLegacy';
 export {
   addObjectToTransport,
+  changeTransportTaskType,
   createTransportTask,
   readTransportActionLog,
   readTransportObjects,
   removeObjectFromTransport,
+  type TransportTaskType,
 } from './objects';
 export type { ICreatedTransport } from './parseCreatedTransport';
 export { parseCreatedTransport } from './parseCreatedTransport';

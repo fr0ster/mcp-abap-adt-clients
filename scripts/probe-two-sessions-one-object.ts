@@ -122,7 +122,7 @@ async function cycle(
   say(`  ${label}  lock      ok (${handle.slice(0, 10)}…)`);
 
   const written = await step('update', () =>
-    cls.update(config, { sourceCode: source(note), lockHandle: handle }),
+    cls.update(config, { source: source(note), lockHandle: handle }),
   );
   await cls.unlock(config, handle);
   say(`  ${label}  unlock    sent`);
@@ -191,7 +191,7 @@ async function stepwise(
   await pause('after LOCK — the editor lock should be visible');
 
   const written = await cls.update(config, {
-    sourceCode: source('stepwise'),
+    source: source('stepwise'),
     lockHandle: handle,
   });
   say(
@@ -253,7 +253,7 @@ async function repeatCycles(
     step(`lock      ok (${handle.slice(0, 10)}…)`);
 
     const written = await cls.update(config, {
-      sourceCode: source(`round ${round}`),
+      source: source(`round ${round}`),
       lockHandle: handle,
     });
     step(

@@ -135,7 +135,7 @@ export class AdtStructure<
 
   /** Create the object. */
   async create<E extends IAdtError = IAdtError>(
-    config: Omit<IStructureConfig, 'sourceCode'> & { sourceCode?: never },
+    config: Omit<IStructureConfig, 'source'> & { source?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     // **The one guard this package keeps, and only on a create.**
@@ -254,7 +254,7 @@ export class AdtStructure<
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const name = this.name(config);
-    const source = options?.sourceCode || config.ddlCode;
+    const source = options?.source || config.source;
 
     return answering(
       () =>
@@ -360,7 +360,7 @@ export class AdtStructure<
 
     return answering(
       () =>
-        checkStructure(connection, name, version, config.ddlCode, this.logger),
+        checkStructure(connection, name, version, config.source, this.logger),
       this.results.check as IResultStrategy<ReturnType<R['check']>>,
       options?.analyse,
     );

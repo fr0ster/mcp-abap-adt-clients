@@ -111,7 +111,7 @@ describe('Program (using AdtClient)', () => {
             transportRequest,
             description: params.description,
             programType: params.program_type,
-            sourceCode: params.source_code,
+            source: params.source_code,
           };
         },
         ensureObjectReady: async (programName: string) => {
@@ -189,19 +189,18 @@ describe('Program (using AdtClient)', () => {
         }
 
         const testCase = tester.getTestCaseDefinition();
-        const sourceCode =
-          testCase?.params?.source_code || config.sourceCode || '';
+        const sourceCode = testCase?.params?.source_code || config.source || '';
         const updateSourceCode =
           testCase?.params?.update_source_code || sourceCode;
 
         await tester.flowTestAuto({
-          sourceCode: sourceCode,
+          source: sourceCode,
           updateConfig: {
             programName: config.programName,
             packageName: config.packageName,
             description: config.description || '',
             programType: config.programType,
-            sourceCode: updateSourceCode,
+            source: updateSourceCode,
           },
         });
       },

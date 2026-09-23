@@ -65,8 +65,13 @@ export interface ITestCaseParams {
 }
 
 export interface IFlowTestOptions {
-  sourceCode?: string;
-  xmlContent?: string;
+  /**
+   * What the update writes — ABAP text for a class, an XML document for a
+   * domain. One field, because the contract has one: `sourceCode` and
+   * `xmlContent` used to sit here side by side, split by what the body
+   * happened to contain, and every caller had to pick the right one.
+   */
+  source?: string;
   updateConfig?: any;
   /**
    * This type's write takes a complete document.
@@ -966,20 +971,19 @@ export class BaseTester<TConfig, TState = unknown> {
       // update below, under the lock this harness takes.
       const createOptions: IAdtCreateOptions = {
         timeout: options?.timeout,
-        xmlContent: options?.xmlContent,
       };
       // The source is stripped rather than cast away. `create` takes
-      // `Omit<TConfig, 'sourceCode'> & { sourceCode?: never }`, and a *generic*
+      // `Omit<TConfig, 'source'> & { source?: never }`, and a *generic*
       // `TConfig` cannot satisfy that — the compiler has no way to know the
       // concrete type lacks the field. A concrete caller writes
       // `create({ className })` and needs none of this; a wrapper like this one
       // has to say out loud what it is not sending, which is the right thing to
       // say anyway.
-      const { sourceCode: _sourceIsNotCreates, ...createConfig } =
-        config as TConfig & { sourceCode?: unknown };
+      const { source: _sourceIsNotCreates, ...createConfig } =
+        config as TConfig & { source?: unknown };
       expectResult(
         await this.adtObject.create(
-          createConfig as Omit<TConfig, 'sourceCode'> & { sourceCode?: never },
+          createConfig as Omit<TConfig, 'source'> & { source?: never },
           createOptions,
         ),
         'create',
@@ -1064,13 +1068,12 @@ export class BaseTester<TConfig, TState = unknown> {
         logTestStep(currentStep, this.logger);
         const updateOptions: IAdtOperationOptions = {
           // The UPDATE content, not the create content. Every handler resolves
-          // `options.sourceCode ?? config.sourceCode` with options winning, so
+          // `options.source ?? config.source` with options winning, so
           // passing the create source here overwrote the object with what it
           // already held and the update became a no-op — measured on E19 with
           // the include suite, where the stored source stayed 52 characters
           // while `update_source_code` was 62.
-          sourceCode: options?.updateConfig?.sourceCode ?? options?.sourceCode,
-          xmlContent: options?.updateConfig?.xmlContent ?? options?.xmlContent,
+          source: options?.updateConfig?.source ?? options?.source,
           timeout: options?.timeout,
         };
         expectResult(
@@ -1080,7 +1083,7 @@ export class BaseTester<TConfig, TState = unknown> {
               ...options.updateConfig,
               ...(documentToWrite === undefined
                 ? {}
-                : { document: documentToWrite }),
+                : { source: documentToWrite }),
             } as Partial<TConfig>,
             updateOptions,
           )) as IAdtResponse<unknown>,
@@ -1149,21 +1152,21 @@ export class BaseTester<TConfig, TState = unknown> {
         // object — a legitimate edit — wrote empty and was then compared
         // against the content it had before, reporting a mismatch on a correct
         // update. Emptiness is a value; only absence is absence.
-        const updateContent =
-          options.updateConfig?.sourceCode ??
-          options.updateConfig?.xmlContent ??
-          options.sourceCode ??
-          options.xmlContent;
+        const updateContent = options.updateConfig?.source ?? options.source;
+        // **What the content IS decides how it is compared**, and one field no
+        // longer says. It used to: `sourceCode` meant text and `xmlContent`
+        // meant a document, which is the classification the contract stopped
+        // asking for — both are `source` now. `updateTakesDocument` already
+        // marks the types whose write takes a whole document, so it is what
+        // answers here. Nothing changes for today's suites: a document type
+        // passes no `source` at all, the harness reads and patches the
+        // document itself, and the kind stays `unknown` as before.
         const updateContentKind =
-          options.updateConfig?.sourceCode !== undefined
-            ? 'source'
-            : options.updateConfig?.xmlContent !== undefined
+          updateContent === undefined
+            ? 'unknown'
+            : options.updateTakesDocument
               ? 'xml'
-              : options.sourceCode !== undefined
-                ? 'source'
-                : options.xmlContent !== undefined
-                  ? 'xml'
-                  : 'unknown';
+              : 'source';
 
         if (preUpdateActive && postUpdateInactive) {
           if (updateContentKind === 'source') {
@@ -1877,8 +1880,7 @@ export class BaseTester<TConfig, TState = unknown> {
       currentStep = 'update';
       logTestStep(currentStep, this.logger);
       const updateOptions: IAdtOperationOptions = {
-        sourceCode: options?.sourceCode,
-        xmlContent: options?.xmlContent,
+        source: options?.source,
         timeout: options?.timeout,
       };
       const updateState = await this.updateUnderLock(

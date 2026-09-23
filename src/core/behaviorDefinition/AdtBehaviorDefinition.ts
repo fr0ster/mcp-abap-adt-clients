@@ -147,8 +147,8 @@ export class AdtBehaviorDefinition<
 
   /** Create the object. */
   async create<E extends IAdtError = IAdtError>(
-    config: Omit<IBehaviorDefinitionConfig, 'sourceCode'> & {
-      sourceCode?: never;
+    config: Omit<IBehaviorDefinitionConfig, 'source'> & {
+      source?: never;
     },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
@@ -277,12 +277,12 @@ export class AdtBehaviorDefinition<
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const name = this.name(config);
-    // The source is the caller's, through `options.sourceCode`. This used to
-    // fall back to `config.sourceCode` — two channels for one value, where the
-    // contract documents one. `config.sourceCode` is `check`'s alone now: a
+    // The source is the caller's, through `options.source`. This used to
+    // fall back to `config.source` — two channels for one value, where the
+    // contract documents one. `config.source` is `check`'s alone now: a
     // syntax check compiles a source that is not on the server yet, so it has
     // nowhere else to arrive.
-    const source = options?.sourceCode;
+    const source = options?.source;
 
     return answering(
       () =>
@@ -383,7 +383,7 @@ export class AdtBehaviorDefinition<
           'abapCheckRun',
           '',
           version,
-          config.sourceCode,
+          config.source,
         ),
       this.results.check as IResultStrategy<ReturnType<R['check']>>,
       options?.analyse,

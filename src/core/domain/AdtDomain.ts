@@ -135,7 +135,7 @@ export class AdtDomain<R extends IDomainResults = typeof domainDocuments>
 
   /** Create the object. */
   async create<E extends IAdtError = IAdtError>(
-    config: Omit<IDomainConfig, 'sourceCode'> & { sourceCode?: never },
+    config: Omit<IDomainConfig, 'source'> & { source?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     // **The one guard this package keeps, and only on a create.**
@@ -227,7 +227,7 @@ export class AdtDomain<R extends IDomainResults = typeof domainDocuments>
 
     const name = this.name(config);
 
-    // `config.document` is what gets written. The fields beside it describe a
+    // `config.source` is what gets written. The fields beside it describe a
     // create; on an update nothing here merges them into a document, because
     // nothing is read to merge them into.
     return answering(
@@ -239,7 +239,7 @@ export class AdtDomain<R extends IDomainResults = typeof domainDocuments>
             package_name: config.packageName as string,
             transport_request: config.transportRequest,
           } as Parameters<typeof updateDomain>[1],
-          config.document as string,
+          config.source as string,
           options?.lockHandle,
         ),
       this.results.metadataUpdated as IResultStrategy<

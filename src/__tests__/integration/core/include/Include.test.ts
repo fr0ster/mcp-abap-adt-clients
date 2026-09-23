@@ -115,7 +115,7 @@ describe('Include (PROG/I, using AdtClient)', () => {
             packageName,
             transportRequest,
             description: params.description,
-            sourceCode: params.source_code,
+            source: params.source_code,
           };
         },
         ensureObjectReady: async (includeName: string) => {
@@ -199,18 +199,16 @@ describe('Include (PROG/I, using AdtClient)', () => {
         }
 
         const testCase = tester.getTestCaseDefinition();
-        const sourceCode =
-          testCase?.params?.source_code || config.sourceCode || '';
-        const updateSourceCode =
-          testCase?.params?.update_source_code || sourceCode;
+        const source = testCase?.params?.source_code || config.source || '';
+        const updateSourceCode = testCase?.params?.update_source_code || source;
 
         await tester.flowTestAuto({
-          sourceCode,
+          source,
           updateConfig: {
             includeName: config.includeName,
             packageName: config.packageName,
             description: config.description || '',
-            sourceCode: updateSourceCode,
+            source: updateSourceCode,
           },
         });
       },

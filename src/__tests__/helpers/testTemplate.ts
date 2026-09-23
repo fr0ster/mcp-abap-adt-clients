@@ -160,7 +160,7 @@ describe('ObjectType (using AdtClient)', () => {
               resolver?.getTransportRequest?.() ||
               resolveTransportRequest(params.transport_request),
             description: params.description,
-            sourceCode: params.source_code,
+            source: params.source_code,
           };
         },
         // Idempotence: a create test deletes what a previous run left.
@@ -233,14 +233,13 @@ describe('ObjectType (using AdtClient)', () => {
       }
 
       const testCase = tester.getTestCaseDefinition();
-      const sourceCode =
-        testCase?.params?.source_code || config.sourceCode || '';
+      const source = testCase?.params?.source_code || config.source || '';
 
       await tester.flowTestAuto({
-        sourceCode,
+        source,
         updateConfig: {
           ...config,
-          sourceCode: testCase?.params?.update_source_code || sourceCode,
+          source: testCase?.params?.update_source_code || source,
         },
       });
     }, 900000);

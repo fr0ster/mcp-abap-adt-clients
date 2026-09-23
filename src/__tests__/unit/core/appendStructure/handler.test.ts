@@ -85,7 +85,7 @@ describe('AdtAppendStructure handler', () => {
     const as = new AdtAppendStructure(conn);
     await as.update(
       { appendStructureName: 'ZOK_X' },
-      { sourceCode: 'new source', lockHandle: 'LOCK_HANDLE_42' },
+      { source: 'new source', lockHandle: 'LOCK_HANDLE_42' },
     );
 
     // One request, and it is the write. No lock, no check, no readiness poll:

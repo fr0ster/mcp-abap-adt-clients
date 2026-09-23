@@ -93,7 +93,7 @@ export class AdtLocalTypes<R extends IClassResults = typeof classDocuments>
         checkClassLocalTypes(
           connection,
           config.className as string,
-          config.localTypesCode as string,
+          config.source as string,
           'inactive',
           this.contentTypes?.sourceArtifactContentType(),
         ),
@@ -158,7 +158,7 @@ export class AdtLocalTypes<R extends IClassResults = typeof classDocuments>
     // (see delete()). Only its absence is an error.
 
     const name = config.className as string;
-    const source = options?.sourceCode ?? config.localTypesCode ?? '';
+    const source = options?.source ?? config.source ?? '';
 
     return answering(
       () =>
@@ -188,7 +188,7 @@ export class AdtLocalTypes<R extends IClassResults = typeof classDocuments>
     config: Partial<ILocalTypesConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
-    return await this.update({ ...config, localTypesCode: '' }, options);
+    return await this.update({ ...config, source: '' }, options);
   }
 
   /** Syntax-check the include. */
@@ -205,7 +205,7 @@ export class AdtLocalTypes<R extends IClassResults = typeof classDocuments>
         checkClassLocalTypes(
           connection,
           config.className as string,
-          config.localTypesCode as string,
+          config.source as string,
           status === 'active' ? 'active' : 'inactive',
           this.contentTypes?.sourceArtifactContentType(),
         ),

@@ -138,7 +138,7 @@ export class AdtDataElement<
 
   /** Create the object. */
   async create<E extends IAdtError = IAdtError>(
-    config: Omit<IDataElementConfig, 'sourceCode'> & { sourceCode?: never },
+    config: Omit<IDataElementConfig, 'source'> & { source?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     // **The one guard this package keeps, and only on a create.**
@@ -240,7 +240,7 @@ export class AdtDataElement<
           },
           // The document the caller built. The fields beside it describe a
           // create; on an update nothing merges them into a body here.
-          config.document as string,
+          config.source as string,
           options?.lockHandle,
         ),
       this.results.metadataUpdated as IResultStrategy<

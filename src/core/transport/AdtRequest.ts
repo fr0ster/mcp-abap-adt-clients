@@ -34,6 +34,7 @@ import type {
   IAdtRequest,
   IAdtResponse,
   IAdtSystemContext,
+  IAdtTransportObjectActions,
   IDeferredResponseConnection,
   IListTransportsOptions,
   ILogger,
@@ -52,10 +53,12 @@ import {
 } from './list';
 import {
   addObjectToTransport,
+  changeTransportTaskType,
   createTransportTask,
   readTransportActionLog,
   readTransportObjects,
   removeObjectFromTransport,
+  type TransportTaskType,
 } from './objects';
 import { getTransport } from './read';
 import {
@@ -98,7 +101,15 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
       ReturnType<R['deleted']>,
       ReturnType<R['deletionCheck']>
     >,
-    IAdtRequest<ReturnType<R['list']>>
+    IAdtRequest<ReturnType<R['list']>>,
+    IAdtTransportObjectActions<
+      ReturnType<NonNullable<R['removedObject']>>,
+      ReturnType<NonNullable<R['addedObject']>>,
+      ReturnType<NonNullable<R['createdTask']>>,
+      ReturnType<NonNullable<R['actionLog']>>,
+      ReturnType<NonNullable<R['objects']>>,
+      ReturnType<NonNullable<R['taskTypeChanged']>>
+    >
 {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
@@ -129,7 +140,7 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
    * before the POST — which is why this module has no `validate`.
    */
   async create<E extends IAdtError = IAdtError>(
-    config: Omit<ITransportConfig, 'sourceCode'> & { sourceCode?: never },
+    config: Omit<ITransportConfig, 'source'> & { source?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -321,7 +332,7 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
 
     this.logger?.info?.('Updating transport request:', number);
     return answering(
-      () => updateTransport(connection, number, config.document as string),
+      () => updateTransport(connection, number, config.source as string),
       this.results.metadataUpdated as IResultStrategy<
         ReturnType<R['metadataUpdated']>
       >,
@@ -534,6 +545,47 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
       (this.results.actionLog ??
         transportDocuments.actionLog) as IResultStrategy<
         ReturnType<NonNullable<R['actionLog']>>
+      >,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * Give a task its type — Development/Correction, Repair, or back to
+   * Unclassified.
+   *
+   * **A task is born without one**, and passing a type to
+   * {@link createTask} does not change that: measured against BTP ABAP on
+   * 2026-09-23, `tm:type` on the creating call is accepted and ignored, and
+   * every task — including ones created long before this library — reads back
+   * as `Unclassified`. CTS assigns a type when the first object lands, or a
+   * caller assigns it here.
+   *
+   * ```ts
+   * await request.changeTaskType(task, 'S'); // Development/Correction
+   * ```
+   *
+   * `'S'`, `'R'` and `'X'` are the measured vocabulary; `'Q'` is a
+   * customizing type and is refused on a workbench request, and `'K'`/`'W'`
+   * are REQUEST types, refused as unknown. Addressed at the TASK — that is
+   * where the listing puts the `changetasktype` link.
+   *
+   * As with every user action here, `ok` means the document was understood.
+   * Read the request back to see the type.
+   */
+  async changeTaskType<E extends IAdtError = IAdtError>(
+    taskNumber: string,
+    type: TransportTaskType,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<NonNullable<R['taskTypeChanged']>>, E>> {
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    this.logger?.info?.(`Changing the type of task ${taskNumber} to`, type);
+    return answering(
+      () => changeTransportTaskType(connection, taskNumber, type),
+      (this.results.taskTypeChanged ??
+        transportDocuments.taskTypeChanged) as IResultStrategy<
+        ReturnType<NonNullable<R['taskTypeChanged']>>
       >,
       options?.analyse,
     );

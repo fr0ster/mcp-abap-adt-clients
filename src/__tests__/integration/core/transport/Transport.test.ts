@@ -471,6 +471,36 @@ describe('AdtRequest', () => {
           expect(taskNumber).toMatch(/\S/);
           logTestStep(`newtask answered ${taskNumber}`, testsLogger);
 
+          // **A task is born without a type, and `changeTaskType` is what
+          // gives it one.** Measured against BTP ABAP, 2026-09-23: `tm:type`
+          // passed to `newtask` is accepted and ignored, and the task reads
+          // back as Unclassified. This is the one moment in the suite where a
+          // task is known to be fresh, so it is where the member is exercised.
+          //
+          // The answer is not the evidence — like every user action here, a
+          // `200` says the document was understood. The re-read is.
+          logTestStep('give the task a type', testsLogger);
+          const taskTyped = await request.changeTaskType(taskNumber, 'S');
+          if (!taskTyped.ok) {
+            // A system that refuses the action has answered, and that is the
+            // measurement. Nothing below depends on the type, so the round
+            // trip carries on — but the refusal is on the record, not passed
+            // over in silence.
+            testsLogger.warn?.(
+              `changetasktype refused: ${taskTyped.getError().message}`,
+            );
+          } else {
+            const afterTyping = String(
+              expectResult(
+                await request.readMetadata({ transportNumber: taskNumber }),
+                'read the task back after typing it',
+              ),
+            );
+            // The type sits on the task's own element in its document.
+            expect(afterTyping).toContain('tm:type="S"');
+            logTestStep('the task reads back as type S', testsLogger);
+          }
+
           const packageName = resolvePackageName(undefined);
           if (!packageName) {
             logTestSkip(
@@ -613,7 +643,7 @@ describe('AdtRequest', () => {
                 domainName,
                 packageName,
                 transportRequest: sharedRequest,
-                document: typed,
+                source: typed,
               },
               { lockHandle: domainHandle },
             );

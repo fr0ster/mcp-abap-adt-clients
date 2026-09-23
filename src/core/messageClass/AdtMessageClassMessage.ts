@@ -161,8 +161,8 @@ export class AdtMessageClassMessage<
 
   /** Create the message — the same write as `update`; ADT upserts. */
   async create<E extends IAdtError = IAdtError>(
-    config: Omit<IMessageClassMessageConfig, 'sourceCode'> & {
-      sourceCode?: never;
+    config: Omit<IMessageClassMessageConfig, 'source'> & {
+      source?: never;
     },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['written']>, E>> {

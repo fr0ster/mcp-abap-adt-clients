@@ -132,6 +132,7 @@ const RUNTIME_EXPORTS = [
   'AtcLog',
   'buildDumpIdPrefix',
   'buildRuntimeDumpsUserQuery',
+  'changeTransportTaskType',
   'compareRecordedAt',
   'createAdtClient',
   'CrossTrace',

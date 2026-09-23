@@ -59,9 +59,13 @@ describe('AdtUnitTest — managing the tests', () => {
       className: 'ZCL_TESTS',
       packageName: '$TMP',
       description: 'tests',
-      testClassSource: 'CLASS ltcl DEFINITION FOR TESTING.',
     });
 
+    // No source is passed, and there is no longer a way to pass one: `create`
+    // takes the config without its `source`. This test used to hand one over
+    // to show it was ignored; the contract refuses it at the type now, which
+    // is the stronger statement of the same fact.
+    //
     // One request: the class. Writing the tests into it is
     // `getLocalTestClass().update()`, which the consumer issues once the class
     // is active — an order this member cannot get right on its behalf, because
@@ -77,7 +81,7 @@ describe('AdtUnitTest — managing the tests', () => {
 
     await h.update({
       className: 'ZCL_TESTS',
-      testClassSource: 'CLASS ltcl DEFINITION FOR TESTING.',
+      source: 'CLASS ltcl DEFINITION FOR TESTING.',
     });
 
     expect(
@@ -97,7 +101,7 @@ describe('AdtUnitTest — managing the tests', () => {
     await h.update(
       {
         className: 'ZCL_TESTS',
-        testClassSource: 'CLASS ltcl DEFINITION FOR TESTING.',
+        source: 'CLASS ltcl DEFINITION FOR TESTING.',
       },
       { lockHandle: 'HELD-BY-CALLER' },
     );
@@ -116,7 +120,7 @@ describe('AdtUnitTest — managing the tests', () => {
 
     await h.update(
       { className: 'ZCL_TESTS' },
-      { lockHandle: 'HELD-BY-CALLER', sourceCode: '' },
+      { lockHandle: 'HELD-BY-CALLER', source: '' },
     );
 
     expect(calls).toHaveLength(1);

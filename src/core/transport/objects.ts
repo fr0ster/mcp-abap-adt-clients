@@ -227,3 +227,65 @@ export async function readTransportObjects(
     headers: { Accept: ACCEPT_TRANSPORT },
   });
 }
+
+/**
+ * The task types CTS accepts, as `changetasktype` reads them.
+ *
+ * It repeats the union `IAdtTransportObjectActions.changeTaskType` declares
+ * inline, because the contract gives it no name to import. `AdtRequest`
+ * declares that interface, so the member cannot go missing — but a narrowing
+ * on either side would pass, method parameters being bivariant. If a fourth
+ * type is ever measured, the contract is where it is named first.
+ */
+export type TransportTaskType = 'S' | 'R' | 'X';
+
+/**
+ * Give a task its type — `useraction="changetasktype"`.
+ *
+ * **A task is born without one.** Measured against BTP ABAP, 2026-09-23:
+ * every task a `newtask` creates reads back as `Unclassified`, including ones
+ * created before this library existed, and passing `tm:type` on the creating
+ * call changes nothing — the attribute is accepted and ignored. CTS assigns
+ * the type when the first object lands, or a caller assigns it here.
+ *
+ * **The document nests, and that is the whole of the difficulty.** The type
+ * goes on a `tm:task` child, not on the root: six attribute spellings on the
+ * root were each answered
+ *
+ *     400  Specified request type or task type  is unknown
+ *
+ * with two spaces where the value belongs — the endpoint read an empty one
+ * every time. The shape below answers 200, and a re-read shows the new type.
+ * The same message NAMES the value when one arrives (`… type K is unknown`),
+ * which is what confirmed the empty reading rather than a wrong one.
+ *
+ * Measured vocabulary, same run:
+ *
+ *   S → Development/Correction
+ *   R → Repair
+ *   X → Unclassified, the state a task starts in
+ *   Q → refused: "You can only change the type of tasks in workbench
+ *       requests" — a customizing type, valid but not here
+ *   K, W → refused as unknown: those are REQUEST types, not task ones
+ *
+ * Addressed at the task's own URL, which is where the listing puts the
+ * `changetasktype` link — on the task element, never on the request above it.
+ */
+export async function changeTransportTaskType(
+  connection: IAbapConnection,
+  taskNumber: string,
+  type: TransportTaskType,
+): Promise<IAdtWireResponse> {
+  const number = attribute(taskNumber);
+  return connection.makeAdtRequest({
+    url: requestUrl(taskNumber),
+    method: 'PUT',
+    timeout: getTimeout('default'),
+    data:
+      '<?xml version="1.0" encoding="ASCII"?>\n' +
+      `<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:number="${number}" tm:useraction="changetasktype">` +
+      `<tm:task tm:number="${number}" tm:type="${attribute(type)}"/>` +
+      '</tm:root>',
+    headers: USER_ACTION_HEADERS,
+  });
+}

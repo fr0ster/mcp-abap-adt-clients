@@ -336,7 +336,7 @@ export class AdtServiceBinding<
    * reaches a caller only if it fails.
    */
   async create<E extends IAdtError = IAdtError>(
-    config: Omit<IServiceBindingConfig, 'sourceCode'> & { sourceCode?: never },
+    config: Omit<IServiceBindingConfig, 'source'> & { source?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     // **The one guard this package keeps, and only on a create.**

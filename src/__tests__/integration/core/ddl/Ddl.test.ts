@@ -122,7 +122,7 @@ describe('View (using AdtClient)', () => {
             packageName,
             transportRequest,
             description: params.description,
-            ddlSource: params.ddl_source,
+            source: params.ddl_source,
           };
         },
         // See the note in BehaviorImplementation.test.ts: a killed run never
@@ -285,18 +285,17 @@ describe('View (using AdtClient)', () => {
           return;
         }
 
-        const ddlSource =
-          testCase?.params?.ddl_source || config.ddlSource || '';
+        const ddlSource = testCase?.params?.ddl_source || config.source || '';
         const updatedDdlSource =
           testCase?.params?.updated_ddl_source || ddlSource;
 
         await tester.flowTestAuto({
-          sourceCode: updatedDdlSource,
+          source: updatedDdlSource,
           updateConfig: {
             ddlName: config.ddlName,
             packageName: config.packageName,
             description: config.description || '',
-            ddlSource: updatedDdlSource,
+            source: updatedDdlSource,
           },
         });
       },

@@ -81,7 +81,7 @@ describe('AdtRequest.update()', () => {
 
     await new AdtRequest(connection).updateMetadata({
       transportNumber: 'TRLK900438',
-      document: edited,
+      source: edited,
     });
 
     expect(calls).toHaveLength(1);

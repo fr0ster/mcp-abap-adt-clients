@@ -149,7 +149,7 @@ describe('AdtUnitTest (using AdtClient)', () => {
         const transportRequest = resolveTransportRequest(
           testCase.params.transport_request,
         );
-        const sourceCode =
+        const source =
           testCase.params.source_code ||
           `CLASS ${containerClass} DEFINITION PUBLIC FINAL CREATE PUBLIC. ENDCLASS.`;
         const testClassSource =
@@ -222,7 +222,7 @@ describe('AdtUnitTest (using AdtClient)', () => {
               await client.getClass().validate({
                 className: containerClass,
                 packageName,
-                sourceCode,
+                source,
               }),
               'validate the container class name',
             );
@@ -243,7 +243,7 @@ describe('AdtUnitTest (using AdtClient)', () => {
 
           // The source is written either way, and it was not.
           //
-          // `create` used to be handed `sourceCode` and ignores it — it makes an
+          // `create` used to be handed `source` and ignores it — it makes an
           // empty class, and interfaces 38.0.0 took the field off the member for
           // exactly this reason. Only the `else` branch wrote the source, so on
           // a system where the container class did not exist yet it was created
@@ -265,7 +265,7 @@ describe('AdtUnitTest (using AdtClient)', () => {
           const containerHandle = String(containerLock);
           expectResult(
             await client.getClass().update(containerConfig, {
-              sourceCode,
+              source,
               lockHandle: containerHandle,
             }),
             'write container class source',
@@ -294,7 +294,7 @@ describe('AdtUnitTest (using AdtClient)', () => {
                 .getLocalTestClass()
                 .update(
                   { className: containerClass, transportRequest },
-                  { sourceCode: testClassSource, lockHandle: includeHandle },
+                  { source: testClassSource, lockHandle: includeHandle },
                 ),
               'write the test class include',
             );

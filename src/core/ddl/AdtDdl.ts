@@ -134,7 +134,7 @@ export class AdtDdl<R extends IDdlResults = typeof ddlDocuments>
 
   /** Create the object. */
   async create<E extends IAdtError = IAdtError>(
-    config: Omit<IDdlConfig, 'sourceCode'> & { sourceCode?: never },
+    config: Omit<IDdlConfig, 'source'> & { source?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     // **The one guard this package keeps, and only on a create.**
@@ -249,7 +249,7 @@ export class AdtDdl<R extends IDdlResults = typeof ddlDocuments>
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const name = this.name(config);
-    const source = options?.sourceCode || config.ddlSource;
+    const source = options?.source || config.source;
 
     return answering(
       () =>
@@ -352,7 +352,7 @@ export class AdtDdl<R extends IDdlResults = typeof ddlDocuments>
       status === 'active' ? 'active' : 'inactive';
 
     return answering(
-      () => checkDdl(connection, name, version, config.ddlSource),
+      () => checkDdl(connection, name, version, config.source),
       this.results.check as IResultStrategy<ReturnType<R['check']>>,
       options?.analyse,
     );

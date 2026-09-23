@@ -44,9 +44,9 @@ describe('AdtServiceDefinition.create is metadata-only', () => {
     await handler.create(config);
 
     // @ts-expect-error a create carries no source: the POST has no body for it
-    void (() => handler.create({ ...config, sourceCode: UNIQUE_SOURCE }));
+    void (() => handler.create({ ...config, source: UNIQUE_SOURCE }));
     // @ts-expect-error nor through the options
-    void (() => handler.create(config, { sourceCode: UNIQUE_SOURCE }));
+    void (() => handler.create(config, { source: UNIQUE_SOURCE }));
 
     const posts = calls.filter((c) => c.method === 'POST');
     expect(posts.length).toBeGreaterThan(0);

@@ -120,7 +120,7 @@ describe('an injected reading reaches the caller as its own type', () => {
 
     const source = await include.update(
       { functionGroupName: 'ZFG', includeName: 'LZFGF01' },
-      { sourceCode: '* code' },
+      { source: '* code' },
     );
     const document = await include.updateMetadata({
       functionGroupName: 'ZFG',

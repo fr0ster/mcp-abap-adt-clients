@@ -207,7 +207,7 @@ const METADATA_TARGETS: Array<{
     family: 'ddl',
     url: '/sap/bc/adt/ddic/ddl/sources/ZMCP_SHR_I_ROOT',
     accept:
-      'application/vnd.sap.adt.ddlSource.v2+xml, application/vnd.sap.adt.ddlSource+xml',
+      'application/vnd.sap.adt.source.v2+xml, application/vnd.sap.adt.source+xml',
   },
   {
     family: 'function-group',
@@ -1175,7 +1175,7 @@ async function main(): Promise<void> {
           { className: SCRATCH_CLASS_NAME },
           {
             lockHandle: 'ZZ_INVALID_LOCK_HANDLE_0001',
-            sourceCode: MINIMAL_VALID_SOURCE,
+            source: MINIMAL_VALID_SOURCE,
           },
         );
       });
@@ -1186,7 +1186,7 @@ async function main(): Promise<void> {
         await client
           .getClass()
           .check(
-            { className: SCRATCH_CLASS_NAME, sourceCode: BROKEN_SOURCE },
+            { className: SCRATCH_CLASS_NAME, source: BROKEN_SOURCE },
             'inactive',
           );
       });
@@ -1194,12 +1194,12 @@ async function main(): Promise<void> {
       track('setup: persist broken source into the scratch class');
       await withLock(SCRATCH_CLASS_NAME, async (lockHandle) => {
         // A raw PUT never syntax-checks; it saves whatever bytes it is given.
-        // `sourceCode` is an option, not config — config.sourceCode is check's.
+        // `sourceCode` is an option, not config — config.source is check's.
         await client
           .getClass()
           .update(
             { className: SCRATCH_CLASS_NAME },
-            { lockHandle, sourceCode: BROKEN_SOURCE },
+            { lockHandle, source: BROKEN_SOURCE },
           );
       });
       console.log('  broken source saved as the inactive version, unlocked');
@@ -1228,7 +1228,7 @@ async function main(): Promise<void> {
           .getClass()
           .update(
             { className: SCRATCH_CLASS_NAME },
-            { lockHandle, sourceCode: MINIMAL_VALID_SOURCE },
+            { lockHandle, source: MINIMAL_VALID_SOURCE },
           );
       });
 
@@ -1289,13 +1289,13 @@ async function main(): Promise<void> {
       await withCase('update-source-success', async () => {
         await withLock(CREATE_CLASS_NAME, async (lockHandle) => {
           // `sourceCode` goes in OPTIONS, not the config. adt-clients 18 made
-          // `config.sourceCode` belong to `check` alone, and an update that
+          // `config.source` belong to `check` alone, and an update that
           // puts it in the config is told "Source code is required for update".
           await client.getClass().update(
             { className: CREATE_CLASS_NAME },
             {
               lockHandle,
-              sourceCode:
+              source:
                 MINIMAL_VALID_SOURCE.split(SCRATCH_CLASS_NAME).join(
                   CREATE_CLASS_NAME,
                 ),
@@ -1355,7 +1355,7 @@ async function main(): Promise<void> {
           .getClass()
           .update(
             { className: UNIT_TEST_CLASS_NAME },
-            { lockHandle, sourceCode: UNIT_TEST_MAIN_SOURCE },
+            { lockHandle, source: UNIT_TEST_MAIN_SOURCE },
           );
       });
       await writeTestInclude(UNIT_TEST_PASSING);

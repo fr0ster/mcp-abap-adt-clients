@@ -108,7 +108,7 @@ async function main(): Promise<void> {
 
     for (let round = 1; round <= writes; round++) {
       const written = await cls.update(config, {
-        sourceCode: source(round),
+        source: source(round),
         lockHandle: handle,
       });
       note(

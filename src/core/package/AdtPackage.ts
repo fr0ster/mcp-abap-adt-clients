@@ -151,7 +151,7 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
    * package before it is ever locked.
    */
   async create<E extends IAdtError = IAdtError>(
-    config: Omit<IPackageConfig, 'sourceCode'> & { sourceCode?: never },
+    config: Omit<IPackageConfig, 'source'> & { source?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     // **No guard here, unlike every other create.**
@@ -309,7 +309,7 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
           connection,
           fields,
           // The document the caller built; the fields above describe a create.
-          config.document as string,
+          config.source as string,
           options?.lockHandle as string,
         ),
       this.results.metadataUpdated as IResultStrategy<

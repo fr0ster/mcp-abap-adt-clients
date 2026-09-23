@@ -104,7 +104,7 @@ describe('Transformation - XSLTProgram (using AdtClient)', () => {
             packageName,
             transportRequest,
             description: params.description,
-            sourceCode: params.source_code,
+            source: params.source_code,
           };
         },
         ensureObjectReady: async (transformationName: string) => {
@@ -166,18 +166,16 @@ describe('Transformation - XSLTProgram (using AdtClient)', () => {
 </xsl:transform>`;
 
         const sourceCode =
-          testCase?.params?.source_code ||
-          config.sourceCode ||
-          defaultSourceCode;
+          testCase?.params?.source_code || config.source || defaultSourceCode;
 
         await tester.flowTestAuto({
-          sourceCode: sourceCode,
+          source: sourceCode,
           updateConfig: {
             transformationName: config.transformationName,
             transformationType: config.transformationType || 'XSLTProgram',
             packageName: config.packageName,
             description: config.description || '',
-            sourceCode: sourceCode,
+            source: sourceCode,
           },
         });
       },

@@ -113,7 +113,7 @@ describe('FunctionModule (using AdtClient)', () => {
             packageName,
             transportRequest,
             description: params.description,
-            sourceCode: params.source_code,
+            source: params.source_code,
             masterSystem: resolveMasterSystem(params.master_system),
             responsible: process.env.SAP_USERNAME || process.env.SAP_USER,
           };
@@ -238,16 +238,15 @@ describe('FunctionModule (using AdtClient)', () => {
         }
 
         const testCase = tester.getTestCaseDefinition();
-        const sourceCode =
-          testCase?.params?.source_code || config.sourceCode || '';
+        const sourceCode = testCase?.params?.source_code || config.source || '';
 
         await tester.flowTestAuto({
-          sourceCode: sourceCode,
+          source: sourceCode,
           updateConfig: {
             functionModuleName: config.functionModuleName,
             functionGroupName: config.functionGroupName,
             description: config.description || '',
-            sourceCode: sourceCode,
+            source: sourceCode,
           },
         });
       },

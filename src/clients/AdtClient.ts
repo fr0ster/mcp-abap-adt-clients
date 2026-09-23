@@ -814,7 +814,8 @@ export type IRequestContract<R extends ITransportResults> = IAdtCreatable<
     ReturnType<NonNullable<R['addedObject']>>,
     ReturnType<NonNullable<R['createdTask']>>,
     ReturnType<NonNullable<R['actionLog']>>,
-    ReturnType<NonNullable<R['objects']>>
+    ReturnType<NonNullable<R['objects']>>,
+    ReturnType<NonNullable<R['taskTypeChanged']>>
   >;
 export type ILocalTestClassContract<R extends IClassResults> = IAdtReadable<
   ILocalTestClassConfig,

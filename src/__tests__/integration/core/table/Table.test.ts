@@ -111,7 +111,7 @@ describe('Table (using AdtClient)', () => {
             packageName,
             transportRequest,
             description: params.description,
-            ddlCode: params.ddl_code,
+            source: params.ddl_code,
           };
         },
         ensureObjectReady: async (tableName: string) => {
@@ -165,15 +165,15 @@ describe('Table (using AdtClient)', () => {
 
         const testCase = tester.getTestCaseDefinition();
         const updatedDdlCode =
-          testCase?.params?.updated_ddl_code || config.ddlCode || '';
+          testCase?.params?.updated_ddl_code || config.source || '';
 
         await tester.flowTestAuto({
-          sourceCode: updatedDdlCode,
+          source: updatedDdlCode,
           updateConfig: {
             tableName: config.tableName,
             packageName: config.packageName,
             description: config.description || '',
-            ddlCode: updatedDdlCode,
+            source: updatedDdlCode,
           },
         });
       },
