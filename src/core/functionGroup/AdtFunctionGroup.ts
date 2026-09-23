@@ -128,7 +128,7 @@ export class AdtFunctionGroup<
 
   /** Create the function group. */
   async create<E extends IAdtError = IAdtError>(
-    config: Omit<IFunctionGroupConfig, 'sourceCode'> & { sourceCode?: never },
+    config: Omit<IFunctionGroupConfig, 'source'> & { source?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     // **The one guard this package keeps, and only on a create.**
@@ -247,10 +247,13 @@ export class AdtFunctionGroup<
             lock_handle: options?.lockHandle as string,
             transport_request: config.transportRequest,
           } as Parameters<typeof updateFunctionGroup>[1],
-          // The document the caller built. The description used to be merged
+          // The document the caller built, from either channel — see
+          // `AdtDomain.updateMetadata` for why both are read.
+          //
+          // The description used to be merged
           // into a document read here, inside a lock window opened here; both
           // the read and the window are theirs now.
-          config.document as string,
+          (options?.source ?? config.source) as string,
           this.contentTypes,
         ),
       this.results.metadataUpdated as IResultStrategy<

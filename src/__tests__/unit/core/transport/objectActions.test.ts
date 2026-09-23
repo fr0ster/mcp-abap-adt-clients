@@ -450,6 +450,63 @@ describe('readObjects', () => {
   });
 });
 
+describe('changeTaskType', () => {
+  /**
+   * **The type goes on a `tm:task` child, not on the root**, and that single
+   * fact cost six attempts. Measured against BTP ABAP, 2026-09-23: six
+   * spellings on the root each answered
+   *
+   *     400  Specified request type or task type  is unknown
+   *
+   * with two spaces where the value belongs — an empty read every time. The
+   * nested shape answered 200 and the task read back as
+   * Development/Correction. The same message names the value when one does
+   * arrive ("… type K is unknown"), which is how the empty reading was told
+   * apart from a wrong one.
+   */
+  it('nests the type under tm:task, which is what the server reads', async () => {
+    const { connection, calls } = connectionOver(() => answering(REMOVED));
+
+    await new AdtRequest(connection).changeTaskType('E19K905943', 'S');
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].method).toBe('PUT');
+    // The TASK's own URL: that is where the listing puts the
+    // `changetasktype` link, never on the request above it.
+    expect(calls[0].url).toBe('/sap/bc/adt/cts/transportrequests/E19K905943');
+
+    const body = String(calls[0].data);
+    expect(body).toContain('tm:useraction="changetasktype"');
+    expect(body).toContain('<tm:task tm:number="E19K905943" tm:type="S"/>');
+    // The shape that was refused six times over.
+    expect(body).not.toMatch(/<tm:root[^>]*tm:type=/);
+  });
+
+  it('carries the headers its user-action siblings carry', async () => {
+    const { connection, calls } = connectionOver(() => answering(REMOVED));
+
+    await new AdtRequest(connection).changeTaskType('E19K905943', 'R');
+
+    expect(calls[0].headers?.['Content-Type']).toBe('text/plain');
+    expect(calls[0].headers?.Accept).toBe(
+      'application/vnd.sap.adt.transportorganizer.v1+xml',
+    );
+  });
+
+  /** `X` puts a task back in the state every task is created in. */
+  it.each([
+    'S',
+    'R',
+    'X',
+  ] as const)('sends %s as the server spells it', async (type) => {
+    const { connection, calls } = connectionOver(() => answering(REMOVED));
+
+    await new AdtRequest(connection).changeTaskType('E19K905943', type);
+
+    expect(String(calls[0].data)).toContain(`tm:type="${type}"`);
+  });
+});
+
 describe('the contract a consumer actually holds', () => {
   it('reaches all four through client.getRequest()', async () => {
     const { connection, calls } = connectionOver((options) =>

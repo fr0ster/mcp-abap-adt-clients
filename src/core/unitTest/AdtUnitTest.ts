@@ -192,7 +192,7 @@ export class AdtUnitTest<R extends IUnitTestResults = typeof unitTestDocuments>
    * it belongs to the caller rather than to a chain it cannot see into.
    */
   async create<E extends IAdtError = IAdtError>(
-    config: Omit<IUnitTestConfig, 'sourceCode'> & { sourceCode?: never },
+    config: Omit<IUnitTestConfig, 'source'> & { source?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     const name = this.name(config);
@@ -255,7 +255,7 @@ export class AdtUnitTest<R extends IUnitTestResults = typeof unitTestDocuments>
     return this.adtLocalTestClass.update(
       {
         className: name,
-        testClassCode: config.testClassSource,
+        source: config.source,
         transportRequest: config.transportRequest,
       },
       options,

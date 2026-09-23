@@ -50,7 +50,7 @@ if (!locked.ok) throw new Error(locked.getError().message);
 const lockHandle = locked.getResult().value;
 
 try {
-  await cls.update(config, { sourceCode: updatedCode, lockHandle });
+  await cls.update(config, { source: updatedCode, lockHandle });
 } finally {
   await cls.unlock(config, lockHandle);          // stateless again
 }

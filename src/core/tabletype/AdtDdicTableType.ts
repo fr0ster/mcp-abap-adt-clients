@@ -133,7 +133,7 @@ export class AdtDdicTableType<
 
   /** Create the object. */
   async create<E extends IAdtError = IAdtError>(
-    config: Omit<ITableTypeConfig, 'sourceCode'> & { sourceCode?: never },
+    config: Omit<ITableTypeConfig, 'source'> & { source?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     // **The one guard this package keeps, and only on a create.**
@@ -237,8 +237,9 @@ export class AdtDdicTableType<
             tabletype_name: name,
             transport_request: config.transportRequest,
           },
-          // The document the caller built; the fields above describe a create.
-          config.document as string,
+          // The document the caller built, from either channel — see
+          // `AdtDomain.updateMetadata`; the fields above describe a create.
+          (options?.source ?? config.source) as string,
           options?.lockHandle,
         ),
       this.results.metadataUpdated as IResultStrategy<

@@ -101,7 +101,7 @@ describe('BehaviorDefinition (using AdtClient)', () => {
               params.transport_request ||
               getEnvironmentConfig().default_transport ||
               '',
-            sourceCode: params.source_code,
+            source: params.source_code,
           };
         },
         ensureObjectReady: async (bdefName: string) => {
@@ -184,11 +184,10 @@ describe('BehaviorDefinition (using AdtClient)', () => {
         }
 
         const testCase = tester.getTestCaseDefinition();
-        const sourceCode =
-          testCase?.params?.source_code || config.sourceCode || '';
+        const sourceCode = testCase?.params?.source_code || config.source || '';
 
         await tester.flowTestAuto({
-          sourceCode: sourceCode,
+          source: sourceCode,
           readMetadata: true,
           readMetadataOptions: { withLongPolling: true },
           updateConfig: {
@@ -197,7 +196,7 @@ describe('BehaviorDefinition (using AdtClient)', () => {
             rootEntity: config.rootEntity,
             implementationType: config.implementationType,
             description: config.description || '',
-            sourceCode: sourceCode,
+            source: sourceCode,
           },
         });
       },

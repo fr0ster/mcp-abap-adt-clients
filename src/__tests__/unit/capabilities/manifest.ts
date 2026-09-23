@@ -130,7 +130,7 @@ export const HANDLERS = {
     factory: (c: AdtClient) => c.getClass(),
     subject: '/sap/bc/adt/oo/classes/ZCL_GUARD',
     config: {
-      sourceCode: 'CLASS zcl_guard DEFINITION PUBLIC. ENDCLASS.',
+      source: 'CLASS zcl_guard DEFINITION PUBLIC. ENDCLASS.',
       className: 'ZCL_GUARD',
       packageName: '$TMP',
       description: 'guard',
@@ -159,7 +159,7 @@ export const HANDLERS = {
     factory: (c: AdtClient) => c.getInterface(),
     subject: '/sap/bc/adt/oo/interfaces/ZIF_GUARD',
     config: {
-      sourceCode: 'INTERFACE zif_guard PUBLIC. ENDINTERFACE.',
+      source: 'INTERFACE zif_guard PUBLIC. ENDINTERFACE.',
       interfaceName: 'ZIF_GUARD',
       packageName: '$TMP',
       description: 'guard',
@@ -188,7 +188,7 @@ export const HANDLERS = {
     factory: (c: AdtClient) => c.getInclude(),
     subject: '/sap/bc/adt/programs/includes/ZGUARD_INC',
     config: {
-      sourceCode: '" guard',
+      source: '" guard',
       includeName: 'ZGUARD_INC',
       packageName: '$TMP',
       description: 'guard',
@@ -236,7 +236,7 @@ export const HANDLERS = {
     factory: (c: AdtClient) => c.getProgram(),
     subject: '/sap/bc/adt/programs/programs/ZGUARD',
     config: {
-      sourceCode: 'REPORT zguard.',
+      source: 'REPORT zguard.',
       programName: 'ZGUARD',
       packageName: '$TMP',
       description: 'guard',
@@ -265,8 +265,7 @@ export const HANDLERS = {
     factory: (c: AdtClient) => c.getDdl(),
     subject: '/sap/bc/adt/ddic/ddl/sources/ZGUARD_DDL',
     config: {
-      sourceCode: 'define view zguard_ddl as select from t000 { mandt }',
-      ddlSource: 'define view zguard_ddl as select from t000 { mandt }',
+      source: 'define view zguard_ddl as select from t000 { mandt }',
       ddlName: 'ZGUARD_DDL',
       packageName: '$TMP',
       description: 'guard',
@@ -296,8 +295,7 @@ export const HANDLERS = {
     factory: (c: AdtClient) => c.getTable(),
     subject: '/sap/bc/adt/ddic/tables/ZGUARD_TAB',
     config: {
-      sourceCode: "@EndUserText.label: 'guard'\ndefine table zguard_tab {}",
-      ddlCode: "@EndUserText.label: 'guard'\ndefine table zguard_tab {}",
+      source: "@EndUserText.label: 'guard'\ndefine table zguard_tab {}",
       tableName: 'ZGUARD_TAB',
       packageName: '$TMP',
       description: 'guard',
@@ -326,8 +324,7 @@ export const HANDLERS = {
     factory: (c: AdtClient) => c.getStructure(),
     subject: '/sap/bc/adt/ddic/structures/ZGUARD_STRU',
     config: {
-      sourceCode: 'define structure zguard_stru {}',
-      ddlCode: 'define structure zguard_stru {}',
+      source: 'define structure zguard_stru {}',
       structureName: 'ZGUARD_STRU',
       packageName: '$TMP',
       description: 'guard',
@@ -357,7 +354,7 @@ export const HANDLERS = {
     factory: (c: AdtClient) => c.getTableType(),
     subject: '/sap/bc/adt/ddic/tabletypes/ZGUARD_TTYP',
     config: {
-      sourceCode: 'define table type zguard_ttyp of zguard_stru;',
+      source: 'define table type zguard_ttyp of zguard_stru;',
       rowTypeName: 'ZGUARD_STRU',
       tableTypeName: 'ZGUARD_TTYP',
       packageName: '$TMP',
@@ -400,7 +397,7 @@ export const HANDLERS = {
     factory: (c: AdtClient) => c.getAccessControl(),
     subject: '/sap/bc/adt/acm/dcl/sources/ZGUARD_DCL',
     config: {
-      sourceCode: "@EndUserText.label: 'guard'\ndefine role zguard_dcl {}",
+      source: "@EndUserText.label: 'guard'\ndefine role zguard_dcl {}",
       accessControlName: 'ZGUARD_DCL',
       packageName: '$TMP',
       description: 'guard',
@@ -430,7 +427,7 @@ export const HANDLERS = {
     factory: (c: AdtClient) => c.getAppendStructure(),
     subject: '/sap/bc/adt/ddic/structures/ZGUARD_APP',
     config: {
-      sourceCode: 'extend structure zguard_tab with zguard_app {}',
+      source: 'extend structure zguard_tab with zguard_app {}',
       appendStructureName: 'ZGUARD_APP',
       baseObject: 'ZGUARD_TAB',
       packageName: '$TMP',
@@ -461,7 +458,7 @@ export const HANDLERS = {
     factory: (c: AdtClient) => c.getBehaviorDefinition(),
     subject: '/sap/bc/adt/bo/behaviordefinitions/ZGUARD_BDEF',
     config: {
-      sourceCode: 'managed implementation in class zbp_guard unique;',
+      source: 'managed implementation in class zbp_guard unique;',
       name: 'ZGUARD_BDEF',
       rootEntity: 'ZGUARD_VIEW',
       implementationType: 'managed',
@@ -493,7 +490,7 @@ export const HANDLERS = {
     factory: (c: AdtClient) => c.getBehaviorImplementation(),
     subject: '/sap/bc/adt/oo/classes/ZBP_GUARD',
     config: {
-      sourceCode: 'CLASS zbp_guard DEFINITION PUBLIC. ENDCLASS.',
+      source: 'CLASS zbp_guard DEFINITION PUBLIC. ENDCLASS.',
       className: 'ZBP_GUARD',
       behaviorDefinition: 'ZGUARD_BDEF',
       packageName: '$TMP',
@@ -525,7 +522,7 @@ export const HANDLERS = {
     subject: '/sap/bc/adt/ddic/ddlx/sources/ZGUARD_DDLX',
     config: {
       name: 'ZGUARD_DDLX',
-      sourceCode: 'annotate view zguard_ddl with {}',
+      source: 'annotate view zguard_ddl with {}',
       packageName: '$TMP',
       description: 'guard',
     },
@@ -555,7 +552,7 @@ export const HANDLERS = {
       // enhoxhh is the flavour whose source can be updated; the others have no
       // source resource, so update would refuse before issuing anything.
       enhancementType: 'enhoxhh',
-      sourceCode: '" guard',
+      source: '" guard',
       packageName: '$TMP',
       description: 'guard',
     },
@@ -584,7 +581,7 @@ export const HANDLERS = {
     factory: (c: AdtClient) => c.getServiceDefinition(),
     subject: '/sap/bc/adt/ddic/srvd/sources/ZGUARD_SRVD',
     config: {
-      sourceCode: 'define service zguard_srvd { expose t000; }',
+      source: 'define service zguard_srvd { expose t000; }',
       serviceDefinitionName: 'ZGUARD_SRVD',
       packageName: '$TMP',
       description: 'guard',
@@ -614,7 +611,7 @@ export const HANDLERS = {
     factory: (c: AdtClient) => c.getFunctionModule(),
     subject: '/sap/bc/adt/functions/groups/ZGUARD_FG/fmodules/ZGUARD_FM',
     config: {
-      sourceCode: 'FUNCTION zguard_fm. ENDFUNCTION.',
+      source: 'FUNCTION zguard_fm. ENDFUNCTION.',
       functionGroupName: 'ZGUARD_FG',
       functionModuleName: 'ZGUARD_FM',
       packageName: '$TMP',
@@ -647,7 +644,7 @@ export const HANDLERS = {
     factory: (c: AdtClient) => c.getScalarFunction(),
     subject: '/sap/bc/adt/ddic/dsfd/sources/ZGUARD_DSFD',
     config: {
-      sourceCode: 'define function zguard_dsfd returns { x : abap.int4; }',
+      source: 'define function zguard_dsfd returns { x : abap.int4; }',
       scalarFunctionName: 'ZGUARD_DSFD',
       packageName: '$TMP',
       description: 'guard',
@@ -679,7 +676,7 @@ export const HANDLERS = {
     config: {
       implementationName: 'ZGUARD_DSFI',
       scalarFunctionName: 'ZGUARD_DSFD',
-      sourceCode: 'METHOD guard. ENDMETHOD.',
+      source: 'METHOD guard. ENDMETHOD.',
       packageName: '$TMP',
       description: 'guard',
     },
@@ -725,7 +722,7 @@ export const HANDLERS = {
     factory: (c: AdtClient) => c.getTransformation(),
     subject: '/sap/bc/adt/xslt/transformations/ZGUARD_XSLT',
     config: {
-      sourceCode: '<xsl:transform version="1.0"/>',
+      source: '<xsl:transform version="1.0"/>',
       transformationName: 'ZGUARD_XSLT',
       transformationType: 'XSLT',
       packageName: '$TMP',
@@ -960,7 +957,7 @@ export const HANDLERS = {
     factory: (c: AdtClient) => c.getFunctionInclude(),
     subject: '/sap/bc/adt/functions/groups/ZGUARD_FG/includes/LZGUARD_FGF01',
     config: {
-      sourceCode: '* include source',
+      source: '* include source',
       functionGroupName: 'ZGUARD_FG',
       includeName: 'LZGUARD_FGF01',
       packageName: '$TMP',
@@ -1144,7 +1141,7 @@ export const HANDLERS = {
     include: 'testclasses',
     config: {
       className: 'ZCL_GUARD',
-      testClassCode: 'CLASS ltcl DEFINITION FOR TESTING.',
+      source: 'CLASS ltcl DEFINITION FOR TESTING.',
     },
     requests: {
       read: '/sap/bc/adt/oo/classes/ZCL_GUARD/includes/testclasses',
@@ -1176,7 +1173,7 @@ export const HANDLERS = {
     factory: (c: AdtClient) => c.getLocalTypes(),
     subject: '/sap/bc/adt/oo/classes/ZCL_GUARD',
     include: 'implementations',
-    config: { className: 'ZCL_GUARD', localTypesCode: 'TYPES ty_x TYPE i.' },
+    config: { className: 'ZCL_GUARD', source: 'TYPES ty_x TYPE i.' },
     requests: {
       read: '/sap/bc/adt/oo/classes/ZCL_GUARD/includes/implementations',
       readMetadata: '/sap/bc/adt/oo/classes/ZCL_GUARD',
@@ -1209,7 +1206,7 @@ export const HANDLERS = {
     include: 'definitions',
     config: {
       className: 'ZCL_GUARD',
-      definitionsCode: 'CLASS lcl DEFINITION.',
+      source: 'CLASS lcl DEFINITION.',
     },
     requests: {
       read: '/sap/bc/adt/oo/classes/ZCL_GUARD/includes/definitions',
@@ -1241,7 +1238,7 @@ export const HANDLERS = {
     factory: (c: AdtClient) => c.getLocalMacros(),
     subject: '/sap/bc/adt/oo/classes/ZCL_GUARD',
     include: 'macros',
-    config: { className: 'ZCL_GUARD', macrosCode: 'DEFINE mac.' },
+    config: { className: 'ZCL_GUARD', source: 'DEFINE mac.' },
     requests: {
       read: '/sap/bc/adt/oo/classes/ZCL_GUARD/includes/macros',
       readMetadata: '/sap/bc/adt/oo/classes/ZCL_GUARD',
@@ -1347,7 +1344,7 @@ export const HANDLERS = {
       className: 'ZCL_GUARD_TESTS',
       packageName: '$TMP',
       description: 'guard',
-      testClassSource: 'CLASS ltcl DEFINITION FOR TESTING.',
+      source: 'CLASS ltcl DEFINITION FOR TESTING.',
     },
     requests: {
       // Since 18.0.0 this is the container class's POST and nothing else.
@@ -1382,7 +1379,7 @@ export const HANDLERS = {
       packageName: '$TMP',
       description: 'guard',
       cdsViewName: 'ZGUARD_VIEW',
-      testClassSource: 'CLASS ltcl DEFINITION FOR TESTING.',
+      source: 'CLASS ltcl DEFINITION FOR TESTING.',
     },
     requests: {
       // Since 18.0.0 this is the container class's POST and nothing else.

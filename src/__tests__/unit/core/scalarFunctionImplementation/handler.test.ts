@@ -57,7 +57,7 @@ describe('AdtScalarFunctionImplementation handler', () => {
     const h = new AdtScalarFunctionImplementation(conn);
     await h.update(
       { implementationName: 'ZI', scalarFunctionName: 'ZF' },
-      { sourceCode: 'src', lockHandle: 'LOCK_HANDLE_42' },
+      { source: 'src', lockHandle: 'LOCK_HANDLE_42' },
     );
 
     expect(calls).toHaveLength(1);
@@ -74,7 +74,7 @@ describe('AdtScalarFunctionImplementation handler', () => {
     const h = new AdtScalarFunctionImplementation(conn);
     await h.updateMetadata(
       { implementationName: 'ZI' },
-      { sourceCode: '<blues/>', lockHandle: 'LOCK_HANDLE_42' },
+      { source: '<blues/>', lockHandle: 'LOCK_HANDLE_42' },
     );
 
     expect(calls).toHaveLength(1);

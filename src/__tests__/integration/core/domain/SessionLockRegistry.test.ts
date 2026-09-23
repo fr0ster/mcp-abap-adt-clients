@@ -152,7 +152,9 @@ describe('Session lock registry (using AdtClient)', () => {
         await getDomain(connection, domainConfig.domainName);
       } catch (error: any) {
         if (error?.response?.status === 404) {
-          await client.getDomain().create(domainConfig);
+          const { source: _domainSourceIsNotCreates, ...domainCreateConfig } =
+            domainConfig;
+          await client.getDomain().create(domainCreateConfig);
         } else {
           throw error;
         }
@@ -161,7 +163,11 @@ describe('Session lock registry (using AdtClient)', () => {
         await getDataElement(connection, dataElementConfig.dataElementName);
       } catch (error: any) {
         if (error?.response?.status === 404) {
-          await client.getDataElement().create(dataElementConfig);
+          const {
+            source: _dataElementSourceIsNotCreates,
+            ...dataElementCreateConfig
+          } = dataElementConfig;
+          await client.getDataElement().create(dataElementCreateConfig);
         } else {
           throw error;
         }

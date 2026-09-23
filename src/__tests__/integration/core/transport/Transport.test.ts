@@ -325,6 +325,33 @@ describe('AdtRequest', () => {
       return answer.ok ? answer.getResult().value : [];
     };
 
+    /**
+     * What a task's own element says its type is.
+     *
+     * **The attribute is spelled two ways in one document.** On `tm:request`
+     * it is the code — `tm:type="K"` — and on `tm:task` it is the expanded
+     * text: a task this run had just set to `'S'` read back
+     * `tm:type="Development/Correction"`. An assertion on `"S"` therefore
+     * fails against a server that did exactly what it was asked, which is how
+     * this reader came to exist.
+     *
+     * The text is also a description, so it is whatever the logon language
+     * renders it as. Nothing here compares it to a literal: the caller
+     * compares the value before a change with the value after.
+     */
+    const taskTypeOf = async (
+      taskNumber: string,
+    ): Promise<{ type: string; document: string }> => {
+      const answer = await client
+        .getRequest()
+        .readMetadata({ transportNumber: taskNumber });
+      const document = answer.ok ? String(answer.getResult().value ?? '') : '';
+      const element = (document.match(/<tm:task\s[^>]*?>/g) ?? []).find((t) =>
+        t.includes(`tm:number="${taskNumber}"`),
+      );
+      return { type: element?.match(/tm:type="([^"]*)"/)?.[1] ?? '', document };
+    };
+
     /** The task numbers under a request, in document order. */
     const tasksOf = async (number: string): Promise<string[]> => {
       const answer = await client.getRequest().readMetadata({
@@ -471,6 +498,40 @@ describe('AdtRequest', () => {
           expect(taskNumber).toMatch(/\S/);
           logTestStep(`newtask answered ${taskNumber}`, testsLogger);
 
+          // **A task is born without a type, and `changeTaskType` is what
+          // gives it one.** Measured against BTP ABAP, 2026-09-23: `tm:type`
+          // passed to `newtask` is accepted and ignored, and the task reads
+          // back as Unclassified. This is the one moment in the suite where a
+          // task is known to be fresh, so it is where the member is exercised.
+          //
+          // The answer is not the evidence — like every user action here, a
+          // `200` says the document was understood. **The change is: the type
+          // before the call against the type after it.** This asserted
+          // `tm:type="S"`, the value sent, and failed against a server that
+          // had done exactly what it was asked — see {@link taskTypeOf} for
+          // the two spellings that trap. Comparing before with after needs
+          // neither spelling nor a language.
+          //
+          // **A refusal fails this.** It was a warning and a carry-on first,
+          // which would have let a wrong endpoint, a wrong document or a
+          // missing authorisation pass as a green run — the one thing the step
+          // exists to catch. The task above was created by this run and is
+          // known to exist, so there is no environment case left for a
+          // refusal to mean.
+          logTestStep('give the task a type', testsLogger);
+          const typeBefore = (await taskTypeOf(taskNumber)).type;
+          expectResult(
+            await request.changeTaskType(taskNumber, 'S'),
+            'give the task its type',
+          );
+          const typeAfter = (await taskTypeOf(taskNumber)).type;
+          logTestStep(
+            `the task's type went from "${typeBefore}" to "${typeAfter}"`,
+            testsLogger,
+          );
+          expect(typeAfter).not.toBe('');
+          expect(typeAfter).not.toBe(typeBefore);
+
           const packageName = resolvePackageName(undefined);
           if (!packageName) {
             logTestSkip(
@@ -613,9 +674,8 @@ describe('AdtRequest', () => {
                 domainName,
                 packageName,
                 transportRequest: sharedRequest,
-                document: typed,
               },
-              { lockHandle: domainHandle },
+              { source: typed, lockHandle: domainHandle },
             );
             if (!typedIn.ok) {
               testsLogger.warn?.(

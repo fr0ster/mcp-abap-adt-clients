@@ -135,8 +135,8 @@ export class AdtAuthorizationField<
 
   /** Create the object. */
   async create<E extends IAdtError = IAdtError>(
-    config: Omit<IAuthorizationFieldConfig, 'sourceCode'> & {
-      sourceCode?: never;
+    config: Omit<IAuthorizationFieldConfig, 'source'> & {
+      source?: never;
     },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {

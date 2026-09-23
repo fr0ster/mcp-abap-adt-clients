@@ -200,7 +200,7 @@ describe('ScalarFunction (DSFD/SCF) integration', () => {
               expectResult(
                 await sf.update(
                   { scalarFunctionName, transportRequest },
-                  { sourceCode: configuredSource, lockHandle: sfLock },
+                  { source: configuredSource, lockHandle: sfLock },
                 ),
                 'update scalar function',
               );

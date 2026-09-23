@@ -418,7 +418,7 @@ async function run(): Promise<void> {
         .getClass()
         .update(
           { className: options.objectName, transportRequest },
-          { sourceCode: updatedSource },
+          { source: updatedSource },
         );
     } catch (error) {
       logHttpError(error, 'Update');
@@ -473,7 +473,7 @@ async function run(): Promise<void> {
         .getClass()
         .update(
           { className: options.objectName, transportRequest },
-          { sourceCode: originalSource },
+          { source: originalSource },
         );
       await client.getClass().activate({ className: options.objectName });
       const restored = await readSource(client, connection, 'active');

@@ -64,7 +64,7 @@ both: a function include, a scalar function implementation and a feature toggle.
 
 ```typescript
 // a class — has a source
-await client.getClass().update({ className }, { sourceCode, lockHandle });
+await client.getClass().update({ className }, { source, lockHandle });
 
 // a domain — is its document, and the document is what you send
 const current = await client.getDomain().readMetadata({ domainName });
@@ -99,7 +99,7 @@ if (!locked.ok) throw new Error(locked.getError().message);
 const lockHandle = locked.getResult().value;
 
 try {
-  await cls.update(config, { sourceCode, lockHandle });
+  await cls.update(config, { source, lockHandle });
 } finally {
   await cls.unlock(config, lockHandle);           // stateless again
 }
@@ -124,6 +124,113 @@ are both written under the *class's* lock. That was always possible by passing
 **Leaving an object saved-but-inactive is a legitimate state**, and sometimes the
 one you want — several objects activated together afterwards, for instance. Not
 calling `activate` is how you get it.
+
+## What a write sends: one field, and what belongs in it
+
+Every write takes its payload as **`source`** — `options.source` on the call,
+`config.source` where a type still reads it from the configuration. One name,
+because a write is a write: this library does not inspect what it carries, and
+a field named for the kind of content would be asking the caller to classify a
+value nobody here reads. Until `@mcp-abap-adt/interfaces-adt` 6.0.0 the same
+value went by eleven names — `sourceCode`, `document`, `ddlCode`, `ddlSource`,
+`testClassSource`, `xmlContent` and the rest — and which one a type wanted was
+something you found out by trying.
+
+What goes *in* it depends on the member, and there are two kinds.
+
+### `update()` — the object's source, in the object's own language
+
+```typescript
+await client.getClass().update({ className }, { source, lockHandle });
+```
+
+| the type | what `source` holds |
+|---|---|
+| class, interface, program, include, function module, function include, enhancement | ABAP |
+| DDL source, table, structure, append structure, scalar function | CDS DDL |
+| access control | CDS DCL |
+| transformation | XSLT or Simple Transformation |
+| metadata extension | CDS annotations |
+| behavior definition, behavior implementation | RAP behavior language / ABAP |
+| service definition | the `define service` block |
+| scalar function implementation | JSON — the one write that is neither ABAP nor XML |
+
+The server compiles it and answers. Nothing is validated here, and nothing is
+assembled: what you pass is the body.
+
+### `updateMetadata()` — the object's whole document
+
+A domain, a data element, a package, a table type, a function group, a
+transport request and an authorization field have no source at all: the object
+**is** its document, and the write sends that document. Four more types offer
+both members, each addressing a resource of its own — a feature toggle, a
+message class, a function include and a scalar function implementation:
+
+```typescript
+const current = await domain.readMetadata({ domainName });
+const edited  = patch(String(current.getResult().value)); // yours to do
+const handle  = (await domain.lock({ domainName })).getResult().value;
+await domain.updateMetadata({ domainName }, { source: edited, lockHandle: handle });
+```
+
+**The body may travel in either place.** `options.source` is what the
+capability atom documents and what these implementations prefer;
+`config.source` is what each type's own config documents, and it is read when
+the options carry none. The contract states both, in two places, and until it
+settles on one, passing either works.
+
+**It is a replace, never a merge.** Nothing is read inside the member to keep
+what you left out — a field missing from the document you send is a field the
+object loses. So the sequence is read, edit, write, and the read is yours: the
+library stopped fetching-and-patching inside `update` in 19.0.0.
+
+A domain document, for instance, carries three groups, and a fresh `create`
+leaves all three present and empty:
+
+```xml
+<doma:domain adtcore:name="ZDEMO_DOMAIN" adtcore:version="inactive" ...>
+  <doma:content>
+    <doma:typeInformation>
+      <doma:datatype>CHAR</doma:datatype>     <!-- empty after a create -->
+      <doma:length>000010</doma:length>       <!-- six digits, zero-padded -->
+      <doma:decimals>000000</doma:decimals>
+    </doma:typeInformation>
+    <doma:outputInformation>
+      <doma:length>000010</doma:length>
+      <doma:style>0</doma:style>
+      <doma:conversionExit/>
+      <doma:signExists>false</doma:signExists>
+      <doma:lowercase>false</doma:lowercase>
+    </doma:outputInformation>
+    <doma:valueInformation>
+      <doma:valueTableRef adtcore:name="..."/>  <!-- or fixed values -->
+      <doma:fixValues>
+        <doma:fixValue>
+          <doma:position>1</doma:position>
+          <doma:low>X</doma:low>
+          <doma:high/>                          <!-- set: an interval -->
+          <doma:text>Yes</doma:text>
+        </doma:fixValue>
+      </doma:fixValues>
+    </doma:valueInformation>
+  </doma:content>
+</doma:domain>
+```
+
+**A create leaves the type empty, and an empty type is not activatable** —
+`DO(251) Data type ' ' does not exist`. Filling it in is this write, which is
+why a domain is created and then updated rather than created complete.
+
+The other document types follow the same rule with their own namespace:
+`dtel:` for a data element (`dtel:typeKind`, `dtel:typeName`), `pak:` for a
+package, `tm:` for a transport request. What each one contains is the
+**server's** vocabulary, not this library's: read one from your own system and
+you have the authoritative example, which is also what the probe under
+`scripts/probe-domain-document-shape.ts` does.
+
+**A not-ready read answers `200` with an empty body**, not a `404`. An empty
+document patched and written back is a write that empties the object, so check
+the read before editing it.
 
 ## `delete()` does not lock, and works on all but one thing
 
@@ -182,9 +289,9 @@ const lockHandle = locked.getResult().value;
 try {
   await cls.update(
     { className },
-    { sourceCode: mainSourceFor(className, behaviorDefinition), lockHandle },
+    { source: mainSourceFor(className, behaviorDefinition), lockHandle },
   );
-  await bimpl.update({ className }, { sourceCode, lockHandle });
+  await bimpl.update({ className }, { source, lockHandle });
 } finally {
   await cls.unlock({ className }, lockHandle);
 }

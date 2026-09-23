@@ -166,7 +166,7 @@ export class AdtScalarFunction<
 
   /** Create the object. */
   async create<E extends IAdtError = IAdtError>(
-    config: Omit<IScalarFunctionConfig, 'sourceCode'> & { sourceCode?: never },
+    config: Omit<IScalarFunctionConfig, 'source'> & { source?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     // **The one guard this package keeps, and only on a create.**
@@ -292,12 +292,12 @@ export class AdtScalarFunction<
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const name = this.name(config);
-    // The source is the caller's, through `options.sourceCode`. This used to
-    // fall back to `config.sourceCode` — two channels for one value, where the
-    // contract documents one. `config.sourceCode` is `check`'s alone now: a
+    // The source is the caller's, through `options.source`. This used to
+    // fall back to `config.source` — two channels for one value, where the
+    // contract documents one. `config.source` is `check`'s alone now: a
     // syntax check compiles a source that is not on the server yet, so it has
     // nowhere else to arrive.
-    const source = options?.sourceCode;
+    const source = options?.source;
 
     return answering(
       () =>
@@ -402,7 +402,7 @@ export class AdtScalarFunction<
       status === 'active' ? 'active' : 'inactive';
 
     return answering(
-      () => checkScalarFunction(connection, name, version, config.sourceCode),
+      () => checkScalarFunction(connection, name, version, config.source),
       this.results.check as IResultStrategy<ReturnType<R['check']>>,
       options?.analyse,
     );

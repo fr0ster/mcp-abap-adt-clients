@@ -200,7 +200,7 @@ async function runCycle(
 
   const updated = await step(`update #${revision}`, () =>
     cls.update(config, {
-      sourceCode: sourceFor(className, revision),
+      source: sourceFor(className, revision),
       lockHandle: handle,
     }),
   );
@@ -332,7 +332,7 @@ async function main(): Promise<void> {
       if (handleA) {
         const carried = await step("update (session A's handle in B)", () =>
           session.cls.update(config, {
-            sourceCode: sourceFor(className, 9),
+            source: sourceFor(className, 9),
             lockHandle: handleA,
           }),
         );
@@ -359,7 +359,7 @@ async function main(): Promise<void> {
     say('');
     say('── after the window ────────────────────────────────');
     const naked = await step('update (no handle)', () =>
-      session.cls.update(config, { sourceCode: sourceFor(className, 3) }),
+      session.cls.update(config, { source: sourceFor(className, 3) }),
     );
     steps.push(naked.record);
     say(

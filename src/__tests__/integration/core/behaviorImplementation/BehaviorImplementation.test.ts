@@ -112,7 +112,7 @@ describe('BehaviorImplementation (using AdtClient)', () => {
               params.transport_request ||
               getEnvironmentConfig().default_transport ||
               '',
-            sourceCode: params.source_code,
+            source: params.source_code,
           };
         },
         // **Cleanup belongs at the start, not only at the end.** A run that is
@@ -212,11 +212,10 @@ describe('BehaviorImplementation (using AdtClient)', () => {
         }
 
         const testCase = tester.getTestCaseDefinition();
-        const sourceCode =
-          testCase?.params?.source_code || config.sourceCode || '';
+        const sourceCode = testCase?.params?.source_code || config.source || '';
 
         await tester.flowTestAuto({
-          sourceCode: sourceCode,
+          source: sourceCode,
           readMetadata: true,
           readMetadataOptions: { withLongPolling: true },
           // **The third request, and the flow cannot guess it.** `create` makes
@@ -257,7 +256,7 @@ describe('BehaviorImplementation (using AdtClient)', () => {
                   },
                   {
                     lockHandle: locked,
-                    sourceCode: mainSourceFor(
+                    source: mainSourceFor(
                       config.className,
                       config.behaviorDefinition,
                     ),
@@ -274,7 +273,7 @@ describe('BehaviorImplementation (using AdtClient)', () => {
             packageName: config.packageName,
             behaviorDefinition: config.behaviorDefinition,
             description: config.description || '',
-            sourceCode: sourceCode,
+            source: sourceCode,
           },
         });
       },

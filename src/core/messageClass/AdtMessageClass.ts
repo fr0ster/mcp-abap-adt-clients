@@ -135,7 +135,7 @@ export class AdtMessageClass<
 
   /** Create the message class shell. No activation — message classes have none. */
   async create<E extends IAdtError = IAdtError>(
-    config: Omit<IMessageClassConfig, 'sourceCode'> & { sourceCode?: never },
+    config: Omit<IMessageClassConfig, 'source'> & { source?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     // **The one guard this package keeps, and only on a create.**

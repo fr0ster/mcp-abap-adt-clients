@@ -78,7 +78,7 @@ async function writeAndActivate(
   note(`${who}  lock      ok (${handle.slice(0, 12)}…)`);
 
   const written = await cls.update(config, {
-    sourceCode: source(who),
+    source: source(who),
     lockHandle: handle,
   });
   note(

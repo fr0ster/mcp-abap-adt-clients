@@ -70,7 +70,7 @@ await fincl.create({
   functionGroupName: 'ZFGROUP',
   includeName: 'LZFGROUPF01',
   description: 'Forms include',
-  sourceCode: '* report source',
+  source: '* report source',
 });
 
 // Dedicated source reader
@@ -206,7 +206,7 @@ await include.create({
 const source = await include.read({ includeName: 'ZMY_INCLUDE' });
 await include.update(
   { includeName: 'ZMY_INCLUDE' },
-  { sourceCode: '" changed' },
+  { source: '" changed' },
 );
 await include.activate({ includeName: 'ZMY_INCLUDE' });
 await include.delete({ includeName: 'ZMY_INCLUDE' });
@@ -214,7 +214,7 @@ await include.delete({ includeName: 'ZMY_INCLUDE' });
 
 Contract notes:
 - **Activation is a call, not an option.** `activate()` is its own member and
-  runs when you call it. **A write takes its source from `options.sourceCode`
+  runs when you call it. **A write takes its source from `options.source`
   and nowhere else** — the config's field used to serve as a second channel for
   the same value and no longer does; it belongs to `check`, which compiles a
   source that is not on the server yet. `options.lockHandle` is passed to the
@@ -228,7 +228,7 @@ Contract notes:
   layer is replaced and the ABAP layer beneath it keeps the enqueue locks, whose
   handles died with the cookie. Pass `options.timeout` when a deadline is worth
   that risk, or set `SAP_TIMEOUT_DEFAULT` for a floor across the process.
-- **An empty source is a source.** `sourceCode: ''` clears an include; only
+- **An empty source is a source.** `source: ''` clears an include; only
   `undefined` means none was given. An empty include is a valid object, so
   emptiness must be expressible.
 - **Creating one works on modern on-prem only.** Only there does discovery give
@@ -428,7 +428,7 @@ this member existed still compiles.
 Nothing about `list()` changes. A caller who never needs to choose can keep
 calling it with no argument.
 
-#### The object list: `readObjects()`, `removeObject()`, `addObject()`, `createTask()`
+#### The object list: `readObjects()`, `removeObject()`, `addObject()`, `createTask()`, `changeTaskType()`
 
 Deleting an ABAP object does not free its name. The CTS object-directory entry
 stays on the request that carried it — SAP says so as it happens: *"Release
@@ -463,6 +463,9 @@ const task = await request.createTask('E19K905941', { targetUser: 'OKYSLYTSIA' }
 
 // And the other direction.
 await request.addObject('E19K907073', { name: 'Z_CL_000001', type: 'CLAS' });
+
+// A task is created without a type; this is how one is given.
+await request.changeTaskType('E19K907073', 'S'); // Development/Correction
 ```
 
 Four things worth knowing before the first call, three of them measured
@@ -493,6 +496,18 @@ had:
   no capture of Eclipse showed the gap. This client cannot fill it in: the
   connection does not say who is authenticated, and asking would cost a second
   request.
+- **A task is born unclassified, and `createTask` cannot change that.**
+  Measured against BTP ABAP on 2026-09-23: `tm:type` passed to the creating
+  call is accepted and ignored, and every task on that system — including
+  ones created long before this library — reads back as `Unclassified`. CTS
+  assigns the type when the first object lands, or `changeTaskType()` assigns
+  it. The measured vocabulary is `S` (Development/Correction), `R` (Repair)
+  and `X` (back to Unclassified); `Q` is a customizing type and is refused on
+  a workbench request, and `K`/`W` are *request* types, refused as unknown.
+
+  The type goes on a `tm:task` child of the document, not on its root — six
+  spellings on the root were each answered `400 "Specified request type or
+  task type  is unknown"`, with two spaces where the value belongs.
 - **Objects live on tasks, so address the task**, not the request above it.
   `createTask()` answers a number that is itself a request resource — it
   reads, writes and releases like one.
@@ -645,7 +660,7 @@ What "the whole content" is depends on the type, and on nothing else:
 
 | types | the whole content | passed as |
 |---|---|---|
-| class, program, interface, DDL, and the other source-bearing types | the full source | `options.sourceCode` |
+| class, program, interface, DDL, and the other source-bearing types | the full source | `options.source` |
 | domain, package, dataElement, tableType, transport, functionGroup | the object's own document | `config.document` |
 
 ```typescript
@@ -654,7 +669,7 @@ const current = await client.getClass().read({ className: 'ZCL_X' }, 'active');
 const edited = addAMethod(String(current.getResult().value));
 
 const handle = (await client.getClass().lock({ className: 'ZCL_X' })).getResult().value;
-await client.getClass().update({ className: 'ZCL_X' }, { sourceCode: edited, lockHandle: handle });
+await client.getClass().update({ className: 'ZCL_X' }, { source: edited, lockHandle: handle });
 await client.getClass().unlock({ className: 'ZCL_X' }, handle);
 
 // A document type. Same shape, different noun.

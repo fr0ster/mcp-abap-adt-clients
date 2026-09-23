@@ -118,7 +118,7 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
    * why the include is not what was asked for.
    */
   async create<E extends IAdtError = IAdtError>(
-    config: Omit<IIncludeConfig, 'sourceCode'> & { sourceCode?: never },
+    config: Omit<IIncludeConfig, 'source'> & { source?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     // **The one guard this package keeps, and only on a create.**
@@ -193,7 +193,7 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
   /**
    * Write new source.
    *
-   * `options.sourceCode` wins over the config's. `options.lockHandle` means the
+   * `options.source` wins over the config's. `options.lockHandle` means the
    * caller already holds the lock and manages it — this then writes only, and
    * neither locks nor unlocks. Activation is `options.activateOnUpdate`.
    *
@@ -210,12 +210,12 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
 
     // Absence, not emptiness: clearing an include to empty is a real edit, and
     // a truthiness check made it impossible to express.
-    // The source is the caller's, through `options.sourceCode`. This used to
-    // fall back to `config.sourceCode` — two channels for one value, where the
-    // contract documents one. `config.sourceCode` is `check`'s alone now: a
+    // The source is the caller's, through `options.source`. This used to
+    // fall back to `config.source` — two channels for one value, where the
+    // contract documents one. `config.source` is `check`'s alone now: a
     // syntax check compiles a source that is not on the server yet, so it has
     // nowhere else to arrive.
-    const sourceCode = options?.sourceCode;
+    const source = options?.source;
     const includeName = requireName(config);
 
     return answering(
@@ -223,7 +223,7 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
         uploadIncludeSource(
           connection,
           includeName,
-          sourceCode as string,
+          source as string,
           options?.lockHandle,
           config.transportRequest,
         ),

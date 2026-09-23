@@ -93,7 +93,7 @@ describe('AdtInclude', () => {
       const { connection, calls } = createConnection();
       await new AdtInclude(connection, logger).update(
         { includeName: 'ZMY_INC' },
-        { sourceCode: '" only in options' },
+        { source: '" only in options' },
       );
 
       const put = calls.find((c) => c.method === 'PUT');
@@ -104,7 +104,7 @@ describe('AdtInclude', () => {
       const { connection, calls } = createConnection();
       await new AdtInclude(connection, logger).update(
         { includeName: 'ZMY_INC' },
-        { sourceCode: '" code' },
+        { source: '" code' },
       );
 
       expect(calls.some((c) => c.url.includes('/activation'))).toBe(false);
@@ -115,7 +115,7 @@ describe('AdtInclude', () => {
       expectResult(
         await new AdtInclude(connection, logger).update(
           { includeName: 'ZMY_INC' },
-          { sourceCode: '" code', lockHandle: 'CALLER_HANDLE' },
+          { source: '" code', lockHandle: 'CALLER_HANDLE' },
         ),
         'update with a caller-held lock',
       );
@@ -136,7 +136,7 @@ describe('AdtInclude', () => {
       const { connection, calls } = createConnection();
       await new AdtInclude(connection, logger).update(
         { includeName: 'ZMY_INC' },
-        { sourceCode: '' },
+        { source: '' },
       );
 
       const put = calls.find((c) => c.method === 'PUT');

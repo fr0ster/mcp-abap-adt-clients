@@ -128,7 +128,7 @@ export class AdtTable<R extends ITableResults = typeof tableDocuments>
 
   /** Create the object. */
   async create<E extends IAdtError = IAdtError>(
-    config: Omit<ITableConfig, 'sourceCode'> & { sourceCode?: never },
+    config: Omit<ITableConfig, 'source'> & { source?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     // **The one guard this package keeps, and only on a create.**
@@ -250,7 +250,7 @@ export class AdtTable<R extends ITableResults = typeof tableDocuments>
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const name = this.name(config);
-    const source = options?.sourceCode || config.ddlCode;
+    const source = options?.source || config.source;
 
     return answering(
       () =>

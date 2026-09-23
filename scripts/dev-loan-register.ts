@@ -386,7 +386,7 @@ async function build(
   let unlockRefused = '';
   try {
     updated = await handler.update(updateConfig, {
-      sourceCode: a.source,
+      source: a.source,
       lockHandle: handle,
     });
   } finally {

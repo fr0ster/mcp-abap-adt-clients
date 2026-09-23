@@ -112,7 +112,7 @@ describe('AccessControl (using AdtClient)', () => {
             packageName,
             transportRequest,
             description: params.description,
-            sourceCode: params.source_code,
+            source: params.source_code,
           };
         },
         ensureObjectReady: async (accessControlName: string) => {
@@ -167,16 +167,16 @@ describe('AccessControl (using AdtClient)', () => {
         const testCase = tester.getTestCaseDefinition();
         const sourceCode =
           testCase?.params?.source_code ||
-          config.sourceCode ||
+          config.source ||
           `@EndUserText.label: '${config.description || config.accessControlName}'\n@MappingRole: true\ndefine role ${config.accessControlName} {\n  grant select on ${config.accessControlName}\n  where ( ) = aspect pfcg_auth( , , );\n}`;
 
         await tester.flowTestAuto({
-          sourceCode: sourceCode,
+          source: sourceCode,
           updateConfig: {
             accessControlName: config.accessControlName,
             packageName: config.packageName,
             description: config.description || '',
-            sourceCode: sourceCode,
+            source: sourceCode,
           },
         });
       },

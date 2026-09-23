@@ -414,12 +414,13 @@ async function invoke(
     case 'update':
     case 'updateMetadata':
       // The source travels in the options, which is the only channel now: the
-      // fallback to `config.sourceCode` is gone, so a write with neither is
+      // fallback to `config.source` is gone, so a write with neither is
       // refused before the request — correctly, and not what this guard is
-      // measuring. `xmlContent` for the same reason on the document writes.
+      // measuring. One field covers both kinds of body: this used to pass
+      // `sourceCode` and `xmlContent` side by side, an ABAP line for the text
+      // writes and an element for the document ones, and the handler chose.
       await fn.call(handler, config, {
-        sourceCode: String(config.sourceCode ?? '" guard'),
-        xmlContent: String(config.xmlContent ?? '<guard/>'),
+        source: String(config.source ?? '" guard'),
         lockHandle: 'GUARD-LOCK',
       });
       return;
@@ -485,8 +486,7 @@ async function invokeWithOptions(
     case 'updateMetadata':
       await fn.call(handler, config, {
         ...options,
-        sourceCode: String(config.sourceCode ?? '" guard'),
-        xmlContent: String(config.xmlContent ?? '<guard/>'),
+        source: String(config.source ?? '" guard'),
         lockHandle: 'GUARD-LOCK',
       });
       return;

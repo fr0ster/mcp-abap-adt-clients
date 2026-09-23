@@ -24,6 +24,117 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+### Added
+
+- **`AdtRequest.changeTaskType(task, type)`** — a task is created without a
+  type, and this is how one is given.
+
+  Measured against BTP ABAP, 2026-09-23. Every task reads back as
+  `Unclassified` after `newtask`, including tasks created long before this
+  library existed, and `tm:type` passed to the creating call is accepted and
+  ignored. CTS assigns the type when the first object lands; a caller who
+  wants it sooner assigns it here.
+
+  **The type goes on a `tm:task` child, not on the root**, which is the whole
+  of the difficulty and took six refusals to establish: every spelling tried
+  on the root answered `400 "Specified request type or task type  is
+  unknown"` — two spaces where the value belongs, an empty read each time.
+  The nested shape answers 200 and a re-read shows the new type. The same
+  message names the value when one arrives (`… type K is unknown`), which is
+  what told an empty read apart from a wrong one.
+
+  Vocabulary, from the same run: `S` Development/Correction, `R` Repair, `X`
+  back to Unclassified. `Q` is refused — *"You can only change the type of
+  tasks in workbench requests"* — and `K`/`W` are request types, refused as
+  unknown.
+
+  Addressed at the TASK's own URL, which is where the listing puts the
+  `changetasktype` link. `taskTypeChanged` joins `ITransportResults` as an
+  optional slot, like every member added since 19.0.0.
+
+  It reaches the contract as well as the class: `AdtRequest` now declares
+  `IAdtTransportObjectActions` — with the sixth type argument the member
+  brought — so `client.getRequest().changeTaskType(...)` compiles for a
+  consumer holding the contract, and a member going missing becomes a build
+  error rather than a runtime one.
+
+  Exercised against a live system in `Transport.test.ts`, at the one moment a
+  task is known to be fresh: `newtask`, then the type, then a re-read that has
+  to show `tm:type="S"`.
+
+### Changed — `@mcp-abap-adt/interfaces` ^50.0.0
+
+- **BREAKING: one name for what a write sends — `source`.** The payload had
+  eleven names across this package's configs and options: `sourceCode` in 15
+  configs, `document` in 6, `ddlCode` and `ddlSource` for the same thing in
+  neighbouring files, `testClassSource`, and on the write options `sourceCode`
+  *and* `xmlContent`, divided by what the body happened to contain. All of them
+  are `source`.
+
+  ```diff
+  - await cls.update({ className }, { sourceCode, lockHandle });
+  + await cls.update({ className }, { source, lockHandle });
+
+  - await domain.updateMetadata({ domainName, document: edited }, { lockHandle });
+  + await domain.updateMetadata({ domainName }, { source: edited, lockHandle });
+  ```
+
+  This library does not read what it carries. For a class it is ABAP, for a
+  domain the object's own XML document, for a scalar function implementation
+  JSON — and which is which is documentation, not a type:
+  `docs/usage/OBJECT_LIFECYCLE.md` gains **"What a write sends: one field, and
+  what belongs in it"**, with the shape of a domain document and the rule that
+  an `updateMetadata` is a replace, never a merge.
+
+  Recorded as **decision 32** in `mcp-abap-adt-interfaces`. It withdraws the
+  half of decision 31 that called for a typed document model;
+  `docs/superpowers/specs/inputs-per-operation.md` says so and keeps what is
+  still to do.
+
+- **BREAKING: a create takes no payload, and now it cannot.** Every `create`
+  here excluded `sourceCode` from its config; the field it must exclude is
+  `source`, and leaving the exclusion on the old name would have re-opened the
+  hole it was added to close — a create accepting a body the endpoint drops.
+  32 handlers moved.
+
+  `AdtCdsUnitTest.create` is the one place this changed behaviour. Its template
+  path required `className && classTemplate && testClassSource`, and the source
+  it required was never used in the branch — which posts the class and nothing
+  else. With the payload off the member, that condition could no longer be met
+  by anyone and the path was unreachable. **The template alone selects it now.**
+
+- **Fixed on review: the documented `updateMetadata` call sent `undefined`.**
+  The six document writes — domain, data element, package, table type,
+  function group, transport request — read the body from `config.source` only,
+  while `IAdtMetadataUpdatable.updateMetadata` documents `options` as
+  "`source` for the body". The call in this package's own documentation was
+  the broken one.
+
+  The contract states both, in two places: the atom puts the body in the
+  options, and each type's config says a caller "reads the document … and
+  passes it here". So both are read now, the options winning, which makes
+  neither sentence a lie — and **which of the two the contract keeps is a
+  decision for `mcp-abap-adt-interfaces`**, not one to settle by silently
+  preferring one here. Two unit tests pin both channels.
+
+- `scripts/transport-admin.ts describe` never sent a body at all: it passed a
+  `description` field no request builder reads, and reported success. It reads
+  the request, patches `tm:desc` and writes the document, like every other
+  caller of a document write.
+
+- The test harness follows: `IFlowTestOptions.sourceCode` and `.xmlContent`
+  are one `source`. How an update's content is compared — text equality or an
+  XML subset — used to be decided by which of the two fields the caller filled
+  in; it is decided by `updateTakesDocument`, which already marks the types
+  whose write takes a whole document. No suite passed `xmlContent`, so nothing
+  changes in what runs.
+
+### Fixed
+
+- A comment in `AdtCdsUnitTest` had Cyrillic in an English word — "not
+  активated". Present since 18.0.0.
+
+
 ## [21.0.0] - 2026-09-22
 
 ### Removed — `@mcp-abap-adt/interfaces` ^48.0.0

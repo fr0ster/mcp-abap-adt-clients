@@ -116,7 +116,7 @@ describe('ServiceDefinition (using AdtClient)', () => {
             packageName,
             transportRequest,
             description: params.description,
-            sourceCode: params.source_code,
+            source: params.source_code,
           };
         },
         ensureObjectReady: async (serviceDefinitionName: string) => {
@@ -171,16 +171,16 @@ describe('ServiceDefinition (using AdtClient)', () => {
         const testCase = tester.getTestCaseDefinition();
         const sourceCode =
           testCase?.params?.source_code ||
-          config.sourceCode ||
+          config.source ||
           `@EndUserText.label: '${config.description || config.serviceDefinitionName}'\ndefine service ${config.serviceDefinitionName} {\n expose ZOK_C_CDS_TEST;\n}`;
 
         await tester.flowTestAuto({
-          sourceCode: sourceCode,
+          source: sourceCode,
           updateConfig: {
             serviceDefinitionName: config.serviceDefinitionName,
             packageName: config.packageName,
             description: config.description || '',
-            sourceCode: sourceCode,
+            source: sourceCode,
           },
         });
       },

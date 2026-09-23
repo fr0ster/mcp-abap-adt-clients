@@ -174,8 +174,8 @@ export class AdtBehaviorImplementation<
    * refers to does not exist until then.
    */
   async create<E extends IAdtError = IAdtError>(
-    config: Omit<IBehaviorImplementationConfig, 'sourceCode'> & {
-      sourceCode?: never;
+    config: Omit<IBehaviorImplementationConfig, 'source'> & {
+      source?: never;
     },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
@@ -310,11 +310,11 @@ export class AdtBehaviorImplementation<
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const name = this.name(config);
-    // The source is the caller's, through `options.sourceCode`. This used to
-    // read `config.implementationCode` and `config.sourceCode` as well — three
+    // The source is the caller's, through `options.source`. This used to
+    // read `config.implementationCode` and `config.source` as well — three
     // channels for one value, of which the contract documents one, and nothing
     // in this repository ever set either config field.
-    const source = options?.sourceCode;
+    const source = options?.source;
     // No `behaviorDefinition` guard: this writes the implementation include and
     // never reads the definition's name. It was required here while `update`
     // also wrote the generated shell, which does mention it — the guard outlived

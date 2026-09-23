@@ -504,7 +504,7 @@ define structure ${structureName} {
           await structureHandler.update(
             {
               structureName: structureName,
-              ddlCode: structureDdlCode,
+              source: structureDdlCode,
               transportRequest: transportRequest,
             },
             { lockHandle: structureLockHandle },

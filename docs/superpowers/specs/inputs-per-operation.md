@@ -1,6 +1,9 @@
 # Inputs per operation, and the document a write sends
 
-**Status:** not started. Delete this file when it is done or abandoned.
+**Status:** partly done. The payload half shipped — `interfaces-adt` 6.0.0 /
+`interfaces` 50.0.0, consumed by the next `adt-clients` major — and §2.3 was
+withdrawn with it. What remains is the per-operation input split, §2.1–2.2
+and steps 3–6. Delete this file when that is done or abandoned.
 
 Prescriptive. Where it disagrees with the code, the code is what changes.
 
@@ -59,54 +62,41 @@ per type. The name stays the concrete type's business. Normalising it to `name`
 is a separate decision and is **out of scope here**; do not do it as a side
 effect.
 
-### 2.3 The document model
+### 2.3 The document model — **withdrawn**
 
-Splitting without it delivers nothing: `IDomainUpdateConfig` would hold
-`document?: string` and nothing else, which is the typing the library has today
-— that is, none. So the two land in one major or not at all.
+This section used to require a typed model of each document: `doma:content`'s
+three groups, `valueTableRef` as a reference rather than a string, `fixValues`
+as a union with the value table, four label pairs on a data element. It said
+the split and the model land in one major or not at all.
 
-The model is derived from documents that were read, not from guesses. For a
-domain, `doma:content` has three groups:
+**Decision 32 withdrew it**, and `interfaces-adt` 6.0.0 went the other way: a
+write sends `source`, a string this library passes through and does not read.
+For a class it is ABAP, for a domain it is the object's XML document, and what
+that XML may look like is documentation — `docs/usage/OBJECT_LIFECYCLE.md`,
+"What a write sends" — not a type.
 
-```
-typeInformation    datatype, length, decimals
-outputInformation  length (its own: SPRAS is LANG(1) shown as 2), style,
-                   conversionExit, signExists, lowercase, ampmFormat
-valueInformation   EITHER valueTableRef OR fixValues, never both;
-                   plus appendExists
-```
+The reasoning is in the decision, and it is short: this package is a cut of
+endpoints. It does not demand a particular ABAP body either, and a consumer who
+must assemble the XML anyway is better served by the server's own document,
+read back, than by a model of it maintained here and drifting.
 
-- `valueTableRef` is a **reference** — `adtcore:uri`, `adtcore:type="TABL/DT"`,
-  `adtcore:name` — not a string. Today's `value_table?: string` described it
-  wrongly.
-- each `fixValue` is `position`, `low`, `high`, `text`. An **empty `low` is a
-  value**, not an omission: `ZOK_D_TEST` has `low=""` with `text="FALSE"`.
-  `IFixedValue` is `{ low, text }` and must be replaced, not extended in place.
-- either/or is a fact about the data, so model it as a union rather than two
-  optional fields that can both be set.
+So the split below no longer depends on this. `IDomainUpdateConfig` holding
+`source` and the lock is not "no typing" — it is the accurate statement of what
+that endpoint takes.
 
-A data element is the same story: `dtel:dataElement` carries four labels, **each
-with a `Length` and a `MaxLength`** — six values per label pair, not four — plus
-`searchHelp`, `searchHelpParameter`, `setGetParameter`, `defaultComponentName`,
-`deactivateInputHistory`, `changeDocument`, `leftToRightDirection`,
-`deactivateBIDIFiltering`.
+### 2.4 What the create sends — **settled**
 
-Six types have document-only updates. All six need this treatment; do not do one
-and leave five.
+**The create posts a shell, and takes no payload.** `IAdtCreatable.create` now
+excludes `source` from its config and takes `IAdtCreateOptions`, which refuses
+it too: measured across all 27 create implementations here, every one posts a
+metadata document and not one carries source.
 
-### 2.4 What the create sends
-
-**The create posts a shell.** The server's own POST answer documents it:
-`version="inactive"`, all three `doma:content` groups present and empty. A
-create arriving with them filled in is a different flow — measured to be
-accepted (`201`, the type is kept, the activation is clean) but not the flow
-this library follows. `datatype` therefore belongs on `IDomainCreateConfig` as
-input to the *object's shape*, and the create sends what that flow sends.
-
-Settle this explicitly before writing code, and record the answer here: does
-`create` send the type, or does the shape arrive only with the document? The
-measurement permits either; the flow prefers the second. **The decision is the
-maintainer's, not this spec's.**
+The other half of the question — whether the create sends the domain's *type* —
+is settled the same way and against the measurement's permission.
+`datatype`, `length` and `decimals` went back onto `IDomainConfig` in 4.1.0 on
+the strength of a POST that keeps them, and came off again in 6.0.0: the shape
+arrives with the document, through the update. A day-old field with no importer
+was removed rather than deprecated.
 
 ## 3. What is measured and what is not
 
@@ -122,17 +112,23 @@ maintainer's, not this spec's.**
 Anything unmeasured either gets measured before it enters the contract as input,
 or does not enter. That rule is what this whole line of work exists to enforce.
 
+With §2.3 withdrawn, none of the unmeasured rows is input to anything any more:
+no group of a document is declared as a field, so there is nothing left for
+them to be wrong about. They stay here because the measured rows are worth
+keeping — and because the day a document model is proposed again, this is the
+list of what it would first have to establish.
+
 ## 4. Order
 
-1. **Settle §2.4** and record it.
-2. **Measure** what §3 leaves open, for whichever groups the answer to §2.4
-   makes input. Read-only probes where possible; one created-and-deleted object
-   where not.
+1. ~~Settle §2.4~~ — **done**, `interfaces-adt` 6.0.0 / `interfaces` 50.0.0,
+   and consumed by the `adt-clients` major that takes them.
+2. ~~Measure what §3 leaves open~~ — **dropped with §2.3**. Nothing unmeasured
+   is input any more.
 3. **`interfaces-adt`**: add the agnostic input and result shapes. Additive —
    a minor.
 4. **`adt-clients`**: declare the concrete per-operation configs, extend the
-   agnostic ones, split every handler's members onto them, add the document
-   model. Major.
+   agnostic ones, split every handler's members onto them. Major. The document
+   model is no longer part of this step.
 5. **Remove** the old `IXxxConfig` from the contract, declaring each removal in
    `tools/surface-removed.txt` with its reason. Major for `interfaces-adt` and
    `interfaces`.
@@ -150,8 +146,9 @@ Publish the dependency before consuming it. No local tarball bridges.
   `check-surface.js` asserts the contract. Without this the spec has moved the
   problem, not solved it.
 - No field is declared on an input and dropped by the request it belongs to.
-- `document?: string` is gone, or kept deliberately with the reason written down.
-- The six document-only types all have their model.
+- ~~`document?: string` is gone~~ — **done**: it is `source`, on every type that
+  takes a payload, and the eleven names it replaced are listed in decision 32.
+- ~~The six document-only types all have their model~~ — **withdrawn**, §2.3.
 - Every claim in §3 that became input is measured, and the measurement is in a
   probe under `scripts/`, not in a commit message.
 - `npm run check` in `interfaces`, and build + `test:check` + the unit suite in

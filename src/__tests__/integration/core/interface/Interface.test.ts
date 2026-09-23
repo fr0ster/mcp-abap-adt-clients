@@ -111,7 +111,7 @@ describe('Interface (using AdtClient)', () => {
             packageName,
             transportRequest,
             description: params.description,
-            sourceCode: params.source_code,
+            source: params.source_code,
           };
         },
         ensureObjectReady: async (interfaceName: string) => {
@@ -164,12 +164,12 @@ describe('Interface (using AdtClient)', () => {
         }
 
         await tester.flowTestAuto({
-          sourceCode: config.sourceCode,
+          source: config.source,
           updateConfig: {
             interfaceName: config.interfaceName,
             packageName: config.packageName,
             description: config.description || '',
-            sourceCode: config.sourceCode,
+            source: config.source,
           },
         });
       },

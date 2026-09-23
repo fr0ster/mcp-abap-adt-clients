@@ -198,7 +198,7 @@ const config = { className: 'ZCL_TEST' };
 const locked = await client.getClass().lock(config);
 if (locked.ok) {
   const lockHandle = locked.getResult().value;
-  await client.getClass().update(config, { sourceCode, lockHandle });
+  await client.getClass().update(config, { source, lockHandle });
   await client.getClass().unlock(config, lockHandle);
 }
 await client.getClass().activate(config);
@@ -357,7 +357,7 @@ await client.getClass().read(
 // Now the object is guaranteed to be ready for subsequent operations
 await client.getClass().update({
   className: 'ZCL_TEST'
-}, { sourceCode: updatedCode });
+}, { source: updatedCode });
 ```
 
 **What it is intended to do**, where a system honours it: avoid an arbitrary
@@ -387,7 +387,7 @@ const current = await client.getClass().read({ className: 'ZCL_TEST' }, 'active'
 const edited = addAMethod(String(current.getResult().value));
 
 const handle = (await client.getClass().lock({ className: 'ZCL_TEST' })).getResult().value;
-await client.getClass().update({ className: 'ZCL_TEST' }, { sourceCode: edited, lockHandle: handle });
+await client.getClass().update({ className: 'ZCL_TEST' }, { source: edited, lockHandle: handle });
 await client.getClass().unlock({ className: 'ZCL_TEST' }, handle);
 ```
 
@@ -816,7 +816,7 @@ interface IClassConfig {
   packageName?: string;
   transportRequest?: string;
   description: string;
-  sourceCode?: string;
+  source?: string;
 }
 ```
 
@@ -843,12 +843,12 @@ see the measured caveat above before depending on it.
 // ❌ Before - Using fixed timeouts
 await client.getClass().create({ className: 'ZCL_TEST', ... });
 await new Promise(resolve => setTimeout(resolve, 2000)); // Fixed delay
-await client.getClass().update({ className: 'ZCL_TEST' }, { sourceCode });
+await client.getClass().update({ className: 'ZCL_TEST' }, { source });
 
 // ✅ After - Using long polling
 await client.getClass().create({ className: 'ZCL_TEST', ... });
 // Long polling is automatically used in create/update methods
-await client.getClass().update({ className: 'ZCL_TEST' }, { sourceCode });
+await client.getClass().update({ className: 'ZCL_TEST' }, { source });
 
 // Or explicitly use long polling in read operations
 await client.getClass().read(

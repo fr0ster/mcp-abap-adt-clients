@@ -183,7 +183,7 @@ describe('Shared - what check answers', () => {
 
     const answer = await client
       .getClass()
-      .check({ className, sourceCode: BROKEN_SOURCE }, 'inactive');
+      .check({ className, source: BROKEN_SOURCE }, 'inactive');
 
     if (!answer.ok) {
       const message = answer.getError().message;
@@ -296,7 +296,7 @@ describe('Shared - what check answers', () => {
 
     const judged = await client
       .getClass()
-      .check({ className, sourceCode: BROKEN_SOURCE }, 'inactive', {
+      .check({ className, source: BROKEN_SOURCE }, 'inactive', {
         analyse: everythingIsAFailure,
       });
 
@@ -318,7 +318,7 @@ describe('Shared - what check answers', () => {
     };
     const realistic = await client
       .getClass()
-      .check({ className, sourceCode: BROKEN_SOURCE }, 'inactive', {
+      .check({ className, source: BROKEN_SOURCE }, 'inactive', {
         analyse: bySeverity,
       });
     testsLogger.info?.(

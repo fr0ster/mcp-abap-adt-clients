@@ -110,7 +110,7 @@ async function main(): Promise<void> {
       await cls.update(
         { className: NAME },
         {
-          sourceCode: [
+          source: [
             `CLASS ${NAME.toLowerCase()} DEFINITION PUBLIC FINAL CREATE PUBLIC.`,
             '  PUBLIC SECTION.',
             '    METHODS probe.',

@@ -185,7 +185,7 @@ async function main(): Promise<void> {
     const updated = await cls.update(
       { ...config, transportRequest: updateRequest ?? request },
       {
-        sourceCode: source(className, 'updated'),
+        source: source(className, 'updated'),
         lockHandle: handle,
       },
     );

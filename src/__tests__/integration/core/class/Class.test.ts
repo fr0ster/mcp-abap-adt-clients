@@ -110,7 +110,7 @@ describe('Class (using AdtClient)', () => {
             transportRequest,
             description:
               params.description || `Test class ${params.class_name}`,
-            sourceCode: params.source_code,
+            source: params.source_code,
           };
         },
         ensureObjectReady: async (className: string) => {
@@ -187,16 +187,16 @@ describe('Class (using AdtClient)', () => {
         const testCase = tester.getTestCaseDefinition();
         const sourceCode =
           testCase?.params?.source_code ||
-          config.sourceCode ||
+          config.source ||
           `CLASS ${config.className} DEFINITION PUBLIC FINAL CREATE PUBLIC. ENDCLASS.`;
 
         await tester.flowTestAuto({
-          sourceCode: sourceCode,
+          source: sourceCode,
           updateConfig: {
             className: config.className,
             packageName: config.packageName,
             description: config.description || '',
-            sourceCode: sourceCode,
+            source: sourceCode,
           },
         });
       },

@@ -28,12 +28,12 @@ tester.setup({
     className: resolver.getParam('class_name'),
     packageName: resolver.getPackageName(),
     description: resolver.getParam('description'),
-    sourceCode: resolver.getParam('source_code'),
+    source: resolver.getParam('source_code'),
   }),
 });
 
 await tester.flowTestAuto({
-  sourceCode: config.sourceCode,
+  source: config.source,
   updateConfig: { className: config.className },
 });
 ```

@@ -35,7 +35,7 @@ export async function updateAClass(
   //    answers its report now, whatever the findings; what a warning means for
   //    whether you write is yours. Skip this whole block if you do not want a
   //    check, which is a choice the old member did not offer.
-  const report = await cls.check({ className, sourceCode: edited }, 'inactive');
+  const report = await cls.check({ className, source: edited }, 'inactive');
   if (!report.ok) throw new Error(report.getError().message);
   if (
     /<\w*:?checkMessage[^>]*type="E"/.test(
@@ -56,7 +56,7 @@ export async function updateAClass(
     //    write, in its own words.
     const written = await cls.update(
       { className },
-      { sourceCode: edited, lockHandle },
+      { source: edited, lockHandle },
     );
     if (!written.ok) throw new Error(written.getError().message);
   } finally {

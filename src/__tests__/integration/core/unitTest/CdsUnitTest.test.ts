@@ -271,16 +271,19 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
 
           // Step 2: Create CDS unit test class
           logTestStep('create', testsLogger);
-          const cdsUnitTestConfigForCreate: ICdsUnitTestConfig = {
-            className,
-            packageName,
-            cdsViewName: ddlName,
-            classTemplate,
-            testClassSource,
-            description:
-              cdsUnitTestConfig.description || `CDS unit test for ${ddlName}`,
-            transportRequest,
-          };
+          const cdsUnitTestConfigForCreate: Omit<ICdsUnitTestConfig, 'source'> =
+            {
+              className,
+              packageName,
+              cdsViewName: ddlName,
+              classTemplate,
+              // No source: `create` is the POST and takes none. The template is
+              // what makes this the CDS create; the tests are written by the
+              // update below.
+              description:
+                cdsUnitTestConfig.description || `CDS unit test for ${ddlName}`,
+              transportRequest,
+            };
 
           const createState = expectResult(
             await client.getCdsUnitTest().create(cdsUnitTestConfigForCreate),

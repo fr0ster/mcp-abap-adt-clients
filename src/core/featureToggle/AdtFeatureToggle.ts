@@ -168,7 +168,7 @@ export class AdtFeatureToggle<
 
   /** Create the object. */
   async create<E extends IAdtError = IAdtError>(
-    config: Omit<IFeatureToggleConfig, 'sourceCode'> & { sourceCode?: never },
+    config: Omit<IFeatureToggleConfig, 'source'> & { source?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     // **The one guard this package keeps, and only on a create.**

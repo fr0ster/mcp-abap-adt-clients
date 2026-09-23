@@ -129,7 +129,7 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
    * Create class with full operation chain
    */
   async create<E extends IAdtError = IAdtError>(
-    config: Omit<IClassConfig, 'sourceCode'> & { sourceCode?: never },
+    config: Omit<IClassConfig, 'source'> & { source?: never },
     options?: IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
     // **The one guard this package keeps, and only on a create.**
@@ -230,12 +230,12 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    // The source is the caller's, through `options.sourceCode`. This used to
-    // fall back to `config.sourceCode` — two channels for one value, where the
-    // contract documents one. `config.sourceCode` is `check`'s alone now: a
+    // The source is the caller's, through `options.source`. This used to
+    // fall back to `config.source` — two channels for one value, where the
+    // contract documents one. `config.source` is `check`'s alone now: a
     // syntax check compiles a source that is not on the server yet, so it has
     // nowhere else to arrive.
-    const sourceCode = options?.sourceCode;
+    const source = options?.source;
 
     // **One member, one endpoint: the PUT.** This used to be a window — lock,
     // check, PUT, unlock, check, and an activation on request — six requests
@@ -252,7 +252,7 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
         updateClass(
           connection,
           config.className as string,
-          sourceCode as string,
+          source as string,
           options?.lockHandle,
           config.transportRequest,
           this.contentTypes?.sourceArtifactContentType(),
@@ -334,7 +334,7 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
           connection,
           config.className as string,
           version,
-          config.sourceCode,
+          config.source,
           this.contentTypes?.sourceArtifactContentType(),
         ),
       this.results.check as IResultStrategy<ReturnType<R['check']>>,

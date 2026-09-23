@@ -96,7 +96,7 @@ export class AdtLocalDefinitions<
         checkClassDefinitions(
           connection,
           config.className as string,
-          config.definitionsCode as string,
+          config.source as string,
           'inactive',
           this.contentTypes?.sourceArtifactContentType(),
         ),
@@ -161,7 +161,7 @@ export class AdtLocalDefinitions<
     // (see delete()). Only its absence is an error.
 
     const name = config.className as string;
-    const source = options?.sourceCode ?? config.definitionsCode ?? '';
+    const source = options?.source ?? config.source ?? '';
 
     return answering(
       () =>
@@ -191,7 +191,7 @@ export class AdtLocalDefinitions<
     config: Partial<ILocalDefinitionsConfig>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
-    return await this.update({ ...config, definitionsCode: '' }, options);
+    return await this.update({ ...config, source: '' }, options);
   }
 
   /** Syntax-check the include. */
@@ -208,7 +208,7 @@ export class AdtLocalDefinitions<
         checkClassDefinitions(
           connection,
           config.className as string,
-          config.definitionsCode as string,
+          config.source as string,
           status === 'active' ? 'active' : 'inactive',
           this.contentTypes?.sourceArtifactContentType(),
         ),

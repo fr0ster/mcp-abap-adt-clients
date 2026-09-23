@@ -180,12 +180,12 @@ extend view ${targetEntity} with "${extName}"
         }
 
         await tester.flowTestAuto({
-          sourceCode: config.sourceCode,
+          source: config.source,
           readMetadata: true,
           readMetadataOptions: { withLongPolling: true },
           updateConfig: {
             name: config.name,
-            sourceCode: config.sourceCode,
+            source: config.source,
           },
         });
       },

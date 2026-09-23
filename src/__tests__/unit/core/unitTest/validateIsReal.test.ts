@@ -111,7 +111,7 @@ describe('AdtCdsUnitTest.validate()', () => {
         className: 'ZCL_CDS_DUMMY',
         packageName: 'ZPKG',
         classTemplate: '<template/>',
-        testClassSource: 'CLASS ltcl_test DEFINITION FOR TESTING.',
+        source: 'CLASS ltcl_test DEFINITION FOR TESTING.',
       }),
       'validation',
     );
@@ -141,7 +141,7 @@ describe('AdtCdsUnitTest.validate()', () => {
         // sent, and the server's rejection is the thing under test.
         packageName: 'ZPKG',
         classTemplate: '<template/>',
-        testClassSource: 'CLASS ltcl_test DEFINITION FOR TESTING.',
+        source: 'CLASS ltcl_test DEFINITION FOR TESTING.',
       }),
       'validate a name the server rejects',
     );

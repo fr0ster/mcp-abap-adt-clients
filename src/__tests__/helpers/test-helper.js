@@ -2290,42 +2290,42 @@ async function updateAndActivateShared(
   if (type === 'tables') {
     await writeAndActivate(
       client.getTable(),
-      { tableName: name, ddlCode: depConfig.source, transportRequest },
-      { sourceCode: depConfig.source },
+      { tableName: name, source: depConfig.source, transportRequest },
+      { source: depConfig.source },
     );
   } else if (type === 'structures') {
-    // A structure carries its source as `ddlCode`, like a table. Without this
+    // A structure carries its source like a table does. Without this
     // branch it fell to the "no update logic, skipping" line below — so the run
     // announced "updating source and activating", did neither, and recorded the
     // object as satisfied. Both shared structures had been in that state.
     await writeAndActivate(
       client.getStructure(),
-      { structureName: name, ddlCode: depConfig.source, transportRequest },
-      { sourceCode: depConfig.source },
+      { structureName: name, source: depConfig.source, transportRequest },
+      { source: depConfig.source },
     );
   } else if (type === 'views') {
     await writeAndActivate(
       client.getDdl(),
-      { ddlName: name, ddlSource: depConfig.source, transportRequest },
-      { sourceCode: depConfig.source },
+      { ddlName: name, source: depConfig.source, transportRequest },
+      { source: depConfig.source },
     );
   } else if (type === 'programs') {
     await writeAndActivate(
       client.getProgram(),
-      { programName: name, sourceCode: depConfig.source, transportRequest },
-      { sourceCode: depConfig.source },
+      { programName: name, source: depConfig.source, transportRequest },
+      { source: depConfig.source },
     );
   } else if (type === 'behavior_definitions') {
     await writeAndActivate(
       client.getBehaviorDefinition(),
-      { name, sourceCode: depConfig.source, transportRequest },
-      { sourceCode: depConfig.source },
+      { name, source: depConfig.source, transportRequest },
+      { source: depConfig.source },
     );
   } else if (type === 'classes') {
     await writeAndActivate(
       client.getClass(),
-      { className: name, sourceCode: depConfig.source, transportRequest },
-      { sourceCode: depConfig.source },
+      { className: name, source: depConfig.source, transportRequest },
+      { source: depConfig.source },
     );
   } else if (type === 'access_controls') {
     mustSucceed(
@@ -2333,10 +2333,10 @@ async function updateAndActivateShared(
         client.getAccessControl(),
         {
           accessControlName: name,
-          sourceCode: depConfig.source,
+          source: depConfig.source,
           transportRequest,
         },
-        { sourceCode: depConfig.source },
+        { source: depConfig.source },
       ),
       `shared accesscontrol update ${name}`,
     );
@@ -2346,10 +2346,10 @@ async function updateAndActivateShared(
         client.getInterface(),
         {
           interfaceName: name,
-          sourceCode: depConfig.source,
+          source: depConfig.source,
           transportRequest,
         },
-        { sourceCode: depConfig.source },
+        { source: depConfig.source },
       ),
       `shared interface update ${name}`,
     );
@@ -2360,10 +2360,10 @@ async function updateAndActivateShared(
         {
           functionModuleName: name,
           functionGroupName: depConfig.function_group,
-          sourceCode: depConfig.source,
+          source: depConfig.source,
           transportRequest,
         },
-        { sourceCode: depConfig.source },
+        { source: depConfig.source },
       ),
       `shared functionmodule update ${name}`,
     );
@@ -2376,10 +2376,10 @@ async function updateAndActivateShared(
         {
           functionGroupName: depConfig.function_group,
           includeName: name,
-          sourceCode: depConfig.source,
+          source: depConfig.source,
           transportRequest,
         },
-        { sourceCode: depConfig.source },
+        { source: depConfig.source },
       ),
       `shared functioninclude update ${name}`,
     );
@@ -2389,10 +2389,10 @@ async function updateAndActivateShared(
         client.getServiceDefinition(),
         {
           serviceDefinitionName: name,
-          sourceCode: depConfig.source,
+          source: depConfig.source,
           transportRequest,
         },
-        { sourceCode: depConfig.source },
+        { source: depConfig.source },
       ),
       `shared servicedefinition update ${name}`,
     );
@@ -2678,9 +2678,8 @@ async function ensureSharedDependency(client, type, name, logger) {
                 domainName: name,
                 packageName,
                 transportRequest,
-                document: domainDocumentFor(current, depConfig),
               },
-              undefined,
+              { source: domainDocumentFor(current, depConfig) },
             ),
             `shared domain update ${name}`,
           );
@@ -2698,9 +2697,8 @@ async function ensureSharedDependency(client, type, name, logger) {
                 dataElementName: name,
                 packageName,
                 transportRequest,
-                document: dataElementDocumentFor(current, depConfig),
               },
-              undefined,
+              { source: dataElementDocumentFor(current, depConfig) },
             ),
             `shared dataelement update ${name}`,
           );
@@ -2795,9 +2793,8 @@ async function ensureSharedDependency(client, type, name, logger) {
             // it — took over. A defect only a fresh system ever sees.
             packageName,
             transportRequest,
-            document: domainDocumentFor(createdDomain, depConfig),
           },
-          undefined,
+          { source: domainDocumentFor(createdDomain, depConfig) },
         ),
         `shared domain update ${name}`,
       );
@@ -2827,9 +2824,8 @@ async function ensureSharedDependency(client, type, name, logger) {
             // failure waiting behind it.
             packageName,
             transportRequest,
-            document: dataElementDocumentFor(createdElement, depConfig),
           },
-          undefined,
+          { source: dataElementDocumentFor(createdElement, depConfig) },
         ),
         `shared dataelement update ${name}`,
       );
@@ -2839,7 +2835,6 @@ async function ensureSharedDependency(client, type, name, logger) {
           structureName: name,
           packageName,
           description: depConfig.description || 'Shared test structure',
-          ddlCode: depConfig.source,
           transportRequest,
         }),
         `shared structure create ${name}`,
@@ -2851,10 +2846,10 @@ async function ensureSharedDependency(client, type, name, logger) {
             client.getStructure(),
             {
               structureName: name,
-              ddlCode: depConfig.source,
+              source: depConfig.source,
               transportRequest,
             },
-            { sourceCode: depConfig.source },
+            { source: depConfig.source },
           ),
           `shared structure update ${name}`,
         );
@@ -2866,7 +2861,6 @@ async function ensureSharedDependency(client, type, name, logger) {
           tableName: name,
           packageName,
           description: depConfig.description || 'Shared test table',
-          ddlCode: depConfig.source,
           transportRequest,
         }),
         `shared table create ${name}`,
@@ -2878,10 +2872,10 @@ async function ensureSharedDependency(client, type, name, logger) {
             client.getTable(),
             {
               tableName: name,
-              ddlCode: depConfig.source,
+              source: depConfig.source,
               transportRequest,
             },
-            { sourceCode: depConfig.source },
+            { source: depConfig.source },
           ),
           `shared table update ${name}`,
         );
@@ -2893,7 +2887,6 @@ async function ensureSharedDependency(client, type, name, logger) {
           ddlName: name,
           packageName,
           description: depConfig.description || 'Shared test view',
-          ddlSource: depConfig.source,
           transportRequest,
         }),
         `shared ddl create ${name}`,
@@ -2905,10 +2898,10 @@ async function ensureSharedDependency(client, type, name, logger) {
             client.getDdl(),
             {
               ddlName: name,
-              ddlSource: depConfig.source,
+              source: depConfig.source,
               transportRequest,
             },
-            { sourceCode: depConfig.source },
+            { source: depConfig.source },
           ),
           `shared ddl update ${name}`,
         );
@@ -2930,10 +2923,10 @@ async function ensureSharedDependency(client, type, name, logger) {
             client.getProgram(),
             {
               programName: name,
-              sourceCode: depConfig.source,
+              source: depConfig.source,
               transportRequest,
             },
-            { sourceCode: depConfig.source },
+            { source: depConfig.source },
           ),
           `shared program update ${name}`,
         );
@@ -2946,7 +2939,7 @@ async function ensureSharedDependency(client, type, name, logger) {
           rootEntity: depConfig.root_entity || name,
           implementationType: depConfig.implementation_type || 'Managed',
           description: depConfig.description || 'Shared test BDEF',
-          sourceCode: depConfig.source,
+          source: depConfig.source,
           transportRequest,
         }),
         `shared behaviordefinition create ${name}`,
@@ -2958,10 +2951,10 @@ async function ensureSharedDependency(client, type, name, logger) {
             client.getBehaviorDefinition(),
             {
               name,
-              sourceCode: depConfig.source,
+              source: depConfig.source,
               transportRequest,
             },
-            { sourceCode: depConfig.source },
+            { source: depConfig.source },
           ),
           `shared behaviordefinition update ${name}`,
         );
@@ -2984,10 +2977,10 @@ async function ensureSharedDependency(client, type, name, logger) {
             client.getClass(),
             {
               className: name,
-              sourceCode: depConfig.source,
+              source: depConfig.source,
               transportRequest,
             },
-            { sourceCode: depConfig.source },
+            { source: depConfig.source },
           ),
           `shared class update ${name}`,
         );
@@ -2999,7 +2992,7 @@ async function ensureSharedDependency(client, type, name, logger) {
           accessControlName: name,
           packageName,
           description: depConfig.description || 'Shared test access control',
-          sourceCode: depConfig.source,
+          source: depConfig.source,
           transportRequest,
         }),
         `shared accesscontrol create ${name}`,
@@ -3011,10 +3004,10 @@ async function ensureSharedDependency(client, type, name, logger) {
             client.getAccessControl(),
             {
               accessControlName: name,
-              sourceCode: depConfig.source,
+              source: depConfig.source,
               transportRequest,
             },
-            { sourceCode: depConfig.source },
+            { source: depConfig.source },
           ),
           `shared accesscontrol update ${name}`,
         );
@@ -3037,10 +3030,10 @@ async function ensureSharedDependency(client, type, name, logger) {
             client.getInterface(),
             {
               interfaceName: name,
-              sourceCode: depConfig.source,
+              source: depConfig.source,
               transportRequest,
             },
-            { sourceCode: depConfig.source },
+            { source: depConfig.source },
           ),
           `shared interface update ${name}`,
         );
@@ -3097,10 +3090,10 @@ async function ensureSharedDependency(client, type, name, logger) {
             {
               functionModuleName: name,
               functionGroupName: depConfig.function_group,
-              sourceCode: depConfig.source,
+              source: depConfig.source,
               transportRequest,
             },
-            { sourceCode: depConfig.source },
+            { source: depConfig.source },
           ),
           `shared functionmodule update ${name}`,
         );
@@ -3128,10 +3121,10 @@ async function ensureSharedDependency(client, type, name, logger) {
             {
               functionGroupName: depConfig.function_group,
               includeName: name,
-              sourceCode: depConfig.source,
+              source: depConfig.source,
               transportRequest,
             },
-            { sourceCode: depConfig.source },
+            { source: depConfig.source },
           ),
           `shared functioninclude update ${name}`,
         );
@@ -3145,7 +3138,7 @@ async function ensureSharedDependency(client, type, name, logger) {
           description:
             depConfig.description || 'Shared test service definition',
           transportRequest,
-          sourceCode: depConfig.source,
+          source: depConfig.source,
         }),
         `shared servicedefinition create ${name}`,
       );
@@ -3156,10 +3149,10 @@ async function ensureSharedDependency(client, type, name, logger) {
             client.getServiceDefinition(),
             {
               serviceDefinitionName: name,
-              sourceCode: depConfig.source,
+              source: depConfig.source,
               transportRequest,
             },
-            { sourceCode: depConfig.source },
+            { source: depConfig.source },
           ),
           `shared servicedefinition update ${name}`,
         );
