@@ -24,6 +24,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+### Added
+
+- **`AdtRequest.changeTaskType(task, type)`** — a task is created without a
+  type, and this is how one is given.
+
+  Measured against BTP ABAP, 2026-09-23. Every task reads back as
+  `Unclassified` after `newtask`, including tasks created long before this
+  library existed, and `tm:type` passed to the creating call is accepted and
+  ignored. CTS assigns the type when the first object lands; a caller who
+  wants it sooner assigns it here.
+
+  **The type goes on a `tm:task` child, not on the root**, which is the whole
+  of the difficulty and took six refusals to establish: every spelling tried
+  on the root answered `400 "Specified request type or task type  is
+  unknown"` — two spaces where the value belongs, an empty read each time.
+  The nested shape answers 200 and a re-read shows the new type. The same
+  message names the value when one arrives (`… type K is unknown`), which is
+  what told an empty read apart from a wrong one.
+
+  Vocabulary, from the same run: `S` Development/Correction, `R` Repair, `X`
+  back to Unclassified. `Q` is refused — *"You can only change the type of
+  tasks in workbench requests"* — and `K`/`W` are request types, refused as
+  unknown.
+
+  Addressed at the TASK's own URL, which is where the listing puts the
+  `changetasktype` link. `taskTypeChanged` joins `ITransportResults` as an
+  optional slot, like every member added since 19.0.0.
+
+
 ## [21.0.0] - 2026-09-22
 
 ### Removed — `@mcp-abap-adt/interfaces` ^48.0.0

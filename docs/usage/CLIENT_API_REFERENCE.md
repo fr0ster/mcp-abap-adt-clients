@@ -428,7 +428,7 @@ this member existed still compiles.
 Nothing about `list()` changes. A caller who never needs to choose can keep
 calling it with no argument.
 
-#### The object list: `readObjects()`, `removeObject()`, `addObject()`, `createTask()`
+#### The object list: `readObjects()`, `removeObject()`, `addObject()`, `createTask()`, `changeTaskType()`
 
 Deleting an ABAP object does not free its name. The CTS object-directory entry
 stays on the request that carried it — SAP says so as it happens: *"Release
@@ -463,6 +463,9 @@ const task = await request.createTask('E19K905941', { targetUser: 'OKYSLYTSIA' }
 
 // And the other direction.
 await request.addObject('E19K907073', { name: 'Z_CL_000001', type: 'CLAS' });
+
+// A task is created without a type; this is how one is given.
+await request.changeTaskType('E19K907073', 'S'); // Development/Correction
 ```
 
 Four things worth knowing before the first call, three of them measured
@@ -493,6 +496,18 @@ had:
   no capture of Eclipse showed the gap. This client cannot fill it in: the
   connection does not say who is authenticated, and asking would cost a second
   request.
+- **A task is born unclassified, and `createTask` cannot change that.**
+  Measured against BTP ABAP on 2026-09-23: `tm:type` passed to the creating
+  call is accepted and ignored, and every task on that system — including
+  ones created long before this library — reads back as `Unclassified`. CTS
+  assigns the type when the first object lands, or `changeTaskType()` assigns
+  it. The measured vocabulary is `S` (Development/Correction), `R` (Repair)
+  and `X` (back to Unclassified); `Q` is a customizing type and is refused on
+  a workbench request, and `K`/`W` are *request* types, refused as unknown.
+
+  The type goes on a `tm:task` child of the document, not on its root — six
+  spellings on the root were each answered `400 "Specified request type or
+  task type  is unknown"`, with two spaces where the value belongs.
 - **Objects live on tasks, so address the task**, not the request above it.
   `createTask()` answers a number that is itself a request resource — it
   reads, writes and releases like one.
