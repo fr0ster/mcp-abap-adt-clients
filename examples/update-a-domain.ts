@@ -93,8 +93,8 @@ export async function updateADomain(
     // 4. The write. Whether `edited` is complete is your system's ruling: this
     //    package inspects nothing, and the server says so in its own words.
     const written = await domain.updateMetadata(
-      { domainName, source: edited },
-      { lockHandle },
+      { domainName },
+      { source: edited, lockHandle },
     );
     if (!written.ok) throw new Error(written.getError().message);
   } finally {

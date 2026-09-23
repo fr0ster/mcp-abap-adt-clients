@@ -173,6 +173,12 @@ const handle  = (await domain.lock({ domainName })).getResult().value;
 await domain.updateMetadata({ domainName }, { source: edited, lockHandle: handle });
 ```
 
+**The body may travel in either place.** `options.source` is what the
+capability atom documents and what these implementations prefer;
+`config.source` is what each type's own config documents, and it is read when
+the options carry none. The contract states both, in two places, and until it
+settles on one, passing either works.
+
 **It is a replace, never a merge.** Nothing is read inside the member to keep
 what you left out — a field missing from the document you send is a field the
 object loses. So the sequence is read, edit, write, and the read is yours: the

@@ -227,9 +227,18 @@ export class AdtDomain<R extends IDomainResults = typeof domainDocuments>
 
     const name = this.name(config);
 
-    // `config.source` is what gets written. The fields beside it describe a
-    // create; on an update nothing here merges them into a document, because
-    // nothing is read to merge them into.
+    // **Both channels, and the options win.** The contract says this twice
+    // and differently: `IAdtMetadataUpdatable.updateMetadata` documents
+    // `options` as "`source` for the body", while `IDomainConfig.source` says
+    // a caller "reads the document … and passes it here" — the config. This
+    // used to read the config only, so the call the atom documents sent
+    // `undefined`. Reading both costs nothing and makes neither sentence a
+    // lie; which of the two the contract keeps is a decision for
+    // `mcp-abap-adt-interfaces`, not something to settle by silently
+    // preferring one here.
+    //
+    // The fields beside it describe a create; on an update nothing here merges
+    // them into a document, because nothing is read to merge them into.
     return answering(
       () =>
         updateDomain(
@@ -239,7 +248,7 @@ export class AdtDomain<R extends IDomainResults = typeof domainDocuments>
             package_name: config.packageName as string,
             transport_request: config.transportRequest,
           } as Parameters<typeof updateDomain>[1],
-          config.source as string,
+          (options?.source ?? config.source) as string,
           options?.lockHandle,
         ),
       this.results.metadataUpdated as IResultStrategy<

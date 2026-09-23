@@ -238,9 +238,11 @@ export class AdtDataElement<
             data_element_name: name,
             transport_request: config.transportRequest,
           },
-          // The document the caller built. The fields beside it describe a
-          // create; on an update nothing merges them into a body here.
-          config.source as string,
+          // The document the caller built, from either channel — see
+          // `AdtDomain.updateMetadata` for why both are read. The fields
+          // beside it describe a create; on an update nothing merges them into
+          // a body here.
+          (options?.source ?? config.source) as string,
           options?.lockHandle,
         ),
       this.results.metadataUpdated as IResultStrategy<

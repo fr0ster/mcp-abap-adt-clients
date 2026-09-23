@@ -79,10 +79,11 @@ describe('AdtRequest.update()', () => {
       'tm:desc="New description"',
     );
 
-    await new AdtRequest(connection).updateMetadata({
-      transportNumber: 'TRLK900438',
-      source: edited,
-    });
+    // The body goes in the options, where the contract puts it.
+    await new AdtRequest(connection).updateMetadata(
+      { transportNumber: 'TRLK900438' },
+      { source: edited },
+    );
 
     expect(calls).toHaveLength(1);
     expect(calls[0].method).toBe('PUT');
@@ -91,6 +92,49 @@ describe('AdtRequest.update()', () => {
     // Everything else the caller kept is still there — because they kept it.
     expect(String(calls[0].data)).toContain('tm:owner="CB9900000000"');
     expect(String(calls[0].data)).toContain('tm:number="TRLK900438"');
+  });
+
+  /**
+   * **Both channels reach the body, and the options win.** The contract says
+   * where the body goes twice and differently — `IAdtMetadataUpdatable`
+   * documents `options` as "`source` for the body", `ITransportConfig.source`
+   * says the caller "passes it here" — so an implementation that reads one of
+   * them makes the other sentence a lie. This one reads both, and these two
+   * cases are what keeps that true.
+   */
+  it('takes the document from the config as well', async () => {
+    const { connection, calls } = connectionOver(() => TRANSPORT_ITEM_XML);
+    const edited = TRANSPORT_ITEM_XML.replace(
+      /tm:desc="[^"]*"/,
+      'tm:desc="From the config"',
+    );
+
+    await new AdtRequest(connection).updateMetadata({
+      transportNumber: 'TRLK900438',
+      source: edited,
+    });
+
+    expect(String(calls[0].data)).toContain('tm:desc="From the config"');
+  });
+
+  it('prefers the options when both carry one', async () => {
+    const { connection, calls } = connectionOver(() => TRANSPORT_ITEM_XML);
+    const fromConfig = TRANSPORT_ITEM_XML.replace(
+      /tm:desc="[^"]*"/,
+      'tm:desc="From the config"',
+    );
+    const fromOptions = TRANSPORT_ITEM_XML.replace(
+      /tm:desc="[^"]*"/,
+      'tm:desc="From the options"',
+    );
+
+    await new AdtRequest(connection).updateMetadata(
+      { transportNumber: 'TRLK900438', source: fromConfig },
+      { source: fromOptions },
+    );
+
+    expect(String(calls[0].data)).toContain('tm:desc="From the options"');
+    expect(String(calls[0].data)).not.toContain('From the config');
   });
 
   it('touches neither the collection nor the search-configuration endpoint', async () => {

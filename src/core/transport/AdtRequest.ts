@@ -332,7 +332,12 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
 
     this.logger?.info?.('Updating transport request:', number);
     return answering(
-      () => updateTransport(connection, number, config.source as string),
+      () =>
+        updateTransport(
+          connection,
+          number,
+          (options?.source ?? config.source) as string,
+        ),
       this.results.metadataUpdated as IResultStrategy<
         ReturnType<R['metadataUpdated']>
       >,

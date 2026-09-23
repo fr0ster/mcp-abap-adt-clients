@@ -1073,18 +1073,18 @@ export class BaseTester<TConfig, TState = unknown> {
           // already held and the update became a no-op — measured on E19 with
           // the include suite, where the stored source stayed 52 characters
           // while `update_source_code` was 62.
-          source: options?.updateConfig?.source ?? options?.source,
+          // A document write and a source write take the same channel: the
+          // contract says the body is `options.source` for `update` and for
+          // `updateMetadata` alike. `documentToWrite` is what the read-patch
+          // step above produced for the types whose write takes a whole
+          // document; it wins, because for those types there is nothing else.
+          source:
+            documentToWrite ?? options?.updateConfig?.source ?? options?.source,
           timeout: options?.timeout,
         };
         expectResult(
           (await this.updateUnderLock(
-            {
-              ...config,
-              ...options.updateConfig,
-              ...(documentToWrite === undefined
-                ? {}
-                : { source: documentToWrite }),
-            } as Partial<TConfig>,
+            { ...config, ...options.updateConfig } as Partial<TConfig>,
             updateOptions,
           )) as IAdtResponse<unknown>,
           'update',

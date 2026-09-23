@@ -103,6 +103,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   else. With the payload off the member, that condition could no longer be met
   by anyone and the path was unreachable. **The template alone selects it now.**
 
+- **Fixed on review: the documented `updateMetadata` call sent `undefined`.**
+  The six document writes — domain, data element, package, table type,
+  function group, transport request — read the body from `config.source` only,
+  while `IAdtMetadataUpdatable.updateMetadata` documents `options` as
+  "`source` for the body". The call in this package's own documentation was
+  the broken one.
+
+  The contract states both, in two places: the atom puts the body in the
+  options, and each type's config says a caller "reads the document … and
+  passes it here". So both are read now, the options winning, which makes
+  neither sentence a lie — and **which of the two the contract keeps is a
+  decision for `mcp-abap-adt-interfaces`**, not one to settle by silently
+  preferring one here. Two unit tests pin both channels.
+
+- `scripts/transport-admin.ts describe` never sent a body at all: it passed a
+  `description` field no request builder reads, and reported success. It reads
+  the request, patches `tm:desc` and writes the document, like every other
+  caller of a document write.
+
 - The test harness follows: `IFlowTestOptions.sourceCode` and `.xmlContent`
   are one `source`. How an update's content is compared — text equality or an
   XML subset — used to be decided by which of the two fields the caller filled

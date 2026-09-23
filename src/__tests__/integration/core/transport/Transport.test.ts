@@ -479,27 +479,27 @@ describe('AdtRequest', () => {
           //
           // The answer is not the evidence — like every user action here, a
           // `200` says the document was understood. The re-read is.
+          //
+          // **A refusal fails this.** It was a warning and a carry-on first,
+          // which would have let a wrong endpoint, a wrong document or a
+          // missing authorisation pass as a green run — the one thing the step
+          // exists to catch. The task above was created by this run and is
+          // known to exist, so there is no environment case left for a
+          // refusal to mean.
           logTestStep('give the task a type', testsLogger);
-          const taskTyped = await request.changeTaskType(taskNumber, 'S');
-          if (!taskTyped.ok) {
-            // A system that refuses the action has answered, and that is the
-            // measurement. Nothing below depends on the type, so the round
-            // trip carries on — but the refusal is on the record, not passed
-            // over in silence.
-            testsLogger.warn?.(
-              `changetasktype refused: ${taskTyped.getError().message}`,
-            );
-          } else {
-            const afterTyping = String(
-              expectResult(
-                await request.readMetadata({ transportNumber: taskNumber }),
-                'read the task back after typing it',
-              ),
-            );
-            // The type sits on the task's own element in its document.
-            expect(afterTyping).toContain('tm:type="S"');
-            logTestStep('the task reads back as type S', testsLogger);
-          }
+          expectResult(
+            await request.changeTaskType(taskNumber, 'S'),
+            'give the task its type',
+          );
+          const afterTyping = String(
+            expectResult(
+              await request.readMetadata({ transportNumber: taskNumber }),
+              'read the task back after typing it',
+            ),
+          );
+          // The type sits on the task's own element in its document.
+          expect(afterTyping).toContain('tm:type="S"');
+          logTestStep('the task reads back as type S', testsLogger);
 
           const packageName = resolvePackageName(undefined);
           if (!packageName) {
@@ -643,9 +643,8 @@ describe('AdtRequest', () => {
                 domainName,
                 packageName,
                 transportRequest: sharedRequest,
-                source: typed,
               },
-              { lockHandle: domainHandle },
+              { source: typed, lockHandle: domainHandle },
             );
             if (!typedIn.ok) {
               testsLogger.warn?.(

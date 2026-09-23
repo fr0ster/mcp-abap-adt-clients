@@ -2678,9 +2678,8 @@ async function ensureSharedDependency(client, type, name, logger) {
                 domainName: name,
                 packageName,
                 transportRequest,
-                source: domainDocumentFor(current, depConfig),
               },
-              undefined,
+              { source: domainDocumentFor(current, depConfig) },
             ),
             `shared domain update ${name}`,
           );
@@ -2698,9 +2697,8 @@ async function ensureSharedDependency(client, type, name, logger) {
                 dataElementName: name,
                 packageName,
                 transportRequest,
-                source: dataElementDocumentFor(current, depConfig),
               },
-              undefined,
+              { source: dataElementDocumentFor(current, depConfig) },
             ),
             `shared dataelement update ${name}`,
           );
@@ -2795,9 +2793,8 @@ async function ensureSharedDependency(client, type, name, logger) {
             // it — took over. A defect only a fresh system ever sees.
             packageName,
             transportRequest,
-            source: domainDocumentFor(createdDomain, depConfig),
           },
-          undefined,
+          { source: domainDocumentFor(createdDomain, depConfig) },
         ),
         `shared domain update ${name}`,
       );
@@ -2827,9 +2824,8 @@ async function ensureSharedDependency(client, type, name, logger) {
             // failure waiting behind it.
             packageName,
             transportRequest,
-            source: dataElementDocumentFor(createdElement, depConfig),
           },
-          undefined,
+          { source: dataElementDocumentFor(createdElement, depConfig) },
         ),
         `shared dataelement update ${name}`,
       );

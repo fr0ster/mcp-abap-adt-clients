@@ -247,10 +247,13 @@ export class AdtFunctionGroup<
             lock_handle: options?.lockHandle as string,
             transport_request: config.transportRequest,
           } as Parameters<typeof updateFunctionGroup>[1],
-          // The document the caller built. The description used to be merged
+          // The document the caller built, from either channel — see
+          // `AdtDomain.updateMetadata` for why both are read.
+          //
+          // The description used to be merged
           // into a document read here, inside a lock window opened here; both
           // the read and the window are theirs now.
-          config.source as string,
+          (options?.source ?? config.source) as string,
           this.contentTypes,
         ),
       this.results.metadataUpdated as IResultStrategy<

@@ -308,8 +308,9 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
         updatePackage(
           connection,
           fields,
-          // The document the caller built; the fields above describe a create.
-          config.source as string,
+          // The document the caller built, from either channel — see
+          // `AdtDomain.updateMetadata`; the fields above describe a create.
+          (options?.source ?? config.source) as string,
           options?.lockHandle as string,
         ),
       this.results.metadataUpdated as IResultStrategy<
