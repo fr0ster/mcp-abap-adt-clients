@@ -13,6 +13,28 @@ Tags follow the same rule: these releases are tagged
 `adt-strategies@<version>`, never `v<version>` — that scheme is `adt-clients`'
 and fires its release workflow.
 
+## 0.4.0 — 2026-09-24
+
+### Changed
+
+- **`@mcp-abap-adt/interfaces-adt@^9.0.0`** (was `^7.0.0`). Two majors, and this
+  package was left behind when the rest of the family moved: `adt-clients` 22.0.0
+  went to `^9.0.0`, this workspace did not, and 0.3.0 is on npm declaring `^7.0.0`.
+
+  **A consumer installing 0.3.0 got a contract two majors old** — and if they also
+  held `adt-clients` 22, two copies of it in one tree. Nothing this package imports
+  changed name or shape across those majors (`IResultStrategy`, `IAdtResponse`,
+  `IAdtError` and the reading shapes are untouched), which is why it compiled and
+  why nothing complained.
+
+  **How it hid.** The check for one copy per tree was
+  `find node_modules -path "*@mcp-abap-adt/interfaces-*/package.json"`, which never
+  looks inside `packages/*/node_modules` — so it printed five paths and read as
+  clean while `packages/adt-strategies/node_modules` held `interfaces-adt@7.0.0`.
+  The SAP run for `adt-clients` 22.0.0 went through that tree. The check is
+  `find . -path "*@mcp-abap-adt/interfaces-*/package.json" -not -path "./.git/*"`
+  now, and it prints five packages, one copy each, all at the root.
+
 ## [0.3.0] - 2026-09-21
 
 ### Changed
