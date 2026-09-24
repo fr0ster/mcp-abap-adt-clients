@@ -1,6 +1,6 @@
 {
   "name": "@mcp-abap-adt/adt-clients",
-  "version": "21.0.0",
+  "version": "22.0.0",
   "description": "ADT clients for SAP ABAP systems - AdtClient and AdtRuntimeClient",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -120,17 +120,18 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "@mcp-abap-adt/interfaces-adt": "^7.0.0",
-    "@mcp-abap-adt/interfaces-auth": "^1.1.0",
-    "@mcp-abap-adt/interfaces-network": "^1.0.0",
-    "@mcp-abap-adt/interfaces-utils": "^1.0.0",
-    "@mcp-abap-adt/logger": "^0.3.1",
+    "@mcp-abap-adt/interfaces-adt": "^9.0.0",
+    "@mcp-abap-adt/interfaces-auth": "^1.2.0",
+    "@mcp-abap-adt/interfaces-network": "^2.0.0",
+    "@mcp-abap-adt/interfaces-utils": "^1.1.0",
+    "@mcp-abap-adt/logger": "^0.4.0",
     "axios": "^1.18.1",
     "fast-xml-parser": "^5.9.3"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.4",
-    "@mcp-abap-adt/connection": "^9.0.0",
+    "@mcp-abap-adt/connection": "^9.2.0",
+    "@mcp-abap-adt/interfaces-auth-sap": "^1.0.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^25.3.3",
     "dotenv": "^17.3.1",

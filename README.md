@@ -75,12 +75,15 @@ This package interacts with external packages **ONLY through interfaces**:
 
   | package | what this package takes from it | names |
   |---|---|---|
-  | [`@mcp-abap-adt/interfaces-adt`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-adt) `^7.0.0` | `IAbapConnection`, the capability atoms, every object's config, `ADT_TASK_TYPE` | 126 |
-  | [`@mcp-abap-adt/interfaces-network`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-network) `^1.0.0` | `IWebSocketTransport` and its four companions, `ITimeoutConfig` | 6 |
-  | [`@mcp-abap-adt/interfaces-utils`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-utils) `^1.0.0` | `ILogger`, `LogLevel` | 2 |
-  | [`@mcp-abap-adt/interfaces-auth`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-auth) `^1.1.0` | `IAuthProvider` | 1 |
+  | [`@mcp-abap-adt/interfaces-adt`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-adt) `^9.0.0` | `IAbapConnection`, the capability atoms, every object's config, `ADT_TASK_TYPE`, `ITimeoutConfig` | 178 |
+  | [`@mcp-abap-adt/interfaces-network`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-network) `^2.0.0` | `IWebSocketTransport` and its four companions, `HttpError` | 6 |
+  | [`@mcp-abap-adt/interfaces-utils`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-utils) `^1.1.0` | `ILogger`, `LogLevel`, `XmlNode` | 3 |
+  | [`@mcp-abap-adt/interfaces-auth`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-auth) `^1.2.0` | `IAuthProvider` | 1 |
+  | [`@mcp-abap-adt/interfaces-auth-sap`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-auth-sap) `^1.0.0` — **dev only** | `ISapConfig`, to build a connector in one unit test | 1 |
 
-  Taking them by name is what keeps a consumer off the facade's release rate: `interfaces-utils` has had one release ever, and a package that needs only `ILogger` should move at that pace rather than at ADT's.
+  Taking them by name is what keeps a consumer off one release rate for every contract: `interfaces-utils` has had two releases ever, and a package that needs only `ILogger` should move at that pace rather than at ADT's. The `@mcp-abap-adt/interfaces` facade is **deleted** — npm still serves 51.0.0 to anyone pinned to it and nothing further ships there.
+
+  Three names moved between those packages in `interfaces-adt` 9.0.0 and this release follows them: `HttpError` to `-network`, `XmlNode` to `-utils`, and `ITimeoutConfig` the other way, into `-adt`, because `csrf` names an SAP operation rather than a transport primitive.
 - **`@mcp-abap-adt/connection`**: Uses the `IAbapConnection` interface for HTTP requests — does not know about the concrete connection implementation. It is a **dev** dependency; consumers supply their own implementation.
 - **No other direct package dependencies**: all remaining interactions happen through well-defined interfaces
 

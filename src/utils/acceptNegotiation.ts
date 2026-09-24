@@ -1,9 +1,9 @@
 import type {
-  HttpError,
   IAbapConnection,
   IAbapRequestOptions,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt';
+import type { HttpError } from '@mcp-abap-adt/interfaces-network';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 
 const acceptCache = new Map<string, string>();

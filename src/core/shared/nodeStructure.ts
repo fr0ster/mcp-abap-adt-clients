@@ -8,9 +8,8 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-  XmlNode,
 } from '@mcp-abap-adt/interfaces-adt';
-import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type { ILogger, XmlNode } from '@mcp-abap-adt/interfaces-utils';
 import { XMLParser } from 'fast-xml-parser';
 import { AdtParseError, throwIfSapError } from '../../utils/adtErrors';
 import { getTimeout } from '../../utils/timeouts';

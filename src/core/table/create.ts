@@ -3,10 +3,10 @@
  */
 
 import type {
-  HttpError,
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt';
+import type { HttpError } from '@mcp-abap-adt/interfaces-network';
 import { ACCEPT_TABLE, CT_TABLE } from '../../constants/contentTypes';
 import { limitDescription, safeStringify } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';

@@ -29,12 +29,12 @@ import {
   BasicAuthProvider,
   OnPremHttpTransport,
 } from '@mcp-abap-adt/connection';
-import {
-  ADT_SESSION_ERROR,
-  type IAbapConnection,
-  type ISapConfig,
-  type ISessionLifecycleAware,
+import type {
+  IAbapConnection,
+  ISessionLifecycleAware,
 } from '@mcp-abap-adt/interfaces-adt';
+import { ADT_SESSION_ERROR } from '@mcp-abap-adt/interfaces-adt';
+import type { ISapConfig } from '@mcp-abap-adt/interfaces-auth-sap';
 import { type AdtStub, startAdtStub } from './adtStubServer';
 
 // These tests talk to a local stub and finish in well under a second. The suite

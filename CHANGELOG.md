@@ -22,16 +22,55 @@ independent versions. One package at a time: `npm run publish:clients` and
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [22.0.0] - 2026-09-24
+
+### Why this is a major
+
+Measured against the published 21.0.0 tarball, following every re-export:
+**586 names then, 592 now, and nothing removed.** Six were added — the transport
+request's object-list members. So no import of a consumer's breaks, and semver
+would allow a minor.
+
+It is a major for two things a name count cannot show:
+
+1. **The contract moves a major, and a consumer has to move with it.** 21.0.0
+   declares `@mcp-abap-adt/interfaces@^48.0.0` — the facade, which is now
+   deleted. This release declares `interfaces-adt@^9.0.0` and four siblings. A
+   consumer holding types from the facade, or from `interfaces-adt@8`, ends up
+   with two copies of the contract in one tree and types that do not match
+   across the seam. That is work on their side, and a minor would say otherwise.
+
+2. **`updateMetadata` reads `options.source` only.** There is no `config.source`
+   left in any `src/core/*/update.ts`. A caller who passed the body in the config
+   now sends nothing there, and the compiler catches it only once they are on
+   `interfaces-adt@9`, where the field is gone from those six config types.
 
 ### Changed — the contract packages, by name
 
 - **BREAKING: the `@mcp-abap-adt/interfaces` facade is gone from this package.**
-  It takes `@mcp-abap-adt/interfaces-adt` `^7.0.0`, `-network` `^1.0.0`,
-  `-utils` `^1.0.0` and `-auth` `^1.1.0` directly. 729 import and re-export
-  statements across 694 files were repointed; all 135 names resolved — 126 to
-  `-adt`, 6 to `-network`, 2 to `-utils`, 1 to `-auth`, and **none** needed the
-  facade.
+  It takes `@mcp-abap-adt/interfaces-adt` `^9.0.0`, `-network` `^2.0.0`,
+  `-utils` `^1.1.0` and `-auth` `^1.2.0` directly, plus `-auth-sap` `^1.0.0` as
+  a **dev** dependency, for the one unit test that builds an `ISapConfig`. 729
+  import and re-export statements across 694 files were repointed; all names
+  resolved and **none** needed the facade, which is now deleted — npm serves
+  51.0.0 to anyone pinned to it and nothing further ships there.
+
+  Re-measured against the released packages: **189 distinct names — 178 from
+  `-adt`, 6 `-network`, 3 `-utils`, 1 `-auth`, 1 `-auth-sap`.**
+
+- **Three contracts changed package, and this release follows them.**
+  `interfaces-adt` 9.0.0 moved everything that is not ADT out, so:
+
+  | name | was | is | why |
+  |---|---|---|---|
+  | `HttpError` | `-adt` | `-network` | nothing about an HTTP failure is ABAP; 14 files here import it |
+  | `XmlNode` | `-adt` | `-utils` | a parser's output shape is not an ADT contract |
+  | `ITimeoutConfig` | `-network` | `-adt` | its `csrf` field names an SAP operation, not a transport primitive |
+
+  17 files repointed, nothing renamed and no shape changed, so a consumer that
+  imports these names from this package's dependencies changes an import path
+  and nothing else. The packages were resolved from each one's installed
+  `dist/index.d.ts` rather than from a list written by hand.
 
   **Why it matters to a consumer, measured.** Every symbol the facade forwards
   is already marked *"@deprecated Import from …"*, and forwarding is what
@@ -65,9 +104,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 - **`TransportTaskType` is gone; `AdtTaskType` and `ADT_TASK_TYPE` come from
   the contract.** The local alias repeated a union the contract declared
   inline, because there was no name to import. There is now, and the letters
-  are SAP's: `changeTaskType(task, ADT_TASK_TYPE.developmentCorrection)`. Not a
-  break at the type level — the alias and the union are mutually assignable —
-  but the export `TransportTaskType` is removed.
+  are SAP's: `changeTaskType(task, ADT_TASK_TYPE.developmentCorrection)`.
+
+  **Not a break, and the earlier claim that it was one is wrong.** The alias and
+  the union are mutually assignable, and the name was never in a published
+  surface: the 21.0.0 tarball exports 586 names and `TransportTaskType` is not
+  among them. It was added and removed between releases.
 
 ### Added
 
