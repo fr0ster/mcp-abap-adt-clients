@@ -22,7 +22,28 @@ independent versions. One package at a time: `npm run publish:clients` and
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [22.0.0] - 2026-09-24
+
+### Why this is a major
+
+Measured against the published 21.0.0 tarball, following every re-export:
+**586 names then, 592 now, and nothing removed.** Six were added — the transport
+request's object-list members. So no import of a consumer's breaks, and semver
+would allow a minor.
+
+It is a major for two things a name count cannot show:
+
+1. **The contract moves a major, and a consumer has to move with it.** 21.0.0
+   declares `@mcp-abap-adt/interfaces@^48.0.0` — the facade, which is now
+   deleted. This release declares `interfaces-adt@^9.0.0` and four siblings. A
+   consumer holding types from the facade, or from `interfaces-adt@8`, ends up
+   with two copies of the contract in one tree and types that do not match
+   across the seam. That is work on their side, and a minor would say otherwise.
+
+2. **`updateMetadata` reads `options.source` only.** There is no `config.source`
+   left in any `src/core/*/update.ts`. A caller who passed the body in the config
+   now sends nothing there, and the compiler catches it only once they are on
+   `interfaces-adt@9`, where the field is gone from those six config types.
 
 ### Changed — the contract packages, by name
 
@@ -83,9 +104,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 - **`TransportTaskType` is gone; `AdtTaskType` and `ADT_TASK_TYPE` come from
   the contract.** The local alias repeated a union the contract declared
   inline, because there was no name to import. There is now, and the letters
-  are SAP's: `changeTaskType(task, ADT_TASK_TYPE.developmentCorrection)`. Not a
-  break at the type level — the alias and the union are mutually assignable —
-  but the export `TransportTaskType` is removed.
+  are SAP's: `changeTaskType(task, ADT_TASK_TYPE.developmentCorrection)`.
+
+  **Not a break, and the earlier claim that it was one is wrong.** The alias and
+  the union are mutually assignable, and the name was never in a published
+  surface: the 21.0.0 tarball exports 586 names and `TransportTaskType` is not
+  among them. It was added and removed between releases.
 
 ### Added
 
