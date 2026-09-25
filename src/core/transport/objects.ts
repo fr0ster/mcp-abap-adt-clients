@@ -241,10 +241,12 @@ export async function readTransportObjects(
  * created before this library existed, and passing `tm:type` on the creating
  * call changes nothing — the attribute is accepted and ignored.
  *
- * **The creation path matters.** Normal CTS object recording may classify an
- * existing Unclassified task, or create a classified task when one is
- * needed. The direct `addobject` action here does not do that on every
- * system. On an on-premise system, 2026-09-25, `addobject` onto a task made
+ * **The creation path matters.** When locking an object starts the normal CTS
+ * flow and the user chooses to create a request, CTS creates both the request
+ * and its task and classifies that task correctly. It can likewise classify
+ * an existing Unclassified task selected in that flow. The direct
+ * `addobject` action here does not do that on every system. On an on-premise
+ * system, 2026-09-25, `addobject` onto a task made
  * through `newtask` was refused with `400 SCTS_ADT_MSG 009` / TK127 —
  * *"Changes to objects are only allowed in correction/repair"*. The same
  * call answered 200 once {@link changeTransportTaskType} had given the task

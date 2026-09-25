@@ -498,10 +498,12 @@ had:
   request.
 - **A task created explicitly through `createTask()` is born unclassified,
   and the creating call cannot change that.** Measured against BTP ABAP on
-  2026-09-23: `tm:type` passed to `newtask` is accepted and ignored. Normal
-  CTS object recording may classify an existing task, but the direct
-  `addobject` action does not do so on every system. On premise, 2026-09-25,
-  `addObject()` onto a fresh Unclassified task was refused with
+  2026-09-23: `tm:type` passed to `newtask` is accepted and ignored. When
+  locking an object starts the normal CTS flow and the user creates a request,
+  CTS creates and correctly classifies its task; it can also classify an
+  existing task selected in that flow. The direct `addobject` action does not
+  do so on every system. On premise, 2026-09-25, `addObject()` onto a fresh
+  Unclassified task was refused with
   `SCTS_ADT_MSG 009` / TK127; after `changeTaskType(task, 'S')` the same call
   answered 200. Classify a task before adding objects directly. The measured
   vocabulary is `S` (Development/Correction), `R` (Repair) and `X` (back to

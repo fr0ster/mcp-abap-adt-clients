@@ -565,10 +565,12 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
    * every task created that way — including ones created long before this
    * library — reads back as `Unclassified`.
    *
-   * **The creation path matters.** Normal CTS object recording may classify
-   * an existing Unclassified task, or create a classified task when one is
-   * needed. That is not what this client's direct `addobject` action does. A
-   * task created explicitly through {@link createTask} stays `Unclassified`,
+   * **The creation path matters.** When locking an object starts the normal
+   * CTS flow and the user chooses to create a request, CTS creates both the
+   * request and its task and classifies that task correctly. It can likewise
+   * classify an existing Unclassified task selected in that flow. That is not
+   * what this client's direct `addobject` action does. A task created
+   * explicitly through {@link createTask} stays `Unclassified`,
    * and {@link addObject} onto it was refused on an on-premise system,
    * 2026-09-25, with `400 SCTS_ADT_MSG 009` / TK127, *"Changes to objects are
    * only allowed in correction/repair"*. After
