@@ -240,10 +240,11 @@ export async function readTransportObjects(
  * **A task is born without one.** Measured against BTP ABAP, 2026-09-23:
  * every task on that system read back as `Unclassified`, and passing
  * `tm:type` on the creating call changes nothing — the attribute is accepted
- * and ignored. None of those tasks came from the CTS edit flow: all were
- * created by hand through `newtask`, by this library's tests and by
- * mcp-abap-adt's, and until this function existed neither changed a task's
- * type.
+ * and ignored. That system is a trial with no transport system configured,
+ * so the CTS edit flow never creates a request there and every request and
+ * task is made by hand. All of them came through `newtask`, from this
+ * library's tests and from mcp-abap-adt's, and until this function existed
+ * neither changed a task's type.
  *
  * **The creation path matters.** When locking an object starts the normal CTS
  * flow and the user chooses to create a request, CTS creates both the request

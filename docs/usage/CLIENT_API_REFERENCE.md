@@ -499,10 +499,11 @@ had:
 - **A task created explicitly through `createTask()` is born unclassified,
   and the creating call cannot change that.** Measured against BTP ABAP on
   2026-09-23: `tm:type` passed to `newtask` is accepted and ignored, and every
-  task on that system read back as `Unclassified`. None of them came from the
-  CTS edit flow: all were created by hand through `newtask`, by this library's
-  tests and by mcp-abap-adt's, and until `changeTaskType()` existed neither
-  changed a task's type. When locking an object starts the normal CTS flow and
+  task on that system read back as `Unclassified`. That system is a trial with
+  no transport system configured, so the CTS edit flow never creates a request
+  there and every request and task is made by hand. All of them came through
+  `newtask`, from this library's tests and from mcp-abap-adt's, and until
+  `changeTaskType()` existed neither changed a task's type. When locking an object starts the normal CTS flow and
   the user creates a request, CTS creates and correctly classifies its task; it
   can also classify an existing task selected in that flow. The direct `addobject` action is not that flow. On premise, 2026-09-25,
   `addObject()` onto a fresh Unclassified task was refused with
