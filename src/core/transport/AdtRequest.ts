@@ -576,7 +576,9 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
    * with `400 SCTS_ADT_MSG 009` / TK127, *"Changes to objects are only allowed
    * in correction/repair"*. After `changeTaskType(task, 'S')` the same call
    * answered 200. A caller that intends to add objects directly must
-   * therefore classify the task first.
+   * therefore classify the task first. SAP states the same rule in
+   * [Changing a Task Type](https://help.sap.com/docs/ABAP_Cloud/bbcee501b99848bdadecd4e290db3ae4/36fa0d5b537d499ab361d862bcfa51ce.html):
+   * *"You cannot add any objects if the task type is Unclassified."*
    *
    * ```ts
    * await request.changeTaskType(task, ADT_TASK_TYPE.developmentCorrection);

@@ -507,7 +507,9 @@ had:
   direct `addobject` action is not that flow. On premise, 2026-09-25,
   `addObject()` onto a fresh Unclassified task was refused with
   `SCTS_ADT_MSG 009` / TK127; after `changeTaskType(task, 'S')` the same call
-  answered 200. Classify a task before adding objects directly. The measured
+  answered 200. Classify a task before adding objects directly — SAP states
+  the same rule in [Changing a Task Type](https://help.sap.com/docs/ABAP_Cloud/bbcee501b99848bdadecd4e290db3ae4/36fa0d5b537d499ab361d862bcfa51ce.html):
+  *"You cannot add any objects if the task type is Unclassified."* The measured
   vocabulary is `S` (Development/Correction), `R` (Repair) and `X` (back to
   Unclassified); `Q` is a customizing type and is refused on a workbench
   request, and `K`/`W` are *request* types, refused as unknown.

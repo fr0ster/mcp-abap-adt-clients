@@ -253,6 +253,9 @@ export async function readTransportObjects(
  * correction/repair"*. The same call answered 200 once
  * {@link changeTransportTaskType} had given the task type `S`. A caller that
  * intends to add objects directly must therefore classify the task first.
+ * SAP states the same rule in
+ * [Changing a Task Type](https://help.sap.com/docs/ABAP_Cloud/bbcee501b99848bdadecd4e290db3ae4/36fa0d5b537d499ab361d862bcfa51ce.html):
+ * *"You cannot add any objects if the task type is Unclassified."*
  *
  * **The document nests, and that is the whole of the difficulty.** The type
  * goes on a `tm:task` child, not on the root: six attribute spellings on the
