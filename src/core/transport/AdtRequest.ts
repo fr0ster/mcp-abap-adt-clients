@@ -464,6 +464,11 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
    * request/task."* That is a third lock flavour — not the enqueue lock, not
    * the request-versus-task one — and it is the server's verdict to read,
    * not a state this client checks for beforehand.
+   *
+   * **The same message, with longtext TK127, was also returned for an
+   * Unclassified task** on an on-premise system, 2026-09-25 — including one
+   * created explicitly through {@link createTask}. Classify it through
+   * {@link changeTaskType} before adding objects directly.
    */
   async addObject<E extends IAdtError = IAdtError>(
     transportNumber: string,
@@ -557,9 +562,21 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
    * **A task is born without one**, and passing a type to
    * {@link createTask} does not change that: measured against BTP ABAP on
    * 2026-09-23, `tm:type` on the creating call is accepted and ignored, and
-   * every task — including ones created long before this library — reads back
-   * as `Unclassified`. CTS assigns a type when the first object lands, or a
-   * caller assigns it here.
+   * every task on that system — including ones created long before this
+   * library — read back as `Unclassified`. Why the tasks CTS created there
+   * read that way too is not established.
+   *
+   * **The creation path matters.** When locking an object starts the normal
+   * CTS flow and the user chooses to create a request, CTS creates both the
+   * request and its task and classifies that task correctly. It can likewise
+   * classify an existing Unclassified task selected in that flow. That is not
+   * what this client's direct `addobject` action does. A task created
+   * explicitly through {@link createTask} stays `Unclassified`, and
+   * {@link addObject} onto it was refused on an on-premise system, 2026-09-25,
+   * with `400 SCTS_ADT_MSG 009` / TK127, *"Changes to objects are only allowed
+   * in correction/repair"*. After `changeTaskType(task, 'S')` the same call
+   * answered 200. A caller that intends to add objects directly must
+   * therefore classify the task first.
    *
    * ```ts
    * await request.changeTaskType(task, ADT_TASK_TYPE.developmentCorrection);
