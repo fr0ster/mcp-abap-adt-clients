@@ -465,10 +465,9 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
    * the request-versus-task one — and it is the server's verdict to read,
    * not a state this client checks for beforehand.
    *
-   * **The same message, with longtext TK127, means the task has no type.** On
-   * premise an Unclassified task refuses every `addobject` with *"Changes to
-   * objects are only allowed in correction/repair"* — give it one with
-   * {@link changeTaskType} first.
+   * **The same message, with longtext TK127, means the task has no type** —
+   * the case of a task created by hand through {@link createTask}, which
+   * stays Unclassified until {@link changeTaskType} gives it one.
    */
   async addObject<E extends IAdtError = IAdtError>(
     transportNumber: string,
@@ -562,14 +561,17 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
    * **A task is born without one**, and passing a type to
    * {@link createTask} does not change that: measured against BTP ABAP on
    * 2026-09-23, `tm:type` on the creating call is accepted and ignored, and
-   * every task — including ones created long before this library — reads back
-   * as `Unclassified`.
+   * every task created that way — including ones created long before this
+   * library — reads back as `Unclassified`.
    *
-   * **On premise nothing types it for you, and {@link addObject} refuses it.**
-   * Measured on an on-premise system, 2026-09-25: `addobject` onto a fresh
-   * task answered `400 SCTS_ADT_MSG 009` / TK127, *"Changes to objects are
-   * only allowed in correction/repair"*; after `changeTaskType(task, 'S')`
-   * the same call answered 200. Type a task here before attaching objects.
+   * **Which tasks that concerns.** A task CTS creates itself — with the
+   * request, or when an object is first locked on a request — gets its type
+   * there. A task created by hand through {@link createTask} stays
+   * `Unclassified`, and {@link addObject} onto it is refused — on an
+   * on-premise system, 2026-09-25, `400 SCTS_ADT_MSG 009` / TK127, *"Changes
+   * to objects are only allowed in correction/repair"*; after
+   * `changeTaskType(task, 'S')` the same call answered 200. Typing such a
+   * task is the caller's decision, not this client's.
    *
    * ```ts
    * await request.changeTaskType(task, ADT_TASK_TYPE.developmentCorrection);
