@@ -464,6 +464,11 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
    * request/task."* That is a third lock flavour — not the enqueue lock, not
    * the request-versus-task one — and it is the server's verdict to read,
    * not a state this client checks for beforehand.
+   *
+   * **The same message, with longtext TK127, means the task has no type.** On
+   * premise an Unclassified task refuses every `addobject` with *"Changes to
+   * objects are only allowed in correction/repair"* — give it one with
+   * {@link changeTaskType} first.
    */
   async addObject<E extends IAdtError = IAdtError>(
     transportNumber: string,
@@ -558,8 +563,13 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
    * {@link createTask} does not change that: measured against BTP ABAP on
    * 2026-09-23, `tm:type` on the creating call is accepted and ignored, and
    * every task — including ones created long before this library — reads back
-   * as `Unclassified`. CTS assigns a type when the first object lands, or a
-   * caller assigns it here.
+   * as `Unclassified`.
+   *
+   * **On premise nothing types it for you, and {@link addObject} refuses it.**
+   * Measured on an on-premise system, 2026-09-25: `addobject` onto a fresh
+   * task answered `400 SCTS_ADT_MSG 009` / TK127, *"Changes to objects are
+   * only allowed in correction/repair"*; after `changeTaskType(task, 'S')`
+   * the same call answered 200. Type a task here before attaching objects.
    *
    * ```ts
    * await request.changeTaskType(task, ADT_TASK_TYPE.developmentCorrection);

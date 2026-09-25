@@ -125,6 +125,9 @@ export async function removeObjectFromTransport(
  * flavour, distinct from the enqueue lock and from the request-versus-task
  * one, and it is the server's answer to read rather than a state this client
  * checks for.
+ *
+ * The same `SCTS_ADT_MSG 009` also arrives, with longtext TK127, when the
+ * target task is still Unclassified — see {@link changeTransportTaskType}.
  */
 export async function addObjectToTransport(
   connection: IAbapConnection,
@@ -235,8 +238,14 @@ export async function readTransportObjects(
  * **A task is born without one.** Measured against BTP ABAP, 2026-09-23:
  * every task a `newtask` creates reads back as `Unclassified`, including ones
  * created before this library existed, and passing `tm:type` on the creating
- * call changes nothing — the attribute is accepted and ignored. CTS assigns
- * the type when the first object lands, or a caller assigns it here.
+ * call changes nothing — the attribute is accepted and ignored.
+ *
+ * **On premise CTS does not type it for you.** Measured on an on-premise
+ * system, 2026-09-25: `addobject` onto a fresh, Unclassified task was refused
+ * with `400 SCTS_ADT_MSG 009` / TK127 — *"Changes to objects are only allowed
+ * in correction/repair"* — and the same call answered 200 once this had given
+ * the task type `S`. So a task that is meant to receive objects is typed here
+ * first; waiting for the first object to type it does not work there.
  *
  * **The document nests, and that is the whole of the difficulty.** The type
  * goes on a `tm:task` child, not on the root: six attribute spellings on the
