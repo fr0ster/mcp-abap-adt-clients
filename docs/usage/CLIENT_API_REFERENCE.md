@@ -499,17 +499,18 @@ had:
 - **A task created explicitly through `createTask()` is born unclassified,
   and the creating call cannot change that.** Measured against BTP ABAP on
   2026-09-23: `tm:type` passed to `newtask` is accepted and ignored, and every
-  task on that system — including ones created long before this library —
-  read back as `Unclassified`. Why the tasks CTS created there read that way
-  too is not established. When locking an object starts the normal CTS flow
-  and the user creates a request, CTS creates and correctly classifies its
-  task; it can also classify an existing task selected in that flow. The
-  direct `addobject` action is not that flow. On premise, 2026-09-25,
+  task on that system read back as `Unclassified`. None of them came from the
+  CTS edit flow: all were created by hand through `newtask`, by this library's
+  tests and by mcp-abap-adt's, and until `changeTaskType()` existed neither
+  changed a task's type. When locking an object starts the normal CTS flow and
+  the user creates a request, CTS creates and correctly classifies its task; it
+  can also classify an existing task selected in that flow. The direct `addobject` action is not that flow. On premise, 2026-09-25,
   `addObject()` onto a fresh Unclassified task was refused with
   `SCTS_ADT_MSG 009` / TK127; after `changeTaskType(task, 'S')` the same call
   answered 200. Classify a task before adding objects directly — SAP states
   the same rule in [Changing a Task Type](https://help.sap.com/docs/ABAP_Cloud/bbcee501b99848bdadecd4e290db3ae4/36fa0d5b537d499ab361d862bcfa51ce.html):
-  *"You cannot add any objects if the task type is Unclassified."* The measured
+  *"You cannot add any objects if the task type is Unclassified. You need to
+  change the task type to Development/Correction or Repair."* The measured
   vocabulary is `S` (Development/Correction), `R` (Repair) and `X` (back to
   Unclassified); `Q` is a customizing type and is refused on a workbench
   request, and `K`/`W` are *request* types, refused as unknown.

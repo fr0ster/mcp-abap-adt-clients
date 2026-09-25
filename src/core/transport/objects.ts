@@ -238,10 +238,12 @@ export async function readTransportObjects(
  * Give a task its type — `useraction="changetasktype"`.
  *
  * **A task is born without one.** Measured against BTP ABAP, 2026-09-23:
- * every task on that system read back as `Unclassified`, including ones
- * created before this library existed, and passing `tm:type` on the creating
- * call changes nothing — the attribute is accepted and ignored. Why the tasks
- * CTS created there read that way too is not established.
+ * every task on that system read back as `Unclassified`, and passing
+ * `tm:type` on the creating call changes nothing — the attribute is accepted
+ * and ignored. None of those tasks came from the CTS edit flow: all were
+ * created by hand through `newtask`, by this library's tests and by
+ * mcp-abap-adt's, and until this function existed neither changed a task's
+ * type.
  *
  * **The creation path matters.** When locking an object starts the normal CTS
  * flow and the user chooses to create a request, CTS creates both the request
@@ -255,7 +257,8 @@ export async function readTransportObjects(
  * intends to add objects directly must therefore classify the task first.
  * SAP states the same rule in
  * [Changing a Task Type](https://help.sap.com/docs/ABAP_Cloud/bbcee501b99848bdadecd4e290db3ae4/36fa0d5b537d499ab361d862bcfa51ce.html):
- * *"You cannot add any objects if the task type is Unclassified."*
+ * *"You cannot add any objects if the task type is Unclassified. You need to
+ * change the task type to Development/Correction or Repair."*
  *
  * **The document nests, and that is the whole of the difficulty.** The type
  * goes on a `tm:task` child, not on the root: six attribute spellings on the

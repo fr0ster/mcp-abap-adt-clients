@@ -562,9 +562,10 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
    * **A task is born without one**, and passing a type to
    * {@link createTask} does not change that: measured against BTP ABAP on
    * 2026-09-23, `tm:type` on the creating call is accepted and ignored, and
-   * every task on that system — including ones created long before this
-   * library — read back as `Unclassified`. Why the tasks CTS created there
-   * read that way too is not established.
+   * every task on that system read back as `Unclassified`. None of them came
+   * from the CTS edit flow: all were created by hand through `newtask`, by
+   * this library's tests and by mcp-abap-adt's, and until this member existed
+   * neither changed a task's type.
    *
    * **The creation path matters.** When locking an object starts the normal
    * CTS flow and the user chooses to create a request, CTS creates both the
@@ -578,7 +579,8 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
    * answered 200. A caller that intends to add objects directly must
    * therefore classify the task first. SAP states the same rule in
    * [Changing a Task Type](https://help.sap.com/docs/ABAP_Cloud/bbcee501b99848bdadecd4e290db3ae4/36fa0d5b537d499ab361d862bcfa51ce.html):
-   * *"You cannot add any objects if the task type is Unclassified."*
+   * *"You cannot add any objects if the task type is Unclassified. You need
+   * to change the task type to Development/Correction or Repair."*
    *
    * ```ts
    * await request.changeTaskType(task, ADT_TASK_TYPE.developmentCorrection);
