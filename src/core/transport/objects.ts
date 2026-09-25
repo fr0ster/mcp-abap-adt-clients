@@ -126,9 +126,10 @@ export async function removeObjectFromTransport(
  * one, and it is the server's answer to read rather than a state this client
  * checks for.
  *
- * The same `SCTS_ADT_MSG 009` also arrives, with longtext TK127, when the
- * target is Unclassified — including a task created explicitly through
- * `newtask`. Classify it first through {@link changeTransportTaskType}.
+ * On an on-premise system, 2026-09-25, the same `SCTS_ADT_MSG 009` also
+ * arrived, with longtext TK127, when the target was Unclassified — including
+ * a task created explicitly through `newtask`. Classify it first through
+ * {@link changeTransportTaskType}.
  */
 export async function addObjectToTransport(
   connection: IAbapConnection,
@@ -237,21 +238,21 @@ export async function readTransportObjects(
  * Give a task its type — `useraction="changetasktype"`.
  *
  * **A task is born without one.** Measured against BTP ABAP, 2026-09-23:
- * every task a `newtask` creates reads back as `Unclassified`, including ones
+ * every task on that system read back as `Unclassified`, including ones
  * created before this library existed, and passing `tm:type` on the creating
- * call changes nothing — the attribute is accepted and ignored.
+ * call changes nothing — the attribute is accepted and ignored. Why the tasks
+ * CTS created there read that way too is not established.
  *
  * **The creation path matters.** When locking an object starts the normal CTS
  * flow and the user chooses to create a request, CTS creates both the request
  * and its task and classifies that task correctly. It can likewise classify
- * an existing Unclassified task selected in that flow. The direct
- * `addobject` action here does not do that on every system. On an on-premise
- * system, 2026-09-25, `addobject` onto a task made
- * through `newtask` was refused with `400 SCTS_ADT_MSG 009` / TK127 —
- * *"Changes to objects are only allowed in correction/repair"*. The same
- * call answered 200 once {@link changeTransportTaskType} had given the task
- * type `S`. A caller that intends to add objects directly must therefore
- * classify the task first.
+ * an existing Unclassified task selected in that flow. The direct `addobject`
+ * action here is not that flow. On an on-premise system, 2026-09-25,
+ * `addobject` onto a task made through `newtask` was refused with
+ * `400 SCTS_ADT_MSG 009` / TK127 — *"Changes to objects are only allowed in
+ * correction/repair"*. The same call answered 200 once
+ * {@link changeTransportTaskType} had given the task type `S`. A caller that
+ * intends to add objects directly must therefore classify the task first.
  *
  * **The document nests, and that is the whole of the difficulty.** The type
  * goes on a `tm:task` child, not on the root: six attribute spellings on the

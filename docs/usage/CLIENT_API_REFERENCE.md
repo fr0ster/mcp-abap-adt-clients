@@ -498,12 +498,14 @@ had:
   request.
 - **A task created explicitly through `createTask()` is born unclassified,
   and the creating call cannot change that.** Measured against BTP ABAP on
-  2026-09-23: `tm:type` passed to `newtask` is accepted and ignored. When
-  locking an object starts the normal CTS flow and the user creates a request,
-  CTS creates and correctly classifies its task; it can also classify an
-  existing task selected in that flow. The direct `addobject` action does not
-  do so on every system. On premise, 2026-09-25, `addObject()` onto a fresh
-  Unclassified task was refused with
+  2026-09-23: `tm:type` passed to `newtask` is accepted and ignored, and every
+  task on that system — including ones created long before this library —
+  read back as `Unclassified`. Why the tasks CTS created there read that way
+  too is not established. When locking an object starts the normal CTS flow
+  and the user creates a request, CTS creates and correctly classifies its
+  task; it can also classify an existing task selected in that flow. The
+  direct `addobject` action is not that flow. On premise, 2026-09-25,
+  `addObject()` onto a fresh Unclassified task was refused with
   `SCTS_ADT_MSG 009` / TK127; after `changeTaskType(task, 'S')` the same call
   answered 200. Classify a task before adding objects directly. The measured
   vocabulary is `S` (Development/Correction), `R` (Repair) and `X` (back to
@@ -521,9 +523,10 @@ had:
 `SCTS_ADT_MSG 009` and a longtext naming the holder: *"There are no links to
 this request/task."* That is a third lock flavour, distinct from the enqueue
 lock and from the request-versus-task one, and it is the server's verdict to
-read rather than a state the client checks for first. The same message with
-longtext TK127 is returned for an Unclassified target task; classify it with
-`changeTaskType()` before adding objects directly. `pgmid` defaults to `R3TR`,
+read rather than a state the client checks for first. On premise,
+2026-09-25, the same message with longtext TK127 was returned for an
+Unclassified target task; classify it with `changeTaskType()` before adding
+objects directly. `pgmid` defaults to `R3TR`,
 and `obj_desc` is sent only when given.
 
 `IAbapObjectEntry`, the type those two members take, comes from
