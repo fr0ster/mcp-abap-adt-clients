@@ -127,8 +127,8 @@ export async function removeObjectFromTransport(
  * checks for.
  *
  * The same `SCTS_ADT_MSG 009` also arrives, with longtext TK127, when the
- * target is a task created by hand and still Unclassified — see
- * {@link changeTransportTaskType}.
+ * target is Unclassified — including a task created explicitly through
+ * `newtask`. Classify it first through {@link changeTransportTaskType}.
  */
 export async function addObjectToTransport(
   connection: IAbapConnection,
@@ -241,13 +241,15 @@ export async function readTransportObjects(
  * created before this library existed, and passing `tm:type` on the creating
  * call changes nothing — the attribute is accepted and ignored.
  *
- * **Only a task created by hand stays that way.** A task CTS creates itself
- * — with the request, or when an object is first locked on a request — gets
- * its type there. One created through `newtask` stays Unclassified, and on an
- * on-premise system, 2026-09-25, `addobject` onto it was refused with
- * `400 SCTS_ADT_MSG 009` / TK127 — *"Changes to objects are only allowed in
- * correction/repair"*. The same call answered 200 once this had given the
- * task type `S`. Typing such a task is the caller's call to make.
+ * **The creation path matters.** Normal CTS object recording may classify an
+ * existing Unclassified task, or create a classified task when one is
+ * needed. The direct `addobject` action here does not do that on every
+ * system. On an on-premise system, 2026-09-25, `addobject` onto a task made
+ * through `newtask` was refused with `400 SCTS_ADT_MSG 009` / TK127 —
+ * *"Changes to objects are only allowed in correction/repair"*. The same
+ * call answered 200 once {@link changeTransportTaskType} had given the task
+ * type `S`. A caller that intends to add objects directly must therefore
+ * classify the task first.
  *
  * **The document nests, and that is the whole of the difficulty.** The type
  * goes on a `tm:task` child, not on the root: six attribute spellings on the

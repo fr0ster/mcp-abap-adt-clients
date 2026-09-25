@@ -465,9 +465,10 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
    * the request-versus-task one — and it is the server's verdict to read,
    * not a state this client checks for beforehand.
    *
-   * **The same message, with longtext TK127, means the task has no type** —
-   * the case of a task created by hand through {@link createTask}, which
-   * stays Unclassified until {@link changeTaskType} gives it one.
+   * **The same message, with longtext TK127, is also returned for an
+   * Unclassified task** — including one created explicitly through
+   * {@link createTask}. Classify it through {@link changeTaskType} before
+   * adding objects directly.
    */
   async addObject<E extends IAdtError = IAdtError>(
     transportNumber: string,
@@ -564,14 +565,15 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
    * every task created that way — including ones created long before this
    * library — reads back as `Unclassified`.
    *
-   * **Which tasks that concerns.** A task CTS creates itself — with the
-   * request, or when an object is first locked on a request — gets its type
-   * there. A task created by hand through {@link createTask} stays
-   * `Unclassified`, and {@link addObject} onto it is refused — on an
-   * on-premise system, 2026-09-25, `400 SCTS_ADT_MSG 009` / TK127, *"Changes
-   * to objects are only allowed in correction/repair"*; after
-   * `changeTaskType(task, 'S')` the same call answered 200. Typing such a
-   * task is the caller's decision, not this client's.
+   * **The creation path matters.** Normal CTS object recording may classify
+   * an existing Unclassified task, or create a classified task when one is
+   * needed. That is not what this client's direct `addobject` action does. A
+   * task created explicitly through {@link createTask} stays `Unclassified`,
+   * and {@link addObject} onto it was refused on an on-premise system,
+   * 2026-09-25, with `400 SCTS_ADT_MSG 009` / TK127, *"Changes to objects are
+   * only allowed in correction/repair"*. After
+   * `changeTaskType(task, 'S')` the same call answered 200. A caller that
+   * intends to add objects directly must therefore classify the task first.
    *
    * ```ts
    * await request.changeTaskType(task, ADT_TASK_TYPE.developmentCorrection);

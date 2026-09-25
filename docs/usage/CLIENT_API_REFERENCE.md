@@ -496,14 +496,17 @@ had:
   no capture of Eclipse showed the gap. This client cannot fill it in: the
   connection does not say who is authenticated, and asking would cost a second
   request.
-- **A task is born unclassified, and `createTask` cannot change that.**
-  Measured against BTP ABAP on 2026-09-23: `tm:type` passed to the creating
-  call is accepted and ignored, and every task on that system — including
-  ones created long before this library — reads back as `Unclassified`. CTS
-  assigns the type when the first object lands, or `changeTaskType()` assigns
-  it. The measured vocabulary is `S` (Development/Correction), `R` (Repair)
-  and `X` (back to Unclassified); `Q` is a customizing type and is refused on
-  a workbench request, and `K`/`W` are *request* types, refused as unknown.
+- **A task created explicitly through `createTask()` is born unclassified,
+  and the creating call cannot change that.** Measured against BTP ABAP on
+  2026-09-23: `tm:type` passed to `newtask` is accepted and ignored. Normal
+  CTS object recording may classify an existing task, but the direct
+  `addobject` action does not do so on every system. On premise, 2026-09-25,
+  `addObject()` onto a fresh Unclassified task was refused with
+  `SCTS_ADT_MSG 009` / TK127; after `changeTaskType(task, 'S')` the same call
+  answered 200. Classify a task before adding objects directly. The measured
+  vocabulary is `S` (Development/Correction), `R` (Repair) and `X` (back to
+  Unclassified); `Q` is a customizing type and is refused on a workbench
+  request, and `K`/`W` are *request* types, refused as unknown.
 
   The type goes on a `tm:task` child of the document, not on its root — six
   spellings on the root were each answered `400 "Specified request type or
@@ -516,8 +519,10 @@ had:
 `SCTS_ADT_MSG 009` and a longtext naming the holder: *"There are no links to
 this request/task."* That is a third lock flavour, distinct from the enqueue
 lock and from the request-versus-task one, and it is the server's verdict to
-read rather than a state the client checks for first. `pgmid` defaults to
-`R3TR`, and `obj_desc` is sent only when given.
+read rather than a state the client checks for first. The same message with
+longtext TK127 is returned for an Unclassified target task; classify it with
+`changeTaskType()` before adding objects directly. `pgmid` defaults to `R3TR`,
+and `obj_desc` is sent only when given.
 
 `IAbapObjectEntry`, the type those two members take, comes from
 `@mcp-abap-adt/interfaces` — import it from there, or from
