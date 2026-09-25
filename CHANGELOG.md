@@ -22,6 +22,34 @@ independent versions. One package at a time: `npm run publish:clients` and
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [22.0.1] - 2026-09-25
+
+Documentation only — no code changed, and nothing a consumer imports or sends
+is different.
+
+### Documentation
+
+- **A task is typed by CTS only in the edit flow; a task made by hand has to
+  be typed by its caller.** 22.0.0 said *"CTS assigns the type when the first
+  object lands"*. That is not so for a task created through `newtask` /
+  `createTask()`. When an object is locked and the user picks or creates a
+  request, CTS creates the task and gives it its type. A request and task
+  created by hand stay `Unclassified`, and the direct `addobject` is not that
+  flow. On premise, 2026-09-25, `addObject()` onto a fresh Unclassified task
+  was refused with `400 SCTS_ADT_MSG 009` and longtext TK127, *"Changes to
+  objects are only allowed in correction/repair"*. After
+  `changeTaskType(task, 'S')` the same call answered 200. SAP documents the
+  rule in
+  [Changing a Task Type](https://help.sap.com/docs/ABAP_Cloud/bbcee501b99848bdadecd4e290db3ae4/36fa0d5b537d499ab361d862bcfa51ce.html):
+  *"You cannot add any objects if the task type is Unclassified. You need to
+  change the task type to Development/Correction or Repair."*
+- **Why every task on the BTP trial read as Unclassified.** The trial has no
+  transport system configured, so the CTS edit flow never creates a request
+  there, and every request and task on it was made by hand through `newtask`.
+  Until `changeTaskType` existed, nothing typed them.
+- The `addObject` / `addObjectToTransport` docs name the TK127 refusal next to
+  the held-elsewhere one, which carries the same `SCTS_ADT_MSG 009`.
+
 ## [22.0.0] - 2026-09-24
 
 ### Why this is a major
