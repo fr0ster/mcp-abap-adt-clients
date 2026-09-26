@@ -1,14 +1,3 @@
-import { XMLParser } from 'fast-xml-parser';
-
-const versionParser = new XMLParser({
-  ignoreAttributes: false,
-  attributeNamePrefix: '@_',
-  removeNSPrefix: true,
-});
-
-const asArray = <T>(value: T | T[] | undefined): T[] =>
-  value === undefined ? [] : Array.isArray(value) ? value : [value];
-
 /**
  * What a deletion check answers: `del:checkResponse`.
  *

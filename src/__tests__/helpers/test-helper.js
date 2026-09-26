@@ -1082,10 +1082,11 @@ async function retryCheckAfterActivate(checkFunction, options = {}) {
  * still reported PASS, while the tests around it created objects in the very
  * package this claimed was absent.
  *
- * Parsing goes through `searchObjectsTyped` rather than a local XML reader.
+ * Parsing goes through `readSearchHits` (adt-strategies) rather than a local
+ * XML reader.
  * ADT is not consistent across releases about namespacing quickSearch hits —
  * `<adtcore:objectReference adtcore:name>` on some, `<objectReference name>` on
- * others — and `parseSearchResults` already accepts both, with tests. The copy
+ * others — and `readSearchHits` already accepts both, with tests. The copy
  * that used to live here required the literal `<adtcore:objectReference` and
  * read only the prefixed attribute, so on a system emitting the unprefixed
  * form the lookup would succeed and this would still answer "missing" — the
@@ -1099,13 +1100,19 @@ async function retryCheckAfterActivate(checkFunction, options = {}) {
 async function checkPackageExists(connection, packageName) {
   try {
     // Dynamically required to avoid circular dependencies
-    const { searchObjectsTyped } = require('../../core/shared/search');
+    const { searchObjects } = require('../../core/shared/search');
+    // The source path: the reading is new in adt-strategies and its built
+    // entry point does not carry it until it is released.
+    const {
+      readSearchHits,
+    } = require('../../../packages/adt-strategies/src/results/utils');
 
-    const hits = await searchObjectsTyped(connection, {
+    const answer = await searchObjects(connection, {
       query: `${packageName}*`,
       objectType: 'DEVC',
       maxResults: 101,
     });
+    const hits = readSearchHits(String(answer?.data ?? ''));
 
     return hits.some(
       (hit) => hit.name?.toUpperCase() === packageName.toUpperCase(),
@@ -2143,14 +2150,17 @@ async function ensureSharedPackage(client, logger) {
       // verify the package exists via search before giving up
       let exists = false;
       try {
+        // `searchObjects` never existed: the call threw, this catch hid it,
+        // and the fallback always reported the package missing. `search`
+        // answers the result document as it arrived.
         const searchResult = await client
           .getUtils()
-          .searchObjects({ query: packageName, objectType: 'DEVC' });
-        const data =
-          typeof searchResult.data === 'string' ? searchResult.data : '';
+          .search({ query: packageName, objectType: 'DEVC' });
         exists =
-          searchResult.status === 200 &&
-          data.toUpperCase().includes(packageName.toUpperCase());
+          searchResult.ok &&
+          String(searchResult.getResult().value)
+            .toUpperCase()
+            .includes(packageName.toUpperCase());
       } catch (_searchError) {
         exists = false;
       }
@@ -2452,7 +2462,15 @@ async function activateSharedFunctionGroup(
   // So the list decides. It is the only resource that answers "is it active
   // NOW", and reading it straight after the POST is sound because that POST
   // does its work before it answers — nine cycles of nine, same probe.
-  const listed = await client.getUtils().getInactiveObjects();
+  // The list read into references by `utilInactiveObjects`; the shipped
+  // default answers the document as it came.
+  const { utilDocuments } = require('../../core/shared/utilResultSet');
+  const {
+    utilInactiveObjects,
+  } = require('../../../packages/adt-strategies/src/results/utils');
+  const listed = await client
+    .getUtils({ ...utilDocuments, inactive: utilInactiveObjects })
+    .getInactiveObjects();
   if (!listed.ok) {
     logger?.warn?.(
       `Shared function group ${name} was activated, but the inactive list ` +

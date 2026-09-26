@@ -76,44 +76,15 @@ export type { IServiceResults } from './core/service/types';
 export { serviceDocuments } from './core/service/types';
 export type { IServiceDefinitionResults } from './core/serviceDefinition/types';
 export { serviceDefinitionDocuments } from './core/serviceDefinition/types';
-/** The reading of `/activation/inactiveobjects`, injectable since 18.0.0. */
-export { inactiveObjects } from './core/shared/getInactiveObjects';
-/**
- * The run id out of a started activation's `Location` value.
- *
- * Exported beside `activationRunId`, for a caller whose own reading keeps the
- * exchange and pulls the id out later.
- */
-export { extractRunId } from './core/shared/groupActivation';
 /**
  * What a deletion check answers, named once for every result set that carries a
  * `deletionCheck` strategy. It is a different document from `check`'s.
  */
 export type { DeletionCheckResult } from './core/shared/results';
-/** The shapes the shipped readings build. See `IUtilResults` for which member. */
+/** The util result set: documents as they arrived; the readings are in @mcp-abap-adt/adt-strategies. */
 export type { IUtilResults } from './core/shared/utilResultSet';
 export { utilDocuments } from './core/shared/utilResultSet';
-export type {
-  IAdtObjectHit,
-  IInactiveObjectsResponse,
-  INamedItem,
-  IObjectReference,
-  IRepositoryNodeChild,
-  IRepositoryNodeContents,
-  IRepositoryObjectNode,
-  ISearchResult,
-  IWhereUsedListResult,
-  IWhereUsedReference,
-  PackageHierarchyCodeFormat,
-  PackageHierarchySupportedType,
-} from './core/shared/utilResults';
-export {
-  activationRunId,
-  namedItems,
-  nodeContents,
-  searchHits,
-  whereUsedReferences,
-} from './core/shared/utilResults';
+export type { INamedItem } from './core/shared/utilResults';
 export type { IStructureResults } from './core/structure/types';
 export { structureDocuments } from './core/structure/types';
 export type { ITableResults } from './core/table/types';

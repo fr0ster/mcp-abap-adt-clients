@@ -4,32 +4,68 @@
  */
 
 export { AdtRuntimeClient } from './clients/AdtRuntimeClient';
-export { ApplicationLog } from './runtime/applicationLog/ApplicationLog';
-export { AdtAtc } from './runtime/atc/AdtAtc';
-export { AtcLog } from './runtime/atc/AtcLog';
-export { DdicActivation } from './runtime/ddic/DdicActivation';
+export {
+  ApplicationLog,
+  applicationLogDocuments,
+  type IApplicationLogResults,
+} from './runtime/applicationLog/ApplicationLog';
+export {
+  AdtAtc,
+  atcDocuments,
+  type IAtcResults,
+} from './runtime/atc/AdtAtc';
+export {
+  AtcLog,
+  atcLogDocuments,
+  type IAtcLogResults,
+} from './runtime/atc/AtcLog';
+export {
+  DdicActivation,
+  ddicActivationDocuments,
+  type IDdicActivationResults,
+} from './runtime/ddic/DdicActivation';
 // Keep low-level dump types/functions (may be used by consumers)
 export {
   buildDumpIdPrefix,
   buildRuntimeDumpsUserQuery,
 } from './runtime/dumps';
-export { RuntimeDumps } from './runtime/dumps/RuntimeDumps';
-export { FeedRepository } from './runtime/feeds/FeedRepository';
+export {
+  type IRuntimeDumpsResults,
+  RuntimeDumps,
+  runtimeDumpsDocuments,
+} from './runtime/dumps/RuntimeDumps';
+export {
+  FeedRepository,
+  feedDocuments,
+  type IFeedResults,
+} from './runtime/feeds/FeedRepository';
 
-export { GatewayErrorLog } from './runtime/gatewayErrorLog/GatewayErrorLog';
+export {
+  GatewayErrorLog,
+  gatewayErrorLogDocuments,
+  type IGatewayErrorLogResults,
+} from './runtime/gatewayErrorLog/GatewayErrorLog';
 
 // The class is still exported for backward compatibility
-export { SystemMessages } from './runtime/systemMessages/SystemMessages';
+export {
+  type ISystemMessagesResults,
+  SystemMessages,
+  systemMessagesDocuments,
+} from './runtime/systemMessages/SystemMessages';
 
-export { CrossTrace } from './runtime/traces/CrossTraceDomain';
+export {
+  CrossTrace,
+  crossTraceDocuments,
+  type ICrossTraceResultSet,
+} from './runtime/traces/CrossTraceDomain';
 // Domain objects
-export { Profiler } from './runtime/traces/ProfilerDomain';
-export { St05Trace } from './runtime/traces/St05Trace';
-/**
- * Public since 15.0.0, because the removal of `latestTraceId()` made it the
- * replacement — and a replacement a consumer cannot import is no replacement.
- * Sorting a trace listing needs it: `recordedAt` compared as text gets the
- * order wrong across UTC offsets, so every caller would otherwise write the
- * same subtle bug by hand.
- */
-export { compareRecordedAt } from './runtime/traces/traceParsing';
+export {
+  type IProfilerResults,
+  Profiler,
+  profilerDocuments,
+} from './runtime/traces/ProfilerDomain';
+export {
+  type ISt05TraceResults,
+  St05Trace,
+  st05TraceDocuments,
+} from './runtime/traces/St05Trace';

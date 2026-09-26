@@ -1,12 +1,20 @@
 import type {
+  IAdtAnalyseOptions,
+  IAdtError,
   IAdtResponse,
-  IProfiler,
   IProfilerListOptions,
   IProfilerTraceDbAccessesOptions,
   IProfilerTraceHitListOptions,
   IProfilerTraceParameters,
   IProfilerTraceStatementsOptions,
-  ViewArgs,
+  IResultStrategy,
+  ITraceDeletion,
+  ITraceEntry,
+  ITraceFamily,
+  ITraceListing,
+  ITraceReading,
+  ITraceView,
+  ViewOptions,
   ViewResult,
 } from '@mcp-abap-adt/interfaces-adt';
 import type {
@@ -15,79 +23,119 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { answering } from '../../utils/adtResponse';
+import { nothing, rawDocument } from '../../utils/resultStrategy';
 import {
   buildTraceParametersXml,
   DEFAULT_PROFILER_TRACE_PARAMETERS,
   deleteTrace,
-  extractProfilerIdFromResponse,
   getTraceDbAccesses,
   getTraceHitList,
   getTraceStatements,
   listTraceFiles,
 } from './profiler';
-import {
-  parseDbAccesses,
-  parseHitList,
-  parseStatements,
-  parseTraceEntries,
-} from './traceParsing';
-import type { IAbapTraceEntry, IAbapTraceViews } from './types';
 
-export class Profiler implements IProfiler<IAbapTraceEntry, IAbapTraceViews> {
+/** One strategy per distinct answer of the ABAP profiler. */
+export interface IProfilerResults {
+  /** The `abaptraces` feed — `list`. `profilerTraceEntries` reads it. */
+  readonly list: IResultStrategy<unknown>;
+  /** The `hitlist` view. `profilerHitList` reads it. */
+  readonly hitlist: IResultStrategy<unknown>;
+  /** The `statements` view. `profilerStatements` reads it. */
+  readonly statements: IResultStrategy<unknown>;
+  /** The `dbAccesses` view. `profilerDbAccesses` reads it. */
+  readonly dbAccesses: IResultStrategy<unknown>;
+  /**
+   * The DELETE. `void`, because the contract's deletion answers nothing a
+   * caller reads — whether it happened is `ok`, and `analyse` judges it.
+   */
+  readonly deletion: IResultStrategy<void>;
+}
+
+/**
+ * The shipped default: every listing and view answers its document as it
+ * arrived; a deletion answers nothing.
+ *
+ * `satisfies`, never an annotation — see `classDocuments` for why.
+ */
+export const profilerDocuments = {
+  list: rawDocument,
+  hitlist: rawDocument,
+  statements: rawDocument,
+  dbAccesses: rawDocument,
+  deletion: nothing,
+} satisfies IProfilerResults;
+
+/** The three views a profiler trace has, typed by the strategies that read them. */
+export interface IProfilerViews<R extends IProfilerResults> {
+  hitlist: ITraceView<ReturnType<R['hitlist']>, IProfilerTraceHitListOptions>;
+  statements: ITraceView<
+    ReturnType<R['statements']>,
+    IProfilerTraceStatementsOptions
+  >;
+  dbAccesses: ITraceView<
+    ReturnType<R['dbAccesses']>,
+    IProfilerTraceDbAccessesOptions
+  >;
+}
+
+/**
+ * The ABAP profiler: list, read a view, delete — one request each.
+ *
+ * Composed from the atoms `IProfiler` is made of rather than `IProfiler`
+ * itself: that alias fixes a listing's answer to `TEntry[]`, and the listing
+ * answers whatever the `list` strategy makes of the feed — the document, by
+ * default.
+ */
+export class Profiler<R extends IProfilerResults = typeof profilerDocuments>
+  implements
+    ITraceFamily<'profiler'>,
+    ITraceListing<ITraceEntry, IProfilerListOptions, ReturnType<R['list']>>,
+    ITraceReading<IProfilerViews<R>>,
+    ITraceDeletion
+{
   readonly kind = 'profiler' as const;
 
   constructor(
     private readonly connection: IAbapConnection,
     readonly _logger: ILogger,
+    // The one cast in this file, and it is on the default. See AdtClass.
+    private readonly results: R = profilerDocuments as unknown as R,
   ) {}
 
-  /**
-   * What traces exist.
-   *
-   * Parsed, not raw: the contract says a listing yields entries, and there is
-   * no escape hatch beside it. A `listTraceFilesResponse()` used to sit here
-   * handing back the document — on this class only, where nobody holding
-   * `IProfiler` could reach it, which is how the gap hid. The feed is an id and
-   * a few identifying fields measured on two systems that agreed; there is
-   * nothing in it to read a second way.
-   */
-  async list(
-    options?: IProfilerListOptions,
-  ): Promise<IAdtResponse<IAbapTraceEntry[]>> {
+  /** What traces exist. */
+  async list<E extends IAdtError = IAdtError>(
+    options?: IProfilerListOptions & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['list']>, E>> {
     return answering(
       () => listTraceFiles(this.connection, options),
-      (answer) => parseTraceEntries(answer),
+      this.results.list as IResultStrategy<ReturnType<R['list']>>,
+      options?.analyse,
     );
   }
 
-  /**
-   * What is inside one trace.
-   *
-   * One operation, three views. The result type is the view's own — asking for
-   * `hitlist` yields a hit list, and the compiler refuses a view this family
-   * does not have.
-   */
   /**
    * Remove a trace.
    *
-   * `void`: there is nothing to read from a deletion, and the contract says so.
-   * What a missing id does is not measured — a `404` would reject here, and a
-   * caller that must tolerate one has to catch until somebody measures a repeat.
+   * What a missing id answers is not measured; a caller who must tolerate one
+   * reads `ok`, or passes an `analyse` that says what it means.
    */
-  async delete(traceId: string): Promise<IAdtResponse<void>> {
+  async delete<E extends IAdtError = IAdtError>(
+    traceId: string,
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<void, E>> {
     return answering(
       () => deleteTrace(this.connection, traceId),
-      () => undefined,
+      this.results.deletion,
+      options?.analyse,
     );
   }
 
   /**
-   * The raw response for a view, before anything is made of it.
+   * The request for a view.
    *
-   * One place that knows which URL and which options a view sends, so nothing
-   * built on top of it can drift from what {@link read} asks for.
+   * One place that knows which URL and which options a view sends.
    */
-  private async viewResponse<K extends keyof IAbapTraceViews>(
+  private async viewResponse<K extends keyof IProfilerViews<R>>(
     traceId: string,
     view: K,
     options: unknown,
@@ -120,19 +168,18 @@ export class Profiler implements IProfiler<IAbapTraceEntry, IAbapTraceViews> {
   /**
    * What is inside one trace.
    *
-   * The mapping is deliberately plain: document onto the view's type, nothing
-   * more. No filtering, no reshaping — those belong to the server, which has
-   * endpoints for them. A `readWith(parse, …)` sat beside this until 31.0.0,
-   * making how far the answer was read a property of which method was called;
-   * a consumer who wants another reading implements `IProfiler`, which is
-   * generic in what its views answer for exactly that reason.
+   * One operation, three views, each read by its own strategy — asking for
+   * `hitlist` yields what the `hitlist` strategy makes of the hit list, and the
+   * compiler refuses a view this family does not have.
    */
-  async read<K extends keyof IAbapTraceViews>(
+  async read<
+    K extends keyof IProfilerViews<R>,
+    E extends IAdtError = IAdtError,
+  >(
     traceId: string,
     view: K,
-    ...args: ViewArgs<IAbapTraceViews, K>
-  ): Promise<IAdtResponse<ViewResult<IAbapTraceViews, K>>> {
-    const [options] = args;
+    options?: ViewOptions<IProfilerViews<R>, K> & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ViewResult<IProfilerViews<R>, K>, E>> {
     // Before the request, not inside it: a view this family does not have is a
     // caller error, and classified inside `answering` it would come back as
     // `origin: 'connection'` — advice to check the network over a name the
@@ -140,31 +187,15 @@ export class Profiler implements IProfiler<IAbapTraceEntry, IAbapTraceViews> {
     if (view !== 'hitlist' && view !== 'statements' && view !== 'dbAccesses') {
       throw new Error(`Unknown trace view: ${String(view)}`);
     }
-
     return answering(
       () => this.viewResponse(traceId, view, options),
-      (answer) => {
-        switch (view) {
-          case 'hitlist':
-            return parseHitList(answer) as ViewResult<IAbapTraceViews, K>;
-          case 'statements':
-            return parseStatements(answer) as ViewResult<IAbapTraceViews, K>;
-          case 'dbAccesses':
-            return parseDbAccesses(answer) as ViewResult<IAbapTraceViews, K>;
-          default:
-            // Unreachable through the typed surface; reachable from JavaScript.
-            throw new Error(`Unknown trace view: ${String(view)}`);
-        }
-      },
+      this.results[view] as IResultStrategy<ViewResult<IProfilerViews<R>, K>>,
+      options?.analyse,
     );
   }
 
   buildParametersXml(options?: IProfilerTraceParameters): string {
     return buildTraceParametersXml(options);
-  }
-
-  extractIdFromResponse(response: IAdtWireResponse): string | undefined {
-    return extractProfilerIdFromResponse(response);
   }
 
   getDefaultParameters(): Omit<IProfilerTraceParameters, 'description'> {

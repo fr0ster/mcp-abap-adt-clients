@@ -6,39 +6,9 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { XMLParser } from 'fast-xml-parser';
 import { buildObjectUri } from '../../utils/activationUtils';
-import { headerValueToString } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { IObjectReference } from './types';
-
-const _xmlParser = new XMLParser({
-  ignoreAttributes: false,
-  attributeNamePrefix: '@_',
-  parseAttributeValue: false,
-});
-
-type AdtHeaderValue = IAdtWireResponse['headers'][string];
-
-/**
- * Extract run ID from location header
- */
-/**
- * The run id ADT puts in the `Location` header of a started activation.
- *
- * Exported because `activateObjectsGroup` is the POST and nothing else since
- * 19.0.0: the caller takes the id from the answer, decides how long to wait,
- * and asks {@link getActivationResults} when they are ready. Waiting on an
- * asynchronous job is theirs, not this package's.
- */
-export function extractRunId(
-  location: AdtHeaderValue | undefined,
-): string | null {
-  const locationValue = headerValueToString(location);
-  if (!locationValue) return null;
-  const match = locationValue.match(/\/activation\/runs\/([^/]+)/);
-  return match ? match[1] : null;
-}
 
 /**
  * What an activation run is doing — `/activation/runs/{runId}`.
@@ -92,11 +62,11 @@ export async function getActivationResults(
 /**
  * Activate multiple objects in a group (with session support)
  *
- * Implements the EclipseADT activation flow:
- * 1. POST /sap/bc/adt/activation/runs?method=activate&preauditRequested=false - Start activation
- * 2. GET /sap/bc/adt/activation/runs/{runId}?withLongPolling=true - Poll for completion
- * 3. GET /sap/bc/adt/activation/results/{runId} - Get activation results
- * 4. GET /sap/bc/adt/activation/inactiveobjects - Check for remaining inactive objects
+ * One POST — `/sap/bc/adt/activation/runs?method=activate` — answered as it
+ * came: `202` with the run id in `Location`. Waiting on the run
+ * (`getActivationRun`) and fetching what it produced (`getActivationResults`)
+ * are the caller's next requests; `utilActivationRunId` and `extractRunId` in
+ * `@mcp-abap-adt/adt-strategies` read the id.
  *
  * This function allows activating multiple objects of different types in a single request.
  * Useful for activating related objects together (e.g., BDEF + CDS view).
@@ -104,7 +74,7 @@ export async function getActivationResults(
  * @param connection - ABAP connection instance
  * @param objects - Array of objects to activate
  * @param preauditRequested - Request pre-audit before activation (default: false)
- * @returns Axios response with activation result (from step 3 - activation results)
+ * @returns The answer to the POST, as it came
  *
  * @example
  * ```typescript

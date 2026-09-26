@@ -1,16 +1,20 @@
 /**
- * A deletion that did not delete is a failure; a check that says "no" is not.
+ * A deletion that did not delete is a failure — when the caller's `analyse`
+ * says so; a check that says "no" is an answer.
  *
  * Both endpoints answer **200** with the same document shape, and the difference
- * is what was asked. `deleteObjectsGroup` asked for something and did not get it.
- * `checkDeletionGroup` asked a question and got its answer — `isDeletable="false"`
- * with a reason is what a caller runs the check *for*, and turning it into a
- * failure would make the useful answer the hard one to read.
+ * is what was asked. `deleteObjectsGroup` used to read `del:isDeleted` itself and
+ * throw; it answers the document as it came now, and `analyseDeletion` from
+ * `@mcp-abap-adt/adt-strategies` — which reads every object and every message —
+ * is what turns it into a failure. `checkDeletionGroup` asked a question and got
+ * its answer — `isDeletable="false"` with a reason is what a caller runs the
+ * check *for*.
  *
  * The document below is verbatim from a cloud trial, 2026-09-03, for a package
  * with two objects in it.
  */
 
+import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AdtUtils } from '../../../core/shared/AdtUtils';
@@ -63,29 +67,47 @@ const answering = (data: string): IAbapConnection =>
 const ONE_PACKAGE = [{ name: 'ZADT_BLD_PKG03', type: 'DEVC/K' }];
 
 describe('deleteObjectsGroup', () => {
-  it('answers a failure when the objects were not deleted', async () => {
+  it('answers the document as it came when no analyse is given', async () => {
     const utils = new AdtUtils(answering(NOT_DELETED), logger);
 
     const response = await utils.deleteObjectsGroup(ONE_PACKAGE);
 
-    // 200, no `<exc:exception>` — so nothing below this raised, and before the
-    // fix the caller was handed `ok: true` for objects that are still there.
+    // The library reads no verdict into a 200: the document is the answer, and
+    // `isDeleted="false"` is in it for whoever reads it.
+    expect(response.ok).toBe(true);
+    if (!response.ok) throw new Error('expected the document');
+    expect(response.getResult().value).toContain('isDeleted="false"');
+  });
+
+  it('answers a failure through analyseDeletion when the objects were not deleted', async () => {
+    const utils = new AdtUtils(answering(NOT_DELETED), logger);
+
+    const response = await utils.deleteObjectsGroup(ONE_PACKAGE, undefined, {
+      analyse: analyseDeletion,
+    });
+
     expect(response.ok).toBe(false);
     if (response.ok) throw new Error('expected a failure');
 
     const failure = response.getError();
     expect(failure.origin).toBe('refusal');
-    // The server's own sentence, and the name of what refused.
-    expect(failure.message).toContain('Package contains 2 objects');
+    // The name of what refused, and the server's own sentence in the messages.
     expect(failure.message).toContain('ZADT_BLD_PKG03');
+    expect(failure.messages.map((m) => m.text).join(' ')).toContain(
+      'Package contains 2 objects',
+    );
+    // The answer it came on stays attached.
+    expect(failure.response?.data).toBe(NOT_DELETED);
   });
 
   it('answers a result when they were', async () => {
     const utils = new AdtUtils(answering(DELETED), logger);
 
-    const response = await utils.deleteObjectsGroup([
-      { name: 'ZGONE', type: 'CLAS/OC' },
-    ]);
+    const response = await utils.deleteObjectsGroup(
+      [{ name: 'ZGONE', type: 'CLAS/OC' }],
+      undefined,
+      { analyse: analyseDeletion },
+    );
 
     expect(response.ok).toBe(true);
   });

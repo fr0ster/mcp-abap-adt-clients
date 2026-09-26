@@ -70,6 +70,16 @@ export {
   type IAbapGitRepo,
 } from './results/abapGit';
 export {
+  atcRunStatus,
+  atcStartedRun,
+  atcSystemCheckVariant,
+  atcWaitingRun,
+  atcWorklistId,
+  type IAtcRunStatus,
+  type IAtcStartedRun,
+  type IAtcWaitingRun,
+} from './results/atc';
+export {
   type FeatureToggleState,
   featureToggleCheckState,
   featureToggleRuntimeState,
@@ -78,6 +88,46 @@ export {
   type IFeatureToggleRuntimeState,
   type IFeatureToggleUserLevel,
 } from './results/featureToggle';
+export {
+  feedDescriptors,
+  feedEntries,
+  feedGatewayErrorDetail,
+  feedGatewayErrors,
+  feedSystemMessages,
+  feedVariants,
+  type ICallStackEntry,
+  type IFeedDescriptor,
+  type IFeedEntry,
+  type IFeedVariant,
+  type IGatewayErrorDetail,
+  type IGatewayErrorEntry,
+  type IGatewayException,
+  type ISourceCodeLine,
+  type ISystemMessageEntry,
+} from './results/feeds';
+export {
+  compareRecordedAt,
+  type IAbapTraceAccessTime,
+  type IAbapTraceDbAccess,
+  type IAbapTraceDbAccesses,
+  type IAbapTraceEntry,
+  type IAbapTraceHitList,
+  type IAbapTraceHitListEntry,
+  type IAbapTraceStatement,
+  type IAbapTraceStatements,
+  type ITraceCatalogueItem,
+  type ITraceExecutions,
+  type ITraceProgramRef,
+  type ITraceRequestEntry,
+  type ITraceTiming,
+  profilerDbAccesses,
+  profilerHitList,
+  profilerStatements,
+  profilerTraceEntries,
+  traceSchedulingProfilerId,
+  traceSchedulingRequests,
+  traceSchedulingTypes,
+} from './results/traces';
 export {
   type ICreatedTransport,
   type ITransportObjectEntry,
@@ -92,4 +142,26 @@ export {
   transportTree,
 } from './results/transport';
 export { unitTestRunId } from './results/unitTest';
+export {
+  extractRunId,
+  type IAdtObjectHit,
+  type IInactiveObjectsResponse,
+  type INamedItem,
+  type IParsedNodeStructure,
+  type IRepositoryNodeChild,
+  type IRepositoryNodeContents,
+  type IRepositoryObjectNode,
+  type ISearchResult,
+  type IWhereUsedListResult,
+  type IWhereUsedReference,
+  readNamedItems,
+  readNodeStructure,
+  readSearchHits,
+  utilActivationRunId,
+  utilInactiveObjects,
+  utilNamedItems,
+  utilNodeContents,
+  utilSearchHits,
+  utilWhereUsedReferences,
+} from './results/utils';
 export { type IObjectVersion, objectVersions } from './results/versions';

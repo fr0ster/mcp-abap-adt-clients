@@ -20,6 +20,9 @@
  * request would still return the caller's type and still compile.
  */
 
+// The source path, not the package: the reading is new in adt-strategies and
+// the package's built entry point does not carry it until it is released.
+import { utilSearchHits } from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AdtUtils } from '../../../core/shared/AdtUtils';
@@ -99,11 +102,27 @@ describe('AdtUtils.search — one endpoint, the reading injected once', () => {
     expect(injected.sent).toEqual(shipped.sent);
   });
 
-  it('the shipped reading answers the parsed hits', async () => {
+  it('the shipped reading answers the document as it came', async () => {
+    const { connection } = createConnection();
+
+    const value = expectResult(
+      await new AdtUtils(connection, logger).search({ query: 'ZCL_*' }),
+      'search',
+    );
+
+    // The hits used to be the default. They are a strategy in adt-strategies
+    // now, asked for by name — the case below.
+    expect(value).toBe(SEARCH_XML);
+  });
+
+  it('answers the hits when utilSearchHits is the reading', async () => {
     const { connection } = createConnection();
 
     const hits = expectResult(
-      await new AdtUtils(connection, logger).search({ query: 'ZCL_*' }),
+      await new AdtUtils(connection, logger, {
+        ...utilDocuments,
+        search: utilSearchHits,
+      }).search({ query: 'ZCL_*' }),
       'search',
     );
 

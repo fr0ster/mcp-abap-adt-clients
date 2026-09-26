@@ -1,7 +1,17 @@
+import {
+  compareRecordedAt,
+  profilerHitList,
+  profilerTraceEntries,
+} from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import { Profiler } from '../../../runtime/traces/ProfilerDomain';
-import { compareRecordedAt } from '../../../runtime/traces/traceParsing';
+import {
+  Profiler,
+  profilerDocuments,
+} from '../../../runtime/traces/ProfilerDomain';
 import { expectResult } from '../../helpers/contract';
+
+/** A profiler that reads its feed into entries — the reading a caller passes. */
+const parsing = { ...profilerDocuments, list: profilerTraceEntries };
 
 describe('Profiler', () => {
   // Real documents rather than empty bodies, so these cases test the
@@ -57,7 +67,7 @@ describe('Profiler', () => {
     } as unknown as IAbapConnection;
 
     const entries = expectResult(
-      await new Profiler(connection, createLogger()).list(),
+      await new Profiler(connection, createLogger(), parsing).list(),
       'entries',
     );
     // Exactly the snippet the CHANGELOG and the reference publish, guard and
@@ -83,7 +93,7 @@ describe('Profiler', () => {
     } as unknown as IAbapConnection;
 
     const entries = expectResult(
-      await new Profiler(connection, createLogger()).list(),
+      await new Profiler(connection, createLogger(), parsing).list(),
       'entries',
     );
     expect(entries).toEqual([]);
@@ -98,6 +108,37 @@ describe('Profiler', () => {
     expect(() =>
       entries.reduce((a, b) => (compareRecordedAt(a, b) > 0 ? a : b)),
     ).toThrow(TypeError);
+  });
+
+  it('answers the feed as it came unless a reading is given', async () => {
+    const connection = createConnectionMock();
+    const answer = await new Profiler(connection, createLogger()).list();
+    expect(expectResult(answer, 'list')).toBe(FEED);
+  });
+
+  it('read() answers each view through its own strategy', async () => {
+    const connection = createConnectionMock();
+    const raw = await new Profiler(connection, createLogger()).read(
+      'T1',
+      'hitlist',
+      {},
+    );
+    expect(expectResult(raw, 'hitlist')).toBe(HITLIST);
+
+    const parsed = await new Profiler(connection, createLogger(), {
+      ...profilerDocuments,
+      hitlist: profilerHitList,
+    }).read('T1', 'hitlist', {});
+    expect(expectResult(parsed, 'hitlist')).toEqual({ entries: [] });
+  });
+
+  it("passes the caller's analyse through, so the verdict is theirs", async () => {
+    const connection = createConnectionMock();
+    const answer = await new Profiler(connection, createLogger()).delete('T1', {
+      analyse: () => ({ origin: 'refusal', message: 'not wanted' }),
+    });
+    expect(answer.ok).toBe(false);
+    if (!answer.ok) expect(answer.getError().message).toBe('not wanted');
   });
 
   it('delete() sends DELETE to the trace itself', async () => {

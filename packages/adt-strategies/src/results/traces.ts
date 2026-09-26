@@ -1,62 +1,246 @@
 /**
- * Turning trace documents into the types `@mcp-abap-adt/interfaces` declares.
+ * The ABAP profiler's documents, and the trace schedule's.
  *
- * **This maps; it does not validate.** Validating what SAP sends is not this
- * library's job — the server is the authority on its own documents, and where a
- * check is genuinely needed ADT has an endpoint for it (see
- * `AdtInclude.validate()`, which posts to `/includes/validation`). A parser that
- * also judges the wire ends up asserting things about SAP that nobody measured.
+ * Moved from adt-clients, where `Profiler.list/read` and the executors'
+ * trace-scheduling members applied these to every answer. The members answer
+ * the document as it came now; a caller who wants the shapes below passes these
+ * readings in the result set it constructs the implementation with:
  *
- * An earlier version of this file did exactly that: a `TraceDocumentError`
- * thrown at six levels — document root, rows, fields, nested elements,
- * containers, values — plus an RFC 3339 timestamp validator. Each step had an
- * argument; the sum did not. It also created a failure mode of its own, refusing
- * timestamps a legitimate Atom feed may carry. It is gone.
+ * ```typescript
+ * new Profiler(connection, logger, {
+ *   ...profilerDocuments,
+ *   list: profilerTraceEntries,
+ *   hitlist: profilerHitList,
+ * });
+ * ```
  *
- * What replaces it is the type contract. If `IAbapTraceStatement.id` is
- * required, that is already a claim, backed by the measurement that every
- * statement carries one; checking it again at runtime is refusing to trust your
- * own contract. Nothing here invents a value the document did not contain —
- * no `?? 0`, no `?? ''`. A field the wire omits arrives as `undefined`, which is
- * the truth about the wire.
+ * **These map; they do not validate.** Validating what SAP sends is not a
+ * reading's job — the server is the authority on its own documents. Nothing
+ * here invents a value the document did not contain — no `?? 0`, no `?? ''`.
+ * A field the wire omits arrives as `undefined`, which is the truth about the
+ * wire, and a body that is empty or not XML reads as no rows rather than
+ * throwing: whether that is a failure is the caller's `analyse` to say.
  *
  * **An empty body is not an error here, and this is deliberate.** ADT answers
- * `200` with nothing when the requested documents are not there; it has 404 and
- * it has error payloads, and it used neither. Relaying that as an empty result
- * is a faithful relay, not a fabrication — nothing is invented that the response
- * did not contain.
- *
- * This has been raised more than once, because elsewhere in this repository a
- * `200` with an empty body IS a hazard: on an editable object it silently
- * corrupts read-modify-write, since the empty read becomes the basis of a write
- * that erases what was there. That danger belongs to the *update* path and to
- * objects one writes back. A trace view is read-only — nobody PUTs a hit list —
- * so the hazard does not transfer, and importing it here would put our judgement
- * in the one place we otherwise say the server decides.
- *
- * The element and attribute names are transcribed from measurement. The one
- * genuine uncertainty is the nesting of the feed's `trc:` fields: on the
- * trace-requests feed they sit under `trc:extendedData`, and the traces feed is
- * expected to match, but no raw body of it has been read end to end. So the
- * entry reader looks in both places.
+ * `200` with nothing when the requested documents are not there. A trace view
+ * is read-only — nobody PUTs a hit list — so the read-modify-write hazard of an
+ * empty `200` elsewhere does not transfer.
  */
 
+import type {
+  IResultStrategy,
+  ITraceEntry,
+  ITraceState,
+} from '@mcp-abap-adt/interfaces-adt';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { XMLParser } from 'fast-xml-parser';
-import type { INamedItem } from '../../core/shared/utilResults';
-import type {
-  IAbapTraceAccessTime,
-  IAbapTraceDbAccess,
-  IAbapTraceDbAccesses,
-  IAbapTraceEntry,
-  IAbapTraceHitList,
-  IAbapTraceHitListEntry,
-  IAbapTraceStatement,
-  IAbapTraceStatements,
-  ITraceProgramRef,
-  ITraceRequestEntry,
-  ITraceTiming,
-} from './types';
+
+export interface ITraceProgramRef {
+  name: string;
+  type: string;
+  uri: string;
+  context?: string;
+  byteCodeOffset?: number;
+  /** Present on a statement's calling program: a query URI, not a plain URI. */
+  objectReferenceQuery?: string;
+}
+
+/**
+ * `trc:grossTime` and `trc:traceEventNetTime`.
+ *
+ * Typed from measurement at last. These were `unknown` in 22.0.0 and 23.0.0
+ * because the elements had been seen on every row while their attributes had
+ * never been captured — the earlier reads were summarised into a table and the
+ * bodies discarded. A raw capture settles it: both carry exactly these two, in
+ * both the hit list and the statements, with no variant anywhere in the
+ * documents read.
+ *
+ * The **unit of `time` is not established.** The wire says `time="243"` and
+ * nothing about what 243 is; `percentage` is of the trace total, which is what
+ * makes a row comparable without knowing the unit. Naming it `timeMicros` would
+ * be inventing the one thing the measurement did not give.
+ */
+export interface ITraceTiming {
+  /** `time` — the raw figure, in whatever unit the system reports. */
+  time: number;
+  /** `percentage` of the trace total. */
+  percentage: number;
+}
+
+/** One row of the hit list. */
+export interface IAbapTraceHitListEntry {
+  /** Position in the top-down ordering, which is not `index`. */
+  topDownIndex?: number;
+  index: number;
+  hitCount?: number;
+  stackCount?: number;
+  recursionDepth?: number;
+  description?: string;
+  /** What a statement's `hitlistAnchor` refers to. */
+  proceduralEntryAnchor?: string;
+  callingProgram?: ITraceProgramRef;
+  calledProgram?: ITraceProgramRef;
+  grossTime?: ITraceTiming;
+}
+
+/** `trc:hitlist`. */
+export interface IAbapTraceHitList {
+  entries: IAbapTraceHitListEntry[];
+}
+
+/** One traced statement. */
+export interface IAbapTraceStatement {
+  id: string;
+  index: number;
+  callLevel?: number;
+  text?: string;
+  variable?: string;
+  package?: string;
+  component?: string;
+  componentDescription?: string;
+  /** Points at a hit list entry's `proceduralEntryAnchor`. */
+  hitlistAnchor?: string;
+  isProcedureLike?: boolean;
+  callingProgram?: ITraceProgramRef;
+  grossTime?: ITraceTiming;
+  traceEventNetTime?: ITraceTiming;
+}
+
+/** `trc:statements` — the large one. */
+export interface IAbapTraceStatements {
+  statements: IAbapTraceStatement[];
+}
+
+/**
+ * `trc:accessTime`. Measured, unlike the other two timing elements.
+ *
+ * `total` splits into `applicationServer` and `database`, and
+ * `ratioOfTraceTotal` says how much of the whole trace this one access was —
+ * which is the number that finds the offender without reading every row.
+ */
+export interface IAbapTraceAccessTime {
+  total?: number;
+  applicationServer?: number;
+  database?: number;
+  ratioOfTraceTotal?: number;
+}
+
+/** One database access. */
+export interface IAbapTraceDbAccess {
+  index: number;
+  tableName?: string;
+  /** The SQL, as the trace recorded it. */
+  statement?: string;
+  type?: string;
+  totalCount?: number;
+  /** Served from the buffer rather than the database. */
+  bufferedCount?: number;
+  accessTime?: IAbapTraceAccessTime;
+}
+
+/** `trc:dbAccesses`. */
+export interface IAbapTraceDbAccesses {
+  accesses: IAbapTraceDbAccess[];
+}
+
+/**
+ * A trace as the `abaptraces` feed describes it.
+ *
+ * {@link ITraceEntry} is what *every* family can say; this is what the ABAP
+ * profiler actually sends, and all of it is transcribed from one raw feed —
+ * sixty entries, every field present in every one of them, none of it outside
+ * `trc:extendedData`.
+ *
+ * The fields are required because the wire carried them without exception in
+ * the sample. That is a claim, and this is where it is recorded so a later
+ * system that omits one can be met by relaxing the type rather than by
+ * guessing what happened.
+ *
+ * Units are deliberately not asserted. `runtime` reads `554` and the document
+ * says nothing more; `size` reads `8`. Naming them `runtimeMicros` or
+ * `sizeBytes` would add precision the measurement does not contain.
+ */
+export interface IAbapTraceEntry extends ITraceEntry {
+  /** `trc:user`. Also available as `atom:author/atom:name`. */
+  user: string;
+  /** `trc:objectName` — the generated form, e.g. `ZCL_SOMETHING=========CP`. */
+  objectName: string;
+  /** `trc:state` — `R`/Finished on every entry read. */
+  state: ITraceState;
+  /** `trc:expiration`. The system deletes traces; this says when. */
+  expiresAt: string;
+
+  /** `trc:system` — the three-character system id. */
+  system: string;
+  /** `trc:client`. A string: a client is a code, and `010` is not `10`. */
+  client: string;
+  /** `trc:host` — the application server that recorded it. */
+  host: string;
+
+  /** `trc:size`. Unit unstated by the document. */
+  size: number;
+  /** `trc:runtime`, and the three figures it divides into. Unit unstated. */
+  runtime: number;
+  runtimeABAP: number;
+  runtimeSystem: number;
+  runtimeDatabase: number;
+
+  /** `trc:isAggregated` — whether the measurement was aggregated. */
+  isAggregated: boolean;
+  /** `trc:amdpFileSize`. Zero on every entry read; the field is still there. */
+  amdpFileSize: number;
+}
+
+/**
+ * `trc:executions` — a request's budget and how much of it is spent.
+ */
+export interface ITraceExecutions {
+  /** How many runs this request may measure. */
+  maximal?: number;
+  /** How many it has measured. */
+  completed?: number;
+}
+
+/**
+ * A scheduled trace request, as the server stores it.
+ *
+ * Transcribed from a created entry: the identifier, the two catalogue choices
+ * echoed back as the same URIs the catalogues hand out, and the link to the
+ * trace file once a run has produced one — which is how a scheduled request is
+ * connected to the trace it eventually yields.
+ *
+ * Deliberately no shape for a *submitted* request: the stored entry is
+ * measured, the submitted document is not.
+ */
+export interface ITraceRequestEntry {
+  /** `atom:id` — the request's own URI. */
+  id: string;
+  /** `trc:requestIndex`. */
+  index?: number;
+  description?: string;
+  /** `trc:expires`. A request that is never fulfilled does not live forever. */
+  expiresAt?: string;
+  isAggregated?: boolean;
+  /** `trc:processTypeId`, a URI from `listProcessTypes()`. */
+  processTypeId?: string;
+  /** `trc:objectTypeId`, a URI from `listObjectTypes()`. */
+  objectTypeId?: string;
+  /** `trc:executions` — how many runs it may measure, and how many it has. */
+  executions?: ITraceExecutions;
+  /** The trace this request produced, when it has produced one. */
+  traceUri?: string;
+}
+
+/**
+ * One entry of a trace catalogue — `listObjectTypes()` / `listProcessTypes()`.
+ *
+ * `name` is a **URI**, not a short code, and it is exactly what a stored trace
+ * request echoes back as `trc:processTypeId` / `trc:objectTypeId`.
+ */
+export interface ITraceCatalogueItem {
+  name: string;
+  description: string;
+}
 
 const parser = new XMLParser({
   ignoreAttributes: false,
@@ -195,27 +379,6 @@ const ID_IN_URI = /abaptraces\/([A-Za-z0-9]{16,})(?:\/|$)/;
 /** The fractional digits beyond the millisecond, or '' when there are none. */
 const SUB_MILLI = /\.(\d+)/;
 
-/**
- * Order two traces by when they were recorded.
- *
- * A comparator, not a validator — this reads the timestamp for our own purpose
- * rather than judging whether SAP was entitled to send it.
- *
- * Two things it must get right, both defects in our own logic and neither about
- * the wire:
- *
- * - **Not as text.** `2026-08-28T09:00:00Z` is later than
- *   `2026-08-28T10:00:00+02:00` and sorts lower as a string, so a caller
- *   picking the newest entry would take the stale one instead.
- * - **Past the millisecond.** `Date.parse` truncates there, so `…00.1001Z` and
- *   `…00.1009Z` come back equal and the older of the two is kept. Removing the
- *   RFC 3339 validator took this fix with it, which it should not have: the
- *   validator was a claim about SAP, this is arithmetic about our own ordering.
- *
- * An unreadable timestamp sorts first rather than throwing. Ordering is not
- * judgement, and `NaN` compares false in both directions, which would otherwise
- * leave the result depending on iteration order.
- */
 /** Seconds field of `60` — the leap second, which POSIX time cannot hold. */
 const LEAP_SECOND = /^(.*T\d{2}:\d{2}:)60(\D.*)?$/;
 
@@ -246,6 +409,27 @@ function millisOf(raw: string): number {
   return Number.NaN;
 }
 
+/**
+ * Order two traces by when they were recorded.
+ *
+ * A comparator, not a validator — this reads the timestamp for our own purpose
+ * rather than judging whether SAP was entitled to send it.
+ *
+ * Two things it must get right, both defects in our own logic and neither about
+ * the wire:
+ *
+ * - **Not as text.** `2026-08-28T09:00:00Z` is later than
+ *   `2026-08-28T10:00:00+02:00` and sorts lower as a string, so a caller
+ *   picking the newest entry would take the stale one instead.
+ * - **Past the millisecond.** `Date.parse` truncates there, so `…00.1001Z` and
+ *   `…00.1009Z` come back equal and the older of the two is kept. Removing the
+ *   RFC 3339 validator took this fix with it, which it should not have: the
+ *   validator was a claim about SAP, this is arithmetic about our own ordering.
+ *
+ * An unreadable timestamp sorts first rather than throwing. Ordering is not
+ * judgement, and `NaN` compares false in both directions, which would otherwise
+ * leave the result depending on iteration order.
+ */
 export function compareRecordedAt(
   a: { recordedAt: string },
   b: { recordedAt: string },
@@ -274,11 +458,9 @@ export function compareRecordedAt(
  *
  * Order is the server's, and **order is not age** — measured, a feed's first
  * entries were minutes old while its last were eight days older. A caller that
- * wants the newest uses {@link compareRecordedAt}.
+ * wants the newest sorts with {@link compareRecordedAt}.
  */
-export function parseTraceEntries(
-  response: IAdtWireResponse,
-): IAbapTraceEntry[] {
+function readTraceEntries(response: IAdtWireResponse): IAbapTraceEntry[] {
   return asList(rootOf(response, 'feed').entry).map(
     (entry): IAbapTraceEntry => {
       const idText = text(entry.id) ?? '';
@@ -348,7 +530,7 @@ function programRef(node: unknown): ITraceProgramRef | undefined {
   };
 }
 
-export function parseHitList(response: IAdtWireResponse): IAbapTraceHitList {
+function readHitList(response: IAdtWireResponse): IAbapTraceHitList {
   return {
     entries: asList(rootOf(response, 'hitlist').entry).map(
       (row): IAbapTraceHitListEntry => ({
@@ -367,9 +549,7 @@ export function parseHitList(response: IAdtWireResponse): IAbapTraceHitList {
   };
 }
 
-export function parseStatements(
-  response: IAdtWireResponse,
-): IAbapTraceStatements {
+function readStatements(response: IAdtWireResponse): IAbapTraceStatements {
   return {
     statements: asList(rootOf(response, 'statements').statement).map(
       (row): IAbapTraceStatement => ({
@@ -404,9 +584,7 @@ function accessTime(node: unknown): IAbapTraceAccessTime | undefined {
   };
 }
 
-export function parseDbAccesses(
-  response: IAdtWireResponse,
-): IAbapTraceDbAccesses {
+function readDbAccesses(response: IAdtWireResponse): IAbapTraceDbAccesses {
   return {
     accesses: asList(rootOf(response, 'dbAccesses').dbAccess).map(
       (row): IAbapTraceDbAccess => ({
@@ -429,7 +607,7 @@ export function parseDbAccesses(
  * what a stored trace request echoes back as `trc:processTypeId` /
  * `trc:objectTypeId`. Renaming it here would hide that they are the same string.
  */
-export function parseNamedItems(response: IAdtWireResponse): INamedItem[] {
+function readCatalogue(response: IAdtWireResponse): ITraceCatalogueItem[] {
   return asList(rootOf(response, 'namedItemList').namedItem).map((item) => ({
     name: text(item.name) as string,
     description: text(item.description) as string,
@@ -442,9 +620,7 @@ export function parseNamedItems(response: IAdtWireResponse): INamedItem[] {
  * An empty feed means nothing is scheduled — this collection is consumed by the
  * runs that fulfil it — NOT that the endpoint is broken.
  */
-export function parseTraceRequests(
-  response: IAdtWireResponse,
-): ITraceRequestEntry[] {
+function readTraceRequests(response: IAdtWireResponse): ITraceRequestEntry[] {
   return asList(rootOf(response, 'feed').entry).map(
     (entry): ITraceRequestEntry => {
       const extended = presentNode(entry.extendedData) ?? {};
@@ -479,3 +655,71 @@ export function parseTraceRequests(
     },
   );
 }
+
+/**
+ * The request id out of a scheduled measurement's `Location`.
+ *
+ * The id appears only there: reading the created resource back answers `200`
+ * with an **empty body**, measured. A `Location` that is absent reads as `''`
+ * rather than throwing — that SAP did not say is the caller's to judge, through
+ * `analyse`, which sees the same answer.
+ */
+function readProfilerId(response: IAdtWireResponse): string {
+  const headers = response?.headers as
+    | Record<string, string | string[] | undefined>
+    | undefined;
+  const location =
+    headers?.location ??
+    headers?.Location ??
+    headers?.['content-location'] ??
+    headers?.['Content-Location'];
+  if (typeof location !== 'string' || !location.trim()) {
+    return '';
+  }
+  const value = location.trim();
+  if (value.startsWith('/')) {
+    return value;
+  }
+  try {
+    const parsed = new URL(value);
+    return `${parsed.pathname}${parsed.search}`;
+  } catch {
+    return value;
+  }
+}
+
+/** The `abaptraces` feed, read as its traces — `Profiler.list`. */
+export const profilerTraceEntries: IResultStrategy<IAbapTraceEntry[]> = (
+  answer,
+) => readTraceEntries(answer);
+
+/** `trc:hitlist` — the `hitlist` view of `Profiler.read`. */
+export const profilerHitList: IResultStrategy<IAbapTraceHitList> = (answer) =>
+  readHitList(answer);
+
+/** `trc:statements` — the `statements` view of `Profiler.read`. */
+export const profilerStatements: IResultStrategy<IAbapTraceStatements> = (
+  answer,
+) => readStatements(answer);
+
+/** `trc:dbAccesses` — the `dbAccesses` view of `Profiler.read`. */
+export const profilerDbAccesses: IResultStrategy<IAbapTraceDbAccesses> = (
+  answer,
+) => readDbAccesses(answer);
+
+/**
+ * A trace catalogue — what `listObjectTypes()` and `listProcessTypes()` answer,
+ * a `nameditem:namedItemList`.
+ */
+export const traceSchedulingTypes: IResultStrategy<ITraceCatalogueItem[]> = (
+  answer,
+) => readCatalogue(answer);
+
+/** The schedule — `listRequests()` and `getRequestsByUri()`. */
+export const traceSchedulingRequests: IResultStrategy<ITraceRequestEntry[]> = (
+  answer,
+) => readTraceRequests(answer);
+
+/** The request id `scheduleTrace()` was answered with, or `''`. */
+export const traceSchedulingProfilerId: IResultStrategy<string> = (answer) =>
+  readProfilerId(answer);

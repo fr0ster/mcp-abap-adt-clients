@@ -13,9 +13,12 @@
  * mentioned `getTransaction` was its own doc comment and this refusal of it.
  */
 
-import type {
-  IAdtResponse,
-  IResultStrategy,
+import {
+  AdtObjectErrorCodes,
+  type IAdtAnalyseOptions,
+  type IAdtError,
+  type IAdtResponse,
+  type IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import { buildObjectUri } from '../../utils/activationUtils';
 import { answering, failed } from '../../utils/adtResponse';
@@ -44,11 +47,17 @@ export class AdtUtilsLegacy<
    *
    * Modern systems use async /sap/bc/adt/activation/runs with polling.
    * Legacy systems use synchronous /sap/bc/adt/activation — response contains result directly.
+   *
+   * Read through the same `activation` slot as the modern run. The default keeps
+   * the document, which here is the result itself; `utilActivationRunId` would
+   * find no run id in it and answer `''`, so a caller on a legacy system does
+   * not pass that one.
    */
-  override async activateObjectsGroup(
+  override async activateObjectsGroup<E extends IAdtError = IAdtError>(
     objects: IObjectReference[],
     preauditRequested: boolean = false,
-  ): Promise<IAdtResponse<ReturnType<R['activation']>>> {
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
     const url = `/sap/bc/adt/activation?method=activate&preauditRequested=${preauditRequested}`;
 
     const objectReferences = objects
@@ -76,6 +85,7 @@ ${objectReferences}
           },
         }),
       this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
+      options?.analyse,
     );
   }
 
@@ -88,36 +98,49 @@ ${objectReferences}
    * type — the substitution decision 13 is about, broken by the half that is
    * meant to be interchangeable.
    *
-   * `origin` is `'connection'`: the endpoint is not there. That is the same
-   * remedy as an unreachable host — a different system, not a different
-   * question — and it is what separates this from a refusal, which is a server
-   * answering about an object.
+   * `origin` is `'refusal'` with `UNSUPPORTED_OPERATION`: this system's
+   * discovery catalogue does not list the endpoint, so the operation is not
+   * offered here. It was `'connection'`, which tells a caller to reauthenticate
+   * or restore reachability over a request that was never sent — nothing about
+   * the connection failed.
+   *
+   * No request is made, so there is no answer for the caller's `analyse` to
+   * read; the option is accepted for the contract's shape.
    */
-  override async getTableColumns(
+  override async getTableColumns<E extends IAdtError = IAdtError>(
     _tableName: string,
-  ): Promise<IAdtResponse<ReturnType<R['columns']>>> {
+    _options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['columns']>, E>> {
     return this.refuse(
       'Table columns',
       '/sap/bc/adt/datapreview/ddic/{name}/metadata',
     );
   }
 
-  override async getTableContents(
+  override async getTableContents<E extends IAdtError = IAdtError>(
     _params: IGetTableContentsParams,
-  ): Promise<IAdtResponse<ReturnType<R['contents']>>> {
+    _options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['contents']>, E>> {
     return this.refuse('Table contents', '/sap/bc/adt/datapreview/ddic');
   }
 
-  override async getSqlQuery(
+  override async getSqlQuery<E extends IAdtError = IAdtError>(
     _params: IGetSqlQueryParams,
-  ): Promise<IAdtResponse<ReturnType<R['query']>>> {
+    _options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['query']>, E>> {
     return this.refuse('SQL query', '/sap/bc/adt/datapreview/freestyle');
   }
 
-  private refuse<T>(operation: string, endpoint: string): IAdtResponse<T> {
-    return failed<T>({
-      origin: 'connection',
+  private refuse<T, E extends IAdtError>(
+    operation: string,
+    endpoint: string,
+  ): IAdtResponse<T, E> {
+    // The library's own verdict, so `E` is its default `IAdtError` here — the
+    // same cast `answering` makes when no strategy supplied one.
+    return failed<T, E>({
+      origin: 'refusal',
+      code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION,
       message: unsupportedError(operation, endpoint),
-    });
+    } as E);
   }
 }

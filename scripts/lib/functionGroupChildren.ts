@@ -11,12 +11,11 @@
  * to whoever wants a list. Built over `fetchNodeStructure`, which is one
  * request and keeps its reading.
  */
+
+import { readNodeStructure } from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
-import {
-  fetchNodeStructure,
-  parseNodeStructure,
-} from '../../src/core/shared/nodeStructure';
+import { fetchNodeStructure } from '../../src/core/shared/nodeStructure';
 
 const bodyOf = (data: unknown): string =>
   typeof data === 'string' ? data : JSON.stringify(data ?? '');
@@ -42,7 +41,7 @@ export async function functionGroupChildren(
     '000000',
     true,
   );
-  const { objectTypes } = parseNodeStructure(bodyOf(root.data), logger);
+  const { objectTypes } = readNodeStructure(bodyOf(root.data));
 
   const wanted = objectTypes.find((t) => t.objectType === childType);
   if (!wanted) return [];
@@ -54,7 +53,7 @@ export async function functionGroupChildren(
     wanted.nodeId,
     true,
   );
-  const { nodes } = parseNodeStructure(bodyOf(children.data), logger);
+  const { nodes } = readNodeStructure(bodyOf(children.data));
 
   const seen = new Set<string>();
   const names: string[] = [];

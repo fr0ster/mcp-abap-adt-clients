@@ -1,6 +1,15 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
-import { ClassExecutor, ProgramExecutor } from '../executors';
+import {
+  ClassExecutor,
+  classExecutorDocuments,
+  type IClassExecutorResults,
+} from '../executors/class/ClassExecutor';
+import {
+  type IProgramExecutorResults,
+  ProgramExecutor,
+  programExecutorDocuments,
+} from '../executors/program/ProgramExecutor';
 import { withRequestTrace } from '../utils/requestTrace';
 
 export class AdtExecutor {
@@ -15,11 +24,15 @@ export class AdtExecutor {
     this.logger = logger;
   }
 
-  getClassExecutor(): ClassExecutor {
-    return new ClassExecutor(this.connection, this.logger);
+  getClassExecutor<
+    R extends IClassExecutorResults = typeof classExecutorDocuments,
+  >(results: R = classExecutorDocuments as unknown as R): ClassExecutor<R> {
+    return new ClassExecutor<R>(this.connection, this.logger, results);
   }
 
-  getProgramExecutor(): ProgramExecutor {
-    return new ProgramExecutor(this.connection, this.logger);
+  getProgramExecutor<
+    R extends IProgramExecutorResults = typeof programExecutorDocuments,
+  >(results: R = programExecutorDocuments as unknown as R): ProgramExecutor<R> {
+    return new ProgramExecutor<R>(this.connection, this.logger, results);
   }
 }

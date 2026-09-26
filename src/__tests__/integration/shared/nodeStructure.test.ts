@@ -5,12 +5,18 @@
  * Enable debug logs: DEBUG_TESTS=true npm test -- unit/shared/nodeStructure.test
  */
 
+// The source path, not the package: these readings are new in adt-strategies
+// and the package's built entry point does not carry them until it is released.
+import {
+  type IRepositoryNodeContents,
+  utilNodeContents,
+} from '@mcp-abap-adt/adt-strategies';
 import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtClient } from '../../../clients/AdtClient';
-import type { IRepositoryNodeContents } from '../../../core/shared/utilResults';
+import { utilDocuments } from '../../../core/shared/utilResultSet';
 import { failed } from '../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import type { TestableObject } from '../../helpers/BaseTester';
@@ -95,8 +101,10 @@ class NodeStructureObject implements TestableObject<INodeStructureParams> {
     if (!config.parent_type || !config.parent_name) {
       return Promise.reject(new Error('parent_type and parent_name required'));
     }
+    // The level's shape is `utilNodeContents`, asked for by name — the shipped
+    // default answers the document as it came.
     return this.client
-      .getUtils()
+      .getUtils({ ...utilDocuments, node: utilNodeContents })
       .fetchNodeStructure(config.parent_type, config.parent_name, {
         nodeId: config.node_id,
       });

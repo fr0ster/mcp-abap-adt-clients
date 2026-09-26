@@ -1,4 +1,7 @@
 /**
+ * Moved with the readings from adt-clients (`traceParsing.test.ts`), where
+ * `Profiler` and the executors applied them to every answer.
+ *
  * What the trace parsers map, and what they deliberately do not do.
  *
  * An earlier version of this file had fifty-nine cases, thirty-five of them
@@ -16,13 +19,14 @@
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   compareRecordedAt,
-  parseDbAccesses,
-  parseHitList,
-  parseNamedItems,
-  parseStatements,
-  parseTraceEntries,
-  parseTraceRequests,
-} from '../../../runtime/traces/traceParsing';
+  profilerDbAccesses,
+  profilerHitList,
+  profilerStatements,
+  profilerTraceEntries,
+  traceSchedulingProfilerId,
+  traceSchedulingRequests,
+  traceSchedulingTypes,
+} from '../results/traces';
 
 const response = (data: string): IAdtWireResponse =>
   ({ data, status: 200, statusText: 'OK', headers: {} }) as IAdtWireResponse;
@@ -55,7 +59,7 @@ describe('trace document mapping', () => {
       // Transcribed from the raw capture rather than trimmed to what the
       // parser happened to read: the point is that nothing in the document is
       // dropped on the floor.
-      expect(parseTraceEntries(FEED(REAL_ENTRY))).toEqual([
+      expect(profilerTraceEntries(FEED(REAL_ENTRY))).toEqual([
         {
           id: TRACE_ID,
           recordedAt: '2026-08-28T10:00:00Z',
@@ -79,14 +83,14 @@ describe('trace document mapping', () => {
     });
 
     it('keeps the client as a string, because `010` is not `10`', () => {
-      const entries = parseTraceEntries(
+      const entries = profilerTraceEntries(
         FEED(REAL_ENTRY.replace('<trc:client>100<', '<trc:client>010<')),
       );
       expect(entries[0]?.client).toBe('010');
     });
 
     it('finds the trc: fields under extendedData', () => {
-      const entries = parseTraceEntries(
+      const entries = profilerTraceEntries(
         FEED(
           `<atom:entry><atom:id>/sap/bc/adt/runtime/traces/abaptraces/${TRACE_ID}</atom:id><atom:published>2026-08-28T10:00:00Z</atom:published><trc:extendedData><trc:user>SOMEONE</trc:user><trc:objectName>ZCL_X=====CP</trc:objectName><trc:state trc:value="R" trc:text="Finished"/><trc:expiration>2026-09-25T10:00:00Z</trc:expiration></trc:extendedData></atom:entry>`,
         ),
@@ -104,7 +108,7 @@ describe('trace document mapping', () => {
       // real had never been read end to end. It has been now: sixty entries,
       // every `trc:` field inside the container and not one outside it. A
       // second lookup would be reading for a document nobody has seen.
-      const entries = parseTraceEntries(
+      const entries = profilerTraceEntries(
         FEED(
           `<atom:entry><atom:id>/sap/bc/adt/runtime/traces/abaptraces/${TRACE_ID}</atom:id><atom:published>2026-08-28T10:00:00Z</atom:published><trc:objectName>ON_THE_ENTRY</trc:objectName></atom:entry>`,
         ),
@@ -113,7 +117,7 @@ describe('trace document mapping', () => {
     });
 
     it('falls back to atom:author for the user', () => {
-      const entries = parseTraceEntries(
+      const entries = profilerTraceEntries(
         FEED(
           `<atom:entry><atom:id>/sap/bc/adt/runtime/traces/abaptraces/${TRACE_ID}</atom:id><atom:published>2026-08-28T10:00:00Z</atom:published><atom:author><atom:name>SOMEONE</atom:name></atom:author></atom:entry>`,
         ),
@@ -123,14 +127,14 @@ describe('trace document mapping', () => {
 
     it('reads a feed with no entries as no traces', () => {
       expect(
-        parseTraceEntries(FEED('<atom:title>Traces</atom:title>')),
+        profilerTraceEntries(FEED('<atom:title>Traces</atom:title>')),
       ).toEqual([]);
     });
   });
 
   describe('the three views', () => {
     it('maps a hit list row, including the program it names', () => {
-      const parsed = parseHitList(
+      const parsed = profilerHitList(
         response(
           '<?xml version="1.0"?><trc:hitlist xmlns:trc="x" xmlns:adtcore="y"><trc:entry trc:index="1" trc:hitCount="3" trc:recursionDepth="0" trc:description="do it"><trc:callingProgram adtcore:name="ZCL_X" adtcore:type="CLAS/OC" adtcore:uri="/sap/bc/adt/oo/classes/zcl_x" trc:byteCodeOffset="12"/></trc:entry></trc:hitlist>',
         ),
@@ -154,7 +158,7 @@ describe('trace document mapping', () => {
       // `ITraceTiming` was `unknown` through two releases because the elements
       // had been seen while their attributes never had. Both carry `time` and
       // `percentage`, in the hit list and the statements alike.
-      const parsed = parseHitList(
+      const parsed = profilerHitList(
         response(
           '<?xml version="1.0"?><trc:hitlist xmlns:trc="x"><trc:entry trc:index="1"><trc:grossTime time="243" percentage="43.8628"/></trc:entry></trc:hitlist>',
         ),
@@ -166,7 +170,7 @@ describe('trace document mapping', () => {
     });
 
     it('leaves a timing absent when the element is', () => {
-      const parsed = parseHitList(
+      const parsed = profilerHitList(
         response(
           '<?xml version="1.0"?><trc:hitlist xmlns:trc="x"><trc:entry trc:index="1"/></trc:hitlist>',
         ),
@@ -175,7 +179,7 @@ describe('trace document mapping', () => {
     });
 
     it('maps a statement, keeping the anchor that links it to the hit list', () => {
-      const parsed = parseStatements(
+      const parsed = profilerStatements(
         response(
           '<?xml version="1.0"?><trc:statements xmlns:trc="x"><trc:statement trc:id="7" trc:index="2" trc:callLevel="3" trc:hitlistAnchor="A1" trc:isProcedureLike="true"/></trc:statements>',
         ),
@@ -190,7 +194,7 @@ describe('trace document mapping', () => {
     });
 
     it('reads traceEventNetTime the same way', () => {
-      const parsed = parseStatements(
+      const parsed = profilerStatements(
         response(
           '<?xml version="1.0"?><trc:statements xmlns:trc="x"><trc:statement trc:id="7" trc:index="2"><trc:traceEventNetTime time="14" percentage="2.53"/></trc:statement></trc:statements>',
         ),
@@ -202,7 +206,7 @@ describe('trace document mapping', () => {
     });
 
     it('maps a database access with its split access time', () => {
-      const parsed = parseDbAccesses(
+      const parsed = profilerDbAccesses(
         response(
           '<?xml version="1.0"?><trc:dbAccesses xmlns:trc="x"><trc:dbAccess trc:index="1" trc:tableName="T000" trc:totalCount="4" trc:bufferedCount="1"><trc:accessTime trc:total="120" trc:applicationServer="20" trc:database="100" trc:ratioOfTraceTotal="3"/></trc:dbAccess></trc:dbAccesses>',
         ),
@@ -223,7 +227,7 @@ describe('trace document mapping', () => {
 
     it('reads an empty view as no rows', () => {
       expect(
-        parseHitList(
+        profilerHitList(
           response('<?xml version="1.0"?><trc:hitlist xmlns:trc="x"/>'),
         ),
       ).toEqual({ entries: [] });
@@ -231,12 +235,12 @@ describe('trace document mapping', () => {
 
     it('reads one row and many rows the same way', () => {
       // fast-xml-parser gives an object for one child and an array for several.
-      const one = parseHitList(
+      const one = profilerHitList(
         response(
           '<?xml version="1.0"?><trc:hitlist xmlns:trc="x"><trc:entry trc:index="1"/></trc:hitlist>',
         ),
       );
-      const many = parseHitList(
+      const many = profilerHitList(
         response(
           '<?xml version="1.0"?><trc:hitlist xmlns:trc="x"><trc:entry trc:index="1"/><trc:entry trc:index="2"/></trc:hitlist>',
         ),
@@ -249,7 +253,7 @@ describe('trace document mapping', () => {
   describe('the catalogues and the schedule', () => {
     it('reads a catalogue item, whose name is a URI and not a code', () => {
       expect(
-        parseNamedItems(
+        traceSchedulingTypes(
           response(
             '<?xml version="1.0"?><nameditem:namedItemList xmlns:nameditem="x"><nameditem:namedItem><nameditem:name>/sap/bc/adt/runtime/traces/abaptraces/objecttypes/any</nameditem:name><nameditem:description>Any</nameditem:description></nameditem:namedItem></nameditem:namedItemList>',
           ),
@@ -263,7 +267,7 @@ describe('trace document mapping', () => {
     });
 
     it('reads a stored trace request, catalogue choices and all', () => {
-      const [entry] = parseTraceRequests(
+      const [entry] = traceSchedulingRequests(
         FEED(
           '<atom:entry><atom:id>/sap/bc/adt/runtime/traces/abaptraces/requests/26</atom:id>' +
             '<atom:link href="/sap/bc/adt/runtime/traces/abaptraces/B343" rel="http://www.sap.com/adt/relations/runtime/traces/abaptraces/tracefile"/>' +
@@ -286,12 +290,12 @@ describe('trace document mapping', () => {
 
     it('reads the boolean the same way as an attribute and as an element', () => {
       // The same field arrives both ways; one mapper, so they cannot disagree.
-      const asElement = parseTraceRequests(
+      const asElement = traceSchedulingRequests(
         FEED(
           '<atom:entry><atom:id>/x/1</atom:id><trc:extendedData><trc:isAggregated>false</trc:isAggregated></trc:extendedData></atom:entry>',
         ),
       );
-      const asAttribute = parseTraceRequests(
+      const asAttribute = traceSchedulingRequests(
         FEED(
           '<atom:entry><atom:id>/x/1</atom:id><trc:extendedData trc:isAggregated="false"/></atom:entry>',
         ),
@@ -305,7 +309,7 @@ describe('trace document mapping', () => {
       // document's spelling — it belongs to `asx:abap` payloads — so it is not
       // silently turned into `true` here either.
       for (const raw of ['X', 'unexpected', '']) {
-        const [entry] = parseTraceRequests(
+        const [entry] = traceSchedulingRequests(
           FEED(
             `<atom:entry><atom:id>/x/1</atom:id><trc:extendedData><trc:isAggregated>${raw}</trc:isAggregated></trc:extendedData></atom:entry>`,
           ),
@@ -318,7 +322,7 @@ describe('trace document mapping', () => {
       // The runs that fulfil requests consume them, so empty is the normal
       // answer — not a broken endpoint.
       expect(
-        parseTraceRequests(FEED('<atom:title>Requests</atom:title>')),
+        traceSchedulingRequests(FEED('<atom:title>Requests</atom:title>')),
       ).toEqual([]);
     });
   });
@@ -393,12 +397,47 @@ describe('trace document mapping', () => {
       // caller that needs a different reading supplies its own parser through
       // `readWith`.
       expect(() =>
-        parseHitList(
+        profilerHitList(
           response('<?xml version="1.0"?><exc:exception xmlns:exc="x"/>'),
         ),
       ).not.toThrow();
-      expect(() => parseHitList(response('not xml at all <'))).not.toThrow();
-      expect(() => parseHitList(response(''))).not.toThrow();
+      expect(() => profilerHitList(response('not xml at all <'))).not.toThrow();
+      expect(() => profilerHitList(response(''))).not.toThrow();
     });
+  });
+});
+
+describe('traceSchedulingProfilerId', () => {
+  const withHeaders = (headers: Record<string, string>): IAdtWireResponse =>
+    ({
+      data: '',
+      status: 201,
+      statusText: 'Created',
+      headers,
+    }) as IAdtWireResponse;
+
+  it('reads the request id out of Location, absolute or relative', () => {
+    expect(
+      traceSchedulingProfilerId(
+        withHeaders({
+          location:
+            'https://host/sap/bc/adt/runtime/traces/abaptraces/ABCD1234EFGH5678',
+        }),
+      ),
+    ).toBe('/sap/bc/adt/runtime/traces/abaptraces/ABCD1234EFGH5678');
+    expect(
+      traceSchedulingProfilerId(
+        withHeaders({
+          location: '/sap/bc/adt/runtime/traces/abaptraces/ID123',
+        }),
+      ),
+    ).toBe('/sap/bc/adt/runtime/traces/abaptraces/ID123');
+  });
+
+  it('reads an answer without Location as no id, rather than throwing', () => {
+    // It used to throw "Trace scheduling returned no request id" from inside
+    // the member — SAP's answer lacking something, dressed as a library
+    // failure. The caller's analyse judges it now.
+    expect(traceSchedulingProfilerId(withHeaders({}))).toBe('');
   });
 });

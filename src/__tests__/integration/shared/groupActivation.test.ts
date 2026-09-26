@@ -12,6 +12,9 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+// The source path, not the package: this reading is new in adt-strategies and
+// the package's built entry point does not carry it until it is released.
+import { utilActivationRunId } from '@mcp-abap-adt/adt-strategies';
 import type {
   IAbapConnection,
   ISessionLifecycleAware,
@@ -20,7 +23,7 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import { activationStatusIn } from '../../../../scripts/lib/activationRun';
 import type { AdtClient } from '../../../clients/AdtClient';
-import { orThrow } from '../../../utils/adtResponse';
+import { utilDocuments } from '../../../core/shared/utilResultSet';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import { expectResult } from '../../helpers/contract';
 import {
@@ -531,15 +534,20 @@ define structure ${structureName} {
         // on its own is not success: it says the server accepted the work, and
         // the results document is what says how the work went. A fixed sleep in
         // its place was a guess about someone else's system.
-        const utils = client.getUtils();
+        // The run id is `utilActivationRunId`'s reading of `Location`; the
+        // shipped default answers the POST as it came.
+        const utils = client.getUtils({
+          ...utilDocuments,
+          activation: utilActivationRunId,
+        });
         const runId = expectResult(
           await utils.activateObjectsGroup(objectsToActivate, false),
           'activation run id',
         );
         expect(runId).toBeTruthy();
 
-        // The wait is this test's. `activateObjectsGroup` is the POST and
-        // answers the run id; `finished` is what this test needs, and `error`
+        // The wait is this test's. `activateObjectsGroup` is the POST, read
+        // here into the run id; `finished` is what this test needs, and `error`
         // or `failed` is what it must not accept as one.
         let runStatus = '';
         const runDeadline = Date.now() + 120_000;

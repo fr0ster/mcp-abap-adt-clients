@@ -1,17 +1,25 @@
+// The source path, not the package: the reading is new in adt-strategies and
+// the package's built entry point does not carry it until it is released.
+import { utilActivationRunId } from '@mcp-abap-adt/adt-strategies';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { AdtClient, activationRunId, extractRunId } from '../../../index';
+import { AdtClient } from '../../../clients/AdtClient';
+import { utilDocuments } from '../../../core/shared/utilResultSet';
 
 /**
- * Start, then status, then results — through the package entry point.
+ * Start, then status, then results — through the client a consumer holds.
  *
  * `activateObjectsGroup` used to poll `/activation/runs/{runId}` itself and
  * answer the results. The wait is the caller's now, so the whole sequence has
  * to be reachable from outside: the start must hand back the run id, and both
  * members that take one must be there. This asserts that end to end, because
  * each piece passing on its own would not have caught the id being discarded.
+ *
+ * The id is read by `utilActivationRunId` from adt-strategies, passed for the
+ * `activation` slot — the default answers the POST as it came. The reading's
+ * own cases moved there with it (`utilReadings.test.ts`).
  */
 const RUN_ID = 'ACT0000000042';
 
@@ -43,7 +51,10 @@ const recording = () => {
 
 it('starts a run, reads its status, then its results', async () => {
   const { connection, urls } = recording();
-  const utils = new AdtClient(connection).getUtils();
+  const utils = new AdtClient(connection).getUtils({
+    ...utilDocuments,
+    activation: utilActivationRunId,
+  });
 
   const started = await utils.activateObjectsGroup([
     { name: 'ZCL_X', type: 'CLAS/OC' },
@@ -69,17 +80,14 @@ it('starts a run, reads its status, then its results', async () => {
   ]);
 });
 
-it('exports the reading and the header helper a caller composes with', () => {
-  // A caller who keeps the exchange with `wireItself` reads the id later.
-  expect(
-    activationRunId({
-      headers: { location: `/sap/bc/adt/activation/runs/${RUN_ID}` },
-    } as never),
-  ).toBe(RUN_ID);
-
-  expect(extractRunId(`/sap/bc/adt/activation/runs/${RUN_ID}`)).toBe(RUN_ID);
-
-  // No header carried one: the reading says it found none rather than
-  // inventing a verdict about the server.
-  expect(activationRunId({ headers: {} } as never)).toBe('');
+it('answers the POST as it came by default', async () => {
+  const { connection } = recording();
+  const started = await new AdtClient(connection)
+    .getUtils()
+    .activateObjectsGroup([{ name: 'ZCL_X', type: 'CLAS/OC' }]);
+  expect(started.ok).toBe(true);
+  if (!started.ok) throw new Error('expected the answer');
+  // The body, which carries nothing — the id is in a header the default does
+  // not read.
+  expect(started.getResult().value).toBe('');
 });

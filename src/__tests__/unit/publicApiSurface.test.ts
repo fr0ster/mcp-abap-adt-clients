@@ -1,9 +1,10 @@
 /**
  * What the package actually hands out from its root.
  *
- * This exists because a claim in the CHANGELOG outran the code:
- * `parseSearchResults` was described as "exported for callers already holding
- * the XML" while the symbol never reached the public barrel. It had `export` in
+ * This exists because a claim in the CHANGELOG once outran the code:
+ * `parseSearchResults` (a reading, since moved to @mcp-abap-adt/adt-strategies
+ * as `readSearchHits`) was described as exported while the symbol never reached
+ * the public barrel. It had `export` in
  * its own module, the module was not re-exported, and nothing noticed — a
  * deep import into `dist/core/shared/search` was the only way in, which is not
  * an API, it is a consumer reaching past the package boundary.
@@ -15,33 +16,9 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import * as rootExports from '../../index';
-import { AdtSAPError, parseSearchResults } from '../../index';
+import { AdtSAPError } from '../../index';
 
 describe('public API surface', () => {
-  it('hands out parseSearchResults from the package root', () => {
-    expect(typeof parseSearchResults).toBe('function');
-  });
-
-  it('parses through the public entry point, not just past it', () => {
-    // Exercised via the root import, so an export that exists but resolves to
-    // something unusable would fail here rather than in the deep module.
-    const hits = parseSearchResults(
-      `<objectReferences>
-         <objectReference adtcore:name="ZCL_PUBLIC" adtcore:type="CLAS/OC"/>
-       </objectReferences>`,
-    );
-
-    expect(hits).toEqual([
-      {
-        name: 'ZCL_PUBLIC',
-        type: 'CLAS/OC',
-        description: '',
-        packageName: undefined,
-        uri: undefined,
-      },
-    ]);
-  });
-
   it('hands out AdtSAPError from the package root', () => {
     // Every client throws this. A consumer who cannot import it cannot tell a
     // refusal from any other failure, and `.document` — the answer SAP actually
@@ -86,9 +63,6 @@ describe('public API surface', () => {
  * reads only what is marked.
  */
 const RUNTIME_EXPORTS = [
-  // name, so it is part of the surface rather than an internal detail.
-  // Public since 15.0.0: the replacement for the removed `latestTraceId()`.
-  // Thrown by every client since the refusal check; a consumer catches it by
   'AdtAbapGitClient',
   'AdtAppendStructure',
   'AdtAtc',
@@ -110,78 +84,75 @@ const RUNTIME_EXPORTS = [
   'AdtServiceBinding',
   'ApplicationLog',
   'AtcLog',
-  'buildDumpIdPrefix',
-  'buildRuntimeDumpsUserQuery',
-  'changeTransportTaskType',
-  'compareRecordedAt',
-  'createAdtClient',
-  'CrossTrace',
   'CT_INCLUDE',
+  'CrossTrace',
   'DdicActivation',
   'FeedRepository',
-  'fetchDiscoveryEndpoints',
   'GatewayErrorLog',
-  'getSystemInformation',
-  'isEndpointInDiscovery',
-  'isModernAdtSystem',
-  'parseSearchResults',
   'Profiler',
-  'resolveBindingVariant',
-  'resolveContentTypes',
   'RuntimeDumps',
   'St05Trace',
   'SystemMessages',
-  // The injection surface. A member's result type is a type parameter of its
-  // contract, and these are what a consumer reaches for to fill it in: the
-  // strategy implementations, the shipped default set for each object type,
-  // and the two error strategies a caller's own `analyse` can defer to.
-  // Without them the seam the contracts name is unreachable from outside.
   'abapGitDocuments',
   'accessControlDocuments',
   'appendStructureDocuments',
+  'applicationLogDocuments',
+  'atcDocuments',
+  'atcLogDocuments',
   'authorizationFieldDocuments',
   'behaviorDefinitionDocuments',
+  'buildDumpIdPrefix',
+  'buildRuntimeDumpsUserQuery',
+  'changeTransportTaskType',
   'classDocuments',
+  'classExecutorDocuments',
+  'createAdtClient',
+  'crossTraceDocuments',
   'dataElementDocuments',
+  'ddicActivationDocuments',
   'ddlDocuments',
   'domainDocuments',
   'enhancementDocuments',
   'featureToggleDocuments',
+  'feedDocuments',
+  'fetchDiscoveryEndpoints',
   'functionGroupDocuments',
   'functionIncludeDocuments',
   'functionModuleDocuments',
-  // The reading of `/activation/inactiveobjects` — injectable since 18.0.0.
-  'inactiveObjects',
+  'gatewayErrorLogDocuments',
+  'getSystemInformation',
   'includeDocuments',
   'interfaceDocuments',
-  // The class shell a behavior implementation needs at its own `source/main`.
-  // Exported since 18.0.0, when `updateMain()` went: writing it is the caller's.
+  'isEndpointInDiscovery',
+  'isModernAdtSystem',
   'mainSourceFor',
   'messageClassDocuments',
   'messageDocuments',
   'metadataExtensionDocuments',
-  'namedItems',
-  'nodeContents',
-  'activationRunId',
-  'extractRunId',
   'nothing',
   'nothingIsARefusal',
   'packageDocuments',
+  'profilerDocuments',
   'programDocuments',
+  'programExecutorDocuments',
   'rawDocument',
+  'resolveBindingVariant',
+  'resolveContentTypes',
+  'runtimeDumpsDocuments',
   'scalarFunctionDocuments',
   'scalarFunctionImplementationDocuments',
-  'searchHits',
   'serviceDefinitionDocuments',
   'serviceDocuments',
+  'st05TraceDocuments',
   'structureDocuments',
+  'systemMessagesDocuments',
   'tableDocuments',
   'tableTypeDocuments',
+  'traceSchedulingDocuments',
   'transformationDocuments',
   'transportDocuments',
   'unitTestDocuments',
   'utilDocuments',
-  'whereUsedReferences',
   'wireItself',
 ];
 

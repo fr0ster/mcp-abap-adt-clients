@@ -2,7 +2,11 @@
  * Application Log - Exports
  */
 
-export { ApplicationLog } from './ApplicationLog';
+export {
+  ApplicationLog,
+  applicationLogDocuments,
+  type IApplicationLogResults,
+} from './ApplicationLog';
 export {
   getApplicationLogObject,
   getApplicationLogSource,

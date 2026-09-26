@@ -19,6 +19,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { profilerTraceEntries } from '@mcp-abap-adt/adt-strategies';
 import * as dotenv from 'dotenv';
 import {
   createTestConnection,
@@ -27,6 +28,7 @@ import {
 import { refuseWhileRunOwnsSession } from '../src/__tests__/helpers/sharedSession';
 import { createConnectionLogger } from '../src/__tests__/helpers/testLogger';
 import { AdtRuntimeClient } from '../src/clients/AdtRuntimeClient';
+import { profilerDocuments } from '../src/runtime/traces/ProfilerDomain';
 import { resultOf } from './resultOf';
 
 const envPath =
@@ -41,7 +43,11 @@ async function main() {
   const logger = createConnectionLogger();
   const connection = await createTestConnection(logger);
   try {
-    const profiler = new AdtRuntimeClient(connection, logger).getProfiler();
+    // The listing is an Atom feed as it arrived; read it into entries.
+    const profiler = new AdtRuntimeClient(connection, logger).getProfiler({
+      ...profilerDocuments,
+      list: profilerTraceEntries,
+    });
     const entries = resultOf(await profiler.list());
 
     // biome-ignore lint/suspicious/noConsole: a probe reports to whoever ran it

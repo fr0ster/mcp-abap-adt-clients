@@ -11,14 +11,13 @@
  * `dist`, `docs/usage`, the README and the licences — because it belongs to
  * whoever wants a tree. The dev scripts and the integration tests use it the
  * way any consumer would, over the two single-request members that stayed:
- * `fetchNodeStructure` and the `parseNodeStructure` reading.
+ * `fetchNodeStructure` and the `readNodeStructure` reading (adt-strategies).
  */
+
+import { readNodeStructure } from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
-import {
-  fetchNodeStructure,
-  parseNodeStructure,
-} from '../../src/core/shared/nodeStructure';
+import { fetchNodeStructure } from '../../src/core/shared/nodeStructure';
 
 export interface IWalkedNode {
   readonly name: string;
@@ -77,7 +76,7 @@ export async function walkPackage(
     return { name, type: 'DEVC/K', isPackage: true, children: [] };
   }
 
-  const { nodes, objectTypes } = parseNodeStructure(xml, logger);
+  const { nodes, objectTypes } = readNodeStructure(xml);
   const all = [...nodes];
 
   for (const typeInfo of objectTypes) {
@@ -89,7 +88,7 @@ export async function walkPackage(
       typeInfo.nodeId,
       true,
     );
-    all.push(...parseNodeStructure(bodyOf(perType.data), logger).nodes);
+    all.push(...readNodeStructure(bodyOf(perType.data)).nodes);
   }
 
   const children: IWalkedNode[] = [];

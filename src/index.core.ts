@@ -26,7 +26,6 @@ export {
   resolveBindingVariant,
 } from './core/service';
 
-export { parseSearchResults } from './core/shared';
 export {
   AdtContentTypesBase,
   AdtContentTypesModern,

@@ -59,6 +59,13 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import {
+  atcRunStatus,
+  atcStartedRun,
+  atcSystemCheckVariant,
+  atcWaitingRun,
+  atcWorklistId,
+} from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { type ILogger, LogLevel } from '@mcp-abap-adt/interfaces-utils';
 import { DefaultLogger } from '@mcp-abap-adt/logger';
@@ -72,6 +79,7 @@ import { refuseWhileRunOwnsSession } from '../src/__tests__/helpers/sharedSessio
 import { createConnectionLogger } from '../src/__tests__/helpers/testLogger';
 import { AdtRuntimeClient } from '../src/clients/AdtRuntimeClient';
 import { inStatefulSession } from '../src/core/shared/capabilities/statefulSession';
+import { atcDocuments } from '../src/runtime/atc/AdtAtc';
 import { orThrow } from '../src/utils/adtResponse';
 import { classifyCreateOutcome, classifyRunOutcome } from './lib/atcOutcomes';
 
@@ -654,7 +662,15 @@ async function main(): Promise<void> {
           'Neither a created variant nor a system variant to fall back on.',
         );
       } else {
-        const atc = new AdtRuntimeClient(connection, logger).getAtc();
+        // Read with the ATC strategies: the client answers documents.
+        const atc = new AdtRuntimeClient(connection, logger).getAtc({
+          ...atcDocuments,
+          worklist: atcWorklistId,
+          startedRun: atcStartedRun,
+          waitingRun: atcWaitingRun,
+          runStatus: atcRunStatus,
+          checkVariant: atcSystemCheckVariant,
+        });
 
         // Only the run itself answers question 4, so only the run is inside
         // this try. It used to wrap the worklist read and a local file write
@@ -676,7 +692,8 @@ async function main(): Promise<void> {
         try {
           // The variant is named, so no customizing read; the worklist is its
           // own call since 19.0.0.
-          const worklistId = await atc.createWorklist(variantForRun);
+          // createWorklist answers through the strategies since 23.0.0.
+          const worklistId = await orThrow(atc.createWorklist(variantForRun));
           const answer = await atc.startRun(
             worklistId,
             {
@@ -686,16 +703,18 @@ async function main(): Promise<void> {
           );
           if (answer.ok) {
             const value = answer.getResult().value;
+            // The waiting run's answer carries no worklist id on the wire;
+            // the one this probe created is the run's.
             accepted = {
-              triple: value.waited ? value.findingStats : '(not waited)',
-              worklistId: value.worklistId,
+              triple: value.findingStats,
+              worklistId: value.worklistId || worklistId,
             };
             if (ourVariant) {
               answered.runAcceptedVariant = 'yes';
             } else {
               fallbackRun = {
                 variant: variantForRun,
-                findingStats: accepted.triple,
+                findingStats: accepted?.triple ?? '',
               };
             }
           } else {

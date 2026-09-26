@@ -6,3 +6,15 @@
  */
 
 export { AdtExecutor } from './clients/AdtExecutor';
+export {
+  classExecutorDocuments,
+  type IClassExecutorResults,
+} from './executors/class/ClassExecutor';
+export {
+  type IProgramExecutorResults,
+  programExecutorDocuments,
+} from './executors/program/ProgramExecutor';
+export {
+  type ITraceSchedulingResults,
+  traceSchedulingDocuments,
+} from './executors/traceScheduling';

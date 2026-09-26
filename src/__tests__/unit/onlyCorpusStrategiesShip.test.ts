@@ -38,6 +38,15 @@ describe('the public surface', () => {
     'parseCreatedTransport',
     'parseObjectEntries',
     'parseSearchConfigurations',
+    // The util readings, now utilSearchHits and its siblings.
+    'parseSearchResults',
+    'inactiveObjects',
+    'extractRunId',
+    'activationRunId',
+    'namedItems',
+    'nodeContents',
+    'searchHits',
+    'whereUsedReferences',
   ])('no longer exports %s', (name) => {
     expect(api).not.toHaveProperty(name);
   });
