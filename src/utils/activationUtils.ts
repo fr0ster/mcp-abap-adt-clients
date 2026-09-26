@@ -11,6 +11,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt';
 import { CT_ACTIVATION } from '../constants/contentTypes';
+import { getEnhancementUri } from '../core/enhancement/types';
 import { encodeSapObjectName } from './internalUtils';
 import { getTimeout } from './timeouts';
 
@@ -61,12 +62,30 @@ export function buildObjectUri(
     case 'PROG':
       return `/sap/bc/adt/programs/programs/${lowerName}`;
 
+    case 'PROG/I':
+      return `/sap/bc/adt/programs/includes/${lowerName}`;
+
     case 'FUGR/FF': {
       if (parentName) {
         const lowerParent = encodeSapObjectName(parentName).toLowerCase();
         return `/sap/bc/adt/functions/groups/${lowerParent}/fmodules/${lowerName}`;
       }
       return `/sap/bc/adt/functions/groups/${lowerName}/fmodules/${lowerName}`;
+    }
+
+    case 'FUGR/I': {
+      // A function include lives under its group, and the address is
+      // meaningless without it: `/functions/groups/<group>/includes/<NAME>`,
+      // with the include's name upper-cased the way its own activation sends
+      // it. The group is the caller's to give — it is their argument that is
+      // missing, not anything SAP said, so it is thrown.
+      if (!parentName) {
+        throw new Error(
+          `A function include (FUGR/I) is addressed under its function group; pass the group as parentName for ${name}`,
+        );
+      }
+      const lowerParent = encodeSapObjectName(parentName).toLowerCase();
+      return `/sap/bc/adt/functions/groups/${lowerParent}/includes/${encodeSapObjectName(name.toUpperCase())}`;
     }
 
     case 'FUGR':
@@ -122,7 +141,12 @@ export function buildObjectUri(
 
     case 'BDEF/BDO':
     case 'BDEF':
-      return `/sap/bc/adt/ddic/bdef/sources/${lowerName}`;
+      // `/bo/behaviordefinitions`, as a BDEF's own activation and the
+      // inactive-objects list both address it. This read `/ddic/bdef/sources`
+      // until #173: SAP resolved that to nothing and answered
+      // `activationExecuted="false"` with no message, so a group activation
+      // reported success and left the behavior definition inactive.
+      return `/sap/bc/adt/bo/behaviordefinitions/${lowerName}`;
 
     case 'DCLS/DL':
     case 'DCLS':
@@ -135,8 +159,39 @@ export function buildObjectUri(
       return `/sap/bc/adt/ddic/dsfi/${lowerName}`;
 
     case 'ENHO/ENH':
+    case 'XSLT/VT':
+    case 'XSLT':
+      return `/sap/bc/adt/xslt/transformations/${lowerName}`;
+
+    case 'AUTH':
+      return `/sap/bc/adt/aps/iam/auth/${lowerName}`;
+
+    case 'FTG2/FT':
+    case 'FTG2':
+      return `/sap/bc/adt/sfw/featuretoggles/${lowerName}`;
+
+    // The subtype is a path segment — `/enhancements/enhoxh/<name>` — so it is
+    // read off the type code, and built by the same function the enhancement's
+    // own activation uses. This case built `/enhancements/<name>` until #173's
+    // check found it, and the subtyped codes fell through to `default`.
+    case 'ENHO/EXH':
+      return getEnhancementUri('enhoxh', lowerName);
+    case 'ENHO/EXHB':
+      return getEnhancementUri('enhoxhb', lowerName);
+    case 'ENHO/EXHH':
+      return getEnhancementUri('enhoxhh', lowerName);
+    case 'ENHS/EXS':
+      return getEnhancementUri('enhsxs', lowerName);
+    case 'ENHS/EXSB':
+      return getEnhancementUri('enhsxsb', lowerName);
+
     case 'ENHO':
-      return `/sap/bc/adt/enhancements/${lowerName}`;
+    case 'ENHS':
+      // Which subtype is the caller's to say; guessing one is the `default`
+      // branch's mistake below. Their argument is short, not SAP's answer.
+      throw new Error(
+        `${type} does not say which enhancement subtype ${name} is, and the subtype is part of its address; pass the full type (e.g. ENHO/EXH, ENHO/EXHB, ENHO/EXHH, ENHS/EXS, ENHS/EXSB)`,
+      );
 
     default:
       // A guess dressed as a mapping: right when the ADT path happens to be the
