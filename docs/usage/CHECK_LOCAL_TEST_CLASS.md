@@ -11,6 +11,7 @@ import {
   OnPremHttpTransport,
 } from '@mcp-abap-adt/connection';
 import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { analyseCheck } from '@mcp-abap-adt/adt-strategies';
 
 const config = {
   url: process.env.SAP_URL!,
@@ -33,14 +34,28 @@ await connection.connect();
 
 const client = new AdtClient(connection);
 
-const result = await client.getLocalTestClass().check({
-  className: 'ZCL_MY_CLASS',
-});
+// One check run. Without `analyse` the report comes back as it arrived, errors
+// and all — a check that finds a syntax error is a check that worked. With
+// `analyseCheck`, a report carrying an error is a failure listing every message.
+const answer = await client.getLocalTestClass().check(
+  { className: 'ZCL_MY_CLASS' },
+  'inactive',
+  { analyse: analyseCheck },
+);
 
-console.log(result.checkResult?.status);
+if (answer.ok) {
+  console.log(answer.getResult().value);   // the check-run report document
+} else {
+  for (const m of answer.getError().messages) {
+    console.log(`[${m.type}] ${m.text}`);
+  }
+}
 ```
 
 ## Notes
 
 - Local test class checks use the same ADT endpoints as class checks.
 - If you need to read metadata, use `readMetadata` on the same object.
+- A check of a class that does not exist answers `chkrun:status="notProcessed"`
+  with no messages, which reads like clean code if you only count messages;
+  `analyseCheck` reads the status first.

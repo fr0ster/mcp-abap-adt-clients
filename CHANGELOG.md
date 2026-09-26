@@ -22,6 +22,158 @@ independent versions. One package at a time: `npm run publish:clients` and
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [23.0.0] - 2026-09-26
+
+**This package interprets nothing.** Every member makes one ADT request. What
+the answer becomes is the result strategy the implementation was built with —
+and every shipped default is the document as it arrived (`rawDocument`) or
+`nothing`. Whether it is a failure is the `analyse` the caller passes with the
+call — and no member supplies one of its own. Every reading and verdict this
+package used to apply is a named strategy in `@mcp-abap-adt/adt-strategies`.
+A failure caused by SAP's answer comes back through the strategy; a member
+throws only for a cause inside the library. Decision 15 in
+[`docs/architecture/DECISIONS.md`](docs/architecture/DECISIONS.md).
+
+**[`docs/usage/MIGRATION-23.md`](docs/usage/MIGRATION-23.md) has the replacing
+code for every item below**; the section numbers in brackets point into it.
+
+### Added
+
+- **A result set for every runtime, executor and abapGit implementation**, and
+  its default: `abapGitDocuments`, `applicationLogDocuments`, `atcDocuments`,
+  `atcLogDocuments`, `classExecutorDocuments`, `crossTraceDocuments`,
+  `ddicActivationDocuments`, `feedDocuments`, `gatewayErrorLogDocuments`,
+  `profilerDocuments`, `programExecutorDocuments`, `runtimeDumpsDocuments`,
+  `st05TraceDocuments`, `systemMessagesDocuments`, `traceSchedulingDocuments`,
+  with their `I…Results` types. Build with one to get a shape
+  (`runtime.getProfiler({ ...profilerDocuments, list: profilerTraceEntries })`).
+- **`versions` and `versionSource` slots** in every versionable type's result
+  set; **`switched`, `runtimeState` and `checkState`** in the feature toggle's,
+  which `getFeatureToggle(results)` is now typed by (`IFeatureToggleObject`).
+- **`@mcp-abap-adt/interfaces-adt-connection` `^1.0.0`** as a dependency.
+
+### Changed
+
+- **BREAKING: `@mcp-abap-adt/interfaces-adt` `^11.0.0`** (was `^9.0.0`), and the
+  connection contract from `@mcp-abap-adt/interfaces-adt-connection`:
+  `IAbapConnection`, `IAdtWireResponse`, `IAbapRequestOptions`, `ITimeoutConfig`,
+  the connection capability atoms and `ADT_SESSION_ERROR` are no longer exported
+  by `interfaces-adt`. Import them from the connection package, and move
+  `interfaces-adt` to 11 in the same step so one copy of each contract is in the
+  tree [§1].
+- **BREAKING: every member takes `options.analyse`** — 79 that had none,
+  including `lock`, `unlock`, `getVersions`, the unit-test run members, every
+  `getUtils()`, runtime, executor and abapGit member. Where a member had no
+  options parameter, it is a new last parameter [§2].
+- **BREAKING: no member applies a verdict of its own.** `getPackage().delete`,
+  `getServiceBinding().update`, `getMessageClassMessage().read`, `validate` on
+  scalar function, scalar function implementation, append structure and
+  transformation, `getUnitTest().run`, `getCdsUnitTest().run(className)` and
+  `checkCdsTestDoubles` answer SAP's reply. Pass `analyseDeletion`,
+  `analysePublication`, `analyseMessageClassMessage(msgno)`,
+  `analyseUnsupportedStatus(statuses, what)`, `analyseUnitTestStart` or
+  `analyseCdsTestDoubles` to keep the old verdict [§3].
+- **BREAKING: every default reading is the document.** The transport listing,
+  created request, object entries and search configurations; `getVersions`;
+  unit-test `run`; the feature toggle's states; `search`, `getAllTypes`,
+  `fetchNodeStructure`, `getInactiveObjects`, `activateObjectsGroup`; the
+  abapGit listing, error log and external-repository check; ATC, profiler,
+  trace-scheduling and feed members. **Most are typed `unknown` either way, so
+  the compiler will not show this** — pass the reading from adt-strategies for
+  the slot [§4, §9].
+- **BREAKING: `getRequest().list({ configUri })` requires the saved search it
+  runs** and makes one request; it no longer reads the configurations and
+  chooses. Take one from `searchConfigurations()`. `AdtClientLegacy`'s `list`
+  takes none and refuses one [§4].
+- **BREAKING: every slot of `ITransportResults` is required.** The seven added
+  after 19.0.0 were optional and fell back to the shipped defaults inside the
+  implementation; a hand-written result set now names every slot — spread
+  `transportDocuments` and override.
+- **BREAKING: `lock` answers `''` for a `200` without a handle** instead of
+  throwing "Failed to obtain lock handle" as a connection failure; **`unlock`
+  answers SAP's reply** instead of an empty value built here [§5].
+- **BREAKING: `getVersions`/`getVersionSource` answer the feed and the source as
+  they came**; a `404`/`406` is the transport's failure instead of a thrown
+  `UNSUPPORTED_OPERATION` [§4].
+- **BREAKING: unit tests remember nothing.** `run` answers the start's document
+  (the id is in a header — `unitTestRunId` reads it); `getStatus(runId, …)` and
+  `getResult(runId, …)` take the run. On a legacy system `getStatus`/`getResult`
+  refuse with `UNSUPPORTED_OPERATION` instead of replaying a remembered answer
+  [§6].
+- **BREAKING: `getMessageClass().updateMetadata` is one PUT of `options.source`**
+  under `options.lockHandle`; it no longer reads the class and patches
+  `config.description` into it [§7].
+- **BREAKING: `AdtAbapGitClient`** makes one request per member and takes a
+  result set as its fourth constructor argument; `unlink({ repositoryId })` and
+  `getErrorLog(logLink)` take what `listRepos` reported [§8].
+- **BREAKING: `AdtRuntimeClient` and `AdtExecutor` factories take a result set
+  and build a fresh implementation per call** — no caching, so one caller's
+  readings never reach another. `getAtc().resolveCheckVariant()` and
+  `createWorklist()` answer `IAdtResponse` instead of a bare string, and ATC's
+  and trace scheduling's throws on SAP's answer are gone [§9].
+- **BREAKING: `getUtils().deleteObjectsGroup` answers SAP's reply** instead of
+  throwing on `del:isDeleted="false"`; pass `analyseDeletion` [§4].
+- **BREAKING: where-used addresses objects with `buildObjectUri`**, the address
+  group activation and deletion use; friendly names map onto type codes, and
+  `'intf/if'` and `'stru/dt'` — not ADT codes — are thrown before any request.
+  Use `'interface'`/`'INTF/OI'` and `'structure'`/`'TABL/DS'` [§4].
+- **BREAKING: `isModernAdtSystem`, `getSystemInformation` and
+  `fetchDiscoveryEndpoints` raise failures other than `404`/`405`/`501`**
+  instead of answering `false`/`null`/empty, so `createAdtClient` no longer hands
+  a legacy client to a modern system reached over a broken connection [§10].
+- **Accept negotiation keeps its state per connection.** The caches and the
+  on/off switch were module globals shared by every client in the process [§10].
+- **Creates and unlocks no longer rewrap a refusal** in an `Error` that dropped
+  the response (behavior definition, interface, table, table type, transport);
+  the interface create no longer re-checks the status, the function-include
+  delete no longer judges `isDeleted`, and the legacy transport read no longer
+  fabricates a `404` [§11].
+- **`@mcp-abap-adt/interfaces-auth` is a dev dependency.** Nothing outside the
+  test helpers imports it; as a dependency it went to every consumer for
+  nothing.
+- `@mcp-abap-adt/connection` (dev) `^9.3.0`.
+
+### Removed
+
+- **BREAKING: the readings exported from the root** — `parseTransportTree`,
+  `parseCreatedTransport`, `parseObjectEntries`, `parseSearchResults`,
+  `searchHits`, `namedItems`, `nodeContents`, `inactiveObjects`,
+  `activationRunId`, `extractRunId`, `whereUsedReferences`, `compareRecordedAt` —
+  and the types that described their output (`ObjectVersion`, `ISearchResult`,
+  `ITransportTree` and its node types, `ICreatedTransport`,
+  `ITransportObjectEntry`, `IWhereUsedListResult`, …). All are in
+  `@mcp-abap-adt/adt-strategies`, the parsers as strategies [§12].
+- **BREAKING: `TransportSearchConfigurationMissing`** and the resolver that
+  threw it [§4].
+- **BREAKING: `AdtAbapGitClient.getRepo`**; take the entry from `listRepos`
+  [§8]. `IAbapGitAbortedError`/`IAbapGitTimeoutError`, thrown by a poll loop
+  gone since 19.0.0.
+- **BREAKING: unit-test `getRunId`, `getStatusResponse`, `getResultResponse`,
+  `getClassName`, `getCdsViewName`** [§6].
+- Dead code nothing reached: `LockCapability`, `VersionsCapability`, the
+  `*ForUpdate` lock helpers, `acquireLockHandle`, `getDomainInfo`,
+  `checkTransportRequirements`, `parsePackageDeletionCheck`,
+  `searchObjectsTyped`, the `Unsupported*OperationError` classes, the internal
+  verdicts (`packageDeletionRefusal`, `publicationRefusal`,
+  `validationUnsupported`, `validationUnavailable`, `startedRun`,
+  `testDoublesVerdict`, `runId`), `utils/managementOperations.ts`,
+  `utils/readOperations.ts`, `utils/validation.ts`, and `answeringValue`, which
+  wrapped a value the library computed in a fabricated `200`.
+
+### Fixed
+
+- **Group activation and group deletion address eleven types the way each
+  type's own activation does** (#173). Where the two disagreed, SAP resolved the
+  address to nothing and answered `activationExecuted="false"` with no message,
+  which reads as success — measured on E19 for `BDEF/BDO`, which the group left
+  inactive. `BDEF/BDO`, `PROG/I`, `FUGR/I`, `XSLT/VT`, `AUTH`, `FTG2/FT` and the
+  enhancement types now get their real addresses; a bare `ENHO`/`ENHS` without
+  its subtype, or a `FUGR/I` without its group, is thrown naming what is
+  missing.
+- **A declined deletion names SAP's reason** (#172) — through `analyseDeletion`
+  in `@mcp-abap-adt/adt-strategies`, which now reads every `del:message` and its
+  T100 key. See that package's changelog.
+
 ## [22.0.1] - 2026-09-25
 
 Documentation only — no code changed, and nothing a consumer imports or sends

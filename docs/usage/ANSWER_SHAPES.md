@@ -102,11 +102,12 @@ Nothing, and deliberately.
   finds none: every exchange that produced an answer comes back as a success
   carrying it. A request that never completed is still a failure — there is no
   answer to read.
-- **The reading is injected**, once, at construction. The shipped defaults hand
-  back the document for almost everything, because a document is the one shape
-  that loses nothing.
+- **The reading is injected**, once, at construction. Since 23.0.0 every
+  shipped default hands back the document as it arrived — or nothing, where ADT
+  answers nothing — because a document is the one shape that loses nothing.
 - **The verdict is injected** per call, through `analyse`, because whether an
-  answer is a failure depends on what you were doing when you asked.
+  answer is a failure depends on what you were doing when you asked. No member
+  supplies one of its own when you pass none; until 23.0.0 ten did.
 
 Build both from the corpus above, against the types and the system you actually
 use. Reading this package's source will tell you what it does; it will not tell
@@ -115,11 +116,15 @@ you what your server says.
 **If you have no opinion yet**, `@mcp-abap-adt/adt-strategies` has one. It lives
 in this repository under `packages/adt-strategies`: one failure strategy per
 document form above, each tested against the refusal it came from *and* the
-success it has to be told apart from, plus `asItCame` for the result axis. It
-collects error strategies and nothing else — shaping a result is yours.
+success it has to be told apart from. It also holds the result readings this
+package used to apply on its own — the transport tree, the version feed, search
+hits, a unit-test run id, the ATC, profiler, feed and abapGit readings — for a
+caller who asks for those shapes rather than the document.
 
 ## See also
 
+- [`MIGRATION-23.md`](MIGRATION-23.md) — the readings and verdicts that moved
+  to `@mcp-abap-adt/adt-strategies` in 23.0.0
 - [`MIGRATION-19.md`](MIGRATION-19.md) — what moved to the consumer in 19.0.0
 - [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md) — answers that are accurate about
   the wrong thing, including the `S_ABPLNGVS` language-version refusal

@@ -4,11 +4,17 @@
 
 TypeScript clients for SAP ABAP Development Tools (ADT).
 
-> **Upgrading from 18.x?** 19.0.0 stops this package from deciding anything: the
-> readings that turned a response into a verdict are gone, every member issues
-> one endpoint call, and 454 input guards went with them.
-> [`docs/usage/MIGRATION-19.md`](docs/usage/MIGRATION-19.md) is what a consumer
-> on the old contract has to change.
+> **Upgrading from 22.x?** 23.0.0 makes this package interpret nothing: every
+> member answers the document SAP sent unless you give it a reading when you
+> build it, and judges nothing unless you pass `analyse` with the call. Every
+> reading and verdict it used to apply is a strategy in
+> [`@mcp-abap-adt/adt-strategies`](packages/adt-strategies). The connection
+> contract moved to `@mcp-abap-adt/interfaces-adt-connection`.
+> [`docs/usage/MIGRATION-23.md`](docs/usage/MIGRATION-23.md) has the replacing
+> code for every removed behaviour.
+>
+> **From 18.x?** Read [`docs/usage/MIGRATION-19.md`](docs/usage/MIGRATION-19.md)
+> first: 19.0.0 is where members became one endpoint call each.
 
 ## Features
 
@@ -56,8 +62,17 @@ This package is responsible for:
 
 - **Provides ADT clients**: `AdtClient` and specialized clients for ADT operations
 - **Manages locks**: Lock registry with persistent storage and CLI tools
-- **Handles requests**: Makes HTTP requests to SAP ADT endpoints through connection interface
-- **Manages state**: Maintains object state across chained operations
+- **Handles requests**: Makes HTTP requests to SAP ADT endpoints through connection interface — one request per member
+- **Relays answers**: Hands back what SAP sent, read by the result strategy you built the implementation with and judged by the `analyse` you pass with the call
+
+#### What This Package Does NOT Interpret
+
+Nothing. Which part of a document you want, and whether an answer is a failure,
+are decisions about your system and your task; since 23.0.0 no member takes
+either on your behalf. The shipped result sets answer documents as they arrived;
+the readings and verdicts that used to be applied here are strategies in
+[`@mcp-abap-adt/adt-strategies`](packages/adt-strategies), which you pass by
+name. See [Strategies](#strategies-what-an-answer-becomes-and-whether-it-failed).
 
 #### What This Package Does NOT Do
 
@@ -73,18 +88,22 @@ This package interacts with external packages **ONLY through interfaces**:
 
 - **The contract packages** — the single definition site for every public type this package exposes (see [Type System](#type-system)). Their *types* are part of this package's public API; import them from the package that declares the name you need, not from the deprecated `@mcp-abap-adt/interfaces` facade:
 
-  | package | what this package takes from it | names |
-  |---|---|---|
-  | [`@mcp-abap-adt/interfaces-adt`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-adt) `^9.0.0` | `IAbapConnection`, the capability atoms, every object's config, `ADT_TASK_TYPE`, `ITimeoutConfig` | 178 |
-  | [`@mcp-abap-adt/interfaces-network`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-network) `^2.0.0` | `IWebSocketTransport` and its four companions, `HttpError` | 6 |
-  | [`@mcp-abap-adt/interfaces-utils`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-utils) `^1.1.0` | `ILogger`, `LogLevel`, `XmlNode` | 3 |
-  | [`@mcp-abap-adt/interfaces-auth`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-auth) `^1.2.0` | `IAuthProvider` | 1 |
-  | [`@mcp-abap-adt/interfaces-auth-sap`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-auth-sap) `^1.0.0` — **dev only** | `ISapConfig`, to build a connector in one unit test | 1 |
+  | package | what this package takes from it |
+  |---|---|
+  | [`@mcp-abap-adt/interfaces-adt`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-adt) `^11.0.0` | the capability atoms, every object's config, `IAdtResponse`, `IAnalyse`, `IAdtAnalyseOptions`, `IResultStrategy`, `ADT_NO_FAILURE`, `ADT_TASK_TYPE` |
+  | [`@mcp-abap-adt/interfaces-adt-connection`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-adt-connection) `^1.0.0` | `IAbapConnection`, `IAdtWireResponse`, `IAbapRequestOptions`, `ITimeoutConfig`, the connection capability atoms, `ADT_SESSION_ERROR` |
+  | [`@mcp-abap-adt/interfaces-network`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-network) `^2.0.0` | `IWebSocketTransport` and its four companions, `HttpError` |
+  | [`@mcp-abap-adt/interfaces-utils`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-utils) `^1.1.0` | `ILogger`, `LogLevel`, `XmlNode` |
+  | [`@mcp-abap-adt/interfaces-auth`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-auth) — **dev only** | `IAuthProvider`, for the test helpers that open a session |
+  | [`@mcp-abap-adt/interfaces-auth-sap`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-auth-sap) `^1.0.0` — **dev only** | `ISapConfig`, to build a connector in one unit test |
 
   Taking them by name is what keeps a consumer off one release rate for every contract: `interfaces-utils` has had two releases ever, and a package that needs only `ILogger` should move at that pace rather than at ADT's. The `@mcp-abap-adt/interfaces` facade is **deleted** — npm still serves 51.0.0 to anyone pinned to it and nothing further ships there.
 
-  Three names moved between those packages in `interfaces-adt` 9.0.0 and this release follows them: `HttpError` to `-network`, `XmlNode` to `-utils`, and `ITimeoutConfig` the other way, into `-adt`, because `csrf` names an SAP operation rather than a transport primitive.
+  **The connection has its own package since 23.0.0.** `interfaces-adt` 11 moved the connection contract to `@mcp-abap-adt/interfaces-adt-connection` and does not re-export it: the object contracts had three majors in one day, none touching the connection, and a connector had to follow each of them or install a second copy. Import `IAbapConnection` from there.
+
+  Earlier moves, still in force: `HttpError` is `-network`'s and `XmlNode` is `-utils`'s (both since `interfaces-adt` 9.0.0).
 - **`@mcp-abap-adt/connection`**: Uses the `IAbapConnection` interface for HTTP requests — does not know about the concrete connection implementation. It is a **dev** dependency; consumers supply their own implementation.
+- **`@mcp-abap-adt/adt-strategies`** (optional, same repository): the readings and verdicts, derived from recorded ADT answers. Not a dependency of this package — it depends on the contracts, and you pass its strategies into this package's members.
 - **No other direct package dependencies**: all remaining interactions happen through well-defined interfaces
 
 > **Coming from 17.x?** 18.0.0 is a breaking release — see
@@ -117,6 +136,7 @@ npm install @mcp-abap-adt/adt-clients
 2. **AdtRuntimeClient**
    - Stable runtime operations for ABAP debugging, traces, dumps, logs, feeds, ATC check runs, and more
    - Factory accessors: `getProfiler()`, `getCrossTrace()`, `getSt05Trace()`, `getApplicationLog()`, `getAtc()`, `getAtcLog()`, `getDdicActivation()`, `getDumps()`, `getFeeds()`, `getSystemMessages()`, `getGatewayErrorLog()`
+   - Each takes an optional result set (`getProfiler({ ...profilerDocuments, list: profilerTraceEntries })`) and builds a fresh implementation per call — nothing is cached, so one caller's readings never become another's
    - `getAtc()` runs ATC checks; `getAtcLog()` reads the execution and check-failure logs. Same subject, different resources — see [ATC check runs](docs/usage/CLIENT_API_REFERENCE.md#atc-check-runs)
 
 3. **AdtExecutor**
@@ -124,9 +144,14 @@ npm install @mcp-abap-adt/adt-clients
    - Executors:
      - `getClassExecutor()` for `classrun`
      - `getProgramExecutor()` for `programrun` (on-premise systems)
-   - Methods: `run`, `runWithProfiler`, `runWithProfiling`
+   - Methods: `run`, `runWithProfiler`, and trace scheduling (`scheduleTrace`, `listRequests`, `getRequestsByUri`, `listObjectTypes`, `listProcessTypes`)
+   - Each executor factory takes an optional result set, like the runtime client's
 
-4. **AdtClientsWS**
+4. **AdtAbapGitClient**
+   - Standalone: `new AdtAbapGitClient(connection, logger, options?, results?)`
+   - `link`, `pull`, `unlink({ repositoryId })`, `listRepos`, `getErrorLog(logLink)`, `checkExternalRepo` — one request each; `pull` does not wait
+
+5. **AdtClientsWS**
    - Realtime request/event facade over `IWebSocketTransport`
    - Includes debugger-session facade: listen, attach, step, stack, variables
    - Example: `await wsClient.request('debugger.listen', { timeoutSeconds: 30 })`
@@ -164,7 +189,11 @@ import {
   BasicAuthProvider,
   OnPremHttpTransport,
 } from '@mcp-abap-adt/connection';
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient, utilDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  utilSearchHits,
+  utilWhereUsedReferences,
+} from '@mcp-abap-adt/adt-strategies';
 
 const config = {
   url: 'https://your-sap-system.example.com',
@@ -206,22 +235,29 @@ await client.getClass().create({
 // The lock window is yours: lock, write, unlock, activate — in the order you
 // choose, each answering its own contract. Deleting works the same way:
 // `checkDeletion()` asks whether it can go, `delete()` does it.
-const config = { className: 'ZCL_TEST' };
-const locked = await client.getClass().lock(config);
+const target = { className: 'ZCL_TEST' };
+const locked = await client.getClass().lock(target);
 if (locked.ok) {
+  // The handle SAP sent — '' if it sent none, which is yours to judge.
   const lockHandle = locked.getResult().value;
-  await client.getClass().update(config, { source, lockHandle });
-  await client.getClass().unlock(config, lockHandle);
+  await client.getClass().update(target, { source, lockHandle });
+  await client.getClass().unlock(target, lockHandle);
 }
-await client.getClass().activate(config);
+await client.getClass().activate(target);
 
 // Every member answers a contract: a result or a failure, and the compiler
-// makes you say which you are reading.
-const utils = client.getUtils();
+// makes you say which you are reading. What the result *is* was chosen when
+// the implementation was built: the shipped set answers documents as they
+// arrived, and a reading from @mcp-abap-adt/adt-strategies gives a shape.
+const utils = client.getUtils({
+  ...utilDocuments,
+  search: utilSearchHits,
+  whereUsed: utilWhereUsedReferences,
+});
 
 const found = await utils.search({ query: 'Z*', objectType: 'CLAS' });
 if (found.ok) {
-  found.getResult().value;        // ISearchResult[]
+  found.getResult().value;        // ISearchResult[] — the document, without utilSearchHits
 } else {
   found.getError().origin;        // 'connection' | 'refusal'
   found.getError().message;       // what SAP said, verbatim
@@ -253,14 +289,14 @@ const answer = await utils.getWhereUsed({
   scopeXml: narrowed,
 });
 
-// The default reading is the document. `whereUsedReferences` is the shape the
-// old member returned, offered by name rather than imposed:
-import { whereUsedReferences } from '@mcp-abap-adt/adt-clients';
-
-const references = whereUsedReferences({ data: answer.getResult().value } as never);
-console.log(`Found ${references.totalReferences} references`);
-for (const ref of references.references) {
-  console.log(`${ref.name} (${ref.type}) in ${ref.packageName}`);
+// `utilWhereUsedReferences` above is the shape the old member returned,
+// offered by name rather than imposed. Without it, this is the document.
+if (answer.ok) {
+  const references = answer.getResult().value;
+  console.log(`Found ${references.totalReferences} references`);
+  for (const ref of references.references) {
+    console.log(`${ref.name} (${ref.type}) in ${ref.packageName}`);
+  }
 }
 ```
 
@@ -284,7 +320,8 @@ await debuggerSession.step({ action: 'step_over' });
 ### Using AdtExecutor (Execution API)
 
 ```typescript
-import { AdtExecutor } from '@mcp-abap-adt/adt-clients';
+import { AdtExecutor, programExecutorDocuments } from '@mcp-abap-adt/adt-clients';
+import { traceSchedulingProfilerId } from '@mcp-abap-adt/adt-strategies';
 
 const executor = new AdtExecutor(connection, console);
 
@@ -294,23 +331,28 @@ await executor.getClassExecutor().run({ className: 'ZCL_MY_CLASSRUN' });
 // Program execution (on-premise)
 await executor.getProgramExecutor().run({ programName: 'ZMY_EXEC_REPORT' });
 
-// Program execution with profiling
-const runWithProfilingResult = await executor.getProgramExecutor().runWithProfiling(
-  { programName: 'ZMY_EXEC_REPORT' },
-  {
-    profilerParameters: {
-      allProceduralUnits: true,
-      sqlTrace: true,
-      allDbEvents: true,
-    },
-  },
-);
+// Program execution under the profiler: schedule the trace, then run with the
+// id it answered. Two requests, so two calls — the order is yours.
+const programs = executor.getProgramExecutor({
+  ...programExecutorDocuments,
+  scheduled: traceSchedulingProfilerId,
+});
+const scheduled = await programs.scheduleTrace({
+  allProceduralUnits: true,
+  sqlTrace: true,
+  allDbEvents: true,
+});
+if (scheduled.ok) {
+  await programs.runWithProfiler(
+    { programName: 'ZMY_EXEC_REPORT' },
+    { profilerId: scheduled.getResult().value },
+  );
+}
 
 // The run reports what it did, not what SAP will write afterwards: there is no
-// `traceId` here. Find the trace with `runtime.getProfiler().list()` when you
+// trace id here. Find the trace with `runtime.getProfiler().list()` when you
 // are ready — comparing against the ids you saw before the run, since position
 // in the feed is not age.
-console.log(runWithProfilingResult.profilerId);
 ```
 
 **AdtUtils read type safety:**
@@ -351,30 +393,24 @@ import { AdtClient } from '@mcp-abap-adt/adt-clients';
 
 const client = new AdtClient(connection);
 
-// Create a class
 await client.getClass().create({
   className: 'ZCL_TEST',
   packageName: 'ZPACKAGE',
   description: 'Test class'
 });
 
-// Wait for object to be ready using long polling
-// The server will hold the connection until the object is available
-await client.getClass().read(
+// Ask the server to hold the read until the object is available. Where the
+// system honours it, this replaces an arbitrary sleep; where it does not, it
+// answers at once — so read what came back rather than assuming.
+const read = await client.getClass().read(
   { className: 'ZCL_TEST' },
   'active',
   { withLongPolling: true }
 );
-
-// Now the object is guaranteed to be ready for subsequent operations
-await client.getClass().update({
-  className: 'ZCL_TEST'
-}, { source: updatedCode });
 ```
 
 **What it is intended to do**, where a system honours it: avoid an arbitrary
-timeout by letting the server decide when the object is ready. `AdtObject`
-implementations pass it internally on reads after create/update.
+timeout by letting the server decide when the object is ready.
 
 **What it does not do:** guarantee the object is there when the call returns.
 See the caveat above — on the system measured, the flag had no effect on object
@@ -390,17 +426,24 @@ change what you mean to change, pass the result. Anything you leave out is gone,
 because nothing is read on your behalf to keep it.
 
 For a class, a program or a DDL source the whole content is the **full source**.
-For domain, package, dataElement, tableType, transport and functionGroup it is
-the object's own **document**, passed as `config.document` — those six fetched
-and patched it for you until 19.0.0, and no longer do.
+For domain, package, dataElement, tableType, transport, functionGroup and
+message class it is the object's own **document**, passed as `options.source` to
+`updateMetadata` — the first six fetched and patched it for you until 19.0.0,
+the message class until 23.0.0, and none of them does now.
 
 ```typescript
-const current = await client.getClass().read({ className: 'ZCL_TEST' }, 'active');
+const cls = client.getClass();
+const target = { className: 'ZCL_TEST' };
+
+const current = await cls.read(target, 'active');
+if (!current.ok) throw new Error(current.getError().message);
 const edited = addAMethod(String(current.getResult().value));
 
-const handle = (await client.getClass().lock({ className: 'ZCL_TEST' })).getResult().value;
-await client.getClass().update({ className: 'ZCL_TEST' }, { source: edited, lockHandle: handle });
-await client.getClass().unlock({ className: 'ZCL_TEST' }, handle);
+const locked = await cls.lock(target);
+if (!locked.ok) throw new Error(locked.getError().message);
+const lockHandle = locked.getResult().value;
+await cls.update(target, { source: edited, lockHandle });
+await cls.unlock(target, lockHandle);
 ```
 
 Watch the read. ADT answers a read of a not-yet-ready object with **HTTP 200 and
@@ -418,7 +461,9 @@ doing. If you have no opinion yet,
 derived from recorded ADT answers, each tested against the refusal it came from
 and the success it must be told apart from.
 
-Full detail: [`docs/usage/MIGRATION-19.md`](docs/usage/MIGRATION-19.md). Every
+Full detail: [`docs/usage/MIGRATION-19.md`](docs/usage/MIGRATION-19.md) for the
+write rule, [`docs/usage/MIGRATION-23.md`](docs/usage/MIGRATION-23.md) for the
+readings and verdicts that became strategies. Every
 sequence 19.0.0 handed back to the consumer is written out under
 [`examples/`](examples), one file per removed member.
 
@@ -516,7 +561,7 @@ if (answer.ok) {
 } else {
   answer.getError().origin;   // 'connection' | 'refusal'
   answer.getError().message;  // the server's own words
-  answer.getError().request;  // create() issues six calls — this says which
+  answer.getError().request;  // the call that failed: method and URL
   answer.getError().response; // the document, and the status it came on
 }
 ```
@@ -530,22 +575,62 @@ twenty-six were an errors array a caller had to remember to look at, next to a
 handful of stored envelopes; a member answers one value now, and the failure is
 in the other half of the answer.
 
-**Two origins, and both describe the server.** `'refusal'` is SAP answering no —
-including the ones it delivers inside a 200, which is most of them: a refused
-activation, a deletion the check declined, a validation resource a system does
-not have. `'connection'` is no answer arriving at all. There is no third: a
-document *this library* cannot read is not a verdict about SAP, so it throws as
-itself rather than being dressed as one.
+**Two origins, and both describe the server.** `'refusal'` is SAP answering no;
+`'connection'` is no answer arriving at all. A refusal SAP delivers inside a
+`200` — a refused activation, a deletion the check declined — is an answer like
+any other until your `analyse` says it is a failure: that is the one decision
+this package leaves wholly to you.
 
-```typescript
-// A logon page from an expired session, in place of the document asked for.
-// This used to read as "the package is empty".
-await client.getUtils().getAllTypes();   // throws AdtParseError
-```
+**What throws, and what does not.** The boundary is the cause. A failure caused
+by SAP's answer comes back through the strategies, with the response attached —
+never as an exception, and never rewrapped into one that drops the response.
+A member throws only for a cause inside the library: an argument you left out,
+found before any request was built (a function include without its group, a
+where-used type no vocabulary knows), or a defect. A reading that throws — your
+own, or one from `adt-strategies` — surfaces as itself, not as a connection
+failure, because a parser's bug is not advice to reauthenticate.
 
 The transport frame is `IAdtWireResponse`. It is the shape the connection layer
 speaks and lives at that boundary; `IAdtResponse` names what a member answers
 with.
+
+### Strategies: what an answer becomes, and whether it failed
+
+Two strategies shape every answer, and neither is this package's:
+
+- the **result strategy** — what the answer *becomes* — is given **once, when
+  you build the implementation**: one result set per object type, one slot per
+  member;
+- the **error strategy** — whether the answer is a *failure* — is given **with
+  every call**, as `options.analyse`.
+
+The shipped result sets (`classDocuments`, `transportDocuments`,
+`utilDocuments`, `profilerDocuments`, … — one per implementation) answer the
+document as it arrived (`rawDocument`), or nothing (`nothing`) where there is
+nothing to read. No member supplies an `analyse` of its own. Every reading and
+verdict this package used to apply is a named strategy in
+[`@mcp-abap-adt/adt-strategies`](packages/adt-strategies):
+
+```typescript
+import { transportDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  analyseDeletion,
+  transportSearchConfigurations,
+  transportTree,
+} from '@mcp-abap-adt/adt-strategies';
+
+// Result strategies: once, at construction.
+const requests = client.getRequest({
+  ...transportDocuments,
+  list: transportTree,
+  searchConfigurations: transportSearchConfigurations,
+});
+
+// Error strategy: per call.
+await client
+  .getPackage()
+  .delete({ packageName: 'ZPKG' }, { analyse: analyseDeletion });
+```
 
 ### The reading is yours, and you choose it once
 
@@ -555,7 +640,7 @@ What a member's result *becomes* is a strategy — `(answer: IAdtWireResponse) =
 ```typescript
 import { AdtClient, classDocuments, rawDocument } from '@mcp-abap-adt/adt-clients';
 
-// The shipped reading: each member answers what it always answered.
+// The shipped reading: each member answers the document as it arrived.
 client.getClass();
 
 // Your own, for every member of this class implementation.
@@ -624,8 +709,7 @@ await adtObject.readTransport(config, { withLongPolling: true });
 - In tests - replace fixed `setTimeout` delays with long polling for better reliability
 
 A member answers one value — what the reading made of the answer — and a failure
-in the other half. The stored envelopes (`createResult`, `updateResult`,
-`checkResult`) are gone with the state bags:
+in the other half:
 
 ```typescript
 const answer = await client.getFunctionModule().create({
@@ -638,50 +722,34 @@ if (!answer.ok) throw new Error(answer.getError().message);
 console.log(answer.getResult().value);   // the create's document, by default
 ```
 
-A chain answers for the operation the caller asked for, not for each of its
-steps: `create()` may lock, check, write, unlock and activate, and what comes
-back is the create's own answer — unless one of those failed, which is why the
-object is not what was asked for and so is what comes back instead.
+There is no chain behind it: `create()` is the POST, and the lock, write,
+unlock and activation around it are calls of your own, each with its own answer.
 
-### Accept Negotiation (Optional)
+### Accept Negotiation
 
-Some ADT endpoints return `406` when the `Accept` header does not match the system’s supported media types. The client can
-optionally auto-correct `Accept` by retrying with supported values returned in the 406 response.
+Some ADT endpoints return `406` when the `Accept` header does not match the
+system's supported media types. The client retries once with a type the `406`
+names, and remembers it for that endpoint.
 
-**Enable globally:**
+**It is on unless you turn it off** — per client, or for the process:
+
 ```typescript
 import { AdtClient } from '@mcp-abap-adt/adt-clients';
 
 const client = new AdtClient(connection, console, {
-  enableAcceptCorrection: true,
+  enableAcceptCorrection: false,
 });
 ```
 
-**Enable via environment:**
 ```bash
-ADT_ACCEPT_CORRECTION=true npm test
+ADT_ACCEPT_CORRECTION=false npm test
 ```
 
-**Override per read call:**
-```typescript
-await client.getClass().read(
-  { className: 'ZCL_TEST' },
-  'active',
-  { accept: 'text/plain' }
-);
-
-await client.getClass().readMetadata(
-  { className: 'ZCL_TEST' },
-  { accept: 'application/vnd.sap.adt.oo.classes.v4+xml', version: 'active' }
-);
-
-// Read source without version (initial post-create state)
-await client.getClass().read({ className: 'ZCL_TEST' }, undefined);
-```
-
-Notes:
-- Disabled by default.
-- Correction retries once and caches the supported `Accept` per endpoint.
+**The state is the connection's** since 23.0.0: the remembered types and the
+switch live on the connection object. They used to be module globals, so a
+header learned on one system was sent to every other, and one client's switch
+changed it for all. Two connections to two systems in one process no longer
+share anything.
 
 ### Handler classes exported directly
 
@@ -699,11 +767,11 @@ hold yourself:
 
 <!-- surface:begin -->
 `getSystemInformation`, `isModernAdtSystem`, `resolveContentTypes`,
-`fetchDiscoveryEndpoints`, `isEndpointInDiscovery`, `parseSearchResults`,
-`parseTransportTree`
+`fetchDiscoveryEndpoints`, `isEndpointInDiscovery`, `createAdtClient`
 <!-- surface:end -->
 
-- `getSystemInformation(connection)` — the ADT system record, or `null`.
+- `getSystemInformation(connection)` — the ADT system record, or `null` when
+  the endpoint is absent.
 - `isModernAdtSystem(connection)` — whether `/sap/bc/adt/core/discovery` is
   served. S/4 HANA and BTP expose it; BASIS 7.40 and below only have
   `/sap/bc/adt/discovery`.
@@ -711,27 +779,29 @@ hold yourself:
   headers) or `AdtContentTypesBase` (v1, universal) from that answer.
 - `fetchDiscoveryEndpoints(connection)` / `isEndpointInDiscovery(...)` — the
   discovery document and a membership test over it.
-- `parseSearchResults(xml)` — turn a quickSearch payload you already hold into
-  `ISearchResult[]`. Needs no connection, which is why it is a plain export
-  rather than a method on `getUtils()`.
-- `parseTransportTree(xml)` — turn a transport-tree response you already hold
-  into `ITransportTree`: requests, their tasks, and the containers each was
-  nested under, attributes verbatim. `client.getRequest().list()` applies it for
-  you against a live connection — it is that member's shipped reading; use the
-  standalone export for a response obtained elsewhere (batch result, fixture,
-  capture). See the "Transport Requests" section of
-  [docs/usage/CLIENT_API_REFERENCE.md](docs/usage/CLIENT_API_REFERENCE.md).
-- `parseCreatedTransport(xml)` — the same, for a create response: the new
-  request's number, description, target and owner.
+- `createAdtClient(connection, logger?, options?)` — `AdtClient` or
+  `AdtClientLegacy`, from `isModernAdtSystem`.
+
+**A probe answers only for an absent endpoint.** A `404`, `405` or `501` is the
+answer `false`, `null` or an empty set stands for. Any other failure — no
+network, an expired session, a `401`, a `500` — is raised, since 23.0.0: it
+says nothing about the system, and swallowing it handed a legacy client to a
+modern system reached over a broken connection.
+
+The parsers that used to sit here — `parseSearchResults`, `parseTransportTree`,
+`parseCreatedTransport` — are readings, and are in `@mcp-abap-adt/adt-strategies`
+as `readSearchHits`, `transportTree` and `transportCreated`. A reading takes a
+wire response, so a document you already hold (a batch result, a fixture, a
+capture) is read with `transportTree({ status: 200, statusText: 'OK', headers: {}, data: xml })`.
 
 `src/index.ts` is the full surface; everything reachable from it is public and
 everything else is not.
 
 ## Type System
 
-### Single Definition Site: `@mcp-abap-adt/interfaces`
+### Single Definition Site: the contract packages
 
-Since **7.5.0**, every public type is **defined once**, in `@mcp-abap-adt/interfaces` (`^17.1.0`). This package declares no copies of its own — the low-level `*Params` interfaces, every `IXxxConfig`/`IXxxState` pair, the option/result types and the cross-cutting shared types all live there.
+Since **7.5.0**, every contract type is **defined once**, in the contract packages — today `@mcp-abap-adt/interfaces-adt` (`^11.0.0`) for the ADT contracts and `@mcp-abap-adt/interfaces-adt-connection` (`^1.0.0`) for the connection. This package declares no copies of its own — every `IXxxConfig`, the capability atoms, the option and response types and the cross-cutting shared types all live there.
 
 **Import them from the package that owns them:**
 
@@ -741,15 +811,15 @@ import type { IClassConfig, IProgramConfig } from '@mcp-abap-adt/interfaces-adt'
 
 The `IXxxState` half of every pair is gone: a member answers a value and a
 failure, and neither is a state bag. What a *reading* produces is not a contract
-type either — it belongs beside the reading that builds it, which is in this
-package:
+type either — it belongs beside the reading that builds it, and since 23.0.0 the
+readings are in `@mcp-abap-adt/adt-strategies`:
 
 ```typescript
 import type {
+  IObjectVersion,
   ISearchResult,
   ITransportTree,
-  ObjectVersion,
-} from '@mcp-abap-adt/adt-clients';
+} from '@mcp-abap-adt/adt-strategies';
 ```
 
 A contract carries what is needed to use it or to replace it. `ITransportTree`
@@ -758,11 +828,11 @@ the contract naming one would be describing an implementation.
 
 Since **9.0.0** this is the only route: the package no longer re-exports types it does not own. It used to republish 145 of them, which was more than half its public surface — so a consumer could hold `IClassConfig` believing it came from this client, and a type would appear to change whenever this client released, for reasons that had nothing to do with it. Types now travel on the contract package's release cycle, which is where they are actually decided.
 
-What this package exports is what it owns: the clients, the handler classes, the batch and runtime facades, and a few helpers.
+What this package exports is what it owns: the clients, the handler classes, the batch and runtime facades, the result sets each implementation is built with (`<x>Documents` and their `I…Results` types), the building blocks `rawDocument`, `nothing`, `wireItself` and `nothingIsARefusal`, and a few helpers.
 
 ### Honest capability types (since 8.0.0)
 
-`@mcp-abap-adt/interfaces` (`^37.0.0`) has **capability atoms and nothing above them** — `IAdtCreatable`, `IAdtReadable`, `IAdtMetadataReadable`, `IAdtUpdatable`, `IAdtMetadataUpdatable`, `IAdtDeletable`, `IAdtValidatable`, `IAdtCheckable`, `IAdtActivatable`, `IAdtLockable`, `IAdtVersionable`, `IAdtTransportAware` — each covering one operation against one resource. **There is no composite.** `IAdtObject`, `IAdtCrud`, `IAdtModifiable` and `IAdtSourceObject` were removed in interfaces 29.0.0: they forced one result type on members that answer different things, and a create does not answer what a read answers. `IAdtSearchable` went in 30.0.0 — searching is not something an object does to itself, and the question already had a home in `IAdtInformationSystem.search`. A handler declares the atoms it honours, so there is nothing a composite could drift from.
+`@mcp-abap-adt/interfaces-adt` has **capability atoms and nothing above them** — `IAdtCreatable`, `IAdtReadable`, `IAdtMetadataReadable`, `IAdtUpdatable`, `IAdtMetadataUpdatable`, `IAdtDeletable`, `IAdtValidatable`, `IAdtCheckable`, `IAdtActivatable`, `IAdtLockable`, `IAdtVersionable`, `IAdtTransportAware` — each covering one operation against one resource. **There is no composite.** `IAdtObject`, `IAdtCrud`, `IAdtModifiable` and `IAdtSourceObject` were removed in interfaces 29.0.0: they forced one result type on members that answer different things, and a create does not answer what a read answers. `IAdtSearchable` went in 30.0.0 — searching is not something an object does to itself, and the question already had a home in `IAdtInformationSystem.search`. A handler declares the atoms it honours, so there is nothing a composite could drift from.
 
 Since **8.0.0**, each handler `implements` only the atoms it genuinely supports, and `AdtClient.getXxx()` return types are narrowed to match:
 
@@ -779,7 +849,7 @@ Since **9.0.0** no accessor returns the wide type, and since **12.0.0** none ret
 
 `getUnitTest()` and `getCdsUnitTest()` changed meaning rather than shape: a unit test's subject is the container class and its `testclasses` include, so `create()` creates that class and writes the tests into it, `update`/`delete`/`read` manage the include, `lock`/`unlock` take the container's lock, and running is `IAdtRunnable` — one method, with `getStatus`/`getResult` on `ITestRunInformation` because asking about a run is not running it.
 
-The runtime client narrows the same way. `AdtRuntimeClient.getAtc()` returns `IAdtRunnable & IAtcRunStatusReadable & IAtcFindings` — a check run is run and then read, never created, locked, activated or versioned, and the type says so rather than offering the rest and throwing.
+The runtime client narrows the same way. `AdtRuntimeClient.getAtc()` implements `IAtcRunStatusReadable & IAtcFindings`, plus `resolveCheckVariant`, `createWorklist` and `startRun` — a check run is three requests, started and then read, never created, locked, activated or versioned, and the type says so rather than offering the rest and throwing. It is not `IAdtRunnable` since 19.0.0: that atom's `run` is one call.
 
 **A guard keeps this true.** `src/__tests__/unit/capabilities/` compares all 37 factory return types against the 12 atoms in both directions at compile time, calls every method of every declared capability against a recording connection to check it issues the request its capability names, and fails if a new factory appears without an entry. Adding a throwing method back to a narrowed handler stops compiling. The guard walks `AdtClient` and `AdtClientLegacy` only; the runtime accessors are pinned by `src/__tests__/unit/clients/AdtRuntimeClient.factory.test.ts`.
 
@@ -790,7 +860,7 @@ One category deliberately remains local, because it is code, not contract:
   `resolveBindingVariant`
   <!-- surface:end -->
   `SERVICE_BINDING_VARIANT_MAP` is **not** among them since 9.0.0 — it is defined in
-  `@mcp-abap-adt/interfaces` and is imported from there, like every other type and constant that package owns.
+  `@mcp-abap-adt/interfaces-adt` and is imported from there, like every other type and constant that package owns.
   `ENHANCEMENT_TYPE_CODES` and the enhancement URL helpers (`getEnhancementBaseUrl`, `getEnhancementUri`,
   `supportsSourceCode`, `isImplementationType`, `isSpotType`) were listed here but never exported; they are
   internal to `core/enhancement` and stay that way. Nothing outside this package asked for them, and an export
@@ -801,14 +871,14 @@ this client's constructor options and system context — used to be declared her
 theory that they describe *this client* rather than the wire contract. That reasoning did
 not survive contact with the package's own purpose: a consumer must import them to
 configure the client at all, so they belong with everything else a consumer imports to use
-the library. They now live in `@mcp-abap-adt/interfaces`, alongside `IAdtContentTypes` /
+the library. They now live in `@mcp-abap-adt/interfaces-adt`, alongside `IAdtContentTypes` /
 `IAdtHeaders` (the header-provider contract — `AdtContentTypesBase` and
 `AdtContentTypesModern`, the two shipped implementations, stay here), the three `IBatch*`
 shapes, the twelve abapGit types, the ten executor types, and the five debugger types. This
-package no longer declares or exports any contract type — every `import type` name it hands
-out is sourced from `@mcp-abap-adt/interfaces`.
+package no longer declares or exports any contract type — every contract name it uses is
+sourced from the contract packages.
 
-> **Version pairing.** Because the types are now sourced rather than copied, `@mcp-abap-adt/interfaces` is a hard peer of this package's public API. A major bump there implies a bump here; keep the two in step rather than letting a resolver pick a mismatched pair.
+> **Version pairing.** Because the types are sourced rather than copied, `@mcp-abap-adt/interfaces-adt` and `@mcp-abap-adt/interfaces-adt-connection` are hard peers of this package's public API. A major bump there implies a bump here; keep the two in step rather than letting a resolver pick a mismatched pair.
 
 ### Naming Conventions
 
@@ -842,39 +912,23 @@ See [Architecture Documentation](docs/architecture/ARCHITECTURE.md#type-system-a
 
 ## Migration Guide
 
-### From Timeouts to Long Polling
+One document per breaking release, each written for a consumer on the contract
+before it:
 
-**Migration from fixed timeouts to long polling:**
+- **[22.x → 23.0.0](docs/usage/MIGRATION-23.md)** — readings and verdicts became
+  strategies in `@mcp-abap-adt/adt-strategies`; the connection contract moved
+  to `@mcp-abap-adt/interfaces-adt-connection`; `list` takes a `configUri`;
+  abapGit, unit tests and versions answer what SAP sent.
+- **[18.x → 19.0.0](docs/usage/MIGRATION-19.md)** — one member, one endpoint
+  call; `update` takes the whole content.
+- **[17.x → 18.0.0](docs/usage/MIGRATION-18.0.md)** — the sequence around a
+  write is yours.
 
-The package passes long polling (`?withLongPolling=true`) instead of fixed
-timeouts when reading after a create or update. It is the better default — a
-fixed sleep is guesswork either way — but it is **not** a readiness guarantee:
-see the measured caveat above before depending on it.
+### From timeouts to long polling
 
-```typescript
-// ❌ Before - Using fixed timeouts
-await client.getClass().create({ className: 'ZCL_TEST', ... });
-await new Promise(resolve => setTimeout(resolve, 2000)); // Fixed delay
-await client.getClass().update({ className: 'ZCL_TEST' }, { source });
-
-// ✅ After - Using long polling
-await client.getClass().create({ className: 'ZCL_TEST', ... });
-// Long polling is automatically used in create/update methods
-await client.getClass().update({ className: 'ZCL_TEST' }, { source });
-
-// Or explicitly use long polling in read operations
-await client.getClass().read(
-  { className: 'ZCL_TEST' },
-  'active',
-  { withLongPolling: true }
-);
-```
-
-**Benefits:**
-- No arbitrary delays - waits for actual object readiness
-- Faster execution when objects are ready quickly
-- More reliable - server-driven waiting ensures object is available
-- Automatic in `create()` and `update()` methods
+`withLongPolling` on a read you make is the better default than a fixed sleep —
+but it is **not** a readiness guarantee: see the measured caveat above. No
+member uses it on your behalf; `create()` and `update()` issue one request each.
 
 ### Builderless API
 
@@ -883,9 +937,13 @@ await client.getClass().read(
 
 ## Documentation
 
-- **[Operation Delays](docs/OPERATION_DELAYS.md)** – configurable delays for SAP operations in tests (sequential execution, timing issues)
+- **[Documentation index](docs/README.md)**
+- **[Migrating to 23.0.0](docs/usage/MIGRATION-23.md)** – the replacing code for every removed behaviour
+- **[Client API reference](docs/usage/CLIENT_API_REFERENCE.md)** – every client, member and result set
 - **[Architecture](docs/architecture/ARCHITECTURE.md)** – package structure and design decisions
-- **[Test Configuration Schema](docs/TEST_CONFIG_SCHEMA.md)** – YAML test configuration reference
+- **[Decisions](docs/architecture/DECISIONS.md)** – the choices that could have gone the other way, and why
+- **[Operation Delays](docs/usage/OPERATION_DELAYS.md)** – configurable delays for SAP operations in tests
+- **[Test Configuration Schema](docs/development/TEST_CONFIG_SCHEMA.md)** – YAML test configuration reference
 
 ## Logging and Debugging
 
@@ -934,7 +992,7 @@ const client = new AdtClient(connection, logger);
 
 **Note:** All logger methods are optional. Lock handles are always logged in full (not truncated).
 
-See [docs/DEBUG.md](docs/DEBUG.md) for detailed debugging guide.
+See [docs/usage/DEBUG.md](docs/usage/DEBUG.md) for detailed debugging guide.
 
 ## Changelog
 

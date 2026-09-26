@@ -44,4 +44,6 @@ that does not exist is indistinguishable from a clean check unless you read
 ## Imports
 
 The files import from `../src` because they sit inside this repository. In your
-code every one of those is `@mcp-abap-adt/adt-clients`.
+code every one of those is `@mcp-abap-adt/adt-clients`. The readings they pass —
+`utilActivationRunId` in `activate-a-group.ts` — come from
+`@mcp-abap-adt/adt-strategies`, the same in your code as here.

@@ -13,6 +13,81 @@ Tags follow the same rule: these releases are tagged
 `adt-strategies@<version>`, never `v<version>` — that scheme is `adt-clients`'
 and fires its release workflow.
 
+## [0.5.0] - 2026-09-26
+
+Released together with `adt-clients` 23.0.0, which stopped applying any reading
+or verdict of its own. Everything it used to apply is here now, by name — a
+consumer on `adt-clients` 22.x who relied on a parsed default or a built-in
+verdict passes the strategy below instead.
+[MIGRATION-23.md](../../docs/usage/MIGRATION-23.md) has the replacing code for
+each.
+
+### Added
+
+- **The result axis.** Until now it had one member, `asItCame`. It gains every
+  reading `adt-clients` applied as a default, each an `IResultStrategy` for one
+  slot of that package's result sets:
+  - transports — `transportTree`, `transportCreated`,
+    `transportSearchConfigurations`, `transportObjectEntries`, with
+    `ITransportTree` and its node types, `ICreatedTransport`,
+    `ITransportObjectEntry`;
+  - versions — `objectVersions`, `IObjectVersion` (was `ObjectVersion` in
+    `adt-clients`);
+  - unit tests — `unitTestRunId`, which reads the id from the header ADT puts
+    it in;
+  - feature toggles — `featureToggleRuntimeState`, `featureToggleCheckState`
+    and their state types;
+  - utilities — `utilSearchHits`, `utilNamedItems`, `utilNodeContents`,
+    `utilInactiveObjects`, `utilActivationRunId`, `utilWhereUsedReferences`, the
+    pure `readSearchHits`, `readNamedItems`, `readNodeStructure`, `extractRunId`,
+    and the shapes (`ISearchResult`, `INamedItem`, `IWhereUsedListResult`, …).
+    They read an SAP error document as an empty result instead of throwing:
+    judging it is `analyse`'s;
+  - abapGit — `abapGitRepos` (now with `repositoryId`, `pullLink` and `logLink`,
+    which `unlink`, `pull` and `getErrorLog` take), `abapGitErrorLog`,
+    `abapGitExternalRepo`. Text is read verbatim: the old parser in
+    `adt-clients` turned the repository key `000001` into `1`;
+  - ATC — `atcSystemCheckVariant`, `atcWorklistId`, `atcStartedRun`,
+    `atcWaitingRun`, `atcRunStatus`;
+  - profiler and trace scheduling — `profilerTraceEntries`, `profilerHitList`,
+    `profilerStatements`, `profilerDbAccesses`, `compareRecordedAt`,
+    `traceSchedulingTypes`, `traceSchedulingRequests`,
+    `traceSchedulingProfilerId`;
+  - feeds — `feedDescriptors`, `feedVariants`, `feedEntries`,
+    `feedSystemMessages`, `feedGatewayErrors`, `feedGatewayErrorDetail`.
+- **The verdicts `adt-clients` members applied on their own**, as error
+  strategies: `analysePublication` (was `publicationRefusal`),
+  `analyseCdsTestDoubles` (was `testDoublesVerdict`),
+  `analyseMessageClassMessage(msgno)`, `analyseUnitTestStart` (was
+  `startedRun`), `analyseUnsupportedStatus(statuses, what)` (was
+  `validationUnsupported`/`validationUnavailable`, and the versions `404`/`406`
+  throw). With the readings underneath: `readPublicationRefusal`,
+  `readCdsTestDoublesRefusal`, `readMessageClassMessageAbsence`.
+  `analyseDeletion` replaces `adt-clients`' `packageDeletionRefusal`, which
+  `AdtPackage.delete` applied until now.
+- **`@mcp-abap-adt/interfaces-adt-connection` `^1.0.0`** as a dependency, for
+  `IAdtWireResponse`.
+
+### Changed
+
+- **BREAKING: `@mcp-abap-adt/interfaces-adt` `^11.0.0`** (was `^9.0.0`), to
+  match `adt-clients` 23.0.0. The two are installed side by side and name the
+  same contract types in one signature; a consumer holding 9 or 10 next to this
+  gets two copies of `IAdtError`. Move both packages together.
+- **`analyseDeletion` and `readDeletionRefusal` read every `del:message`**
+  (#172). The reading took `object.message` as one element; with two messages
+  fast-xml-parser gives an array, so the type and text read `undefined`, SAP's
+  reason was replaced by the reference counts, and an `E` on a permitted object
+  was missed. Measured on E19: a service-binding check answering a `W` and an
+  `E` came back as "0 strong and 0 weak external references". Now every
+  message with text is kept, in order, each with its own severity, and the T100
+  key and `msgv1..4` are read from the long-text link — the one part of a
+  deletion message that does not change with the logon language. An object is
+  refused when its verdict attribute is not `"true"` or any message is an `E`;
+  the counts stand in only when SAP said nothing.
+- **`readCheckRunRefusal` reads every `checkReport`.** Several read as a check
+  that never ran. Defensive: no several-object capture exists yet.
+
 ## 0.4.0 — 2026-09-24
 
 ### Changed

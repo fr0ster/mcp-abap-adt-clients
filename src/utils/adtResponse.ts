@@ -223,4 +223,3 @@ export async function orThrow<T>(
   // is what crosses this seam.
   throw new Error(response.getError().message);
 }
-

@@ -71,7 +71,8 @@ in the answer rather than as an exception this library invented.
 
 ## The session belongs to the caller, not to this library
 
-`IAbapConnection` — the whole contract this library depends on — is five
+`IAbapConnection` — the whole contract this library depends on, from
+`@mcp-abap-adt/interfaces-adt-connection` since 23.0.0 — is five
 methods: `connect`, `getBaseUrl`, `getSessionId`, `setSessionType`,
 `makeAdtRequest`. There is no `disconnect`, no `close`, no `recycle`. That is
 deliberate, and it has a consequence worth knowing before you meet it:
@@ -97,13 +98,16 @@ and only you can make one:
 // The consumer owns the lifecycle, so the consumer recycles.
 await connection.disconnect();   // on your concrete connector, not on IAbapConnection
 await connection.connect();
-await client.getPackage().delete({ packageName });
+await client.getPackage().delete({ packageName }, { analyse: analyseDeletion });
 ```
 
-This library's part is to report the refusal rather than swallow it.
-`AdtPackage.delete()` reads `del:isDeleted` out of the response body and throws
-with the message id — a `200` from a deletion endpoint means the request was
-understood, not that the object went away.
+This library's part is to hand the refusal back whole rather than swallow it —
+and yours is to read it. A `200` from a deletion endpoint means the request was
+understood, not that the object went away: SAP says which in `del:isDeleted` and
+its `del:message`s. Pass `analyseDeletion` from `@mcp-abap-adt/adt-strategies`
+and a declined delete is a failure carrying every message SAP sent, each with its
+T100 key; pass nothing and it is the document, for you to read. Until 23.0.0
+`AdtPackage.delete()` applied that reading on its own.
 
 The test harness does exactly this, in `recycleTestSession()`, under the
 `cleanup_session_after_test` flag in `test-config.yaml`. That is harness code on
