@@ -24,9 +24,12 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IDomainConfig } from '../../../../core/domain';
-import { getDomain } from '../../../../core/domain/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { expectResult } from '../../../helpers/contract';
+import {
+  deleteDomain,
+  recreateActiveDomain,
+} from '../../../helpers/lockTargets';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -68,6 +71,8 @@ describe('Domain lock registry (using AdtClient)', () => {
   let hasConfig = false;
   let isCloudSystem = false;
   let config: IDomainConfig | undefined;
+  let domainType: { datatype?: string; length?: number; decimals?: number } =
+    {};
 
   beforeAll(async () => {
     try {
@@ -105,6 +110,11 @@ describe('Domain lock registry (using AdtClient)', () => {
           transportRequest: resolver.getTransportRequest(),
           description: params.description,
         };
+        domainType = {
+          datatype: params.datatype,
+          length: params.length,
+          decimals: params.decimals,
+        };
       }
       hasConfig = true;
     } catch (error) {
@@ -128,19 +138,8 @@ describe('Domain lock registry (using AdtClient)', () => {
       }
 
       try {
-        // Ensure the domain exists (idempotent: create it only if missing).
-        try {
-          await getDomain(connection, config.domainName);
-        } catch (error: any) {
-          if (error?.response?.status === 404) {
-            // A domain's config has no `source` since interfaces-adt
-            // 7.0.0 — the body of a write is `options.source` — so there
-            // is nothing to strip before a create any more.
-            await client.getDomain().create(config);
-          } else {
-            throw error;
-          }
-        }
+        // A typed, active domain, not the shell a create alone makes.
+        await recreateActiveDomain(client, config, domainType);
 
         // Lock through the client — the handler records it in the session-scoped
         // registry. Deliberately do NOT unlock here.
@@ -167,21 +166,11 @@ describe('Domain lock registry (using AdtClient)', () => {
     getTimeout('test'),
   );
 
-  // Created for a lock target and never activated, so it is an inactive shell.
-  // Leaving it behind puts an invalid object in the system and makes the next
-  // run's Domain workflow see "already exists".
+  // A failed cleanup fails the suite: the leftover is what this used to be.
   afterAll(async () => {
-    const name = config?.domainName;
-    if (!client || !name) return;
-    await client
-      .getDomain()
-      .delete({ domainName: name })
-      .catch((error: unknown) =>
-        testsLogger.warn?.(
-          `cleanup: ${name} not removed: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        ),
-      );
+    if (!client || !config) return;
+    // A lock the test left held blocks the delete rather than enabling it.
+    await client.unlockAll();
+    await deleteDomain(client, config);
   }, 300000);
 });
