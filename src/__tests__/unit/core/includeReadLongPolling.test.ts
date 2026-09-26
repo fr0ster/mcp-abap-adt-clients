@@ -18,7 +18,7 @@
  * given, the behaviour implementation lowercases it — so the expectations are
  * spelled out rather than shared.
  */
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { getBehaviorImplementationImplementations } from '../../../core/behaviorImplementation/read';
 import {
   getClassDefinitionsInclude,

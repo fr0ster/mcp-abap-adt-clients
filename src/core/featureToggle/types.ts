@@ -6,12 +6,12 @@
  * `IFeatureToggleObject` in the contract names.
  *
  * The runtime-state shapes below left `@mcp-abap-adt/interfaces` in 31.0.0 with
- * the other result shapes: `IFeatureToggleObject<TState>` says a toggle answers
- * *a* state, and what that state looks like is this implementation's to name.
+ * the other result shapes. `IFeatureToggleObject<R>` names one result per
+ * domain member, and what each looks like is the result strategy's to say.
  */
 
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
-import { rawDocument } from '../../utils/resultStrategy';
+import { nothing, rawDocument } from '../../utils/resultStrategy';
 
 // Types defined in @mcp-abap-adt/interfaces
 export type {
@@ -24,47 +24,6 @@ export type {
   IFeatureToggleRollout,
   IFeatureToggleSource,
 } from '@mcp-abap-adt/interfaces-adt';
-
-/** What a toggle can be, as SFW reports it. */
-export type FeatureToggleState = 'on' | 'off' | 'undefined';
-
-/** One client's setting of a toggle. */
-export interface IFeatureToggleClientLevel {
-  client: string;
-  description?: string;
-  state: FeatureToggleState;
-}
-
-/** One user's setting of a toggle. */
-export interface IFeatureToggleUserLevel {
-  user: string;
-  state: FeatureToggleState;
-}
-
-/**
- * A toggle's runtime state: what it is set to, for whom, and by whom last.
- *
- * This is the shape the five domain members answer by default — read out of
- * the SFW state resource rather than handed over as a document, because the
- * whole point of `getRuntimeState` is the two settings and who set them.
- */
-export interface IFeatureToggleRuntimeState {
-  name: string;
-  clientState: FeatureToggleState;
-  userState: FeatureToggleState;
-  clientChangedBy?: string;
-  clientChangedOn?: string;
-  clientStates: IFeatureToggleClientLevel[];
-  userStates: IFeatureToggleUserLevel[];
-}
-
-/** What `checkState` answers: the current state and what a change would need. */
-export interface IFeatureToggleCheckStateResult {
-  currentState: FeatureToggleState;
-  transportPackage?: string;
-  transportUri?: string;
-  customizingTransportAllowed: boolean;
-}
 
 /**
  * What ADT answers when a feature toggle is created: its metadata document.
@@ -110,6 +69,12 @@ export interface IFeatureToggleResults {
   readonly deletionCheck: IResultStrategy<unknown>;
   /** What the object's own document answers when written. */
   readonly metadataUpdated: IResultStrategy<unknown>;
+  /** What `switchOn` and `switchOff` answer — nothing worth reading. */
+  readonly switched: IResultStrategy<unknown>;
+  /** What `getRuntimeState` answers: the `…/states` JSON. */
+  readonly runtimeState: IResultStrategy<unknown>;
+  /** What `checkState` answers: the `…/check` JSON. */
+  readonly checkState: IResultStrategy<unknown>;
 }
 
 /**
@@ -129,6 +94,9 @@ export const featureToggleDocuments = {
   sourceDocument: rawDocument,
   deletionCheck: rawDocument,
   metadataUpdated: rawDocument,
+  switched: nothing,
+  runtimeState: rawDocument,
+  checkState: rawDocument,
 } satisfies IFeatureToggleResults;
 
 /**

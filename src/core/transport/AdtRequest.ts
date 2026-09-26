@@ -24,7 +24,7 @@
 
 import type {
   AdtTaskType,
-  IAbapConnection,
+  IAdtAnalyseOptions,
   IAdtCreatable,
   IAdtCreateOptions,
   IAdtDeletable,
@@ -36,22 +36,19 @@ import type {
   IAdtResponse,
   IAdtSystemContext,
   IAdtTransportObjectActions,
-  IDeferredResponseConnection,
   IListTransportsOptions,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
-import { TRANSPORT_SEARCH_CONFIGURATIONS_URL } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAbapConnection,
+  IDeferredResponseConnection,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
-import { TransportSearchConfigurationMissing } from '../../utils/adtErrors';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { createTransport } from './create';
 import { deleteTransport } from './delete';
-import {
-  getTransportSearchConfigurations,
-  listTransports,
-  requestTransportSearchConfigurations,
-} from './list';
+import { listTransports, requestTransportSearchConfigurations } from './list';
 import {
   addObjectToTransport,
   changeTransportTaskType,
@@ -103,12 +100,12 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
     >,
     IAdtRequest<ReturnType<R['list']>>,
     IAdtTransportObjectActions<
-      ReturnType<NonNullable<R['removedObject']>>,
-      ReturnType<NonNullable<R['addedObject']>>,
-      ReturnType<NonNullable<R['createdTask']>>,
-      ReturnType<NonNullable<R['actionLog']>>,
-      ReturnType<NonNullable<R['objects']>>,
-      ReturnType<NonNullable<R['taskTypeChanged']>>
+      ReturnType<R['removedObject']>,
+      ReturnType<R['addedObject']>,
+      ReturnType<R['createdTask']>,
+      ReturnType<R['actionLog']>,
+      ReturnType<R['objects']>,
+      ReturnType<R['taskTypeChanged']>
     >
 {
   private readonly connection: IAbapConnection;
@@ -194,115 +191,50 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
    * Until 30.0.0 this resource had three members — `list`, `listNodes`, and a
    * `listNodes<T>(parse, …)` overload — which answered the identical document
    * read to three different depths. One request, one member: the reading is
-   * chosen when this implementation is constructed, and the tree is the
-   * default because it is the only one that carries the containers, the
-   * description and the language a request holds.
+   * chosen when this implementation is constructed. The default hands the
+   * document back as it came; `parseTransportTree` is the reading that builds
+   * the tree.
    *
-   * With `configUri`: one request. Without: two — the configurations, then the
-   * list. The five filter parameters this used to take were never read by the
-   * server; filtering is a property of the saved configuration.
+   * One request, run by the saved search the caller names. Until
+   * interfaces-adt 11 a missing `configUri` made this read the configurations
+   * and choose one, refusing when there were none or several — a second request
+   * and a choice that is the caller's (decision 37). `searchConfigurations`
+   * answers what there is to choose from. The five filter parameters this used
+   * to take were never read by the server; filtering is a property of the
+   * saved configuration.
    */
-  async list(
-    options?: IListTransportsOptions,
-  ): Promise<IAdtResponse<ReturnType<R['list']>>> {
-    const configUri =
-      options?.configUri ?? (await this.resolveSearchConfiguration());
-
+  async list<E extends IAdtError = IAdtError>(
+    options: IListTransportsOptions & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['list']>, E>> {
+    const { configUri } = options;
     this.logger?.info?.('Listing transport requests', { configUri });
     return answering(
       () => listTransports(this.connection, { configUri }),
       this.results.list as IResultStrategy<ReturnType<R['list']>>,
+      options.analyse,
     );
   }
 
   /**
    * The saved transport searches this system holds.
    *
-   * **Why this is public, when `resolveSearchConfiguration` below is not.**
-   * A listing is a saved search, and `list()` will resolve one itself when it
-   * is not given a `configUri`. That resolution is deliberately opinionated —
-   * one configuration is used, several are refused rather than guessed between
-   * — and both halves of that opinion are unreachable from outside:
-   *
-   * - **its answer cannot be read.** The request happens inside a member
-   *   called for something else, so a caller's `analyse` never sees it and
-   *   their result strategy never shapes it. A refusal from this endpoint
-   *   arrives as a throw out of `list()`.
-   * - **its verdict cannot be acted on.** On a system holding several saved
-   *   searches the resolver throws, telling the caller to pass a `configUri`
-   *   explicitly — and gives them no supported way to find one. The consumer
-   *   that hit this reached the URL with a raw request of its own, which is
-   *   the library failing at its job rather than the consumer misusing it.
-   *
-   * So: one request, the caller's strategies in charge of it, and the choice
-   * theirs to make. `list({ configUri })` then costs exactly one request,
-   * which is what it costs today with the resolution hidden inside it.
-   *
-   * ```typescript
-   * const request = client.getRequest();
-   * const configurations = await request.searchConfigurations({ analyse });
-   * if (!configurations.ok) return configurations.getError();
-   * for (const { uri } of configurations.getResult().value) {
-   *   const listed = await request.list({ configUri: uri });
-   * }
-   * ```
-   *
-   * The default reading is `parseSearchConfigurations` — exactly as much of
-   * the document as it takes to address a configuration, which is what the
-   * internal resolver has always used. Inject `searchConfigurations` in the
-   * result set to read it differently.
+   * **What `list` needs.** A listing is a saved search, and since
+   * interfaces-adt 11 `list` takes the one to run rather than choosing among
+   * them itself — this is where a caller finds out what there is. One request,
+   * read by the strategy this implementation was built with and judged by the
+   * caller's `analyse`.
    */
   async searchConfigurations<E extends IAdtError = IAdtError>(
     options?: IAdtOperationOptions<E>,
-  ): Promise<
-    IAdtResponse<ReturnType<NonNullable<R['searchConfigurations']>>, E>
-  > {
+  ): Promise<IAdtResponse<ReturnType<R['searchConfigurations']>, E>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     return answering(
       () => requestTransportSearchConfigurations(connection),
-      (this.results.searchConfigurations ??
-        transportDocuments.searchConfigurations) as IResultStrategy<
-        ReturnType<NonNullable<R['searchConfigurations']>>
+      this.results.searchConfigurations as IResultStrategy<
+        ReturnType<R['searchConfigurations']>
       >,
       options?.analyse,
-    );
-  }
-
-  /**
-   * Which saved search to run when the caller named none.
-   *
-   * Deterministic or it throws — never "the first one", which would silently
-   * run somebody else's filters.
-   *
-   * The deferred-connection check lives HERE and not in `list()`: an explicit
-   * `configUri` waits for nothing, so a batch call that supplies one is
-   * legitimate. Guarding earlier would reject it.
-   */
-  protected async resolveSearchConfiguration(): Promise<string> {
-    const configurations = await getTransportSearchConfigurations(
-      this.connection,
-    );
-
-    if (configurations.length === 0) {
-      throw new TransportSearchConfigurationMissing(
-        TRANSPORT_SEARCH_CONFIGURATIONS_URL,
-      );
-    }
-
-    if (configurations.length === 1) {
-      return configurations[0].uri;
-    }
-
-    // Several. Picking one would mean guessing which attribute marks a default,
-    // and the payload on the only system we have carries no such marker — one
-    // configuration cannot show what several would look like. So: say so, and
-    // let the caller choose. This branch gets a rule when a system with several
-    // configurations has actually been read.
-    throw new Error(
-      `This system has ${configurations.length} transport search configurations ` +
-        'and none can be shown to be the default; pass configUri explicitly. ' +
-        `Available: ${configurations.map((c) => c.uri).join(', ')}`,
     );
   }
 
@@ -440,7 +372,7 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
     transportNumber: string,
     object: IAbapObjectEntry & { position: string },
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<NonNullable<R['removedObject']>>, E>> {
+  ): Promise<IAdtResponse<ReturnType<R['removedObject']>, E>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     this.logger?.info?.(
@@ -448,9 +380,8 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
     );
     return answering(
       () => removeObjectFromTransport(connection, transportNumber, object),
-      (this.results.removedObject ??
-        transportDocuments.removedObject) as IResultStrategy<
-        ReturnType<NonNullable<R['removedObject']>>
+      this.results.removedObject as IResultStrategy<
+        ReturnType<R['removedObject']>
       >,
       options?.analyse,
     );
@@ -474,7 +405,7 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
     transportNumber: string,
     object: IAbapObjectEntry,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<NonNullable<R['addedObject']>>, E>> {
+  ): Promise<IAdtResponse<ReturnType<R['addedObject']>, E>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     this.logger?.info?.(
@@ -482,10 +413,7 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
     );
     return answering(
       () => addObjectToTransport(connection, transportNumber, object),
-      (this.results.addedObject ??
-        transportDocuments.addedObject) as IResultStrategy<
-        ReturnType<NonNullable<R['addedObject']>>
-      >,
+      this.results.addedObject as IResultStrategy<ReturnType<R['addedObject']>>,
       options?.analyse,
     );
   }
@@ -509,7 +437,7 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
   async createTask<E extends IAdtError = IAdtError>(
     transportNumber: string,
     options: { targetUser: string } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<NonNullable<R['createdTask']>>, E>> {
+  ): Promise<IAdtResponse<ReturnType<R['createdTask']>, E>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     this.logger?.info?.(
@@ -519,10 +447,7 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
     return answering(
       () =>
         createTransportTask(connection, transportNumber, options.targetUser),
-      (this.results.createdTask ??
-        transportDocuments.createdTask) as IResultStrategy<
-        ReturnType<NonNullable<R['createdTask']>>
-      >,
+      this.results.createdTask as IResultStrategy<ReturnType<R['createdTask']>>,
       options?.analyse,
     );
   }
@@ -538,7 +463,7 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
   async readActionLog<E extends IAdtError = IAdtError>(
     transportNumber: string,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<NonNullable<R['actionLog']>>, E>> {
+  ): Promise<IAdtResponse<ReturnType<R['actionLog']>, E>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     this.logger?.info?.(
@@ -547,10 +472,7 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
     );
     return answering(
       () => readTransportActionLog(connection, transportNumber),
-      (this.results.actionLog ??
-        transportDocuments.actionLog) as IResultStrategy<
-        ReturnType<NonNullable<R['actionLog']>>
-      >,
+      this.results.actionLog as IResultStrategy<ReturnType<R['actionLog']>>,
       options?.analyse,
     );
   }
@@ -600,15 +522,14 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
     taskNumber: string,
     type: AdtTaskType,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<NonNullable<R['taskTypeChanged']>>, E>> {
+  ): Promise<IAdtResponse<ReturnType<R['taskTypeChanged']>, E>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     this.logger?.info?.(`Changing the type of task ${taskNumber} to`, type);
     return answering(
       () => changeTransportTaskType(connection, taskNumber, type),
-      (this.results.taskTypeChanged ??
-        transportDocuments.taskTypeChanged) as IResultStrategy<
-        ReturnType<NonNullable<R['taskTypeChanged']>>
+      this.results.taskTypeChanged as IResultStrategy<
+        ReturnType<R['taskTypeChanged']>
       >,
       options?.analyse,
     );
@@ -620,8 +541,10 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
    * **Read this before {@link removeObject}, because that is where the
    * position comes from.** Nothing else here answers one as a value:
    * `readMetadata` hands back the document and leaves the caller to dig
-   * `tm:position` out of it by hand, which is the parsing this member exists
-   * to do — it answers entries, each with a `position` that is there.
+   * `tm:position` out of it by hand. This member answers the same resource
+   * through the `objects` strategy: construct the implementation with
+   * `parseObjectEntries` there to be answered entries, each with its
+   * `position`. The default hands the document back as it came.
    *
    * It is *not* that `readMetadata` cannot see them. That was said here on
    * the belief that sending no `Accept` gets a thinner representation, and it
@@ -637,6 +560,7 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
    * asked, so an entry being gone from this list is the evidence.
    *
    * ```ts
+   * // constructed with { ...transportDocuments, objects: (a) => parseObjectEntries(a.data) }
    * const listed = await request.readObjects(task);
    * const entry = listed.ok
    *   ? listed.getResult().value.find((o) => o.name === 'ZCL_X')
@@ -651,7 +575,7 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
   async readObjects<E extends IAdtError = IAdtError>(
     transportNumber: string,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<NonNullable<R['objects']>>, E>> {
+  ): Promise<IAdtResponse<ReturnType<R['objects']>, E>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     this.logger?.info?.(
@@ -660,9 +584,7 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
     );
     return answering(
       () => readTransportObjects(connection, transportNumber),
-      (this.results.objects ?? transportDocuments.objects) as IResultStrategy<
-        ReturnType<NonNullable<R['objects']>>
-      >,
+      this.results.objects as IResultStrategy<ReturnType<R['objects']>>,
       options?.analyse,
     );
   }

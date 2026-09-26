@@ -5,13 +5,17 @@
  * member chose a deadline, a poll interval and what counts as finished, for
  * every caller.
  *
- * `activateObjectsGroup` answers the run id — the server puts it in `Location`
- * and the body carries nothing. Which status ends your wait is a question about
- * your system's answers, so it is read here rather than decided for you.
+ * The server puts the run id in `Location` and the body carries nothing, so the
+ * shipped reading — the document — is empty here. `utilActivationRunId` from
+ * `@mcp-abap-adt/adt-strategies` reads the id, given once when the utils are
+ * built. Which status ends your wait is a question about your system's answers,
+ * so it is read here rather than decided for you.
  */
 
+import { utilActivationRunId } from '@mcp-abap-adt/adt-strategies';
 import type { IObjectReference } from '@mcp-abap-adt/interfaces-adt';
 import type { AdtClient } from '../src/clients/AdtClient';
+import { utilDocuments } from '../src/core/shared/utilResultSet';
 
 const statusIn = (document: string): string =>
   /runs:status="([^"]*)"/.exec(document)?.[1] ?? '';
@@ -21,7 +25,10 @@ export async function activateAGroup(
   objects: IObjectReference[],
   deadlineMs = 60_000,
 ): Promise<string> {
-  const utils = client.getUtils();
+  const utils = client.getUtils({
+    ...utilDocuments,
+    activation: utilActivationRunId,
+  });
 
   const started = await utils.activateObjectsGroup(objects);
   if (!started.ok) throw new Error(started.getError().message);

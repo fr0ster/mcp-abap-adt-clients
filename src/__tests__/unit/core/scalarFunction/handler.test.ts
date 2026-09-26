@@ -1,8 +1,9 @@
+import { analyseUnsupportedStatus } from '@mcp-abap-adt/adt-strategies';
+import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
-import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtScalarFunction } from '../../../../core/scalarFunction/AdtScalarFunction';
 import { expectFailure, expectResult } from '../../../helpers/contract';
 
@@ -60,20 +61,34 @@ describe('AdtScalarFunction handler', () => {
     expect(failure.origin).toBe('connection');
   });
 
-  it('validate() names 404/405/501 as unsupported, not as a bad name', async () => {
+  it('validate() answers a missing resource as it came, and a strategy names it', async () => {
     const { conn } = makeConn(() =>
       Object.assign(new Error('nope'), { response: { status: 405 } }),
     );
     const sf = new AdtScalarFunction(conn);
     // Some systems have no validation resource at all. That is not a verdict
-    // about the name — the shipped `analyse` names it, so a consumer branches
-    // on the code rather than decoding a status.
-    const failure = expectFailure(
+    // about the name, but the library reads nothing into the status: the
+    // failure comes back as the transport saw it...
+    const plain = expectFailure(
       await sf.validate({ scalarFunctionName: 'ZOK_F' }),
       'validate where the resource is absent',
     );
-    expect(failure.code).toBe(AdtObjectErrorCodes.UNSUPPORTED_OPERATION);
-    expect(failure.message).toContain('405');
+    expect(plain.code).not.toBe(AdtObjectErrorCodes.UNSUPPORTED_OPERATION);
+    // ...and a caller who wants it named passes the reading that names it.
+    const named = expectFailure(
+      await sf.validate(
+        { scalarFunctionName: 'ZOK_F' },
+        {
+          analyse: analyseUnsupportedStatus(
+            [404, 405, 501],
+            'scalar-function name validation',
+          ),
+        },
+      ),
+      'validate where the resource is absent, read by the strategy',
+    );
+    expect(named.code).toBe(AdtObjectErrorCodes.UNSUPPORTED_OPERATION);
+    expect(named.message).toContain('405');
   });
 
   it('validate() reports non-unsupported errors as themselves (e.g. 403)', async () => {
@@ -82,10 +97,8 @@ describe('AdtScalarFunction handler', () => {
     );
     const sf = new AdtScalarFunction(conn);
 
-    // 403 is not in the unsupported set, so the shipped `analyse` leaves it
-    // alone: a system that refused the caller is not a system without the
-    // resource, and giving it the unsupported code would hide an authorization
-    // problem behind a capability one.
+    // A system that refused the caller is not a system without the resource,
+    // and nothing here renames a 403: it comes back as itself.
     const failure = expectFailure(
       await sf.validate({ scalarFunctionName: 'ZOK_F' }),
       'validate refused with 403',

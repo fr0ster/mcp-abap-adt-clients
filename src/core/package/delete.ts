@@ -3,13 +3,9 @@
  */
 
 import type {
-  AdtNoFailure,
   IAbapConnection,
-  IAdtError,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
-import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces-adt';
-import { XMLParser } from 'fast-xml-parser';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   ACCEPT_DELETION,
   ACCEPT_DELETION_CHECK,
@@ -17,7 +13,6 @@ import {
   CT_DELETION_CHECK,
 } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { requestOf } from '../../utils/requestTrace';
 import { getTimeout } from '../../utils/timeouts';
 import type { IDeletePackageParams } from './types';
 
@@ -55,116 +50,6 @@ export async function checkPackageDeletion(
     headers,
   });
 }
-
-/**
- * Parse deletion check response to get isDeletable flag
- */
-export function parsePackageDeletionCheck(response: IAdtWireResponse): {
-  isDeletable: boolean;
-  message?: string;
-} {
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: '@_',
-  });
-
-  try {
-    const result = parser.parse(response.data);
-    const checkObject =
-      result['del:checkResponse']?.['del:object'] ||
-      result.checkResponse?.object;
-
-    if (!checkObject) {
-      return { isDeletable: false, message: 'No check result in response' };
-    }
-
-    const isDeletable =
-      checkObject['@_del:isDeletable'] === 'true' ||
-      checkObject['@_isDeletable'] === 'true';
-    const message =
-      checkObject['del:message']?.['del:text'] ||
-      checkObject.message?.text ||
-      '';
-
-    return { isDeletable, message: message || undefined };
-  } catch (error) {
-    return {
-      isDeletable: false,
-      message: `Failed to parse check response: ${error}`,
-    };
-  }
-}
-
-/**
- * The verdict a package **deletion** carries, as an error strategy.
- *
- * Not {@link deletionRefusal}: that reads a *check* response, whose verdict is
- * `del:isDeletable`. A deletion answers `del:deletionResult` with
- * `del:isDeleted`, and running the check parser over it found no `isDeletable`
- * at all — so a successful delete was reported as a refusal, on the one handler
- * that used it for both steps.
- *
- * The message id travels in the longtext link — `…/messageclass/PAK/messages/
- * 058/longtext?…` for "package is already locked" — and is the only part that
- * does not change with the logon language, so it is carried into the message a
- * caller reads.
- */
-export const packageDeletionRefusal = (
-  verdict: IAdtError | AdtNoFailure,
-  answer?: IAdtWireResponse,
-): IAdtError | AdtNoFailure => {
-  if (verdict !== ADT_NO_FAILURE) return verdict;
-
-  const xml = typeof answer?.data === 'string' ? answer.data : '';
-  // Nothing to read is not a refusal. ADT answers some deletions with an empty
-  // body, and inventing a "no" from silence is what the check parser did here.
-  if (!xml.trim()) return ADT_NO_FAILURE;
-
-  let deleteObject: Record<string, unknown> | undefined;
-  try {
-    const parsed = new XMLParser({
-      ignoreAttributes: false,
-      attributeNamePrefix: '@_',
-    }).parse(xml) as Record<string, Record<string, unknown>>;
-    deleteObject = (parsed['del:deletionResult']?.['del:object'] ??
-      parsed.deletionResult?.object) as Record<string, unknown> | undefined;
-  } catch {
-    // A body that will not parse says nothing about the deletion either.
-    return ADT_NO_FAILURE;
-  }
-
-  if (!deleteObject) return ADT_NO_FAILURE;
-  const isDeleted =
-    deleteObject['@_del:isDeleted'] === 'true' ||
-    deleteObject['@_isDeleted'] === 'true';
-  if (isDeleted) return ADT_NO_FAILURE;
-
-  const messageNode = (deleteObject['del:message'] ??
-    deleteObject.message ??
-    {}) as Record<string, unknown>;
-  const text =
-    (messageNode['del:text'] as string) ??
-    (messageNode.text as string) ??
-    'Deletion failed';
-  const longtext =
-    ((messageNode['atom:link'] as Record<string, unknown>)?.['@_href'] as
-      | string
-      | undefined) ??
-    ((messageNode.link as Record<string, unknown>)?.['@_href'] as
-      | string
-      | undefined);
-  const id =
-    typeof longtext === 'string'
-      ? /messageclass\/([A-Z0-9_]+)\/messages\/(\d+)/i.exec(longtext)
-      : null;
-
-  return {
-    origin: 'refusal',
-    message: `Package deletion failed${id ? ` [${id[1]}/${id[2]}]` : ''}: ${text}`,
-    response: answer,
-    request: requestOf(answer),
-  };
-};
 
 /**
  * Delete ABAP package using ADT deletion API

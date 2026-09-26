@@ -5,7 +5,7 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_VALIDATION_CLASS_NAME } from '../../constants/contentTypes';
 import { getTimeout } from '../../utils/timeouts';
 
@@ -70,7 +70,6 @@ export async function validateClassName(
  * @param version - 'active' (default) or 'inactive' - version context for validation
  * @param sessionId - Optional session ID
  * @returns Check result with errors/warnings
- * @throws Error if validation finds syntax errors
  */
 export async function validateClassSource(
   connection: IAbapConnection,

@@ -9,8 +9,8 @@
  * Usage: npx ts-node scripts/probe-trace-reaches-analyse.ts
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
 import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { analyseException } from '../packages/adt-strategies/src/refusals/analyse';
 import { withRequestTrace } from '../src/utils/requestTrace';
 

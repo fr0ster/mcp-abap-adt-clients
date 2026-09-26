@@ -16,11 +16,11 @@
  * atom — `readMetadata`, `unlock` and `getVersionSource` are where stubs hid.
  */
 
+import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
-  IAdtResponse,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtClient } from '../../../clients/AdtClient';
 import { createLibraryLogger } from '../../helpers/testLogger';
 import type { RequestSpec } from './manifest';
@@ -302,22 +302,12 @@ const EXTRA_REQUESTS: Record<string, string> = {
   'messageClassMessage.update': 'as create',
   'messageClassMessage.delete': 'as create',
 
-  // **Read-modify-write, and the two that are left.**
+  // **Read-modify-write: none left outside the message exception above.**
   //
-  // These objects *are* their document and the endpoint takes it whole, so
-  // changing one field means fetching the XML, patching it and PUTting it back.
-  // Since 19.0.0 that read is the caller's: `config.document` carries what they
-  // built, and domain, dataElement, tableType, package and transport each issue
-  // one PUT.
-  //
-  // Two have not been converted yet and still read first. They are listed as
-  // debt, not as shape.
-  //
-  // One left, and it is the documented exception: a message is a row inside its
-  // class's document, so writing one means reading the class, replacing that
-  // row and putting the class back. There is no endpoint that writes a single
-  // message.
-  'messageClass.updateMetadata': 'GET the document, patch it, PUT it back',
+  // These objects *are* their document and the endpoint takes it whole. Since
+  // 19.0.0 the read is the caller's — domain, dataElement, tableType, package
+  // and transport each issue one PUT — and since 23.0.0 the message class's
+  // own `updateMetadata` does too, with the document in `options.source`.
 };
 
 /**
@@ -458,7 +448,16 @@ function takesOptions(
 ): boolean {
   const fn = handler[method] as ((...args: unknown[]) => unknown) | undefined;
   if (typeof fn !== 'function') return false;
-  if (method === 'unlock' || method === 'getVersionSource') return false;
+  // `getVersions` and `getVersionSource` take the caller's `analyse` since
+  // 23.0.0, and nothing else: their contract options carry no deadline, so
+  // there is none to carry to the wire — the same as before, when they took no
+  // options at all.
+  if (
+    method === 'unlock' ||
+    method === 'getVersions' ||
+    method === 'getVersionSource'
+  )
+    return false;
   return fn.length >= (OPTIONS_POSITION[method] ?? 2);
 }
 

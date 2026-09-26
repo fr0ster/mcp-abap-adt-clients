@@ -1,7 +1,7 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
   ACCEPT_APPEND_STRUCTURE,

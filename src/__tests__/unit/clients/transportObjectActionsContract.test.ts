@@ -15,6 +15,7 @@
  * 2.0.0 settled that, and this file is what keeps them agreeing.
  */
 import type { AdtClient } from '../../../clients/AdtClient';
+import { transportParsing } from '../../helpers/transportParsing';
 
 () => {
   const c = null as unknown as AdtClient;
@@ -50,7 +51,9 @@ import type { AdtClient } from '../../../clients/AdtClient';
   // therefore does not compile: the caller is asked what to do about the
   // entry that has no position.
   void (async () => {
-    const listed = await c.getRequest().readObjects('E19K905942');
+    const listed = await c
+      .getRequest(transportParsing)
+      .readObjects('E19K905942');
     if (!listed.ok) return;
     const [entry] = listed.getResult().value;
     // @ts-expect-error position is optional on a listed entry, required here

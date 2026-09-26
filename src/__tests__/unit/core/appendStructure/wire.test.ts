@@ -1,7 +1,7 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { getAppendStructureSource } from '../../../../core/appendStructure/read';
 import { unlockAppendStructure } from '../../../../core/appendStructure/unlock';
 import { updateAppendStructure } from '../../../../core/appendStructure/update';

@@ -26,7 +26,7 @@
 import type {
   IAbapConnection,
   ISessionLifecycleAware,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtClient } from '../../../clients/AdtClient';
 import {

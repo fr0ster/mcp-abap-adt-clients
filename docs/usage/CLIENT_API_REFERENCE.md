@@ -15,6 +15,14 @@ anything that can be deleted can be asked whether it can be deleted *now* — an
 [OBJECT_LIFECYCLE.md](OBJECT_LIFECYCLE.md) for the flow they make and the one
 type where it does not hold.
 
+**Nothing is read into an answer unless you ask for it.** Since 23.0.0 every
+implementation answers the document as it arrived, unless you build it with a
+reading of your own; whether an answer is a failure is the `analyse` you pass
+with the call. The readings and verdicts this package used to apply on its own
+live in [`@mcp-abap-adt/adt-strategies`](../../packages/adt-strategies), and
+[MIGRATION-23.md](MIGRATION-23.md) maps each removed behaviour to the code that
+replaces it.
+
 ## AdtClient
 
 ```typescript
@@ -22,14 +30,14 @@ import { AdtClient } from '@mcp-abap-adt/adt-clients';
 
 const client = new AdtClient(connection);
 
-// CRUD operations via IAdtObject
+// One member, one request: this is the POST.
 await client.getClass().create({
   className: 'ZCL_TEST',
   packageName: 'ZPACKAGE',
   description: 'Test class',
 });
 
-const readState = await client.getClass().read({ className: 'ZCL_TEST' });
+const read = await client.getClass().read({ className: 'ZCL_TEST' });
 ```
 
 Every member answers `IAdtResponse` — a result or a failure, never both:
@@ -66,15 +74,14 @@ await client.getAuthorizationField().create({
 // Available on all systems (legacy, modern on-prem, cloud).
 // Endpoint: /sap/bc/adt/functions/groups/{groupName}/includes/{includeName}
 const fincl = client.getFunctionInclude();
+// `create` is the POST and carries no source; writing it is `update` under a lock.
 await fincl.create({
   functionGroupName: 'ZFGROUP',
   includeName: 'LZFGROUPF01',
   description: 'Forms include',
-  source: '* report source',
 });
 
-// Dedicated source reader
-const source = await fincl.readSource({
+const source = await fincl.read({
   functionGroupName: 'ZFGROUP',
   includeName: 'LZFGROUPF01',
 });
@@ -82,35 +89,58 @@ const source = await fincl.readSource({
 // Feature Toggle (FTG2/FT) — SAP feature-gate artifact with JSON source payload.
 // Available on modern on-prem and cloud MDD; absent on legacy kernels (BASIS < 7.50).
 // Endpoint: /sap/bc/adt/sfw/featuretoggles/{name}
-// Factory returns IFeatureToggleObject — extends IAdtObject<IFeatureToggleConfig,
-// IFeatureToggleState> and adds five domain methods (switchOn, switchOff,
-// getRuntimeState, checkState, readSource). The full surface is statically
-// visible on the factory return — no casts required at call sites.
-const toggle = client.getFeatureToggle();
+// Besides the CRUD atoms a toggle has five members of its own (switchOn,
+// switchOff, getRuntimeState, checkState, readSource), each answering its own
+// slot of the result set. The default answers every document as it arrived;
+// the two JSON readings are in @mcp-abap-adt/adt-strategies:
+//
+//   import { featureToggleDocuments } from '@mcp-abap-adt/adt-clients';
+//   import {
+//     featureToggleCheckState,
+//     featureToggleRuntimeState,
+//   } from '@mcp-abap-adt/adt-strategies';
+const toggle = client.getFeatureToggle({
+  ...featureToggleDocuments,
+  runtimeState: featureToggleRuntimeState,
+  checkState: featureToggleCheckState,
+});
 
 // --- 1. Create a custom feature toggle ---
 // CREATE typically requires SAP_DEVELOPER-equivalent authorization. On cloud
 // On some systems FTG2/FT creation is SAP-reserved — expect HTTP 403.
 // On modern on-prem (BASIS ≥ 7.50) with developer auth, this works.
+// `create` is the POST and carries no source: the toggle is created empty.
 await toggle.create({
   featureToggleName: 'ZMY_FEATURE',
   packageName: 'ZMY_PKG',
   description: 'My feature toggle',
   transportRequest: 'DEVK900123',
-  source: {
-    // Optional structured source body. If omitted, the toggle is created
-    // empty and the JSON source can be updated later via update() with
-    // config.source set, or by calling the low-level uploadFeatureToggleSource.
-    rollout: {
-      lifecycleStatus: 'inValidation',
-      strategy: 'immediate',
-      configurable: false,
-      defaultEnabledFor: 'none',
-      reversible: true,
-    },
-    toggledPackages: ['ZMY_PKG'],
-  },
 });
+
+// The JSON source is a write of its own, under the toggle's lock.
+const toggleLock = await toggle.lock({ featureToggleName: 'ZMY_FEATURE' });
+if (!toggleLock.ok) throw new Error(toggleLock.getError().message);
+await toggle.update(
+  {
+    featureToggleName: 'ZMY_FEATURE',
+    transportRequest: 'DEVK900123',
+    source: {
+      rollout: {
+        lifecycleStatus: 'inValidation',
+        strategy: 'immediate',
+        configurable: false,
+        defaultEnabledFor: 'none',
+        reversible: true,
+      },
+      toggledPackages: ['ZMY_PKG'],
+    },
+  },
+  { lockHandle: toggleLock.getResult().value },
+);
+await toggle.unlock(
+  { featureToggleName: 'ZMY_FEATURE' },
+  toggleLock.getResult().value,
+);
 
 // --- 2. Switch the toggle ON (client-level) ---
 // transportRequest is REQUIRED for client-level toggling (captures the change
@@ -130,20 +160,21 @@ await toggle.switchOff(
 );
 
 // --- 4. Pre-flight check before toggling ---
-// checkState() returns current state plus transport binding info. Call this
-// before switchOn/switchOff when you need to know whether a customising
-// transport is allowed and which package / object URI the change would bind to.
+// checkState() answers the `…/check` JSON: current state plus transport
+// binding info. Call it before switchOn/switchOff when you need to know whether
+// a customising transport is allowed and which package / object URI the change
+// would bind to. Read by featureToggleCheckState:
 const preflight = await toggle.checkState({ featureToggleName: 'ZMY_FEATURE' });
-console.log(preflight.checkStateResult);
+if (preflight.ok) console.log(preflight.getResult().value);
 // { currentState: 'off', transportPackage: 'ZMY_PKG',
 //   transportUri: '/sap/bc/adt/vit/wb/object_type/sf01/object_name/zmy_feature',
 //   customizingTransportAllowed: true }
 
 // --- 5. Read runtime state (all levels) ---
-// Returns the client-level aggregate for the current session plus the full
-// per-client and per-user breakdowns.
+// The `…/states` JSON: the client-level aggregate for the current session plus
+// the full per-client and per-user breakdowns. Read by featureToggleRuntimeState:
 const runtime = await toggle.getRuntimeState({ featureToggleName: 'ZMY_FEATURE' });
-console.log(runtime.runtimeState);
+if (runtime.ok) console.log(runtime.getResult().value);
 // {
 //   name: 'ZMY_FEATURE',
 //   clientState: 'on',
@@ -154,17 +185,22 @@ console.log(runtime.runtimeState);
 
 // --- 6. Read the JSON source body (rollout / toggledPackages / attributes) ---
 // Unlike ABAP source, feature-toggle source is structured JSON. readSource()
-// parses it and returns IFeatureToggleSource via state.sourceResult.
-const sourceState = await toggle.readSource(
+// answers it as it arrived (the `sourceDocument` slot); parsing it into
+// IFeatureToggleSource is a reading of your own.
+const sourceDoc = await toggle.readSource(
   { featureToggleName: 'ZMY_FEATURE' },
   'active', // or 'inactive'
 );
-console.log(sourceState.sourceResult?.rollout?.defaultEnabledFor);
-// 'none' | 'someCustomers' | 'allCustomers' | ...
+if (sourceDoc.ok) {
+  // The body as the server sent it: rollout, toggledPackages, attributes.
+  const parsed = JSON.parse(String(sourceDoc.getResult().value));
+}
 
 // --- 7. Update the toggle (one request: the write) ---
 // Since 18.0.0 `update` is the write and nothing else. Lock it first if the
 // system asks for a handle, and activate afterwards if you want it active.
+// `lock` answers the handle SAP sent, or '' when its answer carried none —
+// since 23.0.0 that is an answer, not a thrown "Failed to obtain lock handle".
 const locked = await toggle.lock({ featureToggleName: 'ZMY_FEATURE' });
 const lockHandle = locked.ok ? locked.getResult().value : undefined;
 await toggle.update({ featureToggleName: 'ZMY_FEATURE' }, { lockHandle });
@@ -259,8 +295,15 @@ import {
   CloudHttpTransport,
   TokenAuthProvider,
 } from '@mcp-abap-adt/connection';
-import { AdtAbapGitClient } from '@mcp-abap-adt/adt-clients';
-import type { IAdtAbapGitClient } from '@mcp-abap-adt/interfaces-adt';
+import {
+  AdtAbapGitClient,
+  abapGitDocuments,
+} from '@mcp-abap-adt/adt-clients';
+import {
+  abapGitErrorLog,
+  abapGitExternalRepo,
+  abapGitRepos,
+} from '@mcp-abap-adt/adt-strategies';
 
 // abapGit needs cloud or ABAP Platform 2022+, so the cloud connector and the
 // cloud wire — the one that asks for a session at
@@ -284,14 +327,24 @@ const connection = new AdtCloudConnector(
 );
 await connection.connect();
 
-const abapGit: IAdtAbapGitClient = new AdtAbapGitClient(connection);
+// The client answers every document as it arrived (`abapGitDocuments`) and
+// `unlink` answers nothing. The shapes below are readings you ask for, once,
+// when you build it.
+const abapGit = new AdtAbapGitClient(connection, undefined, undefined, {
+  ...abapGitDocuments,
+  repos: abapGitRepos,
+  errorLog: abapGitErrorLog,
+  externalRepo: abapGitExternalRepo,
+});
 
 // Probe a remote repo before linking
 const info = await abapGit.checkExternalRepo({
   url: 'https://github.com/SAP-samples/cloud-abap-rap.git',
 });
-console.log(info.accessMode);                        // 'PUBLIC' | 'PRIVATE' | ...
-console.log(info.branches.map((b) => b.name));       // ['HEAD', 'refs/heads/main', ...]
+if (info.ok) {
+  console.log(info.getResult().value.accessMode);                    // 'PUBLIC' | 'PRIVATE' | ...
+  console.log(info.getResult().value.branches.map((b) => b.name));   // ['HEAD', 'refs/heads/main', ...]
+}
 
 // Link a package to a remote repo
 await abapGit.link({
@@ -300,11 +353,19 @@ await abapGit.link({
   branchName: 'refs/heads/main',
 });
 
+// Every member is addressed by what `listRepos` reported: the pull link, the
+// log link, the repository key. A member never looks them up for you.
+const findRepo = async () => {
+  const repos = await abapGit.listRepos();
+  if (!repos.ok) throw new Error(repos.getError().message);
+  const repo = repos.getResult().value.find((r) => r.package === 'ZMY_PKG');
+  if (!repo) throw new Error('ZMY_PKG is not linked');
+  return repo;
+};
+
 // Pull — one POST, to the link `listRepos` reported. It does not wait.
-const repos = await abapGit.listRepos();
-if (!repos.ok) throw new Error(repos.getError().message);
-const linked = repos.getResult().value.find((r) => r.package === 'ZMY_PKG');
-if (!linked?.pullLink) throw new Error('ZMY_PKG reports no pull link');
+const linked = await findRepo();
+if (!linked.pullLink) throw new Error('ZMY_PKG reports no pull link');
 
 const started = await abapGit.pull({
   package: 'ZMY_PKG',
@@ -320,38 +381,32 @@ if (!started.ok) throw new Error(started.getError().message);
 // Read once before testing the condition: `linked` was fetched before the POST,
 // so its status says nothing about this pull.
 const deadline = Date.now() + 600_000;
-let status = (await abapGit.getRepo('ZMY_PKG')).getResult().value;
-while (status.status === 'R' && Date.now() < deadline) {
+let repo = await findRepo();
+while (repo.status === 'R' && Date.now() < deadline) {
   await new Promise((resolve) => setTimeout(resolve, 2000));
-  const answer = await abapGit.getRepo('ZMY_PKG');
-  if (!answer.ok) throw new Error(answer.getError().message);
-  status = answer.getResult().value;
-  console.log(`status: ${status.status} — ${status.statusText}`);
+  repo = await findRepo();
+  console.log(`status: ${repo.status} — ${repo.statusText}`);
 }
 
-if (status.status === 'E' || status.status === 'A') {
-  const log = await abapGit.getErrorLog('ZMY_PKG');
+// The error log is read from the link the repository reports — on a failed
+// pull, or any time.
+if ((repo.status === 'E' || repo.status === 'A') && repo.logLink) {
+  const log = await abapGit.getErrorLog(repo.logLink);
   console.error('pull failed:', log.ok ? log.getResult().value : log.getError());
 }
 
-// Read status without triggering a pull
-const repo = await abapGit.getRepo('ZMY_PKG');
-
-// List all linked repos on this system
-const all = await abapGit.listRepos();
-
-// Fetch the error log as a first-class operation (not only on failed pulls)
-const log = await abapGit.getErrorLog('ZMY_PKG');
-
-// Remove the binding. DELETE /sap/bc/adt/abapgit/repos/{repositoryId}
-// under the hood — repositoryId is resolved automatically from the
-// package name.
-await abapGit.unlink({ package: 'ZMY_PKG' });
+// Remove the binding: DELETE /sap/bc/adt/abapgit/repos/{repositoryId}, by the
+// key `listRepos` reported.
+if (repo.repositoryId) {
+  await abapGit.unlink({ repositoryId: repo.repositoryId });
+}
 ```
 
 **Availability.** ADT-integrated abapGit ships with SAP BTP ABAP Environment (Steampunk) and modern on-prem from ABAP Platform 2022+. Legacy kernels (BASIS < 7.50) do not expose `/sap/bc/adt/abapgit/*`. This is **not** the community abapGit that installs via SE38 — that one is a separate ABAP program with its own UI and does not go through ADT.
 
-**Async pull contract.** `pull` starts the server-side job and answers. The job then runs on its own, and nothing you do on this side stops it — which is why the wait above is written in your code rather than hidden in a member with a timeout option. Poll `getRepo(package)` until `status !== 'R'` before re-issuing `pull` or `unlink`: starting a second pull while the first is still `R` is unsupported and fails fast.
+**Async pull contract.** `pull` starts the server-side job and answers. The job then runs on its own, and nothing you do on this side stops it — which is why the wait above is written in your code rather than hidden in a member with a timeout option. Poll `listRepos()` until the repository's `status !== 'R'` before re-issuing `pull` or `unlink`: starting a second pull while the first is still `R` is unsupported and fails fast.
+
+**No `getRepo`, since 23.0.0.** It listed every repository and picked one for a package — a filter over a document, which is a reading, and a "not found" the library composed from its own search. `listRepos` and your own `find` are the same request. For the same reason `unlink` takes the `repositoryId` and `getErrorLog` the `logLink` that `listRepos` reports, instead of a package name each looked up on its own. `abapGitRepos` reads the key verbatim: the reading it replaces turned `000001` into `1`, which is not the key `unlink` is addressed by.
 
 **Content-type version.** Defaults to `v3` for sapcli compatibility. Cloud MDD advertises `v4`; consumers can opt in via `new AdtAbapGitClient(conn, logger, { contentTypeVersion: 'v4' })`.
 
@@ -362,7 +417,8 @@ await abapGit.unlink({ package: 'ZMY_PKG' });
 ```typescript
 import type { IAdtRequest } from '@mcp-abap-adt/interfaces-adt';
 
-const requests: IAdtRequest = client.getRequest();
+// The type argument is what `list` answers — `unknown` for the shipped document.
+const requests: IAdtRequest<unknown> = client.getRequest();
 ```
  `create()` and `read()` behave as any
 other handler; `list()` is the one method worth reading closely, because the
@@ -372,61 +428,53 @@ never worked, on any system this was probed against, and the endpoint answers
 that shape with the same 309-byte empty root every time.
 
 ```typescript
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient, transportDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  transportSearchConfigurations,
+  transportTree,
+} from '@mcp-abap-adt/adt-strategies';
 
 const client = new AdtClient(connection);
 
-// No configUri: resolves the one saved transport search this system exposes.
-// Throws if there are zero configurations (nothing to run) or more than one
-// (which one is ambiguous — there is no "default" flag in the payload).
-const listState = await client.getRequest().list();
-console.log(listState.listResult?.data);
-
-// Pass configUri explicitly to pick a specific saved search, or to skip
-// resolution altogether (required on a batch client — see below).
-await client.getRequest().list({
-  configUri: '/sap/bc/adt/cts/transportrequests/searchconfigurations/<id>',
+// The documents as they arrived, unless you ask for a reading.
+const request = client.getRequest({
+  ...transportDocuments,
+  list: transportTree,
+  searchConfigurations: transportSearchConfigurations,
 });
 
-// Where a configUri comes from: ask. searchConfigurations() is one request,
-// with your analyse over its answer and your reading of its document.
-const request = client.getRequest();
-const configurations = await request.searchConfigurations({ analyse });
-if (!configurations.ok) return configurations.getError();
+// Where a configUri comes from: ask. searchConfigurations() is one request.
+const configurations = await request.searchConfigurations();
+if (!configurations.ok) throw new Error(configurations.getError().message);
 
+// Which saved search to run is yours to choose — the payload carries no name
+// and no "default" flag, so there is nothing to choose by but what you know.
 for (const { uri } of configurations.getResult().value) {
   const listed = await request.list({ configUri: uri });
+  if (listed.ok) console.log(listed.getResult().value.requests.length);
 }
 ```
 
 #### `searchConfigurations()` — where a `configUri` comes from
 
-`list()` with no argument resolves one itself, and that resolution is
-opinionated: one configuration is used, several are refused rather than
-guessed between. Both halves of that opinion used to be out of a caller's
-reach — the request happened inside a member called for something else, so no
-`analyse` saw its answer and no result strategy shaped it; and on a system
-holding several saved searches the refusal told the caller to "pass configUri
-explicitly" without giving them a supported way to find one.
-
-`searchConfigurations(options?)` is that way. One request, the caller's
-strategies in charge of it, and the choice theirs to make:
+**`list()` requires a `configUri` since 23.0.0** (`IListTransportsOptions` in
+`@mcp-abap-adt/interfaces-adt` 11). Until then `list()` with no argument read
+the configurations itself and chose: one was used, several were refused with
+`TransportSearchConfigurationMissing`. That was two requests behind one member,
+the first of them out of reach of any `analyse` or reading, and a choice about
+the caller's system made without the caller. Now the two requests are yours:
 
 | | requests |
 |---|---|
-| `list()` | two: the configurations, then the list |
-| `searchConfigurations()` + `list({ configUri })` | two, the same two, both yours |
-| `list({ configUri })` alone | one |
+| `searchConfigurations()` + `list({ configUri })` | two, both yours |
+| `list({ configUri })` with a `configUri` you kept | one |
 
-The default reading is `parseSearchConfigurations` — as much of the document
-as it takes to address a configuration (`uri`, `etag`, and the configuration's
-own attributes unrenamed), which is what the internal resolver has always
-used. Inject a `searchConfigurations` strategy in the result set to read the
-document differently; the slot is optional, so a result set written before
-this member existed still compiles.
-
-Nothing about `list()` changes. A caller who never needs to choose can keep
-calling it with no argument.
+`searchConfigurations(options?)` answers the configurations document as it
+arrived. `transportSearchConfigurations` from `@mcp-abap-adt/adt-strategies`
+reads it into `ITransportSearchConfiguration[]` — `uri`, `etag`, and the
+configuration's own attributes unrenamed — which is as much of the document as
+it takes to address one. A configuration's `uri` does not change between runs,
+so a caller who has found theirs can keep it and skip the first request.
 
 #### The object list: `readObjects()`, `removeObject()`, `addObject()`, `createTask()`, `changeTaskType()`
 
@@ -439,7 +487,13 @@ ways out were releasing the whole request, shipping everything else in it, or
 SE09 by hand.
 
 ```typescript
-const request = client.getRequest();
+import { transportDocuments } from '@mcp-abap-adt/adt-clients';
+import { transportObjectEntries } from '@mcp-abap-adt/adt-strategies';
+
+const request = client.getRequest({
+  ...transportDocuments,
+  objects: transportObjectEntries,
+});
 
 // What the task holds, each entry with the position the removal needs.
 const listed = await request.readObjects('E19K905942');
@@ -477,9 +531,10 @@ had:
   answered `200` with the usual echo document, and re-reading the task found
   all twenty-two still on it. The same documents carrying `tm:position`
   removed every one. `readObjects()` is where the number comes from.
-- **`readObjects()` exists for the parsing, not for the representation.** Its
-  default reading answers the entries as values, each with the `position`
-  `removeObject()` needs, rather than a document to dig through. The header it
+- **`readObjects()` exists for the parsing, not for the representation.** With
+  `transportObjectEntries` it answers the entries as values, each with the
+  `position` `removeObject()` needs, rather than a document to dig through (its
+  default, like every member's, is the document). The header it
   sends changes nothing: measured against an on-premise system, 2026-09-21,
   the same URL with and without
   `application/vnd.sap.adt.transportorganizer.v1+xml` came back byte for byte
@@ -534,41 +589,58 @@ objects directly. `pgmid` defaults to `R3TR`,
 and `obj_desc` is sent only when given.
 
 `IAbapObjectEntry`, the type those two members take, comes from
-`@mcp-abap-adt/interfaces` — import it from there, or from
-`@mcp-abap-adt/interfaces-adt` directly, rather than from this package.
+`@mcp-abap-adt/interfaces-adt` — import it from there rather than from this
+package.
 
-`removedObject`, `addedObject`, `createdTask` and `actionLog` are optional
-slots in the result set — a result set written before these members existed
-still compiles. The defaults hand the document back untouched, except
-`createdTask`, which reads the new number the way `created` reads a new
-request's.
+Every slot of `ITransportResults` is required, and every default hands the
+document back untouched — `createdTask` and `created` included. The new number
+is read by `transportCreated`, and the object list's entries (with the
+`position` `removeObject()` needs) by `transportObjectEntries`, both from
+`@mcp-abap-adt/adt-strategies`:
 
-**On a batch client**, `configUri` is required. Resolving "no argument" needs
-a response from `getTransportSearchConfigurations()`, and a batch connection
-cannot deliver one until `batchExecute()` runs — so `batch.getRequest().list()`
-throws immediately, while `batch.getRequest().list({ configUri })` records
-normally and resolves after `batchExecute()`.
+```typescript
+import { transportDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  transportCreated,
+  transportObjectEntries,
+} from '@mcp-abap-adt/adt-strategies';
+
+const request = client.getRequest({
+  ...transportDocuments,
+  created: transportCreated,
+  createdTask: transportCreated,
+  objects: transportObjectEntries,
+});
+```
+
+The `readObjects()` and `createTask()` examples above assume that set.
+
+**On a batch client** `list({ configUri })` records normally and resolves after
+`batchExecute()`, like any other member: it is one request now, so there is no
+first answer a batch would have to deliver early.
 
 **Migration from filter parameters.** There is no server-side filtering to
 lose — the five parameters (`user`, `status`, `date_range`, `target_system`,
-`request_type`) were never read by the endpoint. Call `list()` with no
-argument to run the saved search Eclipse already uses, or pass `configUri` to
-pick a specific one. See [CHANGELOG.md](../../CHANGELOG.md) (11.0.0 entry) for
-the before/after low-level signature.
+`request_type`) were never read by the endpoint. Pass the `configUri` of the
+saved search you mean — Eclipse's own is among those `searchConfigurations()`
+answers. See [CHANGELOG.md](../../CHANGELOG.md) (11.0.0 entry) for the
+before/after low-level signature.
 
-#### `list()` — the transport tree, parsed
+#### `list()` — the transport tree
 
-`list()` answers whatever the reading it was built with makes of the body, and
-the shipped one parses it into requests, their tasks, and the containers each
-request was nested under.
+`list()` answers whatever the reading it was built with makes of the body. The
+default is the document; `transportTree` from `@mcp-abap-adt/adt-strategies`
+reads it into requests, their tasks, and the containers each request was nested
+under.
 
 ```typescript
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
-import type { ITransportTree } from '@mcp-abap-adt/adt-clients';
+import { AdtClient, transportDocuments } from '@mcp-abap-adt/adt-clients';
+import { type ITransportTree, transportTree } from '@mcp-abap-adt/adt-strategies';
 
 const client = new AdtClient(connection);
+const requests = client.getRequest({ ...transportDocuments, list: transportTree });
 
-const answer = await client.getRequest().list();
+const answer = await requests.list({ configUri });
 if (!answer.ok) throw new Error(answer.getError().message);
 
 const tree: ITransportTree = answer.getResult().value;
@@ -582,9 +654,10 @@ for (const request of tree.requests) {
 `listNodes()` sat beside it until 31.0.0, doing the same request and parsing the
 same body — one endpoint under two names, differing only in how far the answer
 was read. That is what the injected reading replaces, so the pair is one member
-now. `ITransportTree` moved with it: a contract carries what is needed to use or
-replace it, and a shape a replacement reading would not produce is neither, so
-it is imported from `@mcp-abap-adt/adt-clients` rather than from the contracts.
+now. `ITransportTree` is not a contract type: a contract carries what is needed
+to use or replace it, and a shape a replacement reading would not produce is
+neither. It lives beside the reading that builds it, in
+`@mcp-abap-adt/adt-strategies` since 23.0.0.
 
 **Containers are a list because the nesting is not fixed.** `?configUri=`
 alone answers `tm:workbench > tm:modifiable > tm:request`; `?targets=true`
@@ -598,9 +671,8 @@ name rather than by a path observed on one system.
 not `request.attributes.number` — naming a field is the consumer's decision,
 not this library's.
 
-**The parse costs no request.** With `configUri` it is one HTTP call; without
-one it is two (the saved-search configuration, then the list). Reading the
-document a second way never means fetching it a second time.
+**The parse costs no request.** `list()` is one HTTP call. Reading the document
+a second way never means fetching it a second time.
 
 **Your own reading, for a payload the shipped one does not know:**
 
@@ -614,11 +686,12 @@ const requests = client.getRequest({
 ```
 
 `myParse` still yields a typed result instead of forcing a caller back onto raw
-XML — and `rawDocument` is there for a caller who wants exactly that.
+XML — and the default, `rawDocument`, is there for a caller who wants exactly
+that.
 
-**A body the shipped reading does not recognise throws.** That is what stops
+**A body `transportTree` does not recognise throws.** That is what stops
 `list()`'s original defect (an empty root read as success) from recurring: a
-reading that cannot read is this library failing, not the server refusing, and
+reading that cannot read is the reading failing, not the server refusing, and
 it surfaces as itself rather than as a verdict about SAP. An empty `tm:root` is
 different — that is **not** an error, and the answer succeeds with
 `requests: []` and whatever attributes the root itself carried. A system with no
@@ -626,9 +699,11 @@ transport requests must be able to say so without being reported as broken; the
 distinction is the root element and the nesting, never a count.
 
 **Legacy systems answer the same member.** `AdtRequestLegacy.list()` reads
-`/sap/bc/cts/transportrequests`, whose payload has never been captured — so the
-shipped reading may well not recognise it, and will say which element it
+`/sap/bc/cts/transportrequests`, whose payload has never been captured — so
+`transportTree` may well not recognise it, and will say which element it
 expected and what it found. That is the cue to inject a reading for your system.
+That endpoint is not a saved search, so `AdtRequestLegacy.list()` keeps
+`configUri` optional and refuses one that is given.
 
 **Known limitation — `?targets=true` is not sent.** This library requests
 `?configUri=` alone; Eclipse requests `?targets=true&configUri=`. With
@@ -639,22 +714,23 @@ the type: `containers` is already an ordered list, so `tm:target` can be
 added later without a breaking change. Whether to send it — always, never, or
 behind a flag — is an open decision, not an oversight.
 
-**`parseTransportTree()`** is also exported from the package root, for a
-transport-tree response obtained some other way (a batch result, a fixture,
-anything already held as a string):
+**A response obtained some other way** (a batch result, a fixture, anything
+already held) is read by the same strategy — it is a function of the wire
+response, and needs no connection:
 
 ```typescript
-import { parseTransportTree } from '@mcp-abap-adt/adt-clients';
+import { transportTree } from '@mcp-abap-adt/adt-strategies';
 
-const tree = parseTransportTree(xmlAlreadyInHand);
+const tree = transportTree({ status: 200, statusText: 'OK', headers: {}, data: xmlAlreadyInHand });
 ```
 
-**`create()` answers the new request, not its document.** `parseCreatedTransport`
-is its shipped reading, and the number is the only thing the response is there to
-deliver:
+**`create()` answers the document; `transportCreated` reads the new request out
+of it**, and the number is the only thing the response is there to deliver:
 
 ```typescript
-const created = await client.getRequest().create({ description: 'my change' });
+const created = await client
+  .getRequest({ ...transportDocuments, created: transportCreated })
+  .create({ description: 'my change' });
 if (!created.ok) throw new Error(created.getError().message);
 
 created.getResult().value.transportNumber;   // 'DEVK900123'
@@ -679,20 +755,29 @@ What "the whole content" is depends on the type, and on nothing else:
 
 ```typescript
 // A source type. Sending one method body replaces the class with that body.
-const current = await client.getClass().read({ className: 'ZCL_X' }, 'active');
+const cls = client.getClass();
+const current = await cls.read({ className: 'ZCL_X' }, 'active');
+if (!current.ok) throw new Error(current.getError().message);
 const edited = addAMethod(String(current.getResult().value));
 
-const handle = (await client.getClass().lock({ className: 'ZCL_X' })).getResult().value;
-await client.getClass().update({ className: 'ZCL_X' }, { source: edited, lockHandle: handle });
-await client.getClass().unlock({ className: 'ZCL_X' }, handle);
+const classLock = await cls.lock({ className: 'ZCL_X' });
+if (!classLock.ok) throw new Error(classLock.getError().message);
+const handle = classLock.getResult().value;
+await cls.update({ className: 'ZCL_X' }, { source: edited, lockHandle: handle });
+await cls.unlock({ className: 'ZCL_X' }, handle);
 
-// A document type. Same shape, different noun.
-const doc = await client.getDomain().readMetadata({ domainName: 'ZD' });
+// A document type. Same shape, different noun: the document goes in
+// `options.source` of `updateMetadata`.
+const domain = client.getDomain();
+const doc = await domain.readMetadata({ domainName: 'ZD' });
+if (!doc.ok) throw new Error(doc.getError().message);
 const patched = patchTheDescription(String(doc.getResult().value), 'new');
 
-const lock = (await client.getDomain().lock({ domainName: 'ZD' })).getResult().value;
-await client.getDomain().updateMetadata({ domainName: 'ZD', document: patched }, { lockHandle: lock });
-await client.getDomain().unlock({ domainName: 'ZD' }, lock);
+const domainLock = await domain.lock({ domainName: 'ZD' });
+if (!domainLock.ok) throw new Error(domainLock.getError().message);
+const lock = domainLock.getResult().value;
+await domain.updateMetadata({ domainName: 'ZD' }, { source: patched, lockHandle: lock });
+await domain.unlock({ domainName: 'ZD' }, lock);
 ```
 
 **Until 19.0.0 the six document types hid this.** They fetched the current
@@ -772,23 +857,17 @@ const client = new AdtClient(connection, console, {
 });
 ```
 
-You can also override the `Accept` header per read call:
+The switch and the corrections it learns belong to **the connection**, not to
+the process. Until 23.0.0 they were module globals: an `Accept` corrected on one
+system was sent to every other, keyed by method and URL alone, and one client's
+`enableAcceptCorrection` switched it for all. This is protocol mechanics — a
+retry with a type the server named — not a reading of SAP's verdict, which is
+why it stays in the library.
 
-```typescript
-await client.getClass().read(
-  { className: 'ZCL_TEST' },
-  'active',
-  { accept: 'text/plain' }
-);
-
-await client.getClass().readMetadata(
-  { className: 'ZCL_TEST' },
-  { accept: 'application/vnd.sap.adt.oo.classes.v4+xml', version: 'active' }
-);
-
-// Read source without version (initial post-create state)
-await client.getClass().read({ className: 'ZCL_TEST' }, undefined);
-```
+There is no per-call `Accept` override on the object members: the header each
+member sends is the one its endpoint takes, and negotiation corrects it when a
+system answers `406`. Reading a source without a version (the state right after
+a create) is `read(config, undefined)`.
 
 ### AdtUtils (Object Metadata/Source)
 
@@ -838,12 +917,19 @@ server, because that is the only thing this contract is a verdict about:
 | `connection` | no usable answer — unreachable, expired session, endpoint absent | reauthenticate, or check reachability |
 | `refusal` | SAP answered about this object and said no | ask something else |
 
-**A document this library cannot read is neither.** It is this library failing
-rather than the server refusing, so it throws as itself — `AdtParseError`,
-carrying what it looked for and the document it looked in. Calling that
-`origin: 'parse'` (as 17.0.0 did) told a caller to go and look at a system that
-had answered them correctly. A **consumer's own reading** throwing is the same
-case, and surfaces untouched for the same reason.
+**A reading that cannot read is neither.** Every default is the document as it
+arrived, so nothing this package ships parses an answer on its way to you. A
+reading you inject — your own, or one from `@mcp-abap-adt/adt-strategies` — that
+throws is a failure of the reading, not the server refusing, so it surfaces as
+itself, outside the classification. Calling that `origin: 'parse'` (as 17.0.0
+did) told a caller to go and look at a system that had answered them correctly.
+
+**What throws, and what answers.** A cause on SAP's side — a status, a refusal
+in a body, an answer missing what you expected — comes back through the
+strategies, never as a throw and never rewrapped in an error that drops the
+response. A throw is reserved for causes inside this library: an argument you
+did not give that the request cannot be built without (a where-used type no
+address exists for, an ATC run over no objects), or a bug.
 
 There is no `cause`. What a library threw inside itself is not part of what a
 consumer reads; what the server said is, and that is `message` and `response`.
@@ -873,9 +959,28 @@ const parsed = client.getClass({
 
 One set per object type is exported, named after it — `classDocuments`,
 `transportDocuments`, `packageDocuments`, `utilDocuments` and the rest — beside
-the interface each satisfies (`IClassResults`, …). The three building blocks are
-`rawDocument` (the body as it arrived), `nothing` (for a member ADT answers with
-nothing worth reading, such as an unlock) and `wireItself`.
+the interface each satisfies (`IClassResults`, …). **Every default answers the
+document as it arrived**, or nothing where ADT answers nothing. The three
+building blocks are `rawDocument` (the body as it arrived), `nothing` (for a
+member ADT answers with nothing worth reading) and `wireItself` (the whole
+exchange: status, headers, body).
+
+The readings — the transport tree, the version feed, search hits, a unit-test
+run id, the ATC and profiler views, the abapGit list — are strategies in
+[`@mcp-abap-adt/adt-strategies`](../../packages/adt-strategies), and you put the
+ones you want into the set:
+
+```typescript
+import { classDocuments } from '@mcp-abap-adt/adt-clients';
+import { objectVersions } from '@mcp-abap-adt/adt-strategies';
+
+const classes = client.getClass({ ...classDocuments, versions: objectVersions });
+```
+
+The runtime client and the executor work the same way: `getProfiler(results)`,
+`getAtc(results)`, `getClassExecutor(results)` and the rest take a set, and each
+call builds a fresh implementation — a cached one kept the first caller's
+readings for everyone after.
 
 **A set covers every member that makes a request.** `utilDocuments` is the
 largest, at twenty slots — one for each member of `AdtUtils` that reaches ADT.
@@ -891,9 +996,9 @@ are no `parse` parameters, no `readWith`, and no second member differing only in
 how far it read.
 
 **What a reading produces is not a contract type.** `ISearchResult`,
-`ITransportTree`, `ObjectVersion`, `IRepositoryNodeContents` and their
-neighbours live in `@mcp-abap-adt/adt-clients`, beside the readings that build
-them — inject your own reading and it is your shape that comes back, so a
+`ITransportTree`, `IObjectVersion`, `IRepositoryNodeContents` and their
+neighbours live in `@mcp-abap-adt/adt-strategies`, beside the readings that
+build them — inject your own reading and it is your shape that comes back, so a
 contract naming one would be describing an implementation.
 
 **The other axis is `analyse`, and it is per call**, because whether an answer is
@@ -911,13 +1016,17 @@ await client.getClass().read({ className: 'ZCL_X' }, 'active', {
 ```
 
 The failure question is asked first, always: a reading is never handed a refusal
-to make a value out of. **No error strategy ships from this package.** ADT
-delivers some refusals inside a `200` — an activation checklist carrying
-`<msg type="E">`, a validation carrying `<SEVERITY>ERROR</SEVERITY>`, a deletion
-check saying no — and nothing below the contract can tell those from a success.
-Which of them your application should treat as a failure depends on your system
-and what you are about to do, so you write the `analyse` and this package stays
-out of it.
+to make a value out of. **No error strategy ships from this package, and no
+member supplies one of its own.** ADT delivers some refusals inside a `200` —
+an activation checklist carrying `<msg type="E">`, a validation carrying
+`<SEVERITY>ERROR</SEVERITY>`, a deletion check saying no — and nothing below
+the contract can tell those from a success. Which of them your application
+should treat as a failure depends on your system and what you are about to do,
+so the `analyse` is yours: write it, or take one from
+`@mcp-abap-adt/adt-strategies` (`analyseActivation`, `analyseDeletion`,
+`analysePublication`, `analyseUnitTestStart`, …). Until 23.0.0 ten members
+applied a verdict of their own when you passed none; each now hands on what you
+gave it, or nothing.
 
 Omit `analyse` and you still get a failure when the transport itself failed,
 carrying the response and the request it arrived on. Pass `nothingIsARefusal`
@@ -958,6 +1067,8 @@ Unpublishing is the same, against `…/unpublishjobs`.
 it for you:
 
 ```typescript
+import { analysePublication } from '@mcp-abap-adt/adt-strategies';
+
 const bindings = client.getServiceBinding();
 
 const locked = await bindings.lock({ bindingName: 'ZAC_SRVB01' });
@@ -974,7 +1085,9 @@ try {
     // ~133 seconds on the systems measured, both directions. The 120s default
     // is under that, so a caller that does not raise it will be told the
     // request timed out while the job goes on to finish.
-    { timeout: 300_000 },
+    // analysePublication (@mcp-abap-adt/adt-strategies) reads the job's
+    // <SEVERITY> into a failure; without it the document is the answer.
+    { timeout: 300_000, analyse: analysePublication },
   );
   if (!answer.ok) throw new Error(answer.getError().message);
 } finally {
@@ -1023,8 +1136,10 @@ The value stays legitimate on a binding's *config*, where it says a create
 should not publish.
 
 **Nothing here waits.** The job answers its own verdict — `<SEVERITY>OK` with a
-`<SHORT_TEXT>` — and `publicationRefusal` reads it, so a refused publish comes
-back as the failure half. It takes about two minutes of server time on the
+`<SHORT_TEXT>` — inside a `200`. Pass `analysePublication` from
+`@mcp-abap-adt/adt-strategies` in the `update` options and a refused publish
+comes back as the failure half; pass nothing and it comes back as the document,
+yours to read. Until 23.0.0 the member applied that reading itself. It takes about two minutes of server time on the
 systems measured; that is the operation, not a timeout to tune. If you want to
 watch the result settle, read the service group yourself:
 
@@ -1047,10 +1162,17 @@ Message classes and their individual messages are two separate handlers.
 `getMessageClass()` manages the class shell (name, description, package,
 `masterLanguage`); `getMessageClassMessage()` manages a single message, which is
 read-modify-write over the parent class (a message has no independent write
-endpoint). Message classes are **not activated**, so `activate()`/`check()` throw
-`UNSUPPORTED_OPERATION`.
+endpoint — the one exception to "one member, one request"). Message classes are
+**not activated**, and the handler carries no `activate()` or `check()` at all.
+
+`getMessageClass().updateMetadata()` is one `PUT` of the document you pass in
+`options.source`, under your `options.lockHandle`. Until 23.0.0 it read the
+class itself and patched `config.description` into it; now you read it
+(`readMetadata`), change what you mean to change, and pass the whole document.
 
 ```typescript
+import { analyseMessageClassMessage } from '@mcp-abap-adt/adt-strategies';
+
 // Create the class, then add/edit/remove messages on it.
 await client.getMessageClass().create({
   name: 'ZMY_MSG',
@@ -1072,15 +1194,21 @@ await client.getMessageClassMessage().update({
   msgtext: 'Order &1 does not exist',
 });
 
-// Read one message (resolved from the class).
-const msg = await client.getMessageClassMessage().read({
-  className: 'ZMY_MSG',
-  msgno: '001',
-});
-console.log(msg?.message?.msgtext);
+// Read one message. The answer is the class's document — there is no resource
+// for a single message. analyseMessageClassMessage (@mcp-abap-adt/adt-strategies)
+// turns a message number the class does not carry into a failure; without it,
+// the class answering is a success whether or not the message is there.
+const msg = await client.getMessageClassMessage().read(
+  { className: 'ZMY_MSG', msgno: '001' },
+  undefined,
+  { analyse: analyseMessageClassMessage('001') },
+);
+if (msg.ok) console.log(msg.getResult().value);   // the class document
 
 // Remove a single message, then delete the whole class.
-await client.getMessageClassMessage().delete({ className: 'ZMY_MSG', msgno: '001' });
+// `delete` is on the class, not on the contract `getMessageClassMessage()`
+// answers — construct it against the connection you hold.
+await new AdtMessageClassMessage(connection).delete({ className: 'ZMY_MSG', msgno: '001' });
 await client.getMessageClass().delete({ name: 'ZMY_MSG' });
 ```
 
@@ -1095,31 +1223,46 @@ Since 12.0.0 a handler whose object has none carries neither method — `getDoma
 `getAuthorizationField()`, `getFeatureToggle()`, `getServiceBinding()`, `getRequest()`
 and the unit-test handlers. The call does not compile, rather than throwing at runtime.
 
-```typescript
-import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
+`getVersions` answers the Atom feed and `getVersionSource` the source, each as
+it arrived, through the `versions` and `versionSource` slots of the result set.
+`objectVersions` from `@mcp-abap-adt/adt-strategies` reads the feed into
+`IObjectVersion[]`:
 
-const listed = await client.getClass().getVersions({ className: 'ZCL_MY_CLASS' });
+```typescript
+import { classDocuments } from '@mcp-abap-adt/adt-clients';
+import { objectVersions } from '@mcp-abap-adt/adt-strategies';
+
+const classes = client.getClass({ ...classDocuments, versions: objectVersions });
+
+const listed = await classes.getVersions({ className: 'ZCL_MY_CLASS' });
 if (!listed.ok) throw new Error(listed.getError().message);
 
-const versions = listed.getResult().value;   // ObjectVersion[]
+const versions = listed.getResult().value;   // IObjectVersion[]
 for (const v of versions) {
   console.log(`${v.versionId} by ${v.author ?? '?'} at ${v.updatedAt ?? '?'}`);
 }
 
 // Fetch the source of a specific version via its opaque contentUri.
 if (versions.length > 0) {
-  const src = await client.getClass().getVersionSource(versions[0].contentUri);
+  const src = await classes.getVersionSource(versions[0].contentUri);
   if (src.ok) console.log(src.getResult().value);
 }
 ```
 
 A type that *does* have version history, on a system where the resource is not
-available, answers a failure named
-`code === AdtObjectErrorCodes.UNSUPPORTED_OPERATION` — never the raw HTTP status
-for a caller to decode. That is a fact about the system, not about the contract:
+available, answers what the transport said — a `404` or `406` failure with its
+response. Until 23.0.0 the member threw `UNSUPPORTED_OPERATION` in its place,
+which is a verdict about the system this package had no business making. If you
+want it named, say so per call:
 
 ```typescript
-const listed = await client.getClass().getVersions({ className: 'ZCL_MY_CLASS' });
+import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
+import { analyseUnsupportedStatus } from '@mcp-abap-adt/adt-strategies';
+
+const listed = await classes.getVersions(
+  { className: 'ZCL_MY_CLASS' },
+  { analyse: analyseUnsupportedStatus([404, 406], 'version history') },
+);
 if (!listed.ok) {
   if (listed.getError().code === AdtObjectErrorCodes.UNSUPPORTED_OPERATION) {
     // this system does not answer the versions resource
@@ -1129,73 +1272,69 @@ if (!listed.ok) {
 
 ### AdtUtils (Where-used)
 
-Where-used is a two-step flow:
+Where-used is two requests, and both are yours:
 
-1) `getWhereUsedScope` fetches scope XML (available object types + default selections).
-2) `getWhereUsed` executes the search with that scope (defaults to server selection if scope is omitted).
+1) `getWhereUsedScope` fetches the scope XML (available object types + default selections).
+2) `getWhereUsed` executes the search with that scope (the server's default selection if scope is omitted).
 
-`modifyWhereUsedScope` is a local helper that edits the scope XML (no ADT call).
+`modifyWhereUsedScope` edits the scope XML locally — no ADT call.
 
 See `docs/architecture/ARCHITECTURE.md` for the architectural overview.
 
 ```typescript
-const utils = client.getUtils();
+import { utilDocuments } from '@mcp-abap-adt/adt-clients';
+import { utilWhereUsedReferences } from '@mcp-abap-adt/adt-strategies';
 
-const scopeResponse = await utils.getWhereUsedScope({
-  object_name: 'ZMY_CLASS',
-  object_type: 'class',
+const utils = client.getUtils({
+  ...utilDocuments,
+  whereUsed: utilWhereUsedReferences,
 });
 
-const scopeXml = utils.modifyWhereUsedScope(scopeResponse.data, {
-  enableOnly: ['CLAS/OC', 'INTF/OI'],
+const scope = await utils.getWhereUsedScope({
+  object_name: 'ZMY_TABLE',
+  object_type: 'table',
+});
+if (!scope.ok) throw new Error(scope.getError().message);
+
+// Only structures/tables — not the dozens of other referencing types. SAP
+// applies the selection server-side, so it never searches the unwanted ones.
+const scopeXml = utils.modifyWhereUsedScope(String(scope.getResult().value), {
+  enableOnly: ['TABL/DS', 'TABL/DT'],   // or disable: ['CLAS/OC'], or enableAll: true
 });
 
 const result = await utils.getWhereUsed({
-  object_name: 'ZMY_CLASS',
-  object_type: 'class',
+  object_name: 'ZMY_TABLE',
+  object_type: 'table',
   scopeXml,
 });
-```
-
-`getWhereUsedList` is a convenience wrapper that performs the scope fetch, search, and
-XML parsing in one call and returns structured `references`. Use `enableOnlyTypes` to
-restrict the search to specific ADT object types — SAP applies the selection server-side,
-so it never searches (nor returns) the unwanted types, e.g. hundreds of `CLAS/OC`:
-
-> On systems that do not expose the `/usageReferences/scope` sub-resource (some S/4
-> releases answer it with HTTP 404), server-side filtering is unavailable: the search
-> falls back to an unscoped query and `enableOnlyTypes` / `disableTypes` are then applied
-> to the parsed `references` client-side, so callers still receive the narrowed set.
-
-```typescript
-const utils = client.getUtils();
-
-// Only structures/tables — not the dozens of other referencing types.
-const result = await utils.getWhereUsedList({
-  object_name: 'ZMY_TABLE',
-  object_type: 'table',
-  enableOnlyTypes: ['TABL/DS', 'TABL/DT'],
-});
-
-console.log(`Found ${result.totalReferences} references`);
-for (const ref of result.references) {
-  console.log(`${ref.name} (${ref.type}) in ${ref.packageName}`);
+if (result.ok) {
+  const found = result.getResult().value;
+  console.log(`Found ${found.totalReferences} references`);
+  for (const ref of found.references) {
+    console.log(`${ref.name} (${ref.type}) in ${ref.packageName}`);
+  }
 }
-
-// Or keep the default SAP scope but prune a noisy type:
-await utils.getWhereUsedList({
-  object_name: 'ZMY_TABLE',
-  object_type: 'table',
-  disableTypes: ['CLAS/OC'],
-});
-
-// `enableAllTypes: true` selects every type (Eclipse "select all"); `enableOnlyTypes`
-// takes precedence over it, and `disableTypes` is applied on top.
 ```
+
+`getWhereUsedList`, which joined the scope and the search and filtered on the
+client when a system had no `/usageReferences/scope` (some S/4 releases answer
+it with `404`), left in 19.0.0: what to do on such a system is a decision about
+your system, not a fallback hidden in here. Without `utilWhereUsedReferences`,
+`getWhereUsed` answers the document.
+
+**`object_type`** is an ADT type code (`CLAS/OC`, `BDEF/BDO`, …, any case) or
+one of the friendly names `class`, `program`, `include`, `function`,
+`functiongroup`, `interface`, `package`, `table`, `structure`, `domain`,
+`dataelement`, `view`, `functionmodule`. A function module is named
+`GROUP|FM_NAME`. Since 23.0.0 the address is built by the same `buildObjectUri`
+each family's activation is checked against; the separate vocabulary where-used
+kept before accepted `intf/if` and `stru/dt`, which are not ADT codes, and those
+are now refused — thrown before any request, because the argument is what is
+wrong, not anything the server said.
 
 ## AdtRuntimeClient
 
-`AdtRuntimeClient` exposes all runtime operations through domain object factories. Each factory returns a stateless domain object that wraps a set of related ADT endpoints.
+`AdtRuntimeClient` exposes all runtime operations through domain object factories. Each factory takes a result set, builds a fresh implementation on every call, and returns it — nothing is cached, so one caller's readings never become another's. Every default answers the document as it arrived; the readings are in `@mcp-abap-adt/adt-strategies`. Every member takes `analyse` in its options.
 
 ```typescript
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
@@ -1210,12 +1349,27 @@ executors. The two never share a vocabulary: scheduling yields a *request id*,
 reading takes a *trace id*.
 
 ```typescript
-import { compareRecordedAt } from '@mcp-abap-adt/adt-clients';
+import { profilerDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  compareRecordedAt,
+  profilerDbAccesses,
+  profilerHitList,
+  profilerStatements,
+  profilerTraceEntries,
+} from '@mcp-abap-adt/adt-strategies';
 
-const profiler = runtime.getProfiler();
+const profiler = runtime.getProfiler({
+  ...profilerDocuments,
+  list: profilerTraceEntries,
+  hitlist: profilerHitList,
+  statements: profilerStatements,
+  dbAccesses: profilerDbAccesses,
+});
 
-// What traces exist — parsed entries, not a raw response.
-const traces = await profiler.list({ user: 'SOMEONE' });
+// What traces exist.
+const listed = await profiler.list({ user: 'SOMEONE' });
+if (!listed.ok) throw new Error(listed.getError().message);
+const traces = listed.getResult().value;   // IAbapTraceEntry[]
 // Not `a.recordedAt > b.recordedAt`: that compares ISO timestamps as text and
 // gets the answer wrong across UTC offsets. See the note below.
 // The guard is not decoration: an empty feed is normal — nothing profiled yet —
@@ -1225,14 +1379,19 @@ const newest = traces.length
   : undefined;
 if (!newest) return;
 
-// What is inside one. The result is the view's own type.
+// What is inside one. The result is what that view's strategy makes of it.
 const hitList = await profiler.read(newest.id, 'hitlist', {
   withSystemEvents: false,
 });
 const statements = await profiler.read(newest.id, 'statements');
 const dbAccesses = await profiler.read(newest.id, 'dbAccesses');
 
-console.log(hitList.entries.length, dbAccesses.accesses[0]?.accessTime?.total);
+if (hitList.ok && dbAccesses.ok) {
+  console.log(
+    hitList.getResult().value.entries.length,
+    dbAccesses.getResult().value.accesses[0]?.accessTime?.total,
+  );
+}
 
 // And take it back out when done — since 15.0.0.
 await profiler.delete(newest.id);
@@ -1241,12 +1400,26 @@ await profiler.delete(newest.id);
 Configuring and scheduling live on the executors:
 
 ```typescript
-const classExecutor = new AdtExecutor(connection, logger).getClassExecutor();
+import { AdtExecutor, classExecutorDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  traceSchedulingProfilerId,
+  traceSchedulingRequests,
+  traceSchedulingTypes,
+} from '@mcp-abap-adt/adt-strategies';
 
-const objectTypes = await classExecutor.listObjectTypes();   // INamedItem[]
+const classExecutor = new AdtExecutor(connection, logger).getClassExecutor({
+  ...classExecutorDocuments,
+  types: traceSchedulingTypes,
+  requests: traceSchedulingRequests,
+  scheduled: traceSchedulingProfilerId,
+});
+
+const objectTypes = await classExecutor.listObjectTypes();   // ITraceCatalogueItem[]
 const processTypes = await classExecutor.listProcessTypes();
 const scheduled = await classExecutor.listRequests();        // ITraceRequestEntry[]
 
+// The request id is in `Location` and nowhere else — the default reading,
+// which reads the body, answers ''.
 const requestId = await classExecutor.scheduleTrace({
   description: 'CI trace run',
   sqlTrace: true,
@@ -1263,21 +1436,22 @@ Contract notes:
   which is generic in what its views answer. `readWith(parse, …)` sat beside
   `read()` until 31.0.0 — the same endpoint under a second name, differing only
   in who read the body — and went with every other member of that shape.
-- **The parsers do not validate.** Judging SAP's own documents is not this
-  library's job; the server is the authority on its responses, and where a check
-  is needed ADT has an endpoint (`getInclude().validate()`). A body the shipped
-  mapping does not recognise yields empty rather than an exception. Searching and
-  filtering belong to the server too.
+- **The readings do not validate.** Judging SAP's own documents is not a
+  reading's job; the server is the authority on its responses, and where a check
+  is needed ADT has an endpoint (`getInclude().validate()`). A body the
+  `profiler*` readings do not recognise yields empty rather than an exception.
+  Searching and filtering belong to the server too.
 - **A run does not promise a trace.** SAP writes it asynchronously, so when
-  `runWithProfiling` returns there may be no trace, there may never be one, and
+  `runWithProfiler` returns there may be no trace, there may never be one, and
   you may legitimately read it a week later. To find the one your run produced,
   note the ids before running and look for a new one — see
   `src/__tests__/helpers/traceHelpers.ts`.
 - **Position in the feed is not age.** A feed's first entries have been measured
   minutes old while its last were eight days older, so "the first id in the
   document" is a trace chosen at random. Compare `recordedAt`.
-- `scheduleTrace()` answers with the request id and nothing else: reading the
-  created parameters resource back gives `200` with an empty body.
+- `scheduleTrace()` answers what SAP sent; the answer carries the request id, and
+  `traceSchedulingProfilerId` reads it. Keep it: reading the created parameters
+  resource back gives `200` with an empty body.
 - `grossTime` and `traceEventNetTime` are `{ time, percentage }` since 14.0.0,
   measured from a raw capture. The **unit of `time` is not named** — the wire
   gives a figure and no unit; `percentage` is of the trace total, which is what
@@ -1286,12 +1460,14 @@ Contract notes:
   `runtime` and its three parts, `isAggregated`, `amdpFileSize`. `client` is a
   **string**, because `010` is not `10`.
 - Comparing `recordedAt` as a **string** is wrong: `09:00:00Z` is later than
-  `10:00:00+02:00` and sorts lower as text. Use the exported `compareRecordedAt`.
+  `10:00:00+02:00` and sorts lower as text. Use `compareRecordedAt` from
+  `@mcp-abap-adt/adt-strategies`, beside the reading that produces the field.
   There is no `latestTraceId()` since 15.0.0 — it lived on the concrete class
   where `getProfiler()` never exposed it, so no consumer could call it:
 
   ```typescript
-  const traces = await profiler.list();
+  const listed = await profiler.list();
+  const traces = listed.ok ? listed.getResult().value : [];
   // `latestTraceId()` answered `undefined` on an empty feed. Keep that: an
   // empty feed is normal, and `reduce` with no initial value throws on `[]`.
   const newest = traces.length
@@ -1299,8 +1475,8 @@ Contract notes:
     : undefined;
   ```
 - **`delete(traceId)` takes an id or a full URI**, so the `uri` from `list()`
-  can go straight back. What a missing id does is **not measured**: a `404`
-  rejects, so cleanup code has to catch.
+  can go straight back. What a missing id does is **not measured**: a caller who
+  must tolerate one reads `ok`, or passes an `analyse` that says what it means.
 
 ### Cross-Trace Analysis
 
@@ -1334,9 +1510,13 @@ const logSource = await appLog.getSource('Z_MY_LOG');
 
 ### ATC check runs
 
-`runtime.getAtc()` starts a check run, asks whether it is done, and reads what
-it found. Three capabilities and no more — a check run is not created, locked,
-activated or versioned, and the returned handler's type says so.
+`runtime.getAtc()` makes one request per member. An ATC run is three requests —
+the check variant, a worklist for it, the run — and since 19.0.0 they are three
+members you call in the order you want: `resolveCheckVariant()`,
+`createWorklist(checkVariant)`, `startRun(worklistId, target, options)`. Then
+`getRunStatus(runId)` and `getFindings(worklistId)`. A check run is not
+created, locked, activated or versioned, and the returned handler's type says
+so.
 
 Objects are named by kind, not by URI: the client builds the URI. The kinds are
 `class`, `interface`, `function_group`, `package`, `ddl_source`, `table` and
@@ -1346,42 +1526,62 @@ type; a run being accepted proves nothing, since a URI that cannot exist is
 answered `201` too. `program` and `include` are absent because ABAP Cloud
 refuses to hold either, so nothing there could confirm them.
 
-**Two modes, two shapes.** `wait` is not a timing flag — it changes what the
-server answers with, and the result is a discriminated union on `waited`.
-
-`run()` is one method with one return type, so **narrowing on `waited` is how
-you reach the rest**. That is the point of the union rather than a nuisance from
-it: with four optional fields on one interface, `result.runId!` would compile and
-be `undefined` exactly when the caller waited.
+Every member answers the document as it arrived — `createWorklist` and
+`resolveCheckVariant` included, which answer `IAdtResponse` like the rest since
+23.0.0. The readings are in `@mcp-abap-adt/adt-strategies`:
 
 ```typescript
-const atc = runtime.getAtc();
+import { atcDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  atcRunStatus,
+  atcStartedRun,
+  atcSystemCheckVariant,
+  atcWaitingRun,
+  atcWorklistId,
+} from '@mcp-abap-adt/adt-strategies';
+
+const atc = runtime.getAtc({
+  ...atcDocuments,
+  checkVariant: atcSystemCheckVariant,
+  worklist: atcWorklistId,
+  startedRun: atcStartedRun,
+  waitingRun: atcWaitingRun,
+  runStatus: atcRunStatus,
+});
+
+// The system's variant — or name one yourself and skip this request. On a
+// system whose variant list comes back empty, customizing is the only source
+// of a usable one.
+const variant = await atc.resolveCheckVariant();
+if (!variant.ok || !variant.getResult().value) throw new Error('no check variant');
+
+const worklist = await atc.createWorklist(variant.getResult().value);
+if (!worklist.ok || !worklist.getResult().value) throw new Error('no worklist id');
+const worklistId = worklist.getResult().value;
 
 // Default: the server answers at once with a run id to poll.
-const started = await atc.run({
+const started = await atc.startRun(worklistId, {
   objects: [
     { objectType: 'class', objectName: 'ZCL_MY_CLASS' },
     { objectType: 'ddl_source', objectName: 'ZI_MY_VIEW' },
   ],
 });
-
-if (!started.waited) {
-  // Narrowed to { waited: false; worklistId: string; runId: string }
-  console.log(started.runId, started.worklistId);
-}
 ```
+
+**Two modes, two shapes.** `wait` is not a timing flag — it changes what the
+server answers with, so it decides which slot reads the answer: `startedRun`
+(201, an empty body, the run id in `Location`) or `waitingRun` (200,
+`<atcworklist:worklistRun>`).
 
 ```typescript
 // Or have the server hold the request until the checks finish.
-const done = await atc.run(
+const done = await atc.startRun(
+  worklistId,
   { objects: [{ objectType: 'class', objectName: 'ZCL_MY_CLASS' }] },
   { wait: true },
 );
 
-if (done.waited) {
-  // Narrowed to { waited: true; worklistId: string; findingStats: string }
-  console.log(done.findingStats); // "0,0,1"
-}
+if (done.ok) console.log(done.getResult().value.findingStats); // "0,0,1"
 ```
 
 `findingStats` is the server's `FINDING_STATS` triple verbatim, for example
@@ -1402,18 +1602,19 @@ who can decide when to give up — and `status` travels beside `isFinished` so
 they can report the state they last saw.
 
 ```typescript
-const started = await atc.run({
-  objects: [{ objectType: 'class', objectName: 'ZCL_MY_CLASS' }],
-});
-
-if (!started.waited) {
-  const { runId, worklistId } = started;
+if (started.ok && started.getResult().value.runId) {
+  const { runId } = started.getResult().value;
   const deadline = Date.now() + 5 * 60_000; // yours to choose
-  let status = await atc.getRunStatus(runId);
+  const poll = async () => {
+    const answer = await atc.getRunStatus(runId);
+    if (!answer.ok) throw new Error(answer.getError().message);
+    return answer.getResult().value;
+  };
 
+  let status = await poll();
   while (!status.isFinished && Date.now() < deadline) {
     await new Promise((resolve) => setTimeout(resolve, 2_000));
-    status = await atc.getRunStatus(runId);
+    status = await poll();
   }
 
   if (!status.isFinished) {
@@ -1430,26 +1631,24 @@ finished — read earlier it is empty whatever happened, which is
 indistinguishable from a run that found nothing.
 
 The worklist lists **every object the run checked**, each with its findings,
-empty for the ones that were clean. `getFindings()` returns the raw
-`IAdtResponse`; no finding model is published, because none has been confirmed
+empty for the ones that were clean. `getFindings()` answers the worklist
+document; no finding model is published, because none has been confirmed
 against more than one system.
 
-Two options beyond `wait`:
+`maximumVerdicts` (an option of `startRun`) is a **cap on results**, not a page
+size. Defaults to 100; a caller wanting everything raises it rather than
+paging. It must be a positive integer, and the object set must not be empty —
+both thrown before the request, because the argument is what is wrong.
 
-- `checkVariant` — omitted, the client reads `systemCheckVariant` from ATC
-  customizing. On a system whose variant list comes back empty, customizing is
-  the only source of a usable one.
-- `maximumVerdicts` — a **cap on results**, not a page size. Defaults to 100; a
-  caller wanting everything raises it rather than paging. Must be a positive
-  integer.
-
-**Nothing here defaults a missing value.** Each response the chain depends on
-carries one thing the next step cannot work without — the check variant, the
-worklist id, the `Location`, `FINDING_STATS`, `runs:status` — and where that
-thing is absent the call rejects naming it (`ATC_NO_CHECK_VARIANT`,
+**Nothing here turns a missing value into a verdict.** Until 23.0.0 the chain
+threw when an answer lacked what the next step needed (`ATC_NO_CHECK_VARIANT`,
 `ATC_NO_WORKLIST_ID`, `ATC_NO_RUN_LOCATION`, `ATC_NO_FINDING_STATS`,
-`ATC_RUN_STATUS_MISSING`). The dangerous outcome on an unfamiliar system is not
-an exception; it is a confident zero that reads exactly like a clean check.
+`ATC_RUN_STATUS_MISSING`) — a sentence about SAP's answer raised as if the
+library had failed. The readings now answer `''` for what is not there
+(`atcSystemCheckVariant`, `atcWorklistId`, a `runId` without `Location`, a
+`findingStats` never reported — never `"0,0,0"`), which is why the checks above
+look for it before the next step. The outcome to guard against on an
+unfamiliar system is a confident zero that reads exactly like a clean check.
 
 ### ATC Log
 
@@ -1495,13 +1694,25 @@ const dumpPayload = await dumps.getById('ABCDEF1234567890');
 ```
 
 Contract notes:
-- `getById()` requires a plain dump ID (not full URI) and throws for empty/invalid IDs.
-- Methods return raw ADT payload (`IAdtResponse`) so consumers can parse XML according to their needs.
+- `getById()` requires a plain dump ID (not a full URI); one containing `/` is
+  thrown before the request.
+- Every member answers the ADT payload as it arrived (`runtimeDumpsDocuments`),
+  so consumers read it according to their needs.
 
 ### Feed Repository
 
 ```typescript
-const feeds = runtime.getFeeds();
+import { feedDocuments } from '@mcp-abap-adt/adt-clients';
+import { feedDescriptors, feedEntries } from '@mcp-abap-adt/adt-strategies';
+
+// Documents as they arrived by default; feedDescriptors, feedVariants,
+// feedEntries, feedSystemMessages, feedGatewayErrors and feedGatewayErrorDetail
+// read them.
+const feeds = runtime.getFeeds({
+  ...feedDocuments,
+  feeds: feedDescriptors,
+  entries: feedEntries,
+});
 
 const catalog = await feeds.list();         // feed catalog
 const variants = await feeds.variants('dumps'); // variants of one feed category

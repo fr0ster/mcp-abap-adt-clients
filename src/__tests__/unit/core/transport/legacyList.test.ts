@@ -9,9 +9,10 @@ import type {
   IAbapConnection,
   IAbapRequestOptions,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtRequestLegacy } from '../../../../core/transport/AdtRequestLegacy';
 import { expectFailure, expectResult } from '../../../helpers/contract';
+import { transportParsing } from '../../../helpers/transportParsing';
 
 const recordingConnection = () => {
   const calls: IAbapRequestOptions[] = [];
@@ -38,7 +39,12 @@ describe('legacy transport list', () => {
     const { connection, calls } = recordingConnection();
 
     const tree = expectResult(
-      await new AdtRequestLegacy(connection).list(),
+      await new AdtRequestLegacy(
+        connection,
+        undefined,
+        undefined,
+        transportParsing,
+      ).list(),
       'legacy list',
     );
 

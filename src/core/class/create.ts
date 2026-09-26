@@ -2,11 +2,11 @@
  * Class create operations - Low-level functions
  */
 
+import type { IAdtContentTypes } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
-  IAdtContentTypes,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import type { HttpError } from '@mcp-abap-adt/interfaces-network';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { CT_CLASS } from '../../constants/contentTypes';

@@ -1,6 +1,17 @@
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
-import { FeedRepository } from '../../../runtime/feeds/FeedRepository';
+import { feedEntries } from '@mcp-abap-adt/adt-strategies';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import {
+  FeedRepository,
+  feedDocuments,
+} from '../../../runtime/feeds/FeedRepository';
 import { expectResult } from '../../helpers/contract';
+
+/**
+ * A repository that reads its feeds into entries. The Atom readings moved to
+ * `@mcp-abap-adt/adt-strategies` (`feedReadings.test.ts` holds their cases);
+ * imported from its source until the package index exports them.
+ */
+const reading = { ...feedDocuments, entries: feedEntries };
 
 const MOCK_ATOM = `<?xml version="1.0" encoding="utf-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
@@ -74,13 +85,56 @@ describe('FeedRepository', () => {
     expect(connection.makeAdtRequest).not.toHaveBeenCalled();
   });
 
-  it('byUrl() parses Atom XML into IFeedEntry array', async () => {
+  it('answers every feed as the document it arrived as by default', async () => {
     const connection = createConnectionMock();
     (connection.makeAdtRequest as jest.Mock).mockResolvedValue({
       status: 200,
       data: MOCK_ATOM,
     });
     const repo = new FeedRepository(connection, createLogger());
+
+    expect(expectResult(await repo.list(), 'feeds')).toBe(MOCK_ATOM);
+    expect(expectResult(await repo.variants('dumps'), 'variants')).toBe(
+      MOCK_ATOM,
+    );
+    expect(expectResult(await repo.dumps(), 'dumps')).toBe(MOCK_ATOM);
+    expect(expectResult(await repo.systemMessages(), 'messages')).toBe(
+      MOCK_ATOM,
+    );
+    expect(expectResult(await repo.gatewayErrors(), 'errors')).toBe(MOCK_ATOM);
+    expect(expectResult(await repo.gatewayErrorDetail('/x'), 'detail')).toBe(
+      MOCK_ATOM,
+    );
+    expect(expectResult(await repo.byUrl('/x'), 'byUrl')).toBe(MOCK_ATOM);
+  });
+
+  it("passes the caller's analyse through on every member", async () => {
+    const connection = createConnectionMock();
+    const repo = new FeedRepository(connection, createLogger());
+    const refuse = {
+      analyse: () => ({ origin: 'refusal' as const, message: 'no' }),
+    };
+
+    const answers = [
+      await repo.list(refuse),
+      await repo.variants('dumps', refuse),
+      await repo.dumps(refuse),
+      await repo.systemMessages(refuse),
+      await repo.gatewayErrors(refuse),
+      await repo.gatewayErrorDetail('/x', refuse),
+      await repo.byUrl('/x', refuse),
+    ];
+    expect(answers.every((a) => !a.ok)).toBe(true);
+    expect(connection.makeAdtRequest).toHaveBeenCalledTimes(7);
+  });
+
+  it('byUrl() answers entries when constructed with feedEntries', async () => {
+    const connection = createConnectionMock();
+    (connection.makeAdtRequest as jest.Mock).mockResolvedValue({
+      status: 200,
+      data: MOCK_ATOM,
+    });
+    const repo = new FeedRepository(connection, createLogger(), reading);
 
     const entries = expectResult(
       await repo.byUrl('/sap/bc/adt/runtime/dumps'),
@@ -105,7 +159,7 @@ describe('FeedRepository', () => {
       status: 200,
       data: '<feed xmlns="http://www.w3.org/2005/Atom"></feed>',
     });
-    const repo = new FeedRepository(connection, createLogger());
+    const repo = new FeedRepository(connection, createLogger(), reading);
 
     const entries = expectResult(
       await repo.byUrl('/sap/bc/adt/runtime/dumps'),

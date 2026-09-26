@@ -5,12 +5,12 @@
  * `DELETE` on the item resource. This pins the request shape so neither stub
  * can silently come back.
  */
+import type { ITransportConfig } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAbapRequestOptions,
   IAdtWireResponse,
-  ITransportConfig,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtRequest } from '../../../../core/transport/AdtRequest';
 
 const ITEM_URL = '/sap/bc/adt/cts/transportrequests/TRLK900438';

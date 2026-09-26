@@ -8,11 +8,13 @@
  * `run` needs none of them to have been called.
  */
 
+import { unitTestRunId } from '@mcp-abap-adt/adt-strategies';
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtUnitTest } from '../../../../core/unitTest/AdtUnitTest';
+import { unitTestDocuments } from '../../../../core/unitTest/types';
 import { expectResult } from '../../../helpers/contract';
 import { createLibraryLogger } from '../../../helpers/testLogger';
 
@@ -179,17 +181,16 @@ describe('AdtUnitTest — what it does not have', () => {
     }
   });
 
-  it('still carries the run conveniences, which no contract promises', () => {
-    // getRunId and the two response getters are this handler remembering its
-    // own last call. That is not a capability — nothing in ADT is "the run I
-    // started last" — so they stay as methods and out of every interface.
+  it('remembers no run: every member takes the run it is about', () => {
+    // getRunId and the two response getters were this handler remembering its
+    // own last call. Nothing in ADT is "the run I started last", and a
+    // consumer's result strategy for `run` could make the value anything — so
+    // they are gone, and the id travels in the caller's hands.
     const { conn } = makeConn();
     const h = new AdtUnitTest(conn, createLibraryLogger());
 
     for (const name of ['getRunId', 'getStatusResponse', 'getResultResponse']) {
-      expect(typeof (h as unknown as Record<string, unknown>)[name]).toBe(
-        'function',
-      );
+      expect((h as unknown as Record<string, unknown>)[name]).toBeUndefined();
     }
   });
 });
@@ -199,8 +200,14 @@ describe('AdtUnitTest — running', () => {
     const { conn, calls } = makeConn(() => RUN_STARTED);
     const h = new AdtUnitTest(conn, createLibraryLogger());
 
+    // The id is in a header of the answer; the reading that finds it is a
+    // strategy the caller gives the implementation when constructing it.
+    const withId = new AdtUnitTest(conn, createLibraryLogger(), {
+      ...unitTestDocuments,
+      run: unitTestRunId,
+    });
     const runId = expectResult(
-      await h.run([{ containerClass: 'ZCL_TESTS', testClass: 'LTCL' }]),
+      await withId.run([{ containerClass: 'ZCL_TESTS', testClass: 'LTCL' }]),
       'start a run',
     );
 
@@ -208,6 +215,7 @@ describe('AdtUnitTest — running', () => {
     expect(calls[0].method).toBe('POST');
     expect(calls[0].url).toBe('/sap/bc/adt/abapunit/runs');
     expect(runId).toBe('00155D-3F2A');
+    void h;
   });
 
   it('asking about a run is a separate request, taking the id', async () => {

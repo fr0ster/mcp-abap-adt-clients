@@ -76,6 +76,10 @@ export interface IServiceDefinitionResults {
   readonly transport: IResultStrategy<unknown>;
   /** What a deletion check answers: `del:checkResponse`. */
   readonly deletionCheck: IResultStrategy<unknown>;
+  /** The version history — an Atom feed; `objectVersions` reads it. */
+  readonly versions: IResultStrategy<unknown>;
+  /** One version's source. */
+  readonly versionSource: IResultStrategy<unknown>;
 }
 
 /**
@@ -94,6 +98,8 @@ export const serviceDefinitionDocuments = {
   updated: rawDocument,
   transport: rawDocument,
   deletionCheck: rawDocument,
+  versions: rawDocument,
+  versionSource: rawDocument,
 } satisfies IServiceDefinitionResults;
 
 /**

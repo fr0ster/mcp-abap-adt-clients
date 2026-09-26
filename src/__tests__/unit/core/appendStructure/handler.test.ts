@@ -1,8 +1,9 @@
+import { analyseUnsupportedStatus } from '@mcp-abap-adt/adt-strategies';
+import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
-import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtAppendStructure } from '../../../../core/appendStructure/AdtAppendStructure';
 import { expectFailure, expectResult } from '../../../helpers/contract';
 
@@ -63,20 +64,33 @@ describe('AdtAppendStructure handler', () => {
     expect(sessionTypes[sessionTypes.length - 1]).toBe('stateless');
   });
 
-  it('validate() names 501 as unsupported, not as a bad name', async () => {
+  it('validate() answers a missing resource as it came, and a strategy names it', async () => {
     const { conn } = makeConn(() =>
       Object.assign(new Error('nope'), { response: { status: 501 } }),
     );
     const as = new AdtAppendStructure(conn);
     // A system with no validation resource has not looked at the name. The
-    // shipped `analyse` says so with a code, so a consumer branches on that
-    // rather than on a status they would have to dig out themselves.
-    const failure = expectFailure(
-      await as.validate({ appendStructureName: 'ZOK_S' }),
-      'validate where the resource is absent',
+    // library reports the status as it came; naming it is a strategy's.
+    expect(
+      expectFailure(
+        await as.validate({ appendStructureName: 'ZOK_S' }),
+        'validate where the resource is absent',
+      ).code,
+    ).not.toBe(AdtObjectErrorCodes.UNSUPPORTED_OPERATION);
+    const named = expectFailure(
+      await as.validate(
+        { appendStructureName: 'ZOK_S' },
+        {
+          analyse: analyseUnsupportedStatus(
+            [404, 405, 501],
+            'append-structure name validation',
+          ),
+        },
+      ),
+      'validate where the resource is absent, read by the strategy',
     );
-    expect(failure.code).toBe(AdtObjectErrorCodes.UNSUPPORTED_OPERATION);
-    expect(failure.message).toContain('501');
+    expect(named.code).toBe(AdtObjectErrorCodes.UNSUPPORTED_OPERATION);
+    expect(named.message).toContain('501');
   });
 
   it('update() is the PUT, and it carries the handle it was given', async () => {

@@ -9,14 +9,15 @@
  */
 
 import type {
-  IAbapConnection,
-  IAdtWireResponse,
   IProfilerTraceDbAccessesOptions,
   IProfilerTraceHitListOptions,
   IProfilerTraceParameters,
   IProfilerTraceStatementsOptions,
 } from '@mcp-abap-adt/interfaces-adt';
-import { XMLParser } from 'fast-xml-parser';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   ACCEPT_TRACE_CALLTREE,
   ACCEPT_TRACE_FEED,
@@ -25,9 +26,6 @@ import {
 } from '../../constants/contentTypes';
 import { getTimeout } from '../../utils/timeouts';
 
-// Declared once, in the contract; re-exported so importers here are unchanged.
-// Declared once, in the contract; re-exported so importers here are unchanged.
-// Declared once, in the contract; re-exported so importers here are unchanged.
 // Declared once, in the contract; re-exported so importers here are unchanged.
 export type {
   IProfilerTraceDbAccessesOptions,
@@ -167,162 +165,6 @@ export async function createTraceParameters(
   });
 }
 
-export function extractProfilerIdFromResponse(
-  response: IAdtWireResponse,
-): string | undefined {
-  const headers = response?.headers as
-    | Record<string, string | string[] | undefined>
-    | undefined;
-  const location =
-    headers?.location ??
-    headers?.Location ??
-    headers?.['content-location'] ??
-    headers?.['Content-Location'];
-  if (typeof location !== 'string' || !location.trim()) {
-    return undefined;
-  }
-  const value = location.trim();
-  if (value.startsWith('/')) {
-    return value;
-  }
-  try {
-    const parsed = new URL(value);
-    return `${parsed.pathname}${parsed.search}`;
-  } catch {
-    return value;
-  }
-}
-
-const TRACE_ID_REGEX =
-  /\/sap\/bc\/adt\/runtime\/traces\/abaptraces\/([A-Za-z0-9]{16,})(?=\/|[?&#"'\s]|$)/g;
-
-/**
- * The trace id out of whatever trace document carries one.
- *
- * Named for the FEED, not for "requests", because the two are different
- * collections and the old name pointed at the wrong one. A trace REQUEST
- * schedules a measurement and is consumed by the run that fulfils it; the
- * finished trace lands in `/runtime/traces/abaptraces`. Measured right
- * after a profiled run, the requests feed answered 200 with 345 bytes and no
- * entries while the traces feed held 95KB of them — and a test that paired this
- * function with `listTraceRequests()`, exactly as the name invited, could never
- * resolve an id.
- */
-export function extractTraceIdFromTraceFeed(
-  response: IAdtWireResponse,
-): string | undefined {
-  const headers = response?.headers as
-    | Record<string, string | string[] | undefined>
-    | undefined;
-  const headerCandidates = [
-    headers?.location,
-    headers?.Location,
-    headers?.['content-location'],
-    headers?.['Content-Location'],
-  ];
-  for (const candidate of headerCandidates) {
-    if (typeof candidate !== 'string') {
-      continue;
-    }
-    const match = [...candidate.matchAll(TRACE_ID_REGEX)][0];
-    if (match?.[1]) {
-      return match[1];
-    }
-  }
-
-  const body =
-    typeof response?.data === 'string'
-      ? response.data
-      : JSON.stringify(response?.data ?? '');
-  const match = [...body.matchAll(TRACE_ID_REGEX)][0];
-  if (match?.[1]) {
-    return match[1];
-  }
-  return undefined;
-}
-
-const traceFeedParser = new XMLParser({
-  ignoreAttributes: false,
-  attributeNamePrefix: '@_',
-  removeNSPrefix: true,
-  parseTagValue: false,
-  parseAttributeValue: false,
-  trimValues: true,
-});
-
-/** One trace in the feed: its id and the moment it was written. */
-export interface ITraceFeedEntry {
-  id: string;
-  /** ISO timestamp from the entry, or an empty string when it carries none. */
-  writtenAt: string;
-}
-
-const ID_IN_URI = /abaptraces\/([A-Za-z0-9]{16,})(?:\/|$)/;
-
-/**
- * The traces in a feed, in the order the server listed them.
- *
- * Position is NOT age: measured the feed's first entries were from
- * 06:09 while its last were eight days older, so "the first id in the document"
- * — which is all a regex over the whole body can give — is a trace chosen at
- * random as far as the caller is concerned. Reading the entries out properly is
- * what lets a caller sort them, or compare them against what it saw before its
- * own run.
- */
-export function parseTraceFeedEntries(
-  response: IAdtWireResponse,
-): ITraceFeedEntry[] {
-  const body =
-    typeof response?.data === 'string'
-      ? response.data
-      : typeof response?.data === 'object' && response?.data !== null
-        ? ''
-        : '';
-  if (!body) {
-    return [];
-  }
-
-  let parsed: any;
-  try {
-    parsed = traceFeedParser.parse(body);
-  } catch {
-    return [];
-  }
-
-  const raw = parsed?.feed?.entry;
-  const entries = Array.isArray(raw) ? raw : raw ? [raw] : [];
-
-  return entries
-    .map((entry: any): ITraceFeedEntry | undefined => {
-      const idText = typeof entry?.id === 'string' ? entry.id : '';
-      const selfHref =
-        (Array.isArray(entry?.link) ? entry.link : [entry?.link])
-          .filter(Boolean)
-          .map((l: any) => String(l?.['@_href'] ?? ''))
-          .find((href: string) => ID_IN_URI.test(href)) ?? '';
-      const id =
-        ID_IN_URI.exec(idText)?.[1] ?? ID_IN_URI.exec(selfHref)?.[1] ?? '';
-      if (!id) {
-        return undefined;
-      }
-      const writtenAt = String(entry?.published ?? entry?.updated ?? '');
-      return { id, writtenAt };
-    })
-    .filter((entry): entry is ITraceFeedEntry => entry !== undefined);
-}
-
-/** @deprecated Misleading name — use {@link extractTraceIdFromTraceFeed}. */
-export const extractTraceIdFromTraceRequestsResponse =
-  extractTraceIdFromTraceFeed;
-
-/**
- * Get profiler trace hitlist
- *
- * @param connection - ABAP connection
- * @param traceIdOrUri - Trace ID (or full trace URI)
- * @param options - Optional filters
- * @returns Axios response with trace hitlist
- */
 /**
  * Delete a trace.
  *

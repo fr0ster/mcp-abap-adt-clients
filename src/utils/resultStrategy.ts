@@ -13,10 +13,8 @@
  * two fields from every read, an MCP server picks by what its model is about to
  * do. None changes its mind between `create` and `read` of the same object.
  */
-import type {
-  IAdtWireResponse,
-  IResultStrategy,
-} from '@mcp-abap-adt/interfaces-adt';
+import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 
 /**
  * The body as it arrived.

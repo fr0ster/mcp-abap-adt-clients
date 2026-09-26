@@ -7,7 +7,7 @@
  * package for a research branch — how a debug session is meant to work over
  * ADT is not measured yet — and the accessors left with them.
  */
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AdtRuntimeClient } from '../../../clients/AdtRuntimeClient';
 import { ApplicationLog } from '../../../runtime/applicationLog/ApplicationLog';
@@ -19,7 +19,10 @@ import { FeedRepository } from '../../../runtime/feeds/FeedRepository';
 import { GatewayErrorLog } from '../../../runtime/gatewayErrorLog/GatewayErrorLog';
 import { SystemMessages } from '../../../runtime/systemMessages/SystemMessages';
 import { CrossTrace } from '../../../runtime/traces/CrossTraceDomain';
-import { Profiler } from '../../../runtime/traces/ProfilerDomain';
+import {
+  Profiler,
+  profilerDocuments,
+} from '../../../runtime/traces/ProfilerDomain';
 import { St05Trace } from '../../../runtime/traces/St05Trace';
 
 describe('AdtRuntimeClient factory pattern', () => {
@@ -101,60 +104,75 @@ describe('AdtRuntimeClient factory pattern', () => {
     expect(client.getGatewayErrorLog()).toBeInstanceOf(GatewayErrorLog);
   });
 
-  describe('caching', () => {
-    it('getProfiler() returns the same instance on repeated calls', () => {
+  /**
+   * No caching since 23.0.0: each call builds an implementation with the result
+   * set it is given. A cached instance was fixed to whatever set the first call
+   * brought, which is memory between calls; the implementations hold no state,
+   * so a new one costs nothing.
+   */
+  describe('each call builds its own implementation, with its own readings', () => {
+    it('getProfiler() is a fresh implementation per call', () => {
       const { client } = createRuntimeClient();
-      expect(client.getProfiler()).toBe(client.getProfiler());
+      expect(client.getProfiler()).not.toBe(client.getProfiler());
     });
 
-    it('getCrossTrace() returns the same instance on repeated calls', () => {
+    it('getCrossTrace() is a fresh implementation per call', () => {
       const { client } = createRuntimeClient();
-      expect(client.getCrossTrace()).toBe(client.getCrossTrace());
+      expect(client.getCrossTrace()).not.toBe(client.getCrossTrace());
     });
 
-    it('getSt05Trace() returns the same instance on repeated calls', () => {
+    it('getSt05Trace() is a fresh implementation per call', () => {
       const { client } = createRuntimeClient();
-      expect(client.getSt05Trace()).toBe(client.getSt05Trace());
+      expect(client.getSt05Trace()).not.toBe(client.getSt05Trace());
     });
 
-    it('getApplicationLog() returns the same instance on repeated calls', () => {
+    it('getApplicationLog() is a fresh implementation per call', () => {
       const { client } = createRuntimeClient();
-      expect(client.getApplicationLog()).toBe(client.getApplicationLog());
+      expect(client.getApplicationLog()).not.toBe(client.getApplicationLog());
     });
 
-    it('getAtcLog() returns the same instance on repeated calls', () => {
+    it('getAtcLog() is a fresh implementation per call', () => {
       const { client } = createRuntimeClient();
-      expect(client.getAtcLog()).toBe(client.getAtcLog());
+      expect(client.getAtcLog()).not.toBe(client.getAtcLog());
     });
 
-    it('getAtc() returns the same instance on repeated calls', () => {
+    it('getAtc() is a fresh implementation per call', () => {
       const { client } = createRuntimeClient();
-      expect(client.getAtc()).toBe(client.getAtc());
+      expect(client.getAtc()).not.toBe(client.getAtc());
     });
 
-    it('getDdicActivation() returns the same instance on repeated calls', () => {
+    it('getDdicActivation() is a fresh implementation per call', () => {
       const { client } = createRuntimeClient();
-      expect(client.getDdicActivation()).toBe(client.getDdicActivation());
+      expect(client.getDdicActivation()).not.toBe(client.getDdicActivation());
     });
 
-    it('getDumps() returns the same instance on repeated calls', () => {
+    it('getDumps() is a fresh implementation per call', () => {
       const { client } = createRuntimeClient();
-      expect(client.getDumps()).toBe(client.getDumps());
+      expect(client.getDumps()).not.toBe(client.getDumps());
     });
 
-    it('getFeeds() returns the same instance on repeated calls', () => {
+    it('getFeeds() is a fresh implementation per call', () => {
       const { client } = createRuntimeClient();
-      expect(client.getFeeds()).toBe(client.getFeeds());
+      expect(client.getFeeds()).not.toBe(client.getFeeds());
     });
 
-    it('getSystemMessages() returns the same instance on repeated calls', () => {
+    it('getSystemMessages() is a fresh implementation per call', () => {
       const { client } = createRuntimeClient();
-      expect(client.getSystemMessages()).toBe(client.getSystemMessages());
+      expect(client.getSystemMessages()).not.toBe(client.getSystemMessages());
     });
 
-    it('getGatewayErrorLog() returns the same instance on repeated calls', () => {
+    it('getGatewayErrorLog() is a fresh implementation per call', () => {
       const { client } = createRuntimeClient();
-      expect(client.getGatewayErrorLog()).toBe(client.getGatewayErrorLog());
+      expect(client.getGatewayErrorLog()).not.toBe(client.getGatewayErrorLog());
+    });
+
+    it('the result set passed is the one the implementation reads with', () => {
+      const { client } = createRuntimeClient();
+      const readings = { ...profilerDocuments, list: () => ['read'] };
+      expect(
+        (client.getProfiler(readings) as unknown as { results: unknown })
+          .results,
+      ).toBe(readings);
     });
   });
 

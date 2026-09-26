@@ -9,8 +9,8 @@
  * at construction makes of that endpoint's answer.
  */
 import type {
-  IAbapConnection,
   IAdtActivatable,
+  IAdtAnalyseOptions,
   IAdtCheckable,
   IAdtCreatable,
   IAdtCreateOptions,
@@ -28,16 +28,18 @@ import type {
   IAdtVersionable,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
+import { lockHandleOf } from '../../utils/lockHandle';
+import { nothing } from '../../utils/resultStrategy';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import {
   createLockTracker,
   type LockRegistry,
   type LockTracker,
 } from '../shared/LockRegistry';
-import type { ObjectVersion } from '../shared/results';
 import type { IReadOptions } from '../shared/types';
 import { activateEnhancement } from './activation';
 import { check as checkEnhancementSource } from './check';
@@ -80,7 +82,11 @@ export class AdtEnhancement<
     IAdtActivatable<IEnhancementConfig, ReturnType<R['activation']>>,
     IAdtLockable<IEnhancementConfig>,
     IAdtTransportAware<IEnhancementConfig, ReturnType<R['transport']>>,
-    IAdtVersionable<IEnhancementConfig, ObjectVersion[], string>
+    IAdtVersionable<
+      IEnhancementConfig,
+      ReturnType<R['versions']>,
+      ReturnType<R['versionSource']>
+    >
 {
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
@@ -437,37 +443,37 @@ export class AdtEnhancement<
     );
   }
 
-  /** Lock the object for modification. */
-  async lock(
+  /**
+   * Lock the object — one LOCK, its handle read by `lockHandleOf`. A 200
+   * carrying no handle reads as `''`; whether that is a refusal is the
+   * caller's `analyse` to say.
+   */
+  async lock<E extends IAdtError = IAdtError>(
     config: Partial<IEnhancementConfig>,
-  ): Promise<IAdtResponse<string>> {
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<string, E>> {
     const name = this.name(config);
-
-    return answering(
-      async () => {
-        const lockHandle = await inStatefulSession(this.connection, () =>
+    const answer = await answering(
+      () =>
+        inStatefulSession(this.connection, () =>
           lockEnhancement(this.connection, this.enhancementType(config), name),
-        );
-        this.lockedTypes.set(name, this.enhancementType(config));
-        this.lockTracker.track(name, lockHandle);
-        // The handle is the value, and the request does not keep the wire it
-        // came on — so the answer is built around what the request produced.
-        return {
-          data: lockHandle,
-          status: 200,
-          statusText: 'OK',
-          headers: {},
-        };
-      },
-      (answer) => String(answer.data),
+        ),
+      lockHandleOf,
+      options?.analyse,
     );
+    if (answer.ok && answer.getResult().value) {
+      this.lockedTypes.set(name, this.enhancementType(config));
+      this.lockTracker.track(name, answer.getResult().value);
+    }
+    return answer;
   }
 
   /** Unlock the object. */
-  async unlock(
+  async unlock<E extends IAdtError = IAdtError>(
     config: Partial<IEnhancementConfig>,
     lockHandle: string,
-  ): Promise<IAdtResponse<void>> {
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<void, E>> {
     const name = this.name(config);
 
     return answering(
@@ -486,35 +492,34 @@ export class AdtEnhancement<
           this.lockTracker.untrack(name);
         }
       },
-      () => undefined,
+      nothing,
+      options?.analyse,
     );
   }
 
   /** Version history of the object's source. */
-  async getVersions(
+  async getVersions<E extends IAdtError = IAdtError>(
     config: Partial<IEnhancementConfig>,
-  ): Promise<IAdtResponse<ObjectVersion[]>> {
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['versions']>, E>> {
     return answering(
-      async () => ({
-        data: await getEnhancementVersions(this.connection, config),
-        status: 200,
-        statusText: 'OK',
-        headers: {},
-      }),
-      (answer) => answer.data as ObjectVersion[],
+      () => getEnhancementVersions(this.connection, config),
+      this.results.versions as IResultStrategy<ReturnType<R['versions']>>,
+      options?.analyse,
     );
   }
 
-  /** The source of one version, by the `contentUri` an entry carries. */
-  async getVersionSource(contentUri: string): Promise<IAdtResponse<string>> {
+  /** Source of one version, by the `contentUri` its entry carried. */
+  async getVersionSource<E extends IAdtError = IAdtError>(
+    contentUri: string,
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['versionSource']>, E>> {
     return answering(
-      async () => ({
-        data: await getEnhancementVersionSource(this.connection, contentUri),
-        status: 200,
-        statusText: 'OK',
-        headers: {},
-      }),
-      (answer) => String(answer.data),
+      () => getEnhancementVersionSource(this.connection, contentUri),
+      this.results.versionSource as IResultStrategy<
+        ReturnType<R['versionSource']>
+      >,
+      options?.analyse,
     );
   }
 }

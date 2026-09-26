@@ -5,57 +5,33 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
-import { XMLParser } from 'fast-xml-parser';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_LOCK } from '../../constants/contentTypes';
-import { headerValueToString } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
- * Lock a function group for editing
+ * `POST …?_action=LOCK` on the function group — answered as it arrived.
+ *
+ * The handle is read by `lockHandleOf` in the member, which looks at the
+ * `sap-adt-lm-handle` header first and the body second, as this did. Until
+ * 23.0.0 this threw when SAP's answer carried neither, which turned a statement
+ * about SAP's answer into a library failure and dropped the answer.
  *
  * @param connection - ABAP connection
  * @param functionGroupName - Name of the function group (e.g., 'Z_FUGR_TEST_0001')
  * @param sessionId - Optional session ID for tracking
- * @returns Lock handle string
  */
 export async function lockFunctionGroup(
   connection: IAbapConnection,
   functionGroupName: string,
   _sessionId: string = '',
-): Promise<string> {
-  const url = `/sap/bc/adt/functions/groups/${functionGroupName.toLowerCase()}?_action=LOCK&accessMode=MODIFY`;
-
-  const headers = {
-    Accept: ACCEPT_LOCK,
-  };
-
-  const response = await connection.makeAdtRequest({
-    url,
+): Promise<IAdtWireResponse> {
+  return connection.makeAdtRequest({
+    url: `/sap/bc/adt/functions/groups/${functionGroupName.toLowerCase()}?_action=LOCK&accessMode=MODIFY`,
     method: 'POST',
     timeout: getTimeout('default'),
-    headers,
+    headers: { Accept: ACCEPT_LOCK },
   });
-
-  // Extract lock handle from response header
-  const lockHandle = headerValueToString(response.headers['sap-adt-lm-handle']);
-  if (!lockHandle) {
-    // Try parsing from XML body if header not present
-    const parser = new XMLParser({
-      ignoreAttributes: false,
-      attributeNamePrefix: '',
-    });
-    const result = parser.parse(response.data);
-    const xmlLockHandle =
-      result?.['asx:abap']?.['asx:values']?.DATA?.LOCK_HANDLE;
-
-    if (!xmlLockHandle) {
-      throw new Error('Failed to acquire lock: no lock handle in response');
-    }
-    return xmlLockHandle;
-  }
-
-  return lockHandle;
 }
 
 /**

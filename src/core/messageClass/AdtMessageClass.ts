@@ -10,7 +10,7 @@
  */
 
 import type {
-  IAbapConnection,
+  IAdtAnalyseOptions,
   IAdtCreatable,
   IAdtCreateOptions,
   IAdtDeletable,
@@ -24,9 +24,12 @@ import type {
   IAdtValidatable,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
+import { lockHandleOf } from '../../utils/lockHandle';
+import { nothing } from '../../utils/resultStrategy';
 import { getTimeout } from '../../utils/timeouts';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import {
@@ -178,13 +181,13 @@ export class AdtMessageClass<
   }
 
   /** The same document `read` fetches — there is no metadata resource. */
-  async readMetadata(
+  async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IMessageClassConfig>,
     options?: {
       withLongPolling?: boolean;
       version?: 'active' | 'inactive';
-    } & IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['metadata']>>> {
+    } & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -197,10 +200,17 @@ export class AdtMessageClass<
     );
   }
 
-  /** Update the message class's own metadata: lock → PUT → unlock. *
+  /**
+   * Write the message class's document — one PUT, whose body is
+   * `options.source`, under the caller's `options.lockHandle`.
+   *
    * **The whole content, every time.** This is a replace, never a merge. Read
-   * what the object holds, change what you mean to change, and pass the result:
-   * anything left out is gone, because nothing is read here to keep it.
+   * what the object holds (`readMetadata`; `parseMessageClass` and
+   * `buildMessageClassXml` are the readings beside it), change what you mean to
+   * change, and pass the result: anything left out is gone, because nothing is
+   * read here to keep it. Until 23.0.0 this read the class itself and patched
+   * `config.description` into it — a second request, and a document this
+   * library composed in place of the caller's.
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IMessageClassConfig>,
@@ -216,8 +226,8 @@ export class AdtMessageClass<
         updateMessageClass(
           connection,
           name,
+          options?.source as string,
           options?.lockHandle,
-          config.description,
           config.transportRequest,
         ),
       this.results.metadataUpdated as IResultStrategy<
@@ -278,36 +288,36 @@ export class AdtMessageClass<
     );
   }
 
-  /** Lock the message class for modification. */
-  async lock(
+  /**
+   * Lock the message class — one LOCK, its handle read by `lockHandleOf`. A 200
+   * carrying no handle reads as `''`; whether that is a refusal is the
+   * caller's `analyse` to say.
+   */
+  async lock<E extends IAdtError = IAdtError>(
     config: Partial<IMessageClassConfig>,
-  ): Promise<IAdtResponse<string>> {
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<string, E>> {
     const name = this.name(config);
-
-    return answering(
-      async () => {
-        const lockHandle = await inStatefulSession(this.connection, () =>
+    const answer = await answering(
+      () =>
+        inStatefulSession(this.connection, () =>
           lockMessageClass(this.connection, name),
-        );
-        this.lockTracker.track(name, lockHandle);
-        // The handle is the value, and the request does not keep the wire it
-        // came on — so the answer is built around what the request produced.
-        return {
-          data: lockHandle,
-          status: 200,
-          statusText: 'OK',
-          headers: {},
-        };
-      },
-      (answer) => String(answer.data),
+        ),
+      lockHandleOf,
+      options?.analyse,
     );
+    if (answer.ok && answer.getResult().value) {
+      this.lockTracker.track(name, answer.getResult().value);
+    }
+    return answer;
   }
 
   /** Unlock the message class. */
-  async unlock(
+  async unlock<E extends IAdtError = IAdtError>(
     config: Partial<IMessageClassConfig>,
     lockHandle: string,
-  ): Promise<IAdtResponse<void>> {
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<void, E>> {
     const name = this.name(config);
 
     return answering(
@@ -319,7 +329,8 @@ export class AdtMessageClass<
           this.lockTracker.untrack(name);
         }
       },
-      () => undefined,
+      nothing,
+      options?.analyse,
     );
   }
 }

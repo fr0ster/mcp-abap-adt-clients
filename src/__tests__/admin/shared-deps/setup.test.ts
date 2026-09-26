@@ -10,14 +10,21 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+// The source path, not the package: these readings are new in adt-strategies
+// and the package's built entry point does not carry them until it is released.
+import {
+  utilActivationRunId,
+  utilInactiveObjects,
+} from '@mcp-abap-adt/adt-strategies';
 import type {
   IAbapConnection,
   ISessionLifecycleAware,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import { activationStatusIn } from '../../../../scripts/lib/activationRun';
 import type { AdtClient } from '../../../clients/AdtClient';
+import { utilDocuments } from '../../../core/shared/utilResultSet';
 import { orThrow } from '../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import {
@@ -53,6 +60,15 @@ const testsLogger: ILogger = createTestsLogger();
 describe('Admin: Setup shared dependencies', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
+  // The readings setup needs — the run id of a started activation and the
+  // inactive list as references. The shipped defaults answer both documents as
+  // they came.
+  const readingUtils = () =>
+    client.getUtils({
+      ...utilDocuments,
+      activation: utilActivationRunId,
+      inactive: utilInactiveObjects,
+    });
   let hasConfig = false;
   let envType = 'onprem';
 
@@ -247,7 +263,7 @@ describe('Admin: Setup shared dependencies', () => {
         try {
           // Start, then wait: setup that carried on after the POST would build
           // the next object against a system still activating the last one.
-          const utils = client.getUtils();
+          const utils = readingUtils();
           const runId = await orThrow(
             utils.activateObjectsGroup(groupActivationObjects),
           );
@@ -322,7 +338,7 @@ describe('Admin: Setup shared dependencies', () => {
         list.filter((o) => configured.has(String(o.name).toUpperCase()));
 
       const firstPass = ours(
-        (await orThrow(client.getUtils().getInactiveObjects())).objects,
+        (await orThrow(readingUtils().getInactiveObjects())).objects,
       ) as Array<{ name: string; type: string }>;
       if (firstPass.length > 0) {
         testsLogger.info(
@@ -332,7 +348,7 @@ describe('Admin: Setup shared dependencies', () => {
           // Waited for, because the inactive list is read immediately below:
           // asking what is still inactive while the activation is running
           // answers about the moment before it.
-          const utils = client.getUtils();
+          const utils = readingUtils();
           const runId = await orThrow(
             utils.activateObjectsGroup(
               firstPass.map((o) => ({ type: o.type, name: o.name })),
@@ -358,7 +374,7 @@ describe('Admin: Setup shared dependencies', () => {
         }
       }
 
-      const inactive = await orThrow(client.getUtils().getInactiveObjects());
+      const inactive = await orThrow(readingUtils().getInactiveObjects());
       const stillInactive = ours(inactive.objects).map(
         (o) => `inactive ${(o as { type: string }).type}:${o.name}`,
       );

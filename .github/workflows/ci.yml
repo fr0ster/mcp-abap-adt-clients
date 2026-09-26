@@ -29,6 +29,12 @@ jobs:
       - name: Run Biome lint
         run: npx biome check src packages --diagnostic-level=error
 
+      # Before any type check: tests and scripts import
+      # `@mcp-abap-adt/adt-strategies`, which resolves to the workspace package's
+      # `dist`. On a clean checkout there is none until this step runs.
+      - name: Build workspace packages
+        run: npm run build:packages
+
       - name: Type check
         run: npx tsc -p tsconfig.json --noEmit
 
@@ -40,9 +46,6 @@ jobs:
 
       - name: Build
         run: npm run build
-
-      - name: Build workspace packages
-        run: npm run build:packages
 
       # No SAP system here, so the integration suites are out of reach — but
       # the unit suites are not, and they carry every invariant this release

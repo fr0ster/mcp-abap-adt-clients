@@ -12,148 +12,150 @@
  */
 
 import type {
-  IAbapConnection,
   IAbapGitExternalRepoCredentials,
   IAbapGitLinkArgs,
   IAbapGitPullArgs,
   IAbapGitUnlinkArgs,
   IAdtAbapGitClient,
   IAdtAbapGitClientOptions,
+  IAdtAnalyseOptions,
+  IAdtError,
   IAdtResponse,
+  IAnalyse,
+  IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
-import { answeringValue, failed, succeeded } from '../utils/adtResponse';
+import { answering } from '../utils/adtResponse';
 import { checkExternalRepo } from './abapGit/checkExternalRepo';
 import { getErrorLog } from './abapGit/getErrorLog';
 import { linkRepo } from './abapGit/link';
-import { listRepos as listReposLowLevel } from './abapGit/listRepos';
+import { listRepos } from './abapGit/listRepos';
 import { pullRepo } from './abapGit/pull';
-import type {
-  IAbapGitErrorLogEntry,
-  IAbapGitExternalRepoInfo,
-  IAbapGitRepoStatus,
-} from './abapGit/types';
+import { abapGitDocuments, type IAbapGitResults } from './abapGit/types';
 import { unlinkRepo } from './abapGit/unlink';
 
-function toPublicRepoStatus(r: {
-  package: string;
-  url: string;
-  branchName: string;
-  status: string;
-  statusText: string;
-  createdBy?: string;
-  createdAt?: string;
-  repositoryId?: string;
-  atomLinks?: { pullLink?: string };
-}): IAbapGitRepoStatus {
-  return {
-    package: r.package,
-    url: r.url,
-    branchName: r.branchName,
-    status: r.status,
-    statusText: r.statusText,
-    createdBy: r.createdBy,
-    createdAt: r.createdAt,
-    repositoryId: r.repositoryId,
-    pullLink: r.atomLinks?.pullLink,
-  };
-}
-
-export class AdtAbapGitClient
-  implements
+/**
+ * One request per member, each read by the strategy the client was built
+ * with, each judged by the `analyse` its caller passes.
+ *
+ * `getRepo` is gone (interfaces-adt 11, decision 37): it listed the
+ * repositories and picked one, which is a reading — `listRepos` through a
+ * strategy of the caller's, then their own `find`. `unlink` and `getErrorLog`
+ * take the key and the log link `listRepos` reports instead of a package they
+ * had to look up.
+ */
+export class AdtAbapGitClient<
+  R extends IAbapGitResults = typeof abapGitDocuments,
+> implements
     IAdtAbapGitClient<
-      IAbapGitRepoStatus[],
-      IAbapGitRepoStatus | undefined,
-      IAbapGitErrorLogEntry[],
-      void,
-      IAbapGitExternalRepoInfo
+      ReturnType<R['repos']>,
+      ReturnType<R['errorLog']>,
+      ReturnType<R['pulled']>,
+      ReturnType<R['externalRepo']>
     >
 {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
   private readonly contentTypeVersion: 'v3' | 'v4';
+  private readonly results: R;
 
   constructor(
     connection: IAbapConnection,
     logger?: ILogger,
     options?: IAdtAbapGitClientOptions,
+    // The one cast in this file, and it is on the default. See AdtClass.
+    results: R = abapGitDocuments as unknown as R,
   ) {
     this.connection = connection;
     this.logger = logger;
     this.contentTypeVersion = options?.contentTypeVersion ?? 'v3';
+    this.results = results;
   }
 
-  /** Link a package to a repository. ADT answers nothing worth reading. */
-  async link(args: IAbapGitLinkArgs): Promise<IAdtResponse<void>> {
+  /** Link a package to a repository. */
+  async link<E extends IAdtError = IAdtError>(
+    args: IAbapGitLinkArgs,
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<void, E>> {
     this.logger?.debug?.(
       `AdtAbapGitClient.link: package=${args.package} url=${args.url}`,
     );
-    return answeringValue(async () => {
-      await linkRepo(this.connection, args, this.contentTypeVersion);
-    });
+    return answering(
+      () => linkRepo(this.connection, args, this.contentTypeVersion),
+      this.results.linked as IResultStrategy<void>,
+      options?.analyse as IAnalyse<E> | undefined,
+    );
   }
 
   /**
    * Start a pull. One POST, to the link `listRepos` reported.
    *
-   * It does not wait. Polling `getRepo(package)` until the status leaves `R`,
+   * It does not wait. Polling `listRepos` until the status leaves `R`,
    * deciding how long to allow and what to do when it does not, and reading
-   * `getErrorLog` when the status says to — all of that is the caller's, and
-   * was four requests in this member until 19.0.0.
+   * `getErrorLog` when the status says to — all of that is the caller's.
    */
-  async pull(args: IAbapGitPullArgs): Promise<IAdtResponse<void>> {
+  async pull<E extends IAdtError = IAdtError>(
+    args: IAbapGitPullArgs,
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['pulled']>, E>> {
     this.logger?.debug?.(`AdtAbapGitClient.pull: package=${args.package}`);
-    return answeringValue(async () => {
-      await pullRepo(this.connection, args, this.contentTypeVersion);
-    });
+    return answering(
+      () => pullRepo(this.connection, args, this.contentTypeVersion),
+      this.results.pulled as IResultStrategy<ReturnType<R['pulled']>>,
+      options?.analyse as IAnalyse<E> | undefined,
+    );
   }
 
-  /** Unlink a package from its repository. */
-  async unlink(args: IAbapGitUnlinkArgs): Promise<IAdtResponse<void>> {
-    this.logger?.debug?.(`AdtAbapGitClient.unlink: package=${args.package}`);
-    return answeringValue(async () => {
-      await unlinkRepo(this.connection, args);
-    });
+  /** Remove a repository link, by the key `listRepos` reported. */
+  async unlink<E extends IAdtError = IAdtError>(
+    args: IAbapGitUnlinkArgs,
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<void, E>> {
+    this.logger?.debug?.(
+      `AdtAbapGitClient.unlink: repositoryId=${args.repositoryId}`,
+    );
+    return answering(
+      () => unlinkRepo(this.connection, args),
+      this.results.unlinked as IResultStrategy<void>,
+      options?.analyse as IAnalyse<E> | undefined,
+    );
   }
 
   /** Every repository this system has linked. */
-  async listRepos(): Promise<IAdtResponse<IAbapGitRepoStatus[]>> {
-    return answeringValue(async () =>
-      (await listReposLowLevel(this.connection)).map(toPublicRepoStatus),
+  async listRepos<E extends IAdtError = IAdtError>(
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['repos']>, E>> {
+    return answering(
+      () => listRepos(this.connection),
+      this.results.repos as IResultStrategy<ReturnType<R['repos']>>,
+      options?.analyse as IAnalyse<E> | undefined,
     );
   }
 
-  /**
-   * One repository, by the package it is linked to.
-   *
-   * `undefined` when nothing is linked to that package — the listing is the
-   * only resource, so absence is a row that is not there rather than a status.
-   */
-  async getRepo(
-    packageName: string,
-  ): Promise<IAdtResponse<IAbapGitRepoStatus | undefined>> {
-    const repos = await this.listRepos();
-    if (!repos.ok) return failed(repos.getError());
-    return succeeded(
-      repos
-        .getResult()
-        .value.find(
-          (r) => r.package.toUpperCase() === packageName.toUpperCase(),
-        ),
+  /** A run's error log, from the log link `listRepos` reported. */
+  async getErrorLog<E extends IAdtError = IAdtError>(
+    logLink: string,
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['errorLog']>, E>> {
+    return answering(
+      () => getErrorLog(this.connection, logLink),
+      this.results.errorLog as IResultStrategy<ReturnType<R['errorLog']>>,
+      options?.analyse as IAnalyse<E> | undefined,
     );
-  }
-
-  /** What the last pull of that package logged. */
-  async getErrorLog(
-    packageName: string,
-  ): Promise<IAdtResponse<IAbapGitErrorLogEntry[]>> {
-    return answeringValue(() => getErrorLog(this.connection, packageName));
   }
 
   /** What an external repository offers, before linking anything to it. */
-  async checkExternalRepo(
+  async checkExternalRepo<E extends IAdtError = IAdtError>(
     args: IAbapGitExternalRepoCredentials,
-  ): Promise<IAdtResponse<IAbapGitExternalRepoInfo>> {
-    return answeringValue(() => checkExternalRepo(this.connection, args));
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['externalRepo']>, E>> {
+    return answering(
+      () => checkExternalRepo(this.connection, args),
+      this.results.externalRepo as IResultStrategy<
+        ReturnType<R['externalRepo']>
+      >,
+      options?.analyse as IAnalyse<E> | undefined,
+    );
   }
 }

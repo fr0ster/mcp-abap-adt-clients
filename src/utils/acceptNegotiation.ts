@@ -2,36 +2,79 @@ import type {
   IAbapConnection,
   IAbapRequestOptions,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import type { HttpError } from '@mcp-abap-adt/interfaces-network';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 
-const acceptCache = new Map<string, string>();
-const contentTypeCache = new Map<string, string>();
+/**
+ * What this connection has learned about Accept and Content-Type, and whether
+ * it corrects them at all.
+ *
+ * **Per connection, not per process.** Until 23.0.0 the two caches and the
+ * on/off switch were module globals: a corrected `Accept` learned on one system
+ * was sent to every other, keyed by method and URL alone, and one client's
+ * `enableAcceptCorrection` switched it for every client in the process. Two
+ * systems on different ADT releases answer the same URL with different media
+ * types; what one taught must not reach the other.
+ *
+ * Kept on the connection object under a symbol rather than in a WeakMap keyed
+ * by it, because members hand the wire functions a `withCallTimeout` proxy of
+ * the connection — a different object — and a proxy forwards symbol property
+ * reads and definitions to the connection it wraps.
+ */
+interface INegotiationState {
+  accept: Map<string, string>;
+  contentType: Map<string, string>;
+  enabled?: boolean;
+}
+
+const STATE = Symbol.for('@mcp-abap-adt/adt-clients/acceptNegotiation');
+
+function stateOf(connection: IAbapConnection): INegotiationState {
+  const holder = connection as unknown as Record<symbol, INegotiationState>;
+  let state = holder[STATE];
+  if (!state) {
+    state = { accept: new Map(), contentType: new Map() };
+    Object.defineProperty(connection, STATE, {
+      value: state,
+      enumerable: false,
+      configurable: true,
+    });
+  }
+  return state;
+}
+
 const baseRequestMap = new WeakMap<
   IAbapConnection,
   IAbapConnection['makeAdtRequest']
 >();
-let acceptCorrectionOverride: boolean | undefined;
 
 export interface IAcceptNegotiationOptions {
   enableAcceptCorrection?: boolean;
   logger?: ILogger;
 }
 
-export function clearAcceptCache(): void {
-  acceptCache.clear();
-  contentTypeCache.clear();
+/** Forget what this connection learned. */
+export function clearAcceptCache(connection: IAbapConnection): void {
+  const state = stateOf(connection);
+  state.accept.clear();
+  state.contentType.clear();
 }
 
-export function setAcceptCorrectionEnabled(enabled?: boolean): void {
-  acceptCorrectionOverride = enabled;
+/** Switch correction on or off for this connection alone. */
+export function setAcceptCorrectionEnabled(
+  connection: IAbapConnection,
+  enabled?: boolean,
+): void {
+  stateOf(connection).enabled = enabled;
 }
 
-export function getAcceptCorrectionEnabled(): boolean {
-  if (acceptCorrectionOverride !== undefined) {
-    return acceptCorrectionOverride;
-  }
+/** This connection's switch, or the `ADT_ACCEPT_CORRECTION` default. */
+export function getAcceptCorrectionEnabled(
+  connection: IAbapConnection,
+): boolean {
+  const enabled = stateOf(connection).enabled;
+  if (enabled !== undefined) return enabled;
   return process.env.ADT_ACCEPT_CORRECTION !== 'false';
 }
 
@@ -157,7 +200,9 @@ export async function makeAdtRequestWithAcceptNegotiation<
   options?: IAcceptNegotiationOptions,
 ): Promise<IAdtWireResponse<T, D>> {
   const enableCorrection =
-    options?.enableAcceptCorrection ?? getAcceptCorrectionEnabled();
+    options?.enableAcceptCorrection ?? getAcceptCorrectionEnabled(connection);
+  const { accept: acceptCache, contentType: contentTypeCache } =
+    stateOf(connection);
   const logger = options?.logger;
   const cacheKey = buildCacheKey(request);
 

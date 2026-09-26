@@ -1,7 +1,7 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { create } from '../../../../core/scalarFunction/create';
 
 function mockConn(capture: {

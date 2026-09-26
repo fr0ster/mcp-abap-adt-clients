@@ -5,7 +5,7 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   ACCEPT_FUNCTION_INCLUDE,
   CT_FUNCTION_INCLUDE,

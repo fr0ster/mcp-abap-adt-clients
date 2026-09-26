@@ -7,11 +7,11 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
-  IAdtResponse,
   ISessionLifecycleAware,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
@@ -126,8 +126,9 @@ describe('Shared - read Accept headers', () => {
 
   beforeAll(async () => {
     try {
-      clearAcceptCache();
       connection = await createTestConnection(connectionLogger);
+      // The run shares one connection, and what it learned lives on it.
+      clearAcceptCache(connection);
       isCloudSystem = await isCloudEnvironment(connection);
       const systemContext = await resolveSystemContext(
         connection,

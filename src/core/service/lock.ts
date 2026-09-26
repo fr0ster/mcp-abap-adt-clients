@@ -25,8 +25,7 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
-import { XMLParser } from 'fast-xml-parser';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_LOCK } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -34,29 +33,21 @@ import { getTimeout } from '../../utils/timeouts';
 const bindingUri = (name: string): string =>
   `/sap/bc/adt/businessservices/bindings/${encodeSapObjectName(name.toLowerCase())}`;
 
-/** Take the lock, and answer the handle the unlock will need. */
+/**
+ * Take the lock — `POST …?_action=LOCK`, answered as it arrived. The member
+ * reads the handle with `lockHandleOf`; until 23.0.0 this parsed it and threw
+ * when SAP's answer had none, which dropped the answer.
+ */
 export async function lockServiceBinding(
   connection: IAbapConnection,
   bindingName: string,
-): Promise<string> {
-  const response = await connection.makeAdtRequest({
+): Promise<IAdtWireResponse> {
+  return connection.makeAdtRequest({
     url: `${bindingUri(bindingName)}?_action=LOCK&accessMode=MODIFY`,
     method: 'POST',
     timeout: getTimeout('default'),
     headers: { Accept: ACCEPT_LOCK },
   });
-
-  const parsed = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: '',
-  }).parse(response.data);
-  const lockHandle = parsed['asx:abap']?.['asx:values']?.DATA?.LOCK_HANDLE;
-  if (!lockHandle) {
-    throw new Error(
-      `Failed to extract lock handle for service binding ${bindingName}`,
-    );
-  }
-  return String(lockHandle);
 }
 
 /** Give it back. Without this the binding stays "currently being edited". */

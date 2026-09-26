@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto';
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_DISCOVERY } from '../../constants/contentTypes';
 import { getTimeout } from '../../utils/timeouts';
 import type { IGetDiscoveryParams } from './types';

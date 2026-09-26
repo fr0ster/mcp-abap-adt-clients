@@ -7,15 +7,19 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+// The source path, not the package: this reading is new in adt-strategies and
+// the package's built entry point does not carry it until it is released.
+import {
+  type IWhereUsedListResult,
+  utilWhereUsedReferences,
+} from '@mcp-abap-adt/adt-strategies';
 import type {
   IAbapConnection,
   ISessionLifecycleAware,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
 import { AdtUtils } from '../../../core/shared/AdtUtils';
-import type { IWhereUsedListResult } from '../../../core/shared/utilResults';
-import { whereUsedReferences } from '../../../core/shared/utilResults';
 import { orThrow } from '../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import { expectResult } from '../../helpers/contract';
@@ -376,7 +380,7 @@ describe('Shared - getWhereUsed', () => {
     expect(noName.ok ? '' : noName.getError().message).toBeTruthy();
   });
 
-  it('answers a missing object type rather than throwing', async () => {
+  it('throws for a missing object type before asking the server', async () => {
     if (!hasConfig) {
       testsLogger.warn?.(
         '⚠️ Skipping test: No .env file or SAP configuration found',
@@ -400,13 +404,18 @@ describe('Shared - getWhereUsed', () => {
       return;
     }
 
-    logTestStep('an empty object type is answered, not thrown', testsLogger);
-    const noType = await new AdtUtils(connection, testsLogger).getWhereUsed({
-      object_name: 'TEST',
-      object_type: '',
-    });
-    expect(noType.ok).toBe(false);
-    expect(noType.ok ? '' : noType.getError().message).toBeTruthy();
+    // Changed on purpose: an empty type used to reach the request builder
+    // inside the request, so its throw came back as `origin: 'connection'` —
+    // advice to check a network nothing reached. Where-used now builds its
+    // address with the shared `buildObjectUri` before any request, and a type
+    // it cannot address is the caller's argument, thrown as itself.
+    logTestStep('an empty object type is thrown, not asked', testsLogger);
+    await expect(
+      new AdtUtils(connection, testsLogger).getWhereUsed({
+        object_name: 'TEST',
+        object_type: '',
+      }),
+    ).rejects.toThrow(/object type/);
   });
 
   it('should get where-used list with parsed results', async () => {
@@ -473,7 +482,7 @@ describe('Shared - getWhereUsed', () => {
           : scope,
       }),
     );
-    const result: IWhereUsedListResult = whereUsedReferences({
+    const result: IWhereUsedListResult = utilWhereUsedReferences({
       data: String(document),
     } as never);
 
@@ -631,7 +640,7 @@ describe('Shared - getWhereUsed', () => {
           ...(scopeXml ? { scopeXml } : {}),
         }),
       );
-      return whereUsedReferences({ data: String(document) } as never);
+      return utilWhereUsedReferences({ data: String(document) } as never);
     };
 
     // Step 1: search ALL types — the "select all" baseline.

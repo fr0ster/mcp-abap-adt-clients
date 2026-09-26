@@ -7,15 +7,20 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { SapConfig } from '@mcp-abap-adt/connection';
+// The source path, not the package: these readings are new in adt-strategies
+// and the package's built entry point does not carry them until it is released.
+import {
+  type ISearchResult,
+  utilSearchHits,
+} from '@mcp-abap-adt/adt-strategies';
 import type {
   IAbapConnection,
   ISessionLifecycleAware,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
-import type { ISearchResult } from '../../../core/shared/utilResults';
+import { utilDocuments } from '../../../core/shared/utilResultSet';
 import { expectResult } from '../../helpers/contract';
 import {
   createTestAdtClient,
@@ -65,6 +70,11 @@ describe('Shared - searchObjects', () => {
     }
   });
 
+  // The hits are a reading the caller asks for; the shipped default is the
+  // document as it came.
+  const hitsUtils = () =>
+    client.getUtils({ ...utilDocuments, search: utilSearchHits });
+
   it('should search objects by name pattern', async () => {
     if (!hasConfig) {
       testsLogger.warn?.(
@@ -76,13 +86,13 @@ describe('Shared - searchObjects', () => {
     logTestStep('search objects by name pattern', testsLogger);
     testsLogger.info?.('🔍 Query: CL_ABAP*, maxResults: 10');
 
-    // The shipped reading answers the hits, so there is no document to parse
-    // here any more — the regex this used to run was /<objectReference/, which
+    // The hits come from `utilSearchHits`, passed as the reading — the default
+    // answers the document. There is no document to parse here — the regex this used to run was /<objectReference/, which
     // never matches, because SAP prefixes the element. It was only logged,
     // never asserted, so it found nothing for as long as it existed.
     const hits = expectResult(
       await withAcceptHandling(
-        client.getUtils().search({ query: 'CL_ABAP*', maxResults: 10 }),
+        hitsUtils().search({ query: 'CL_ABAP*', maxResults: 10 }),
       ),
       'search CL_ABAP*',
     ) as ISearchResult[];
@@ -112,9 +122,7 @@ describe('Shared - searchObjects', () => {
 
     const hits = expectResult(
       await withAcceptHandling(
-        client
-          .getUtils()
-          .search({ query: 'T*', objectType: 'TABL', maxResults: 10 }),
+        hitsUtils().search({ query: 'T*', objectType: 'TABL', maxResults: 10 }),
       ),
       'search tables',
     ) as ISearchResult[];
@@ -141,7 +149,7 @@ describe('Shared - searchObjects', () => {
 
     logTestStep('search objects with default maxResults', testsLogger);
     const hits = expectResult(
-      await withAcceptHandling(client.getUtils().search({ query: 'CL_ABAP*' })),
+      await withAcceptHandling(hitsUtils().search({ query: 'CL_ABAP*' })),
       'search without maxResults',
     ) as ISearchResult[];
 

@@ -96,6 +96,12 @@ export interface IClassResults {
   readonly updated: IResultStrategy<unknown>;
   /** What a deletion check answers: `del:checkResponse`. */
   readonly deletionCheck: IResultStrategy<unknown>;
+  /** The transport request document of the class. */
+  readonly transport: IResultStrategy<unknown>;
+  /** The version history — an Atom feed; `objectVersions` reads it. */
+  readonly versions: IResultStrategy<unknown>;
+  /** One version's source. */
+  readonly versionSource: IResultStrategy<unknown>;
 }
 
 /**
@@ -118,6 +124,9 @@ export const classDocuments = {
   deletion: rawDocument,
   updated: nothing,
   deletionCheck: rawDocument,
+  transport: rawDocument,
+  versions: rawDocument,
+  versionSource: rawDocument,
 } satisfies IClassResults;
 
 /**

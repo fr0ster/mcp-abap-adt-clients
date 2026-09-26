@@ -1,46 +1,27 @@
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_FEATURE_TOGGLE_STATES } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
-import type { FeatureToggleState, IFeatureToggleRuntimeState } from './types';
 
-function normaliseState(raw: unknown): FeatureToggleState {
-  if (raw === 'on' || raw === 'off' || raw === 'undefined') return raw;
-  return 'undefined';
-}
-
+/**
+ * `GET …/states` — the toggle's runtime state, the JSON as it arrived.
+ *
+ * Until 23.0.0 this parsed the `STATES` object and normalised it into
+ * `IFeatureToggleRuntimeState` here (now `featureToggleRuntimeState` in @mcp-abap-adt/adt-strategies), so every caller got that reading whether
+ * they wanted it or not. The reading is the `runtimeState` strategy's now.
+ */
 export async function getFeatureToggleState(
   connection: IAbapConnection,
   name: string,
-): Promise<IFeatureToggleRuntimeState> {
+): Promise<IAdtWireResponse> {
   const encoded = encodeSapObjectName(name.toLowerCase());
-  const resp = await connection.makeAdtRequest({
+  return connection.makeAdtRequest({
     method: 'GET',
     url: `/sap/bc/adt/sfw/featuretoggles/${encoded}/states`,
     timeout: getTimeout('default'),
     headers: { Accept: ACCEPT_FEATURE_TOGGLE_STATES },
   });
-  const parsed =
-    typeof resp.data === 'string' ? JSON.parse(resp.data) : resp.data;
-  const s = parsed?.STATES ?? {};
-  return {
-    name: String(s.NAME ?? name.toUpperCase()),
-    clientState: normaliseState(s.CLIENT_STATE),
-    userState: normaliseState(s.USER_STATE),
-    clientChangedBy: s.CLIENT_CHANGED_BY || undefined,
-    clientChangedOn: s.CLIENT_CHANGED_ON || undefined,
-    clientStates: Array.isArray(s.CLIENT_STATES)
-      ? s.CLIENT_STATES.map((c: any) => ({
-          client: String(c.CLIENT),
-          description: c.DESCRIPTION || undefined,
-          state: normaliseState(c.STATE),
-        }))
-      : [],
-    userStates: Array.isArray(s.USER_STATES)
-      ? s.USER_STATES.map((u: any) => ({
-          user: String(u.USER),
-          state: normaliseState(u.STATE),
-        }))
-      : [],
-  };
 }

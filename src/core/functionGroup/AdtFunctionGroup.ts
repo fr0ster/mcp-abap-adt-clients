@@ -14,8 +14,8 @@
  */
 
 import type {
-  IAbapConnection,
   IAdtActivatable,
+  IAdtAnalyseOptions,
   IAdtCheckable,
   IAdtContentTypes,
   IAdtCreatable,
@@ -32,9 +32,12 @@ import type {
   IAdtValidatable,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
+import { lockHandleOf } from '../../utils/lockHandle';
+import { nothing } from '../../utils/resultStrategy';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import {
   createLockTracker,
@@ -355,36 +358,36 @@ export class AdtFunctionGroup<
     );
   }
 
-  /** Lock the function group for modification. */
-  async lock(
+  /**
+   * Lock the function group — one LOCK, its handle read by `lockHandleOf`. A
+   * 200 carrying no handle reads as `''`; whether that is a refusal is the
+   * caller's `analyse` to say.
+   */
+  async lock<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionGroupConfig>,
-  ): Promise<IAdtResponse<string>> {
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<string, E>> {
     const name = config.functionGroupName as string;
-
-    return answering(
-      async () => {
-        const lockHandle = await inStatefulSession(this.connection, () =>
+    const answer = await answering(
+      () =>
+        inStatefulSession(this.connection, () =>
           lockFunctionGroup(this.connection, name),
-        );
-        this.lockTracker.track(name, lockHandle);
-        // The handle is the value, and the request does not keep the wire it
-        // came on — so the answer is built around what the request produced.
-        return {
-          data: lockHandle,
-          status: 200,
-          statusText: 'OK',
-          headers: {},
-        };
-      },
-      (answer) => String(answer.data),
+        ),
+      lockHandleOf,
+      options?.analyse,
     );
+    if (answer.ok && answer.getResult().value) {
+      this.lockTracker.track(name, answer.getResult().value);
+    }
+    return answer;
   }
 
   /** Unlock the function group. */
-  async unlock(
+  async unlock<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionGroupConfig>,
     lockHandle: string,
-  ): Promise<IAdtResponse<void>> {
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<void, E>> {
     const name = config.functionGroupName as string;
 
     return answering(
@@ -396,7 +399,8 @@ export class AdtFunctionGroup<
         this.lockTracker.untrack(name);
         return result;
       },
-      () => undefined,
+      nothing,
+      options?.analyse,
     );
   }
 }

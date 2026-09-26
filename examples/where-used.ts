@@ -40,7 +40,8 @@ export async function whereUsed(
   if (!found.ok) throw new Error(found.getError().message);
 
   // The document, because that is the shipped default. For a parsed reference
-  // list, construct the utils with `whereUsedReferences` as the `whereUsed`
-  // reading: `client.getUtils({ ...utilDocuments, whereUsed: whereUsedReferences })`.
+  // list, construct the utils with `utilWhereUsedReferences` from
+  // @mcp-abap-adt/adt-strategies as the `whereUsed` reading:
+  // `client.getUtils({ ...utilDocuments, whereUsed: utilWhereUsedReferences })`.
   return String(found.getResult().value ?? '');
 }

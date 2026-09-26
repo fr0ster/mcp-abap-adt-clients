@@ -68,8 +68,9 @@ await client.getClass().update({ className }, { source, lockHandle });
 
 // a domain — is its document, and the document is what you send
 const current = await client.getDomain().readMetadata({ domainName });
+if (!current.ok) throw new Error(current.getError().message);
 const document = patched(current.getResult().value); // yours to edit
-await client.getDomain().updateMetadata({ domainName, document }, { lockHandle });
+await client.getDomain().updateMetadata({ domainName }, { source: document, lockHandle });
 ```
 
 **The whole document, every time.** An update is a replace, not a merge: read
@@ -112,6 +113,13 @@ sets `stateful`, `unlock` restores `stateless`. A lock handle is only valid
 inside a stateful request on some releases, which is why the unlock has to
 happen before anything puts the session back — and why the `finally` above is
 the shape to copy.
+
+**`lock` answers the handle SAP sent; `unlock` answers SAP's reply.** The handle
+is read from the `sap-adt-lm-handle` header or from `LOCK_HANDLE` in the body.
+An answer that carries neither reads as `''` — until 23.0.0 that was a thrown
+"Failed to obtain lock handle", a sentence about SAP's answer raised as if the
+library had failed, with the answer lost. Whether a handle-less `200` is a
+refusal is your `analyse` to say; the response is in the answer either way.
 
 **Passing no handle is allowed.** Whether a write without a lock is accepted is
 ADT's judgement about that object on that system; its refusal comes back in the
@@ -246,10 +254,21 @@ The check asks about a **URI**, and its answer names the type and package it
 resolved that address to, so a type with an address has something to ask with.
 
 ```typescript
-const approved = await client.getClass().checkDeletion(config);
+import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
+
+const approved = await client.getClass().checkDeletion(config, {
+  analyse: analyseDeletion,
+});
 if (!approved.ok) throw new Error(approved.getError().message);
-await client.getClass().delete(config);
+await client.getClass().delete(config, { analyse: analyseDeletion });
 ```
+
+Both answer `200` whether the server agreed or not — the verdict is in the
+body — so without an `analyse` a refusal comes back as a success carrying the
+document. `analyseDeletion` from `@mcp-abap-adt/adt-strategies` reads it: every
+`del:message` in order, each with its own severity, and the T100 key from the
+long-text link, which is the one part of a deletion message that does not
+change with the logon language.
 
 Running `delete` without the check is allowed: ADT answers its own refusal. What
 you lose is the reason — the check's document names what still points at the
@@ -257,7 +276,11 @@ object, and the delete's does not.
 
 The check is a question, and the delete is the answer to a different one. A
 refusal arrives as `del:isDeleted` on the delete — not as `del:isDeletable`,
-which belongs to the check — and `packageDeletionRefusal` reads the right one.
+which belongs to the check — and `analyseDeletion` reads both. Until 23.0.0
+`getPackage().delete()` applied a reading of its own (`packageDeletionRefusal`)
+when you passed none; now no member does. The same holds for
+`getUtils().deleteObjectsGroup()`, which answers SAP's reply instead of
+throwing on `isDeleted="false"` — pass `analyseDeletion` there too.
 
 **The one thing it cannot remove** is an object that was created and never bound
 to a package. The deletion check resolves an object through its package — its
@@ -546,7 +569,8 @@ So the object is not empty and it is not broken. It is unfinished, and the first
 promotes what you wrote into the active version, replacing the skeleton.
 
 **`getVersions()` will not tell you any of this.** It answers `ok` in every state
-above, listing version slots rather than content — `99999` for the inactive,
+above — the feed, which `objectVersions` in `@mcp-abap-adt/adt-strategies`
+reads — listing version slots rather than content — `99999` for the inactive,
 `00000` for the active — so it reports two entries for the class nothing can
 read. The count drops to one when activation consumes the inactive slot, which
 is real but is not an answer to "is there anything to read".
@@ -567,7 +591,8 @@ two ways, and one of them was being dropped. Measured across seven types:
 So a `validate()` that returns a `200` has not told you the name is free. The
 body is the answer, and reading `<SEVERITY>` out of it is your `analyse` — this
 package ships none, because which severities matter depends on what you are
-about to do with the name.
+about to do with the name. `analyseValidation` in `@mcp-abap-adt/adt-strategies`
+is one reading of both forms, for a caller who has no opinion yet.
 
 What `validate()` does **not** answer is whether the object exists: a name that
 is free validates fine whether or not anything was ever created under it. For

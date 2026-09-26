@@ -23,8 +23,7 @@
  */
 
 import type {
-  AdtNoFailure,
-  IAbapConnection,
+  IAdtAnalyseOptions,
   IAdtCreatable,
   IAdtCreateOptions,
   IAdtError,
@@ -36,18 +35,13 @@ import type {
   IAdtRunnable,
   IAdtUpdatable,
   IAdtValidatable,
-  IAdtWireResponse,
   IResultStrategy,
   ITestRunInformation,
   IUnitTestResultOptions,
 } from '@mcp-abap-adt/interfaces-adt';
-import {
-  ADT_NO_FAILURE,
-  AdtObjectErrorCodes,
-} from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { answering } from '../../utils/adtResponse';
-import { requestOf } from '../../utils/requestTrace';
 import { AdtClass, AdtLocalTestClass } from '../class';
 import { getClassUnitTestResult, getClassUnitTestStatus } from '../class/run';
 import { startClassUnitTestRun } from './run';
@@ -56,33 +50,8 @@ import {
   type IClassUnitTestRunOptions,
   type IUnitTestConfig,
   type IUnitTestResults,
-  runId,
   unitTestDocuments,
 } from './types';
-
-/**
- * The shipped reading of a run that started without saying so.
- *
- * ADT answers a started run with its id in a header or in `aunit:run@uri`. An
- * answer carrying neither is not a run a caller can ask about, so it is a
- * failure named {@link AdtObjectErrorCodes.CREATE_FAILED} rather than an empty
- * string handed back as if it were an id.
- */
-export const startedRun = (
-  verdict: IAdtError | AdtNoFailure,
-  answer?: IAdtWireResponse,
-): IAdtError | AdtNoFailure => {
-  if (verdict !== ADT_NO_FAILURE) return verdict;
-  return answer && runId(answer)
-    ? ADT_NO_FAILURE
-    : {
-        origin: 'refusal',
-        code: AdtObjectErrorCodes.CREATE_FAILED,
-        message: 'Failed to start unit test run: run ID not returned',
-        response: answer,
-        request: requestOf(answer),
-      };
-};
 
 /**
  * Not `IAdtDeletable`, and that is the honest shape rather than an omission.
@@ -115,10 +84,6 @@ export class AdtUnitTest<R extends IUnitTestResults = typeof unitTestDocuments>
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
   public readonly objectType: string = 'UnitTest';
-
-  protected lastRunId?: string;
-  protected lastStatusResponse?: IAdtWireResponse;
-  protected lastResultResponse?: IAdtWireResponse;
 
   protected adtClass: AdtClass;
   protected adtLocalTestClass: AdtLocalTestClass;
@@ -283,97 +248,80 @@ export class AdtUnitTest<R extends IUnitTestResults = typeof unitTestDocuments>
   }
 
   /** Lock the container class — an include has no lock of its own. */
-  async lock(config: Partial<IUnitTestConfig>): Promise<IAdtResponse<string>> {
-    return this.adtLocalTestClass.lock({ className: this.name(config) });
+  async lock<E extends IAdtError = IAdtError>(
+    config: Partial<IUnitTestConfig>,
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<string, E>> {
+    return this.adtLocalTestClass.lock(
+      { className: this.name(config) },
+      options,
+    );
   }
 
   /** Unlock the container class. */
-  async unlock(
+  async unlock<E extends IAdtError = IAdtError>(
     config: Partial<IUnitTestConfig>,
     lockHandle: string,
-  ): Promise<IAdtResponse<void>> {
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<void, E>> {
     return this.adtLocalTestClass.unlock(
       { className: this.name(config) },
       lockHandle,
+      options,
     );
   }
 
   /**
-   * Run the tests, and answer the run's id.
+   * Run the tests. One POST.
    *
    * Needs no `create` and no `update`: the tests may have been in the class for
-   * years. Ask about the run through {@link getStatus} and {@link getResult}.
+   * years. The run's id is in a header of the answer — construct this with
+   * `unitTestRunId` from @mcp-abap-adt/adt-strategies for `run` to be answered
+   * the id, and pass `analyseUnitTestStart` to have an id-less answer read as a
+   * failure. Ask about the run through {@link getStatus} and {@link getResult}.
    */
-  async run(
+  async run<E extends IAdtError = IAdtError>(
     tests: IClassUnitTestDefinition[],
-    options?: IClassUnitTestRunOptions,
-  ): Promise<IAdtResponse<ReturnType<R['run']>>> {
+    options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['run']>, E>> {
     this.logger?.info?.('Starting unit test run');
-    const answer = await answering(
+    return answering(
       () => startClassUnitTestRun(this.connection, tests, options),
       this.results.run as IResultStrategy<ReturnType<R['run']>>,
-      startedRun,
+      options?.analyse,
     );
-
-    if (answer.ok) {
-      // Remembered for getRunId(), which exists so a caller can ask later
-      // without threading the id through their own code.
-      this.lastRunId = String(answer.getResult().value);
-      this.logger?.info?.('Unit test run started, run ID:', this.lastRunId);
-    }
-    return answer;
   }
 
-  /** Run id of the most recent {@link run}, if one has been started here. */
-  getRunId(): string | undefined {
-    return this.lastRunId;
-  }
-
-  /** Poll a run. */
-  async getStatus(
+  /**
+   * Poll a run. Takes the run it is about: nothing here remembers the last one
+   * started, because ADT does not either — any holder of the id may ask.
+   */
+  async getStatus<E extends IAdtError = IAdtError>(
     runIdentifier: string,
-    withLongPolling: boolean = true,
-  ): Promise<IAdtResponse<ReturnType<R['status']>>> {
+    withLongPolling: boolean | undefined = true,
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['status']>, E>> {
     return answering(
-      async () => {
-        const response = await getClassUnitTestStatus(
+      () =>
+        getClassUnitTestStatus(
           this.connection,
           runIdentifier,
-          withLongPolling,
-        );
-        this.lastStatusResponse = response;
-        return response;
-      },
+          withLongPolling ?? true,
+        ),
       this.results.status as IResultStrategy<ReturnType<R['status']>>,
+      options?.analyse,
     );
   }
 
-  /** Answer of the most recent {@link getStatus}, if one has been made. */
-  getStatusResponse(): IAdtWireResponse | undefined {
-    return this.lastStatusResponse;
-  }
-
-  /** Fetch the result document of a finished run. */
-  async getResult(
+  /** The result document of a finished run. */
+  async getResult<E extends IAdtError = IAdtError>(
     runIdentifier: string,
-    options?: IUnitTestResultOptions,
-  ): Promise<IAdtResponse<ReturnType<R['result']>>> {
+    options?: IUnitTestResultOptions & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['result']>, E>> {
     return answering(
-      async () => {
-        const response = await getClassUnitTestResult(
-          this.connection,
-          runIdentifier,
-          options,
-        );
-        this.lastResultResponse = response;
-        return response;
-      },
+      () => getClassUnitTestResult(this.connection, runIdentifier, options),
       this.results.result as IResultStrategy<ReturnType<R['result']>>,
+      options?.analyse,
     );
-  }
-
-  /** Answer of the most recent {@link getResult}, if one has been made. */
-  getResultResponse(): IAdtWireResponse | undefined {
-    return this.lastResultResponse;
   }
 }

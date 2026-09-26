@@ -7,7 +7,7 @@
  * does not do — and it went in unnoticed because nothing exercised it.
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AdtInclude } from '../../../core/include';
 import { expectFailure, expectResult } from '../../helpers/contract';

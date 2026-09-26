@@ -1,7 +1,7 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_FEATURE_TOGGLE_METADATA } from '../../constants/contentTypes';
 import { getTimeout } from '../../utils/timeouts';
 

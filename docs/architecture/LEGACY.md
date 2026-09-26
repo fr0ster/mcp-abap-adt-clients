@@ -95,7 +95,7 @@ These types throw an error with the exact missing endpoint when the getter is ca
 |-------------|--------|------|
 | CDS Unit Test | `getCdsUnitTest()` | `/sap/bc/adt/abapunit/testruns` IS present on legacy — not blocked |
 | Unit Test | `getUnitTest()` | Same endpoint — works |
-| Transport Request | `getRequest()` | Uses `/sap/bc/cts/` — `read()`/`list()` work, `create()`/`update()`/`delete()` answer a refusal; `list()`'s payload has never been captured, so the shipped reading may not recognise it and will say so — inject your own |
+| Transport Request | `getRequest()` | Uses `/sap/bc/cts/` — `read()`/`list()` work, `create()`/`update()`/`delete()` answer a refusal. `list()` takes no `configUri` (the endpoint is no saved search, and one that is passed is refused rather than ignored) and answers the document as it came; its payload has never been captured, so `transportTree` from adt-strategies may not read it — inject a reading for your system |
 
 ## Shared Utilities (AdtUtils) Support
 

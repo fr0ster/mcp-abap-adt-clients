@@ -12,15 +12,15 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import type { ITransportObjectEntry } from '@mcp-abap-adt/adt-strategies';
+import { ADT_TASK_TYPE } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   ISessionLifecycleAware,
-} from '@mcp-abap-adt/interfaces-adt';
-import { ADT_TASK_TYPE } from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type { ITransportObjectEntry } from '../../../../core/transport/parseObjectEntries';
 import {
   getSystemInformation,
   isCloudEnvironment,
@@ -47,6 +47,7 @@ import {
   logTestStep,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
+import { transportParsing } from '../../../helpers/transportParsing';
 
 const {
   getEnabledTestCase,
@@ -206,7 +207,9 @@ describe('AdtRequest', () => {
         try {
           logTestStep('create', testsLogger);
           const created = expectResult(
-            await client.getRequest().create(buildConfig(testCase) as any),
+            await client
+              .getRequest(transportParsing)
+              .create(buildConfig(testCase) as any),
             'create transport request',
           );
 
@@ -248,7 +251,7 @@ describe('AdtRequest', () => {
             try {
               logTestStep('read', testsLogger);
               const readState = expectResult(
-                await client.getRequest().readMetadata({
+                await client.getRequest(transportParsing).readMetadata({
                   transportNumber,
                 }),
                 'readState',
@@ -256,7 +259,7 @@ describe('AdtRequest', () => {
               expect(readState).toBeDefined();
               expect(readState).toBeDefined();
               const metadataState = expectResult(
-                await client.getRequest().readMetadata({
+                await client.getRequest(transportParsing).readMetadata({
                   transportNumber,
                 }),
                 'metadataState',
@@ -322,7 +325,9 @@ describe('AdtRequest', () => {
     const objectsOn = async (
       number: string,
     ): Promise<ITransportObjectEntry[]> => {
-      const answer = await client.getRequest().readObjects(number);
+      const answer = await client
+        .getRequest(transportParsing)
+        .readObjects(number);
       return answer.ok ? answer.getResult().value : [];
     };
 
@@ -355,7 +360,7 @@ describe('AdtRequest', () => {
 
     /** The task numbers under a request, in document order. */
     const tasksOf = async (number: string): Promise<string[]> => {
-      const answer = await client.getRequest().readMetadata({
+      const answer = await client.getRequest(transportParsing).readMetadata({
         transportNumber: number,
       });
       const document = answer.ok ? String(answer.getResult().value ?? '') : '';
@@ -414,7 +419,7 @@ describe('AdtRequest', () => {
           'create_transport',
           'builder_transport',
         );
-        const request = client.getRequest();
+        const request = client.getRequest(transportParsing);
         const domainName = 'ZAC_TRQ_DOMA01';
         let taskNumber: string | null = null;
         let transportNumber: string | null = null;
@@ -778,7 +783,9 @@ describe('AdtRequest', () => {
             try {
               logTestStep('create (discriminator transport)', testsLogger);
               const createState = expectResult(
-                await client.getRequest().create(buildConfig(testCase) as any),
+                await client
+                  .getRequest(transportParsing)
+                  .create(buildConfig(testCase) as any),
                 'createState',
               );
               knownTransportNumber = createState.transportNumber || null;
@@ -795,10 +802,20 @@ describe('AdtRequest', () => {
           }
 
           logTestStep('list', testsLogger);
+          // A listing runs a saved search the caller names. The test takes the
+          // system's first one, which is the choice `list` used to make itself
+          // when a system held exactly one.
+          const configs = expectResult(
+            await client.getRequest(transportParsing).searchConfigurations(),
+            'transport search configurations',
+          );
+          expect(configs.length).toBeGreaterThan(0);
           // The shipped reading of a listing is the parsed tree, so the
           // assertions below are about requests rather than about a document.
           const tree = expectResult(
-            await client.getRequest().list(),
+            await client
+              .getRequest(transportParsing)
+              .list({ configUri: configs[0].uri }),
             'list transport requests',
           );
 

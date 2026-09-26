@@ -12,22 +12,18 @@
  */
 
 import type {
-  AdtNoFailure,
-  IAbapConnection,
+  IAdtAnalyseOptions,
   IAdtCreateOptions,
   IAdtError,
   IAdtOperationOptions,
   IAdtResponse,
-  IAdtWireResponse,
   ICdsTestDoubleCheckable,
   ICdsUnitTestConfig,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
-import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
-import { XMLParser } from 'fast-xml-parser';
 import { answering } from '../../utils/adtResponse';
-import { requestOf } from '../../utils/requestTrace';
 import { startClassUnitTestRunByObject } from '../class/run';
 import { validateClassName } from '../class/validation';
 import { AdtDdl } from '../ddl/AdtDdl';
@@ -37,41 +33,8 @@ import {
   type IClassUnitTestDefinition,
   type IClassUnitTestRunOptions,
   type IUnitTestResults,
-  runId,
   unitTestDocuments,
 } from './types';
-
-const severityParser = new XMLParser({ ignoreAttributes: false });
-
-/**
- * The shipped reading of the CDS test-doubles check.
- *
- * Measured: the check reports its verdict inside a 200, as
- * `<SEVERITY>` with the reason in `<SHORT_TEXT>` or `<LONG_TEXT>`. Anything but
- * `OK` means the view cannot be tested with doubles, and a caller who went on
- * to create a test class against it would find out from a later, less obvious
- * failure.
- */
-export const testDoublesVerdict = (
-  verdict: IAdtError | AdtNoFailure,
-  answer?: IAdtWireResponse,
-): IAdtError | AdtNoFailure => {
-  if (verdict !== ADT_NO_FAILURE) return verdict;
-  const data = severityParser.parse(String(answer?.data ?? ''))?.['asx:abap']?.[
-    'asx:values'
-  ]?.DATA;
-  const severity = data?.SEVERITY;
-  if (severity === 'OK') return ADT_NO_FAILURE;
-  return {
-    origin: 'refusal',
-    message:
-      data?.SHORT_TEXT ||
-      data?.LONG_TEXT ||
-      `CDS test doubles check failed with severity: ${severity ?? '(none)'}`,
-    response: answer,
-    request: requestOf(answer),
-  };
-};
 
 export class AdtCdsUnitTest<
     R extends IUnitTestResults = typeof unitTestDocuments,
@@ -80,8 +43,6 @@ export class AdtCdsUnitTest<
   implements ICdsTestDoubleCheckable<ReturnType<R['cdsCheck']>>
 {
   protected adtView: AdtDdl;
-  private cdsViewName?: string;
-  private className?: string;
 
   constructor(
     connection: IAbapConnection,
@@ -102,25 +63,21 @@ export class AdtCdsUnitTest<
    * view itself — and it is asked first, because a view the doubles framework
    * cannot handle makes everything after it pointless.
    */
-  async checkCdsTestDoubles(
+  async checkCdsTestDoubles<E extends IAdtError = IAdtError>(
     cdsViewName: string,
-  ): Promise<IAdtResponse<ReturnType<R['cdsCheck']>>> {
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['cdsCheck']>, E>> {
     this.logger?.info?.(
       'Checking CDS view for unit test doubles:',
       cdsViewName,
     );
-
-    const answer = await answering(
+    // The verdict is `SEVERITY` inside a 200; `analyseCdsTestDoubles` in
+    // @mcp-abap-adt/adt-strategies reads it for a caller who passes it.
+    return answering(
       () => checkCdsTestDoublesAvailability(this.connection, cdsViewName),
       this.results.cdsCheck as IResultStrategy<ReturnType<R['cdsCheck']>>,
-      testDoublesVerdict,
+      options?.analyse,
     );
-
-    if (answer.ok) {
-      this.logger?.info?.('CDS view available for unit test doubles');
-      this.cdsViewName = cdsViewName;
-    }
-    return answer;
   }
 
   /**
@@ -180,7 +137,6 @@ export class AdtCdsUnitTest<
     }
 
     const name = config.className as string;
-    this.className = name;
 
     return this.adtClass.create(
       {
@@ -246,7 +202,6 @@ export class AdtCdsUnitTest<
       },
       options,
     );
-    if (answer.ok) this.className = undefined;
     return answer as IAdtResponse<ReturnType<R['deleted']>, E>;
   }
 
@@ -256,47 +211,20 @@ export class AdtCdsUnitTest<
    * A class name runs every test in that class by object name; an array of test
    * definitions is the parent's route.
    */
-  override async run(
+  override async run<E extends IAdtError = IAdtError>(
     testsOrClassName: IClassUnitTestDefinition[] | string,
-    options?: IClassUnitTestRunOptions,
-  ): Promise<IAdtResponse<ReturnType<R['run']>>> {
+    options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['run']>, E>> {
     if (typeof testsOrClassName !== 'string') {
       return super.run(testsOrClassName, options);
     }
 
     const className = testsOrClassName;
-
     this.logger?.info?.('Starting unit test run for object:', className);
-    const answer = await answering(
+    return answering(
       () => startClassUnitTestRunByObject(this.connection, className, options),
       this.results.run as IResultStrategy<ReturnType<R['run']>>,
-      (verdict, wire) => {
-        if (verdict !== ADT_NO_FAILURE) return verdict;
-        return wire && runId(wire)
-          ? ADT_NO_FAILURE
-          : {
-              origin: 'refusal' as const,
-              message: 'Failed to start unit test run: run ID not returned',
-              response: wire,
-              request: requestOf(wire),
-            };
-      },
+      options?.analyse,
     );
-
-    if (answer.ok) {
-      this.lastRunId = String(answer.getResult().value);
-      this.logger?.info?.('Unit test run started, runId:', this.lastRunId);
-    }
-    return answer;
-  }
-
-  /** The container class this instance created, if it made one. */
-  getClassName(): string | undefined {
-    return this.className;
-  }
-
-  /** The view this instance checked, if it checked one. */
-  getCdsViewName(): string | undefined {
-    return this.cdsViewName;
   }
 }

@@ -5,6 +5,7 @@ import {
   type IUtilResults,
   utilDocuments,
 } from '../../../core/shared/utilResultSet';
+import { rawDocument } from '../../../utils/resultStrategy';
 
 /**
  * The invariant 19.0.0 is built on: a member answers the contract, and what the
@@ -29,9 +30,7 @@ describe('AdtUtils readings', () => {
   it('reads every answer through the injected set, never a fixed strategy', () => {
     const bodies = source.split('\n').filter((line) => /^\s{6}\w/.test(line));
     const fixed = bodies.filter((line) =>
-      /^\s+(rawDocument|activationRunId|searchHits|namedItems|nodeContents|inactiveObjects|whereUsedReferences)[,)]/.test(
-        line,
-      ),
+      /^\s+(rawDocument|nothing|util[A-Z]\w*)[,)]/.test(line),
     );
     expect(fixed).toEqual([]);
   });
@@ -56,9 +55,33 @@ describe('AdtUtils readings', () => {
     for (const slot of Object.keys(shipped)) {
       expect(typeof shipped[slot]).toBe('function');
     }
+    // Every default is the document. The parses that were defaults — search
+    // hits, the type catalogue, the tree level, the inactive list, the run id —
+    // are strategies in adt-strategies a caller passes.
+    for (const slot of Object.keys(shipped)) {
+      expect(shipped[slot]).toBe(rawDocument);
+    }
     // `satisfies`, so the shipped set is assignable to the contract it fills.
     const asContract: IUtilResults = utilDocuments;
     expect(asContract.activation).toBe(utilDocuments.activation);
+  });
+
+  it("hands every answer to the caller's error strategy", () => {
+    // One `answering` per request-making member, and each passes the caller's
+    // `analyse` through — a member that dropped it would judge the answer by
+    // the library's verdict alone, with no way for the caller to say otherwise.
+    for (const file of ['AdtUtils.ts', 'AdtUtilsLegacy.ts']) {
+      const text = readFileSync(
+        join(__dirname, '../../../core/shared', file),
+        'utf-8',
+      );
+      const calls = text.split('return answering(').slice(1);
+      expect(calls.length).toBeGreaterThan(0);
+      for (const call of calls) {
+        const body = call.slice(0, call.indexOf('\n    );'));
+        expect(body).toContain('options?.analyse');
+      }
+    }
   });
 
   it('leaves the three members that make no request without one', () => {

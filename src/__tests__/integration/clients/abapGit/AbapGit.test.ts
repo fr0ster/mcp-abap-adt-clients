@@ -15,12 +15,17 @@
  *   DEBUG_ADT_LIBS=true      — library runtime logs
  */
 
+import {
+  abapGitExternalRepo,
+  abapGitRepos,
+} from '@mcp-abap-adt/adt-strategies';
 import type {
   IAbapConnection,
   ISessionLifecycleAware,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import * as dotenv from 'dotenv';
 import { AdtAbapGitClient } from '../../../../clients/AdtAbapGitClient';
+import { abapGitDocuments } from '../../../../clients/abapGit/types';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { expectResult } from '../../../helpers/contract';
 import {
@@ -43,7 +48,14 @@ const {
 
 describe('AbapGit (standalone AdtAbapGitClient)', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
-  let abapGit: AdtAbapGitClient;
+  // Read with the adt-strategies readings: the client answers documents, and
+  // these assertions are about the shapes a consumer asks for.
+  const results = {
+    ...abapGitDocuments,
+    repos: abapGitRepos,
+    externalRepo: abapGitExternalRepo,
+  };
+  let abapGit: AdtAbapGitClient<typeof results>;
   let isCloudSystem = false;
   let hasConfig = false;
 
@@ -51,7 +63,12 @@ describe('AbapGit (standalone AdtAbapGitClient)', () => {
     try {
       connection = await createTestConnection(createConnectionLogger());
       isCloudSystem = await isCloudEnvironment(connection);
-      abapGit = new AdtAbapGitClient(connection, createLibraryLogger());
+      abapGit = new AdtAbapGitClient(
+        connection,
+        createLibraryLogger(),
+        undefined,
+        results,
+      );
       hasConfig = true;
     } catch (err) {
       createTestsLogger().warn(
@@ -157,12 +174,17 @@ describe('AbapGit (standalone AdtAbapGitClient)', () => {
       // The first read is unconditional. `repo` was fetched *before* the POST,
       // so its status says nothing about this pull — starting the loop on it
       // would skip the wait entirely and let `unlink` run against a job still
-      // in progress.
-      const readStatus = async () =>
-        expectResult(
-          await abapGit.getRepo(flowCaseDef.params.package),
+      // in progress. There is no `getRepo` since interfaces-adt 11: the list,
+      // read by the caller's strategy, is the one resource, and finding the
+      // row is the caller's.
+      const readStatus = async () => {
+        const row = expectResult(
+          await abapGit.listRepos(),
           'repository status',
-        ) as typeof repo;
+        ).find((r) => r.repositoryId === repo.repositoryId);
+        if (!row) throw new Error(`repository ${repo.repositoryId} vanished`);
+        return row;
+      };
 
       const deadline = Date.now() + 300_000;
       let status = await readStatus();
@@ -172,9 +194,15 @@ describe('AbapGit (standalone AdtAbapGitClient)', () => {
       }
       expect(status.status).not.toBe('R');
 
-      if (typeof (abapGit as any).unlink === 'function') {
-        await abapGit.unlink({ package: flowCaseDef.params.package });
+      if (!repo.repositoryId) {
+        throw new Error(
+          'listRepos reported no key, so there is nothing to unlink by',
+        );
       }
+      expectResult(
+        await abapGit.unlink({ repositoryId: repo.repositoryId }),
+        'unlink',
+      );
     },
     getTimeout('test'),
   );

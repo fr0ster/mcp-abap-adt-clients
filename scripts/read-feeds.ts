@@ -15,7 +15,15 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
+import {
+  feedDescriptors,
+  feedEntries,
+  feedGatewayErrorDetail,
+  feedGatewayErrors,
+  feedSystemMessages,
+  feedVariants,
+} from '@mcp-abap-adt/adt-strategies';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import * as dotenv from 'dotenv';
 import {
   createTestConnection,
@@ -23,6 +31,7 @@ import {
 } from '../src/__tests__/helpers/sessionConfig';
 import { createConnectionLogger } from '../src/__tests__/helpers/testLogger';
 import { AdtRuntimeClient } from '../src/clients/AdtRuntimeClient';
+import { feedDocuments } from '../src/runtime/feeds/FeedRepository';
 import { resultOf } from './resultOf';
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../.env');
@@ -54,7 +63,16 @@ async function main() {
     const runtime = new AdtRuntimeClient(connection, undefined, {
       enableAcceptCorrection: true,
     });
-    const feeds = runtime.getFeeds();
+    // The feeds answer Atom documents as they arrived; this script reads them.
+    const feeds = runtime.getFeeds({
+      ...feedDocuments,
+      feeds: feedDescriptors,
+      variants: feedVariants,
+      entries: feedEntries,
+      systemMessages: feedSystemMessages,
+      gatewayErrors: feedGatewayErrors,
+      gatewayErrorDetail: feedGatewayErrorDetail,
+    });
 
     if (!topic) {
       console.log('\n=== Feed Catalog ===\n');

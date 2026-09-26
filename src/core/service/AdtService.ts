@@ -1,8 +1,7 @@
 import type {
-  AdtNoFailure,
   GeneratedServiceType,
-  IAbapConnection,
   IAdtActivatable,
+  IAdtAnalyseOptions,
   IAdtCheckable,
   IAdtCreatable,
   IAdtCreateOptions,
@@ -17,12 +16,13 @@ import type {
   IAdtTransportAware,
   IAdtUpdatable,
   IAdtValidatable,
-  IAdtWireResponse,
-  IAnalyse,
   IResultStrategy,
   ServiceBindingVariant,
 } from '@mcp-abap-adt/interfaces-adt';
-import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
   ACCEPT_CHECK_MESSAGES,
@@ -41,9 +41,8 @@ import {
   buildQueryString,
   encodeSapObjectName,
 } from '../../utils/internalUtils';
-import { requestOf } from '../../utils/requestTrace';
-import { nothing, rawDocument } from '../../utils/resultStrategy';
-import { getSystemInformation } from '../../utils/systemInfo';
+import { lockHandleOf } from '../../utils/lockHandle';
+import { nothing } from '../../utils/resultStrategy';
 import { getTimeout } from '../../utils/timeouts';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import { lockServiceBinding, unlockServiceBinding } from './lock';
@@ -63,49 +62,6 @@ import type {
   ITransportCheckServiceBindingParams,
 } from './types';
 import { resolveBindingVariant, serviceDocuments } from './types';
-/**
- * The verdict a publish or unpublish job answers with.
- *
- * `POST …/{serviceType}/publishjobs` (and `unpublishjobs`) does not just accept
- * the work — it reports the outcome, in ADT's own `asx:abap` envelope:
- *
- * ```xml
- * <asx:values><DATA>
- *   <SEVERITY>OK</SEVERITY>
- *   <SHORT_TEXT>ZAC_SRVB01 published locally</SHORT_TEXT>
- * </DATA></asx:values>
- * ```
- *
- * Nobody read it. The member answered the document and a caller who checked
- * only `ok` learned that the request completed, never what it did — which is
- * the shape this release removes everywhere else. Measured
- * 2026-09-05: the POST takes ~130s of server time and then says exactly this.
- *
- * Conservative in the same way as its neighbours: a body with no `SEVERITY` is
- * not a refusal, because inventing a "no" from silence is how an empty answer
- * came to mean failure elsewhere. Only a severity that is not OK is one.
- */
-export const publicationRefusal = (
-  verdict: IAdtError | AdtNoFailure,
-  answer?: IAdtWireResponse,
-): IAdtError | AdtNoFailure => {
-  if (verdict !== ADT_NO_FAILURE) return verdict;
-
-  const xml = typeof answer?.data === 'string' ? answer.data : '';
-  const severity = /<SEVERITY>([^<]*)<\/SEVERITY>/i.exec(xml)?.[1]?.trim();
-  if (!severity || severity.toUpperCase() === 'OK') return ADT_NO_FAILURE;
-
-  const shortText = /<SHORT_TEXT>([^<]*)<\/SHORT_TEXT>/i.exec(xml)?.[1]?.trim();
-  const longText = /<LONG_TEXT>([^<]*)<\/LONG_TEXT>/i.exec(xml)?.[1]?.trim();
-  return {
-    origin: 'refusal',
-    message:
-      `Publication ${severity}: ${shortText || 'the server gave no short text'}` +
-      (longText ? ` — ${longText}` : ''),
-    response: answer,
-    request: requestOf(answer),
-  };
-};
 
 export class AdtServiceBinding<
   R extends IServiceResults = typeof serviceDocuments,
@@ -409,13 +365,13 @@ export class AdtServiceBinding<
    * The same resource `read` fetches — a binding has one document — declared
    * separately because the contract asks both of a readable.
    */
-  async readMetadata(
+  async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IServiceBindingConfig>,
     options?: {
       withLongPolling?: boolean;
       version?: 'active' | 'inactive';
-    } & IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['metadata']>>> {
+    } & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -485,11 +441,10 @@ export class AdtServiceBinding<
           timeout: options?.timeout,
         }),
       this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
-      // A publication change IS this member's write: `update` on a binding
-      // changes nothing else. The job reports `SEVERITY` and `SHORT_TEXT` in
-      // its answer, and reading them here is what makes a refused publish a
-      // refusal rather than a document nobody looked at.
-      (options?.analyse ?? publicationRefusal) as IAnalyse<E>,
+      // A publication change IS this member's write, and the job reports its
+      // outcome as `SEVERITY` inside a 200. Reading it is the caller's:
+      // `analysePublication` in @mcp-abap-adt/adt-strategies does.
+      options?.analyse,
     );
   }
 
@@ -509,20 +464,26 @@ export class AdtServiceBinding<
    * that locks and unlocks around its own operation decides that for everyone.
    * See `docs/usage/CLIENT_API_REFERENCE.md` for the shape a consumer writes.
    */
-  async lock(
+  async lock<E extends IAdtError = IAdtError>(
     config: Partial<IServiceBindingConfig>,
-  ): Promise<IAdtResponse<string>> {
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<string, E>> {
     const name = this.name(config);
     // Stateful for the LOCK request alone: on older BASIS a handle is only
     // issued inside a stateful request. The switch used to sit outside
     // `answering`, so a refused LOCK returned through the failure path with the
     // connection still stateful — and this connection is shared.
-    return answering(async () => {
-      const data = await inStatefulSession(this.connection, () =>
-        lockServiceBinding(this.connection, name),
-      );
-      return { data, status: 200, statusText: 'OK', headers: {} };
-    }, rawDocument);
+    //
+    // The handle is read by `lockHandleOf`; a 200 carrying none reads as `''`,
+    // and whether that is a refusal is the caller's `analyse` to say.
+    return answering(
+      () =>
+        inStatefulSession(this.connection, () =>
+          lockServiceBinding(this.connection, name),
+        ),
+      lockHandleOf,
+      options?.analyse,
+    );
   }
 
   /**
@@ -533,18 +494,23 @@ export class AdtServiceBinding<
    * else — another session, another process, the same user — is answered
    * `403 ExceptionResourceNoAccess`.
    */
-  async unlock(
+  async unlock<E extends IAdtError = IAdtError>(
     config: Partial<IServiceBindingConfig>,
     lockHandle: string,
-  ): Promise<IAdtResponse<void>> {
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<void, E>> {
     const name = this.name(config);
-    return answering(async () => {
-      try {
-        return await unlockServiceBinding(this.connection, name, lockHandle);
-      } finally {
-        this.connection.setSessionType?.('stateless');
-      }
-    }, nothing);
+    return answering(
+      async () => {
+        try {
+          return await unlockServiceBinding(this.connection, name, lockHandle);
+        } finally {
+          this.connection.setSessionType?.('stateless');
+        }
+      },
+      nothing,
+      options?.analyse,
+    );
   }
 
   /**
@@ -679,14 +645,15 @@ export class AdtServiceBinding<
   }
 
   /** The binding types this system offers. */
-  async getServiceBindingTypes(): Promise<
-    IAdtResponse<ReturnType<R['bindingTypes']>>
-  > {
+  async getServiceBindingTypes<E extends IAdtError = IAdtError>(
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['bindingTypes']>, E>> {
     return answering(
       () => this.bindingTypesRequest(this.connection),
       this.results.bindingTypes as IResultStrategy<
         ReturnType<R['bindingTypes']>
       >,
+      options?.analyse,
     );
   }
 
@@ -805,7 +772,8 @@ export class AdtServiceBinding<
    * `servicename` or `serviceversion`, so there is nothing left to derive.
    * The fourth — "can it go from here to there?" — is the server's to answer,
    * and it does: an invalid transition comes back as `SEVERITY` in the job's
-   * own document, read by `publicationRefusal`. A caller who wants to know
+   * own document, which `analysePublication` in @mcp-abap-adt/adt-strategies
+   * reads for a caller who passes it. A caller who wants to know
    * beforehand calls `read` and looks at `srvb:allowedAction`, which is one
    * request they can see.
    */
@@ -906,12 +874,14 @@ export class AdtServiceBinding<
   }
 
   /** Generate the service the binding exposes. */
-  async generateServiceBinding(
+  async generateServiceBinding<E extends IAdtError = IAdtError>(
     params: IGenerateServiceBindingParams,
-  ): Promise<IAdtResponse<ReturnType<R['generation']>>> {
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['generation']>, E>> {
     return answering(
       () => this.generateRequest(this.connection, params),
       this.results.generation as IResultStrategy<ReturnType<R['generation']>>,
+      options?.analyse,
     );
   }
 
@@ -954,12 +924,14 @@ export class AdtServiceBinding<
    * sends it — a system that only serves v1 answered 406 to the v2-only header
    * this used to send.
    */
-  async getServiceGroup(
+  async getServiceGroup<E extends IAdtError = IAdtError>(
     params: IServiceGroupParams,
-  ): Promise<IAdtResponse<ReturnType<R['odata']>>> {
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['odata']>, E>> {
     return answering(
       () => this.serviceGroupRequest(this.connection, params),
       this.results.odata as IResultStrategy<ReturnType<R['odata']>>,
+      options?.analyse,
     );
   }
 
@@ -984,14 +956,16 @@ export class AdtServiceBinding<
     });
   }
 
-  async classifyServiceBinding(
+  async classifyServiceBinding<E extends IAdtError = IAdtError>(
     params: IClassifyServiceBindingParams,
-  ): Promise<IAdtResponse<ReturnType<R['classification']>>> {
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['classification']>, E>> {
     return answering(
       () => this.classifyRequest(this.connection, params),
       this.results.classification as IResultStrategy<
         ReturnType<R['classification']>
       >,
+      options?.analyse,
     );
   }
 

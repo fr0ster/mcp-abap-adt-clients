@@ -50,7 +50,7 @@ export type ScalarFunctionActivationResult = string;
  * What name validation answers, where the system has the resource.
  *
  * Some systems answer 404, 405 or 501 for it — see
- * {@link validationUnsupported}.
+ * `analyseUnsupportedStatus` in @mcp-abap-adt/adt-strategies.
  */
 export type ScalarFunctionValidationResult = string;
 
@@ -82,6 +82,10 @@ export interface IScalarFunctionResults {
   readonly transport: IResultStrategy<unknown>;
   /** What a deletion check answers: `del:checkResponse`. */
   readonly deletionCheck: IResultStrategy<unknown>;
+  /** The version history — an Atom feed; `objectVersions` reads it. */
+  readonly versions: IResultStrategy<unknown>;
+  /** One version's source. */
+  readonly versionSource: IResultStrategy<unknown>;
 }
 
 /**
@@ -100,6 +104,8 @@ export const scalarFunctionDocuments = {
   updated: rawDocument,
   transport: rawDocument,
   deletionCheck: rawDocument,
+  versions: rawDocument,
+  versionSource: rawDocument,
 } satisfies IScalarFunctionResults;
 
 /**

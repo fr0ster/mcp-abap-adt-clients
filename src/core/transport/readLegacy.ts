@@ -4,49 +4,36 @@
  * Uses /sap/bc/cts/transportrequests instead of /sap/bc/adt/cts/transportrequests
  *
  * Legacy CTS endpoint ignores the transport number in the URL path and always
- * returns the full list of transports for the current user. This function
- * fetches the full list and filters client-side.
+ * returns the full list of transports for the current user. It is answered
+ * as it arrived; nothing here filters it.
  */
 
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Get ABAP transport request (legacy path)
  *
  * GET /sap/bc/cts/transportrequests always returns the full transport list
- * regardless of the URL path. We filter the XML response client-side to
- * find the requested transport number.
+ * regardless of the URL path, so there is nothing in the request to name the
+ * one wanted. The list is answered as it arrived; picking the request out of
+ * it — or calling its absence a failure — is the reading's and the caller's
+ * `analyse`. Until 23.0.0 an answer not mentioning the number was thrown as a
+ * fabricated `{ response: { status: 404 } }`, a status SAP never sent, with
+ * SAP's actual answer dropped.
  */
 export async function getTransportLegacy(
   connection: IAbapConnection,
-  transportNumber: string,
 ): Promise<IAdtWireResponse> {
-  const url = '/sap/bc/cts/transportrequests';
-
-  const response = await connection.makeAdtRequest({
-    url,
+  return connection.makeAdtRequest({
+    url: '/sap/bc/cts/transportrequests',
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {},
   });
-
-  // Legacy endpoint returns full list — check if requested transport exists
-  const data = typeof response.data === 'string' ? response.data : '';
-
-  if (transportNumber && !data.includes(transportNumber)) {
-    // Transport not found in the response — simulate 404
-    const error = new Error(
-      `Transport request ${transportNumber} not found`,
-    ) as Error & { response?: { status: number } };
-    error.response = { status: 404 };
-    throw error;
-  }
-
-  return response;
 }
 
 /**

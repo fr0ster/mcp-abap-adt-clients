@@ -5,36 +5,23 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
-import { XMLParser } from 'fast-xml-parser';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_LOCK } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
- * Lock behavior definition for modification
+ * `POST …?_action=LOCK` — answered as it arrived.
  *
- * Endpoint: POST /sap/bc/adt/bo/behaviordefinitions/{name}?_action=LOCK&accessMode=MODIFY
- *
- * @param connection - ABAP connection instance
- * @param name - Behavior definition name
- * @param sessionId - Session ID for request tracking
- * @param accessMode - Access mode (default: MODIFY)
- * @returns Lock handle that must be used in subsequent update/unlock requests
- *
- * @example
- * ```typescript
- * const lockHandle = await lock(connection, 'Z_MY_BDEF', sessionId);
- * // Use lockHandle for update operations
- * ```
+ * The handle is read by `lockHandleOf` in the member. Until 23.0.0 this parsed
+ * it and threw when SAP's answer had none, which turned a statement about SAP's
+ * answer into a library failure and dropped the answer.
  */
 export async function lock(
   connection: IAbapConnection,
   name: string,
   accessMode: string = 'MODIFY',
-): Promise<string> {
-  const url = `/sap/bc/adt/bo/behaviordefinitions/${encodeSapObjectName(name).toLowerCase()}?_action=LOCK&accessMode=${accessMode}`;
-
+): Promise<IAdtWireResponse> {
   const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
   <asx:values>
     <DATA>
@@ -50,104 +37,14 @@ export async function lock(
   </asx:values>
 </asx:abap>`;
 
-  const headers = {
-    Accept: ACCEPT_LOCK,
-    'Content-Type': 'application/xml',
-  };
-
-  const response = await connection.makeAdtRequest({
-    url,
+  return connection.makeAdtRequest({
+    url: `/sap/bc/adt/bo/behaviordefinitions/${encodeSapObjectName(name).toLowerCase()}?_action=LOCK&accessMode=${accessMode}`,
     method: 'POST',
     timeout: getTimeout('default'),
     data: xmlBody,
-    headers,
+    headers: {
+      Accept: ACCEPT_LOCK,
+      'Content-Type': 'application/xml',
+    },
   });
-
-  // Parse lock handle from XML response
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: '',
-  });
-  const result = parser.parse(response.data);
-  const lockHandle = result?.['asx:abap']?.['asx:values']?.DATA?.LOCK_HANDLE;
-
-  if (!lockHandle) {
-    throw new Error(
-      `Failed to obtain lock handle for behavior definition ${name}. Object may be locked by another user.`,
-    );
-  }
-
-  return lockHandle;
-}
-
-/**
- * Lock behavior definition for editing (returns full response)
- *
- * @param connection - ABAP connection instance
- * @param name - Behavior definition name
- * @param sessionId - Session ID for request tracking
- * @param accessMode - Access mode (default: MODIFY)
- * @returns Object containing response, lockHandle, and optional transport number
- *
- * @example
- * ```typescript
- * const { response, lockHandle, corrNr } = await lockForUpdate(connection, 'Z_MY_BDEF', sessionId);
- * ```
- */
-export async function lockForUpdate(
-  connection: IAbapConnection,
-  name: string,
-  _sessionId: string,
-  accessMode: string = 'MODIFY',
-): Promise<{
-  response: IAdtWireResponse;
-  lockHandle: string;
-  corrNr?: string;
-}> {
-  const url = `/sap/bc/adt/bo/behaviordefinitions/${encodeSapObjectName(name).toLowerCase()}?_action=LOCK&accessMode=${accessMode}`;
-
-  const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
-  <asx:values>
-    <DATA>
-      <LOCK_HANDLE/>
-      <CORRNR/>
-      <CORRUSER/>
-      <CORRTEXT/>
-      <IS_LOCAL>X</IS_LOCAL>
-      <IS_LINK_UP/>
-      <MODIFICATION_SUPPORT/>
-      <SCOPE_MESSAGES/>
-    </DATA>
-  </asx:values>
-</asx:abap>`;
-
-  const headers = {
-    Accept: ACCEPT_LOCK,
-    'Content-Type': 'application/xml',
-  };
-
-  const response = await connection.makeAdtRequest({
-    url,
-    method: 'POST',
-    timeout: getTimeout('default'),
-    data: xmlBody,
-    headers,
-  });
-
-  // Parse lock handle and transport number from XML response
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: '@_',
-  });
-  const result = parser.parse(response.data);
-  const lockHandle = result?.['asx:abap']?.['asx:values']?.DATA?.LOCK_HANDLE;
-  const corrNr = result?.['asx:abap']?.['asx:values']?.DATA?.CORRNR;
-
-  if (!lockHandle) {
-    throw new Error(
-      `Failed to obtain lock handle for behavior definition ${name}. Object may be locked by another user.`,
-    );
-  }
-
-  return { response, lockHandle, corrNr };
 }

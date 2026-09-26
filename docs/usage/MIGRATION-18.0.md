@@ -1,5 +1,7 @@
 # Migrating to 18.0.0
 
+> **History.** This describes the move to 18.0.0 and is kept as it was written. Code in it may not compile against a later release: [MIGRATION-19.md](MIGRATION-19.md) and [MIGRATION-23.md](MIGRATION-23.md) cover what changed since.
+
 For a consumer on 17.x. Everything here is a change you have to make; nothing
 in this release is opt-in.
 

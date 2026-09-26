@@ -1,8 +1,9 @@
+import { analyseUnsupportedStatus } from '@mcp-abap-adt/adt-strategies';
+import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
-import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtScalarFunctionImplementation } from '../../../../core/scalarFunctionImplementation/AdtScalarFunctionImplementation';
 import { expectFailure } from '../../../helpers/contract';
 
@@ -100,18 +101,32 @@ describe('AdtScalarFunctionImplementation handler', () => {
     ).toBe('connection');
   });
 
-  it('validate() names 405 as unsupported; public unlock resets stateless on throw', async () => {
+  it('validate() answers 405 as it came, a strategy names it; public unlock resets stateless on throw', async () => {
     const v = makeConn(() =>
       Object.assign(new Error('no'), { response: { status: 405 } }),
     );
     const hv = new AdtScalarFunctionImplementation(v.conn);
     // Some systems have no validation resource. That is not a verdict about
-    // the name, and reporting it as one told a caller their name was rejected
-    // by a system that never looked at it.
+    // the name; the library reports the status as it came, and a caller who
+    // wants it named passes the reading that names it.
     expect(
       expectFailure(
         await hv.validate({ implementationName: 'ZI' }),
         'validate where the resource is absent',
+      ).code,
+    ).not.toBe(AdtObjectErrorCodes.UNSUPPORTED_OPERATION);
+    expect(
+      expectFailure(
+        await hv.validate(
+          { implementationName: 'ZI' },
+          {
+            analyse: analyseUnsupportedStatus(
+              [404, 405, 501],
+              'name validation',
+            ),
+          },
+        ),
+        'validate where the resource is absent, read by the strategy',
       ).code,
     ).toBe(AdtObjectErrorCodes.UNSUPPORTED_OPERATION);
 

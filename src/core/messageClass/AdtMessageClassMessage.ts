@@ -26,8 +26,6 @@
  */
 
 import type {
-  AdtNoFailure,
-  IAbapConnection,
   IAdtCreatable,
   IAdtCreateOptions,
   IAdtError,
@@ -36,21 +34,16 @@ import type {
   IAdtReadable,
   IAdtResponse,
   IAdtUpdatable,
-  IAdtWireResponse,
-  IAnalyse,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
-import {
-  ADT_NO_FAILURE,
-  AdtObjectErrorCodes,
-} from '@mcp-abap-adt/interfaces-adt';
+import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { MESSAGE_CLASS_UPDATE_CONTENT_TYPE } from '../../constants/contentTypes';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { beginCriticalSection } from '../../utils/criticalSection';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { requestOf } from '../../utils/requestTrace';
 import { getTimeout } from '../../utils/timeouts';
 import { chain } from '../shared/chain';
 import { lockClassForMessageOrPlain, lockMessageIfGranted } from './lock';
@@ -135,20 +128,10 @@ export class AdtMessageClassMessage<
     return answering(
       () => getMessageClassSource(connection, name),
       this.results.read as IResultStrategy<ReturnType<R['read']>>,
-      (options?.analyse ??
-        (((verdict: IAdtError | AdtNoFailure, answer?: IAdtWireResponse) => {
-          if (verdict !== ADT_NO_FAILURE) return verdict;
-          const cls = parseMessageClass(String(answer?.data ?? ''));
-          return cls.messages.some((m) => m.msgno === no)
-            ? ADT_NO_FAILURE
-            : {
-                origin: 'refusal' as const,
-                code: AdtObjectErrorCodes.OBJECT_NOT_FOUND,
-                message: `Message ${no} not found in class ${name}`,
-                response: answer,
-                request: requestOf(answer),
-              };
-        }) as IAnalyse<E>)) as IAnalyse<E>,
+      // The class answering is not the message existing; a caller who wants
+      // an absent message read as a failure passes
+      // `analyseMessageClassMessage(msgno)` from @mcp-abap-adt/adt-strategies.
+      options?.analyse,
     );
   }
 

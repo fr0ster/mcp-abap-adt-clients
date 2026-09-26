@@ -11,8 +11,8 @@
  */
 
 import type {
-  IAbapConnection,
   IAdtActivatable,
+  IAdtAnalyseOptions,
   IAdtCheckable,
   IAdtContentTypes,
   IAdtError,
@@ -26,11 +26,11 @@ import type {
   ILocalDefinitionsConfig,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import type { LockRegistry } from '../shared/LockRegistry';
-import type { ObjectVersion } from '../shared/results';
 import type { IReadOptions } from '../shared/types';
 import { AdtClassMemberBase } from './AdtClassMemberBase';
 import { checkClassDefinitions } from './check';
@@ -218,18 +218,14 @@ export class AdtLocalDefinitions<
   }
 
   /** Version history of this include. */
-  async getVersions(
+  async getVersions<E extends IAdtError = IAdtError>(
     config: Partial<ILocalDefinitionsConfig>,
-  ): Promise<IAdtResponse<ObjectVersion[]>> {
-    const name = config.className as string;
-    return answering(
-      async () => ({
-        data: await this.getIncludeVersions(name, 'definitions'),
-        status: 200,
-        statusText: 'OK',
-        headers: {},
-      }),
-      (answer) => answer.data as ObjectVersion[],
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['versions']>, E>> {
+    return this.includeVersions(
+      config.className as string,
+      'definitions',
+      options,
     );
   }
 }

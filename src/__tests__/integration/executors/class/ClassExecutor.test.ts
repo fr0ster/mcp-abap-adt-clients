@@ -8,7 +8,7 @@ import * as path from 'node:path';
 import type {
   IAbapConnection,
   ISessionLifecycleAware,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
@@ -36,7 +36,13 @@ import {
   logTestStep,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
-import { traceIdsNow, waitForNewTrace } from '../../../helpers/traceHelpers';
+import {
+  type ReadingProfiler,
+  readingClassExecutor,
+  readingProfiler,
+  traceIdsNow,
+  waitForNewTrace,
+} from '../../../helpers/traceHelpers';
 
 const {
   getEnabledTestCase,
@@ -130,6 +136,11 @@ describe('ClassExecutor (integration)', () => {
   let client: AdtClient;
   let executor: AdtExecutor;
   let runtimeClient: AdtRuntimeClient;
+  // Built with the readings, not taken from the clients' factories: the
+  // profiler and the scheduling answer documents by default, and these cases
+  // assert entries, rows and the scheduled request id.
+  let profilerReading: ReadingProfiler;
+  let classRunner: ReturnType<typeof readingClassExecutor>;
   let hasConfig = false;
   let isLegacy = false;
   /** Trace ids this file produced, deleted at teardown. */
@@ -148,6 +159,8 @@ describe('ClassExecutor (integration)', () => {
       isLegacy = legacy;
       executor = new AdtExecutor(connection, libraryLogger);
       runtimeClient = new AdtRuntimeClient(connection, libraryLogger);
+      profilerReading = readingProfiler(connection, libraryLogger);
+      classRunner = readingClassExecutor(connection, libraryLogger);
       hasConfig = true;
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
@@ -172,7 +185,7 @@ describe('ClassExecutor (integration)', () => {
     // knowingly rather than risk deleting a stranger's.
     for (const traceId of tracesCreated) {
       try {
-        await runtimeClient.getProfiler().delete(traceId);
+        await profilerReading.delete(traceId);
       } catch (cleanupError) {
         testsLogger.warn?.(
           `⚠️ Cleanup failed for trace ${traceId}: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,
@@ -219,7 +232,7 @@ describe('ClassExecutor (integration)', () => {
       // The run answers what the reading makes of the response, and the shipped
       // one is the document. A failed run is a failure, not a body to retry.
       lastOutput = expectResult(
-        await executor.getClassExecutor().run({ className }),
+        await classRunner.run({ className }),
         'run class',
       );
       if (!isMissingClassRunMainMessage(lastOutput)) return lastOutput;
@@ -333,13 +346,13 @@ describe('ClassExecutor (integration)', () => {
         // What exists BEFORE the run is how a new trace is recognised. The
         // feed's order is not age, so "the newest entry" is not an answer to
         // "what did my run produce".
-        const profiler = runtimeClient.getProfiler();
+        const profiler = profilerReading;
         const before = await traceIdsNow(profiler);
 
         // Two calls since 19.0.0: schedule the measurement, then run under it.
         // `runWithProfiling` did both, and the order was fixed in the library.
         logTestStep('schedule a trace, then run with profiler', testsLogger);
-        const classExecutor = executor.getClassExecutor();
+        const classExecutor = classRunner;
         const profiledRun = async () => {
           const profilerId = expectResult(
             await classExecutor.scheduleTrace(profilerParameters),

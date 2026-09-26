@@ -12,13 +12,18 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import {
+  featureToggleCheckState,
+  featureToggleRuntimeState,
+} from '@mcp-abap-adt/adt-strategies';
 import type {
   IAbapConnection,
   ISessionLifecycleAware,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
+import { featureToggleDocuments } from '../../../../core/featureToggle/types';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { expectResult } from '../../../helpers/contract';
@@ -42,6 +47,12 @@ import {
   logTestStart,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
+
+const featureToggleReadings = {
+  ...featureToggleDocuments,
+  runtimeState: featureToggleRuntimeState,
+  checkState: featureToggleCheckState,
+};
 
 const {
   getEnabledTestCase,
@@ -429,7 +440,9 @@ describe('FeatureToggle (using AdtClient)', () => {
           );
           return;
         }
-        const handler = client.getFeatureToggle();
+        // The states are JSON documents; the readings that build the shapes
+        // asserted below are strategies the test passes.
+        const handler = client.getFeatureToggle(featureToggleReadings);
         const state = expectResult(
           await handler.getRuntimeState({ featureToggleName }),
           'getRuntimeState',
@@ -451,7 +464,9 @@ describe('FeatureToggle (using AdtClient)', () => {
           );
           return;
         }
-        const handler = client.getFeatureToggle();
+        // The states are JSON documents; the readings that build the shapes
+        // asserted below are strategies the test passes.
+        const handler = client.getFeatureToggle(featureToggleReadings);
         const state = expectResult(
           await handler.checkState({ featureToggleName }),
           'checkState',
@@ -472,7 +487,9 @@ describe('FeatureToggle (using AdtClient)', () => {
           );
           return;
         }
-        const handler = client.getFeatureToggle();
+        // The states are JSON documents; the readings that build the shapes
+        // asserted below are strategies the test passes.
+        const handler = client.getFeatureToggle(featureToggleReadings);
         // The source document, as it arrived. A caller who wants
         // `IFeatureToggleSource` parsed out of it supplies a strategy that does
         // it — this member does not decide that for everyone.
@@ -503,7 +520,9 @@ describe('FeatureToggle (using AdtClient)', () => {
         const transportRequest = resolveTransportRequest(
           testCase?.params?.transport_request,
         );
-        const handler = client.getFeatureToggle();
+        // The states are JSON documents; the readings that build the shapes
+        // asserted below are strategies the test passes.
+        const handler = client.getFeatureToggle(featureToggleReadings);
         // The switch answers the toggle's own response; the runtime state is a
         // second request, and the test makes it because the library no longer
         // makes it for the caller.

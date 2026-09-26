@@ -11,8 +11,9 @@
  * a library that failed everything would pass it.
  */
 
-import type { IAdtError, IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
 import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtParseError, AdtSAPError } from '../../../utils/adtErrors';
 import { answering } from '../../../utils/adtResponse';
 import { rawDocument } from '../../../utils/resultStrategy';

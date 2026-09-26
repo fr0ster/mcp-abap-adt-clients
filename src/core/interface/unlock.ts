@@ -5,14 +5,17 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
-import type { HttpError } from '@mcp-abap-adt/interfaces-network';
-import { encodeSapObjectName, safeStringify } from '../../utils/internalUtils';
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Unlock interface
- * Must use same session and lock handle from lock operation
+ * Must use same session and lock handle from lock operation.
+ *
+ * A refusal comes back as the transport raised it. It used to be rethrown as a
+ * new Error carrying SAP's text alone, which dropped the response and its type
+ * — the very thing the caller's `analyse` reads.
  */
 export async function unlockInterface(
   connection: IAbapConnection,
@@ -22,39 +25,11 @@ export async function unlockInterface(
   // Lower-cased like `lock.ts` does. ADT accepts either, but a lock taken at
   // one spelling and released at another cannot be paired by URL — which is
   // how an unreleased lock hides from anyone reading a wire log.
-  const url = `/sap/bc/adt/oo/interfaces/${encodeSapObjectName(interfaceName).toLowerCase()}?_action=UNLOCK&lockHandle=${encodeURIComponent(lockHandle)}`;
-
-  try {
-    const response = await connection.makeAdtRequest({
-      url,
-      method: 'POST',
-      timeout: getTimeout(),
-      data: '',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    });
-    return response;
-  } catch (error: unknown) {
-    const e = error as HttpError;
-    // If response is not returned (e.g., object locked by another user, network error),
-    // provide more context in the error message
-    if (!e.response) {
-      throw new Error(
-        `Failed to unlock interface ${interfaceName}: No response from server. ` +
-          `Lock handle: ${lockHandle} ` +
-          `The interface may be locked by another user or session may be invalid.`,
-      );
-    }
-    // If we have a response, include its status and data in the error
-    const status = e.response?.status;
-    const statusText = status ? `HTTP ${status}` : 'HTTP ?';
-    const errorData = e.response?.data
-      ? typeof e.response.data === 'string'
-        ? e.response.data
-        : safeStringify(e.response.data)
-      : e.message;
-
-    throw new Error(
-      `Failed to unlock interface ${interfaceName} (${statusText}): ${errorData}`,
-    );
-  }
+  return connection.makeAdtRequest({
+    url: `/sap/bc/adt/oo/interfaces/${encodeSapObjectName(interfaceName).toLowerCase()}?_action=UNLOCK&lockHandle=${encodeURIComponent(lockHandle)}`,
+    method: 'POST',
+    timeout: getTimeout(),
+    data: '',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+  });
 }

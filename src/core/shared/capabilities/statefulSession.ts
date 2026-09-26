@@ -1,4 +1,4 @@
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 
 /** The part of a connection this helper touches, so a caller can pass a stub. */
 type SessionSwitchable = Pick<IAbapConnection, 'setSessionType'>;

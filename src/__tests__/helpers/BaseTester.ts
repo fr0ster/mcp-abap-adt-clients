@@ -26,8 +26,11 @@
  * - Structured test logging via testProgressLogger functions (logTestStart, logTestStep, etc.)
  */
 
+import {
+  analyseDeletion,
+  analyseUnsupportedStatus,
+} from '@mcp-abap-adt/adt-strategies';
 import type {
-  IAbapConnection,
   IAdtActivatable,
   IAdtCreatable,
   IAdtCreateOptions,
@@ -42,6 +45,7 @@ import type {
   IAdtValidatable,
 } from '@mcp-abap-adt/interfaces-adt';
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { LogLevel } from '@mcp-abap-adt/interfaces-utils';
 import { getTimeout } from '../../utils/timeouts';
@@ -356,12 +360,26 @@ export class BaseTester<TConfig, TState = unknown> {
    * package behind every time.
    */
   private async deleteOrRaise(config: Partial<TConfig>): Promise<void> {
-    const answer = await this.adtObject.delete(config);
+    // `isDeleted="false"` arrives inside a 200 and the library reads nothing
+    // into it; the test wants the real outcome, so it asks for the reading.
+    const answer = await this.adtObject.delete(config, {
+      analyse: analyseDeletion,
+    });
     if (!answer.ok) {
       const failure = answer.getError();
+      // The headline names the object; SAP's reason is in `messages`, and a
+      // red cleanup without it cannot be told apart from a misreading.
+      const said = (failure.messages ?? [])
+        .map(
+          (m) =>
+            `${m.type} ${m.text}` +
+            (m.t100 ? ` [${m.t100.id}/${m.t100.no}]` : ''),
+        )
+        .join('; ');
       throw new Error(
         `[${failure.origin}] ${failure.message}` +
-          (failure.request?.url ? ` (${failure.request.url})` : ''),
+          (failure.request?.url ? ` (${failure.request.url})` : '') +
+          (said ? ` — SAP: ${said}` : ''),
       );
     }
   }
@@ -831,8 +849,14 @@ export class BaseTester<TConfig, TState = unknown> {
       // the name. There is nothing to read, and the rest of the flow is still
       // worth running — so it is logged and stepped over. Every other failure
       // still fails the test.
+      // A system without a validation resource answers 404, 405 or 501. The
+      // library reports that as it came; the test names it unsupported, so a
+      // missing resource skips the step instead of failing it.
       const validationAnswer = await this.adtObject.validate(
         config as Partial<TConfig>,
+        {
+          analyse: analyseUnsupportedStatus([404, 405, 501], 'name validation'),
+        },
       );
       const validationUnavailable =
         !validationAnswer.ok &&

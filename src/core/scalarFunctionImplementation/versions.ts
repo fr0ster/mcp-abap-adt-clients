@@ -1,50 +1,46 @@
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
-import type { ObjectVersion } from '../shared/results';
-import { parseVersionsFeed, throwVersionsError } from '../shared/versions';
 import type { IScalarFunctionImplementationConfig } from './types';
 
 const ACCEPT_VERSION_FEED = 'application/atom+xml;type=feed';
 
-// candidate URI — probe-verify on trial
+/**
+ * The version history — the Atom feed, as it arrived (candidate URI,
+ * probe-verify on trial).
+ *
+ * `objectVersions` in @mcp-abap-adt/adt-strategies reads it into entries. A
+ * system without the resource answers 404 or 406, which comes back as the
+ * transport's failure; until 23.0.0 it was thrown as a library error.
+ */
 export async function getScalarFunctionImplementationVersions(
   connection: IAbapConnection,
   config: Partial<IScalarFunctionImplementationConfig>,
-): Promise<ObjectVersion[]> {
+): Promise<IAdtWireResponse> {
   const encodedName = encodeSapObjectName(
     (config.implementationName as string).toLowerCase(),
   );
   const url = `/sap/bc/adt/ddic/dsfi/${encodedName}/source/main/versions`;
-  try {
-    const res = await connection.makeAdtRequest({
-      url,
-      method: 'GET',
-      timeout: getTimeout('default'),
-      headers: { Accept: ACCEPT_VERSION_FEED },
-    });
-    return parseVersionsFeed(String(res.data));
-  } catch (e) {
-    throwVersionsError(
-      e,
-      `scalar function implementation ${config.implementationName}`,
-    );
-  }
+  return connection.makeAdtRequest({
+    url,
+    method: 'GET',
+    timeout: getTimeout('default'),
+    headers: { Accept: ACCEPT_VERSION_FEED },
+  });
 }
 
+/** The source of one version, by the `contentUri` its entry carried. */
 export async function getScalarFunctionImplementationVersionSource(
   connection: IAbapConnection,
   contentUri: string,
-): Promise<string> {
-  try {
-    const res = await connection.makeAdtRequest({
-      url: contentUri,
-      method: 'GET',
-      timeout: getTimeout('default'),
-      headers: { Accept: 'text/plain' },
-    });
-    return String(res.data);
-  } catch (e) {
-    throwVersionsError(e, 'version content');
-  }
+): Promise<IAdtWireResponse> {
+  return connection.makeAdtRequest({
+    url: contentUri,
+    method: 'GET',
+    timeout: getTimeout('default'),
+    headers: { Accept: 'text/plain' },
+  });
 }

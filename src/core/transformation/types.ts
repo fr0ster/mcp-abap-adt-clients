@@ -51,7 +51,7 @@ export type TransformationActivationResult = string;
 /**
  * What name validation answers, where the system has the resource.
  *
- * Measured: one system answers 404 for it — see {@link validationUnavailable},
+ * Measured: one system answers 404 for it — see `analyseUnsupportedStatus` in @mcp-abap-adt/adt-strategies,
  * which is why a missing resource is not reported as a rejected name.
  */
 export type TransformationValidationResult = string;
@@ -84,6 +84,10 @@ export interface ITransformationResults {
   readonly transport: IResultStrategy<unknown>;
   /** What a deletion check answers: `del:checkResponse`. */
   readonly deletionCheck: IResultStrategy<unknown>;
+  /** The version history — an Atom feed; `objectVersions` reads it. */
+  readonly versions: IResultStrategy<unknown>;
+  /** One version's source. */
+  readonly versionSource: IResultStrategy<unknown>;
 }
 
 /**
@@ -102,6 +106,8 @@ export const transformationDocuments = {
   updated: rawDocument,
   transport: rawDocument,
   deletionCheck: rawDocument,
+  versions: rawDocument,
+  versionSource: rawDocument,
 } satisfies ITransformationResults;
 
 /**

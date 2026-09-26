@@ -5,8 +5,7 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
-import { AxiosError } from 'axios';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_VALIDATION_CLASS_NAME } from '../../constants/contentTypes';
 import { limitDescription } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';

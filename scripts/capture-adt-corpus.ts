@@ -67,9 +67,17 @@
  * selected; `delete-success` on its own reuses a class left by an earlier
  * aborted run instead of making a new one.
  */
+
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import {
+  transportCreated,
+  transportObjectEntries,
+  transportSearchConfigurations,
+  transportTree,
+  unitTestRunId,
+} from '@mcp-abap-adt/adt-strategies';
 import * as dotenv from 'dotenv';
 import * as yaml from 'yaml';
 import {
@@ -81,7 +89,20 @@ import {
 } from '../src/__tests__/helpers/sessionConfig';
 import { createConnectionLogger } from '../src/__tests__/helpers/testLogger';
 import { AdtClient } from '../src/clients/AdtClient';
+import { transportDocuments } from '../src/core/transport/types';
+import { unitTestDocuments } from '../src/core/unitTest/types';
 import { walkPackage } from './lib/packageWalk';
+
+// The client answers transport documents as they arrived; this script reads
+// them with the strategies a consumer would pass.
+const transportReadings = {
+  ...transportDocuments,
+  created: transportCreated,
+  createdTask: transportCreated,
+  list: transportTree,
+  searchConfigurations: transportSearchConfigurations,
+  objects: transportObjectEntries,
+};
 
 // ---------------------------------------------------------------------------
 // Config
@@ -1362,14 +1383,19 @@ async function main(): Promise<void> {
 
       const captureRun = async (label: string): Promise<void> => {
         await withCase(label, async () => {
-          const unitTest = client.getUnitTest();
-          await unitTest.run([
+          // The id is in a header of the start's answer: read it with the
+          // strategy, since the client answers documents as they arrived.
+          const unitTest = client.getUnitTest({
+            ...unitTestDocuments,
+            run: unitTestRunId,
+          });
+          const started = await unitTest.run([
             {
               containerClass: UNIT_TEST_CLASS_NAME,
               testClass: 'LTC_PROBE',
             },
           ]);
-          const runId = unitTest.getRunId();
+          const runId = started.ok ? started.getResult().value : '';
           if (!runId) return;
           await unitTest.getStatus(runId, true);
           await unitTest.getResult(runId);
@@ -1502,10 +1528,17 @@ async function main(): Promise<void> {
 
     await withCase('read-transport-list-structure', async () => {
       // `?user=` always answers an empty `<tm:root/>`: the collection is a
-      // saved-configuration search, so the list takes `configUri` now. Recorded
-      // without one, which is the shape a caller gets before they have picked a
-      // configuration.
-      await client.getRequest().list({});
+      // saved-configuration search, so the list takes `configUri`. Since
+      // interfaces-adt 11 the caller names it; the recording runs the system's
+      // first configuration, as the caller of a one-configuration system would.
+      const configs = await client
+        .getRequest(transportReadings)
+        .searchConfigurations();
+      const configUri = configs.ok
+        ? configs.getResult().value[0]?.uri
+        : undefined;
+      if (!configUri) throw new Error('no saved transport search to record');
+      await client.getRequest(transportReadings).list({ configUri });
     });
 
     // -----------------------------------------------------------------

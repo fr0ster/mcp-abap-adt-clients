@@ -15,10 +15,12 @@
 import type {
   AdtObjectType,
   AdtSourceObjectType,
-  IAbapConnection,
-  IAdtWireResponse,
   IReadOptions,
 } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
   ACCEPT_CLASS,

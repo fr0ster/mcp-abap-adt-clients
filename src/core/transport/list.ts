@@ -6,21 +6,17 @@
  * that is precisely what a batch connection cannot supply mid-recording.
  */
 
+import type { IListTransportsParams } from '@mcp-abap-adt/interfaces-adt';
+import { TRANSPORT_SEARCH_CONFIGURATIONS_URL } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
-  IListTransportsParams,
-  ITransportSearchConfiguration,
-} from '@mcp-abap-adt/interfaces-adt';
-import { TRANSPORT_SEARCH_CONFIGURATIONS_URL } from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   ACCEPT_TRANSPORT_CONFIGURATIONS,
   ACCEPT_TRANSPORT_LIST,
 } from '../../constants/contentTypes';
 import { getTimeout } from '../../utils/timeouts';
-import { parseSearchConfigurations } from './parseSearchConfigurations';
-
-export { parseSearchConfigurations };
 
 /**
  * List ABAP transport requests for a saved search.
@@ -71,13 +67,4 @@ export async function requestTransportSearchConfigurations(
     timeout: getTimeout('default'),
     headers: { Accept: ACCEPT_TRANSPORT_CONFIGURATIONS },
   });
-}
-
-/** The same request, parsed — what the internal resolver needs. */
-export async function getTransportSearchConfigurations(
-  connection: IAbapConnection,
-): Promise<ITransportSearchConfiguration[]> {
-  const response = await requestTransportSearchConfigurations(connection);
-
-  return parseSearchConfigurations(response.data);
 }

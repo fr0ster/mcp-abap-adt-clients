@@ -1,8 +1,7 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
-import type { HttpError } from '@mcp-abap-adt/interfaces-network';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_VALIDATION } from '../../constants/contentTypes';
 import { getTimeout } from '../../utils/timeouts';
 import type { IBehaviorDefinitionValidationParams } from './types';

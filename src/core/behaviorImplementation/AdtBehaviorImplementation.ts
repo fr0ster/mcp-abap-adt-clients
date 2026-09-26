@@ -12,8 +12,8 @@
  */
 
 import type {
-  IAbapConnection,
   IAdtActivatable,
+  IAdtAnalyseOptions,
   IAdtCheckable,
   IAdtCreatable,
   IAdtCreateOptions,
@@ -30,13 +30,12 @@ import type {
   IAdtVersionable,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
-import { getSystemInformation } from '../../utils/systemInfo';
 import { AdtClass } from '../class/AdtClass';
 import type { LockRegistry } from '../shared/LockRegistry';
-import type { ObjectVersion } from '../shared/results';
 import type { IReadOptions } from '../shared/types';
 import {
   getBehaviorImplementationMetadata,
@@ -107,8 +106,15 @@ export class AdtBehaviorImplementation<
     IAdtCheckable<IBehaviorImplementationConfig, ReturnType<R['check']>>,
     IAdtActivatable<IBehaviorImplementationConfig, ReturnType<R['activation']>>,
     IAdtLockable<IBehaviorImplementationConfig>,
-    IAdtTransportAware<IBehaviorImplementationConfig, string>,
-    IAdtVersionable<IBehaviorImplementationConfig, ObjectVersion[], string>
+    IAdtTransportAware<
+      IBehaviorImplementationConfig,
+      ReturnType<R['transport']>
+    >,
+    IAdtVersionable<
+      IBehaviorImplementationConfig,
+      ReturnType<R['versions']>,
+      ReturnType<R['versionSource']>
+    >
 {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
@@ -193,9 +199,7 @@ export class AdtBehaviorImplementation<
       );
     }
 
-    // The caller's deadline, if they set one, on every request below.
-    const connection = withCallTimeout(this.connection, options?.timeout);
-
+    // The caller's deadline travels in `options` to the class's create.
     const name = this.name(config);
 
     // The author and the master system come from the config. This used to ask
@@ -268,7 +272,7 @@ export class AdtBehaviorImplementation<
   async readTransport<E extends IAdtError = IAdtError>(
     config: Partial<IBehaviorImplementationConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<string, E>> {
+  ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -283,7 +287,9 @@ export class AdtBehaviorImplementation<
             ? { withLongPolling: options.withLongPolling }
             : undefined,
         ),
-      (answer) => String(answer.data ?? ''),
+      // The class's transport reading: this *is* a class. It used to be an
+      // inline `String(answer.data ?? '')`, a reading no caller could replace.
+      this.results.transport as IResultStrategy<ReturnType<R['transport']>>,
       options?.analyse,
     );
   }
@@ -384,48 +390,49 @@ export class AdtBehaviorImplementation<
   }
 
   /** Lock the class. A behavior implementation has no lock of its own. */
-  async lock(
+  async lock<E extends IAdtError = IAdtError>(
     config: Partial<IBehaviorImplementationConfig>,
-  ): Promise<IAdtResponse<string>> {
-    return this.class.lock({ className: this.name(config) });
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<string, E>> {
+    return this.class.lock({ className: this.name(config) }, options);
   }
 
   /** Unlock the class. */
-  async unlock(
+  async unlock<E extends IAdtError = IAdtError>(
     config: Partial<IBehaviorImplementationConfig>,
     lockHandle: string,
-  ): Promise<IAdtResponse<void>> {
-    return this.class.unlock({ className: this.name(config) }, lockHandle);
-  }
-
-  /** Version history of the implementations include. */
-  async getVersions(
-    config: Partial<IBehaviorImplementationConfig>,
-  ): Promise<IAdtResponse<ObjectVersion[]>> {
-    return answering(
-      async () => ({
-        data: await getBehaviorImplementationVersions(this.connection, config),
-        status: 200,
-        statusText: 'OK',
-        headers: {},
-      }),
-      (answer) => answer.data as ObjectVersion[],
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<void, E>> {
+    return this.class.unlock(
+      { className: this.name(config) },
+      lockHandle,
+      options,
     );
   }
 
-  /** The source of one version, by the `contentUri` an entry carries. */
-  async getVersionSource(contentUri: string): Promise<IAdtResponse<string>> {
+  /** Version history of the object's source. */
+  async getVersions<E extends IAdtError = IAdtError>(
+    config: Partial<IBehaviorImplementationConfig>,
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['versions']>, E>> {
     return answering(
-      async () => ({
-        data: await getBehaviorImplementationVersionSource(
-          this.connection,
-          contentUri,
-        ),
-        status: 200,
-        statusText: 'OK',
-        headers: {},
-      }),
-      (answer) => String(answer.data),
+      () => getBehaviorImplementationVersions(this.connection, config),
+      this.results.versions as IResultStrategy<ReturnType<R['versions']>>,
+      options?.analyse,
+    );
+  }
+
+  /** Source of one version, by the `contentUri` its entry carried. */
+  async getVersionSource<E extends IAdtError = IAdtError>(
+    contentUri: string,
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['versionSource']>, E>> {
+    return answering(
+      () => getBehaviorImplementationVersionSource(this.connection, contentUri),
+      this.results.versionSource as IResultStrategy<
+        ReturnType<R['versionSource']>
+      >,
+      options?.analyse,
     );
   }
 }

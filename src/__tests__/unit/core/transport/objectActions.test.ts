@@ -13,14 +13,15 @@
  * everything else in it — or SE09 by hand.
  */
 
+import { ADT_TASK_TYPE } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAbapRequestOptions,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
-import { ADT_TASK_TYPE } from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtClient } from '../../../../clients/AdtClient';
 import { AdtRequest } from '../../../../core/transport/AdtRequest';
+import { transportParsing } from '../../../helpers/transportParsing';
 
 const REMOVED =
   '<?xml version="1.0" encoding="UTF-8"?>' +
@@ -258,9 +259,12 @@ describe('createTask', () => {
   it('answers the new number, which is the point of calling it', async () => {
     const { connection } = connectionOver(() => answering(NEW_TASK, 201));
 
-    const answer = await new AdtRequest(connection).createTask('E19K905941', {
-      targetUser: 'OKYSLYTSIA',
-    });
+    const answer = await new AdtRequest(
+      connection,
+      undefined,
+      undefined,
+      transportParsing,
+    ).createTask('E19K905941', { targetUser: 'OKYSLYTSIA' });
 
     if (!answer.ok) throw new Error('expected the task');
     const created = answer.getResult().value as {
@@ -344,7 +348,12 @@ describe('readObjects', () => {
   it('answers the entries with the positions removeObject needs', async () => {
     const { connection } = connectionOver(() => answering(OBJECT_LIST));
 
-    const answer = await new AdtRequest(connection).readObjects('E19K905942');
+    const answer = await new AdtRequest(
+      connection,
+      undefined,
+      undefined,
+      transportParsing,
+    ).readObjects('E19K905942');
 
     if (!answer.ok) throw new Error('expected the list');
     const entries = answer.getResult().value;
@@ -378,7 +387,12 @@ describe('readObjects', () => {
   it('keeps the position a string, leading zeros and all', async () => {
     const { connection } = connectionOver(() => answering(OBJECT_LIST));
 
-    const answer = await new AdtRequest(connection).readObjects('E19K905942');
+    const answer = await new AdtRequest(
+      connection,
+      undefined,
+      undefined,
+      transportParsing,
+    ).readObjects('E19K905942');
 
     if (!answer.ok) throw new Error('expected the list');
     expect(answer.getResult().value[0].position).toBe('000025');
@@ -407,7 +421,12 @@ describe('readObjects', () => {
       ),
     );
 
-    const answer = await new AdtRequest(connection).readObjects('E19K905942');
+    const answer = await new AdtRequest(
+      connection,
+      undefined,
+      undefined,
+      transportParsing,
+    ).readObjects('E19K905942');
 
     if (!answer.ok) throw new Error('expected the list');
     const [entry] = answer.getResult().value;
@@ -427,7 +446,12 @@ describe('readObjects', () => {
       ),
     );
 
-    const answer = await new AdtRequest(connection).readObjects('E19K905942');
+    const answer = await new AdtRequest(
+      connection,
+      undefined,
+      undefined,
+      transportParsing,
+    ).readObjects('E19K905942');
 
     if (!answer.ok) throw new Error('expected the list');
     expect(answer.getResult().value).toEqual([]);
@@ -442,7 +466,12 @@ describe('readObjects', () => {
   it('finds the entries wherever the document keeps them', async () => {
     const { connection } = connectionOver(() => answering(REMOVED));
 
-    const answer = await new AdtRequest(connection).readObjects('E19K905942');
+    const answer = await new AdtRequest(
+      connection,
+      undefined,
+      undefined,
+      transportParsing,
+    ).readObjects('E19K905942');
 
     if (!answer.ok) throw new Error('expected the list');
     const entries = answer.getResult().value;
@@ -512,6 +541,31 @@ describe('changeTaskType', () => {
     await new AdtRequest(connection).changeTaskType('E19K905943', type);
 
     expect(String(calls[0].data)).toContain(`tm:type="${type}"`);
+  });
+});
+
+describe('readObjects and createTask by default', () => {
+  // The library interprets nothing on its own: without a parsing strategy the
+  // document comes back as it arrived, and `parseObjectEntries` /
+  // `parseCreatedTransport` are strategies a caller names.
+  it('answers the object list as it arrived', async () => {
+    const { connection } = connectionOver(() => answering(OBJECT_LIST));
+
+    const answer = await new AdtRequest(connection).readObjects('E19K905942');
+
+    if (!answer.ok) throw new Error('expected the document');
+    expect(answer.getResult().value).toBe(OBJECT_LIST);
+  });
+
+  it('answers the created task as it arrived', async () => {
+    const { connection } = connectionOver(() => answering(NEW_TASK, 201));
+
+    const answer = await new AdtRequest(connection).createTask('E19K905941', {
+      targetUser: 'OKYSLYTSIA',
+    });
+
+    if (!answer.ok) throw new Error('expected the document');
+    expect(answer.getResult().value).toBe(NEW_TASK);
   });
 });
 

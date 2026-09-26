@@ -14,6 +14,12 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import {
+  transportCreated,
+  transportObjectEntries,
+  transportSearchConfigurations,
+  transportTree,
+} from '@mcp-abap-adt/adt-strategies';
 import * as dotenv from 'dotenv';
 import {
   createTestConnection,
@@ -21,6 +27,18 @@ import {
 } from '../src/__tests__/helpers/sessionConfig';
 import { createConnectionLogger } from '../src/__tests__/helpers/testLogger';
 import { AdtClient } from '../src/clients/AdtClient';
+import { transportDocuments } from '../src/core/transport/types';
+
+// The client answers transport documents as they arrived; this script reads
+// them with the strategies a consumer would pass.
+const transportReadings = {
+  ...transportDocuments,
+  created: transportCreated,
+  createdTask: transportCreated,
+  list: transportTree,
+  searchConfigurations: transportSearchConfigurations,
+  objects: transportObjectEntries,
+};
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../.env');
 if (fs.existsSync(envPath)) {
@@ -40,7 +58,9 @@ async function main(): Promise<string[]> {
   const logger = createConnectionLogger();
   const connection = await createTestConnection(logger);
   try {
-    const request = new AdtClient(connection, logger).getRequest();
+    const request = new AdtClient(connection, logger).getRequest(
+      transportReadings,
+    );
 
     // **A count nobody could read is not a count.** Every refusal below is
     // collected rather than passed over, because the question this answers —

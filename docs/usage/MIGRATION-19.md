@@ -1,5 +1,7 @@
 # Migrating to 19.0.0
 
+> **History.** This describes the move to 19.0.0 and is kept as it was written. Some of its code no longer compiles against 23.0.0 — `getRepo`, the parsed defaults, connection types from `interfaces-adt` — and [MIGRATION-23.md](MIGRATION-23.md) has what replaces each.
+
 19.0.0 stops this package from deciding anything.
 
 Two rules produced every change below, and both were already the design's

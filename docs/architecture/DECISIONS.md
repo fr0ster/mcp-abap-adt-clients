@@ -81,6 +81,10 @@ indistinguishable from a gate that finds nothing: this one had two holes at once
 change if a documented snippet legitimately needed an internal path — it can,
 via a relative import, which is measured against the loose set on purpose.
 
+**Since 23.0.0** `compareRecordedAt` is exported by `@mcp-abap-adt/adt-strategies`
+rather than here, beside the profiler readings it orders (decision 15). The rule
+held: the removal shipped with the replacement a consumer imports.
+
 ---
 
 ## 3. A checker reads code with a parser, not with a pattern
@@ -661,3 +665,95 @@ that turns a consumer's exception into an `IAdtError`.
 
 **What would change it.** The handlers migrating, at which point `orThrow`
 disappears and this decision is about the whole library rather than one class.
+
+## 15. The library interprets nothing: readings and verdicts are strategies, given by the caller
+
+**Problem.** 19.0.0 took the verdicts out of the defaults, and an audit before
+23.0.0 found the same decision still being taken inside members, where the
+caller could not see it. Ten members judged SAP's answer on their own — seven
+fell back from the caller's `analyse` to a reading of their own
+(`options?.analyse ?? packageDeletionRefusal`), three applied one with no way to
+replace it. Five util slots and every transport, version, abapGit, ATC,
+profiler and feed default were parses rather than the document. `list()` read
+the saved transport searches and chose one; `getRepo` listed every repository
+and filtered; `updateMetadata` on a message class read the class and patched a
+field into it. A unit-test handler remembered its last run id and replayed a
+remembered answer under a synthetic id on legacy systems. And the throws said
+things about SAP: "Failed to obtain lock handle" for a `200` without one, a
+`404`/`406` on a versions resource thrown as `UNSUPPORTED_OPERATION`, creates and
+unlocks that rewrapped a refusal in a new `Error` and dropped the response.
+
+The cost was measured, not argued. Issue #172: the deletion reading took
+`del:message` as one element, fast-xml-parser gives an array for two, and a
+service-binding check answering a `W` and an `E` came back as "0 strong and 0
+weak external references" — SAP's reason replaced by counts, an `E` missed. The
+abapGit parser read the key `000001` as the number `1`, which is the key
+`unlink` is addressed by. Accept negotiation kept its corrections in module
+globals, so a header learned on one system was sent to another. Each was a
+reading nobody had asked for, applied where nobody could replace it.
+
+**Decided.**
+
+1. **The library ships only the document and nothing.** Every result set's
+   default slot is `rawDocument` or `nothing`. The single reading an
+   implementation owns is `lockHandleOf`, because the contract fixes `lock`'s
+   answer as the handle that `update` and `unlock` must be given.
+2. **Every interpretation is a strategy in `@mcp-abap-adt/adt-strategies`** —
+   the readings (`transportTree`, `objectVersions`, `unitTestRunId`,
+   `abapGitRepos`, `utilSearchHits`, the ATC, profiler and feed shapes) and the
+   verdicts (`analyseDeletion`, `analysePublication`, `analyseUnitTestStart`,
+   `analyseCdsTestDoubles`, `analyseMessageClassMessage(msgno)`,
+   `analyseUnsupportedStatus(statuses, what)`), each tested against the recorded
+   answer it was derived from.
+3. **The result strategy is given at construction, the error strategy with every
+   call** — decision 36 in `@mcp-abap-adt/interfaces`, which put
+   `IAdtAnalyseOptions` on every member that answers an `IAdtResponse`. A
+   consumer does not change what shape it wants between `create` and `read` of
+   the same object; it does change what counts as a failure between a delete it
+   expects to succeed and one it is probing.
+4. **The throw boundary is the cause.** A failure caused by SAP's answer comes
+   back through the strategy, with the response — never thrown, never rewrapped.
+   A member throws only for a cause inside the library: an argument the caller
+   left out, found before any request is built, or a defect. A reading that
+   throws surfaces as itself.
+5. **One member, one request** — decision 37 there. A member that needs a value
+   from an earlier answer takes it as an argument: `list({ configUri })` from
+   `searchConfigurations`, `unlink({ repositoryId })` and `getErrorLog(logLink)`
+   from `listRepos`, `getStatus(runId)` from the run. Nothing is remembered
+   between calls — which is also why the runtime and executor factories build a
+   fresh implementation per call instead of caching the first caller's.
+
+The one exception stands: `AdtMessageClassMessage`'s write, where a message is a
+row inside its class's document.
+
+**Against.**
+
+- *Keep the readings as defaults and let a consumer override them.* It is what
+  18.x–22.x did for results, and the audit is the argument against it: a default
+  reading is a decision nobody sees until it is wrong, and #172 was wrong for
+  every consumer at once. An override protects only the consumer who already
+  knows the default is there.
+- *Keep the verdicts as fallbacks* (`analyse ?? ours`). Rejected for the same
+  reason, and because a fallback cannot be switched off: passing nothing still
+  applied it. `src/__tests__/unit/onlyCorpusStrategiesShip.test.ts` now fails on
+  any `analyse ??` under `src/`.
+- *Throw for "SAP did not give me what I need"* (no lock handle, no run id). The
+  cause is SAP's answer, and the throw reached the caller as a connection
+  failure with that answer gone — pointing them at their network over a document
+  they could have read. `''` and the response are more information, not less.
+- *Ship the strategies inside `adt-clients`.* A consumer who needs none of them
+  would install them anyway, and they would move at this package's release rate
+  instead of at the rate evidence arrives. A separate package also keeps the line
+  checkable: nothing under `src/` reads a verdict.
+
+**How to catch a regression.** A result set whose default slot is anything but
+`rawDocument`, `nothing` or `wireItself`. An `analyse ??` (the guard above). A
+`throw` whose message describes what SAP answered. A member that makes two
+requests, or reads a field it did not receive as an argument. A factory that
+caches.
+
+**What would change it.** A reading whose answer is fixed by the contract rather
+than chosen by the consumer — as `lock`'s is — would belong to the
+implementation, the way `lockHandleOf` does. And if the contract ever typed a
+member's result as a specific shape rather than a strategy's output, that reading
+would come back with it; the fix would be in the contract, decided there first.

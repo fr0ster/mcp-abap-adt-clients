@@ -1,30 +1,32 @@
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   ACCEPT_FEATURE_TOGGLE_CHECK_RESULT,
   CT_FEATURE_TOGGLE_CHECK_PARAMETERS,
 } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
-import type {
-  FeatureToggleState,
-  IFeatureToggleCheckStateResult,
-} from './types';
 
-function normaliseState(raw: unknown): FeatureToggleState {
-  if (raw === 'on' || raw === 'off' || raw === 'undefined') return raw;
-  return 'undefined';
-}
-
+/**
+ * `POST …/check` — the toggle's current state and what changing it would
+ * need, the JSON as it arrived.
+ *
+ * Until 23.0.0 this parsed the `RESULT` object and normalised it into
+ * `IFeatureToggleCheckStateResult` here (now `featureToggleCheckState` in @mcp-abap-adt/adt-strategies). The reading is the `checkState`
+ * strategy's now.
+ */
 export async function checkFeatureToggleState(
   connection: IAbapConnection,
   name: string,
   opts?: { userSpecific?: boolean },
-): Promise<IFeatureToggleCheckStateResult> {
+): Promise<IAdtWireResponse> {
   const encoded = encodeSapObjectName(name.toLowerCase());
   const body = {
     PARAMETERS: { IS_USER_SPECIFIC: Boolean(opts?.userSpecific) },
   };
-  const resp = await connection.makeAdtRequest({
+  return connection.makeAdtRequest({
     method: 'POST',
     url: `/sap/bc/adt/sfw/featuretoggles/${encoded}/check`,
     timeout: getTimeout('default'),
@@ -34,13 +36,4 @@ export async function checkFeatureToggleState(
     },
     data: JSON.stringify(body),
   });
-  const parsed =
-    typeof resp.data === 'string' ? JSON.parse(resp.data) : resp.data;
-  const r = parsed?.RESULT ?? {};
-  return {
-    currentState: normaliseState(r.CURRENT_STATE),
-    transportPackage: r.TRANSPORT_PACKAGE || undefined,
-    transportUri: r.TRANSPORT_URI || undefined,
-    customizingTransportAllowed: Boolean(r.CUSTOMIZING_TRANSPORT_ALLOWED),
-  };
 }

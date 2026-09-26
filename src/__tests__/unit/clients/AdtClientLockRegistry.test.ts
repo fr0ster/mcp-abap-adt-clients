@@ -7,7 +7,7 @@
  * The object name comes from test-config.yaml via TestConfigResolver.
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AdtClient } from '../../../clients/AdtClient';
 import { TestConfigResolver } from '../../helpers/TestConfigResolver';

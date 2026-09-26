@@ -14,7 +14,7 @@
  */
 
 import type {
-  IAbapConnection,
+  IAdtAnalyseOptions,
   IAdtCheckable,
   IAdtCreatable,
   IAdtCreateOptions,
@@ -28,12 +28,14 @@ import type {
   IAdtSystemContext,
   IAdtTransportAware,
   IAdtValidatable,
-  IAnalyse,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
+import { lockHandleOf } from '../../utils/lockHandle';
+import { nothing } from '../../utils/resultStrategy';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import {
   createLockTracker,
@@ -43,11 +45,7 @@ import {
 import type { IReadOptions } from '../shared/types';
 import { checkPackage } from './check';
 import { createPackage } from './create';
-import {
-  checkPackageDeletion,
-  deletePackage,
-  packageDeletionRefusal,
-} from './delete';
+import { checkPackageDeletion, deletePackage } from './delete';
 import { lockPackage } from './lock';
 import { getPackage, getPackageTransport } from './read';
 import {
@@ -360,9 +358,11 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
    * deletes it on the first attempt. The PAK lock belongs to the ABAP session
    * and goes with it.
    *
-   * So this reports the failure rather than waiting for something that cannot
-   * happen while the caller still holds the session — and reporting is as far
-   * as it can go. `IAbapConnection` has no `disconnect` and no `recycle`, and
+   * The answer is a 200 either way, and `isDeleted="false"` is in its body: a
+   * caller who wants that read as a failure passes `analyseDeletion` (from
+   * `@mcp-abap-adt/adt-strategies`) — this member reads nothing into it, and it
+   * does not wait for something that cannot happen while the caller still holds
+   * the session. `IAbapConnection` has no `disconnect` and no `recycle`, and
    * should not: the connection belongs to the caller and is usually shared, so
    * tearing it down mid-operation would take every other user of it down as
    * well. Recycling is the consumer's call. See
@@ -383,12 +383,7 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
           transport_request: config.transportRequest,
         }),
       this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
-      // `isDeleted="false"` with PAK/058 arrives inside a 200, so the
-      // document decides here too — but it is a *deletion* result, whose
-      // verdict is `del:isDeleted`. `deletionRefusal` reads a check's
-      // `del:isDeletable`, found none, and reported every successful
-      // package delete as a refusal.
-      (options?.analyse ?? packageDeletionRefusal) as IAnalyse<E>,
+      options?.analyse,
     );
   }
 
@@ -412,34 +407,36 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
     );
   }
 
-  /** Lock the package for modification. */
-  async lock(config: Partial<IPackageConfig>): Promise<IAdtResponse<string>> {
+  /**
+   * Lock the package — one LOCK, its handle read by `lockHandleOf`. A 200
+   * carrying no handle reads as `''`; whether that is a refusal is the
+   * caller's `analyse` to say.
+   */
+  async lock<E extends IAdtError = IAdtError>(
+    config: Partial<IPackageConfig>,
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<string, E>> {
     const name = this.name(config);
-
-    return answering(
-      async () => {
-        const { lockHandle } = await inStatefulSession(this.connection, () =>
+    const answer = await answering(
+      () =>
+        inStatefulSession(this.connection, () =>
           lockPackage(this.connection, name),
-        );
-        this.lockTracker.track(name, lockHandle);
-        // The handle is the value, and the request does not keep the wire it
-        // came on — so the answer is built around what the request produced.
-        return {
-          data: lockHandle,
-          status: 200,
-          statusText: 'OK',
-          headers: {},
-        };
-      },
-      (answer) => String(answer.data),
+        ),
+      lockHandleOf,
+      options?.analyse,
     );
+    if (answer.ok && answer.getResult().value) {
+      this.lockTracker.track(name, answer.getResult().value);
+    }
+    return answer;
   }
 
   /** Unlock the package. */
-  async unlock(
+  async unlock<E extends IAdtError = IAdtError>(
     config: Partial<IPackageConfig>,
     lockHandle: string,
-  ): Promise<IAdtResponse<void>> {
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<void, E>> {
     const name = this.name(config);
 
     return answering(
@@ -453,7 +450,8 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
           this.lockTracker.untrack(name);
         }
       },
-      () => undefined,
+      nothing,
+      options?.analyse,
     );
   }
 }

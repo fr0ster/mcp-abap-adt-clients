@@ -5,11 +5,9 @@
  * Enable debug logs: DEBUG_TESTS=true npm test -- unit/shared/objectStructure.test
  */
 
-import type {
-  IAbapConnection,
-  IAdtResponse,
-} from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtClient } from '../../../clients/AdtClient';
 import { failed } from '../../../utils/adtResponse';

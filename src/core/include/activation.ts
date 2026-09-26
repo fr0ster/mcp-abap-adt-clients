@@ -8,7 +8,7 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { activateObjectInSession } from '../../utils/activationUtils';
 import { includeUrl } from './lock';
 

@@ -9,7 +9,7 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   ACCEPT_CHECK_MESSAGES,
   CT_CHECK_OBJECTS,

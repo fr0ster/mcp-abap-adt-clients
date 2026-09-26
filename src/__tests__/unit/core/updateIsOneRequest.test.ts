@@ -1,7 +1,7 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { updateDataElement } from '../../../core/dataElement/update';
 import { updateDomain } from '../../../core/domain/update';
 import { updatePackage } from '../../../core/package/update';

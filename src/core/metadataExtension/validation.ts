@@ -8,8 +8,7 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
-import { AxiosError } from 'axios';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_VALIDATION } from '../../constants/contentTypes';
 import { getTimeout } from '../../utils/timeouts';
 import type { IMetadataExtensionValidationParams } from './types';

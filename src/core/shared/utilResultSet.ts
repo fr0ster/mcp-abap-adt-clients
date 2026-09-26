@@ -16,28 +16,19 @@
  * package, and `getObjectSourceUri` builds an address. None of them has an
  * answer to read.
  *
- * **Fifteen of these slots were added in 19.0.0 and they were not a widening.**
- * Until 44.0.0 of the contract those members were typed `IAdtResponse<string>`,
- * so the *contract* had chosen the document and no reading could have been
- * offered for them. What changed is whose choice it is. The defaults keep the
- * document, so nothing a caller sees today moves.
- *
- * The five that do not default to the document earn it: a search that answered
- * its 1.3MB listing rather than its hits would make every caller parse it, and
- * a started activation run answers a `Location` header whose id is the only way
- * to reach the run's own two members. `rawDocument` is one argument away in
- * both cases.
+ * **Every default is the document.** Before this release five slots
+ * defaulted to a parse — search hits, the type catalogue, the tree level, the
+ * inactive list and the activation run id — and two of those parses judged the
+ * answer on the way (`throwIfSapError` inside a reading). They moved to
+ * `@mcp-abap-adt/adt-strategies` as `utilSearchHits`, `utilNamedItems`,
+ * `utilNodeContents`, `utilInactiveObjects` and `utilActivationRunId`, with
+ * `utilWhereUsedReferences` beside them; a caller who wants a shape passes one
+ * of those in the set, and nothing is read into an answer they did not ask
+ * for.
  */
 
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
 import { rawDocument } from '../../utils/resultStrategy';
-import { inactiveObjects } from './getInactiveObjects';
-import {
-  activationRunId,
-  namedItems,
-  nodeContents,
-  searchHits,
-} from './utilResults';
 
 export interface IUtilResults {
   /** Hits of an object search — `/informationsystem/search`. */
@@ -49,7 +40,8 @@ export interface IUtilResults {
    * `getWhereUsedList` returned, and that member joined two requests to get
    * there — the scope, then the search — so it could never be given a reading
    * at all. Now the join is the caller's and the shape is a reading like any
-   * other. `whereUsedReferences` is that parse, exported for whoever wants it.
+   * other. `utilWhereUsedReferences` in `@mcp-abap-adt/adt-strategies` is that
+   * parse, for whoever wants it.
    */
   readonly whereUsed: IResultStrategy<unknown>;
   /** The scope document `/usageReferences/scope` answers. */
@@ -67,9 +59,10 @@ export interface IUtilResults {
   /**
    * What starting an activation run answers.
    *
-   * The default is the **run id**, not the document: `/activation/runs` answers
-   * `202` with the id in `Location` and a body that carries nothing, and both
-   * members that continue the sequence take an id.
+   * `/activation/runs` answers `202` with the run id in `Location` and a body
+   * that carries nothing; `utilActivationRunId` in `@mcp-abap-adt/adt-strategies`
+   * reads the id, and `wireItself` keeps the exchange. The legacy synchronous
+   * `/activation` answers its result in the body, which the default keeps.
    */
   readonly activation: IResultStrategy<unknown>;
   /** What an activation run is doing — `/activation/runs/{runId}`. */
@@ -102,15 +95,15 @@ export interface IUtilResults {
  * `satisfies`, never an annotation — see `classDocuments` for why.
  */
 export const utilDocuments = {
-  search: searchHits,
+  search: rawDocument,
   whereUsed: rawDocument,
   whereUsedScope: rawDocument,
   folders: rawDocument,
-  types: namedItems,
-  node: nodeContents,
+  types: rawDocument,
+  node: rawDocument,
   objectStructure: rawDocument,
-  inactive: inactiveObjects,
-  activation: activationRunId,
+  inactive: rawDocument,
+  activation: rawDocument,
   run: rawDocument,
   results: rawDocument,
   deletionCheck: rawDocument,

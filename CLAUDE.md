@@ -52,39 +52,42 @@ npm run test:check:integration  # Integration tests only (runs as pretest)
 
 ### Client Classes (`src/clients/`)
 
-- **AdtClient** (`AdtClient.ts`): High-level CRUD operations via factory methods (`getClass()`, `getProgram()`, `getPackage()`, `getDdl()` (DDL sources — formerly `getView()`), `getTable()`, `getScalarFunction()`, `getScalarFunctionImplementation()`, `getAppendStructure()`, etc.). Each method returns an `IAdtObject<Config, State>` handler. Also: `getUtils()` for shared operations, `getLocalTestClass()`/`getLocalTypes()`/`getLocalDefinitions()`/`getLocalMacros()` for class includes.
-- **AdtRuntimeClient** (`AdtRuntimeClient.ts`): Runtime operations exposed via factory accessors — `getProfiler()`, `getCrossTrace()`, `getSt05Trace()`, `getDebugger()` (composite: `getAbap()`, `getAmdp()`, `getMemorySnapshots()`), `getApplicationLog()`, `getAtcLog()`, `getDdicActivation()`, `getDumps()`, `getFeeds()` (FeedRepository), `getSystemMessages()`, `getGatewayErrorLog()`.
-- **AdtExecutor** (`AdtExecutor.ts`): Program/class execution with optional profiling — `getClassExecutor()`, `getProgramExecutor()`.
+- **AdtClient** (`AdtClient.ts`): High-level CRUD operations via factory methods (`getClass()`, `getProgram()`, `getPackage()`, `getDdl()` (DDL sources — formerly `getView()`), `getTable()`, `getScalarFunction()`, `getScalarFunctionImplementation()`, `getAppendStructure()`, `getRequest()`, etc.). Each factory takes an optional result set (`getClass({ ...classDocuments, versions: objectVersions })`) and returns the intersection of the capability atoms that object supports. Also: `getUtils()` for shared operations, `getLocalTestClass()`/`getLocalTypes()`/`getLocalDefinitions()`/`getLocalMacros()` for class includes. `AdtClientLegacy` and `createAdtClient()` cover BASIS < 7.50.
+- **AdtRuntimeClient** (`AdtRuntimeClient.ts`): Runtime operations exposed via factory accessors — `getProfiler()`, `getCrossTrace()`, `getSt05Trace()`, `getApplicationLog()`, `getAtc()`, `getAtcLog()`, `getDdicActivation()`, `getDumps()`, `getFeeds()` (FeedRepository), `getSystemMessages()`, `getGatewayErrorLog()`. Each takes an optional result set and builds a fresh implementation per call — nothing is cached.
+- **AdtExecutor** (`AdtExecutor.ts`): Program/class execution — `getClassExecutor(results?)`, `getProgramExecutor(results?)`: `run`, `runWithProfiler`, and trace scheduling (`scheduleTrace` and the listings).
 - **AdtClientsWS** (`AdtClientsWS.ts`): WebSocket facade (request/response + event model) wrapping `IWebSocketTransport`.
-- **AdtAbapGitClient** (`AdtAbapGitClient.ts`): Standalone client for SAP-official ADT-integrated abapGit (`/sap/bc/adt/abapgit/*`). Seven public methods — link, pull (async with abort/timeout + lastKnownStatus recovery), unlink (`/repos/{key}`), listRepos, getRepo, getErrorLog, checkExternalRepo. Not a factory on AdtClient — consumers `new` it directly per the "AdtClient = IAdtObject-only" architectural rule. Available on cloud + modern on-prem (ABAP Platform 2022+).
-- **Batch clients** (`AdtClientBatch`, `AdtRuntimeClientBatch`): Mirror main clients but collect requests into `multipart/mixed` batch via `BatchRecordingConnection`.
+- **AdtAbapGitClient** (`AdtAbapGitClient.ts`): Standalone client for SAP-official ADT-integrated abapGit (`/sap/bc/adt/abapgit/*`). Six members, one request each — `link`, `pull({ package, pullLink })` (starts the pull and does not wait; polling `listRepos` is the caller's), `unlink({ repositoryId })`, `listRepos`, `getErrorLog(logLink)`, `checkExternalRepo`. The key, pull link and log link come from `listRepos`; there is no `getRepo`. Result set as the fourth constructor argument (`abapGitDocuments` by default). Not a factory on AdtClient — consumers `new` it directly. Available on cloud + modern on-prem (ABAP Platform 2022+).
 
-All clients accept `IAbapConnection` + `ILogger`. Optional: `options.enableAcceptCorrection` for automatic `Accept` header negotiation on HTTP 406.
+All clients accept `IAbapConnection` (from `@mcp-abap-adt/interfaces-adt-connection`) + `ILogger`. Optional: `options.enableAcceptCorrection` — `Accept` negotiation on HTTP 406 is on unless it is `false` or `ADT_ACCEPT_CORRECTION=false`; its state lives on the connection.
 
 ### Core Modules (`src/core/`)
 
-28 object-type modules (class, program, interface, ddl, table, structure, domain, dataElement, package, functionGroup, functionModule, functionInclude, accessControl, serviceDefinition, service, behaviorDefinition, behaviorImplementation, metadataExtension, enhancement, tabletype, transport, unitTest, authorizationField, featureToggle, scalarFunction, scalarFunctionImplementation, appendStructure). Each follows this structure:
+30 object-type modules (class, program, include, interface, ddl, table, structure, domain, dataElement, package, functionGroup, functionModule, functionInclude, accessControl, serviceDefinition, service, behaviorDefinition, behaviorImplementation, metadataExtension, enhancement, tabletype, transport, transformation, unitTest, authorizationField, featureToggle, messageClass, scalarFunction, scalarFunctionImplementation, appendStructure) plus `shared/`. Each follows this structure:
 
-- `AdtXxx.ts` — High-level class implementing `IAdtObject<Config, State>`
-- `types.ts` — `IXxxConfig` (camelCase, public API) and `IXxxState` (operation results, errors array) and `ICreateXxxParams` (snake_case, low-level internal)
+- `AdtXxx.ts` — High-level class implementing the capability atoms the type supports, generic over its result set
+- `types.ts` — the `IXxxResults` result set and its `xxxDocuments` default; configs (`IXxxConfig`) come from `@mcp-abap-adt/interfaces-adt`; `ICreateXxxParams` (snake_case, low-level internal)
 - `create.ts`, `read.ts`, `update.ts`, `delete.ts` — Low-level CRUD functions that build XML, set headers, call `connection.makeAdtRequest()`
-- `lock.ts`, `unlock.ts` — Session management (lock returns `LOCK_HANDLE`)
+- `lock.ts`, `unlock.ts` — Session management; the handle is read by `lockHandleOf` (`src/utils/lockHandle.ts`), `''` when SAP sent none
 - `activation.ts`, `check.ts`, `validation.ts` — Supporting operations
 - `index.ts` — Re-exports public API of the module
 
-**Shared module** (`src/core/shared/AdtUtils.ts`): Large utility class (~1000 lines) — search, where-used, package hierarchy, SQL queries, inactive objects, group activation/deletion, discovery, type info, virtual folders, etc.
+**Shared module** (`src/core/shared/AdtUtils.ts`): Large utility class — search, where-used, SQL queries, inactive objects, group activation/deletion, discovery, type info, virtual folders, etc. Result set `IUtilResults` / `utilDocuments`.
 
 ### Design Patterns
 
-**Factory pattern**: `AdtClient` creates object-specific implementations of the capability contracts in `@mcp-abap-adt/interfaces`.
+**Factory pattern**: `AdtClient` creates object-specific implementations of the capability contracts in `@mcp-abap-adt/interfaces-adt`.
+
+**Interprets nothing**: the result strategy is given when the implementation is built (a result set per object type; the shipped `<x>Documents` answer the document as it arrived via `rawDocument`, or `nothing`); the error strategy (`options.analyse`, `IAdtAnalyseOptions`) is given with every call. No member substitutes its own reading or verdict (`analyse ??` fallbacks are banned by `src/__tests__/unit/onlyCorpusStrategiesShip.test.ts`). Every reading and verdict lives in `@mcp-abap-adt/adt-strategies` (`packages/adt-strategies`). A failure caused by SAP's answer comes back through the strategy — never a throw, never a rewrap that drops the response; a member throws only for a cause inside the library (a caller argument missing before a request is built, a defect). Decision 15 in `docs/architecture/DECISIONS.md`.
 
 **One endpoint, one member**: every member issues exactly one ADT request. `create` is the POST; `update` is the write and carries `options.lockHandle` as given; `delete` is the DELETE; `checkDeletion` is the approval ADT wants first; `lock`/`unlock` are the lock window. Nothing composes them for the caller.
 
 A multi-step operation is therefore the consumer's sequence, in the order it chooses:
 
 ```typescript
-const handle = (await cls.lock(config)).getResult().value;
-await cls.update(config, { sourceCode, lockHandle: handle });
+const locked = await cls.lock(config);
+if (!locked.ok) throw new Error(locked.getError().message);
+const handle = locked.getResult().value;
+await cls.update(config, { source, lockHandle: handle });
 await cls.unlock(config, handle);
 await cls.activate(config);
 ```
@@ -97,11 +100,10 @@ The one exception is `AdtMessageClassMessage`, where a message is a row inside i
 
 ### Supporting Layers
 
-- **Batch** (`src/batch/`): `BatchRecordingConnection` proxies `IAbapConnection`, collects requests, builds `multipart/mixed` payload, parses batch response and resolves deferred promises.
-- **Accept Negotiation** (`src/utils/acceptNegotiation.ts`): On HTTP 406, extracts supported content types from response, caches correct `Accept` per URL, retries. Wraps `connection.makeAdtRequest`.
-- **Runtime** (`src/runtime/`): Debugger, memory snapshots, profiler traces, application logs, runtime dumps — each in its own subfolder.
-- **Executors** (`src/executors/`): Class/program execution with profiling support.
-- **Cloud vs On-premise** (`src/utils/systemInfo.ts`): `getSystemInformation()` and `isCloudEnvironment()` — some operations differ between SAP Cloud and on-premise systems.
+- **Accept Negotiation** (`src/utils/acceptNegotiation.ts`): On HTTP 406, extracts supported content types from response, caches the correct `Accept` per URL, retries once. Wraps `connection.makeAdtRequest`; the caches and the switch are per connection.
+- **Runtime** (`src/runtime/`): profiler and cross/ST05 traces, application logs, ATC, DDIC activation graph, runtime dumps, feeds, system messages, gateway error log — each in its own subfolder, each with its result set.
+- **Executors** (`src/executors/`): Class/program execution and trace scheduling.
+- **System probes** (`src/utils/systemInfo.ts`, `src/utils/discoveryEndpoints.ts`): `getSystemInformation()`, `isModernAdtSystem()`, `fetchDiscoveryEndpoints()` answer 404/405/501 as an absent endpoint and raise any other failure.
 
 ## Code Standards
 
@@ -204,15 +206,18 @@ See `docs/usage/RFC_CONNECTION.md` and `docs/development/RFC_TESTING.md` for ful
 
 ## Key Dependencies
 
-- `@mcp-abap-adt/interfaces` — All interfaces (`IAbapConnection`, `IAdtObject`, `IAdtResponse`, `IWebSocketTransport`, etc.)
-- `@mcp-abap-adt/logger` — Logging interface
+- `@mcp-abap-adt/interfaces-adt` — ADT contracts (capability atoms, configs, `IAdtResponse`, `IAnalyse`, `IAdtAnalyseOptions`, `IResultStrategy`)
+- `@mcp-abap-adt/interfaces-adt-connection` — the connection contract (`IAbapConnection`, `IAdtWireResponse`, `IAbapRequestOptions`, `ITimeoutConfig`, `ADT_SESSION_ERROR`)
+- `@mcp-abap-adt/interfaces-network` — `IWebSocketTransport`, `HttpError`; `@mcp-abap-adt/interfaces-utils` — `ILogger`, `XmlNode`
+- `@mcp-abap-adt/logger` — Logging implementation
 - `fast-xml-parser` — XML parsing for ADT responses
 - `axios` — HTTP client (used internally by connection layer)
-- `@mcp-abap-adt/connection` — **dev only** — concrete `IAbapConnection` implementation for tests
+- `@mcp-abap-adt/connection` — **dev only** — concrete `IAbapConnection` implementation for tests; `@mcp-abap-adt/interfaces-auth` and `-auth-sap` are dev-only too
+- `@mcp-abap-adt/adt-strategies` — workspace package in `packages/adt-strategies`, not a dependency of adt-clients: the readings and verdicts consumers (and the tests) pass in
 
 ## Public API (`src/index.ts`)
 
-Exports all client classes, batch classes, all `IXxxConfig`/`IXxxState` types for every object type, shared types (`AdtObjectType`, `ObjectReference`, `PackageHierarchyNode`, `WhereUsedListResult`, `SearchObjectsParams`, etc.), and `AdtService`/`AdtServiceBinding` classes.
+Exports the client classes, the handler classes exported directly, the result sets (`<x>Documents` + `I…Results`) for every implementation, the building blocks `rawDocument`/`nothing`/`wireItself`/`nothingIsARefusal`, `AdtSAPError`/`AdtParseError`, and the system probes. No contract type is re-exported — consumers import those from the contract packages — and no reading or verdict ships here. The exact value surface is pinned by `src/__tests__/unit/publicApiSurface.test.ts`.
 
 ## Plans and Specs
 

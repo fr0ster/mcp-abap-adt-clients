@@ -5,17 +5,8 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-  IResultStrategy,
-} from '@mcp-abap-adt/interfaces-adt';
-import { XMLParser } from 'fast-xml-parser';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { getTimeout } from '../../utils/timeouts';
-import type { IInactiveObjectsResponse, IObjectReference } from './types';
-
-const xmlParser = new XMLParser({
-  ignoreAttributes: false,
-  attributeNamePrefix: '@_',
-  parseAttributeValue: false,
-});
 
 /**
  * Get list of inactive objects (objects that are not yet activated)
@@ -39,9 +30,8 @@ const xmlParser = new XMLParser({
  *
  * Split from the reading below so the reading can be injected: this is one GET
  * with one answer, which is exactly the shape an `IResultStrategy` types. The
- * `includeRawXml` flag it used to take is gone with the split — a consumer who
- * wants the document passes `rawDocument` as the strategy, which is the same
- * removal the where-used walker's type flags got in this release.
+ * default reading keeps the document; `utilInactiveObjects` in
+ * `@mcp-abap-adt/adt-strategies` reads it into references.
  */
 export async function fetchInactiveObjects(
   connection: IAbapConnection,
@@ -56,42 +46,3 @@ export async function fetchInactiveObjects(
     },
   });
 }
-
-/** The shipped reading of that answer. */
-export const inactiveObjects: IResultStrategy<IInactiveObjectsResponse> = (
-  response,
-) => {
-  const xml = response.data;
-  const parsed = xmlParser.parse(xml);
-
-  const objects: IObjectReference[] = [];
-
-  // Parse XML response
-  const root = parsed['ioc:inactiveObjects'];
-  if (!root) {
-    return { objects };
-  }
-
-  const entries = Array.isArray(root['ioc:entry'])
-    ? root['ioc:entry']
-    : root['ioc:entry']
-      ? [root['ioc:entry']]
-      : [];
-
-  for (const entry of entries) {
-    const objectData = entry['ioc:object'];
-    if (!objectData) continue;
-
-    const ref = objectData['ioc:ref'];
-    if (!ref) continue;
-
-    objects.push({
-      type: ref['@_adtcore:type'] || '',
-      name: ref['@_adtcore:name'] || '',
-    });
-  }
-
-  return {
-    objects,
-  };
-};

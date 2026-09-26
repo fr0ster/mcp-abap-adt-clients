@@ -3,4 +3,8 @@
  */
 
 export * from './activationGraph';
-export { DdicActivation } from './DdicActivation';
+export {
+  DdicActivation,
+  ddicActivationDocuments,
+  type IDdicActivationResults,
+} from './DdicActivation';

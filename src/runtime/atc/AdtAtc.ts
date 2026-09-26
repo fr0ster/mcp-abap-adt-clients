@@ -1,38 +1,37 @@
 /**
- * ATC check runs: start one, ask whether it is done, read what it found.
+ * ATC check runs: the check variant, a worklist, the run, its status, its
+ * findings — one request each.
  *
- * Three capabilities and no more. A check run is not created, updated, locked,
- * activated or versioned — it is run, and then read — so this declares
- * `IAdtRunnable` plus two readers rather than `IAdtObject`.
+ * Three contract capabilities and two members of its own. A check run is not
+ * created, updated, locked, activated or versioned — it is run, and then read.
  *
- * **Nothing here defaults a missing value.** Each response this depends on
- * carries one thing the next step cannot work without, and where that thing is
- * absent the call fails naming it. A missing `Location` never becomes the
- * worklist id and a missing `FINDING_STATS` never becomes `"0,0,0"`: the
- * dangerous outcome on an unfamiliar system is not an exception, it is a
- * confident zero that reads exactly like a clean check.
+ * **Nothing here reads a verdict into an answer.** Each answer a run depends on
+ * carries one thing the next step cannot work without — a check variant, a
+ * worklist id, a run id in `Location`, `FINDING_STATS`, `runs:status`. Whether
+ * its absence is a failure is the caller's `analyse` to say, and what the
+ * answer becomes is the result strategy this was constructed with. The
+ * readings that pull those values out are `atcSystemCheckVariant`,
+ * `atcWorklistId`, `atcStartedRun`, `atcWaitingRun` and `atcRunStatus` in
+ * `@mcp-abap-adt/adt-strategies`; none of them defaults a missing value, so a
+ * missing `FINDING_STATS` never becomes a confident `"0,0,0"`.
  */
 
 import {
   AdtObjectErrorCodes,
-  type IAbapConnection,
+  type IAdtAnalyseOptions,
+  type IAdtError,
   type IAdtResponse,
-  type IAdtRunnable,
-  type IAdtWireResponse,
   type IAtcFindings,
   type IAtcRunOptions,
   type IAtcRunStatusReadable,
   type IAtcRunTarget,
+  type IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AdtOperationError } from '../../utils/adtErrors';
 import { answering } from '../../utils/adtResponse';
 import { rawDocument } from '../../utils/resultStrategy';
-import {
-  parseRunStatus,
-  parseSystemCheckVariant,
-  parseWaitingRun,
-} from './parse';
 import {
   buildAtcObjectUri,
   createAtcWorklist,
@@ -41,27 +40,43 @@ import {
   getAtcWorklist,
   startAtcRun,
 } from './run';
-import type { IAtcRunResult, IAtcRunStatus } from './types';
 
 /** The default cap on results, and the only value anyone has run with. */
 const DEFAULT_MAXIMUM_VERDICTS = 100;
 
-function asText(data: unknown): string {
-  return typeof data === 'string' ? data : String(data ?? '');
+/** One strategy per distinct answer of an ATC run. */
+export interface IAtcResults {
+  /** `/atc/customizing` — `resolveCheckVariant`. */
+  readonly checkVariant: IResultStrategy<unknown>;
+  /** `/atc/worklists` POST, a bare id in `text/plain` — `createWorklist`. */
+  readonly worklist: IResultStrategy<unknown>;
+  /**
+   * A run started with `wait: false`: 201, an empty body, the run id in
+   * `Location`. `rawDocument` reads the body, so it answers `''` — a caller who
+   * wants the run id passes `atcStartedRun`.
+   */
+  readonly startedRun: IResultStrategy<unknown>;
+  /** A run started with `wait: true`: 200, `<atcworklist:worklistRun>`. */
+  readonly waitingRun: IResultStrategy<unknown>;
+  /** The run resource — `getRunStatus`. */
+  readonly runStatus: IResultStrategy<unknown>;
+  /** The worklist — `getFindings`. */
+  readonly findings: IResultStrategy<unknown>;
 }
 
-/** Header lookup that does not assume the server's capitalisation. */
-function header(
-  headers: Record<string, unknown> | undefined,
-  name: string,
-): string | undefined {
-  if (!headers) return undefined;
-  const key = Object.keys(headers).find(
-    (k) => k.toLowerCase() === name.toLowerCase(),
-  );
-  const value = key ? headers[key] : undefined;
-  return typeof value === 'string' ? value : undefined;
-}
+/**
+ * The shipped default: every member answers its document as it arrived.
+ *
+ * `satisfies`, never an annotation — see `classDocuments` for why.
+ */
+export const atcDocuments = {
+  checkVariant: rawDocument,
+  worklist: rawDocument,
+  startedRun: rawDocument,
+  waitingRun: rawDocument,
+  runStatus: rawDocument,
+  findings: rawDocument,
+} satisfies IAtcResults;
 
 /**
  * **Not `IAdtRunnable` since 19.0.0.** That atom's `run` is one call, and an
@@ -69,12 +84,16 @@ function header(
  * A member that made all three chose the order and denied the caller a worklist
  * they could reuse. The atom stays in the contract for whoever composes them.
  */
-export class AdtAtc
-  implements IAtcRunStatusReadable<IAtcRunStatus>, IAtcFindings<string>
+export class AdtAtc<R extends IAtcResults = typeof atcDocuments>
+  implements
+    IAtcRunStatusReadable<ReturnType<R['runStatus']>>,
+    IAtcFindings<ReturnType<R['findings']>>
 {
   constructor(
     private readonly connection: IAbapConnection,
     private readonly logger: ILogger,
+    // The one cast in this file, and it is on the default. See AdtClass.
+    private readonly results: R = atcDocuments as unknown as R,
   ) {}
 
   /**
@@ -86,12 +105,35 @@ export class AdtAtc
    * ({@link resolveCheckVariant}, {@link createWorklist}) and the caller calls
    * them in the order they want — reusing a worklist across runs, or naming a
    * variant without asking the system for one.
+   *
+   * `wait` decides the shape of the answer, not just its timing, so it decides
+   * which strategy reads it: `waitingRun` when the server held the request,
+   * `startedRun` when it did not.
    */
-  async startRun(
+  async startRun<E extends IAdtError = IAdtError>(
     worklistId: string,
     target: IAtcRunTarget,
-    options?: IAtcRunOptions,
-  ): Promise<IAdtResponse<IAtcRunResult>> {
+    options: IAtcRunOptions & { wait: true } & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['waitingRun']>, E>>;
+  async startRun<E extends IAdtError = IAdtError>(
+    worklistId: string,
+    target: IAtcRunTarget,
+    options?: IAtcRunOptions & { wait?: false } & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['startedRun']>, E>>;
+  async startRun<E extends IAdtError = IAdtError>(
+    worklistId: string,
+    target: IAtcRunTarget,
+    options?: IAtcRunOptions & IAdtAnalyseOptions<E>,
+  ): Promise<
+    IAdtResponse<ReturnType<R['waitingRun']> | ReturnType<R['startedRun']>, E>
+  >;
+  async startRun<E extends IAdtError = IAdtError>(
+    worklistId: string,
+    target: IAtcRunTarget,
+    options?: IAtcRunOptions & IAdtAnalyseOptions<E>,
+  ): Promise<
+    IAdtResponse<ReturnType<R['waitingRun']> | ReturnType<R['startedRun']>, E>
+  > {
     const wait = options?.wait ?? false;
     const maximumVerdicts =
       options?.maximumVerdicts ?? DEFAULT_MAXIMUM_VERDICTS;
@@ -103,54 +145,76 @@ export class AdtAtc
       buildAtcObjectUri(o.objectType, o.objectName),
     );
 
-    // The two shapes are read out of the same answer; which one depends on
-    // `wait`, which the caller chose. Both are readings, so both sit in the
-    // reading half — a run the server refused comes back as the failure half,
-    // while an answer this library cannot read throws, which is the whole
-    // reason `answering` runs the reading outside its own catch.
     return answering(
       () =>
         startAtcRun(this.connection, worklistId, uris, maximumVerdicts, wait),
-      (answer) =>
-        wait
-          ? this.readWaitingRun(answer, worklistId)
-          : this.readStartedRun(answer, worklistId),
+      (wait
+        ? this.results.waitingRun
+        : this.results.startedRun) as IResultStrategy<
+        ReturnType<R['waitingRun']> | ReturnType<R['startedRun']>
+      >,
+      options?.analyse,
     );
   }
 
-  async getRunStatus(runId: string): Promise<IAdtResponse<IAtcRunStatus>> {
+  async getRunStatus<E extends IAdtError = IAdtError>(
+    runId: string,
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['runStatus']>, E>> {
     return answering(
       () => getAtcRunStatus(this.connection, runId),
-      (answer) => {
-        const parsed = parseRunStatus(answer.data);
-        const status = parsed.status;
-        if (!status) {
-          // A reading that cannot read is this library's own failure, and it
-          // throws: `IAtcRunStatus.status` is not optional, and resolving with
-          // undefined through it would be a lie the type cannot catch.
-          const error = new AdtOperationError(
-            `ATC run ${runId}: the run resource carried no runs:status.`,
-          );
-          error.code = 'ATC_RUN_STATUS_MISSING';
-          throw error;
-        }
-        return {
-          status,
-          // Exact and case-normalised. A substring test would accept
-          // `unfinished` and `not_finished`, opening the worklist on a run
-          // that had not run.
-          isFinished: status.trim().toLowerCase() === 'finished',
-          worklistId: parsed.worklistId,
-          resultId: parsed.resultId,
-        };
-      },
+      this.results.runStatus as IResultStrategy<ReturnType<R['runStatus']>>,
+      options?.analyse,
     );
   }
 
-  async getFindings(worklistId: string): Promise<IAdtResponse<string>> {
+  async getFindings<E extends IAdtError = IAdtError>(
+    worklistId: string,
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['findings']>, E>> {
     return answering(
       () => getAtcWorklist(this.connection, worklistId),
-      rawDocument,
+      this.results.findings as IResultStrategy<ReturnType<R['findings']>>,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * ATC customizing, which carries the system's check variant —
+   * `/atc/customizing`.
+   *
+   * One request. Public since 19.0.0 because {@link startRun} no longer fetches
+   * it: which variant a run uses is the caller's choice, and asking for the
+   * system default is one of the things they may choose. `atcSystemCheckVariant`
+   * reads the variant out of it; a customizing without one reads as `''`.
+   */
+  async resolveCheckVariant<E extends IAdtError = IAdtError>(
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['checkVariant']>, E>> {
+    return answering(
+      () => getAtcCustomizing(this.connection),
+      this.results.checkVariant as IResultStrategy<
+        ReturnType<R['checkVariant']>
+      >,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * A worklist for a variant — `/atc/worklists`.
+   *
+   * One request, answering a bare id in its body (`atcWorklistId` trims it).
+   * Public for the same reason as {@link resolveCheckVariant}: the run is a
+   * sequence now, and this is one of its steps.
+   */
+  async createWorklist<E extends IAdtError = IAdtError>(
+    checkVariant: string,
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['worklist']>, E>> {
+    return answering(
+      () => createAtcWorklist(this.connection, checkVariant),
+      this.results.worklist as IResultStrategy<ReturnType<R['worklist']>>,
+      options?.analyse,
     );
   }
 
@@ -176,105 +240,5 @@ export class AdtAtc
       error.code = AdtObjectErrorCodes.VALIDATION_FAILED;
       throw error;
     }
-  }
-
-  /**
-   * The system's check variant, out of `/atc/customizing`.
-   *
-   * One request. Public since 19.0.0 because {@link startRun} no longer fetches
-   * it: which variant a run uses is the caller's choice, and asking for the
-   * system default is one of the things they may choose.
-   */
-  async resolveCheckVariant(): Promise<string> {
-    const response = await getAtcCustomizing(this.connection);
-    const variant = parseSystemCheckVariant(response.data);
-    if (!variant) {
-      const error = new AdtOperationError(
-        'ATC customizing carried no systemCheckVariant, and no checkVariant was given. Creating a worklist with an undefined variant would leave the server to decide what that means.',
-      );
-      error.code = 'ATC_NO_CHECK_VARIANT';
-      throw error;
-    }
-    this.logger?.debug?.(`ATC check variant from customizing: ${variant}`);
-    return variant;
-  }
-
-  /**
-   * A worklist for a variant — `/atc/worklists`.
-   *
-   * One request, answering the worklist id. Public for the same reason as
-   * {@link resolveCheckVariant}: the run is a sequence now, and this is one of
-   * its steps.
-   */
-  async createWorklist(checkVariant: string): Promise<string> {
-    const response = await createAtcWorklist(this.connection, checkVariant);
-    const worklistId = asText(response.data).trim();
-    // Non-empty, and nothing more specific: the observed ids are 32-character
-    // hex on one system, but no contract states a format, and a stricter test
-    // would risk refusing a valid id from a system nobody has probed.
-    if (!worklistId) {
-      const error = new AdtOperationError(
-        'ATC worklist creation answered with no id. A run against an empty worklist id is a request nobody can interpret.',
-      );
-      error.code = 'ATC_NO_WORKLIST_ID';
-      throw error;
-    }
-    return worklistId;
-  }
-
-  /** `clientWait=false`: 201, empty body, the run id in `Location`. */
-  private readStartedRun(
-    response: IAdtWireResponse,
-    worklistId: string,
-  ): IAtcRunResult {
-    const location =
-      header(response.headers as Record<string, unknown>, 'location') ??
-      header(response.headers as Record<string, unknown>, 'content-location');
-    if (!location) {
-      const error = new AdtOperationError(
-        'ATC run was accepted without a Location header, so it has no run id to poll. Falling back to the worklist id would look like success and fetch a run that does not exist.',
-      );
-      error.code = 'ATC_NO_RUN_LOCATION';
-      throw error;
-    }
-    const runId = location.replace(/\/+$/, '').split('/').pop();
-    if (!runId) {
-      const error = new AdtOperationError(
-        `ATC run Location carried no id: ${location}`,
-      );
-      error.code = 'ATC_NO_RUN_LOCATION';
-      throw error;
-    }
-    return { waited: false, worklistId, runId };
-  }
-
-  /** `clientWait=true`: 200, `<atcworklist:worklistRun>` with FINDING_STATS. */
-  private readWaitingRun(
-    response: IAdtWireResponse,
-    worklistId: string,
-  ): IAtcRunResult {
-    const parsed = parseWaitingRun(response.data);
-    const findingStats = parsed.findingStats;
-    if (!findingStats) {
-      const error = new AdtOperationError(
-        'ATC waiting run answered without FINDING_STATS. Defaulting it to "0,0,0" would report a confident zero, which is indistinguishable from a clean check.',
-      );
-      error.code = 'ATC_NO_FINDING_STATS';
-      throw error;
-    }
-
-    // The response echoes a worklist id. The one returned is the one this
-    // handler created — that is the id it controls and the id getFindings
-    // takes — so a differing echo is worth a warning and nothing more. It is
-    // not an error: the contract does not make it one, and turning a usable
-    // answer into a failure is not a decision an implementation gets to make.
-    const echoed = parsed.worklistId;
-    if (echoed && echoed !== worklistId) {
-      this.logger?.warn?.(
-        `ATC run echoed worklist ${echoed} but was started against ${worklistId}; returning the one this client created.`,
-      );
-    }
-
-    return { waited: true, worklistId, findingStats };
   }
 }

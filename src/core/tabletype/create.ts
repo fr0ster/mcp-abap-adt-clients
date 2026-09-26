@@ -5,10 +5,9 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
-import type { HttpError } from '@mcp-abap-adt/interfaces-network';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { CT_TABLE_TYPE } from '../../constants/contentTypes';
-import { limitDescription, safeStringify } from '../../utils/internalUtils';
+import { limitDescription } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { ICreateTableTypeParams } from './types';
 
@@ -50,26 +49,14 @@ export async function createTableType(
     'Content-Type': CT_TABLE_TYPE,
   };
 
-  try {
-    const createResponse = await connection.makeAdtRequest({
-      url: createUrl,
-      method: 'POST',
-      timeout: getTimeout('default'),
-      data: tableTypeXml,
-      headers,
-    });
-
-    return createResponse;
-  } catch (error: unknown) {
-    const e = error as HttpError;
-    const errorMessage = e.response?.data
-      ? typeof e.response.data === 'string'
-        ? e.response.data
-        : safeStringify(e.response.data)
-      : e.message;
-
-    throw new Error(
-      `Failed to create table type ${params.tabletype_name}: ${errorMessage}`,
-    );
-  }
+  // A refusal comes back as the transport's failure, with SAP's answer on it.
+  // It used to be rewrapped in a new Error carrying the text alone, which
+  // dropped the response the caller's `analyse` reads.
+  return connection.makeAdtRequest({
+    url: createUrl,
+    method: 'POST',
+    timeout: getTimeout('default'),
+    data: tableTypeXml,
+    headers,
+  });
 }

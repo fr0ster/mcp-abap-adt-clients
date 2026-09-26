@@ -6,11 +6,11 @@
  * - Get feed variants
  */
 
+import type { IFeedQueryOptions } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
-  IFeedQueryOptions,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { getTimeout } from '../../utils/timeouts';
 
 /**

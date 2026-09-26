@@ -12,10 +12,14 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import {
+  analyseUnitTestStart,
+  unitTestRunId,
+} from '@mcp-abap-adt/adt-strategies';
 import type {
   IAbapConnection,
   ISessionLifecycleAware,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
@@ -24,6 +28,7 @@ import type {
   IUnitTestConfig,
 } from '../../../../core/unitTest';
 import { checkCdsTestDoublesAvailability } from '../../../../core/unitTest/checkCdsTestDoublesAvailability';
+import { unitTestDocuments } from '../../../../core/unitTest/types';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { expectResult } from '../../../helpers/contract';
 import {
@@ -319,11 +324,19 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
           // Step 5: Run the tests the generated class holds. No create and no
           // update first — running is its own capability.
           logTestStep('run (unit test)', testsLogger);
-          const unitTest = client.getUnitTest();
+          // The run's id is in a header of the start's answer; the reading that
+          // finds it, and the check that a start carried one, are strategies.
+          const unitTest = client.getUnitTest({
+            ...unitTestDocuments,
+            run: unitTestRunId,
+          });
           const runId = expectResult(
             await unitTest.run(
               [{ containerClass: className, testClass: testClassName }],
-              testCase.params.unit_test_options || {},
+              {
+                ...(testCase.params.unit_test_options || {}),
+                analyse: analyseUnitTestStart,
+              },
             ),
             'start CDS unit test run',
           );

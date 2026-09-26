@@ -26,16 +26,18 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+// The source path, not the package: these readings are new in adt-strategies
+// and the package's built entry point does not carry them until it is released.
+import { utilSearchHits } from '@mcp-abap-adt/adt-strategies';
+import type { IAdtError, IAnalyse } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
-  IAdtError,
-  IAnalyse,
   ISessionLifecycleAware,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
-import { expectResult } from '../../helpers/contract';
+import { utilDocuments } from '../../../core/shared/utilResultSet';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -97,7 +99,10 @@ describe('Response contract - 17.0.0', () => {
       }
       logTestStep('search for objects that exist', testsLogger);
 
-      const answer = await client.getUtils().search({ query: 'CL_ABAP*' });
+      // The hits are a reading the caller asks for; the default is the document.
+      const answer = await client
+        .getUtils({ ...utilDocuments, search: utilSearchHits })
+        .search({ query: 'CL_ABAP*' });
 
       expect(answer.ok).toBe(true);
       if (!answer.ok) {
@@ -250,9 +255,10 @@ describe('Response contract - 17.0.0', () => {
       expect(answer.ok).toBe(true);
       if (!answer.ok) throw new Error('expected an answer to read');
 
-      const body = String(
-        (answer.getResult().value as { data?: unknown })?.data ?? '',
-      );
+      // The default reading is the document itself. This read `.data` off the
+      // value while the default was a parse, which is `undefined` on any value
+      // and so asserted nothing; the body is what carries the claim.
+      const body = String(answer.getResult().value ?? '');
       expect(body.trim().length).toBe(0);
       testsLogger.info?.(
         `📛 ${NEVER_EXISTS} answered 200 with ${body.length} bytes — absence and emptiness are the same document`,

@@ -1,16 +1,18 @@
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_ABAPGIT_REPOS_V2 } from '../../constants/contentTypes';
 import { getTimeout } from '../../utils/timeouts';
-import { type IRepoEntityParsed, parseRepoList } from './xmlParser';
 
+/** Every linked repository — `GET /abapgit/repos`, answered as it arrived. */
 export async function listRepos(
   connection: IAbapConnection,
-): Promise<IRepoEntityParsed[]> {
-  const resp = await connection.makeAdtRequest({
+): Promise<IAdtWireResponse> {
+  return connection.makeAdtRequest({
     method: 'GET',
     url: '/sap/bc/adt/abapgit/repos',
     timeout: getTimeout('default'),
     headers: { Accept: ACCEPT_ABAPGIT_REPOS_V2 },
   });
-  return parseRepoList(String(resp.data));
 }

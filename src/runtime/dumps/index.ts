@@ -2,7 +2,11 @@
  * Runtime Dumps - Exports
  */
 
-export { RuntimeDumps } from './RuntimeDumps';
+export {
+  type IRuntimeDumpsResults,
+  RuntimeDumps,
+  runtimeDumpsDocuments,
+} from './RuntimeDumps';
 export {
   buildDumpIdPrefix,
   buildRuntimeDumpsUserQuery,

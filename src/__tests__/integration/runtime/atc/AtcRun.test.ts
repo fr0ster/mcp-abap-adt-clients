@@ -28,13 +28,21 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import {
+  atcRunStatus,
+  atcStartedRun,
+  atcSystemCheckVariant,
+  atcWaitingRun,
+  atcWorklistId,
+} from '@mcp-abap-adt/adt-strategies';
 import type {
   IAbapConnection,
   ISessionLifecycleAware,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import { AdtRuntimeClient } from '../../../../clients/AdtRuntimeClient';
+import { AdtAtc, atcDocuments } from '../../../../runtime/atc/AdtAtc';
 import { expectResult } from '../../../helpers/contract';
 import {
   createTestConnection,
@@ -65,6 +73,20 @@ const envPath =
 if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath, quiet: true });
 }
+
+/**
+ * The ATC readings these cases construct with. `AdtAtc` answers documents by
+ * default, and `runtime.getAtc()` builds that default; a run is read here for
+ * its ids and its stats, so the client is built with the readings.
+ */
+const atcReading = {
+  ...atcDocuments,
+  checkVariant: atcSystemCheckVariant,
+  worklist: atcWorklistId,
+  startedRun: atcStartedRun,
+  waitingRun: atcWaitingRun,
+  runStatus: atcRunStatus,
+};
 
 const connectionLogger: ILogger = createConnectionLogger();
 const libraryLogger: ILogger = createLibraryLogger();
@@ -171,9 +193,15 @@ describe('ATC check runs (using AdtRuntimeClient)', () => {
         logTestStep(`run ATC over class ${className}, waiting`, testsLogger);
         // Three calls since 19.0.0, because a run is three requests: the
         // system's check variant, a worklist for it, then the run.
-        const atc = runtime.getAtc();
-        const variant = await atc.resolveCheckVariant();
-        const worklistId = await atc.createWorklist(variant);
+        const atc = new AdtAtc(connection, libraryLogger, atcReading);
+        const variant = expectResult(
+          await atc.resolveCheckVariant(),
+          'check variant',
+        );
+        const worklistId = expectResult(
+          await atc.createWorklist(variant),
+          'worklist',
+        );
         const result = expectResult(
           await atc.startRun(
             worklistId,
@@ -267,11 +295,17 @@ describe('ATC check runs (using AdtRuntimeClient)', () => {
       const intervalMs = POLL_INTERVAL_MS;
 
       try {
-        const atc = runtime.getAtc();
+        const atc = new AdtAtc(connection, libraryLogger, atcReading);
 
         logTestStep(`start ATC run over class ${className}`, testsLogger);
-        const variant = await atc.resolveCheckVariant();
-        const worklistId = await atc.createWorklist(variant);
+        const variant = expectResult(
+          await atc.resolveCheckVariant(),
+          'check variant',
+        );
+        const worklistId = expectResult(
+          await atc.createWorklist(variant),
+          'worklist',
+        );
         const started = expectResult(
           await atc.startRun(worklistId, {
             objects: [{ objectType: 'class', objectName: className }],
@@ -282,7 +316,7 @@ describe('ATC check runs (using AdtRuntimeClient)', () => {
         expect(started.waited).toBe(false);
         if (started.waited) return;
         expect(started.runId).toBeTruthy();
-        expect(started.worklistId).toBeTruthy();
+        expect(worklistId).toBeTruthy();
 
         // The bound is the caller's to choose — there is no waitForRun helper,
         // and its absence is the library's design rather than an omission.
@@ -303,9 +337,9 @@ describe('ATC check runs (using AdtRuntimeClient)', () => {
         // reached an end, and the worklist below says what it found.
         expect(status.isFinished).toBe(true);
 
-        logTestStep(`read worklist ${started.worklistId}`, testsLogger);
+        logTestStep(`read worklist ${worklistId}`, testsLogger);
         const worklist = expectResult(
-          await atc.getFindings(started.worklistId),
+          await atc.getFindings(worklistId),
           'ATC findings',
         );
         expect(typeof worklist).toBe('string');

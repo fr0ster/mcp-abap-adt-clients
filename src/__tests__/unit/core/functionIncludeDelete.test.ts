@@ -1,4 +1,4 @@
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { deleteFunctionInclude } from '../../../core/functionInclude/delete';
 
 function connReturning(xml: string): IAbapConnection {
@@ -43,25 +43,28 @@ describe('deleteFunctionInclude', () => {
     expect(res.data).toBe(OK_XML_WITH_S_MESSAGE);
   });
 
-  it('throws the server message when isDeleted="false" (does not mask as success)', async () => {
+  // Until 23.0.0 the two cases below threw: the wire function parsed
+  // `del:isDeleted` and raised "was not deleted" itself. That is a verdict about
+  // SAP's answer, so it belongs to the caller's `analyse` (`analyseDeletion` in
+  // @mcp-abap-adt/adt-strategies); the wire hands the answer over whole.
+  it('hands back the refusal document when isDeleted="false", unjudged', async () => {
     const conn = connReturning(REFUSED_XML);
-    await expect(
-      deleteFunctionInclude(conn, {
-        function_group_name: 'ZG',
-        include_name: 'LZG_T01',
-      }),
-    ).rejects.toThrow(
-      'Only delete function module includes using Function Builder',
-    );
+    const res = await deleteFunctionInclude(conn, {
+      function_group_name: 'ZG',
+      include_name: 'LZG_T01',
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.data).toBe(REFUSED_XML);
   });
 
-  it('throws (not silent success) on an empty/unparseable body', async () => {
+  it('hands back an empty body as it came', async () => {
     const conn = connReturning('');
-    await expect(
-      deleteFunctionInclude(conn, {
-        function_group_name: 'ZG',
-        include_name: 'LZG_X',
-      }),
-    ).rejects.toThrow('was not deleted');
+    const res = await deleteFunctionInclude(conn, {
+      function_group_name: 'ZG',
+      include_name: 'LZG_X',
+    });
+
+    expect(res.data).toBe('');
   });
 });

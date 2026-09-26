@@ -8,15 +8,12 @@ import * as path from 'node:path';
 import type {
   IAbapConnection,
   ISessionLifecycleAware,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import { AdtExecutor } from '../../../../clients/AdtExecutor';
 import { AdtRuntimeClient } from '../../../../clients/AdtRuntimeClient';
-import type {
-  IProfilerTraceParameters,
-  Profiler,
-} from '../../../../runtime/traces';
+import type { IProfilerTraceParameters } from '../../../../runtime/traces';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { expectResult } from '../../../helpers/contract';
 import { resolveRunnableProgramName } from '../../../helpers/runnableProgramHelper';
@@ -40,7 +37,13 @@ import {
   logTestStep,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
-import { traceIdsNow, waitForNewTrace } from '../../../helpers/traceHelpers';
+import {
+  type ReadingProfiler,
+  readingProfiler,
+  readingProgramExecutor,
+  traceIdsNow,
+  waitForNewTrace,
+} from '../../../helpers/traceHelpers';
 
 const {
   getEnabledTestCase,
@@ -116,7 +119,8 @@ describe('ProgramExecutor (integration)', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let executor: AdtExecutor;
   let runtime: AdtRuntimeClient;
-  let profiler: Profiler;
+  let profiler: ReadingProfiler;
+  let programRunner: ReturnType<typeof readingProgramExecutor>;
   let hasConfig = false;
   let isCloudSystem = false;
   let isLegacy = false;
@@ -147,10 +151,11 @@ describe('ProgramExecutor (integration)', () => {
       traceUser = systemContext.responsible;
       executor = new AdtExecutor(connection, libraryLogger);
       runtime = new AdtRuntimeClient(connection, libraryLogger);
-      // The concrete implementation, not `IProfiler`: the contract is generic
-      // in what its readings answer, and naming it here would mean spelling
-      // those parameters out only to repeat what the factory already knows.
-      profiler = runtime.getProfiler();
+      // Built with the readings rather than taken from the factories: the
+      // profiler and the scheduling answer documents by default, and these
+      // cases assert entries, rows and the scheduled request id.
+      profiler = readingProfiler(connection, libraryLogger);
+      programRunner = readingProgramExecutor(connection, libraryLogger);
       hasConfig = true;
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails
@@ -174,7 +179,7 @@ describe('ProgramExecutor (integration)', () => {
     // appeared in between belongs to somebody else.
     for (const traceId of tracesCreated) {
       try {
-        await runtime.getProfiler().delete(traceId);
+        await profiler.delete(traceId);
       } catch (cleanupError) {
         testsLogger.warn?.(
           `⚠️ Cleanup failed for trace ${traceId}: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,
@@ -247,7 +252,7 @@ describe('ProgramExecutor (integration)', () => {
         const programName = sharedRunnableProgram(testCase);
         logTestStep('run', testsLogger);
         const response = expectResult(
-          await executor.getProgramExecutor().run({ programName }),
+          await programRunner.run({ programName }),
           'response',
         );
 
@@ -331,7 +336,7 @@ describe('ProgramExecutor (integration)', () => {
           'create trace parameters, then run with profiler',
           testsLogger,
         );
-        const programExecutor = executor.getProgramExecutor();
+        const programExecutor = programRunner;
         const profilerId = expectResult(
           await programExecutor.scheduleTrace(profilerParameters),
           'scheduled trace',

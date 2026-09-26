@@ -1,4 +1,4 @@
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 
 /**
  * A connection that puts the caller's deadline on every request made through it.

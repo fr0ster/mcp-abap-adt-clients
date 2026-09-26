@@ -1,4 +1,4 @@
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { RuntimeDumps } from '../../../runtime/dumps/RuntimeDumps';
 
 describe('RuntimeDumps', () => {

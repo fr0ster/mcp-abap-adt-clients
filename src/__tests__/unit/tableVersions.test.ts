@@ -1,7 +1,7 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   getTableVersionSource,
   getTableVersions,
@@ -14,29 +14,28 @@ function conn(handler: (o: any) => Promise<IAdtWireResponse>): IAbapConnection {
 }
 
 describe('getTableVersions', () => {
-  it('GETs source/main/versions with the atom-feed Accept and parses it', async () => {
+  it('GETs source/main/versions with the atom-feed Accept, and answers the feed', async () => {
     let seen: any;
     const c = conn(async (o) => {
       seen = o;
       return { data: FEED, status: 200, headers: {} } as IAdtWireResponse;
     });
-    const list = await getTableVersions(c, { tableName: 'ZT' });
+    const answer = await getTableVersions(c, { tableName: 'ZT' });
     expect(seen.url).toBe('/sap/bc/adt/ddic/tables/ZT/source/main/versions');
     expect(seen.headers.Accept).toContain('application/atom+xml;type=feed');
-    expect(list).toHaveLength(1);
-    expect(list[0].contentUri).toContain('/00000/content');
+    // The feed as it arrived — `objectVersions` in adt-strategies reads it.
+    expect(answer.data).toBe(FEED);
   });
 
-  it('translates a 404 into UNSUPPORTED_OPERATION (no raw HTTP outward)', async () => {
-    expect.assertions(1);
+  it('lets a 404 through as the transport raised it, not as a library error', async () => {
+    const err: any = new Error('not found');
+    err.response = { status: 404 };
     const c = conn(async () => {
-      const err: any = new Error('not found');
-      err.response = { status: 404 };
       throw err;
     });
-    await expect(
-      getTableVersions(c, { tableName: 'ZT' }),
-    ).rejects.toMatchObject({ code: 'ADT_UNSUPPORTED_OPERATION' });
+    // A system without the resource said so; the member hands that to the
+    // caller's analyse (`analyseUnsupportedStatus([404, 406], …)` names it).
+    await expect(getTableVersions(c, { tableName: 'ZT' })).rejects.toBe(err);
   });
 });
 
@@ -51,9 +50,12 @@ describe('getTableVersionSource', () => {
         headers: {},
       } as IAdtWireResponse;
     });
-    const src = await getTableVersionSource(c, '/sap/bc/adt/x/00000/content');
+    const answer = await getTableVersionSource(
+      c,
+      '/sap/bc/adt/x/00000/content',
+    );
     expect(seen.url).toBe('/sap/bc/adt/x/00000/content');
     expect(seen.headers.Accept).toBe('text/plain');
-    expect(src).toContain('DEFINE TABLE');
+    expect(String(answer.data)).toContain('DEFINE TABLE');
   });
 });

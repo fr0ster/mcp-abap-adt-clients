@@ -2,8 +2,8 @@
  * ATC (ABAP Test Cockpit) - Exports
  */
 
-export { AdtAtc } from './AdtAtc';
-export { AtcLog } from './AtcLog';
+export { AdtAtc, atcDocuments, type IAtcResults } from './AdtAtc';
+export { AtcLog, atcLogDocuments, type IAtcLogResults } from './AtcLog';
 export {
   getCheckFailureLogs,
   getExecutionLog,

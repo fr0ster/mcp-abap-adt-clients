@@ -5,10 +5,8 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
-import type { HttpError } from '@mcp-abap-adt/interfaces-network';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_TRANSPORT } from '../../constants/contentTypes';
-import { safeStringify } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { ICreateTransportParams } from './types';
 
@@ -51,26 +49,15 @@ export async function createTransport(
     'Content-Type': 'text/plain',
   };
 
-  try {
-    const response = await connection.makeAdtRequest({
-      url,
-      method: 'POST',
-      timeout: getTimeout('default'),
-      data: xmlBody,
-      headers,
-    });
-
-    // The document, as it arrived. What a caller wants out of it is the
-    // reading's question — `parseCreatedTransport` is the shipped answer.
-    return response;
-  } catch (error: unknown) {
-    const e = error as HttpError;
-    const errorMessage = e.response?.data
-      ? typeof e.response.data === 'string'
-        ? e.response.data
-        : safeStringify(e.response.data)
-      : e.message;
-
-    throw new Error(`Failed to create transport request: ${errorMessage}`);
-  }
+  // The document, as it arrived. What a caller wants out of it is the
+  // reading's question. A refusal comes back as the transport's failure, with
+  // SAP's answer on it — it used to be rewrapped in a new Error carrying the
+  // text alone, which dropped the response the caller's `analyse` reads.
+  return connection.makeAdtRequest({
+    url,
+    method: 'POST',
+    timeout: getTimeout('default'),
+    data: xmlBody,
+    headers,
+  });
 }

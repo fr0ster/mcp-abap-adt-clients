@@ -2,105 +2,31 @@
  * Domain lock operations
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
-import type { HttpError } from '@mcp-abap-adt/interfaces-network';
-import { XMLParser } from 'fast-xml-parser';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_LOCK } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
-import type { ICreateDomainParams } from './types';
 
 /**
- * Acquire lock handle by attempting to lock the domain (for create)
+ * `POST …?_action=LOCK` — answered as it arrived.
  *
- * NOTE: Requires stateful session mode enabled via connection.setSessionType("stateful")
- */
-export async function acquireLockHandle(
-  connection: IAbapConnection,
-  args: ICreateDomainParams,
-): Promise<string> {
-  const domainNameEncoded = encodeSapObjectName(args.domain_name.toLowerCase());
-  const url = `/sap/bc/adt/ddic/domains/${domainNameEncoded}?_action=LOCK&accessMode=MODIFY`;
-
-  const headers = {
-    Accept: ACCEPT_LOCK,
-  };
-
-  try {
-    const response = await connection.makeAdtRequest({
-      url,
-      method: 'POST',
-      timeout: getTimeout('default'),
-      data: null,
-      headers,
-    });
-
-    const parser = new XMLParser({
-      ignoreAttributes: false,
-      attributeNamePrefix: '',
-    });
-
-    const result = parser.parse(response.data);
-    const lockHandle = result?.['asx:abap']?.['asx:values']?.DATA?.LOCK_HANDLE;
-
-    if (!lockHandle) {
-      throw new Error('Failed to obtain lock handle from SAP response');
-    }
-
-    return lockHandle;
-  } catch (error: unknown) {
-    const e = error as HttpError;
-    if (
-      typeof e.response?.data === 'string' &&
-      e.response.data.includes('ExceptionResourceAlreadyExists')
-    ) {
-      throw new Error(
-        `Domain ${args.domain_name} already exists. Please delete it first or use a different name.`,
-      );
-    }
-
-    throw new Error(
-      `Failed to create empty domain ${args.domain_name}: ${e.message || error}`,
-    );
-  }
-}
-
-/**
- * Lock domain for modification
- * Returns lock handle that must be used in subsequent requests
- *
- * NOTE: Requires stateful session mode enabled via connection.setSessionType("stateful")
+ * The handle is read by `lockHandleOf` in the member. Until 23.0.0 this parsed
+ * it and threw when SAP's answer had none, which turned a statement about SAP's
+ * answer into a library failure and dropped the answer.
  */
 export async function lockDomain(
   connection: IAbapConnection,
   domainName: string,
-): Promise<string> {
+): Promise<IAdtWireResponse> {
   const domainNameEncoded = encodeSapObjectName(domainName.toLowerCase());
-  const url = `/sap/bc/adt/ddic/domains/${domainNameEncoded}?_action=LOCK&accessMode=MODIFY`;
-
-  const headers = {
-    Accept: ACCEPT_LOCK,
-  };
-
-  const response = await connection.makeAdtRequest({
-    url,
+  return connection.makeAdtRequest({
+    url: `/sap/bc/adt/ddic/domains/${domainNameEncoded}?_action=LOCK&accessMode=MODIFY`,
     method: 'POST',
     timeout: getTimeout('default'),
     data: null,
-    headers,
+    headers: { Accept: ACCEPT_LOCK },
   });
-
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: '',
-  });
-
-  const result = parser.parse(response.data);
-  const lockHandle = result['asx:abap']?.['asx:values']?.DATA?.LOCK_HANDLE;
-
-  if (!lockHandle) {
-    throw new Error('Failed to extract lock handle from response');
-  }
-
-  return lockHandle;
 }

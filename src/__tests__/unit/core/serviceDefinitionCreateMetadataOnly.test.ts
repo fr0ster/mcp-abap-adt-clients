@@ -4,7 +4,7 @@
  * when sourceCode is passed. This is the invariant behind removing the dead
  * source_code create-param — source is written by update(), as in Eclipse ADT.
  */
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AdtServiceDefinition } from '../../../core/serviceDefinition/AdtServiceDefinition';
 import { createTestsLogger } from '../../helpers/testLogger';

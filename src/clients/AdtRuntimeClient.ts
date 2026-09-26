@@ -38,36 +38,64 @@
  * ```
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
-import { ApplicationLog } from '../runtime/applicationLog/ApplicationLog';
-import { AdtAtc } from '../runtime/atc/AdtAtc';
-import { AtcLog } from '../runtime/atc/AtcLog';
-import { DdicActivation } from '../runtime/ddic/DdicActivation';
-import { RuntimeDumps } from '../runtime/dumps/RuntimeDumps';
-import { FeedRepository } from '../runtime/feeds/FeedRepository';
-import { GatewayErrorLog } from '../runtime/gatewayErrorLog/GatewayErrorLog';
-import { SystemMessages } from '../runtime/systemMessages/SystemMessages';
-import { CrossTrace } from '../runtime/traces/CrossTraceDomain';
-import { Profiler } from '../runtime/traces/ProfilerDomain';
-import { St05Trace } from '../runtime/traces/St05Trace';
+import {
+  ApplicationLog,
+  applicationLogDocuments,
+  type IApplicationLogResults,
+} from '../runtime/applicationLog/ApplicationLog';
+import { AdtAtc, atcDocuments, type IAtcResults } from '../runtime/atc/AdtAtc';
+import {
+  AtcLog,
+  atcLogDocuments,
+  type IAtcLogResults,
+} from '../runtime/atc/AtcLog';
+import {
+  DdicActivation,
+  ddicActivationDocuments,
+  type IDdicActivationResults,
+} from '../runtime/ddic/DdicActivation';
+import {
+  type IRuntimeDumpsResults,
+  RuntimeDumps,
+  runtimeDumpsDocuments,
+} from '../runtime/dumps/RuntimeDumps';
+import {
+  FeedRepository,
+  feedDocuments,
+  type IFeedResults,
+} from '../runtime/feeds/FeedRepository';
+import {
+  GatewayErrorLog,
+  gatewayErrorLogDocuments,
+  type IGatewayErrorLogResults,
+} from '../runtime/gatewayErrorLog/GatewayErrorLog';
+import {
+  type ISystemMessagesResults,
+  SystemMessages,
+  systemMessagesDocuments,
+} from '../runtime/systemMessages/SystemMessages';
+import {
+  CrossTrace,
+  crossTraceDocuments,
+  type ICrossTraceResultSet,
+} from '../runtime/traces/CrossTraceDomain';
+import {
+  type IProfilerResults,
+  Profiler,
+  profilerDocuments,
+} from '../runtime/traces/ProfilerDomain';
+import {
+  type ISt05TraceResults,
+  St05Trace,
+  st05TraceDocuments,
+} from '../runtime/traces/St05Trace';
 import { withRequestTrace } from '../utils/requestTrace';
 
 export class AdtRuntimeClient {
   protected readonly connection: IAbapConnection;
   protected readonly logger: ILogger;
-
-  private _profiler?: Profiler;
-  private _crossTrace?: CrossTrace;
-  private _st05Trace?: St05Trace;
-  private _applicationLog?: ApplicationLog;
-  private _atc?: AdtAtc;
-  private _atcLog?: AtcLog;
-  private _ddicActivation?: DdicActivation;
-  private _dumps?: RuntimeDumps;
-  private _feeds?: FeedRepository;
-  private _systemMessages?: SystemMessages;
-  private _gatewayErrorLog?: GatewayErrorLog;
 
   constructor(
     connection: IAbapConnection,
@@ -90,9 +118,13 @@ export class AdtRuntimeClient {
         wrapConnectionAcceptNegotiation,
         getAcceptCorrectionEnabled,
       } = require('../utils/acceptNegotiation');
-      setAcceptCorrectionEnabled(options.enableAcceptCorrection);
+      setAcceptCorrectionEnabled(
+        this.connection,
+        options.enableAcceptCorrection,
+      );
       const shouldWrap =
-        options.enableAcceptCorrection ?? getAcceptCorrectionEnabled();
+        options.enableAcceptCorrection ??
+        getAcceptCorrectionEnabled(this.connection);
       if (shouldWrap) {
         wrapConnectionAcceptNegotiation(this.connection, this.logger);
       }
@@ -101,7 +133,7 @@ export class AdtRuntimeClient {
         getAcceptCorrectionEnabled,
         wrapConnectionAcceptNegotiation,
       } = require('../utils/acceptNegotiation');
-      if (getAcceptCorrectionEnabled()) {
+      if (getAcceptCorrectionEnabled(this.connection)) {
         wrapConnectionAcceptNegotiation(this.connection, this.logger);
       }
     }
@@ -111,32 +143,28 @@ export class AdtRuntimeClient {
   // Domain Object Factories
   // ============================================================================
 
-  getProfiler(): Profiler {
-    if (!this._profiler) {
-      this._profiler = new Profiler(this.connection, this.logger);
-    }
-    return this._profiler;
+  getProfiler<R extends IProfilerResults = typeof profilerDocuments>(
+    results: R = profilerDocuments as unknown as R,
+  ): Profiler<R> {
+    return new Profiler<R>(this.connection, this.logger, results);
   }
 
-  getCrossTrace(): CrossTrace {
-    if (!this._crossTrace) {
-      this._crossTrace = new CrossTrace(this.connection, this.logger);
-    }
-    return this._crossTrace;
+  getCrossTrace<R extends ICrossTraceResultSet = typeof crossTraceDocuments>(
+    results: R = crossTraceDocuments as unknown as R,
+  ): CrossTrace<R> {
+    return new CrossTrace<R>(this.connection, this.logger, results);
   }
 
-  getSt05Trace(): St05Trace {
-    if (!this._st05Trace) {
-      this._st05Trace = new St05Trace(this.connection, this.logger);
-    }
-    return this._st05Trace;
+  getSt05Trace<R extends ISt05TraceResults = typeof st05TraceDocuments>(
+    results: R = st05TraceDocuments as unknown as R,
+  ): St05Trace<R> {
+    return new St05Trace<R>(this.connection, this.logger, results);
   }
 
-  getApplicationLog(): ApplicationLog {
-    if (!this._applicationLog) {
-      this._applicationLog = new ApplicationLog(this.connection, this.logger);
-    }
-    return this._applicationLog;
+  getApplicationLog<
+    R extends IApplicationLogResults = typeof applicationLogDocuments,
+  >(results: R = applicationLogDocuments as unknown as R): ApplicationLog<R> {
+    return new ApplicationLog<R>(this.connection, this.logger, results);
   }
 
   /**
@@ -145,56 +173,49 @@ export class AdtRuntimeClient {
    * The intersection is spelled here rather than given a name: one getter has
    * this set, and a composite earns a name when more than one handler does.
    */
-  getAtc(): AdtAtc {
-    if (!this._atc) {
-      this._atc = new AdtAtc(this.connection, this.logger);
-    }
-    return this._atc;
+  getAtc<R extends IAtcResults = typeof atcDocuments>(
+    results: R = atcDocuments as unknown as R,
+  ): AdtAtc<R> {
+    return new AdtAtc<R>(this.connection, this.logger, results);
   }
 
-  getAtcLog(): AtcLog {
-    if (!this._atcLog) {
-      this._atcLog = new AtcLog(this.connection, this.logger);
-    }
-    return this._atcLog;
+  getAtcLog<R extends IAtcLogResults = typeof atcLogDocuments>(
+    results: R = atcLogDocuments as unknown as R,
+  ): AtcLog<R> {
+    return new AtcLog<R>(this.connection, this.logger, results);
   }
 
-  getDdicActivation(): DdicActivation {
-    if (!this._ddicActivation) {
-      this._ddicActivation = new DdicActivation(this.connection, this.logger);
-    }
-    return this._ddicActivation;
+  getDdicActivation<
+    R extends IDdicActivationResults = typeof ddicActivationDocuments,
+  >(results: R = ddicActivationDocuments as unknown as R): DdicActivation<R> {
+    return new DdicActivation<R>(this.connection, this.logger, results);
   }
 
-  getDumps(): RuntimeDumps {
-    if (!this._dumps) {
-      this._dumps = new RuntimeDumps(this.connection, this.logger);
-    }
-    return this._dumps;
+  getDumps<R extends IRuntimeDumpsResults = typeof runtimeDumpsDocuments>(
+    results: R = runtimeDumpsDocuments as unknown as R,
+  ): RuntimeDumps<R> {
+    return new RuntimeDumps<R>(this.connection, this.logger, results);
   }
 
   // ============================================================================
   // Feed, SystemMessages, GatewayErrorLog Factories
   // ============================================================================
 
-  getFeeds(): FeedRepository {
-    if (!this._feeds) {
-      this._feeds = new FeedRepository(this.connection, this.logger);
-    }
-    return this._feeds;
+  getFeeds<R extends IFeedResults = typeof feedDocuments>(
+    results: R = feedDocuments as unknown as R,
+  ): FeedRepository<R> {
+    return new FeedRepository<R>(this.connection, this.logger, results);
   }
 
-  getSystemMessages(): SystemMessages {
-    if (!this._systemMessages) {
-      this._systemMessages = new SystemMessages(this.connection, this.logger);
-    }
-    return this._systemMessages;
+  getSystemMessages<
+    R extends ISystemMessagesResults = typeof systemMessagesDocuments,
+  >(results: R = systemMessagesDocuments as unknown as R): SystemMessages<R> {
+    return new SystemMessages<R>(this.connection, this.logger, results);
   }
 
-  getGatewayErrorLog(): GatewayErrorLog {
-    if (!this._gatewayErrorLog) {
-      this._gatewayErrorLog = new GatewayErrorLog(this.connection, this.logger);
-    }
-    return this._gatewayErrorLog;
+  getGatewayErrorLog<
+    R extends IGatewayErrorLogResults = typeof gatewayErrorLogDocuments,
+  >(results: R = gatewayErrorLogDocuments as unknown as R): GatewayErrorLog<R> {
+    return new GatewayErrorLog<R>(this.connection, this.logger, results);
   }
 }

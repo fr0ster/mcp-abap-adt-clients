@@ -2,44 +2,30 @@
  * Table lock operations
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
-import { XMLParser } from 'fast-xml-parser';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_LOCK } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
- * Acquire lock handle for the table by locking it for modification
+ * `POST …?_action=LOCK` — answered as it arrived.
+ *
+ * The handle is read by `lockHandleOf` in the member. Until 23.0.0 this parsed
+ * it and threw when SAP's answer had none, which turned a statement about SAP's
+ * answer into a library failure and dropped the answer.
  */
-export async function acquireTableLockHandle(
+export async function lockTable(
   connection: IAbapConnection,
   tableName: string,
-): Promise<string> {
-  const url = `/sap/bc/adt/ddic/tables/${encodeSapObjectName(tableName)}?_action=LOCK&accessMode=MODIFY`;
-
-  const headers = {
-    Accept: ACCEPT_LOCK,
-  };
-
-  const response = await connection.makeAdtRequest({
-    url,
+): Promise<IAdtWireResponse> {
+  return connection.makeAdtRequest({
+    url: `/sap/bc/adt/ddic/tables/${encodeSapObjectName(tableName)}?_action=LOCK&accessMode=MODIFY`,
     method: 'POST',
     timeout: getTimeout('default'),
     data: null,
-    headers,
+    headers: { Accept: ACCEPT_LOCK },
   });
-
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: '',
-  });
-
-  const result = parser.parse(response.data);
-  const lockHandle = result?.['asx:abap']?.['asx:values']?.DATA?.LOCK_HANDLE;
-
-  if (!lockHandle) {
-    throw new Error('Failed to obtain lock handle from SAP response');
-  }
-
-  return lockHandle;
 }

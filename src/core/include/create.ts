@@ -11,11 +11,11 @@
  * target. Elsewhere this request fails for a reason no header can fix.
  */
 
+import type { IAdtContentTypes } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
-  IAdtContentTypes,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { limitDescription } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import { escapeXmlAttr } from '../../utils/xml';

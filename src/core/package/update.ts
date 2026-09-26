@@ -1,15 +1,11 @@
 /**
- * Package update operations
- *
- * Uses read-modify-write pattern: GET current XML → patch fields → PUT.
- * This preserves all SAP-managed fields (abapLanguageVersion, etc.)
- * that would be lost if XML were built from scratch.
+ * Package update operations — one PUT of the document the caller built.
  */
 
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_PACKAGE, CT_PACKAGE } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';

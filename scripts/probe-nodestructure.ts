@@ -13,16 +13,14 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { readNodeStructure } from '@mcp-abap-adt/adt-strategies';
 import * as dotenv from 'dotenv';
 import {
   createTestConnection,
   releaseTestConnection,
 } from '../src/__tests__/helpers/sessionConfig';
 import { createConnectionLogger } from '../src/__tests__/helpers/testLogger';
-import {
-  fetchNodeStructure,
-  parseNodeStructure,
-} from '../src/core/shared/nodeStructure';
+import { fetchNodeStructure } from '../src/core/shared/nodeStructure';
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../.env');
 if (fs.existsSync(envPath)) {
@@ -56,7 +54,7 @@ async function main(): Promise<void> {
         process.stdout.write('    (empty body)\n');
         continue;
       }
-      const { nodes, objectTypes } = parseNodeStructure(xml);
+      const { nodes, objectTypes } = readNodeStructure(xml);
       process.stdout.write(
         `    nodes ${nodes.length}, objectTypes ${objectTypes.length}\n`,
       );

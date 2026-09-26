@@ -1,7 +1,8 @@
+import type { IAbapGitLinkArgs } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
-  IAbapGitLinkArgs,
-} from '@mcp-abap-adt/interfaces-adt';
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   CT_ABAPGIT_REPO_V3,
   CT_ABAPGIT_REPO_V4,
@@ -13,10 +14,10 @@ export async function linkRepo(
   connection: IAbapConnection,
   args: IAbapGitLinkArgs,
   contentTypeVersion: 'v3' | 'v4' = 'v3',
-): Promise<void> {
+): Promise<IAdtWireResponse> {
   const ct =
     contentTypeVersion === 'v4' ? CT_ABAPGIT_REPO_V4 : CT_ABAPGIT_REPO_V3;
-  await connection.makeAdtRequest({
+  return connection.makeAdtRequest({
     method: 'POST',
     url: '/sap/bc/adt/abapgit/repos',
     timeout: getTimeout('default'),

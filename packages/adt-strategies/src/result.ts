@@ -14,10 +14,8 @@
  * Everything else this package collects is on the error axis.
  */
 
-import type {
-  IAdtWireResponse,
-  IResultStrategy,
-} from '@mcp-abap-adt/interfaces-adt';
+import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 
 /**
  * `answer.data` as text, without pretending an object was ever a string.

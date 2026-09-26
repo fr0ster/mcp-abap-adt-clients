@@ -1,8 +1,8 @@
+import type { IAbapGitPullArgs } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
-  IAbapGitPullArgs,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   CT_ABAPGIT_REPO_V3,
   CT_ABAPGIT_REPO_V4,

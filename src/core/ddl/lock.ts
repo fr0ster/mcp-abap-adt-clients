@@ -1,89 +1,28 @@
-/**
- * View lock operations
- */
-
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
-import { XMLParser } from 'fast-xml-parser';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_LOCK } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
- * Lock DDLS for modification
+ * `POST …?_action=LOCK` — answered as it arrived.
+ *
+ * The handle is read by `lockHandleOf` in the member. Until 23.0.0 this parsed
+ * it and threw when SAP's answer had none, which turned a statement about SAP's
+ * answer into a library failure and dropped the answer. `lockDDLSForUpdate`,
+ * which also extracted CORRNR and had no caller, is gone.
  */
 export async function lockDDLS(
   connection: IAbapConnection,
   ddlName: string,
-): Promise<string> {
-  const url = `/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(ddlName).toLowerCase()}?_action=LOCK&accessMode=MODIFY`;
-
-  const headers = {
-    Accept: ACCEPT_LOCK,
-  };
-
-  const response = await connection.makeAdtRequest({
-    url,
+): Promise<IAdtWireResponse> {
+  return connection.makeAdtRequest({
+    url: `/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(ddlName).toLowerCase()}?_action=LOCK&accessMode=MODIFY`,
     method: 'POST',
     timeout: getTimeout('default'),
     data: null,
-    headers,
+    headers: { Accept: ACCEPT_LOCK },
   });
-
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: '',
-  });
-  const result = parser.parse(response.data);
-  const lockHandle = result?.['asx:abap']?.['asx:values']?.DATA?.LOCK_HANDLE;
-
-  if (!lockHandle) {
-    throw new Error('Failed to obtain lock handle from SAP');
-  }
-
-  return lockHandle;
-}
-
-/**
- * Lock DDLS for editing (for update)
- */
-export async function lockDDLSForUpdate(
-  connection: IAbapConnection,
-  ddlName: string,
-): Promise<{
-  response: IAdtWireResponse;
-  lockHandle: string;
-  corrNr?: string;
-}> {
-  const url = `/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(ddlName).toLowerCase()}?_action=LOCK&accessMode=MODIFY`;
-
-  const headers = {
-    Accept: ACCEPT_LOCK,
-  };
-
-  const response = await connection.makeAdtRequest({
-    url,
-    method: 'POST',
-    timeout: getTimeout('default'),
-    data: null,
-    headers,
-  });
-
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: '@_',
-  });
-  const result = parser.parse(response.data);
-  const lockHandle = result?.['asx:abap']?.['asx:values']?.DATA?.LOCK_HANDLE;
-  const corrNr = result?.['asx:abap']?.['asx:values']?.DATA?.CORRNR;
-
-  if (!lockHandle) {
-    throw new Error(
-      'Failed to obtain lock handle from SAP. View may be locked by another user.',
-    );
-  }
-
-  return { response, lockHandle, corrNr };
 }

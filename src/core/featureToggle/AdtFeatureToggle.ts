@@ -3,14 +3,12 @@
  * members `IFeatureToggleObject` names: switchOn, switchOff, getRuntimeState,
  * checkState and readSource.
  *
- * Every CRUD member answers `IAdtResponse<T>`, where T is what the result set
- * given at construction makes of that endpoint's answer. The five domain
- * members answer the runtime-state shapes this module declares — that is what
- * the questions are for.
+ * Every member — CRUD and domain alike — answers `IAdtResponse<T>`, where T is
+ * what the result set given at construction makes of that endpoint's answer.
  */
 import type {
-  IAbapConnection,
   IAdtActivatable,
+  IAdtAnalyseOptions,
   IAdtCheckable,
   IAdtCreatable,
   IAdtCreateOptions,
@@ -24,12 +22,16 @@ import type {
   IAdtSystemContext,
   IAdtUpdatable,
   IAdtValidatable,
+  IFeatureToggleObject,
   IFeatureToggleSource,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
+import { lockHandleOf } from '../../utils/lockHandle';
+import { nothing } from '../../utils/resultStrategy';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import {
   createLockTracker,
@@ -51,10 +53,8 @@ import {
   featureToggleDocuments,
   type ICreateFeatureToggleParams,
   type IDeleteFeatureToggleParams,
-  type IFeatureToggleCheckStateResult,
   type IFeatureToggleConfig,
   type IFeatureToggleResults,
-  type IFeatureToggleRuntimeState,
 } from './types';
 import { unlockFeatureToggle } from './unlock';
 import { updateFeatureToggle } from './update';
@@ -78,7 +78,13 @@ export class AdtFeatureToggle<
     IAdtActivatable<IFeatureToggleConfig, ReturnType<R['activation']>>,
     // No IAdtTransportAware: a feature toggle has no transport resource of its
     // own, and the member that claimed one read the toggle's document instead.
-    IAdtLockable<IFeatureToggleConfig>
+    IAdtLockable<IFeatureToggleConfig>,
+    IFeatureToggleObject<{
+      switched: ReturnType<R['switched']>;
+      runtimeState: ReturnType<R['runtimeState']>;
+      checkState: ReturnType<R['checkState']>;
+      source: ReturnType<R['sourceDocument']>;
+    }>
 {
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
@@ -393,36 +399,36 @@ export class AdtFeatureToggle<
     );
   }
 
-  /** Lock the object for modification. */
-  async lock(
+  /**
+   * Lock the object — one LOCK, its handle read by `lockHandleOf`. A 200
+   * carrying no handle reads as `''`; whether that is a refusal is the
+   * caller's `analyse` to say.
+   */
+  async lock<E extends IAdtError = IAdtError>(
     config: Partial<IFeatureToggleConfig>,
-  ): Promise<IAdtResponse<string>> {
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<string, E>> {
     const name = this.name(config);
-
-    return answering(
-      async () => {
-        const lockHandle = await inStatefulSession(this.connection, () =>
+    const answer = await answering(
+      () =>
+        inStatefulSession(this.connection, () =>
           lockFeatureToggle(this.connection, name),
-        );
-        this.lockTracker.track(name, lockHandle);
-        // The handle is the value, and the request does not keep the wire it
-        // came on — so the answer is built around what the request produced.
-        return {
-          data: lockHandle,
-          status: 200,
-          statusText: 'OK',
-          headers: {},
-        };
-      },
-      (answer) => String(answer.data),
+        ),
+      lockHandleOf,
+      options?.analyse,
     );
+    if (answer.ok && answer.getResult().value) {
+      this.lockTracker.track(name, answer.getResult().value);
+    }
+    return answer;
   }
 
   /** Unlock the object. */
-  async unlock(
+  async unlock<E extends IAdtError = IAdtError>(
     config: Partial<IFeatureToggleConfig>,
     lockHandle: string,
-  ): Promise<IAdtResponse<void>> {
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<void, E>> {
     const name = this.name(config);
 
     return answering(
@@ -436,37 +442,43 @@ export class AdtFeatureToggle<
           this.lockTracker.untrack(name);
         }
       },
-      () => undefined,
+      nothing,
+      options?.analyse,
     );
   }
 
   /**
-   * Switch the toggle on, and answer the state that produced.
+   * Switch the toggle on — one POST to `…/toggle`, read by the `switched`
+   * strategy.
    *
-   * The switch itself answers nothing worth reading, so the state is read back
-   * — which is also the only way a caller learns whether the change took at the
-   * level they asked for.
+   * The switch answers nothing worth reading by default; a caller who wants to
+   * know whether the change took at the level they asked for reads
+   * `getRuntimeState` next. (This comment used to say the state was read back
+   * here; it was not.)
    */
-  async switchOn(
+  async switchOn<E extends IAdtError = IAdtError>(
     config: Partial<IFeatureToggleConfig>,
     opts: { transportRequest: string; userSpecific?: boolean },
-  ): Promise<IAdtResponse<undefined>> {
-    return this.switchTo(config, opts, 'on');
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['switched']>, E>> {
+    return this.switchTo(config, opts, 'on', options);
   }
 
   /** Switch the toggle off — see {@link switchOn}. */
-  async switchOff(
+  async switchOff<E extends IAdtError = IAdtError>(
     config: Partial<IFeatureToggleConfig>,
     opts: { transportRequest: string; userSpecific?: boolean },
-  ): Promise<IAdtResponse<undefined>> {
-    return this.switchTo(config, opts, 'off');
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['switched']>, E>> {
+    return this.switchTo(config, opts, 'off', options);
   }
 
-  private async switchTo(
+  private async switchTo<E extends IAdtError = IAdtError>(
     config: Partial<IFeatureToggleConfig>,
     opts: { transportRequest: string; userSpecific?: boolean },
     targetState: 'on' | 'off',
-  ): Promise<IAdtResponse<undefined>> {
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['switched']>, E>> {
     const name = this.name(config);
     return answering(
       () =>
@@ -476,42 +488,43 @@ export class AdtFeatureToggle<
           is_user_specific: Boolean(opts.userSpecific),
           transport_request: opts.transportRequest,
         }),
-      () => undefined,
+      this.results.switched as IResultStrategy<ReturnType<R['switched']>>,
+      options?.analyse,
     );
   }
 
-  /** What the toggle is set to right now, per client and per user. */
-  async getRuntimeState(
+  /**
+   * What the toggle is set to right now, per client and per user — the
+   * `…/states` JSON, read by the `runtimeState` strategy.
+   */
+  async getRuntimeState<E extends IAdtError = IAdtError>(
     config: Partial<IFeatureToggleConfig>,
-  ): Promise<IAdtResponse<IFeatureToggleRuntimeState>> {
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['runtimeState']>, E>> {
     const name = this.name(config);
-
     return answering(
-      async () => ({
-        data: await getFeatureToggleState(this.connection, name),
-        status: 200,
-        statusText: 'OK',
-        headers: {},
-      }),
-      (answer) => answer.data as unknown as IFeatureToggleRuntimeState,
+      () => getFeatureToggleState(this.connection, name),
+      this.results.runtimeState as IResultStrategy<
+        ReturnType<R['runtimeState']>
+      >,
+      options?.analyse,
     );
   }
 
-  /** The current state, and what changing it would require. */
-  async checkState(
+  /**
+   * The current state, and what changing it would require — the `…/check`
+   * JSON, read by the `checkState` strategy.
+   */
+  async checkState<E extends IAdtError = IAdtError>(
     config: Partial<IFeatureToggleConfig>,
     opts?: { userSpecific?: boolean },
-  ): Promise<IAdtResponse<IFeatureToggleCheckStateResult>> {
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['checkState']>, E>> {
     const name = this.name(config);
-
     return answering(
-      async () => ({
-        data: await checkFeatureToggleState(this.connection, name, opts),
-        status: 200,
-        statusText: 'OK',
-        headers: {},
-      }),
-      (answer) => answer.data as unknown as IFeatureToggleCheckStateResult,
+      () => checkFeatureToggleState(this.connection, name, opts),
+      this.results.checkState as IResultStrategy<ReturnType<R['checkState']>>,
+      options?.analyse,
     );
   }
 
@@ -519,14 +532,15 @@ export class AdtFeatureToggle<
    * The toggle's source document.
    *
    * A separate resource from `read`, which fetches the toggle itself. The JSON
-   * is handed over as it arrived — a caller who wants
-   * {@link IFeatureToggleSource} parsed out supplies a strategy that does it,
-   * rather than this member deciding for everyone.
+   * is handed over as it arrived — a caller who wants `IFeatureToggleSource`
+   * parsed out supplies a strategy that does it, rather than this member
+   * deciding for everyone.
    */
-  async readSource(
+  async readSource<E extends IAdtError = IAdtError>(
     config: Partial<IFeatureToggleConfig>,
     version: 'active' | 'inactive' = 'active',
-  ): Promise<IAdtResponse<ReturnType<R['sourceDocument']>>> {
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['sourceDocument']>, E>> {
     const name = this.name(config);
 
     return answering(
@@ -534,6 +548,7 @@ export class AdtFeatureToggle<
       this.results.sourceDocument as IResultStrategy<
         ReturnType<R['sourceDocument']>
       >,
+      options?.analyse,
     );
   }
 }

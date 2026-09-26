@@ -9,7 +9,7 @@
 const { loadTestEnv } = require('./test-helper');
 
 import * as fs from 'node:fs';
-import { ADT_SESSION_ERROR } from '@mcp-abap-adt/interfaces-adt';
+import { ADT_SESSION_ERROR } from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   createTestConnection,
   getConfig,

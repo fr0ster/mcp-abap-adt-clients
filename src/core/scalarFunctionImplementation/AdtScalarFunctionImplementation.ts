@@ -13,9 +13,8 @@
  * at construction makes of that endpoint's answer.
  */
 import type {
-  AdtNoFailure,
-  IAbapConnection,
   IAdtActivatable,
+  IAdtAnalyseOptions,
   IAdtCheckable,
   IAdtCreatable,
   IAdtCreateOptions,
@@ -31,24 +30,20 @@ import type {
   IAdtUpdatable,
   IAdtValidatable,
   IAdtVersionable,
-  IAdtWireResponse,
-  IAnalyse,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
-import {
-  ADT_NO_FAILURE,
-  AdtObjectErrorCodes,
-} from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
+import { lockHandleOf } from '../../utils/lockHandle';
+import { nothing } from '../../utils/resultStrategy';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import {
   createLockTracker,
   type LockRegistry,
   type LockTracker,
 } from '../shared/LockRegistry';
-import type { ObjectVersion } from '../shared/results';
 import type { IReadOptions } from '../shared/types';
 import { activateScalarFunctionImplementation } from './activation';
 import { checkScalarFunctionImplementation } from './check';
@@ -73,33 +68,6 @@ import {
   getScalarFunctionImplementationVersionSource,
   getScalarFunctionImplementationVersions,
 } from './versions';
-
-/** Statuses that mean the system has no validation resource, not a bad name. */
-const VALIDATION_UNSUPPORTED_STATUSES = new Set([404, 405, 501]);
-
-/**
- * The shipped reading of a validation answer this system may not offer.
- *
- * Measured: some systems answer 404, 405 or 501 for the DSFI validation
- * resource. That is not a verdict about the name — it comes back as a failure
- * named {@link AdtObjectErrorCodes.UNSUPPORTED_OPERATION}, so a consumer
- * branches on the code rather than on a status. The same reading the scalar
- * function and the append structure ship, for the same measured reason.
- */
-export const validationUnsupported = (
-  verdict: IAdtError | AdtNoFailure,
-  answer?: IAdtWireResponse,
-): IAdtError | AdtNoFailure => {
-  if (verdict === ADT_NO_FAILURE) return ADT_NO_FAILURE;
-  const status = verdict.response?.status ?? answer?.status;
-  return status && VALIDATION_UNSUPPORTED_STATUSES.has(status)
-    ? {
-        ...verdict,
-        code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION,
-        message: `This system does not offer scalar-function-implementation name validation (HTTP ${status})`,
-      }
-    : verdict;
-};
 
 export class AdtScalarFunctionImplementation<
   R extends
@@ -139,8 +107,8 @@ export class AdtScalarFunctionImplementation<
     >,
     IAdtVersionable<
       IScalarFunctionImplementationConfig,
-      ObjectVersion[],
-      string
+      ReturnType<R['versions']>,
+      ReturnType<R['versionSource']>
     >
 {
   protected readonly connection: IAbapConnection;
@@ -201,7 +169,7 @@ export class AdtScalarFunctionImplementation<
           config.description,
         ),
       this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
-      (options?.analyse ?? validationUnsupported) as IAnalyse<E>,
+      options?.analyse,
     );
   }
 
@@ -498,38 +466,37 @@ export class AdtScalarFunctionImplementation<
     );
   }
 
-  /** Lock the object for modification. */
-  async lock(
+  /**
+   * Lock the object — one LOCK, its handle read by `lockHandleOf`. A 200
+   * carrying no handle reads as `''`; whether that is a refusal is the
+   * caller's `analyse` to say.
+   */
+  async lock<E extends IAdtError = IAdtError>(
     config: Partial<IScalarFunctionImplementationConfig>,
-  ): Promise<IAdtResponse<string>> {
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<string, E>> {
     const name = this.name(config);
-
-    return answering(
-      async () => {
-        const lockHandle = await inStatefulSession(this.connection, () =>
+    const answer = await answering(
+      () =>
+        inStatefulSession(this.connection, () =>
           lockScalarFunctionImplementation(this.connection, name),
-        );
-        this.lockTracker.track(name, lockHandle);
-        // The handle is the value, and the request does not keep the wire it
-        // came on — so the answer is built around what the request produced.
-        return {
-          data: lockHandle,
-          status: 200,
-          statusText: 'OK',
-          headers: {},
-        };
-      },
-      (answer) => String(answer.data),
+        ),
+      lockHandleOf,
+      options?.analyse,
     );
+    if (answer.ok && answer.getResult().value) {
+      this.lockTracker.track(name, answer.getResult().value);
+    }
+    return answer;
   }
 
   /** Unlock the object. */
-  async unlock(
+  async unlock<E extends IAdtError = IAdtError>(
     config: Partial<IScalarFunctionImplementationConfig>,
     lockHandle: string,
-  ): Promise<IAdtResponse<void>> {
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<void, E>> {
     const name = this.name(config);
-
     return answering(
       async () => {
         // UNLOCK must run stateful (older BASIS #106); stateless after.
@@ -545,41 +512,38 @@ export class AdtScalarFunctionImplementation<
           this.lockTracker.untrack(name);
         }
       },
-      () => undefined,
+      nothing,
+      options?.analyse,
     );
   }
 
   /** Version history of the object's source. */
-  async getVersions(
+  async getVersions<E extends IAdtError = IAdtError>(
     config: Partial<IScalarFunctionImplementationConfig>,
-  ): Promise<IAdtResponse<ObjectVersion[]>> {
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['versions']>, E>> {
     return answering(
-      async () => ({
-        data: await getScalarFunctionImplementationVersions(
-          this.connection,
-          config,
-        ),
-        status: 200,
-        statusText: 'OK',
-        headers: {},
-      }),
-      (answer) => answer.data as ObjectVersion[],
+      () => getScalarFunctionImplementationVersions(this.connection, config),
+      this.results.versions as IResultStrategy<ReturnType<R['versions']>>,
+      options?.analyse,
     );
   }
 
-  /** The source of one version, by the `contentUri` an entry carries. */
-  async getVersionSource(contentUri: string): Promise<IAdtResponse<string>> {
+  /** Source of one version, by the `contentUri` its entry carried. */
+  async getVersionSource<E extends IAdtError = IAdtError>(
+    contentUri: string,
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['versionSource']>, E>> {
     return answering(
-      async () => ({
-        data: await getScalarFunctionImplementationVersionSource(
+      () =>
+        getScalarFunctionImplementationVersionSource(
           this.connection,
           contentUri,
         ),
-        status: 200,
-        statusText: 'OK',
-        headers: {},
-      }),
-      (answer) => String(answer.data),
+      this.results.versionSource as IResultStrategy<
+        ReturnType<R['versionSource']>
+      >,
+      options?.analyse,
     );
   }
 }

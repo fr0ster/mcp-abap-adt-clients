@@ -5,36 +5,17 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
-import { XMLParser } from 'fast-xml-parser';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   ACCEPT_WHERE_USED_RESULT,
   ACCEPT_WHERE_USED_SCOPE,
   CT_WHERE_USED_REQUEST,
   CT_WHERE_USED_SCOPE,
 } from '../../constants/contentTypes';
+import { buildObjectUri } from '../../utils/activationUtils';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
-import type {
-  IGetWhereUsedParams,
-  IGetWhereUsedScopeParams,
-  IWhereUsedListResult,
-  IWhereUsedReference,
-} from './types';
-
-// removeNSPrefix strips the namespace prefix from every element and attribute
-// name. The where-used result is namespaced under http://www.sap.com/adt/ris/
-// usageReferences, but the *prefix* SAP binds to it is system-dependent — some
-// releases emit `usagereferences:` (lower-case), others `usageReferences:`
-// (camel-case). Stripping the prefix lets us read the result regardless of which
-// alias the server chose, instead of hard-coding one and silently parsing 0
-// references on the other. (adtcore:* attributes are normalised the same way.)
-const xmlParser = new XMLParser({
-  ignoreAttributes: false,
-  attributeNamePrefix: '@_',
-  parseAttributeValue: false,
-  removeNSPrefix: true,
-});
+import type { IGetWhereUsedParams, IGetWhereUsedScopeParams } from './types';
 
 /**
  * Modify where-used scope to enable/disable specific object types
@@ -122,70 +103,73 @@ function setIsSelected(typeTag: string, selected: boolean): string {
 }
 
 /**
- * Build object URI based on type and name
+ * The friendly names where-used has always accepted, mapped to the type codes
+ * `buildObjectUri` knows. `buildObjectUri` is the address every family's
+ * activation is verified against; where-used used to keep a vocabulary of its
+ * own beside it, which answered `intf/if` and `stru/dt` — codes ADT does not
+ * use — and knew no behavior definition, metadata extension or service.
  */
-function buildObjectUri(objectName: string, objectType: string): string {
-  const encodedName = encodeSapObjectName(objectName);
-
-  switch (objectType.toLowerCase()) {
-    case 'class':
-    case 'clas/oc':
-      return `/sap/bc/adt/oo/classes/${encodedName}`;
-    case 'program':
-    case 'prog/p':
-      return `/sap/bc/adt/programs/programs/${encodedName}`;
-    case 'include':
-      return `/sap/bc/adt/programs/includes/${encodedName}`;
-    case 'function':
-    case 'functiongroup':
-    case 'fugr':
-      return `/sap/bc/adt/functions/groups/${encodedName}`;
-    case 'functionmodule':
-    case 'function_module':
-    case 'fugr/ff':
-      if (objectName.includes('|')) {
-        const [group, fm] = objectName.split('|');
-        return `/sap/bc/adt/functions/groups/${encodeSapObjectName(group)}/fmodules/${encodeSapObjectName(fm)}`;
-      }
-      throw new Error('Function module name must be in format GROUP|FM_NAME');
-    case 'interface':
-    case 'intf/if':
-      return `/sap/bc/adt/oo/interfaces/${encodedName}`;
-    case 'package':
-    case 'devc/k':
-      return `/sap/bc/adt/packages/${encodedName}`;
-    case 'table':
-    case 'tabl/dt':
-      return `/sap/bc/adt/ddic/tables/${encodedName}`;
-    case 'structure':
-    case 'stru/dt':
-      return `/sap/bc/adt/ddic/structures/${encodedName}`;
-    case 'domain':
-    case 'doma/dd':
-      return `/sap/bc/adt/ddic/domains/${encodedName}`;
-    case 'dataelement':
-    case 'dtel':
-      return `/sap/bc/adt/ddic/dataelements/${encodedName}`;
-    case 'view':
-    case 'ddls/df':
-      return `/sap/bc/adt/ddic/ddl/sources/${encodedName}`;
-    default:
-      throw new Error(`Unsupported object type for where-used: ${objectType}`);
-  }
-}
+const WHERE_USED_ALIASES: Readonly<Record<string, string>> = {
+  class: 'CLAS/OC',
+  program: 'PROG/P',
+  include: 'PROG/I',
+  function: 'FUGR/F',
+  functiongroup: 'FUGR/F',
+  interface: 'INTF/OI',
+  package: 'DEVC/K',
+  table: 'TABL/DT',
+  structure: 'STRU/DS',
+  domain: 'DOMA/DD',
+  dataelement: 'DTEL/DE',
+  view: 'DDLS/DF',
+  functionmodule: 'FUGR/FF',
+  function_module: 'FUGR/FF',
+};
 
 /**
- * True when an error indicates the /usageReferences/scope sub-resource is not
- * available on the target system. SAP answers such requests with HTTP 404
- * ("No suitable resource found") — and 406 for an unaccepted media type — on
- * releases that do not expose the scope step. Callers use this to fall back to
- * an unscoped where-used search rather than failing outright.
+ * The address a where-used request asks about.
+ *
+ * `objectType` is a type code (`CLAS/OC`, `BDEF/BDO`, …, any case) or one of
+ * the friendly names above. A function module is named `GROUP|FM`, because the
+ * parameters carry no separate group.
+ *
+ * Throws for a type neither vocabulary knows, and for a function module without
+ * its group — both are the caller's argument, found before any request is made.
+ * `buildObjectUri` answers an unknown code with a guess (the lowercased code as
+ * a path), which for where-used would be a request about an address that exists
+ * nowhere, so the guess is refused here.
  */
-function isScopeResourceUnavailable(error: unknown): boolean {
-  const status =
-    // biome-ignore lint/suspicious/noExplicitAny: error shape is provider-defined
-    (error as any)?.response?.status ?? (error as any)?.status;
-  return status === 404 || status === 406;
+export function whereUsedObjectUri(
+  objectName: string,
+  objectType: string,
+): string {
+  const code = (
+    WHERE_USED_ALIASES[objectType.toLowerCase()] ?? objectType
+  ).toUpperCase();
+
+  if (!code) {
+    throw new Error(`Where-used needs an object type for ${objectName}`);
+  }
+
+  let name = objectName;
+  let parentName: string | undefined;
+  if (code === 'FUGR/FF') {
+    const [group, fm] = objectName.split('|');
+    if (!fm) {
+      throw new Error(
+        `A function module is named GROUP|FM_NAME for where-used; got ${objectName}`,
+      );
+    }
+    name = fm;
+    parentName = group;
+  }
+
+  const uri = buildObjectUri(name, code, parentName);
+  const guessed = `/sap/bc/adt/${code.toLowerCase()}/${encodeSapObjectName(name).toLowerCase()}`;
+  if (uri === guessed) {
+    throw new Error(`Unsupported object type for where-used: ${objectType}`);
+  }
+  return uri;
 }
 
 /**
@@ -220,7 +204,7 @@ export async function getWhereUsedScope(
   connection: IAbapConnection,
   params: IGetWhereUsedScopeParams,
 ): Promise<IAdtWireResponse> {
-  const objectUri = buildObjectUri(params.object_name, params.object_type);
+  const objectUri = whereUsedObjectUri(params.object_name, params.object_type);
   const scopeUrl = `/sap/bc/adt/repository/informationsystem/usageReferences/scope?uri=${encodeURIComponent(objectUri)}`;
   const scopeRequestBody =
     '<?xml version="1.0" encoding="UTF-8"?><usagereferences:usageScopeRequest xmlns:usagereferences="http://www.sap.com/adt/ris/usageReferences"><usagereferences:affectedObjects/></usagereferences:usageScopeRequest>';
@@ -255,7 +239,7 @@ export async function getWhereUsed(
   connection: IAbapConnection,
   params: IGetWhereUsedParams,
 ): Promise<IAdtWireResponse> {
-  const objectUri = buildObjectUri(params.object_name, params.object_type);
+  const objectUri = whereUsedObjectUri(params.object_name, params.object_type);
 
   // Step 2: perform the actual where-used search.
   // We do NOT auto-fetch a default scope here. The Eclipse ADT client posts
