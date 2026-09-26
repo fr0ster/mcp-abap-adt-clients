@@ -32,8 +32,8 @@ import {
 import type {
   IAbapConnection,
   ISessionLifecycleAware,
-} from '@mcp-abap-adt/interfaces-adt';
-import { ADT_SESSION_ERROR } from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import { ADT_SESSION_ERROR } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ISapConfig } from '@mcp-abap-adt/interfaces-auth-sap';
 import { type AdtStub, startAdtStub } from './adtStubServer';
 

@@ -8,7 +8,7 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   ACCEPT_DATA_ELEMENT,
   ACCEPT_DOMAIN,

@@ -6,11 +6,11 @@
  * documents, and a consumer's own set of strategies comes back as *their* type,
  * typed rather than cast.
  */
+import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
-  IAdtResponse,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AdtClient } from '../../../clients/AdtClient';
 import { classDocuments } from '../../../core/class/types';

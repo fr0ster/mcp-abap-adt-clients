@@ -24,7 +24,7 @@
 
 import type {
   AdtTaskType,
-  IAbapConnection,
+  IAdtAnalyseOptions,
   IAdtCreatable,
   IAdtCreateOptions,
   IAdtDeletable,
@@ -36,22 +36,19 @@ import type {
   IAdtResponse,
   IAdtSystemContext,
   IAdtTransportObjectActions,
-  IDeferredResponseConnection,
   IListTransportsOptions,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
-import { TRANSPORT_SEARCH_CONFIGURATIONS_URL } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAbapConnection,
+  IDeferredResponseConnection,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
-import { TransportSearchConfigurationMissing } from '../../utils/adtErrors';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { createTransport } from './create';
 import { deleteTransport } from './delete';
-import {
-  getTransportSearchConfigurations,
-  listTransports,
-  requestTransportSearchConfigurations,
-} from './list';
+import { listTransports, requestTransportSearchConfigurations } from './list';
 import {
   addObjectToTransport,
   changeTransportTaskType,
@@ -198,59 +195,34 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
    * default because it is the only one that carries the containers, the
    * description and the language a request holds.
    *
-   * With `configUri`: one request. Without: two — the configurations, then the
-   * list. The five filter parameters this used to take were never read by the
-   * server; filtering is a property of the saved configuration.
+   * One request, run by the saved search the caller names. Until
+   * interfaces-adt 11 a missing `configUri` made this read the configurations
+   * and choose one, refusing when there were none or several — a second request
+   * and a choice that is the caller's (decision 37). `searchConfigurations`
+   * answers what there is to choose from. The five filter parameters this used
+   * to take were never read by the server; filtering is a property of the
+   * saved configuration.
    */
-  async list(
-    options?: IListTransportsOptions,
-  ): Promise<IAdtResponse<ReturnType<R['list']>>> {
-    const configUri =
-      options?.configUri ?? (await this.resolveSearchConfiguration());
-
+  async list<E extends IAdtError = IAdtError>(
+    options: IListTransportsOptions & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['list']>, E>> {
+    const { configUri } = options;
     this.logger?.info?.('Listing transport requests', { configUri });
     return answering(
       () => listTransports(this.connection, { configUri }),
       this.results.list as IResultStrategy<ReturnType<R['list']>>,
+      options.analyse,
     );
   }
 
   /**
    * The saved transport searches this system holds.
    *
-   * **Why this is public, when `resolveSearchConfiguration` below is not.**
-   * A listing is a saved search, and `list()` will resolve one itself when it
-   * is not given a `configUri`. That resolution is deliberately opinionated —
-   * one configuration is used, several are refused rather than guessed between
-   * — and both halves of that opinion are unreachable from outside:
-   *
-   * - **its answer cannot be read.** The request happens inside a member
-   *   called for something else, so a caller's `analyse` never sees it and
-   *   their result strategy never shapes it. A refusal from this endpoint
-   *   arrives as a throw out of `list()`.
-   * - **its verdict cannot be acted on.** On a system holding several saved
-   *   searches the resolver throws, telling the caller to pass a `configUri`
-   *   explicitly — and gives them no supported way to find one. The consumer
-   *   that hit this reached the URL with a raw request of its own, which is
-   *   the library failing at its job rather than the consumer misusing it.
-   *
-   * So: one request, the caller's strategies in charge of it, and the choice
-   * theirs to make. `list({ configUri })` then costs exactly one request,
-   * which is what it costs today with the resolution hidden inside it.
-   *
-   * ```typescript
-   * const request = client.getRequest();
-   * const configurations = await request.searchConfigurations({ analyse });
-   * if (!configurations.ok) return configurations.getError();
-   * for (const { uri } of configurations.getResult().value) {
-   *   const listed = await request.list({ configUri: uri });
-   * }
-   * ```
-   *
-   * The default reading is `parseSearchConfigurations` — exactly as much of
-   * the document as it takes to address a configuration, which is what the
-   * internal resolver has always used. Inject `searchConfigurations` in the
-   * result set to read it differently.
+   * **What `list` needs.** A listing is a saved search, and since
+   * interfaces-adt 11 `list` takes the one to run rather than choosing among
+   * them itself — this is where a caller finds out what there is. One request,
+   * read by the strategy this implementation was built with and judged by the
+   * caller's `analyse`.
    */
   async searchConfigurations<E extends IAdtError = IAdtError>(
     options?: IAdtOperationOptions<E>,
@@ -266,43 +238,6 @@ export class AdtRequest<R extends ITransportResults = typeof transportDocuments>
         ReturnType<NonNullable<R['searchConfigurations']>>
       >,
       options?.analyse,
-    );
-  }
-
-  /**
-   * Which saved search to run when the caller named none.
-   *
-   * Deterministic or it throws — never "the first one", which would silently
-   * run somebody else's filters.
-   *
-   * The deferred-connection check lives HERE and not in `list()`: an explicit
-   * `configUri` waits for nothing, so a batch call that supplies one is
-   * legitimate. Guarding earlier would reject it.
-   */
-  protected async resolveSearchConfiguration(): Promise<string> {
-    const configurations = await getTransportSearchConfigurations(
-      this.connection,
-    );
-
-    if (configurations.length === 0) {
-      throw new TransportSearchConfigurationMissing(
-        TRANSPORT_SEARCH_CONFIGURATIONS_URL,
-      );
-    }
-
-    if (configurations.length === 1) {
-      return configurations[0].uri;
-    }
-
-    // Several. Picking one would mean guessing which attribute marks a default,
-    // and the payload on the only system we have carries no such marker — one
-    // configuration cannot show what several would look like. So: say so, and
-    // let the caller choose. This branch gets a rule when a system with several
-    // configurations has actually been read.
-    throw new Error(
-      `This system has ${configurations.length} transport search configurations ` +
-        'and none can be shown to be the default; pass configUri explicitly. ' +
-        `Available: ${configurations.map((c) => c.uri).join(', ')}`,
     );
   }
 

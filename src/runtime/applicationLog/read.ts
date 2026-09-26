@@ -8,11 +8,13 @@
  */
 
 import type {
-  IAbapConnection,
-  IAdtWireResponse,
   IGetApplicationLogObjectOptions,
   IGetApplicationLogSourceOptions,
 } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { getTimeout } from '../../utils/timeouts';
 
 // Declared once, in the contract; re-exported so importers here are unchanged.

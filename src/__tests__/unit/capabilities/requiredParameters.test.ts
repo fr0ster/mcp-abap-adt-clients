@@ -22,7 +22,7 @@
  * The subject is the factory return type, like the rest of this folder: a
  * consumer never names the class.
  */
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtClient } from '../../../clients/AdtClient';
 import { HANDLERS } from './manifest';
 

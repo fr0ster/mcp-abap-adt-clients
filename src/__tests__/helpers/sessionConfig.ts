@@ -14,11 +14,11 @@ import {
   type SapConfig,
   TokenAuthProvider,
 } from '@mcp-abap-adt/connection';
+import type { IAdtClientOptions } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
-  IAdtClientOptions,
   ISessionLifecycleAware,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtClient } from '../../clients/AdtClient';

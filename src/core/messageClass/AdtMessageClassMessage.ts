@@ -27,7 +27,6 @@
 
 import type {
   AdtNoFailure,
-  IAbapConnection,
   IAdtCreatable,
   IAdtCreateOptions,
   IAdtError,
@@ -36,7 +35,6 @@ import type {
   IAdtReadable,
   IAdtResponse,
   IAdtUpdatable,
-  IAdtWireResponse,
   IAnalyse,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
@@ -44,6 +42,10 @@ import {
   ADT_NO_FAILURE,
   AdtObjectErrorCodes,
 } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { MESSAGE_CLASS_UPDATE_CONTENT_TYPE } from '../../constants/contentTypes';
 import { answering } from '../../utils/adtResponse';

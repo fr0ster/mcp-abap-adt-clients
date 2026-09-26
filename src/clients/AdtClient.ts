@@ -14,7 +14,6 @@
  */
 
 import type {
-  IAbapConnection,
   IAdtActivatable,
   IAdtCheckable,
   IAdtClientOptions,
@@ -39,6 +38,7 @@ import type {
   IAdtSystemContext,
   IAdtTransportAware,
   IAdtTransportObjectActions,
+  IAdtTransportSearchConfigurations,
   IAdtUpdatable,
   IAdtValidatable,
   IAdtVersionable,
@@ -46,10 +46,13 @@ import type {
   IClassUnitTestDefinition,
   IClassUnitTestRunOptions,
   IIncludeConfig,
-  ISessionLifecycleAware,
   ITestRunInformation,
 } from '@mcp-abap-adt/interfaces-adt';
-import { ADT_SESSION_ERROR } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAbapConnection,
+  ISessionLifecycleAware,
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import { ADT_SESSION_ERROR } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
   AdtAccessControl,
@@ -748,32 +751,10 @@ export type IEnhancementContract<R extends IEnhancementResults> = IAdtCreatable<
   IAdtLockable<IEnhancementConfig> &
   IAdtTransportAware<IEnhancementConfig, ReturnType<R['transport']>> &
   IAdtVersionable<IEnhancementConfig, ObjectVersion[], string>;
-/**
- * Listing the saved searches a transport listing runs.
- *
- * **Why this capability is declared here rather than beside `list()`.**
- * `list()` lives in `IAdtRequest`, in `@mcp-abap-adt/interfaces`, and that is
- * where this member belongs and where it should end up. It is not there yet
- * for a reason that has nothing to do with the design: that package is at
- * 45.0.0 and this one depends on `^44.0.0`, a major apart. Adding the member
- * there would tie a transport fix to a major dependency bump and everything
- * that comes with it.
- *
- * Declared here, `client.getRequest().searchConfigurations()` type-checks for
- * a consumer today — which it did not when the member existed on the
- * implementation alone, reachable at runtime and invisible to the compiler.
- * Promoting it into `IAdtRequest` later is a type move with no behaviour in
- * it, and this declaration goes when it happens.
- */
-export interface IAdtTransportSearchable<TConfigurations> {
-  searchConfigurations<E extends IAdtError = IAdtError>(
-    options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<TConfigurations, E>>;
-}
 
 /**
- * `IAdtTransportObjectActions` and `IAbapObjectEntry` are imported, not
- * declared.
+ * `IAdtTransportObjectActions`, `IAbapObjectEntry` and
+ * `IAdtTransportSearchConfigurations` are imported, not declared.
  *
  * They were declared here for one release, beside `IAdtTransportSearchable`
  * below and for the same reason: `@mcp-abap-adt/interfaces` was a major ahead
@@ -782,8 +763,9 @@ export interface IAdtTransportSearchable<TConfigurations> {
  * `^45.1.0`, the contracts live in `@mcp-abap-adt/interfaces-adt` 1.2.0 where
  * they belong, and the facade re-exports them.
  *
- * `IAdtTransportSearchable` stays declared below until it makes the same
- * journey; moving it is a type change with no behaviour in it.
+ * `IAdtTransportSearchable` made the same journey in interfaces-adt 11.0.0,
+ * as `IAdtTransportSearchConfigurations`: `list` requires a `configUri` there,
+ * so the contract offers the member that answers where one comes from.
  *
  * `readObjects` made that journey immediately. It shipped here ahead of the
  * contract and was declared beside `IAdtTransportSearchable` for one commit —
@@ -808,7 +790,9 @@ export type IRequestContract<R extends ITransportResults> = IAdtCreatable<
     ReturnType<R['deletionCheck']>
   > &
   IAdtRequest<ReturnType<R['list']>> &
-  IAdtTransportSearchable<ReturnType<NonNullable<R['searchConfigurations']>>> &
+  IAdtTransportSearchConfigurations<
+    ReturnType<NonNullable<R['searchConfigurations']>>
+  > &
   IAdtTransportObjectActions<
     ReturnType<NonNullable<R['removedObject']>>,
     ReturnType<NonNullable<R['addedObject']>>,

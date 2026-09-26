@@ -2,11 +2,11 @@
  * Get Inactive Objects - retrieve list of objects not yet activated
  */
 
+import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
-  IResultStrategy,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { XMLParser } from 'fast-xml-parser';
 import { getTimeout } from '../../utils/timeouts';
 import type { IInactiveObjectsResponse, IObjectReference } from './types';

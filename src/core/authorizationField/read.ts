@@ -2,11 +2,11 @@
  * AuthorizationField (SUSO / AUTH) read operations
  */
 
+import type { IReadOptions } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
-  IReadOptions,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_AUTHORIZATION_FIELD } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';

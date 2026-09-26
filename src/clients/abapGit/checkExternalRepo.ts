@@ -1,24 +1,23 @@
+import type { IAbapGitExternalRepoCredentials } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
-  IAbapGitExternalRepoCredentials,
-} from '@mcp-abap-adt/interfaces-adt';
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   ACCEPT_ABAPGIT_EXTERNAL_REPO_INFO_RESPONSE_V2,
   CT_ABAPGIT_EXTERNAL_REPO_INFO_REQUEST_V2,
 } from '../../constants/contentTypes';
 import { getTimeout } from '../../utils/timeouts';
-import type { IAbapGitExternalRepoInfo } from './types';
 import { buildExternalRepoInfoBody } from './xmlBuilder';
-import { parseExternalRepoInfo } from './xmlParser';
 
 export async function checkExternalRepo(
   connection: IAbapConnection,
   args: IAbapGitExternalRepoCredentials,
-): Promise<IAbapGitExternalRepoInfo> {
+): Promise<IAdtWireResponse> {
   // Phase Z confirmed: request/response use DIFFERENT media-type families.
   //   Content-Type = application/abapgit.adt.repo.info.ext.request.v2+xml
   //   Accept       = application/abapgit.adt.repo.info.ext.response.v2+xml
-  const resp = await connection.makeAdtRequest({
+  return connection.makeAdtRequest({
     method: 'POST',
     url: '/sap/bc/adt/abapgit/externalrepoinfo',
     timeout: getTimeout('default'),
@@ -28,5 +27,4 @@ export async function checkExternalRepo(
     },
     data: buildExternalRepoInfoBody(args),
   });
-  return parseExternalRepoInfo(String(resp.data));
 }

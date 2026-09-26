@@ -1,4 +1,4 @@
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { deleteFunctionInclude } from '../../../core/functionInclude/delete';
 
 function connReturning(xml: string): IAbapConnection {

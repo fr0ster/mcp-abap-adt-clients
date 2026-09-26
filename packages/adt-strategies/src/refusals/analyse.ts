@@ -1,9 +1,6 @@
-import type {
-  IAdtError,
-  IAdtWireResponse,
-  IAnalyse,
-} from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtError, IAnalyse } from '@mcp-abap-adt/interfaces-adt';
 import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   type AdtMessage,
   type AdtRefusal,

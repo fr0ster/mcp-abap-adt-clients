@@ -11,7 +11,7 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtUnitTest } from '../../../../core/unitTest/AdtUnitTest';
 import { expectResult } from '../../../helpers/contract';
 import { createLibraryLogger } from '../../../helpers/testLogger';

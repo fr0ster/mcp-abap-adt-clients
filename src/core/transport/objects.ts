@@ -26,11 +26,11 @@
  * "corrected" later by someone reading only the body.
  */
 
+import type { AdtTaskType } from '@mcp-abap-adt/interfaces-adt';
 import type {
-  AdtTaskType,
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_TRANSPORT } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';

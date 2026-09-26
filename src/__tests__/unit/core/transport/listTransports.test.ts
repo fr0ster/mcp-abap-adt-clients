@@ -10,9 +10,8 @@ import type {
   IAbapConnection,
   IAbapRequestOptions,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import {
-  getTransportSearchConfigurations,
   listTransports,
   parseSearchConfigurations,
 } from '../../../../core/transport/list';
@@ -127,22 +126,5 @@ describe('parseSearchConfigurations reads the href off the link, not the element
       '</configurations:configurations>';
 
     expect(parseSearchConfigurations(xml)).toEqual([]);
-  });
-});
-
-describe('getTransportSearchConfigurations', () => {
-  it('asks the configurations endpoint with its own content type', async () => {
-    const { connection, calls } = recordingConnection(CONFIGURATIONS_XML);
-
-    const configurations = await getTransportSearchConfigurations(connection);
-
-    expect(calls).toHaveLength(1);
-    expect(calls[0].url).toBe(
-      '/sap/bc/adt/cts/transportrequests/searchconfiguration/configurations',
-    );
-    expect(calls[0].headers?.Accept).toBe(
-      'application/vnd.sap.adt.configurations.v1+xml',
-    );
-    expect(configurations).toHaveLength(1);
   });
 });

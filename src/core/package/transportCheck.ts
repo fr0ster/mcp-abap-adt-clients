@@ -2,7 +2,7 @@
  * Package transport check operations
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { XMLParser } from 'fast-xml-parser';
 import {
   ACCEPT_TRANSPORT_CHECK,

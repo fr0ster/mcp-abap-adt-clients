@@ -52,7 +52,6 @@ export { parseTransportTree } from './core/transport/parseTransportTree';
 export {
   AdtParseError,
   AdtSAPError,
-  TransportSearchConfigurationMissing,
 } from './utils/adtErrors';
 export {
   fetchDiscoveryEndpoints,

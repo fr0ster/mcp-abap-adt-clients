@@ -8,13 +8,15 @@
  * no supported way to follow. This member is the way.
  */
 import type {
-  IAbapConnection,
-  IAbapRequestOptions,
   IAdtError,
-  IAdtWireResponse,
   ITransportSearchConfiguration,
 } from '@mcp-abap-adt/interfaces-adt';
 import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAbapConnection,
+  IAbapRequestOptions,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtClient } from '../../../../clients/AdtClient';
 import { AdtRequest } from '../../../../core/transport/AdtRequest';
 import { transportDocuments } from '../../../../core/transport/types';

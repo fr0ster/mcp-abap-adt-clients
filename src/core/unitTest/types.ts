@@ -6,10 +6,8 @@
  * class and its include, while `run`/`status`/`result` are a run.
  */
 
-import type {
-  IAdtWireResponse,
-  IResultStrategy,
-} from '@mcp-abap-adt/interfaces-adt';
+import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { headerValueToString } from '../../utils/internalUtils';
 import { rawDocument } from '../../utils/resultStrategy';
 

@@ -2,10 +2,8 @@
  * Shared system information utilities
  */
 
-import type {
-  IAbapConnection,
-  IAdtContentTypes,
-} from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtContentTypes } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   AdtContentTypesBase,
   AdtContentTypesModern,

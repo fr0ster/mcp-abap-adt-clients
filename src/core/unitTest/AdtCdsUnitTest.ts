@@ -13,17 +13,19 @@
 
 import type {
   AdtNoFailure,
-  IAbapConnection,
   IAdtCreateOptions,
   IAdtError,
   IAdtOperationOptions,
   IAdtResponse,
-  IAdtWireResponse,
   ICdsTestDoubleCheckable,
   ICdsUnitTestConfig,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { XMLParser } from 'fast-xml-parser';
 import { answering } from '../../utils/adtResponse';

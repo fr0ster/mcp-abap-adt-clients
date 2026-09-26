@@ -152,12 +152,12 @@ const RUNTIME_EXPORTS = [
   'RuntimeDumps',
   'St05Trace',
   'SystemMessages',
-  'TransportSearchConfigurationMissing',
   // The injection surface. A member's result type is a type parameter of its
   // contract, and these are what a consumer reaches for to fill it in: the
   // strategy implementations, the shipped default set for each object type,
   // and the two error strategies a caller's own `analyse` can defer to.
   // Without them the seam the contracts name is unreachable from outside.
+  'abapGitDocuments',
   'accessControlDocuments',
   'appendStructureDocuments',
   'authorizationFieldDocuments',

@@ -13,10 +13,8 @@
  * endpoints not present in legacy system discovery are blocked here.
  */
 
-import type {
-  IAbapConnection,
-  IAdtClientOptions,
-} from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtClientOptions } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { classDocuments, type IClassResults } from '../core/class';
 import { AdtClassLegacy } from '../core/class/AdtClassLegacy';

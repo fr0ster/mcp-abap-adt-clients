@@ -6,10 +6,11 @@
  * it depends on which object types you touch and what you were doing. This
  * package takes that decision, for the common case, from evidence.
  *
- * **Almost everything here is on the error axis, and that is deliberate.**
- * Shaping a *result* is the consumer's — which fields, to what end — and there
- * is no defensible default. The single exception is `asItCame`, the absence of
- * shaping.
+ * **Two axes.** The error axis — what counts as a failure — is most of it. The
+ * result axis holds the readings `@mcp-abap-adt/adt-clients` used to apply on
+ * its own before it answered documents as they arrived: they moved here so a
+ * caller who wants a shape asks for it, and one who wants the document gets it.
+ * `asItCame` is the absence of shaping.
  *
  * ```typescript
  * import { analyseActivation, asItCame } from '@mcp-abap-adt/adt-strategies';
@@ -49,6 +50,14 @@ export {
   readUnitTestRefusal,
   readValidationRefusal,
 } from './refusals/read';
-
-// The result axis, which has exactly one member.
 export { asItCame, rawOf } from './result';
+// The result axis: the document as it came, and the readings a caller may ask for.
+export {
+  abapGitErrorLog,
+  abapGitExternalRepo,
+  abapGitRepos,
+  type IAbapGitErrorLogEntry,
+  type IAbapGitExternalRepoBranch,
+  type IAbapGitExternalRepoInfo,
+  type IAbapGitRepo,
+} from './results/abapGit';

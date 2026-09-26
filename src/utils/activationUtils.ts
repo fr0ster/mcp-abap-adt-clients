@@ -9,7 +9,7 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { CT_ACTIVATION } from '../constants/contentTypes';
 import { getEnhancementUri } from '../core/enhancement/types';
 import { encodeSapObjectName } from './internalUtils';

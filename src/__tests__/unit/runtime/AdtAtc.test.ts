@@ -15,10 +15,10 @@
  */
 
 import type {
-  IAbapConnection,
   IAtcRunOptions,
   IAtcRunTarget,
 } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtAtc } from '../../../runtime/atc/AdtAtc';
 import { expectResult } from '../../helpers/contract';
 

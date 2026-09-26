@@ -11,10 +11,8 @@
  * - RFC works for both (and is the only way to get CRUD on legacy)
  */
 
-import type {
-  IAbapConnection,
-  IAdtClientOptions,
-} from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtClientOptions } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { isModernAdtSystem } from '../utils/systemInfo';
 import { AdtClient } from './AdtClient';

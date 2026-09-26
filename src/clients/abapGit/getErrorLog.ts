@@ -1,31 +1,25 @@
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { CT_ABAPGIT_REPO_OBJECT_V2 } from '../../constants/contentTypes';
 import { getTimeout } from '../../utils/timeouts';
-import { listRepos } from './listRepos';
-import type { IAbapGitErrorLogEntry } from './types';
-import { parseErrorLog } from './xmlParser';
 
+/**
+ * A run's error log — one GET to the `log_link` `listRepos` reported.
+ *
+ * Until interfaces-adt 11 this took a package, listed every repository to find
+ * the link, and threw "not found" when the package was not in the list: two
+ * requests, and a sentence SAP never said (decision 37).
+ */
 export async function getErrorLog(
   connection: IAbapConnection,
-  packageName: string,
-): Promise<IAbapGitErrorLogEntry[]> {
-  const repos = await listRepos(connection);
-  const match = repos.find(
-    (r) => r.package.toUpperCase() === packageName.toUpperCase(),
-  );
-  if (!match) {
-    throw new Error(
-      `abapGit repository for package '${packageName}' not found`,
-    );
-  }
-  if (!match.atomLinks.logLink) {
-    return [];
-  }
-  const resp = await connection.makeAdtRequest({
+  logLink: string,
+): Promise<IAdtWireResponse> {
+  return connection.makeAdtRequest({
     method: 'GET',
-    url: match.atomLinks.logLink,
+    url: logLink,
     timeout: getTimeout('default'),
     headers: { Accept: CT_ABAPGIT_REPO_OBJECT_V2 },
   });
-  return parseErrorLog(String(resp.data));
 }

@@ -19,7 +19,7 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { activateAccessControl } from '../../../core/accessControl/activation';
 import { activateAuthorizationField } from '../../../core/authorizationField/activation';
 import { activate as activateBehaviorDefinition } from '../../../core/behaviorDefinition/activation';

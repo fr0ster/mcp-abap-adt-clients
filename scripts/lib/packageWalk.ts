@@ -13,7 +13,7 @@
  * way any consumer would, over the two single-request members that stayed:
  * `fetchNodeStructure` and the `parseNodeStructure` reading.
  */
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
   fetchNodeStructure,

@@ -13,7 +13,6 @@
  */
 
 import type {
-  IAbapConnection,
   IAdtActivatable,
   IAdtCheckable,
   IAdtContentTypes,
@@ -33,6 +32,7 @@ import type {
   IAdtVersionable,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';

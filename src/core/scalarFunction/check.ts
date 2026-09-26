@@ -1,7 +1,7 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { type CheckRunVersion, runCheckRun } from '../../utils/checkRun';
 
 export async function checkScalarFunction(

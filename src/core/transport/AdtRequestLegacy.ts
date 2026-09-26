@@ -16,7 +16,7 @@
  */
 
 import type {
-  IAbapConnection,
+  IAdtAnalyseOptions,
   IAdtError,
   IAdtOperationOptions,
   IAdtResponse,
@@ -25,6 +25,7 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { answering, failed } from '../../utils/adtResponse';
 import { AdtRequest } from './AdtRequest';
@@ -104,21 +105,25 @@ export class AdtRequestLegacy<
    * reading for their system. Handing the document back under a type that
    * promises a tree would be this implementation lying about what it answered.
    */
-  override async list(
-    options?: IListTransportsOptions,
-  ): Promise<IAdtResponse<ReturnType<R['list']>>> {
+  override async list<E extends IAdtError = IAdtError>(
+    // Wider than the contract on purpose: the legacy endpoint is not a saved
+    // search, so there is no `configUri` to require — and one that is passed
+    // is refused below rather than ignored.
+    options?: Partial<IListTransportsOptions> & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['list']>, E>> {
     if (options?.configUri) {
-      return failed(
+      return failed<ReturnType<R['list']>, E>(
         unsupported(
           'configUri',
           '/sap/bc/cts/transportrequests is not a saved-configuration search and always returns the full list for the current user.',
-        ),
+        ) as E,
       );
     }
 
     return answering(
       () => listTransportsLegacy(this.conn),
       this.results.list as IResultStrategy<ReturnType<R['list']>>,
+      options?.analyse,
     );
   }
 

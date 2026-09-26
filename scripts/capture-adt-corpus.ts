@@ -1502,10 +1502,15 @@ async function main(): Promise<void> {
 
     await withCase('read-transport-list-structure', async () => {
       // `?user=` always answers an empty `<tm:root/>`: the collection is a
-      // saved-configuration search, so the list takes `configUri` now. Recorded
-      // without one, which is the shape a caller gets before they have picked a
-      // configuration.
-      await client.getRequest().list({});
+      // saved-configuration search, so the list takes `configUri`. Since
+      // interfaces-adt 11 the caller names it; the recording runs the system's
+      // first configuration, as the caller of a one-configuration system would.
+      const configs = await client.getRequest().searchConfigurations();
+      const configUri = configs.ok
+        ? configs.getResult().value[0]?.uri
+        : undefined;
+      if (!configUri) throw new Error('no saved transport search to record');
+      await client.getRequest().list({ configUri });
     });
 
     // -----------------------------------------------------------------

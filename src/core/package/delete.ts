@@ -2,13 +2,12 @@
  * Package delete operations
  */
 
-import type {
-  AdtNoFailure,
-  IAbapConnection,
-  IAdtError,
-  IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
+import type { AdtNoFailure, IAdtError } from '@mcp-abap-adt/interfaces-adt';
 import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { XMLParser } from 'fast-xml-parser';
 import {
   ACCEPT_DELETION,

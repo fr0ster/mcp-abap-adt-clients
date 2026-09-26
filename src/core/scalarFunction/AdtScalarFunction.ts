@@ -6,7 +6,6 @@
  */
 import type {
   AdtNoFailure,
-  IAbapConnection,
   IAdtActivatable,
   IAdtCheckable,
   IAdtCreatable,
@@ -23,7 +22,6 @@ import type {
   IAdtUpdatable,
   IAdtValidatable,
   IAdtVersionable,
-  IAdtWireResponse,
   IAnalyse,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
@@ -31,6 +29,10 @@ import {
   ADT_NO_FAILURE,
   AdtObjectErrorCodes,
 } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';

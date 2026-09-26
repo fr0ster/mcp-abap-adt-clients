@@ -13,6 +13,9 @@ import { rawOf } from '../result';
 describe('the published surface', () => {
   it('exports every strategy and every reading, callable', () => {
     const expected = [
+      'abapGitErrorLog',
+      'abapGitExternalRepo',
+      'abapGitRepos',
       'analyseActivation',
       'analyseAny',
       'analyseCheck',

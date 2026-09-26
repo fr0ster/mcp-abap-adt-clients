@@ -1,8 +1,5 @@
-import type {
-  IAbapConnection,
-  IAdtResponse,
-  ISt05Trace,
-} from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtResponse, ISt05Trace } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { answering } from '../../utils/adtResponse';
 import { rawDocument } from '../../utils/resultStrategy';

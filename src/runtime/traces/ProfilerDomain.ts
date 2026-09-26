@@ -1,7 +1,5 @@
 import type {
-  IAbapConnection,
   IAdtResponse,
-  IAdtWireResponse,
   IProfiler,
   IProfilerListOptions,
   IProfilerTraceDbAccessesOptions,
@@ -11,6 +9,10 @@ import type {
   ViewArgs,
   ViewResult,
 } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { answering } from '../../utils/adtResponse';
 import {

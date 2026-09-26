@@ -6,11 +6,11 @@
  */
 
 import type {
-  IAbapConnection,
   IAdtOperationOptions,
   IAdtResponse,
 } from '@mcp-abap-adt/interfaces-adt';
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { IWalkedNode } from '../../../../scripts/lib/packageWalk';
 import { walkPackage } from '../../../../scripts/lib/packageWalk';

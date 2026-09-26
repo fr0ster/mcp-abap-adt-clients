@@ -1,4 +1,4 @@
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   ACCEPT_FEATURE_TOGGLE_CHECK_RESULT,
   CT_FEATURE_TOGGLE_CHECK_PARAMETERS,

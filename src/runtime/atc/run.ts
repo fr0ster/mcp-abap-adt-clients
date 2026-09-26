@@ -12,11 +12,11 @@
  * See `docs/evidence/2026-08-16-atc-trial-probe.md` for the captures.
  */
 
+import type { AtcObjectType } from '@mcp-abap-adt/interfaces-adt';
 import type {
-  AtcObjectType,
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   ACCEPT_ATC_CUSTOMIZING,
   ACCEPT_ATC_RUN_RESPONSE,

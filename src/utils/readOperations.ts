@@ -6,7 +6,7 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_NODE_STRUCTURE } from '../constants/contentTypes';
 import { buildQueryString, encodeSapObjectName } from '../utils/internalUtils';
 import { getTimeout } from './timeouts';

@@ -1,8 +1,8 @@
+import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
-import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtAppendStructure } from '../../../../core/appendStructure/AdtAppendStructure';
 import { expectFailure, expectResult } from '../../../helpers/contract';
 

@@ -21,7 +21,7 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { answering as compose } from '../../../utils/adtResponse';
 import { requestOf, withRequestTrace } from '../../../utils/requestTrace';
 import { rawDocument } from '../../../utils/resultStrategy';

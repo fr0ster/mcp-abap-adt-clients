@@ -1,33 +1,27 @@
+import type { IAbapGitUnlinkArgs } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
-  IAbapGitUnlinkArgs,
-} from '@mcp-abap-adt/interfaces-adt';
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { getTimeout } from '../../utils/timeouts';
-import { listRepos } from './listRepos';
 
+/**
+ * Remove a repository link — `DELETE /abapgit/repos/{key}`, by the key
+ * `listRepos` reported.
+ *
+ * Until interfaces-adt 11 this took a package and listed every repository to
+ * find the key, throwing "not found" or "response missing key" from its own
+ * lookup (decision 37).
+ */
 export async function unlinkRepo(
   connection: IAbapConnection,
   args: IAbapGitUnlinkArgs,
-): Promise<void> {
-  const repos = await listRepos(connection);
-  const match = repos.find(
-    (r) => r.package.toUpperCase() === args.package.toUpperCase(),
-  );
-  if (!match) {
-    throw new Error(
-      `abapGit repository for package '${args.package}' not found`,
-    );
-  }
-  if (!match.repositoryId) {
-    throw new Error(
-      `abapGit repository '${args.package}': response missing <abapgitrepo:key>`,
-    );
-  }
+): Promise<IAdtWireResponse> {
   const params: Record<string, string> = {};
   if (args.transportRequest) params.corrNr = args.transportRequest;
-  await connection.makeAdtRequest({
+  return connection.makeAdtRequest({
     method: 'DELETE',
-    url: `/sap/bc/adt/abapgit/repos/${encodeURIComponent(match.repositoryId)}`,
+    url: `/sap/bc/adt/abapgit/repos/${encodeURIComponent(args.repositoryId)}`,
     timeout: getTimeout('default'),
     params,
   });

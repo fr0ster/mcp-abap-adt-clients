@@ -22,7 +22,6 @@ import { inStatefulSession } from '../shared/capabilities/statefulSession';
  */
 
 import type {
-  IAbapConnection,
   IAdtActivatable,
   IAdtCheckable,
   IAdtContentTypes,
@@ -39,9 +38,12 @@ import type {
   IAdtUpdatable,
   IAdtValidatable,
   IAdtVersionable,
-  IAdtWireResponse,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { answering } from '../../utils/adtResponse';
 import { safeErrorMessage } from '../../utils/internalUtils';

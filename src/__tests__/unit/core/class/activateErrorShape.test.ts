@@ -18,7 +18,7 @@
  * inherits the same method.
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtClass } from '../../../../core/class/AdtClass';
 import { expectFailure } from '../../../helpers/contract';
 import { createLibraryLogger } from '../../../helpers/testLogger';

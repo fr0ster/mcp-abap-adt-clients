@@ -39,7 +39,8 @@
     "access": "public"
   },
   "dependencies": {
-    "@mcp-abap-adt/interfaces-adt": "^10.0.0",
+    "@mcp-abap-adt/interfaces-adt": "^11.0.0",
+    "@mcp-abap-adt/interfaces-adt-connection": "^1.0.0",
     "fast-xml-parser": "^5.9.3"
   }
 }

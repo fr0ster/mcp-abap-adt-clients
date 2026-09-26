@@ -73,7 +73,6 @@
  */
 
 import type {
-  IAbapConnection,
   IAdtDataPreview,
   IAdtDiscovery,
   IAdtError,
@@ -83,9 +82,12 @@ import type {
   IAdtOperationOptions,
   IAdtRepositoryStructure,
   IAdtResponse,
-  IAdtWireResponse,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
 import { answering, answeringValue } from '../../utils/adtResponse';

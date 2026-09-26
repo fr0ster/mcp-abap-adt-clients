@@ -1,5 +1,4 @@
 import type {
-  IAbapConnection,
   IAdtResponse,
   IAdtRunnable,
   IProfilerTraceParameters,
@@ -10,6 +9,7 @@ import type {
   IRunnableWithProfiler,
   ITraceScheduling,
 } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { runProgram } from '../../core/program/run';
 import type { INamedItem } from '../../core/shared/utilResults';

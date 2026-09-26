@@ -13,7 +13,7 @@
  * called would have passed before the fix.
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AdtMessageClassMessage } from '../../../../core/messageClass/AdtMessageClassMessage';
 import { expectFailure } from '../../../helpers/contract';

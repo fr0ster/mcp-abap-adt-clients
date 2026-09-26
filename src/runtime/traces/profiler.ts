@@ -9,13 +9,15 @@
  */
 
 import type {
-  IAbapConnection,
-  IAdtWireResponse,
   IProfilerTraceDbAccessesOptions,
   IProfilerTraceHitListOptions,
   IProfilerTraceParameters,
   IProfilerTraceStatementsOptions,
 } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { XMLParser } from 'fast-xml-parser';
 import {
   ACCEPT_TRACE_CALLTREE,

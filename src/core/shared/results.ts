@@ -10,10 +10,8 @@
  * the point: a type nobody can produce from an answer is a type this package has
  * no business declaring, and keeping them together is what makes that visible.
  */
-import type {
-  IAdtWireResponse,
-  IResultStrategy,
-} from '@mcp-abap-adt/interfaces-adt';
+import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { XMLParser } from 'fast-xml-parser';
 
 /**

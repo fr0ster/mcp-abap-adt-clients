@@ -1,7 +1,7 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtClass } from '../../core/class/AdtClass';
 import { AdtLocalTypes } from '../../core/class/AdtLocalTypes';
 import { getClassIncludeVersions } from '../../core/class/versions';

@@ -12,11 +12,11 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { ADT_TASK_TYPE } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   ISessionLifecycleAware,
-} from '@mcp-abap-adt/interfaces-adt';
-import { ADT_TASK_TYPE } from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
@@ -795,10 +795,18 @@ describe('AdtRequest', () => {
           }
 
           logTestStep('list', testsLogger);
+          // A listing runs a saved search the caller names. The test takes the
+          // system's first one, which is the choice `list` used to make itself
+          // when a system held exactly one.
+          const configs = expectResult(
+            await client.getRequest().searchConfigurations(),
+            'transport search configurations',
+          );
+          expect(configs.length).toBeGreaterThan(0);
           // The shipped reading of a listing is the parsed tree, so the
           // assertions below are about requests rather than about a document.
           const tree = expectResult(
-            await client.getRequest().list(),
+            await client.getRequest().list({ configUri: configs[0].uri }),
             'list transport requests',
           );
 

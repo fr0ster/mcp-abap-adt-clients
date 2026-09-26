@@ -5,7 +5,7 @@
  * not put withLongPolling in the request URL or params. It guards against a
  * future "fix" that wires an unverified parameter.
  */
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { readFeatureToggle } from '../../../core/featureToggle/read';
 
 function fakeConn(): { conn: IAbapConnection; calls: any[] } {

@@ -1,73 +1,36 @@
 /**
- * abapGit client type definitions.
+ * The result strategies an abapGit client is constructed with.
  *
- * The contract types (IAdtAbapGitClient and friends) live in
- * @mcp-abap-adt/interfaces — a consumer must import them to use the client
- * at all, and that package is the one place to import from. Only the two
- * error shapes below stay here: they are not part of the public contract,
- * only thrown internally by the poll loop.
+ * One per member, given once, so every call through the client answers the
+ * shape its strategy makes (decision 22 in the interfaces repository). The
+ * shipped default reads nothing: each member answers the document ADT sent,
+ * and `unlink` — a DELETE with nothing to read — answers nothing. The readings
+ * that used to be applied here (`IAbapGitRepoStatus` and the rest) are
+ * `abapGitRepos`, `abapGitErrorLog` and `abapGitExternalRepo` in
+ * `@mcp-abap-adt/adt-strategies`, for a caller who wants those shapes.
  */
+import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
+import { nothing, rawDocument } from '../../utils/resultStrategy';
 
-/** The status ADT reports for a linked repository. `R` while a pull runs. */
-export type AbapGitStatus = 'R' | 'E' | 'A' | string;
+export interface IAbapGitResults {
+  readonly linked: IResultStrategy<unknown>;
+  readonly pulled: IResultStrategy<unknown>;
+  readonly unlinked: IResultStrategy<unknown>;
+  readonly repos: IResultStrategy<unknown>;
+  readonly errorLog: IResultStrategy<unknown>;
+  readonly externalRepo: IResultStrategy<unknown>;
+}
 
 /**
- * One linked repository, as `/sap/bc/adt/abapgit/repos` reports it.
+ * The shipped default: documents as they arrived.
  *
- * It left `@mcp-abap-adt/interfaces` in 31.0.0 with the other result shapes:
- * `IAdtAbapGitClient<TRepos, TRepo, TErrorLog, TPull, TExternalRepo>` says
- * every member answers *something*, and what that something looks like is this
- * implementation's to name.
+ * `satisfies`, never an annotation — see `classDocuments` for why.
  */
-export interface IAbapGitRepoStatus {
-  package: string;
-  url: string;
-  branchName: string;
-  status: AbapGitStatus;
-  statusText: string;
-  createdBy?: string;
-  createdAt?: string;
-  repositoryId?: string;
-  /**
-   * Where a pull for this repository is posted.
-   *
-   * Reported since 19.0.0, because `pull` no longer lists the repositories to
-   * find it — a caller lists once, keeps the link, and posts. The server names
-   * it as an atom link on the repository; a repository that offers none cannot
-   * be pulled, which is why this is optional rather than invented.
-   */
-  pullLink?: string;
-}
-
-/** One line of a pull's error log. */
-export interface IAbapGitErrorLogEntry {
-  msgType: 'E' | 'W' | 'I' | 'S' | string;
-  objectType: string;
-  objectName: string;
-  messageText: string;
-}
-
-/** One branch of an external repository. */
-export interface IAbapGitExternalRepoBranch {
-  name: string;
-  sha1: string;
-  isHead: boolean;
-  type?: string;
-}
-
-/** What the external-repository probe answers. */
-export interface IAbapGitExternalRepoInfo {
-  branches: IAbapGitExternalRepoBranch[];
-  // Measured: the field is `accessMode`, not `access`.
-  accessMode?: 'PUBLIC' | 'PRIVATE' | string;
-}
-
-export interface IAbapGitAbortedError extends Error {
-  name: 'AbortError';
-  lastKnownStatus?: IAbapGitRepoStatus;
-}
-
-export interface IAbapGitTimeoutError extends Error {
-  name: 'TimeoutError';
-  lastKnownStatus?: IAbapGitRepoStatus;
-}
+export const abapGitDocuments = {
+  linked: rawDocument,
+  pulled: rawDocument,
+  unlinked: nothing,
+  repos: rawDocument,
+  errorLog: rawDocument,
+  externalRepo: rawDocument,
+} satisfies IAbapGitResults;

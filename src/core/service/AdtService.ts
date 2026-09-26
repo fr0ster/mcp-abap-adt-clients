@@ -1,7 +1,6 @@
 import type {
   AdtNoFailure,
   GeneratedServiceType,
-  IAbapConnection,
   IAdtActivatable,
   IAdtCheckable,
   IAdtCreatable,
@@ -17,12 +16,15 @@ import type {
   IAdtTransportAware,
   IAdtUpdatable,
   IAdtValidatable,
-  IAdtWireResponse,
   IAnalyse,
   IResultStrategy,
   ServiceBindingVariant,
 } from '@mcp-abap-adt/interfaces-adt';
 import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
   ACCEPT_CHECK_MESSAGES,

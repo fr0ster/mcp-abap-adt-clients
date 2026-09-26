@@ -1,4 +1,4 @@
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { Profiler } from '../../../runtime/traces/ProfilerDomain';
 import { compareRecordedAt } from '../../../runtime/traces/traceParsing';
 import { expectResult } from '../../helpers/contract';

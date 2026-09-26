@@ -5,7 +5,7 @@
  * but without dependency on connection package
  */
 
-import type { ITimeoutConfig } from '@mcp-abap-adt/interfaces-adt';
+import type { ITimeoutConfig } from '@mcp-abap-adt/interfaces-adt-connection';
 
 /**
  * Get timeout configuration from environment variables

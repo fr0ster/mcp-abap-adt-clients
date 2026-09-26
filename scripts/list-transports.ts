@@ -27,7 +27,23 @@ async function main(): Promise<void> {
   const logger = createConnectionLogger();
   const connection = await createTestConnection(logger);
   try {
-    const answer = await new AdtClient(connection, logger).getRequest().list();
+    const requests = new AdtClient(connection, logger).getRequest();
+    // A listing runs a saved search, and the caller names which one: take the
+    // configurations, and use the first unless SEARCH_CONFIG_URI says otherwise.
+    const configs = await requests.searchConfigurations();
+    if (!configs.ok) {
+      // biome-ignore lint/suspicious/noConsole: a probe reports to whoever ran it
+      console.log(`configurations failed: ${configs.getError().message}`);
+      return;
+    }
+    const available = configs.getResult().value;
+    const configUri = process.env.SEARCH_CONFIG_URI ?? available[0]?.uri;
+    if (!configUri) {
+      // biome-ignore lint/suspicious/noConsole: same
+      console.log('this system holds no saved transport search');
+      return;
+    }
+    const answer = await requests.list({ configUri });
     if (!answer.ok) {
       // biome-ignore lint/suspicious/noConsole: a probe reports to whoever ran it
       console.log(`list failed: ${answer.getError().message}`);

@@ -38,7 +38,7 @@
  * ```
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { ApplicationLog } from '../runtime/applicationLog/ApplicationLog';
 import { AdtAtc } from '../runtime/atc/AdtAtc';

@@ -7,12 +7,14 @@
  */
 
 import type {
-  IAbapConnection,
-  IAdtWireResponse,
   IListTransportsParams,
   ITransportSearchConfiguration,
 } from '@mcp-abap-adt/interfaces-adt';
 import { TRANSPORT_SEARCH_CONFIGURATIONS_URL } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   ACCEPT_TRANSPORT_CONFIGURATIONS,
   ACCEPT_TRANSPORT_LIST,
@@ -71,13 +73,4 @@ export async function requestTransportSearchConfigurations(
     timeout: getTimeout('default'),
     headers: { Accept: ACCEPT_TRANSPORT_CONFIGURATIONS },
   });
-}
-
-/** The same request, parsed — what the internal resolver needs. */
-export async function getTransportSearchConfigurations(
-  connection: IAbapConnection,
-): Promise<ITransportSearchConfiguration[]> {
-  const response = await requestTransportSearchConfigurations(connection);
-
-  return parseSearchConfigurations(response.data);
 }

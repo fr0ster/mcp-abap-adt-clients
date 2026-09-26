@@ -7,7 +7,7 @@
  * Flow: lock → DELETE {objectUrl}?lockHandle=... → unlock on failure
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { writeQuery } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 

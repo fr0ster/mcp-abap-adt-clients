@@ -34,7 +34,7 @@ import type {
   IAbapConnection,
   IAbapRequestOptions,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 
 /** Enough to say which call, and nothing more. Matches `IAdtError.request`. */
 export interface IAdtRequestTrace {

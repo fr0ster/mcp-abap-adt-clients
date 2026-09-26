@@ -11,10 +11,8 @@
  * build if that call starts compiling again. There is no runtime half — the
  * point is what a consumer's editor tells them before they run anything.
  */
-import type {
-  IAbapConnection,
-  IAdtUpdatable,
-} from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtUpdatable } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AdtClient } from '../../../../clients/AdtClient';
 import type { IServiceBindingPublicationConfig } from '../../../../core/service/types';

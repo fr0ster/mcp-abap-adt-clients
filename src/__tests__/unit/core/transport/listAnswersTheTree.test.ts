@@ -18,7 +18,7 @@ import type {
   IAbapConnection,
   IAbapRequestOptions,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtRequest } from '../../../../core/transport/AdtRequest';
 import { expectResult } from '../../../helpers/contract';
 
@@ -61,13 +61,13 @@ describe('AdtRequest.list()', () => {
     );
 
     const tree = expectResult(
-      await new AdtRequest(connection).list(),
+      await new AdtRequest(connection).list({ configUri: '/sap/bc/adt/cts/x' }),
       'list transport requests',
     );
 
     expect(tree.requests).toHaveLength(7);
-    // The configuration lookup and the listing itself. Nothing is re-fetched
-    // to read the document a second time.
-    expect(calls).toHaveLength(2);
+    // The listing alone: the caller named the search, and nothing is
+    // re-fetched to read the document a second time.
+    expect(calls).toHaveLength(1);
   });
 });
