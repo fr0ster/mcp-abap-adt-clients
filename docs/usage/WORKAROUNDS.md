@@ -72,7 +72,7 @@ ATC
 **Symptom.** In an ABAP session that has already saved a package:
 
 - a second `updateMetadata()` of it answers
-  `400 ExceptionResourceAlreadyExists`, T100 `PAK/058`, *"Package ZMCP_BLD_PKGHTTP
+  `400 ExceptionResourceAlreadyExists`, T100 `PAK/058`, *"Package <PACKAGE>
   is already locked"*;
 - a `delete()` of it answers **`200`** carrying `isDeleted="false"` and the same
   `PAK/058`, while `checkDeletion()` just before it answered
@@ -162,13 +162,13 @@ A delete that should read `isDeleted="false"` as a failure passes
 a success carrying the document.
 
 **Evidence.** Issue [#176](https://github.com/fr0ster/mcp-abap-adt-clients/issues/176)
-and its comments. The cause was read from the ABAP code on E19 (on-premise).
-Measured on E19:
+and its comments. The cause was read from the ABAP code of an on-premise system.
+Measured on an on-premise system:
 
 - 2026-08-31, HTTP: a delete from the session that updated the package answered
   `isDeleted="false"`, `PAK/058`, retried for 30 seconds; one second after the
   session ended the same request deleted it.
-- 2026-09-26, one session throughout, both transports (`ZAC_INNER_PKG02`):
+- 2026-09-26, one session throughout, both transports (a test package):
 
   | step | HTTP | RFC |
   | --- | --- | --- |
@@ -274,7 +274,7 @@ stateless. The include-level `LOCK` endpoint has never been probed.
 ## A service binding is locked to publish it
 
 **Symptom.** A service binding will not delete — *"You are already editing
-ZAC_SRVB01"* — or `_action=LOCK` from another process answers
+<SERVICE_BINDING>"* — or `_action=LOCK` from another process answers
 `403 ExceptionResourceNoAccess`, *"User … is currently editing"*. Recycling
 your own session does not clear it.
 
@@ -365,7 +365,7 @@ the cause:
 
 ```
 GET  → 200, empty body
-PUT  → 400: The description is missing for ZAC_DOM01
+PUT  → 400: The description is missing for <DOMAIN>
 ```
 
 **Cause.** ADT answers absence, and not-yet-ready, with an empty success. The
@@ -422,7 +422,7 @@ belongs to the explanation.
 of your own must not default an empty `del:type` to `E` when the verdict is
 `"true"`.
 
-**Evidence.** E19 (on-premise) and the cloud trial, 2026-09-26: a DDLS delete
+**Evidence.** An on-premise system and a cloud ABAP environment, 2026-09-26: a DDLS delete
 answered `isDeleted="true"` with the `S::000` message, and the object was gone
 on the next read. The recorded document is the fixture in
 `packages/adt-strategies/src/__tests__/readings.test.ts`
@@ -468,7 +468,7 @@ mistyped `packageName`.
 ## What a bare create leaves depends on the type
 
 **Symptom.** Straight after `create()`, a read of a **class** answers
-`400 ExceptionResourceWrongData`, `SADT_RESOURCE/007`, *"Resource  ZCL_X: wrong
+`400 ExceptionResourceWrongData`, `SADT_RESOURCE/007`, *"Resource  <CLASS>: wrong
 input data for processing"* (note the double space) — for `active`, `inactive`,
 metadata and source alike. Waiting 30 seconds does not help, and neither does
 lock + unlock. Other types answer differently, and a service definition's
@@ -485,7 +485,7 @@ create is refused outright with *"Check of condition failed"*.
 | `serviceDefinition` | **nothing — the POST is refused** | — |
 
 The class does have a skeleton; it becomes readable at the first source write
-(`version=active` → SAP's `class ZAC_X definition`, `version=inactive` → what
+(`version=active` → SAP's `class <CLASS> definition`, `version=inactive` → what
 you wrote).
 
 **Rule.** A read straight after a create proves nothing portable. Two checks
@@ -516,8 +516,8 @@ lock                ok
 read while locked   refused
 read after unlock   refused                       ← not the lock either
 first source write  ok
-read active         200   class ZAC_PROBE_INACT definition      ← SAP's skeleton
-read inactive       200   CLASS zac_probe_inact DEFINITION …    ← as written
+read active         200   class <CLASS> definition      ← SAP's skeleton
+read inactive       200   CLASS <class> DEFINITION …    ← as written
 ```
 
 **Where it bites.** `create` then `read` / `readMetadata` on `getClass()`,
@@ -566,7 +566,7 @@ existing class is checked under all three versions) and
 
 **Symptom.** `POST /sap/bc/adt/activation` answers **`200` even on failure**, and
 `activationExecuted="false"` comes back for an object that is fine. A class that
-does not exist answers `200` with `<msg type="E">` *"Class ZCL_X does not have
+does not exist answers `200` with `<msg type="E">` *"Class <CLASS> does not have
 a TMDIR entry"* (`OO(045)`, beside an informational `EU(239)`).
 
 **Cause.** The flag says whether ADT did any work, not whether the work
@@ -619,7 +619,7 @@ once. The only answer to "is it active now" is that list, not the activation's
 **Workaround.** After `activate()`, read `getUtils().getInactiveObjects()` and
 activate what is still listed — the parts before the container. For a
 background run use `activateObjectsGroup()` / `getActivationRun()` /
-`getActivationResults()`. On the trial, activating a function group can leave
+`getActivationResults()`. On a cloud ABAP environment, activating a function group can leave
 `FUGR/F <group>` listed with a "nothing to do" answer
 (`activationExecuted="false"`, `generationExecuted="true"`, no messages); on
 premise both entries cleared. That difference is unsettled.
@@ -685,7 +685,7 @@ path.
 `containers` is an ordered list walked by name; a reading of your own must do
 the same. This library sends `?configUri=` alone; `targets=true` is not sent.
 
-**Evidence.** Eclipse ADT 3.60.0 against the trial, 2026-08-11 — the user's
+**Evidence.** Eclipse ADT 3.60.0 against a cloud ABAP trial, 2026-08-11 — the user's
 captured request/response trace — against this library's own probe of
 2026-08-07, which never saw `tm:target`.
 
@@ -732,7 +732,7 @@ system configured, so every request and task on it is hand-made.
 **Symptom.** `/sap/bc/adt/atc/variants` answers `totalItemCount 0`, and a
 findings read with a `checkstyle` `Accept` answers `406`.
 
-**Cause.** On the trial the variant a run uses is the system's, delivered by
+**Cause.** On a cloud ABAP environment the variant a run uses is the system's, delivered by
 `POST /sap/bc/adt/atc/customizing` (`systemCheckVariant`, there
 `ABAP_CLOUD_DEVELOPMENT_DEFAULT`). The worklist has exactly one representation:
 the `406` says *"Accepted content types: application/atc.worklist.v1+xml"*.
