@@ -7,7 +7,8 @@
  * Every member answers `IAdtResponse<T>`, where T is what the result set given
  * at construction makes of that endpoint's answer.
  *
- * Operation chains:
+ * The sequences Eclipse follows — each step is its own member here, one
+ * request each, and the caller composes them:
  * - Create: validate → create → check
  * - Update: lock → check → update → unlock
  * - Delete: check(deletion) → delete
@@ -141,12 +142,16 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
   }
 
   /**
-   * Create the package: validate → create → check.
+   * Create the package: one POST. Eclipse validates before it and runs a
+   * check after it; both are members of their own here.
    *
-   * The check is a checkrun on the new object, the way Eclipse does it, not a
+   * That check is a checkrun on the new object, the way Eclipse does it, not a
    * second call to the validation endpoint — captured 2026-08-31, which
    * validates, creates, then posts `/sap/bc/adt/checkruns` on the created
    * package before it is ever locked.
+   *
+   * A package can be saved only once per ABAP session: PAK/058 — see
+   * docs/usage/WORKAROUNDS.md. Over RFC the create counts as that save.
    */
   async create<E extends IAdtError = IAdtError>(
     config: Omit<IPackageConfig, 'source'> & { source?: never },
@@ -232,20 +237,8 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
   /**
    * Update the package's metadata.
    *
-   * **One save per ABAP session** (issue #176). A session that has created or
-   * updated a package cannot update it again: the PUT answers 400
-   * `ExceptionResourceAlreadyExists`, PAK/058, "Package … is already locked".
-   * The handle is not the cause — a made-up one answers 423
-   * `SADT_RESOURCE/026`, ours is accepted — and neither is the enqueue lock.
-   * `CL_PACKAGE` keeps each package instance in a static buffer for the whole
-   * ABAP session, the create and the update both leave it in state
-   * `requested`, and the next save loads it back from that buffer and
-   * `set_changeable` refuses. Over RFC every call shares one session, so an
-   * update straight after a create fails; over HTTP the create is stateless
-   * and the update succeeds. Measured on an on-premise system 2026-09-26, both transports.
-   *
-   * Nothing here opens a new session to get round it — that is the caller's,
-   * on the connection it owns. See docs/development/RFC_TESTING.md.
+   * A package can be saved only once per ABAP session: PAK/058 — see
+   * docs/usage/WORKAROUNDS.md. Opening a new session is the caller's.
    *
    * **The whole content, every time.** This is a replace, never a merge. Read
    * what the object holds, change what you mean to change, and pass the result:
@@ -329,16 +322,9 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
   /**
    * Delete the package.
    *
-   * A package this session has just updated cannot be deleted by this session —
-   * measured 2026-08-31: `deletion/check` answers `isDeletable="true"`
-   * while `deletion/delete` answers HTTP 200 carrying `isDeleted="false"` and
-   * PAK/058, "package is already locked", even though the UNLOCK moments
-   * earlier answered 200. It is not a delay: retried for 30 seconds inside the
-   * run it never succeeds, and the same request one second after the run ends
-   * deletes it on the first attempt. It is `CL_PACKAGE`'s session buffer
-   * (issue #176): the update left the package's instance there as `requested`,
-   * and the delete loads it back and is refused. A new session has no such
-   * instance.
+   * A package can be saved only once per ABAP session: PAK/058 — see
+   * docs/usage/WORKAROUNDS.md. A delete from a session that saved the package
+   * is refused; from a new session it succeeds.
    *
    * The answer is a 200 either way, and `isDeleted="false"` is in its body: a
    * caller who wants that read as a failure passes `analyseDeletion` (from

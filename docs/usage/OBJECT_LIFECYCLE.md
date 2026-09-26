@@ -391,11 +391,11 @@ verdict and this library does not look for one in the body either: reading an
 activation checklist is your `analyse`, written from the responses your own
 system gives.
 
-Two things worth knowing while you write it. `activationExecuted="false"` has
-been observed on an object that was already active, with no message attached —
-so the flag on its own does not separate "nothing to do" from "refused". And a
-locked object refuses with HTTP 403, which never reaches a body-reading strategy
-at all.
+Two things worth knowing while you write it: `activationExecuted="false"` with
+no message means "nothing to do", and a locked object refuses with HTTP 403,
+which never reaches a body-reading strategy at all — see
+[WORKAROUNDS.md](WORKAROUNDS.md#activationexecuted-false-is-not-a-failure).
+`analyseActivation` in `@mcp-abap-adt/adt-strategies` reads both.
 
 ## How to check a created object, and when
 
@@ -524,56 +524,14 @@ all: it is changed and deleted directly.
 
 ## What a bare `create()` actually leaves, per type
 
-A POST sometimes builds a minimal working object and sometimes builds nothing.
-Which one you get is a property of the type, and it is not guessable — measured
-on a cloud system by creating each and asking every way of reading it:
-
-| Type | What the POST left | A read straight after |
-|---|---|---|
-| `domain` | a complete object — the create carries the content | 2067 bytes |
-| `interface` | a generated skeleton | 53 bytes |
-| `class` | a generated skeleton | **refused**, `400`, "wrong input data" |
-| `ddl` | an object with no content | `200`, empty |
-| `serviceDefinition` | **nothing — the create itself is refused** | — |
-
-`serviceDefinition` is the clearest case of the second kind: there is nothing to
-generate a service from, so the POST answers *"Check of condition failed"* and
-no object is made. `program` could not be measured here — an ABAP Cloud system
-refuses it outright with `S_DEVELOP`.
-
-### The class has a skeleton; you just cannot read it yet
-
-The class row above is the one to be careful with, because the refusal invites
-the wrong conclusion. SAP *did* generate a minimal class. It is stored as the
-active version, and it becomes readable the moment the first source is written:
-
-```
-GET …/source/main?version=active    200   class ZAC_PROBE_INACT definition      ← SAP's, lower case
-GET …/source/main?version=inactive  200   CLASS zac_probe_inact DEFINITION …    ← ours, as written
-```
-
-Before that first write, every read refuses — `active`, `inactive`, neither,
-metadata, source. And nothing else lifts it:
-
-```
-create              ok
-read after create   refused, wrong input data
-read after 30s      refused                       ← not timing
-lock                ok
-read while locked   refused
-read after unlock   refused                       ← not the lock either
-```
-
-So the object is not empty and it is not broken. It is unfinished, and the first
-`update()` is what finishes it. Activation is a separate matter again: it
-promotes what you wrote into the active version, replacing the skeleton.
-
-**`getVersions()` will not tell you any of this.** It answers `ok` in every state
-above — the feed, which `objectVersions` in `@mcp-abap-adt/adt-strategies`
-reads — listing version slots rather than content — `99999` for the inactive,
-`00000` for the active — so it reports two entries for the class nothing can
-read. The count drops to one when activation consumes the inactive slot, which
-is real but is not an answer to "is there anything to read".
+A POST sometimes builds a minimal working object and sometimes builds nothing,
+and which one you get is a property of the type: a domain is complete, an
+interface has a generated skeleton, a DDL source answers `200` with an empty
+body, a class has a skeleton that **no read can see until its first source
+write**, and a service definition's create is refused outright.
+`getVersions()` answers `ok` in every one of those states. The measured table,
+the class's read sequence and what to do are in
+[WORKAROUNDS.md](WORKAROUNDS.md#what-a-bare-create-leaves-depends-on-the-type).
 
 ## The name is taken from the POST onward, and `validate()` may not say so
 
@@ -607,18 +565,12 @@ its package.
 
 ## Absence does not have one wording
 
-Deleting each object and reading it again produced three different sentences:
-
-```
-domain     Error while importing object ZAC_UNFIN_DOM from the database
-interface  Resource INTERFACE ZAC_UNFIN_INTF does not exist.
-ddl        Data definition ZAC_UNFIN_DDLS of version  does not exist
-```
-
-All three are refusals and all three mean the same thing. None of them is worth
-matching on: the text is the server's, it is language-dependent, and it varies
-by type. If you need to branch on absence, branch on the failure your own
-`analyse` decided, not on the sentence.
+Deleting an object and reading it again answers a different sentence per type —
+*"Error while importing object … from the database"* for a domain, *"Resource
+INTERFACE … does not exist."*, *"Data definition … of version  does not
+exist"*. All mean the same thing, and none is worth matching on: branch on the
+failure your own `analyse` decided. See
+[WORKAROUNDS.md](WORKAROUNDS.md#what-a-bare-create-leaves-depends-on-the-type).
 
 Reproduce with `npx ts-node scripts/probe-inactive-metadata.ts` and
 `npx ts-node scripts/probe-unfinished-create.ts`.

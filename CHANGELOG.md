@@ -22,6 +22,43 @@ independent versions. One package at a time: `npm run publish:clients` and
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [23.0.1] - 2026-09-27
+
+### Fixed
+
+- **A package update without a lock handle no longer sends
+  `?lockHandle=undefined`.** `updatePackage` interpolated
+  `encodeURIComponent(lockHandle)` unconditionally, so a call with no handle
+  asked SAP to check a handle literally named `undefined`, and the refusal
+  (423 `SADT_RESOURCE/026`, "invalid lock handle: undefined", measured on
+  E19) named a handle nobody passed. The PUT now builds its query with
+  `writeQuery`, like every other write: an absent handle or transport is left
+  out. No change for a caller that passes both.
+
+### Documentation
+
+- **SAP-side behaviour a consumer has to work around is in one place:
+  [`docs/usage/WORKAROUNDS.md`](docs/usage/WORKAROUNDS.md).** Sixteen cases,
+  each with the same sections — symptom, cause, rule, workaround, evidence
+  (system and date) and the members it bites: PAK/058, the session-type
+  header, class includes under the class lock, the service-binding lock,
+  refusals inside a `200`, empty `200` reads, the untyped `S::000` message on a
+  successful delete, `S_ABPLNGVS` for a missing package, what a bare create
+  leaves, check runs without the object, activation flags and settling, the
+  transport search, tree and task typing, and the ATC check variant.
+- **PAK/058 now states the rule for both transports.** A package can be saved
+  only once per ABAP session: over RFC from the create onward, over HTTP every
+  stateful lock → update → unlock counts (the stateless create does not), and
+  a delete from a session that saved the package is refused. Measured on E19
+  over HTTP and RFC (#176). It is `CL_PACKAGE`'s session buffer, not state lost
+  between RFC contexts.
+- **The guides point to it instead of repeating it.** `RFC_TESTING.md`,
+  `RFC_CONNECTION.md`, `STATEFUL_SESSION_GUIDE.md`, `TROUBLESHOOTING.md` and
+  `OBJECT_LIFECYCLE.md` keep a sentence or two and a link, and the
+  `AdtPackage` `create` / `updateMetadata` / `delete` comments carry the
+  one-line rule. Linked from `README.md`, `docs/README.md` and
+  `ANSWER_SHAPES.md`.
+
 ## [23.0.0] - 2026-09-26
 
 **This package interprets nothing.** Every member makes one ADT request. What

@@ -84,15 +84,12 @@ middle of one operation would take every other caller down with it. The library
 goes as far as `setSessionType('stateful' | 'stateless')` and no further.
 
 Some ADT operations cannot be done twice in one ABAP session, and this is where
-that lands on you rather than on us. The clearest case: a package the session
-has just updated **cannot be deleted by that same session** — ADT answers
-`PAK/058`, and the same delete from any other session succeeds on the first
-attempt, immediately, while the first session is still open. It is ownership of
-the framework's state, not a delay: retried for 30 seconds it never succeeds.
-The state is `CL_PACKAGE`'s instance buffer, which lives as long as the ABAP
-session and which a create or an update leaves the package in as `requested`
-(issue #176). Over RFC, where every call shares one session, the same buffer
-refuses an update straight after the create.
+that lands on you rather than on us. The clearest case: a package can be saved
+only once per ABAP session — the next update or delete from that session is
+refused with `PAK/058`, and the same request from any other session succeeds at
+once. It is `CL_PACKAGE`'s session buffer, not a delay: retrying never helps.
+The rule for HTTP and RFC, the evidence and the workaround are in
+[WORKAROUNDS.md](WORKAROUNDS.md#a-package-can-be-saved-only-once-per-abap-session).
 
 So when an operation refuses in a way that names editing or locking, and the
 object is one your session has just changed, the fix is a different session —

@@ -25,6 +25,7 @@ Complete documentation for the `@mcp-abap-adt/adt-clients` package.
 - [**STATEFUL_SESSION_GUIDE.md**](usage/STATEFUL_SESSION_GUIDE.md) - Guide for stateful session management
 - [**CHECK_LOCAL_TEST_CLASS.md**](usage/CHECK_LOCAL_TEST_CLASS.md) - Guide for validating ABAP Unit test classes
 - [**DEBUG.md**](usage/DEBUG.md) - Debugging and troubleshooting guide
+- [**WORKAROUNDS.md**](usage/WORKAROUNDS.md) — SAP-side behaviour a consumer has to work around (PAK/058, refusals inside a `200`, empty `200` reads, activation flags, transport search, …): symptom, cause, rule, workaround and evidence for each
 - [TROUBLESHOOTING.md](usage/TROUBLESHOOTING.md) — what ADT answers when it refuses, and why the message is often accurate about the wrong thing
 - [**OPERATION_DELAYS.md**](usage/OPERATION_DELAYS.md) - Detailed guide on operation delays and timing
 - [**OPERATION_DELAYS_SUMMARY.md**](usage/OPERATION_DELAYS_SUMMARY.md) - Quick reference for operation delays
@@ -54,6 +55,8 @@ docs/
 │   ├── OBJECT_LIFECYCLE.md           # The create → … → activate flow and its exceptions
 │   ├── CLIENT_API_REFERENCE.md       # Client API reference
 │   ├── STATEFUL_SESSION_GUIDE.md     # Session management
+│   ├── WORKAROUNDS.md                # SAP-side behaviour and its workarounds
+│   ├── TROUBLESHOOTING.md            # Refusals that name the wrong cause
 │   ├── CHECK_LOCAL_TEST_CLASS.md     # Local test class validation
 │   ├── DEBUG.md                      # Debugging guide
 │   ├── OPERATION_DELAYS.md           # Operation delays (detailed)

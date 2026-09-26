@@ -185,16 +185,8 @@ RFC returns base64 lock handles that may contain spaces, `+`, `=`. All lock hand
 
 ## Packages: one save per ABAP session
 
-A session that has created or updated a package cannot update or delete it
-again: the save answers `400 PAK/058`, the delete `isDeleted="false"` with the
-same message. It is SAP's package framework — `CL_PACKAGE` buffers the package
-instance for the whole ABAP session — and it bites over RFC first because every
-RFC call shares one session, so an update straight after a create is refused.
-
-Do each step that saves a package after the first on a new connection (over
-HTTP, a new stateful session). The library does not do that for you; each
-member is one request on the connection it was given.
-
-The cause, the measured answers of both transports, and the test that works
-around it are in
-[`docs/development/RFC_TESTING.md`](../development/RFC_TESTING.md#packages-a-session-that-saved-a-package-cannot-save-or-delete-it-again).
+A package can be saved only once per ABAP session: the next update or delete
+from that session is refused with `PAK/058`. Over RFC every call shares one
+session, so an update straight after a create is already refused. The rule for
+both transports and the workaround are in
+[WORKAROUNDS.md](WORKAROUNDS.md#a-package-can-be-saved-only-once-per-abap-session).
