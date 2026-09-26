@@ -7,7 +7,8 @@
  * Every member answers `IAdtResponse<T>`, where T is what the result set given
  * at construction makes of that endpoint's answer.
  *
- * Operation chains:
+ * The sequences Eclipse follows — each step is its own member here, one
+ * request each, and the caller composes them:
  * - Create: validate → create → check
  * - Update: lock → check → update → unlock
  * - Delete: check(deletion) → delete
@@ -141,9 +142,10 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
   }
 
   /**
-   * Create the package: validate → create → check.
+   * Create the package: one POST. Eclipse validates before it and runs a
+   * check after it; both are members of their own here.
    *
-   * The check is a checkrun on the new object, the way Eclipse does it, not a
+   * That check is a checkrun on the new object, the way Eclipse does it, not a
    * second call to the validation endpoint — captured 2026-08-31, which
    * validates, creates, then posts `/sap/bc/adt/checkruns` on the created
    * package before it is ever locked.
