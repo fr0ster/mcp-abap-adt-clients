@@ -5,7 +5,6 @@
  * at construction makes of that endpoint's answer.
  */
 import type {
-  AdtNoFailure,
   IAdtActivatable,
   IAdtCheckable,
   IAdtCreatable,
@@ -22,17 +21,9 @@ import type {
   IAdtUpdatable,
   IAdtValidatable,
   IAdtVersionable,
-  IAnalyse,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
-import {
-  ADT_NO_FAILURE,
-  AdtObjectErrorCodes,
-} from '@mcp-abap-adt/interfaces-adt';
-import type {
-  IAbapConnection,
-  IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt-connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
@@ -66,33 +57,6 @@ import {
   getTransformationVersionSource,
   getTransformationVersions,
 } from './versions';
-
-/**
- * The shipped reading of a validation answer this system may not offer.
- *
- * Measured on one system: `/xslt/transformations/validation` answers 404
- * there. That is not a verdict about the name, and the old code turned it into
- * a fabricated `{ status: 200, data: '' }` — a success the server never gave.
- * It comes back as a failure named
- * {@link AdtObjectErrorCodes.UNSUPPORTED_OPERATION} instead, so a consumer can
- * see the difference between "the name is taken" and "this system does not
- * check names".
- */
-export const validationUnavailable = (
-  verdict: IAdtError | AdtNoFailure,
-  answer?: IAdtWireResponse,
-): IAdtError | AdtNoFailure => {
-  if (verdict === ADT_NO_FAILURE) return ADT_NO_FAILURE;
-  const status = verdict.response?.status ?? answer?.status;
-  return status === 404
-    ? {
-        ...verdict,
-        code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION,
-        message:
-          'This system does not offer transformation name validation (HTTP 404)',
-      }
-    : verdict;
-};
 
 export class AdtTransformation<
   R extends ITransformationResults = typeof transformationDocuments,
@@ -172,7 +136,7 @@ export class AdtTransformation<
           config.description,
         ),
       this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
-      (options?.analyse ?? validationUnavailable) as IAnalyse<E>,
+      options?.analyse,
     );
   }
 

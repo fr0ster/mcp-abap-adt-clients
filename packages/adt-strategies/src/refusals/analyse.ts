@@ -1,14 +1,20 @@
 import type { IAdtError, IAnalyse } from '@mcp-abap-adt/interfaces-adt';
-import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces-adt';
+import {
+  ADT_NO_FAILURE,
+  AdtObjectErrorCodes,
+} from '@mcp-abap-adt/interfaces-adt';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   type AdtMessage,
   type AdtRefusal,
   readActivationRefusal,
   readAdtRefusal,
+  readCdsTestDoublesRefusal,
   readCheckRunRefusal,
   readDeletionRefusal,
   readExceptionRefusal,
+  readMessageClassMessageAbsence,
+  readPublicationRefusal,
   readUnitTestRefusal,
   readValidationRefusal,
 } from './read';
@@ -44,6 +50,7 @@ function asFailure(
 ): IAdtMessageFailure {
   return {
     origin: 'refusal',
+    code: refusal.code,
     message: refusal.message,
     adtType: refusal.adtType,
     namespace: refusal.namespace,
@@ -164,3 +171,81 @@ export const analyseException = analyser(readExceptionRefusal);
  * `null` here means "not a failure".
  */
 export const analyseAny = analyser(readAdtRefusal);
+
+/** A service binding's publication — `SEVERITY` other than `OK` refuses. */
+export const analysePublication = analyser(readPublicationRefusal);
+
+/** The CDS test-doubles check — anything but `SEVERITY` `OK` refuses. */
+export const analyseCdsTestDoubles = analyser(readCdsTestDoublesRefusal);
+
+/**
+ * Reading one message of a class: the class answering is not the message
+ * existing. Built for the message number asked about.
+ */
+export const analyseMessageClassMessage = (
+  msgno: string,
+): IAnalyse<IAdtMessageFailure> =>
+  analyser((document) => readMessageClassMessageAbsence(document, msgno));
+
+/**
+ * A unit-test run that started without saying which run it is.
+ *
+ * ADT answers a started run with its id in a header — `Location`,
+ * `Content-Location` or `sap-adt-location` — or in `aunit:run@uri`, and the
+ * recorded start answers 201 with an empty body and the id in `Location`. An
+ * answer carrying neither is not a run a caller can ask about. Moved from
+ * adt-clients' `startedRun`, which was hard-wired into `run`.
+ */
+export const analyseUnitTestStart: IAnalyse<IAdtMessageFailure> = (
+  verdict,
+  answer,
+) => {
+  if (verdict !== ADT_NO_FAILURE) return enrich(verdict, answer);
+  const headers = (answer?.headers ?? {}) as Record<string, unknown>;
+  const header = [
+    headers.location,
+    headers['content-location'],
+    headers['sap-adt-location'],
+  ]
+    .map((v) => (Array.isArray(v) ? v[0] : v))
+    .find((v) => typeof v === 'string' && /\/runs\/[^/]+/.test(v));
+  const body = typeof answer?.data === 'string' ? answer.data : '';
+  const inBody = /<aunit:run[^>]*uri="[^"]*\/runs\/[^/"]+/.test(body);
+  if (header || inBody) return ADT_NO_FAILURE;
+  const message = 'Failed to start unit test run: run ID not returned';
+  return {
+    origin: 'refusal',
+    code: AdtObjectErrorCodes.CREATE_FAILED,
+    message,
+    messages: [{ type: 'E', text: message }],
+    response: answer,
+    request: requestOf(answer),
+  };
+};
+
+/**
+ * A system that does not offer a resource, told apart from a refusal.
+ *
+ * Some systems answer 404, 405 or 501 for a validation resource they do not
+ * have. That is not a verdict about the name, so this renames the failure
+ * `UNSUPPORTED_OPERATION` and says what is missing; any other failure passes
+ * through as it came. Moved from adt-clients' `validationUnsupported` (404, 405
+ * and 501, three families) and `validationUnavailable` (404, transformations).
+ */
+export const analyseUnsupportedStatus = (
+  statuses: ReadonlyArray<number>,
+  what: string,
+): IAnalyse<IAdtError> => {
+  const set = new Set(statuses);
+  return (verdict, answer) => {
+    if (verdict === ADT_NO_FAILURE) return ADT_NO_FAILURE;
+    const status = verdict.response?.status ?? answer?.status;
+    return status !== undefined && set.has(status)
+      ? {
+          ...verdict,
+          code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION,
+          message: `This system does not offer ${what} (HTTP ${status})`,
+        }
+      : verdict;
+  };
+};

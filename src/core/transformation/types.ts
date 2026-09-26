@@ -51,7 +51,7 @@ export type TransformationActivationResult = string;
 /**
  * What name validation answers, where the system has the resource.
  *
- * Measured: one system answers 404 for it — see {@link validationUnavailable},
+ * Measured: one system answers 404 for it — see `analyseUnsupportedStatus` in @mcp-abap-adt/adt-strategies,
  * which is why a missing resource is not reported as a rejected name.
  */
 export type TransformationValidationResult = string;

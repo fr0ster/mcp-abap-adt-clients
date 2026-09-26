@@ -26,6 +26,10 @@
  * - Structured test logging via testProgressLogger functions (logTestStart, logTestStep, etc.)
  */
 
+import {
+  analyseDeletion,
+  analyseUnsupportedStatus,
+} from '@mcp-abap-adt/adt-strategies';
 import type {
   IAdtActivatable,
   IAdtCreatable,
@@ -356,7 +360,11 @@ export class BaseTester<TConfig, TState = unknown> {
    * package behind every time.
    */
   private async deleteOrRaise(config: Partial<TConfig>): Promise<void> {
-    const answer = await this.adtObject.delete(config);
+    // `isDeleted="false"` arrives inside a 200 and the library reads nothing
+    // into it; the test wants the real outcome, so it asks for the reading.
+    const answer = await this.adtObject.delete(config, {
+      analyse: analyseDeletion,
+    });
     if (!answer.ok) {
       const failure = answer.getError();
       throw new Error(
@@ -831,8 +839,14 @@ export class BaseTester<TConfig, TState = unknown> {
       // the name. There is nothing to read, and the rest of the flow is still
       // worth running — so it is logged and stepped over. Every other failure
       // still fails the test.
+      // A system without a validation resource answers 404, 405 or 501. The
+      // library reports that as it came; the test names it unsupported, so a
+      // missing resource skips the step instead of failing it.
       const validationAnswer = await this.adtObject.validate(
         config as Partial<TConfig>,
+        {
+          analyse: analyseUnsupportedStatus([404, 405, 501], 'name validation'),
+        },
       );
       const validationUnavailable =
         !validationAnswer.ok &&

@@ -8,6 +8,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
@@ -172,16 +173,18 @@ describe('Package (using AdtClient)', () => {
             await recycleTestSession(connection);
           }
 
-          // Through the handler, not the low-level writer. The writer hands
-          // the document on and says nothing about it — the verdict belongs to
-          // `packageDeletionRefusal`, and only `delete()` applies it. Calling
-          // the writer here made a refused delete silent: three runs passed
-          // this flow and left ZAC_INNER_PKG04 behind every time.
+          // `isDeleted="false"` with PAK/058 arrives inside a 200, and the
+          // library reads nothing into it — so the test passes the reading.
+          // Without one a refused delete was silent: three runs passed this
+          // flow and left ZAC_INNER_PKG04 behind every time.
           expectResult(
-            await client.getPackage().delete({
-              packageName: cfg.packageName,
-              transportRequest: cfg.transportRequest,
-            }),
+            await client.getPackage().delete(
+              {
+                packageName: cfg.packageName,
+                transportRequest: cfg.transportRequest,
+              },
+              { analyse: analyseDeletion },
+            ),
             `delete package ${cfg.packageName}`,
           );
         },

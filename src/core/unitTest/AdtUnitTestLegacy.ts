@@ -15,6 +15,8 @@
  */
 
 import type {
+  IAdtAnalyseOptions,
+  IAdtError,
   IAdtResponse,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
@@ -29,82 +31,54 @@ import type {
   unitTestDocuments,
 } from './types';
 
-/** Synthetic run ID for legacy synchronous results */
-const LEGACY_SYNC_RUN_ID = 'legacy-sync';
-
 export class AdtUnitTestLegacy<
   R extends IUnitTestResults = typeof unitTestDocuments,
 > extends AdtUnitTest<R> {
   /**
-   * Run the tests.
+   * Run the tests. On a legacy system the POST answers the finished result.
    *
-   * The result comes back with the POST, so the id this answers is synthetic —
-   * it exists so {@link getStatus} and {@link getResult} keep the same shape
-   * they have on a modern system. The run's own reading is bypassed for that
-   * reason: there is no id in the answer to read.
+   * So the answer is read by this implementation's `run` strategy as it came —
+   * the result document itself, not an id. It used to be replaced by a
+   * synthetic id and kept for `getStatus` and `getResult` to replay; nothing
+   * here remembers a run any more, because the contract says every member
+   * takes the run it is about.
    */
-  override async run(
+  override async run<E extends IAdtError = IAdtError>(
     tests: IClassUnitTestDefinition[],
-    options?: IClassUnitTestRunOptions,
-  ): Promise<IAdtResponse<ReturnType<R['run']>>> {
+    options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['run']>, E>> {
     this.logger?.info?.('Starting unit test run (legacy)');
-    const answer = await answering(
-      async () => {
-        const response = await startClassUnitTestRunLegacy(
-          this.connection,
-          tests,
-          options,
-        );
-        // Legacy answers with the finished result — kept as both, since a
-        // caller asking for either is asking about the same document.
-        this.lastStatusResponse = response;
-        this.lastResultResponse = response;
-        this.lastRunId = LEGACY_SYNC_RUN_ID;
-        return response;
-      },
-      () => LEGACY_SYNC_RUN_ID as ReturnType<R['run']>,
+    return answering(
+      () => startClassUnitTestRunLegacy(this.connection, tests, options),
+      this.results.run as IResultStrategy<ReturnType<R['run']>>,
+      options?.analyse,
     );
-
-    if (answer.ok) {
-      this.logger?.info?.('Unit test run completed (legacy, synchronous)');
-    }
-    return answer;
   }
 
   /**
-   * Status of a run — the answer the run itself returned, since a legacy
-   * system finishes before it answers and exposes nothing to poll.
+   * Refused without a request: a legacy system finishes a run before it
+   * answers and exposes no run to poll. `run`'s own answer is the result.
    */
-  override async getStatus(): Promise<IAdtResponse<ReturnType<R['status']>>> {
-    const held = this.lastStatusResponse;
-    if (!held) {
-      return failed({
-        origin: 'refusal',
-        code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION,
-        message:
-          'No status available. A legacy system returns the result from run(), so there is nothing to poll before one has been started here.',
-      });
-    }
-    return answering(
-      async () => held,
-      this.results.status as IResultStrategy<ReturnType<R['status']>>,
-    );
+  override async getStatus<E extends IAdtError = IAdtError>(): Promise<
+    IAdtResponse<ReturnType<R['status']>, E>
+  > {
+    return failed<ReturnType<R['status']>, E>({
+      origin: 'refusal',
+      code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION,
+      message:
+        'A legacy system has no run to poll: run() answers the finished result.',
+    } as E);
   }
 
-  /** Result of a run — same document, same reason. */
-  override async getResult(): Promise<IAdtResponse<ReturnType<R['result']>>> {
-    const held = this.lastResultResponse;
-    if (!held) {
-      return failed({
-        origin: 'refusal',
-        code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION,
-        message:
-          'No result available. A legacy system returns the result from run(), so there is nothing to fetch before one has been started here.',
-      });
-    }
-    return answering(
-      async () => held,
-      this.results.result as IResultStrategy<ReturnType<R['result']>>,
-    );
+  /** Refused for the same reason: `run`'s answer is the result document. */
+  override async getResult<E extends IAdtError = IAdtError>(): Promise<
+    IAdtResponse<ReturnType<R['result']>, E>
+  > {
+    return failed<ReturnType<R['result']>, E>({
+      origin: 'refusal',
+      code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION,
+      message:
+        'A legacy system has no result to fetch: run() answers the finished result.',
+    } as E);
   }
 }

@@ -67,9 +67,11 @@
  * selected; `delete-success` on its own reuses a class left by an earlier
  * aborted run instead of making a new one.
  */
+
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { unitTestRunId } from '@mcp-abap-adt/adt-strategies';
 import * as dotenv from 'dotenv';
 import * as yaml from 'yaml';
 import {
@@ -81,6 +83,7 @@ import {
 } from '../src/__tests__/helpers/sessionConfig';
 import { createConnectionLogger } from '../src/__tests__/helpers/testLogger';
 import { AdtClient } from '../src/clients/AdtClient';
+import { unitTestDocuments } from '../src/core/unitTest/types';
 import { walkPackage } from './lib/packageWalk';
 
 // ---------------------------------------------------------------------------
@@ -1362,14 +1365,19 @@ async function main(): Promise<void> {
 
       const captureRun = async (label: string): Promise<void> => {
         await withCase(label, async () => {
-          const unitTest = client.getUnitTest();
-          await unitTest.run([
+          // The id is in a header of the start's answer: read it with the
+          // strategy, since the client answers documents as they arrived.
+          const unitTest = client.getUnitTest({
+            ...unitTestDocuments,
+            run: unitTestRunId,
+          });
+          const started = await unitTest.run([
             {
               containerClass: UNIT_TEST_CLASS_NAME,
               testClass: 'LTC_PROBE',
             },
           ]);
-          const runId = unitTest.getRunId();
+          const runId = started.ok ? started.getResult().value : '';
           if (!runId) return;
           await unitTest.getStatus(runId, true);
           await unitTest.getResult(runId);

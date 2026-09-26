@@ -1,3 +1,4 @@
+import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import { XMLParser } from 'fast-xml-parser';
 
 /**
@@ -121,7 +122,16 @@ export interface AdtRefusal {
     | 'deletion'
     | 'checkrun'
     | 'validation'
-    | 'unittest';
+    | 'unittest'
+    | 'publication'
+    | 'cdsTestDoubles'
+    | 'messageClass';
+  /**
+   * An `AdtObjectErrorCodes` value where the reading names one — a message a
+   * class does not hold is `OBJECT_NOT_FOUND`. Absent where the document is
+   * the whole answer.
+   */
+  readonly code?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -623,6 +633,96 @@ export function readValidationRefusal(document: unknown): AdtRefusal | null {
     form: 'validation',
     message: shortText || longText || `Validation answered ${rawSeverity}`,
     messages: [{ type: severity(rawSeverity), text: shortText || longText }],
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Form 5b — the same `asx:abap` severity envelope, answering other questions
+// ---------------------------------------------------------------------------
+
+/** `SEVERITY`, `SHORT_TEXT` and `LONG_TEXT` out of an `asx:abap` document. */
+function severityEnvelope(
+  document: unknown,
+): { severity: string; shortText: string; longText: string } | null {
+  const data = parseXml(document)?.abap?.values?.DATA;
+  if (!data || typeof data !== 'object') return null;
+  return {
+    severity: textOf(data.SEVERITY).toUpperCase(),
+    shortText: textOf(data.SHORT_TEXT),
+    longText: textOf(data.LONG_TEXT),
+  };
+}
+
+/**
+ * A service binding's publication answer: the job's `SEVERITY`.
+ *
+ * Measured by adt-clients (2026-09-05): the POST takes ~130 s of server time
+ * and answers `<SEVERITY>OK</SEVERITY>` with a `SHORT_TEXT` such as "ZAC_SRVB01
+ * published locally". A body with no `SEVERITY` is not a refusal — silence is
+ * not a "no" — and only a severity other than `OK` is one. Moved from
+ * adt-clients' `publicationRefusal`, which applied it by default.
+ */
+export function readPublicationRefusal(document: unknown): AdtRefusal | null {
+  const found = severityEnvelope(document);
+  if (!found?.severity || found.severity === 'OK') return null;
+  const message =
+    `Publication ${found.severity}: ${found.shortText || 'the server gave no short text'}` +
+    (found.longText ? ` — ${found.longText}` : '');
+  return {
+    form: 'publication',
+    message,
+    messages: [{ type: severity(found.severity), text: message }],
+  };
+}
+
+/**
+ * Whether a CDS view can be tested with test doubles.
+ *
+ * The check reports its verdict inside a 200 as `SEVERITY`, with the reason in
+ * `SHORT_TEXT` or `LONG_TEXT`. Anything but `OK` — including no severity at
+ * all — means the view cannot be tested with doubles. Moved from adt-clients'
+ * `testDoublesVerdict`, which was hard-wired into the member.
+ */
+export function readCdsTestDoublesRefusal(
+  document: unknown,
+): AdtRefusal | null {
+  const found = severityEnvelope(document);
+  if (found?.severity === 'OK') return null;
+  const message =
+    found?.shortText ||
+    found?.longText ||
+    `CDS test doubles check failed with severity: ${found?.severity || '(none)'}`;
+  return {
+    form: 'cdsTestDoubles',
+    message,
+    messages: [{ type: 'E', text: message }],
+  };
+}
+
+/**
+ * A message class document that does not hold the message asked for.
+ *
+ * A message is a row inside its class, so reading one reads the class; the
+ * class answering is not the message existing. Moved from adt-clients'
+ * `AdtMessageClassMessage.read`, which applied it by default.
+ */
+export function readMessageClassMessageAbsence(
+  document: unknown,
+  msgno: string,
+): AdtRefusal | null {
+  const root = parseXml(document)?.messageClass;
+  if (!root) return null;
+  const held = asArray(root.messages).some(
+    (m: any) => String(m?.['@msgno'] ?? '') === msgno,
+  );
+  if (held) return null;
+  const name = typeof root['@name'] === 'string' ? root['@name'] : '';
+  const message = `Message ${msgno} not found in class ${name}`.trim();
+  return {
+    form: 'messageClass',
+    code: AdtObjectErrorCodes.OBJECT_NOT_FOUND,
+    message,
+    messages: [{ type: 'E', text: message }],
   };
 }
 

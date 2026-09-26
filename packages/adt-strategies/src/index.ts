@@ -28,10 +28,15 @@
 export {
   analyseActivation,
   analyseAny,
+  analyseCdsTestDoubles,
   analyseCheck,
   analyseDeletion,
   analyseException,
+  analyseMessageClassMessage,
+  analysePublication,
   analyseUnitTest,
+  analyseUnitTestStart,
+  analyseUnsupportedStatus,
   analyseValidation,
   type IAdtMessageFailure,
 } from './refusals/analyse';
@@ -44,9 +49,12 @@ export {
   isIndeterminateWalkAnswer,
   readActivationRefusal,
   readAdtRefusal,
+  readCdsTestDoublesRefusal,
   readCheckRunRefusal,
   readDeletionRefusal,
   readExceptionRefusal,
+  readMessageClassMessageAbsence,
+  readPublicationRefusal,
   readUnitTestRefusal,
   readValidationRefusal,
 } from './refusals/read';
@@ -61,3 +69,4 @@ export {
   type IAbapGitExternalRepoInfo,
   type IAbapGitRepo,
 } from './results/abapGit';
+export { unitTestRunId } from './results/unitTest';

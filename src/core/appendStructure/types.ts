@@ -49,7 +49,7 @@ export type AppendStructureActivationResult = string;
  * What name validation answers, where the system has the resource at all.
  *
  * Measured: some systems answer 404, 405 or 501 for it. That is not a verdict
- * about the name — see {@link validationUnsupported}.
+ * about the name — see `analyseUnsupportedStatus` in @mcp-abap-adt/adt-strategies.
  */
 export type AppendStructureValidationResult = string;
 

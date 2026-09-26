@@ -1,5 +1,4 @@
 import type {
-  AdtNoFailure,
   GeneratedServiceType,
   IAdtActivatable,
   IAdtCheckable,
@@ -16,11 +15,9 @@ import type {
   IAdtTransportAware,
   IAdtUpdatable,
   IAdtValidatable,
-  IAnalyse,
   IResultStrategy,
   ServiceBindingVariant,
 } from '@mcp-abap-adt/interfaces-adt';
-import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -43,9 +40,7 @@ import {
   buildQueryString,
   encodeSapObjectName,
 } from '../../utils/internalUtils';
-import { requestOf } from '../../utils/requestTrace';
 import { nothing, rawDocument } from '../../utils/resultStrategy';
-import { getSystemInformation } from '../../utils/systemInfo';
 import { getTimeout } from '../../utils/timeouts';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import { lockServiceBinding, unlockServiceBinding } from './lock';
@@ -65,49 +60,6 @@ import type {
   ITransportCheckServiceBindingParams,
 } from './types';
 import { resolveBindingVariant, serviceDocuments } from './types';
-/**
- * The verdict a publish or unpublish job answers with.
- *
- * `POST …/{serviceType}/publishjobs` (and `unpublishjobs`) does not just accept
- * the work — it reports the outcome, in ADT's own `asx:abap` envelope:
- *
- * ```xml
- * <asx:values><DATA>
- *   <SEVERITY>OK</SEVERITY>
- *   <SHORT_TEXT>ZAC_SRVB01 published locally</SHORT_TEXT>
- * </DATA></asx:values>
- * ```
- *
- * Nobody read it. The member answered the document and a caller who checked
- * only `ok` learned that the request completed, never what it did — which is
- * the shape this release removes everywhere else. Measured
- * 2026-09-05: the POST takes ~130s of server time and then says exactly this.
- *
- * Conservative in the same way as its neighbours: a body with no `SEVERITY` is
- * not a refusal, because inventing a "no" from silence is how an empty answer
- * came to mean failure elsewhere. Only a severity that is not OK is one.
- */
-export const publicationRefusal = (
-  verdict: IAdtError | AdtNoFailure,
-  answer?: IAdtWireResponse,
-): IAdtError | AdtNoFailure => {
-  if (verdict !== ADT_NO_FAILURE) return verdict;
-
-  const xml = typeof answer?.data === 'string' ? answer.data : '';
-  const severity = /<SEVERITY>([^<]*)<\/SEVERITY>/i.exec(xml)?.[1]?.trim();
-  if (!severity || severity.toUpperCase() === 'OK') return ADT_NO_FAILURE;
-
-  const shortText = /<SHORT_TEXT>([^<]*)<\/SHORT_TEXT>/i.exec(xml)?.[1]?.trim();
-  const longText = /<LONG_TEXT>([^<]*)<\/LONG_TEXT>/i.exec(xml)?.[1]?.trim();
-  return {
-    origin: 'refusal',
-    message:
-      `Publication ${severity}: ${shortText || 'the server gave no short text'}` +
-      (longText ? ` — ${longText}` : ''),
-    response: answer,
-    request: requestOf(answer),
-  };
-};
 
 export class AdtServiceBinding<
   R extends IServiceResults = typeof serviceDocuments,
@@ -487,11 +439,10 @@ export class AdtServiceBinding<
           timeout: options?.timeout,
         }),
       this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
-      // A publication change IS this member's write: `update` on a binding
-      // changes nothing else. The job reports `SEVERITY` and `SHORT_TEXT` in
-      // its answer, and reading them here is what makes a refused publish a
-      // refusal rather than a document nobody looked at.
-      (options?.analyse ?? publicationRefusal) as IAnalyse<E>,
+      // A publication change IS this member's write, and the job reports its
+      // outcome as `SEVERITY` inside a 200. Reading it is the caller's:
+      // `analysePublication` in @mcp-abap-adt/adt-strategies does.
+      options?.analyse,
     );
   }
 
@@ -807,7 +758,8 @@ export class AdtServiceBinding<
    * `servicename` or `serviceversion`, so there is nothing left to derive.
    * The fourth — "can it go from here to there?" — is the server's to answer,
    * and it does: an invalid transition comes back as `SEVERITY` in the job's
-   * own document, read by `publicationRefusal`. A caller who wants to know
+   * own document, which `analysePublication` in @mcp-abap-adt/adt-strategies
+   * reads for a caller who passes it. A caller who wants to know
    * beforehand calls `read` and looks at `srvb:allowedAction`, which is one
    * request they can see.
    */

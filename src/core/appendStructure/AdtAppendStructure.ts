@@ -8,7 +8,6 @@
  * at construction makes of that endpoint's answer.
  */
 import type {
-  AdtNoFailure,
   IAdtActivatable,
   IAdtCheckable,
   IAdtCreatable,
@@ -25,17 +24,9 @@ import type {
   IAdtUpdatable,
   IAdtValidatable,
   IAdtVersionable,
-  IAnalyse,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
-import {
-  ADT_NO_FAILURE,
-  AdtObjectErrorCodes,
-} from '@mcp-abap-adt/interfaces-adt';
-import type {
-  IAbapConnection,
-  IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt-connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
@@ -69,34 +60,6 @@ import {
   getAppendStructureVersionSource,
   getAppendStructureVersions,
 } from './versions';
-
-/** Statuses that mean the system has no validation resource, not that the name is bad. */
-const VALIDATION_UNSUPPORTED_STATUSES = new Set([404, 405, 501]);
-
-/**
- * The shipped reading of a validation answer this system may not offer.
- *
- * Measured: some systems answer 404, 405 or 501 for the append-structure
- * validation resource. That is not a verdict about the name, and reporting it
- * as one told a caller their name was rejected by a system that never looked
- * at it. It comes back as a failure named
- * {@link AdtObjectErrorCodes.UNSUPPORTED_OPERATION}, so a consumer branches on
- * the code rather than on a status they would have to dig out themselves.
- */
-export const validationUnsupported = (
-  verdict: IAdtError | AdtNoFailure,
-  answer?: IAdtWireResponse,
-): IAdtError | AdtNoFailure => {
-  if (verdict === ADT_NO_FAILURE) return ADT_NO_FAILURE;
-  const status = verdict.response?.status ?? answer?.status;
-  return status && VALIDATION_UNSUPPORTED_STATUSES.has(status)
-    ? {
-        ...verdict,
-        code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION,
-        message: `This system does not offer append-structure name validation (HTTP ${status})`,
-      }
-    : verdict;
-};
 
 export class AdtAppendStructure<
   R extends IAppendStructureResults = typeof appendStructureDocuments,
@@ -167,7 +130,7 @@ export class AdtAppendStructure<
     return answering(
       () => validateAppendStructureName(connection, name, config.description),
       this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
-      (options?.analyse ?? validationUnsupported) as IAnalyse<E>,
+      options?.analyse,
     );
   }
 

@@ -27,7 +27,6 @@ import type {
   IAdtSystemContext,
   IAdtTransportAware,
   IAdtValidatable,
-  IAnalyse,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -43,11 +42,7 @@ import {
 import type { IReadOptions } from '../shared/types';
 import { checkPackage } from './check';
 import { createPackage } from './create';
-import {
-  checkPackageDeletion,
-  deletePackage,
-  packageDeletionRefusal,
-} from './delete';
+import { checkPackageDeletion, deletePackage } from './delete';
 import { lockPackage } from './lock';
 import { getPackage, getPackageTransport } from './read';
 import {
@@ -360,9 +355,11 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
    * deletes it on the first attempt. The PAK lock belongs to the ABAP session
    * and goes with it.
    *
-   * So this reports the failure rather than waiting for something that cannot
-   * happen while the caller still holds the session — and reporting is as far
-   * as it can go. `IAbapConnection` has no `disconnect` and no `recycle`, and
+   * The answer is a 200 either way, and `isDeleted="false"` is in its body: a
+   * caller who wants that read as a failure passes `analyseDeletion` (from
+   * `@mcp-abap-adt/adt-strategies`) — this member reads nothing into it, and it
+   * does not wait for something that cannot happen while the caller still holds
+   * the session. `IAbapConnection` has no `disconnect` and no `recycle`, and
    * should not: the connection belongs to the caller and is usually shared, so
    * tearing it down mid-operation would take every other user of it down as
    * well. Recycling is the consumer's call. See
@@ -383,12 +380,7 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
           transport_request: config.transportRequest,
         }),
       this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
-      // `isDeleted="false"` with PAK/058 arrives inside a 200, so the
-      // document decides here too — but it is a *deletion* result, whose
-      // verdict is `del:isDeleted`. `deletionRefusal` reads a check's
-      // `del:isDeletable`, found none, and reported every successful
-      // package delete as a refusal.
-      (options?.analyse ?? packageDeletionRefusal) as IAnalyse<E>,
+      options?.analyse,
     );
   }
 
