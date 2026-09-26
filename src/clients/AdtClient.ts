@@ -978,9 +978,13 @@ export class AdtClient {
         wrapConnectionAcceptNegotiation,
         getAcceptCorrectionEnabled,
       } = require('../utils/acceptNegotiation');
-      setAcceptCorrectionEnabled(options.enableAcceptCorrection);
+      setAcceptCorrectionEnabled(
+        this.connection,
+        options.enableAcceptCorrection,
+      );
       const shouldWrap =
-        options.enableAcceptCorrection ?? getAcceptCorrectionEnabled();
+        options.enableAcceptCorrection ??
+        getAcceptCorrectionEnabled(this.connection);
       if (shouldWrap) {
         wrapConnectionAcceptNegotiation(this.connection, this.logger);
       }
@@ -989,7 +993,7 @@ export class AdtClient {
         getAcceptCorrectionEnabled,
         wrapConnectionAcceptNegotiation,
       } = require('../utils/acceptNegotiation');
-      if (getAcceptCorrectionEnabled()) {
+      if (getAcceptCorrectionEnabled(this.connection)) {
         wrapConnectionAcceptNegotiation(this.connection, this.logger);
       }
     }

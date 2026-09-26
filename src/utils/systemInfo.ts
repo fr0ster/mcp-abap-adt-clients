@@ -11,6 +11,21 @@ import {
 import { getTimeout } from './timeouts';
 
 /**
+ * Whether a failure says the endpoint is not there — the one failure these
+ * probes answer rather than raise.
+ *
+ * 404, 405 and 501 are a system without the resource. Anything else — no
+ * network, an expired session, a 401, a 500 — is not an answer about the
+ * system, and until 23.0.0 it was swallowed into the same `false`/`null`, so a
+ * modern system reached over a broken connection was handed a legacy client.
+ */
+function endpointAbsent(error: unknown): boolean {
+  const status = (error as { response?: { status?: number } })?.response
+    ?.status;
+  return status === 404 || status === 405 || status === 501;
+}
+
+/**
  * Get system information from SAP ADT (for cloud systems)
  * Returns systemID and userName if available
  */
@@ -66,9 +81,11 @@ export async function getSystemInformation(
     }
 
     return null;
-  } catch (_error) {
-    // If endpoint doesn't exist (on-premise) or returns error, return null
-    return null;
+  } catch (error) {
+    // The endpoint absent (on-premise) is the answer `null` stands for; any
+    // other failure is not, and goes back to the caller.
+    if (endpointAbsent(error)) return null;
+    throw error;
   }
 }
 
@@ -130,8 +147,11 @@ export async function isModernAdtSystem(
     // Modern systems return XML with content-length > 0
     const contentType = String(response.headers?.['content-type'] || '');
     return contentType.includes('xml');
-  } catch {
-    return false;
+  } catch (error) {
+    // No core/discovery is a legacy system. Any other failure says nothing
+    // about which system this is, and is raised rather than read as "legacy".
+    if (endpointAbsent(error)) return false;
+    throw error;
   }
 }
 

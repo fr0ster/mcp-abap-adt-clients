@@ -126,8 +126,9 @@ describe('Shared - read Accept headers', () => {
 
   beforeAll(async () => {
     try {
-      clearAcceptCache();
       connection = await createTestConnection(connectionLogger);
+      // The run shares one connection, and what it learned lives on it.
+      clearAcceptCache(connection);
       isCloudSystem = await isCloudEnvironment(connection);
       const systemContext = await resolveSystemContext(
         connection,

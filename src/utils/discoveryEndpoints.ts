@@ -54,11 +54,13 @@ export async function fetchDiscoveryEndpoints(
       }
       match = hrefRegex.exec(xml);
     }
-  } catch {
-    // A failed discovery and a system advertising nothing both come back as an
-    // empty set, and the caller cannot tell them apart. Left as it is because
-    // changing it changes a published signature; worth knowing before treating
-    // an empty result as an answer.
+  } catch (error) {
+    // A failed discovery and a system advertising nothing used to come back as
+    // the same empty set, which the caller could not tell apart. A system with
+    // no discovery resource still answers empty; any other failure is raised.
+    const status = (error as { response?: { status?: number } })?.response
+      ?.status;
+    if (status !== 404 && status !== 405 && status !== 501) throw error;
   }
 
   return endpoints;
