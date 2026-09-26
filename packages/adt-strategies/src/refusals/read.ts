@@ -421,8 +421,18 @@ export function readDeletionRefusal(document: unknown): AdtRefusal | null {
       })
       .filter((m): m is AdtMessage => m !== null);
 
+    // Only an `E` SAP actually typed overturns an explicit "true". An untyped
+    // message reads as `E` by default, which is right for explaining a refusal
+    // and wrong for inventing one: a DDLS delete on E19 answers
+    // `isDeleted="true"` with `del:type=""` and the placeholder text `S::000`,
+    // and the object is gone.
+    const typedError = asArray(object?.message).some(
+      (message: any) =>
+        String(message?.['@type'] ?? '').trim() !== '' &&
+        severity(message?.['@type']) === 'E',
+    );
     const permitted = object?.[verdictAttribute] === 'true';
-    if (permitted && !messages.some((m) => m.type === 'E')) continue;
+    if (permitted && !typedError) continue;
 
     names.push(name);
     if (messages.length > 0) {

@@ -414,6 +414,26 @@ describe('a deletion answer carrying several messages per object', () => {
     );
     expect(readDeletionRefusal(permitted)).not.toBeNull();
   });
+
+  it('an untyped placeholder message does not overturn isDeleted="true"', () => {
+    // E19, 2026-09-26: a CDS source deleted, and the object was gone on the
+    // next read. The one message has `del:type=""`, the text `S::000` and a
+    // long-text link with an empty message class — a placeholder, not a
+    // verdict. Read as an `E`, it turned every DDLS delete into a refusal.
+    const DDLS_DELETED_WITH_PLACEHOLDER =
+      '<?xml version="1.0" encoding="utf-8"?><del:deletionResult xmlns:del="http://www.sap.com/adt/deletion"><del:object del:isDeleted="true" adtcore:uri="/sap/bc/adt/ddic/ddl/sources/ZAC_VIEW_DDLS" adtcore:type="DDLS/DF" adtcore:name="ZAC_VIEW_DDLS" adtcore:packageName="ZAC_TEST_PKG" xmlns:adtcore="http://www.sap.com/adt/core"><del:message del:priority="0" del:type=""><del:text>S::000</del:text><atom:link href="/sap/bc/adt/messageclass//messages/000/longtext?language=E" rel="http://www.sap.com/adt/relations/longtext" type="text/html" xmlns:atom="http://www.w3.org/2005/Atom"/><atom:link href="/sap/bc/adt/ddic/logs/db/USER20260926125954" rel="http://www.sap.com/adt/relations/ddic/deletionlog" type="application/vnd.sap.adt.logs+xml" title="Deletion Log" xmlns:atom="http://www.w3.org/2005/Atom"/></del:message></del:object></del:deletionResult>';
+    expect(readDeletionRefusal(DDLS_DELETED_WITH_PLACEHOLDER)).toBeNull();
+
+    // The same message on a refused object still explains the refusal.
+    expect(
+      readDeletionRefusal(
+        DDLS_DELETED_WITH_PLACEHOLDER.replace(
+          'del:isDeleted="true"',
+          'del:isDeleted="false"',
+        ),
+      )?.message,
+    ).toBe('ADT refuses to delete ZAC_VIEW_DDLS');
+  });
 });
 
 /**
