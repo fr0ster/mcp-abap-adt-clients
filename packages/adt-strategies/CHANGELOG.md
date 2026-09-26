@@ -83,8 +83,12 @@ each.
   message with text is kept, in order, each with its own severity, and the T100
   key and `msgv1..4` are read from the long-text link — the one part of a
   deletion message that does not change with the logon language. An object is
-  refused when its verdict attribute is not `"true"` or any message is an `E`;
-  the counts stand in only when SAP said nothing.
+  refused when its verdict attribute is not `"true"` or any message SAP typed
+  `E`; the counts stand in only when SAP said nothing. An untyped message does
+  not overturn an explicit `"true"`: a DDLS delete answers `isDeleted="true"`
+  with one `del:type=""` message, text `S::000`, and the object is gone —
+  measured on E19 and on the trial. Read as an `E`, it turned every CDS source
+  delete into a refusal.
 - **`readCheckRunRefusal` reads every `checkReport`.** Several read as a check
   that never ran. Defensive: no several-object capture exists yet.
 
