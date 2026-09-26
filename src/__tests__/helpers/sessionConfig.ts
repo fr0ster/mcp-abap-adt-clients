@@ -90,8 +90,7 @@ export function skipUnlessConfigured(error: unknown, logger: ILogger): false {
  * Returns 'http' (default) or 'rfc'.
  *
  * Exported because a suite occasionally has to know. `available_in` gates on the
- * kind of system; this gates on the wire, and one known limitation lives there —
- * see the package lifecycle test.
+ * kind of system; this gates on the wire.
  */
 export function getConnectionType(): 'http' | 'rfc' {
   const { getEnvironmentConfig } = require('./test-helper');

@@ -1108,14 +1108,10 @@ create_data_element:
       params:
         data_element_name: "ZAC_LOCKREG_DTEL"
         description: "SessionLockRegistry lock target"
-        type_kind: "predefinedAbapType"
-        data_type: "CHAR"
-        length: 10
-        decimals: 0
-        short_label: "LockReg"
-        medium_label: "LockReg Elem"
-        long_label: "LockRegistry Element"
-        heading_label: "LockRegistry Element"
+        # Typed by the domain this test creates first (lock_registry_domain),
+        # so the element is built and activated from a full document.
+        type_kind: "domain"
+        domain_name: "ZAC_LOCKREG_DOM"
 
 # Create Authorization Field
 # Authorization fields (SUSO/AUTH, endpoint /sap/bc/adt/aps/iam/auth/{name}) are

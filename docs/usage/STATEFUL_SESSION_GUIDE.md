@@ -89,6 +89,10 @@ has just updated **cannot be deleted by that same session** — ADT answers
 `PAK/058`, and the same delete from any other session succeeds on the first
 attempt, immediately, while the first session is still open. It is ownership of
 the framework's state, not a delay: retried for 30 seconds it never succeeds.
+The state is `CL_PACKAGE`'s instance buffer, which lives as long as the ABAP
+session and which a create or an update leaves the package in as `requested`
+(issue #176). Over RFC, where every call shares one session, the same buffer
+refuses an update straight after the create.
 
 So when an operation refuses in a way that names editing or locking, and the
 object is one your session has just changed, the fix is a different session —

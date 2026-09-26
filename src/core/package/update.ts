@@ -7,7 +7,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_PACKAGE, CT_PACKAGE } from '../../constants/contentTypes';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { IUpdatePackageParams } from './types';
 
@@ -31,10 +31,10 @@ export async function updatePackage(
   lockHandle: string,
 ): Promise<IAdtWireResponse> {
   const encodedName = encodeSapObjectName(params.package_name.toLowerCase());
-  const corrNrParam = params.transport_request
-    ? `&corrNr=${params.transport_request}`
-    : '';
-  const url = `/sap/bc/adt/packages/${encodedName}?lockHandle=${encodeURIComponent(lockHandle)}${corrNrParam}`;
+  // `writeQuery`, like every other write: interpolating the handle directly
+  // sent `?lockHandle=undefined` when there was none, and SAP answered a
+  // refusal about a handle nobody passed.
+  const url = `/sap/bc/adt/packages/${encodedName}${writeQuery(lockHandle, params.transport_request)}`;
 
   return connection.makeAdtRequest({
     url,

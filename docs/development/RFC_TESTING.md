@@ -158,68 +158,61 @@ The function group read endpoint via RFC does not accept specific content types 
 
 `BaseTester` resolves object names from config using camelCase property names (e.g., `config.functionGroupName`). The `loggerPrefix` is converted to camelCase: `'FunctionGroup'` -> `'functionGroup'` + `'Name'` = `'functionGroupName'`.
 
-## Known limitation: package update
+## Packages: a session that saved a package cannot save or delete it again
 
-Updating a package over RFC fails. `create`, `LOCK`, `UNLOCK` and `delete` all
-work; only the `PUT` that saves a change is refused:
+**The rule.** An ABAP session that has created or updated a package cannot
+update or delete that package afterwards. The save is refused with
+`400 ExceptionResourceAlreadyExists`, `PAK/058` ("Package … is already
+locked"); the delete answers `200` carrying `isDeleted="false"` and the same
+`PAK/058`. A session that has not saved the package does both without trouble.
+This holds on either transport — it is a property of the ABAP session, not of
+RFC.
 
-```
-PUT /sap/bc/adt/packages/<name>?lockHandle=<ours>
-  400  ExceptionResourceAlreadyExists   PAK/058  "Package <name> is already locked"
-```
+**The cause** (issue #176, read from the ABAP code on E19). `PAK/058` has one
+source, `CL_PACKAGE->IF_PACKAGE~SET_CHANGEABLE`, and it checks
+`m_lock_state` on the **in-memory package instance**, not an enqueue lock.
+`CL_PACKAGE` keeps those instances in a static buffer that lives as long as the
+ABAP session. The ADT create and the ADT update both end in `M_SAVE`, which
+leaves the instance in state `requested`; the next update or delete loads the
+package through `load_package`, gets the buffered instance back without reading
+the database, and `set_changeable` refuses. No ADT package call resets the
+buffer — nothing in `CL_PAK_ADT_*` calls `set_changeable( abap_false )` or
+`undo_all_changes`.
 
-It is not the lock handle. Measured on E19 2026-08-31, the same endpoint in the
-same session answers:
+**Why it looks like an RFC problem.** Over HTTP the create is a stateless
+request whose session is gone by the time the stateful lock → PUT → unlock
+starts, so the update succeeds; only a delete after that update, from the same
+stateful session, meets the buffer. Over RFC every call shares one ABAP
+session, so the update right after the create is already refused.
 
-| Request | Answer |
-| --- | --- |
-| `PUT` with no `lockHandle` | 400 `ExceptionParameterNotFound`, `SADT_RESOURCE/017` |
-| `PUT` with a made-up handle | 423 `ExceptionResourceInvalidLockHandle`, `SADT_RESOURCE/026` |
-| a second `_action=LOCK` | 403 `ExceptionResourceNoAccess`, `EU/510` |
-| `PUT` with our real handle | 400 `ExceptionResourceAlreadyExists`, `PAK/058` |
+**Measured on E19, 2026-09-26**, one session throughout, the same sequence over
+both transports (`ZAC_INNER_PKG02`, transport `E19K907111`):
 
-The parameter is read, the handle is validated, and ours passes — a `PUT` blind
-to the lock would answer 423, exactly as the made-up handle does. The ADT
-resource lock is recognised as ours, and a second one is refused under `EU/510`,
-a different message class from the one the `PUT` reports. So the refusal comes
-from a layer past the ADT lock: PAK's own, whose state does not survive the hop
-between internal contexts that `SADT_REST_RFC_ENDPOINT` makes per call, while
-the enqueue handle does — which is why the `UNLOCK` afterwards still answers 200.
+| Step | HTTP | RFC |
+| --- | --- | --- |
+| create | 200 | 200 |
+| `_action=LOCK` | 200, handle | 200, handle |
+| `PUT` with a made-up handle | 423 `ExceptionResourceInvalidLockHandle`, `SADT_RESOURCE/026` | same |
+| a second `_action=LOCK` | 403 `ExceptionResourceNoAccess`, `EU/510` | same |
+| `PUT` with our handle | **200**, the change is saved | **400 `ExceptionResourceAlreadyExists`, `PAK/058`** |
+| `_action=UNLOCK` | 200 | 200 |
+| `deletion/check` | `isDeletable="true"` | `isDeletable="true"` |
+| `deletion/delete`, same session | **`isDeleted="false"`, `PAK/058`** | **`isDeleted="false"`, `PAK/058`** |
+| `deletion/delete`, a new session | `isDeleted="true"` | `isDeleted="true"` |
 
-**Packages only.** In the same RFC run 31 other updates pass — classes,
-interfaces, domains, data elements, tables, structures, DDL, behaviour
-definitions — and no `PAK` message appears anywhere else in the log. Every other
-type keeps its state where a lock handle reaches it from any context; the package
-is the one with a second locking layer of its own.
+The handle is not the problem: a made-up one is refused with 423, and ours is
+accepted — over HTTP the same `PUT` saves. The enqueue lock is not either: a
+second `LOCK` is refused under `EU/510`, a different message class, and a
+separate session can update the package while the first still holds its
+buffered instance (measured in mcp-abap-adt, issue #176).
 
-### The same layer blocks a delete after an update, on either transport
+**The workaround is the consumer's**: a new ABAP session for each step that
+saves the package after the first — a new RFC connection, or a new stateful HTTP
+session. This library does not do it inside its members: each member stays one
+request on the connection it was given.
 
-`PAK/058` is not confined to RFC. Over **HTTP**, a package the session has just
-updated cannot be deleted by that session either: `deletion/check` answers
-`isDeletable="true"`, and `deletion/delete` answers HTTP 200 carrying
-`isDeleted="false"` and the same `PAK/058`. A delete from any other session
-succeeds on the first attempt, immediately, while the first session is still
-open — so it is ownership of the PAK state, not a delay. Retried for 30 seconds
-inside the run it never succeeds; sent one second after the run ends it works.
-
-The harness has the mechanism for this — `recycleTestSession()`, which reopens
-the session before the cleanup delete — and the template now ships with
-`cleanup_session_after_test: true`, so it runs. That is what makes the package
-lifecycle test pass its cleanup over HTTP: the delete goes out on a session that
-does not own the PAK state.
-
-A `test-config.yaml` written before this change still carries `false` — the file
-is not in git, and `check:config` compares top-level sections, so it will not
-report the difference. If the package suite fails at cleanup with `PAK/058`,
-that setting is the first thing to look at.
-
-The failure it replaces was real, not swallowed: the object was left behind and
-the next run met it — which then made that run skip its own workflow and report
-green.
-
-Why PAK takes the create path rather than the change path is **not established**,
-and needs the ABAP side to answer. Until it is, this is a known limitation rather
-than an open defect in this library: HTTP is the primary transport for modern
-on-premise systems, and RFC exists for BASIS < 7.50 where package CRUD is not
-supported regardless. The package lifecycle test is skipped over RFC with this
-reason at the skip.
+The package lifecycle test does exactly that. `afterCreate` replaces the test's
+session before the update, and the cleanup replaces it again before the delete
+— `recycleTestSession()`, which ends the session and opens its replacement, never
+a second one beside it. The test runs over RFC as well as HTTP; it used to be
+skipped over RFC.

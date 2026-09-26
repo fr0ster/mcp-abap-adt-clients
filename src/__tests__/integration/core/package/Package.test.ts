@@ -24,7 +24,6 @@ import {
   createTestAdtClient,
   createTestConnection,
   getConfig,
-  getConnectionType,
   recycleTestSession,
   resolveSystemContext,
   skipUnlessConfigured,
@@ -142,33 +141,20 @@ describe('Package (using AdtClient)', () => {
           };
         },
         cleanupObject: async (cfg: IPackageConfig) => {
-          // No session juggling here, because none has been shown to be needed.
+          // **A fresh ABAP session for the delete** (issue #176). `CL_PACKAGE`
+          // keeps a static instance buffer for the whole ABAP session, and a
+          // create or an update leaves the package's instance in it in state
+          // `requested`. Delete loads the package from that buffer and
+          // `set_changeable` refuses: `isDeleted="false"` with PAK/058,
+          // "already locked", inside a 200. No ADT call resets the buffer, so
+          // the only way out is a session that has not saved the package.
+          // Measured on E19 2026-09-26 over HTTP and RFC alike: delete right
+          // after an update is refused from the updating session and succeeds
+          // from a new one.
           //
-          // This used to open a second connection, on the rule that a package
-          // cannot be deleted from the session that created it. That rule was
-          // stated as an on-prem fact and had only been measured on the BTP
-          // trial, where the delete succeeds from the creating session — tested
-          // both ways, with a replacement session and without, package gone.
-          //
-          // Measured on on-prem since, which is where the rule was supposed to
-          // bite: E19, one session for the whole run, create and delete both on
-          // it, full workflow green. So the rule does not bite there either and
-          // the exception stays gone.
-          //
-          // If some system does show the delete failing from the creating
-          // session, it comes back as `recycleTestSession(connection)` —
-          // replacing the run's one session, never opening a second beside it.
-          // A fresh session first, and this is the one type that needs it.
-          // The PAK lock belongs to the ABAP session, so a package this session
-          // has just updated cannot be deleted by it — `deletion/check` answers
-          // `isDeletable="true"` and `deletion/delete` answers 200 carrying
-          // `isDeleted="false"` with PAK/058, "already locked". Measured on E19
-          // 2026-08-31 and again on the trial. Not a delay: retried for thirty
-          // seconds it never succeeds, and the same request one second after
-          // the run ends works first time.
-          //
-          // `recycleTestSession` replaces the run's one session and publishes
-          // the replacement — it never opens a second beside it.
+          // `recycleTestSession` replaces the run's one session — it never
+          // opens a second beside it. This is the consumer's workaround and
+          // lives here, in the test; the library's `delete` stays one request.
           if (connection) {
             await recycleTestSession(connection);
           }
@@ -230,24 +216,6 @@ describe('Package (using AdtClient)', () => {
           return;
         }
 
-        // Known limitation, not a defect in this package: `update` over RFC is
-        // refused with 400 ExceptionResourceAlreadyExists / PAK/058, from a
-        // layer below the ADT lock. The handle is read, validated and accepted
-        // — a PUT blind to it answers 423 instead — and 31 other object types
-        // update over RFC in the same run without complaint. Documented, with
-        // the four endpoint answers that place it, in
-        // docs/development/RFC_TESTING.md. Skipped rather than failed so the
-        // RFC run says something true; it goes red again the day the cause is
-        // found and fixed.
-        if (getConnectionType() === 'rfc') {
-          logTestSkip(
-            testsLogger,
-            'Package - Full workflow',
-            'package update over RFC is refused by the PAK layer (PAK/058) — known limitation, see docs/development/RFC_TESTING.md',
-          );
-          return;
-        }
-
         if (!hasConfig) {
           await tester.flowTestAuto();
           return;
@@ -259,6 +227,14 @@ describe('Package (using AdtClient)', () => {
         }
 
         await tester.flowTestAuto({
+          // **The update in its own ABAP session** (issue #176): the create
+          // leaves the package in `CL_PACKAGE`'s session buffer as
+          // `requested`, and a PUT from the same session is refused with 400
+          // PAK/058. Over HTTP the create is stateless and its session is gone
+          // anyway; over RFC every call shares one session, so without this
+          // the update fails there. Replacing the session is what a consumer
+          // has to do too — the library does not do it for them.
+          afterCreate: () => recycleTestSession(connection),
           updateTakesDocument: (current) =>
             patchXmlAttribute(
               current,

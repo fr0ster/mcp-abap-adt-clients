@@ -183,14 +183,18 @@ Some endpoints via RFC don't support specific Accept content types. The library 
 
 RFC returns base64 lock handles that may contain spaces, `+`, `=`. All lock handles are encoded with `encodeURIComponent()` when placed in URL query parameters.
 
-## Known limitation: package update
+## Packages: one save per ABAP session
 
-`AdtPackage.updateMetadata()` does not work over RFC. Everything else on a package does
-— create, lock, unlock, delete — and every other object type updates normally.
-The save is refused with `400 ExceptionResourceAlreadyExists`, `PAK/058`, and
-the cause sits below the ADT lock, in the package framework's own state rather
-than in the lock handle this library sends.
+A session that has created or updated a package cannot update or delete it
+again: the save answers `400 PAK/058`, the delete `isDeleted="false"` with the
+same message. It is SAP's package framework — `CL_PACKAGE` buffers the package
+instance for the whole ABAP session — and it bites over RFC first because every
+RFC call shares one session, so an update straight after a create is refused.
 
-The evidence and the four endpoint answers that place it are in
-[`docs/development/RFC_TESTING.md`](../development/RFC_TESTING.md#known-limitation-package-update).
-Use HTTP for package changes on a system that supports it.
+Do each step that saves a package after the first on a new connection (over
+HTTP, a new stateful session). The library does not do that for you; each
+member is one request on the connection it was given.
+
+The cause, the measured answers of both transports, and the test that works
+around it are in
+[`docs/development/RFC_TESTING.md`](../development/RFC_TESTING.md#packages-a-session-that-saved-a-package-cannot-save-or-delete-it-again).
