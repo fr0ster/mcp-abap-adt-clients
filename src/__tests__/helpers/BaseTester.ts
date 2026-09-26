@@ -367,9 +367,19 @@ export class BaseTester<TConfig, TState = unknown> {
     });
     if (!answer.ok) {
       const failure = answer.getError();
+      // The headline names the object; SAP's reason is in `messages`, and a
+      // red cleanup without it cannot be told apart from a misreading.
+      const said = (failure.messages ?? [])
+        .map(
+          (m) =>
+            `${m.type} ${m.text}` +
+            (m.t100 ? ` [${m.t100.id}/${m.t100.no}]` : ''),
+        )
+        .join('; ');
       throw new Error(
         `[${failure.origin}] ${failure.message}` +
-          (failure.request?.url ? ` (${failure.request.url})` : ''),
+          (failure.request?.url ? ` (${failure.request.url})` : '') +
+          (said ? ` — SAP: ${said}` : ''),
       );
     }
   }

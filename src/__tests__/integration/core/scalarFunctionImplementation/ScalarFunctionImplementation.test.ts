@@ -19,11 +19,13 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { utilActivationRunId } from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import { activationStatusIn } from '../../../../../scripts/lib/activationRun';
 import type { AdtClient } from '../../../../clients/AdtClient';
+import { utilDocuments } from '../../../../core/shared/utilResultSet';
 import { orThrow } from '../../../../utils/adtResponse';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { expectResult } from '../../../helpers/contract';
@@ -301,8 +303,12 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
 
           // 4) Group-activate the trio, then wait: step 5 reads the active
           // source, and reading it straight after the POST would read whatever
-          // was there before.
-          const utils = client.getUtils();
+          // was there before. The run id is `utilActivationRunId`'s reading of
+          // `Location`; the shipped default answers the POST as it came.
+          const utils = client.getUtils({
+            ...utilDocuments,
+            activation: utilActivationRunId,
+          });
           const runId = expectResult(
             await utils.activateObjectsGroup([
               { type: 'DSFD/SCF', name: funcName },
