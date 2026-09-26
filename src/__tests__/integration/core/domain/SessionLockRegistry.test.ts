@@ -29,6 +29,7 @@ import {
   deleteDomain,
   recreateActiveDataElement,
   recreateActiveDomain,
+  removeLeftoverDataElement,
 } from '../../../helpers/lockTargets';
 import {
   createTestAdtClient,
@@ -157,7 +158,10 @@ describe('Session lock registry (using AdtClient)', () => {
 
     try {
       // Typed and active, not the shells a create alone makes. The element
-      // is typed by the domain, so the domain comes first.
+      // is typed by the domain: a leftover element goes first (it references
+      // the domain, which cannot be deleted under it), then the domain is
+      // rebuilt, then the element.
+      await removeLeftoverDataElement(client, dataElementConfig);
       await recreateActiveDomain(client, domainConfig, domainType);
       await recreateActiveDataElement(
         client,

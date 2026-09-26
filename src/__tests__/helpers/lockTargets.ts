@@ -57,6 +57,28 @@ async function removeLeftover(
   }
 }
 
+/**
+ * Remove a data element a dead run left behind, before its domain is touched.
+ *
+ * A data element typed by a domain holds a reference to it, so a leftover
+ * domain cannot be deleted while its element is still there. A test that
+ * rebuilds both must clear the element first — `recreateActiveDomain` removes
+ * only the domain.
+ */
+export async function removeLeftoverDataElement(
+  client: AdtClient,
+  config: IDataElementConfig,
+): Promise<void> {
+  await removeLeftover(
+    client.getDataElement(),
+    {
+      dataElementName: config.dataElementName,
+      transportRequest: config.transportRequest,
+    },
+    config.dataElementName,
+  );
+}
+
 /** A fresh, typed, active domain. */
 export async function recreateActiveDomain(
   client: AdtClient,
