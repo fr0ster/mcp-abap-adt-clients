@@ -22,6 +22,28 @@ independent versions. One package at a time: `npm run publish:clients` and
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [23.0.1] - 2026-09-27
+
+### Fixed
+
+- **A package update without a lock handle no longer sends
+  `?lockHandle=undefined`.** `updatePackage` interpolated
+  `encodeURIComponent(lockHandle)` unconditionally, so a call with no handle
+  asked SAP to check a handle literally named `undefined`, and the refusal
+  (423 `SADT_RESOURCE/026`, "invalid lock handle: undefined", measured on
+  E19) named a handle nobody passed. The PUT now builds its query with
+  `writeQuery`, like every other write: an absent handle or transport is left
+  out. No change for a caller that passes both.
+
+### Documentation
+
+- **PAK/058 is `CL_PACKAGE`'s session buffer.** A package create or update
+  leaves the package in the ABAP session's static buffer as `requested`, and
+  the next update or delete from the same session is refused with PAK/058;
+  from a new session it succeeds. Measured on E19 over HTTP and RFC. The
+  RFC and session guides and the `AdtPackage` comments state the rule — one
+  session per package save — where they blamed state lost between RFC
+  contexts and called the cause unknown.
 ## [23.0.0] - 2026-09-26
 
 **This package interprets nothing.** Every member makes one ADT request. What
