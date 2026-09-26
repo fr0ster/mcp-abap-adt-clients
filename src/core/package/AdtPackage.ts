@@ -232,40 +232,20 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
   /**
    * Update the package's metadata.
    *
-   * **Package update over RFC fails**, and not for the reason the old comment
-   * gave. It said the PUT "cannot access the PAK lock created by the LOCK
-   * call". Measured 2026-08-31, that is wrong: the PUT reads the
-   * parameter, validates the handle, and accepts ours. Four answers from the
-   * same endpoint, same session, same package, over rfc:
+   * **One save per ABAP session** (issue #176). A session that has created or
+   * updated a package cannot update it again: the PUT answers 400
+   * `ExceptionResourceAlreadyExists`, PAK/058, "Package … is already locked".
+   * The handle is not the cause — a made-up one answers 423
+   * `SADT_RESOURCE/026`, ours is accepted — and neither is the enqueue lock.
+   * `CL_PACKAGE` keeps each package instance in a static buffer for the whole
+   * ABAP session, the create and the update both leave it in state
+   * `requested`, and the next save loads it back from that buffer and
+   * `set_changeable` refuses. Over RFC every call shares one session, so an
+   * update straight after a create fails; over HTTP the create is stateless
+   * and the update succeeds. Measured on an on-premise system 2026-09-26, both transports.
    *
-   *   PUT with no lockHandle     400  ExceptionParameterNotFound
-   *                                   SADT_RESOURCE/017  "Parameter lockHandle
-   *                                   could not be found"
-   *   PUT with a made-up handle  423  ExceptionResourceInvalidLockHandle
-   *                                   SADT_RESOURCE/026  "is not locked
-   *                                   (invalid lock handle: DEADBEEF…)"
-   *   a second _action=LOCK      403  ExceptionResourceNoAccess
-   *                                   EU/510  "User … is currently editing"
-   *   PUT with OUR handle        400  ExceptionResourceAlreadyExists
-   *                                   PAK/058  "Package … is already locked"
-   *
-   * The first two say the lock handle is read and checked, and ours passes both
-   * checks — a PUT that could not see the lock would answer 423, exactly as the
-   * made-up handle does. The third says the ADT resource lock is ours and is
-   * recognised as ours.
-   *
-   * So the refusal comes from a layer past the ADT lock. PAK is the package
-   * framework's own message class, and PAK/058 is what it answers when its own
-   * lock cannot be taken. That state does not survive the hop between internal
-   * contexts that SADT_REST_RFC_ENDPOINT makes per call; the enqueue handle
-   * does, which is why UNLOCK afterwards answers 200.
-   *
-   * It is packages alone. In the same rfc run 31 other updates pass — classes,
-   * interfaces, domains, data elements, tables, structures, DDL, behaviour
-   * definitions — and no PAK message appears anywhere else in the log. Not
-   * critical for release: http is the primary transport for modern on-premise
-   * systems, and rfc exists for BASIS < 7.50, where package CRUD is not
-   * supported regardless.
+   * Nothing here opens a new session to get round it — that is the caller's,
+   * on the connection it owns. See docs/development/RFC_TESTING.md.
    *
    * **The whole content, every time.** This is a replace, never a merge. Read
    * what the object holds, change what you mean to change, and pass the result:
@@ -355,8 +335,10 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
    * PAK/058, "package is already locked", even though the UNLOCK moments
    * earlier answered 200. It is not a delay: retried for 30 seconds inside the
    * run it never succeeds, and the same request one second after the run ends
-   * deletes it on the first attempt. The PAK lock belongs to the ABAP session
-   * and goes with it.
+   * deletes it on the first attempt. It is `CL_PACKAGE`'s session buffer
+   * (issue #176): the update left the package's instance there as `requested`,
+   * and the delete loads it back and is refused. A new session has no such
+   * instance.
    *
    * The answer is a 200 either way, and `isDeleted="false"` is in its body: a
    * caller who wants that read as a failure passes `analyseDeletion` (from
