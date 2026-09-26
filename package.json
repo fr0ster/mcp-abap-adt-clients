@@ -120,7 +120,7 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "@mcp-abap-adt/interfaces-adt": "^9.0.0",
+    "@mcp-abap-adt/interfaces-adt": "^10.0.0",
     "@mcp-abap-adt/interfaces-auth": "^1.2.0",
     "@mcp-abap-adt/interfaces-network": "^2.0.0",
     "@mcp-abap-adt/interfaces-utils": "^1.1.0",

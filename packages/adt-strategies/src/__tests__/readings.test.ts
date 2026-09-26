@@ -303,6 +303,144 @@ describe('a deletion answer naming several objects', () => {
   });
 });
 
+/**
+ * Several `del:message` elements inside one object — issue #172.
+ *
+ * The answers are E19's, 2026-09-26, as the consumer recorded them in
+ * fr0ster/mcp-abap-adt#230 (`src/__tests__/unit/deletionRefusal.test.ts`):
+ * **trimmed to the elements a reading looks at**, so they are held here rather
+ * than in the corpus, which keeps answers as the system sent them.
+ */
+describe('a deletion answer carrying several messages per object', () => {
+  const NS =
+    'xmlns:del="http://www.sap.com/adt/deletion" xmlns:adtcore="http://www.sap.com/adt/core"';
+
+  /** Check of a service binding that did not exist: a W and an E, siblings. */
+  const SRVB_CHECK_TWO_MESSAGES =
+    `<?xml version="1.0" encoding="utf-8"?><del:checkResponse ${NS}>` +
+    '<del:object del:externalStrongReferences="0" del:externalWeakReferences="0" del:isDeletable="false" adtcore:type="SRVB/SVB" adtcore:name="ZMCP_BLD_SRVB01">' +
+    '<del:lockingTransport><del:recording>false</del:recording></del:lockingTransport>' +
+    '<del:message del:priority="0" del:type="W"><del:text>ZMCP_BLD_SRVB01 does not exist</del:text></del:message>' +
+    '<del:message del:priority="0" del:type="E"><del:text>The Service Binding does not exist</del:text>' +
+    '<atom:link href="/sap/bc/adt/messageclass/SDDIC_ADT_SRVB/messages/006/longtext?language=E" rel="http://www.sap.com/adt/relations/longtext" type="text/html" xmlns:atom="http://www.w3.org/2005/Atom"/>' +
+    '</del:message></del:object></del:checkResponse>';
+
+  /** Delete of a table whose directory entry waits for the release. */
+  const TABL_DELETE_TWO_OBJECTS =
+    `<?xml version="1.0" encoding="utf-8"?><del:deletionResult ${NS}>` +
+    '<del:object del:isDeleted="true" adtcore:type="TABT/DTT" adtcore:name="ZMCP_BLD_TAB_H1"><del:message del:priority="0" del:type="S"><del:text/></del:message></del:object>' +
+    '<del:object del:isDeleted="false" adtcore:type="TABL/DT" adtcore:name="ZMCP_BLD_TAB_H1"><del:message del:priority="0" del:type="W"><del:text>Release transport E19K905876 to remove the object directory entry</del:text></del:message></del:object>' +
+    '</del:deletionResult>';
+
+  /** Delete of a behavior definition refused with SWB_TOOL 029. */
+  const BDEF_DELETE_T100 =
+    `<?xml version="1.0" encoding="utf-8"?><del:deletionResult ${NS}>` +
+    '<del:object del:isDeleted="false" adtcore:type="BDEF/BDO" adtcore:name="ZMCP_BLD_I_BDEF">' +
+    '<del:message del:priority="0" del:type="E"><del:text>Error while deleting object ZMCP_BLD_I_BDEF from the database</del:text>' +
+    '<atom:link href="/sap/bc/adt/messageclass/SWB_TOOL/messages/029/longtext?language=E&amp;msgv1=ZMCP_BLD_I_BDEF" rel="http://www.sap.com/adt/relations/longtext" type="text/html" xmlns:atom="http://www.w3.org/2005/Atom"/>' +
+    '</del:message></del:object></del:deletionResult>';
+
+  const CHECK_DELETABLE = `<del:checkResponse ${NS}><del:object del:isDeletable="true" adtcore:name="ZX"/></del:checkResponse>`;
+
+  const CHECK_REFUSED_BY_REFERENCES = `<del:checkResponse ${NS}><del:object del:externalStrongReferences="5" del:externalWeakReferences="3" del:isDeletable="false" adtcore:name="ZMCP_SHR_RTABL"/></del:checkResponse>`;
+
+  it('keeps every message SAP sent, in its order, instead of the reference counts', () => {
+    expect(readDeletionRefusal(SRVB_CHECK_TWO_MESSAGES)).toEqual({
+      form: 'deletion',
+      message: 'ADT refuses to delete ZMCP_BLD_SRVB01',
+      messages: [
+        {
+          type: 'W',
+          text: 'ZMCP_BLD_SRVB01: ZMCP_BLD_SRVB01 does not exist',
+          t100: undefined,
+        },
+        {
+          type: 'E',
+          text: 'ZMCP_BLD_SRVB01: The Service Binding does not exist',
+          t100: { id: 'SDDIC_ADT_SRVB', no: '006', values: undefined },
+        },
+      ],
+    });
+  });
+
+  it('refuses only the object not deleted, with its own message', () => {
+    const found = readDeletionRefusal(TABL_DELETE_TWO_OBJECTS);
+    expect(found?.message).toBe('ADT refuses to delete ZMCP_BLD_TAB_H1');
+    expect(found?.messages).toEqual([
+      {
+        type: 'W',
+        text: 'ZMCP_BLD_TAB_H1: Release transport E19K905876 to remove the object directory entry',
+        t100: undefined,
+      },
+    ]);
+  });
+
+  it('carries the T100 key and its values from the long-text link', () => {
+    expect(readDeletionRefusal(BDEF_DELETE_T100)?.messages).toEqual([
+      {
+        type: 'E',
+        text: 'ZMCP_BLD_I_BDEF: Error while deleting object ZMCP_BLD_I_BDEF from the database',
+        t100: { id: 'SWB_TOOL', no: '029', values: ['ZMCP_BLD_I_BDEF'] },
+      },
+    ]);
+  });
+
+  it('falls back to the reference counts only when SAP gave no text', () => {
+    expect(readDeletionRefusal(CHECK_REFUSED_BY_REFERENCES)?.messages).toEqual([
+      {
+        type: 'E',
+        text: 'ZMCP_SHR_RTABL: 5 strong and 3 weak external references',
+      },
+    ]);
+  });
+
+  it('a permitted object is no refusal, and an E message on it is one', () => {
+    expect(readDeletionRefusal(CHECK_DELETABLE)).toBeNull();
+    const withError = CHECK_DELETABLE.replace(
+      '/>',
+      '><del:message del:type="E"><del:text>locked</del:text></del:message></del:object>',
+    );
+    expect(readDeletionRefusal(withError)?.messages).toEqual([
+      { type: 'E', text: 'ZX: locked', t100: undefined },
+    ]);
+  });
+
+  it('an E among several messages on a permitted object is not missed', () => {
+    // The second half of #172: with two messages the `E` read as no type at
+    // all, so the object passed as permitted.
+    const permitted = SRVB_CHECK_TWO_MESSAGES.replace(
+      'del:isDeletable="false"',
+      'del:isDeletable="true"',
+    );
+    expect(readDeletionRefusal(permitted)).not.toBeNull();
+  });
+});
+
+/**
+ * One `checkReport` per object. No capture of a several-object run exists, so
+ * the envelope is the recorded single-report one with a second report added.
+ */
+describe('a check run answering several reports', () => {
+  const reports = (...inner: string[]): string =>
+    `<?xml version="1.0" encoding="utf-8"?><chkrun:checkRunReports xmlns:chkrun="http://www.sap.com/adt/checkrun">${inner.join('')}</chkrun:checkRunReports>`;
+  const clean =
+    '<chkrun:checkReport chkrun:reporter="abapCheckRun" chkrun:triggeringUri="/x" chkrun:status="processed" chkrun:statusText="Object checked"/>';
+  const failing =
+    '<chkrun:checkReport chkrun:reporter="abapCheckRun" chkrun:triggeringUri="/y" chkrun:status="processed" chkrun:statusText="Object checked"><chkrun:checkMessageList><chkrun:checkMessage chkrun:type="E" chkrun:shortText="Syntax error"/></chkrun:checkMessageList></chkrun:checkReport>';
+
+  it('two clean reports are not a check that never ran', () => {
+    expect(readCheckRunRefusal(reports(clean, clean))).toBeNull();
+  });
+
+  it('one failing report among clean ones is a refusal, with its message', () => {
+    const found = readCheckRunRefusal(reports(clean, failing));
+    expect(found?.message).toBe('Syntax error');
+    expect(found?.messages).toEqual([
+      { type: 'E', text: 'Syntax error', code: undefined },
+    ]);
+  });
+});
+
 describe('an activation that reports no reason', () => {
   /**
    * This used to assert the opposite, and it is worth saying why it flipped.

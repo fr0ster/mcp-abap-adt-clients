@@ -59,9 +59,9 @@ export interface AdtMessage {
   readonly code?: string;
   /**
    * The ABAP message key, where the carrier kept it — `SADT_RESOURCE` `026`
-   * with the values that were substituted into the text. Only `exc:exception`
-   * has ever supplied this; the same message arriving through another carrier
-   * comes as the sentence alone.
+   * with the values that were substituted into the text. `exc:exception`
+   * carries it in its properties; a deletion message carries it in the link to
+   * its long text. Other carriers deliver the sentence alone.
    */
   readonly t100?: {
     readonly id: string;
@@ -352,14 +352,17 @@ export function readActivationRefusal(document: unknown): AdtRefusal | null {
  * carries one too, with `del:type="S"` and an empty `del:text` — visible in
  * `delete-success--02`. The attribute is the verdict; the message explains it.
  *
- * **The two documents must not share a reader.** adt-clients ships
- * `deletionRefusal`, which covers the check step; its `parseDeletionCheck` looks
- * for `isDeletable` with a regex and defaults a missing one to `false`. Handed a
- * `deletionResult`, which has no such attribute, it reports every successful
- * delete as refused. This reader dispatches on the root element instead.
+ * **The two documents must not share a verdict attribute.** A check answers
+ * `isDeletable`, a deletion `isDeleted`. A reader that looked for the first on
+ * both — adt-clients shipped one, `deletionRefusal`, until it stopped shipping
+ * readings — found no `isDeletable` in a `deletionResult` and reported every
+ * successful delete as refused. This reader dispatches on the root element.
  *
- * `isDeleted` has no reader anywhere in this repository today, which is why a
- * refused delete still answers `success: true`.
+ * **Every message counts, and every object.** Both repeat: one `del:object` per
+ * object asked about, and one `del:message` per thing SAP had to say about it.
+ * A message's severity is its own; the object is refused when its verdict
+ * attribute is anything but `"true"`, or when any of its messages is an `E`.
+ * The reference counts stand in only when SAP refused and said nothing.
  */
 export function readDeletionRefusal(document: unknown): AdtRefusal | null {
   const parsed = parseXml(document);
@@ -383,29 +386,51 @@ export function readDeletionRefusal(document: unknown): AdtRefusal | null {
   const names: string[] = [];
 
   for (const object of objects) {
-    const message = object?.message;
-    const messageType = String(message?.['@type'] ?? '').toUpperCase();
-    const messageText = textOf(message?.text);
-
-    const permitted = object?.[verdictAttribute] === 'true';
-    if (permitted && messageType !== 'E') continue;
-
     const name =
       typeof object?.['@name'] === 'string'
         ? object['@name']
         : '(unnamed object)';
+
+    // **Several messages, not one — the same trap one level down.** SAP sends
+    // a `del:message` per thing it has to say, and a check for a service
+    // binding that does not exist carries two: a `W` naming the missing object
+    // and an `E` saying why that refuses it. Read as a single element, both
+    // came back `undefined`, SAP's reason was replaced by the reference counts,
+    // and an `E` on a permitted object was missed outright (issue #172). The
+    // successful delete's `S` with an empty text is dropped by the text test,
+    // which is what it always was: a message with nothing to say.
+    const messages: AdtMessage[] = asArray(object?.message)
+      .map((message: any): AdtMessage | null => {
+        const text = textOf(message?.text);
+        if (!text) return null;
+        return {
+          type: severity(message?.['@type']),
+          text: `${name}: ${text}`,
+          t100: t100FromLongtext(message?.link),
+        };
+      })
+      .filter((m): m is AdtMessage => m !== null);
+
+    const permitted = object?.[verdictAttribute] === 'true';
+    if (permitted && !messages.some((m) => m.type === 'E')) continue;
+
+    names.push(name);
+    if (messages.length > 0) {
+      refused.push(...messages);
+      continue;
+    }
+
+    // SAP said no and gave no sentence. The reference counts are the only
+    // reason the check document carries, so they stand in — and only then.
     const references =
       isCheck &&
       (object?.['@externalStrongReferences'] ||
         object?.['@externalWeakReferences'])
         ? `${object['@externalStrongReferences'] ?? 0} strong and ${object['@externalWeakReferences'] ?? 0} weak external references`
         : undefined;
-    const reason = messageText || references || 'the server did not say why';
-
-    names.push(name);
     refused.push({
-      type: severity(messageType || 'E'),
-      text: `${name}: ${reason}`,
+      type: 'E',
+      text: `${name}: ${references ?? 'the server did not say why'}`,
     });
   }
 
@@ -418,6 +443,35 @@ export function readDeletionRefusal(document: unknown): AdtRefusal | null {
     message: `ADT refuses to delete ${names.join(', ')}`,
     messages: refused,
   };
+}
+
+/**
+ * The T100 key a deletion message carries, read from its long-text link.
+ *
+ * The deletion document has no `T100KEY-*` properties the way `exc:exception`
+ * does, but the key is not missing: the link to the message's long text names
+ * it — `/messageclass/SWB_TOOL/messages/029/longtext?language=E&msgv1=…` — and
+ * the placeholders ride along as `msgv1`…`msgv4`. It is the one part of the
+ * message that does not change with the logon language.
+ */
+function t100FromLongtext(link: unknown): AdtMessage['t100'] {
+  for (const candidate of asArray(link as any)) {
+    const href = candidate?.['@href'];
+    if (typeof href !== 'string') continue;
+    const key = /\/messageclass\/([^/]+)\/messages\/([^/?]+)/i.exec(href);
+    if (!key) continue;
+    const query = href.includes('?') ? href.slice(href.indexOf('?') + 1) : '';
+    const params = new URLSearchParams(query.replace(/&amp;/g, '&'));
+    const values = [1, 2, 3, 4]
+      .map((n) => params.get(`msgv${n}`))
+      .filter((v): v is string => v !== null);
+    return {
+      id: decodeURIComponent(key[1]),
+      no: decodeURIComponent(key[2]),
+      values: values.length ? values : undefined,
+    };
+  }
+  return undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -449,46 +503,62 @@ export function readDeletionRefusal(document: unknown): AdtRefusal | null {
  */
 export function readCheckRunRefusal(document: unknown): AdtRefusal | null {
   const parsed = parseXml(document);
-  const report = parsed?.checkRunReports?.checkReport ?? parsed?.checkReport;
-  if (!report) return null;
+  // One `checkReport` per object checked. A run over several objects answers
+  // several, and the parser gives an array — read as a single report, its
+  // status came back `undefined` and two clean reports read as a check that
+  // never ran. The same trap as `del:object` above; no capture of a
+  // several-object run exists yet, so this is defensive rather than measured.
+  const reports = asArray(
+    parsed?.checkRunReports?.checkReport ?? parsed?.checkReport,
+  );
+  if (reports.length === 0) return null;
 
-  const status = String(report['@status'] ?? '');
-  const statusText = String(report['@statusText'] ?? '');
+  const explanations: string[] = [];
+  const messages: AdtMessage[] = [];
 
-  const messages: AdtMessage[] = asArray(
-    report.checkMessageList?.checkMessage,
-  ).map((msg: any) => ({
-    type: String(msg?.['@type'] ?? 'I'),
-    text:
-      textOf(msg?.['@shortText']) || textOf(msg?.shortText) || 'check message',
-    code: msg?.['@code'] !== undefined ? String(msg['@code']) : undefined,
-  }));
+  for (const report of reports) {
+    const status = String(report?.['@status'] ?? '');
+    const statusText = String(report?.['@statusText'] ?? '');
 
-  if (status !== 'processed') {
-    // A check that never ran carries no message list at all: the reason sits in
-    // an attribute and no severity is stated anywhere. One is supplied, so this
-    // form reduces to {severity, text} like every other.
-    const text =
-      statusText || `Check did not run (status: ${status || 'unstated'})`;
-    return {
-      form: 'checkrun',
-      message: text,
-      messages: messages.length
-        ? messages
-        : [{ type: 'E', text, code: status }],
-    };
+    const reported: AdtMessage[] = asArray(
+      report?.checkMessageList?.checkMessage,
+    ).map((msg: any) => ({
+      type: String(msg?.['@type'] ?? 'I'),
+      text:
+        textOf(msg?.['@shortText']) ||
+        textOf(msg?.shortText) ||
+        'check message',
+      code: msg?.['@code'] !== undefined ? String(msg['@code']) : undefined,
+    }));
+
+    if (status !== 'processed') {
+      // A check that never ran carries no message list at all: the reason sits
+      // in an attribute and no severity is stated anywhere. One is supplied, so
+      // this form reduces to {severity, text} like every other.
+      const text =
+        statusText || `Check did not run (status: ${status || 'unstated'})`;
+      explanations.push(text);
+      messages.push(
+        ...(reported.length ? reported : [{ type: 'E', text, code: status }]),
+      );
+      continue;
+    }
+
+    const errors = reported.filter(
+      (m) =>
+        m.type.toUpperCase() === 'E' &&
+        m.text.trim().toLowerCase() !== statusText.trim().toLowerCase(),
+    );
+    if (errors.length === 0) continue;
+    explanations.push(errors.map((m) => m.text).join('; '));
+    messages.push(...reported);
   }
 
-  const errors = messages.filter(
-    (m) =>
-      m.type.toUpperCase() === 'E' &&
-      m.text.trim().toLowerCase() !== statusText.trim().toLowerCase(),
-  );
-  if (errors.length === 0) return null;
+  if (explanations.length === 0) return null;
 
   return {
     form: 'checkrun',
-    message: errors.map((m) => m.text).join('; '),
+    message: explanations.join('; '),
     messages,
   };
 }
