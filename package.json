@@ -121,7 +121,6 @@
   },
   "dependencies": {
     "@mcp-abap-adt/interfaces-adt": "^10.0.0",
-    "@mcp-abap-adt/interfaces-auth": "^1.2.0",
     "@mcp-abap-adt/interfaces-network": "^2.0.0",
     "@mcp-abap-adt/interfaces-utils": "^1.1.0",
     "@mcp-abap-adt/logger": "^0.4.0",
@@ -131,6 +130,7 @@
   "devDependencies": {
     "@biomejs/biome": "^2.4.4",
     "@mcp-abap-adt/connection": "^9.2.0",
+    "@mcp-abap-adt/interfaces-auth": "^1.2.0",
     "@mcp-abap-adt/interfaces-auth-sap": "^1.0.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^25.3.3",
