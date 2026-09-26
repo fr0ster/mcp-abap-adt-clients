@@ -224,31 +224,3 @@ export async function orThrow<T>(
   throw new Error(response.getError().message);
 }
 
-/**
- * An answer built around a value the request function already assembled.
- *
- * Some readings are not a strategy over one answer: a package walk, a
- * where-used run and an includes listing each make several requests and build
- * one shape out of all of them, so there is no single wire for a strategy to
- * read. Those members produce the value and this wraps it — with the same
- * failure classification as {@link answering}, which is the point of not
- * hand-rolling a try/catch at each of them.
- *
- * It is deliberately not exported as a way around result strategies: a member
- * whose endpoint answers once uses `answering`.
- */
-export async function answeringValue<T, E extends IAdtError = IAdtError>(
-  produce: () => Promise<T>,
-  analyse?: IAnalyse<E>,
-): Promise<IAdtResponse<T, E>> {
-  return answering(
-    async () => ({
-      data: (await produce()) as unknown,
-      status: 200,
-      statusText: 'OK',
-      headers: {},
-    }),
-    (answer) => answer.data as T,
-    analyse,
-  );
-}
