@@ -2,57 +2,33 @@
  * Package lock operations
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import { XMLParser } from 'fast-xml-parser';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_LOCK } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
- * Lock package for modification
- * Returns lock handle that must be used in subsequent requests
+ * `POST …?_action=LOCK` — answered as it arrived.
  *
- * NOTE: Caller must enable stateful session mode via connection.setSessionType("stateful")
- * before calling this function
+ * The handle is read by `lockHandleOf` in the member. Until 23.0.0 this parsed
+ * it (and `CORR_NUMBER`, which nothing read) and threw when SAP's answer had no
+ * handle, which turned a statement about SAP's answer into a library failure
+ * and dropped the answer.
+ *
+ * NOTE: the member runs this inside a stateful session.
  */
-export interface IPackageLockResult {
-  lockHandle: string;
-  corrNr?: string;
-}
-
 export async function lockPackage(
   connection: IAbapConnection,
   packageName: string,
-): Promise<IPackageLockResult> {
-  const url = `/sap/bc/adt/packages/${encodeSapObjectName(packageName.toLowerCase())}?_action=LOCK&accessMode=MODIFY`;
-
-  const headers = {
-    Accept: ACCEPT_LOCK,
-  };
-
-  const response = await connection.makeAdtRequest({
-    url,
+): Promise<IAdtWireResponse> {
+  return connection.makeAdtRequest({
+    url: `/sap/bc/adt/packages/${encodeSapObjectName(packageName.toLowerCase())}?_action=LOCK&accessMode=MODIFY`,
     method: 'POST',
     timeout: getTimeout('default'),
     data: null,
-    headers,
+    headers: { Accept: ACCEPT_LOCK },
   });
-
-  // Parse lock handle from XML response
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: '',
-  });
-  const result = parser.parse(response.data);
-  const data = result?.['asx:abap']?.['asx:values']?.DATA;
-  const lockHandle = data?.LOCK_HANDLE;
-
-  if (!lockHandle) {
-    throw new Error(
-      'Failed to obtain lock handle from SAP. Package may be locked by another user.',
-    );
-  }
-
-  const corrNr = data?.CORR_NUMBER || undefined;
-  return { lockHandle, corrNr };
 }

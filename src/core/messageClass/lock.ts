@@ -2,10 +2,13 @@
  * Message class lock operations
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import { XMLParser } from 'fast-xml-parser';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_LOCK } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
+import { lockHandleOf } from '../../utils/lockHandle';
 import { getTimeout } from '../../utils/timeouts';
 
 const BASE = '/sap/bc/adt/messageclass';
@@ -14,47 +17,31 @@ const BASE = '/sap/bc/adt/messageclass';
 const ACCEPT_LOCK_MSG =
   'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.StatusMessage';
 
-/** Parse LOCK_HANDLE from the asx:abap lock response XML. Throws with errLabel if absent. */
-function parseLockHandle(data: string, errLabel: string): string {
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: '',
-  });
-  const result = parser.parse(data);
-  const lockHandle = result['asx:abap']?.['asx:values']?.DATA?.LOCK_HANDLE;
-  if (!lockHandle) {
-    throw new Error(`Failed to extract lock handle from ${errLabel}`);
-  }
-  return lockHandle;
-}
-
 /**
- * Lock a message class for modification.
- * Returns the lock handle that must be used in subsequent update/delete requests.
+ * Lock a message class for modification — `POST …?_action=LOCK`, answered as
+ * it arrived. `lockHandleOf` reads the handle.
+ *
+ * Until 23.0.0 this parsed the handle and threw when SAP's answer had none.
  *
  * NOTE: Caller must enable stateful session via connection.setSessionType('stateful') first.
  */
 export async function lockMessageClass(
   connection: IAbapConnection,
   name: string,
-): Promise<string> {
+): Promise<IAdtWireResponse> {
   const encoded = encodeSapObjectName(name.toLowerCase());
-  const url = `${BASE}/${encoded}?_action=LOCK&accessMode=MODIFY`;
-
-  const response = await connection.makeAdtRequest({
-    url,
+  return connection.makeAdtRequest({
+    url: `${BASE}/${encoded}?_action=LOCK&accessMode=MODIFY`,
     method: 'POST',
     timeout: getTimeout('default'),
     data: null,
     headers: { Accept: ACCEPT_LOCK },
   });
-
-  return parseLockHandle(response.data, 'message class lock response');
 }
 
 /**
- * Lock an individual message for modification.
- * Returns the message lock handle (MH) used in PUT XML as mc:lockhandle.
+ * Lock an individual message for modification — answered as it arrived. Its
+ * handle (MH) goes into the PUT XML as mc:lockhandle.
  *
  * NOTE: Caller must enable stateful session via connection.setSessionType('stateful') first.
  */
@@ -62,24 +49,20 @@ export async function lockMessage(
   connection: IAbapConnection,
   name: string,
   no: string,
-): Promise<string> {
+): Promise<IAdtWireResponse> {
   const encoded = encodeSapObjectName(name.toLowerCase());
-  const url = `${BASE}/${encoded}/messages/${encodeURIComponent(no)}?_action=LOCK_MSG&accessMode=MODIFY`;
-
-  const response = await connection.makeAdtRequest({
-    url,
+  return connection.makeAdtRequest({
+    url: `${BASE}/${encoded}/messages/${encodeURIComponent(no)}?_action=LOCK_MSG&accessMode=MODIFY`,
     method: 'POST',
     timeout: getTimeout('default'),
     data: null,
     headers: { Accept: ACCEPT_LOCK_MSG },
   });
-
-  return parseLockHandle(response.data, 'message lock response');
 }
 
 /**
- * Lock a message class in the context of a specific message save.
- * Returns the class lock handle (CH) used in PUT ?lockHandle= parameter.
+ * Lock a message class in the context of a specific message save — answered
+ * as it arrived. Its handle (CH) goes into the PUT's ?lockHandle= parameter.
  *
  * NOTE: Caller must enable stateful session via connection.setSessionType('stateful') first.
  */
@@ -87,19 +70,31 @@ export async function lockClassForMessage(
   connection: IAbapConnection,
   name: string,
   no: string,
-): Promise<string> {
+): Promise<IAdtWireResponse> {
   const encoded = encodeSapObjectName(name.toLowerCase());
-  const url = `${BASE}/${encoded}?_action=LOCK&accessMode=MODIFY&msgNo=${encodeURIComponent(no)}&onSave=X`;
-
-  const response = await connection.makeAdtRequest({
-    url,
+  return connection.makeAdtRequest({
+    url: `${BASE}/${encoded}?_action=LOCK&accessMode=MODIFY&msgNo=${encodeURIComponent(no)}&onSave=X`,
     method: 'POST',
     timeout: getTimeout('default'),
     data: null,
     headers: { Accept: ACCEPT_LOCK },
   });
+}
 
-  return parseLockHandle(response.data, 'class-for-message lock response');
+/**
+ * The handle a message save's chain needs, as a string.
+ *
+ * Only `AdtMessageClassMessage.writeClass` reads it — the approved exception to
+ * "one member, one request", which carries handles from one request of its
+ * chain to the next. It cannot continue without one, so a lock answered with
+ * no handle ends the chain here, with the same message it always had.
+ */
+function handleForChain(answer: IAdtWireResponse, errLabel: string): string {
+  const lockHandle = lockHandleOf(answer);
+  if (!lockHandle) {
+    throw new Error(`Failed to extract lock handle from ${errLabel}`);
+  }
+  return lockHandle;
 }
 
 /**
@@ -123,7 +118,10 @@ export async function lockClassForMessageOrPlain(
   no: string,
 ): Promise<string> {
   try {
-    return await lockClassForMessage(connection, name, no);
+    return handleForChain(
+      await lockClassForMessage(connection, name, no),
+      'class-for-message lock response',
+    );
   } catch (error) {
     const status =
       (error as { response?: { status?: number }; status?: number })?.response
@@ -131,7 +129,10 @@ export async function lockClassForMessageOrPlain(
     if (status !== 403) {
       throw error;
     }
-    return lockMessageClass(connection, name);
+    return handleForChain(
+      await lockMessageClass(connection, name),
+      'message class lock response',
+    );
   }
 }
 
@@ -153,7 +154,10 @@ export async function lockMessageIfGranted(
   no: string,
 ): Promise<string | undefined> {
   try {
-    return await lockMessage(connection, name, no);
+    return handleForChain(
+      await lockMessage(connection, name, no),
+      'message lock response',
+    );
   } catch (error) {
     const status =
       (error as { response?: { status?: number } })?.response?.status ??

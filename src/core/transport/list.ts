@@ -6,10 +6,7 @@
  * that is precisely what a batch connection cannot supply mid-recording.
  */
 
-import type {
-  IListTransportsParams,
-  ITransportSearchConfiguration,
-} from '@mcp-abap-adt/interfaces-adt';
+import type { IListTransportsParams } from '@mcp-abap-adt/interfaces-adt';
 import { TRANSPORT_SEARCH_CONFIGURATIONS_URL } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
@@ -20,9 +17,6 @@ import {
   ACCEPT_TRANSPORT_LIST,
 } from '../../constants/contentTypes';
 import { getTimeout } from '../../utils/timeouts';
-import { parseSearchConfigurations } from './parseSearchConfigurations';
-
-export { parseSearchConfigurations };
 
 /**
  * List ABAP transport requests for a saved search.

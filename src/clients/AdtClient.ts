@@ -22,18 +22,15 @@ import type {
   IAdtDataPreview,
   IAdtDeletable,
   IAdtDiscovery,
-  IAdtError,
   IAdtGroupLifecycle,
   IAdtInformationSystem,
   IAdtLockable,
   IAdtMetadataReadable,
   IAdtMetadataUpdatable,
   IAdtObjectAccess,
-  IAdtOperationOptions,
   IAdtReadable,
   IAdtRepositoryStructure,
   IAdtRequest,
-  IAdtResponse,
   IAdtRunnable,
   IAdtSystemContext,
   IAdtTransportAware,
@@ -45,6 +42,7 @@ import type {
   ICdsTestDoubleCheckable,
   IClassUnitTestDefinition,
   IClassUnitTestRunOptions,
+  IFeatureToggleObject,
   IIncludeConfig,
   ITestRunInformation,
 } from '@mcp-abap-adt/interfaces-adt';
@@ -208,9 +206,7 @@ import {
 } from '../core/serviceDefinition';
 import { AdtUtils } from '../core/shared/AdtUtils';
 import { type LockFailure, LockRegistry } from '../core/shared/LockRegistry';
-import type { ObjectVersion } from '../core/shared/results';
 import { type IUtilResults, utilDocuments } from '../core/shared/utilResultSet';
-import type { IWhereUsedListResult } from '../core/shared/utilResults';
 import {
   AdtStructure,
   type IStructureConfig,
@@ -282,7 +278,11 @@ export type IClassContract<R extends IClassResults> = IAdtCreatable<
   IAdtActivatable<IClassConfig, ReturnType<R['activation']>> &
   IAdtLockable<IClassConfig> &
   IAdtTransportAware<IClassConfig, string> &
-  IAdtVersionable<IClassConfig, ObjectVersion[], string>;
+  IAdtVersionable<
+    IClassConfig,
+    ReturnType<R['versions']>,
+    ReturnType<R['versionSource']>
+  >;
 export type IProgramContract<R extends IProgramResults> = IAdtCreatable<
   IProgramConfig,
   ReturnType<R['created']>
@@ -300,7 +300,11 @@ export type IProgramContract<R extends IProgramResults> = IAdtCreatable<
   IAdtActivatable<IProgramConfig, ReturnType<R['activation']>> &
   IAdtLockable<IProgramConfig> &
   IAdtTransportAware<IProgramConfig, ReturnType<R['transport']>> &
-  IAdtVersionable<IProgramConfig, ObjectVersion[], string>;
+  IAdtVersionable<
+    IProgramConfig,
+    ReturnType<R['versions']>,
+    ReturnType<R['versionSource']>
+  >;
 export type IIncludeContract<R extends IIncludeResults> = IAdtCreatable<
   IIncludeConfig,
   ReturnType<R['created']>
@@ -333,7 +337,11 @@ export type IInterfaceContract<R extends IInterfaceResults> = IAdtCreatable<
   IAdtActivatable<IInterfaceConfig, ReturnType<R['activation']>> &
   IAdtLockable<IInterfaceConfig> &
   IAdtTransportAware<IInterfaceConfig, ReturnType<R['transport']>> &
-  IAdtVersionable<IInterfaceConfig, ObjectVersion[], string>;
+  IAdtVersionable<
+    IInterfaceConfig,
+    ReturnType<R['versions']>,
+    ReturnType<R['versionSource']>
+  >;
 export type IDomainContract<R extends IDomainResults> = IAdtCreatable<
   IDomainConfig,
   ReturnType<R['created']>
@@ -405,7 +413,11 @@ export type IStructureContract<R extends IStructureResults> = IAdtCreatable<
   IAdtActivatable<IStructureConfig, ReturnType<R['activation']>> &
   IAdtLockable<IStructureConfig> &
   IAdtTransportAware<IStructureConfig, ReturnType<R['transport']>> &
-  IAdtVersionable<IStructureConfig, ObjectVersion[], string>;
+  IAdtVersionable<
+    IStructureConfig,
+    ReturnType<R['versions']>,
+    ReturnType<R['versionSource']>
+  >;
 export type ITableContract<R extends ITableResults> = IAdtCreatable<
   ITableConfig,
   ReturnType<R['created']>
@@ -423,7 +435,11 @@ export type ITableContract<R extends ITableResults> = IAdtCreatable<
   IAdtActivatable<ITableConfig, ReturnType<R['activation']>> &
   IAdtLockable<ITableConfig> &
   IAdtTransportAware<ITableConfig, ReturnType<R['transport']>> &
-  IAdtVersionable<ITableConfig, ObjectVersion[], string>;
+  IAdtVersionable<
+    ITableConfig,
+    ReturnType<R['versions']>,
+    ReturnType<R['versionSource']>
+  >;
 export type ITableTypeContract<R extends ITableTypeResults> = IAdtCreatable<
   ITableTypeConfig,
   ReturnType<R['created']>
@@ -443,7 +459,11 @@ export type ITableTypeContract<R extends ITableTypeResults> = IAdtCreatable<
   IAdtActivatable<ITableTypeConfig, ReturnType<R['activation']>> &
   IAdtLockable<ITableTypeConfig> &
   IAdtTransportAware<ITableTypeConfig, ReturnType<R['transport']>> &
-  IAdtVersionable<ITableTypeConfig, ObjectVersion[], string>;
+  IAdtVersionable<
+    ITableTypeConfig,
+    ReturnType<R['versions']>,
+    ReturnType<R['versionSource']>
+  >;
 export type IDdlContract<R extends IDdlResults> = IAdtCreatable<
   IDdlConfig,
   ReturnType<R['created']>
@@ -461,7 +481,11 @@ export type IDdlContract<R extends IDdlResults> = IAdtCreatable<
   IAdtActivatable<IDdlConfig, ReturnType<R['activation']>> &
   IAdtLockable<IDdlConfig> &
   IAdtTransportAware<IDdlConfig, ReturnType<R['transport']>> &
-  IAdtVersionable<IDdlConfig, ObjectVersion[], string>;
+  IAdtVersionable<
+    IDdlConfig,
+    ReturnType<R['versions']>,
+    ReturnType<R['versionSource']>
+  >;
 export type IFunctionGroupContract<R extends IFunctionGroupResults> =
   IAdtCreatable<IFunctionGroupConfig, ReturnType<R['created']>> &
     IAdtMetadataReadable<IFunctionGroupConfig, ReturnType<R['metadata']>> &
@@ -494,7 +518,11 @@ export type IFunctionModuleContract<R extends IFunctionModuleResults> =
     IAdtActivatable<IFunctionModuleConfig, ReturnType<R['activation']>> &
     IAdtLockable<IFunctionModuleConfig> &
     IAdtTransportAware<IFunctionModuleConfig, ReturnType<R['transport']>> &
-    IAdtVersionable<IFunctionModuleConfig, ObjectVersion[], string>;
+    IAdtVersionable<
+      IFunctionModuleConfig,
+      ReturnType<R['versions']>,
+      ReturnType<R['versionSource']>
+    >;
 export type IFunctionIncludeContract<R extends IFunctionIncludeResults> =
   IAdtCreatable<IFunctionIncludeConfig, ReturnType<R['created']>> &
     IAdtReadable<IFunctionIncludeConfig, ReturnType<R['source']>> &
@@ -513,7 +541,11 @@ export type IFunctionIncludeContract<R extends IFunctionIncludeResults> =
     IAdtCheckable<IFunctionIncludeConfig, ReturnType<R['check']>> &
     IAdtActivatable<IFunctionIncludeConfig, ReturnType<R['activation']>> &
     IAdtLockable<IFunctionIncludeConfig> &
-    IAdtVersionable<IFunctionIncludeConfig, ObjectVersion[], string>;
+    IAdtVersionable<
+      IFunctionIncludeConfig,
+      ReturnType<R['versions']>,
+      ReturnType<R['versionSource']>
+    >;
 export type IPackageContract<R extends IPackageResults> = IAdtCreatable<
   IPackageConfig,
   ReturnType<R['created']>
@@ -566,7 +598,11 @@ export type IAccessControlContract<R extends IAccessControlResults> =
     IAdtActivatable<IAccessControlConfig, ReturnType<R['activation']>> &
     IAdtLockable<IAccessControlConfig> &
     IAdtTransportAware<IAccessControlConfig, ReturnType<R['transport']>> &
-    IAdtVersionable<IAccessControlConfig, ObjectVersion[], string>;
+    IAdtVersionable<
+      IAccessControlConfig,
+      ReturnType<R['versions']>,
+      ReturnType<R['versionSource']>
+    >;
 export type ITransformationContract<R extends ITransformationResults> =
   IAdtCreatable<ITransformationConfig, ReturnType<R['created']>> &
     IAdtReadable<ITransformationConfig, ReturnType<R['source']>> &
@@ -582,7 +618,11 @@ export type ITransformationContract<R extends ITransformationResults> =
     IAdtActivatable<ITransformationConfig, ReturnType<R['activation']>> &
     IAdtLockable<ITransformationConfig> &
     IAdtTransportAware<ITransformationConfig, ReturnType<R['transport']>> &
-    IAdtVersionable<ITransformationConfig, ObjectVersion[], string>;
+    IAdtVersionable<
+      ITransformationConfig,
+      ReturnType<R['versions']>,
+      ReturnType<R['versionSource']>
+    >;
 export type IServiceDefinitionContract<R extends IServiceDefinitionResults> =
   IAdtCreatable<IServiceDefinitionConfig, ReturnType<R['created']>> &
     IAdtReadable<IServiceDefinitionConfig, ReturnType<R['source']>> &
@@ -598,7 +638,11 @@ export type IServiceDefinitionContract<R extends IServiceDefinitionResults> =
     IAdtActivatable<IServiceDefinitionConfig, ReturnType<R['activation']>> &
     IAdtLockable<IServiceDefinitionConfig> &
     IAdtTransportAware<IServiceDefinitionConfig, ReturnType<R['transport']>> &
-    IAdtVersionable<IServiceDefinitionConfig, ObjectVersion[], string>;
+    IAdtVersionable<
+      IServiceDefinitionConfig,
+      ReturnType<R['versions']>,
+      ReturnType<R['versionSource']>
+    >;
 export type IScalarFunctionContract<R extends IScalarFunctionResults> =
   IAdtCreatable<IScalarFunctionConfig, ReturnType<R['created']>> &
     IAdtReadable<IScalarFunctionConfig, ReturnType<R['source']>> &
@@ -614,7 +658,11 @@ export type IScalarFunctionContract<R extends IScalarFunctionResults> =
     IAdtActivatable<IScalarFunctionConfig, ReturnType<R['activation']>> &
     IAdtLockable<IScalarFunctionConfig> &
     IAdtTransportAware<IScalarFunctionConfig, ReturnType<R['transport']>> &
-    IAdtVersionable<IScalarFunctionConfig, ObjectVersion[], string>;
+    IAdtVersionable<
+      IScalarFunctionConfig,
+      ReturnType<R['versions']>,
+      ReturnType<R['versionSource']>
+    >;
 export type IScalarFunctionImplementationContract<
   R extends IScalarFunctionImplementationResults,
 > = IAdtCreatable<
@@ -653,7 +701,11 @@ export type IScalarFunctionImplementationContract<
     IScalarFunctionImplementationConfig,
     ReturnType<R['transport']>
   > &
-  IAdtVersionable<IScalarFunctionImplementationConfig, ObjectVersion[], string>;
+  IAdtVersionable<
+    IScalarFunctionImplementationConfig,
+    ReturnType<R['versions']>,
+    ReturnType<R['versionSource']>
+  >;
 export type IAppendStructureContract<R extends IAppendStructureResults> =
   IAdtCreatable<IAppendStructureConfig, ReturnType<R['created']>> &
     IAdtReadable<IAppendStructureConfig, ReturnType<R['source']>> &
@@ -669,7 +721,11 @@ export type IAppendStructureContract<R extends IAppendStructureResults> =
     IAdtActivatable<IAppendStructureConfig, ReturnType<R['activation']>> &
     IAdtLockable<IAppendStructureConfig> &
     IAdtTransportAware<IAppendStructureConfig, ReturnType<R['transport']>> &
-    IAdtVersionable<IAppendStructureConfig, ObjectVersion[], string>;
+    IAdtVersionable<
+      IAppendStructureConfig,
+      ReturnType<R['versions']>,
+      ReturnType<R['versionSource']>
+    >;
 export type IBehaviorDefinitionContract<R extends IBehaviorDefinitionResults> =
   IAdtCreatable<IBehaviorDefinitionConfig, ReturnType<R['created']>> &
     IAdtReadable<IBehaviorDefinitionConfig, ReturnType<R['source']>> &
@@ -688,7 +744,11 @@ export type IBehaviorDefinitionContract<R extends IBehaviorDefinitionResults> =
     IAdtActivatable<IBehaviorDefinitionConfig, ReturnType<R['activation']>> &
     IAdtLockable<IBehaviorDefinitionConfig> &
     IAdtTransportAware<IBehaviorDefinitionConfig, ReturnType<R['transport']>> &
-    IAdtVersionable<IBehaviorDefinitionConfig, ObjectVersion[], string>;
+    IAdtVersionable<
+      IBehaviorDefinitionConfig,
+      ReturnType<R['versions']>,
+      ReturnType<R['versionSource']>
+    >;
 export type IBehaviorImplementationContract<R extends IClassResults> =
   IAdtCreatable<IBehaviorImplementationConfig, ReturnType<R['created']>> &
     IAdtReadable<IBehaviorImplementationConfig, ReturnType<R['source']>> &
@@ -716,7 +776,11 @@ export type IBehaviorImplementationContract<R extends IClassResults> =
     > &
     IAdtLockable<IBehaviorImplementationConfig> &
     IAdtTransportAware<IBehaviorImplementationConfig, string> &
-    IAdtVersionable<IBehaviorImplementationConfig, ObjectVersion[], string>;
+    IAdtVersionable<
+      IBehaviorImplementationConfig,
+      ReturnType<R['versions']>,
+      ReturnType<R['versionSource']>
+    >;
 export type IMetadataExtensionContract<R extends IMetadataExtensionResults> =
   IAdtCreatable<IMetadataExtensionConfig, ReturnType<R['created']>> &
     IAdtReadable<IMetadataExtensionConfig, ReturnType<R['source']>> &
@@ -732,7 +796,11 @@ export type IMetadataExtensionContract<R extends IMetadataExtensionResults> =
     IAdtActivatable<IMetadataExtensionConfig, ReturnType<R['activation']>> &
     IAdtLockable<IMetadataExtensionConfig> &
     IAdtTransportAware<IMetadataExtensionConfig, ReturnType<R['transport']>> &
-    IAdtVersionable<IMetadataExtensionConfig, ObjectVersion[], string>;
+    IAdtVersionable<
+      IMetadataExtensionConfig,
+      ReturnType<R['versions']>,
+      ReturnType<R['versionSource']>
+    >;
 export type IEnhancementContract<R extends IEnhancementResults> = IAdtCreatable<
   IEnhancementConfig,
   ReturnType<R['created']>
@@ -750,7 +818,11 @@ export type IEnhancementContract<R extends IEnhancementResults> = IAdtCreatable<
   IAdtActivatable<IEnhancementConfig, ReturnType<R['activation']>> &
   IAdtLockable<IEnhancementConfig> &
   IAdtTransportAware<IEnhancementConfig, ReturnType<R['transport']>> &
-  IAdtVersionable<IEnhancementConfig, ObjectVersion[], string>;
+  IAdtVersionable<
+    IEnhancementConfig,
+    ReturnType<R['versions']>,
+    ReturnType<R['versionSource']>
+  >;
 
 /**
  * `IAdtTransportObjectActions`, `IAbapObjectEntry` and
@@ -811,7 +883,11 @@ export type ILocalTestClassContract<R extends IClassResults> = IAdtReadable<
   IAdtCheckable<ILocalTestClassConfig, ReturnType<R['check']>> &
   IAdtActivatable<ILocalTestClassConfig, ReturnType<R['activation']>> &
   IAdtLockable<ILocalTestClassConfig> &
-  IAdtVersionable<ILocalTestClassConfig, ObjectVersion[], string> &
+  IAdtVersionable<
+    ILocalTestClassConfig,
+    ReturnType<R['versions']>,
+    ReturnType<R['versionSource']>
+  > &
   IAdtTransportAware<ILocalTestClassConfig, string>;
 export type ILocalTypesContract<R extends IClassResults> = IAdtReadable<
   ILocalTypesConfig,
@@ -823,7 +899,11 @@ export type ILocalTypesContract<R extends IClassResults> = IAdtReadable<
   IAdtCheckable<ILocalTypesConfig, ReturnType<R['check']>> &
   IAdtActivatable<ILocalTypesConfig, ReturnType<R['activation']>> &
   IAdtLockable<ILocalTypesConfig> &
-  IAdtVersionable<ILocalTypesConfig, ObjectVersion[], string> &
+  IAdtVersionable<
+    ILocalTypesConfig,
+    ReturnType<R['versions']>,
+    ReturnType<R['versionSource']>
+  > &
   IAdtTransportAware<ILocalTypesConfig, string>;
 export type ILocalDefinitionsContract<R extends IClassResults> = IAdtReadable<
   ILocalDefinitionsConfig,
@@ -835,7 +915,11 @@ export type ILocalDefinitionsContract<R extends IClassResults> = IAdtReadable<
   IAdtCheckable<ILocalDefinitionsConfig, ReturnType<R['check']>> &
   IAdtActivatable<ILocalDefinitionsConfig, ReturnType<R['activation']>> &
   IAdtLockable<ILocalDefinitionsConfig> &
-  IAdtVersionable<ILocalDefinitionsConfig, ObjectVersion[], string> &
+  IAdtVersionable<
+    ILocalDefinitionsConfig,
+    ReturnType<R['versions']>,
+    ReturnType<R['versionSource']>
+  > &
   IAdtTransportAware<ILocalDefinitionsConfig, string>;
 export type ILocalMacrosContract<R extends IClassResults> = IAdtReadable<
   ILocalMacrosConfig,
@@ -847,7 +931,11 @@ export type ILocalMacrosContract<R extends IClassResults> = IAdtReadable<
   IAdtCheckable<ILocalMacrosConfig, ReturnType<R['check']>> &
   IAdtActivatable<ILocalMacrosConfig, ReturnType<R['activation']>> &
   IAdtLockable<ILocalMacrosConfig> &
-  IAdtVersionable<ILocalMacrosConfig, ObjectVersion[], string> &
+  IAdtVersionable<
+    ILocalMacrosConfig,
+    ReturnType<R['versions']>,
+    ReturnType<R['versionSource']>
+  > &
   IAdtTransportAware<ILocalMacrosConfig, string>;
 
 export class AdtClient {
@@ -1875,13 +1963,16 @@ export class AdtClient {
     IAdtValidatable<IFeatureToggleConfig, ReturnType<R['validation']>> &
     IAdtCheckable<IFeatureToggleConfig, ReturnType<R['check']>> &
     IAdtActivatable<IFeatureToggleConfig, ReturnType<R['activation']>> &
-    // Not `IFeatureToggleObject<TState>`: that contract types all five domain
-    // members with one `TState`, and they answer three different things — a
-    // runtime state, a check verdict, and the toggle's source document. Naming
-    // it here would be this factory promising a shape the implementation
-    // cannot honour. Recorded rather than worked around; the contract's own
-    // decision 24 is the rule it collides with.
-    IAdtLockable<IFeatureToggleConfig>;
+    IAdtLockable<IFeatureToggleConfig> &
+    // interfaces-adt 11 gives each of the toggle's answers its own result slot
+    // (`IFeatureToggleObjectResults`), so the factory can promise the domain
+    // members too — each typed by the strategy the caller passed for it.
+    IFeatureToggleObject<{
+      switched: ReturnType<R['switched']>;
+      runtimeState: ReturnType<R['runtimeState']>;
+      checkState: ReturnType<R['checkState']>;
+      source: ReturnType<R['sourceDocument']>;
+    }>;
   getFeatureToggle<
     R extends IFeatureToggleResults = typeof featureToggleDocuments,
   >(results: R = featureToggleDocuments as unknown as R): AdtFeatureToggle<R> {

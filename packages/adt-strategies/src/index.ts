@@ -69,5 +69,27 @@ export {
   type IAbapGitExternalRepoInfo,
   type IAbapGitRepo,
 } from './results/abapGit';
+export {
+  type FeatureToggleState,
+  featureToggleCheckState,
+  featureToggleRuntimeState,
+  type IFeatureToggleCheckState,
+  type IFeatureToggleClientLevel,
+  type IFeatureToggleRuntimeState,
+  type IFeatureToggleUserLevel,
+} from './results/featureToggle';
+export {
+  type ICreatedTransport,
+  type ITransportObjectEntry,
+  type ITransportTree,
+  type ITransportTreeLink,
+  type ITransportTreeNode,
+  type ITransportTreeRequest,
+  type ITransportTreeTask,
+  transportCreated,
+  transportObjectEntries,
+  transportSearchConfigurations,
+  transportTree,
+} from './results/transport';
 export { unitTestRunId } from './results/unitTest';
 export { type IObjectVersion, objectVersions } from './results/versions';

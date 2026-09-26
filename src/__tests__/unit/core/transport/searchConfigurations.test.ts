@@ -20,6 +20,7 @@ import type {
 import { AdtClient } from '../../../../clients/AdtClient';
 import { AdtRequest } from '../../../../core/transport/AdtRequest';
 import { transportDocuments } from '../../../../core/transport/types';
+import { transportParsing } from '../../../helpers/transportParsing';
 
 const CONFIGURATIONS =
   '<?xml version="1.0" encoding="utf-8"?>' +
@@ -77,7 +78,7 @@ describe('the contract a consumer actually holds', () => {
     );
 
     const answer = await new AdtClient(connection)
-      .getRequest()
+      .getRequest(transportParsing)
       .searchConfigurations();
 
     if (!answer.ok) throw new Error('expected the configurations');
@@ -112,7 +113,12 @@ describe('AdtRequest.searchConfigurations', () => {
   it('answers the configurations, addressable as configUri', async () => {
     const { connection } = connectionOver(() => answering(CONFIGURATIONS));
 
-    const answer = await new AdtRequest(connection).searchConfigurations();
+    const answer = await new AdtRequest(
+      connection,
+      undefined,
+      undefined,
+      transportParsing,
+    ).searchConfigurations();
     if (!answer.ok) throw new Error('expected the configurations');
     const configurations = answer.getResult()
       .value as ITransportSearchConfiguration[];
@@ -139,7 +145,12 @@ describe('AdtRequest.searchConfigurations', () => {
           : '<tm:root/>',
       ),
     );
-    const request = new AdtRequest(connection);
+    const request = new AdtRequest(
+      connection,
+      undefined,
+      undefined,
+      transportParsing,
+    );
 
     const answer = await request.searchConfigurations();
     if (!answer.ok) throw new Error('expected the configurations');
@@ -180,6 +191,15 @@ describe('AdtRequest.searchConfigurations', () => {
     expect(answer.getError().message).toBe(
       'the configurations endpoint refused',
     );
+  });
+
+  it('answers the configurations document as it arrived by default', async () => {
+    const { connection } = connectionOver(() => answering(CONFIGURATIONS));
+
+    const answer = await new AdtRequest(connection).searchConfigurations();
+
+    if (!answer.ok) throw new Error('expected the document');
+    expect(answer.getResult().value).toBe(CONFIGURATIONS);
   });
 
   it('reads the answer the caller injected, where one was injected', async () => {

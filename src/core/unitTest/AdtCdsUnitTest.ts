@@ -23,7 +23,6 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
-import { XMLParser } from 'fast-xml-parser';
 import { answering } from '../../utils/adtResponse';
 import { startClassUnitTestRunByObject } from '../class/run';
 import { validateClassName } from '../class/validation';
@@ -36,8 +35,6 @@ import {
   type IUnitTestResults,
   unitTestDocuments,
 } from './types';
-
-const severityParser = new XMLParser({ ignoreAttributes: false });
 
 export class AdtCdsUnitTest<
     R extends IUnitTestResults = typeof unitTestDocuments,

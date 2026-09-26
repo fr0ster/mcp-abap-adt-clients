@@ -14,6 +14,7 @@
  */
 
 import type {
+  IAdtAnalyseOptions,
   IAdtContentTypes,
   IAdtError,
   IAdtOperationOptions,
@@ -25,18 +26,14 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
-import { nothing, rawDocument } from '../../utils/resultStrategy';
-import {
-  type ICapabilityContext,
-  LockCapability,
-  VersionsCapability,
-} from '../shared/capabilities';
+import { lockHandleOf } from '../../utils/lockHandle';
+import { nothing } from '../../utils/resultStrategy';
+import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import {
   createLockTracker,
   type LockRegistry,
   type LockTracker,
 } from '../shared/LockRegistry';
-import type { ObjectVersion } from '../shared/results';
 import type { IReadOptions } from '../shared/types';
 import { activateClass } from './activation';
 import { lockClass } from './lock';
@@ -70,40 +67,6 @@ export abstract class AdtClassMemberBase<
   protected readonly lockTracker: LockTracker;
   public readonly objectType: string = 'Class';
 
-  // Arrow-property capabilities read this lazily, so they may be built as class
-  // fields even though the constructor has not run when they are constructed.
-  private readonly capCtx = (): ICapabilityContext => ({
-    connection: this.connection,
-    logger: this.logger,
-  });
-
-  // One type argument since 31.0.0: the release no longer builds a state shape
-  // for anyone to read — `unlock` answers `IAdtResponse<void>`, and what ADT
-  // said on the way out is nothing a caller asked for.
-  protected readonly lockCap = new LockCapability<IClassConfig>(this.capCtx, {
-    nameOf: (c) => {
-      return c.className as string;
-    },
-    acquire: async (ctx, name) => ({
-      lockHandle: await lockClass(ctx.connection, name),
-    }),
-    release: async (ctx, name, handle) => {
-      await unlockClass(ctx.connection, name, handle);
-    },
-  });
-
-  private readonly versionsCap = new VersionsCapability<IClassConfig>(
-    this.capCtx,
-    {
-      nameOf: (c) => {
-        return c.className as string;
-      },
-      list: (ctx, name) =>
-        getClassIncludeVersions(ctx.connection, name, 'main'),
-      source: (ctx, uri) => getClassVersionSource(ctx.connection, uri),
-    },
-  );
-
   constructor(
     connection: IAbapConnection,
     logger?: ILogger,
@@ -130,30 +93,53 @@ export abstract class AdtClassMemberBase<
    * `/oo/classes/{name}`, never the include, and the PUT that writes the
    * include carries the class's handle.
    */
-  async lock(config: Partial<IClassConfig>): Promise<IAdtResponse<string>> {
-    return answering(
-      async () => {
-        const handle = await this.lockCap.lockHandle(config);
-        this.lockTracker.track(config.className as string, handle);
-        // The lock handle is the value, and the wire it came on is not kept by
-        // the capability — so this is the one place a strategy has nothing to
-        // read and the answer is built from what the request produced.
-        return { data: handle, status: 200, statusText: 'OK', headers: {} };
-      },
-      (answer) => String(answer.data),
+  async lock<E extends IAdtError = IAdtError>(
+    config: Partial<IClassConfig>,
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<string, E>> {
+    const name = config.className as string;
+    // One LOCK, its handle read by `lockHandleOf`. A 200 carrying no handle
+    // reads as `''`; whether that is a refusal is the caller's `analyse` to say.
+    // LOCK must run stateful (older BASIS #106); stateless after.
+    const answer = await answering(
+      () =>
+        inStatefulSession(this.connection, () =>
+          lockClass(this.connection, name),
+        ),
+      lockHandleOf,
+      options?.analyse,
     );
+    if (answer.ok && answer.getResult().value) {
+      this.lockTracker.track(name, answer.getResult().value);
+    }
+    return answer;
   }
 
-  /** Unlock the class. */
-  async unlock(
+  /**
+   * Unlock the class — one UNLOCK, SAP's reply read by nothing.
+   *
+   * Until 23.0.0 this built an empty answer of its own and dropped SAP's.
+   */
+  async unlock<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig>,
     lockHandle: string,
-  ): Promise<IAdtResponse<void>> {
-    return answering(async () => {
-      await this.lockCap.release(config, lockHandle);
-      this.lockTracker.untrack(config.className as string);
-      return { data: '', status: 200, statusText: 'OK', headers: {} };
-    }, nothing);
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<void, E>> {
+    const name = config.className as string;
+    return answering(
+      async () => {
+        // UNLOCK must run stateful (older BASIS #106); stateless after.
+        this.connection.setSessionType('stateful');
+        try {
+          return await unlockClass(this.connection, name, lockHandle);
+        } finally {
+          this.connection.setSessionType('stateless');
+          this.lockTracker.untrack(name);
+        }
+      },
+      nothing,
+      options?.analyse,
+    );
   }
 
   /**
@@ -214,45 +200,50 @@ export abstract class AdtClassMemberBase<
   async readTransport<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<string, E>> {
+  ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     return answering(
       () => getClassTransport(connection, config.className as string, options),
-      rawDocument,
+      this.results.transport as IResultStrategy<ReturnType<R['transport']>>,
       options?.analyse,
     );
   }
 
-  async getVersionSource(contentUri: string): Promise<IAdtResponse<string>> {
+  /** Source of one version, by the `contentUri` its entry carried. */
+  async getVersionSource<E extends IAdtError = IAdtError>(
+    contentUri: string,
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['versionSource']>, E>> {
     return answering(
-      async () => ({
-        data: await this.versionsCap.getVersionSource(contentUri),
-        status: 200,
-        statusText: 'OK',
-        headers: {},
-      }),
-      rawDocument,
+      () => getClassVersionSource(this.connection, contentUri),
+      this.results.versionSource as IResultStrategy<
+        ReturnType<R['versionSource']>
+      >,
+      options?.analyse,
     );
   }
 
-  /** Version history of one include, or of `main` for the class itself. */
-  protected getIncludeVersions(
+  /**
+   * Version history of one include, or of `main` for the class itself — the
+   * Atom feed read by the `versions` strategy.
+   */
+  protected includeVersions<E extends IAdtError = IAdtError>(
     className: string,
     includeType: ClassIncludeType,
-  ): Promise<ObjectVersion[]> {
-    return getClassIncludeVersions(this.connection, className, includeType);
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['versions']>, E>> {
+    return answering(
+      () => getClassIncludeVersions(this.connection, className, includeType),
+      this.results.versions as IResultStrategy<ReturnType<R['versions']>>,
+      options?.analyse,
+    );
   }
 
-  /**
-   * Version history of whatever the concrete handler's subject is.
-   *
-   * `ObjectVersion` left `@mcp-abap-adt/interfaces` in 31.0.0 with the other
-   * result shapes; {@link ObjectVersion} is this package's, declared beside the
-   * reading that builds it.
-   */
-  abstract getVersions(
+  /** Version history of whatever the concrete implementation's subject is. */
+  abstract getVersions<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig>,
-  ): Promise<IAdtResponse<ObjectVersion[]>>;
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['versions']>, E>>;
 }

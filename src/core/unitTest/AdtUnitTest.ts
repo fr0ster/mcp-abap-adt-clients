@@ -248,18 +248,26 @@ export class AdtUnitTest<R extends IUnitTestResults = typeof unitTestDocuments>
   }
 
   /** Lock the container class — an include has no lock of its own. */
-  async lock(config: Partial<IUnitTestConfig>): Promise<IAdtResponse<string>> {
-    return this.adtLocalTestClass.lock({ className: this.name(config) });
+  async lock<E extends IAdtError = IAdtError>(
+    config: Partial<IUnitTestConfig>,
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<string, E>> {
+    return this.adtLocalTestClass.lock(
+      { className: this.name(config) },
+      options,
+    );
   }
 
   /** Unlock the container class. */
-  async unlock(
+  async unlock<E extends IAdtError = IAdtError>(
     config: Partial<IUnitTestConfig>,
     lockHandle: string,
-  ): Promise<IAdtResponse<void>> {
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<void, E>> {
     return this.adtLocalTestClass.unlock(
       { className: this.name(config) },
       lockHandle,
+      options,
     );
   }
 

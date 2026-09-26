@@ -29,6 +29,8 @@ describe('the published surface', () => {
       'analyseUnsupportedStatus',
       'analyseValidation',
       'asItCame',
+      'featureToggleCheckState',
+      'featureToggleRuntimeState',
       'isIndeterminateWalkAnswer',
       'objectVersions',
       'rawOf',
@@ -42,6 +44,10 @@ describe('the published surface', () => {
       'readPublicationRefusal',
       'readUnitTestRefusal',
       'readValidationRefusal',
+      'transportCreated',
+      'transportObjectEntries',
+      'transportSearchConfigurations',
+      'transportTree',
       'unitTestRunId',
     ];
     expect(Object.keys(api).sort()).toEqual(expected);

@@ -10,7 +10,6 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { XMLParser } from 'fast-xml-parser';
 import { ACCEPT_LOCK } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -19,37 +18,25 @@ function includeUrl(includeName: string): string {
   return `/sap/bc/adt/programs/includes/${encodeSapObjectName(includeName).toLowerCase()}`;
 }
 
+/**
+ * `POST …?_action=LOCK` — answered as it arrived.
+ *
+ * The handle is read by `lockHandleOf` in the member. Until 23.0.0 this parsed
+ * it (and `CORRNR`, which nothing read) and threw when SAP's answer had no
+ * handle, which turned a statement about SAP's answer into a library failure
+ * and dropped the answer.
+ */
 export async function lockInclude(
   connection: IAbapConnection,
   includeName: string,
-): Promise<{
-  response: IAdtWireResponse;
-  lockHandle: string;
-  corrNr?: string;
-}> {
-  const response = await connection.makeAdtRequest({
+): Promise<IAdtWireResponse> {
+  return connection.makeAdtRequest({
     url: `${includeUrl(includeName)}?_action=LOCK&accessMode=MODIFY`,
     method: 'POST',
     timeout: getTimeout('default'),
     data: null,
     headers: { Accept: ACCEPT_LOCK },
   });
-
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: '@_',
-  });
-  const parsed = parser.parse(response.data);
-  const values = parsed?.['asx:abap']?.['asx:values']?.DATA;
-  const lockHandle = values?.LOCK_HANDLE;
-
-  if (!lockHandle) {
-    throw new Error(
-      `Failed to obtain a lock handle for include ${includeName}. It may be locked by another user.`,
-    );
-  }
-
-  return { response, lockHandle, corrNr: values?.CORRNR };
 }
 
 export { includeUrl };

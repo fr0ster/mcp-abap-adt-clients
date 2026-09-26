@@ -5,7 +5,7 @@
  * Legacy systems use `/sap/bc/cts/` instead of `/sap/bc/adt/cts/`.
  *
  * Supported:
- * - `read`: GET /sap/bc/cts/transportrequests (the full list, filtered here)
+ * - `read`: GET /sap/bc/cts/transportrequests (the full list, as it came)
  * - `list`: the same resource; not a saved-configuration search, so no configUri
  *
  * Refused, each with the same reason: the legacy endpoint's shape for that
@@ -77,18 +77,21 @@ export class AdtRequestLegacy<
   /**
    * Read one request from the legacy list.
    *
-   * `/sap/bc/cts/transportrequests` answers the full list for the current user;
-   * the one asked for is picked out of it here.
+   * `/sap/bc/cts/transportrequests` answers the full list for the current user
+   * whatever the path names, so `config.transportNumber` cannot reach the
+   * request. The list is answered as it came: picking the request out of it is
+   * the `metadata` strategy's, and calling its absence a failure is the
+   * caller's `analyse`. Until 23.0.0 a list not mentioning the number was
+   * thrown as a fabricated 404.
    */
   override async readMetadata<E extends IAdtError = IAdtError>(
-    config: Partial<ITransportConfig>,
+    _config: Partial<ITransportConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
-    const number = config.transportNumber as string;
-
     return answering(
-      () => getTransportLegacy(this.conn, number),
+      () => getTransportLegacy(this.conn),
       this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
+      options?.analyse,
     );
   }
 
@@ -99,11 +102,10 @@ export class AdtRequestLegacy<
    * accepting one silently would report a filter that never applied.
    *
    * The reading is the one the implementation was built with, like every other
-   * member. The legacy payload has never been captured, so the shipped
-   * `parseTransportTree` may well not read it — and if so it says which element
-   * it expected and what it found, which is a consumer's cue to inject a
-   * reading for their system. Handing the document back under a type that
-   * promises a tree would be this implementation lying about what it answered.
+   * member. The legacy payload has never been captured, so a tree reading such
+   * as `parseTransportTree` may well not read it — and if so it says which
+   * element it expected and what it found, which is a consumer's cue to inject
+   * a reading for their system.
    */
   override async list<E extends IAdtError = IAdtError>(
     // Wider than the contract on purpose: the legacy endpoint is not a saved

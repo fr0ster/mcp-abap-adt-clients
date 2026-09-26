@@ -1,9 +1,5 @@
 /**
- * Package update operations
- *
- * Uses read-modify-write pattern: GET current XML → patch fields → PUT.
- * This preserves all SAP-managed fields (abapLanguageVersion, etc.)
- * that would be lost if XML were built from scratch.
+ * Package update operations — one PUT of the document the caller built.
  */
 
 import type {

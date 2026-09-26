@@ -10,6 +10,10 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import {
+  type IObjectVersion,
+  objectVersions,
+} from '@mcp-abap-adt/adt-strategies';
 import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
@@ -17,7 +21,10 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type { ObjectVersion } from '../../../../core/shared/results';
+import { classDocuments } from '../../../../core/class/types';
+import { interfaceDocuments } from '../../../../core/interface/types';
+import { serviceDefinitionDocuments } from '../../../../core/serviceDefinition/types';
+import { tableDocuments } from '../../../../core/table/types';
 import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
@@ -60,26 +67,37 @@ describe('Object version history', () => {
 
   const cases: Array<{
     label: string;
-    list: () => Promise<IAdtResponse<ObjectVersion[]>>;
+    list: () => Promise<IAdtResponse<IObjectVersion[]>>;
   }> = [
     {
       label: 'table',
-      list: () => client.getTable().getVersions({ tableName: 'ZAC_SHR_BTABL' }),
+      list: () =>
+        client
+          .getTable({ ...tableDocuments, versions: objectVersions })
+          .getVersions({ tableName: 'ZAC_SHR_BTABL' }),
     },
     {
       label: 'class',
-      list: () => client.getClass().getVersions({ className: 'ZAC_SHR_DMP01' }),
+      list: () =>
+        client
+          .getClass({ ...classDocuments, versions: objectVersions })
+          .getVersions({ className: 'ZAC_SHR_DMP01' }),
     },
     {
       label: 'interface',
       list: () =>
-        client.getInterface().getVersions({ interfaceName: 'ZAC_SHR_IF01' }),
+        client
+          .getInterface({ ...interfaceDocuments, versions: objectVersions })
+          .getVersions({ interfaceName: 'ZAC_SHR_IF01' }),
     },
     {
       label: 'serviceDefinition',
       list: () =>
         client
-          .getServiceDefinition()
+          .getServiceDefinition({
+            ...serviceDefinitionDocuments,
+            versions: objectVersions,
+          })
           .getVersions({ serviceDefinitionName: 'ZAC_SHR_SRVD01' }),
     },
   ];

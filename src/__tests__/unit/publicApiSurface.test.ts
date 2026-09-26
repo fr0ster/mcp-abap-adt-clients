@@ -15,11 +15,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import * as rootExports from '../../index';
-import {
-  AdtSAPError,
-  parseSearchResults,
-  parseTransportTree,
-} from '../../index';
+import { AdtSAPError, parseSearchResults } from '../../index';
 
 describe('public API surface', () => {
   it('hands out parseSearchResults from the package root', () => {
@@ -71,22 +67,6 @@ describe('public API surface', () => {
     expect(raised.document).toBe('<exc:exception/>');
     expect(raised.adtType).toBe('ExceptionResourceNotFound');
     expect(raised.namespace).toBe('com.sap.adt');
-  });
-
-  it('hands out parseTransportTree from the package root', () => {
-    expect(typeof parseTransportTree).toBe('function');
-  });
-
-  it('parses a transport tree through the public entry point, not just past it', () => {
-    const tree = parseTransportTree(
-      '<?xml version="1.0"?><tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" ' +
-        'xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="CB9900000000"/>',
-    );
-
-    expect(tree).toEqual({
-      attributes: { 'adtcore:name': 'CB9900000000' },
-      requests: [],
-    });
   });
 });
 
@@ -145,7 +125,6 @@ const RUNTIME_EXPORTS = [
   'isEndpointInDiscovery',
   'isModernAdtSystem',
   'parseSearchResults',
-  'parseTransportTree',
   'Profiler',
   'resolveBindingVariant',
   'resolveContentTypes',
@@ -188,8 +167,6 @@ const RUNTIME_EXPORTS = [
   'nothing',
   'nothingIsARefusal',
   'packageDocuments',
-  'parseCreatedTransport',
-  'parseObjectEntries',
   'programDocuments',
   'rawDocument',
   'scalarFunctionDocuments',

@@ -10,6 +10,12 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import {
+  transportCreated,
+  transportObjectEntries,
+  transportSearchConfigurations,
+  transportTree,
+} from '@mcp-abap-adt/adt-strategies';
 import * as dotenv from 'dotenv';
 import {
   createTestConnection,
@@ -17,6 +23,18 @@ import {
 } from '../src/__tests__/helpers/sessionConfig';
 import { createConnectionLogger } from '../src/__tests__/helpers/testLogger';
 import { AdtClient } from '../src/clients/AdtClient';
+import { transportDocuments } from '../src/core/transport/types';
+
+// The client answers transport documents as they arrived; this script reads
+// them with the strategies a consumer would pass.
+const transportReadings = {
+  ...transportDocuments,
+  created: transportCreated,
+  createdTask: transportCreated,
+  list: transportTree,
+  searchConfigurations: transportSearchConfigurations,
+  objects: transportObjectEntries,
+};
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../.env');
 if (fs.existsSync(envPath)) {
@@ -27,7 +45,9 @@ async function main(): Promise<void> {
   const logger = createConnectionLogger();
   const connection = await createTestConnection(logger);
   try {
-    const requests = new AdtClient(connection, logger).getRequest();
+    const requests = new AdtClient(connection, logger).getRequest(
+      transportReadings,
+    );
     // A listing runs a saved search, and the caller names which one: take the
     // configurations, and use the first unless SEARCH_CONFIG_URI says otherwise.
     const configs = await requests.searchConfigurations();

@@ -89,6 +89,10 @@ export interface IScalarFunctionImplementationResults {
   readonly deletionCheck: IResultStrategy<unknown>;
   /** What the object's own document answers when written. */
   readonly metadataUpdated: IResultStrategy<unknown>;
+  /** The version history — an Atom feed; `objectVersions` reads it. */
+  readonly versions: IResultStrategy<unknown>;
+  /** One version's source. */
+  readonly versionSource: IResultStrategy<unknown>;
 }
 
 /**
@@ -108,6 +112,8 @@ export const scalarFunctionImplementationDocuments = {
   transport: rawDocument,
   deletionCheck: rawDocument,
   metadataUpdated: rawDocument,
+  versions: rawDocument,
+  versionSource: rawDocument,
 } satisfies IScalarFunctionImplementationResults;
 
 /**

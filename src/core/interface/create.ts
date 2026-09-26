@@ -80,21 +80,9 @@ export async function create(
       headers,
     });
 
-    // Verify response status - should be 201 Created
-    if (response.status !== 201 && response.status !== 200) {
-      const errorData =
-        typeof response.data === 'string'
-          ? response.data.substring(0, 1000)
-          : JSON.stringify(response.data).substring(0, 1000);
-      logger?.error?.(
-        `[ERROR] Create interface returned unexpected status - Status: ${response.status}`,
-      );
-      logger?.error?.(`[ERROR] Create interface - Response data:`, errorData);
-      throw new Error(
-        `Interface creation returned status ${response.status} instead of 201`,
-      );
-    }
-
+    // No status test here: a non-2xx already arrives as the transport's
+    // failure, and a 2xx other than 201/200 is not this library's to refuse.
+    // It used to throw a new Error, which dropped SAP's answer.
     return response;
   } catch (error: unknown) {
     const e = error as HttpError;

@@ -1,44 +1,33 @@
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import { XMLParser } from 'fast-xml-parser';
+/**
+ * Access control lock operations
+ */
+
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_LOCK } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
- * Lock access control for modification
- * Returns lock handle that must be used in subsequent requests
+ * `POST …?_action=LOCK` — answered as it arrived.
+ *
+ * The handle is read by `lockHandleOf` in the member. Until 23.0.0 this parsed
+ * it and threw when SAP's answer had none, which turned a statement about SAP's
+ * answer into a library failure and dropped the answer.
  */
 export async function lockAccessControl(
   connection: IAbapConnection,
   accessControlName: string,
-): Promise<string> {
+): Promise<IAdtWireResponse> {
   const accessControlNameEncoded = encodeSapObjectName(
     accessControlName.toLowerCase(),
   );
-  const url = `/sap/bc/adt/acm/dcl/sources/${accessControlNameEncoded}?_action=LOCK&accessMode=MODIFY`;
-
-  const headers = {
-    Accept: ACCEPT_LOCK,
-  };
-
-  const response = await connection.makeAdtRequest({
+  return connection.makeAdtRequest({
     method: 'POST',
-    url,
-    headers,
+    url: `/sap/bc/adt/acm/dcl/sources/${accessControlNameEncoded}?_action=LOCK&accessMode=MODIFY`,
+    headers: { Accept: ACCEPT_LOCK },
     timeout: getTimeout('default'),
   });
-
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: '',
-  });
-
-  const result = parser.parse(response.data);
-  const lockHandle = result['asx:abap']?.['asx:values']?.DATA?.LOCK_HANDLE;
-
-  if (!lockHandle) {
-    throw new Error('Failed to extract lock handle from response');
-  }
-
-  return lockHandle;
 }

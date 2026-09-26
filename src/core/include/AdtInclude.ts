@@ -9,6 +9,7 @@
  */
 import type {
   IAdtActivatable,
+  IAdtAnalyseOptions,
   IAdtContentTypes,
   IAdtCreatable,
   IAdtCreateOptions,
@@ -28,6 +29,8 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
+import { lockHandleOf } from '../../utils/lockHandle';
+import { nothing } from '../../utils/resultStrategy';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import { checkDeletionByUri } from '../shared/deletionCheckByUri';
 import { activateInclude } from './activation';
@@ -295,26 +298,28 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
     );
   }
 
-  /** Lock the include for modification. */
-  async lock(config: Partial<IIncludeConfig>): Promise<IAdtResponse<string>> {
+  /**
+   * Lock the include — one LOCK, its handle read by `lockHandleOf`. A 200
+   * carrying no handle reads as `''`; whether that is a refusal is the
+   * caller's `analyse` to say.
+   */
+  async lock<E extends IAdtError = IAdtError>(
+    config: Partial<IIncludeConfig>,
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<string, E>> {
     const includeName = requireName(config);
-    return answering(
-      async () => {
-        const { lockHandle } = await inStatefulSession(this.connection, () =>
+    const answer = await answering(
+      () =>
+        inStatefulSession(this.connection, () =>
           lockInclude(this.connection, includeName),
-        );
-        config.onLock?.(lockHandle);
-        // The handle is the value, and the request does not keep the wire it
-        // came on — so the answer is built around what the request produced.
-        return {
-          data: lockHandle,
-          status: 200,
-          statusText: 'OK',
-          headers: {},
-        };
-      },
-      (answer) => String(answer.data),
+        ),
+      lockHandleOf,
+      options?.analyse,
     );
+    if (answer.ok && answer.getResult().value) {
+      config.onLock?.(answer.getResult().value);
+    }
+    return answer;
   }
 
   /** Unlock the include, and go back to stateless either way. */
@@ -338,14 +343,16 @@ export class AdtInclude<R extends IIncludeResults = typeof includeDocuments>
    * Cleared after the request, not before: the unlock itself belongs to the
    * window it is closing.
    */
-  async unlock(
+  async unlock<E extends IAdtError = IAdtError>(
     config: Partial<IIncludeConfig>,
     lockHandle: string,
-  ): Promise<IAdtResponse<void>> {
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<void, E>> {
     const includeName = requireName(config);
     const answer = await answering(
       () => unlockInclude(this.connection, includeName, lockHandle),
-      () => undefined,
+      nothing,
+      options?.analyse,
     );
     this.connection.setSessionType?.('stateless');
     return answer;

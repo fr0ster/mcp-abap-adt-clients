@@ -1,66 +1,15 @@
 /**
- * DataElement update operations
- *
- * Uses read-modify-write pattern: GET current XML → patch fields → PUT.
- * This preserves all SAP-managed fields that would be lost if XML were built from scratch.
+ * DataElement update operations — one PUT of the document the caller built.
  */
 
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import {
-  ACCEPT_DATA_ELEMENT,
-  ACCEPT_DOMAIN,
-} from '../../constants/contentTypes';
+import { ACCEPT_DATA_ELEMENT } from '../../constants/contentTypes';
 import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { IUpdateDataElementParams } from './types';
-
-const _debugEnabled = process.env.DEBUG_ADT_LIBS === 'true';
-
-/**
- * Get domain info to extract dataType, length, decimals
- */
-export async function getDomainInfo(
-  connection: IAbapConnection,
-  domainName: string,
-): Promise<{ dataType: string; length: number; decimals: number }> {
-  const { XMLParser } = await import('fast-xml-parser');
-  const domainNameEncoded = encodeSapObjectName(domainName.toLowerCase());
-  const url = `/sap/bc/adt/ddic/domains/${domainNameEncoded}`;
-
-  const headers = {
-    Accept: ACCEPT_DOMAIN,
-  };
-
-  const response = await connection.makeAdtRequest({
-    url,
-    method: 'GET',
-    timeout: getTimeout('default'),
-    headers,
-  });
-
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: '',
-  });
-
-  const result = parser.parse(response.data);
-  const domainXml = result['doma:domain'];
-
-  return {
-    dataType:
-      domainXml['doma:content']?.['doma:typeInformation']?.['doma:datatype'] ||
-      'CHAR',
-    length:
-      domainXml['doma:content']?.['doma:typeInformation']?.['doma:length'] ||
-      100,
-    decimals:
-      domainXml['doma:content']?.['doma:typeInformation']?.['doma:decimals'] ||
-      0,
-  };
-}
 
 /**
  * Write the document the caller built.

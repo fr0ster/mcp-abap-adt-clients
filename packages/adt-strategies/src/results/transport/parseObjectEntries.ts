@@ -24,8 +24,8 @@
  * and removed nothing.
  */
 
+import type { IAbapObjectEntry } from '@mcp-abap-adt/interfaces-adt';
 import { XMLParser } from 'fast-xml-parser';
-import type { IAbapObjectEntry } from './types';
 
 /** What the objects reading answers by default. */
 export interface ITransportObjectEntry extends IAbapObjectEntry {

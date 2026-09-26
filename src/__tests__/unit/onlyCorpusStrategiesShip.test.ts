@@ -32,6 +32,12 @@ describe('the public surface', () => {
     'startedRun',
     'testDoublesVerdict',
     'runId',
+    // The transport readings, now transportTree and its siblings in
+    // @mcp-abap-adt/adt-strategies.
+    'parseTransportTree',
+    'parseCreatedTransport',
+    'parseObjectEntries',
+    'parseSearchConfigurations',
   ])('no longer exports %s', (name) => {
     expect(api).not.toHaveProperty(name);
   });

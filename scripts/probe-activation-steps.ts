@@ -52,6 +52,7 @@ import { lockClass } from '../src/core/class/lock';
 import { getClassMetadata, getClassSource } from '../src/core/class/read';
 import { unlockClass } from '../src/core/class/unlock';
 import { updateClass } from '../src/core/class/update';
+import { lockHandleOf } from '../src/utils/lockHandle';
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../.env');
 if (fs.existsSync(envPath)) {
@@ -222,7 +223,7 @@ async function main(): Promise<void> {
       let handle: string | undefined;
       try {
         const started = Date.now();
-        handle = await lockClass(connection, className);
+        handle = lockHandleOf(await lockClass(connection, className));
         say(`--- LOCK (${Date.now() - started}ms): handle ${handle}`);
         say();
       } catch (error) {

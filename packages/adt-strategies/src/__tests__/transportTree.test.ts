@@ -9,10 +9,13 @@
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { parseTransportTree } from '../../../../core/transport/parseTransportTree';
+import { parseTransportTree } from '../results/transport';
 
 const fixture = (name: string): string =>
-  readFileSync(join(__dirname, '../../../fixtures/transport', name), 'utf8');
+  readFileSync(
+    join(__dirname, '../../../../src/__tests__/fixtures/transport', name),
+    'utf8',
+  );
 
 describe('parseTransportTree reads both captured shapes', () => {
   it('reads the two-level chain (no targets)', () => {

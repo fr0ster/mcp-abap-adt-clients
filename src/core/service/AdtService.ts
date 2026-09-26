@@ -1,6 +1,7 @@
 import type {
   GeneratedServiceType,
   IAdtActivatable,
+  IAdtAnalyseOptions,
   IAdtCheckable,
   IAdtCreatable,
   IAdtCreateOptions,
@@ -40,7 +41,8 @@ import {
   buildQueryString,
   encodeSapObjectName,
 } from '../../utils/internalUtils';
-import { nothing, rawDocument } from '../../utils/resultStrategy';
+import { lockHandleOf } from '../../utils/lockHandle';
+import { nothing } from '../../utils/resultStrategy';
 import { getTimeout } from '../../utils/timeouts';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import { lockServiceBinding, unlockServiceBinding } from './lock';
@@ -363,13 +365,13 @@ export class AdtServiceBinding<
    * The same resource `read` fetches — a binding has one document — declared
    * separately because the contract asks both of a readable.
    */
-  async readMetadata(
+  async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IServiceBindingConfig>,
     options?: {
       withLongPolling?: boolean;
       version?: 'active' | 'inactive';
-    } & IAdtOperationOptions,
-  ): Promise<IAdtResponse<ReturnType<R['metadata']>>> {
+    } & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -462,20 +464,26 @@ export class AdtServiceBinding<
    * that locks and unlocks around its own operation decides that for everyone.
    * See `docs/usage/CLIENT_API_REFERENCE.md` for the shape a consumer writes.
    */
-  async lock(
+  async lock<E extends IAdtError = IAdtError>(
     config: Partial<IServiceBindingConfig>,
-  ): Promise<IAdtResponse<string>> {
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<string, E>> {
     const name = this.name(config);
     // Stateful for the LOCK request alone: on older BASIS a handle is only
     // issued inside a stateful request. The switch used to sit outside
     // `answering`, so a refused LOCK returned through the failure path with the
     // connection still stateful — and this connection is shared.
-    return answering(async () => {
-      const data = await inStatefulSession(this.connection, () =>
-        lockServiceBinding(this.connection, name),
-      );
-      return { data, status: 200, statusText: 'OK', headers: {} };
-    }, rawDocument);
+    //
+    // The handle is read by `lockHandleOf`; a 200 carrying none reads as `''`,
+    // and whether that is a refusal is the caller's `analyse` to say.
+    return answering(
+      () =>
+        inStatefulSession(this.connection, () =>
+          lockServiceBinding(this.connection, name),
+        ),
+      lockHandleOf,
+      options?.analyse,
+    );
   }
 
   /**
@@ -486,18 +494,23 @@ export class AdtServiceBinding<
    * else — another session, another process, the same user — is answered
    * `403 ExceptionResourceNoAccess`.
    */
-  async unlock(
+  async unlock<E extends IAdtError = IAdtError>(
     config: Partial<IServiceBindingConfig>,
     lockHandle: string,
-  ): Promise<IAdtResponse<void>> {
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<void, E>> {
     const name = this.name(config);
-    return answering(async () => {
-      try {
-        return await unlockServiceBinding(this.connection, name, lockHandle);
-      } finally {
-        this.connection.setSessionType?.('stateless');
-      }
-    }, nothing);
+    return answering(
+      async () => {
+        try {
+          return await unlockServiceBinding(this.connection, name, lockHandle);
+        } finally {
+          this.connection.setSessionType?.('stateless');
+        }
+      },
+      nothing,
+      options?.analyse,
+    );
   }
 
   /**
@@ -632,14 +645,15 @@ export class AdtServiceBinding<
   }
 
   /** The binding types this system offers. */
-  async getServiceBindingTypes(): Promise<
-    IAdtResponse<ReturnType<R['bindingTypes']>>
-  > {
+  async getServiceBindingTypes<E extends IAdtError = IAdtError>(
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['bindingTypes']>, E>> {
     return answering(
       () => this.bindingTypesRequest(this.connection),
       this.results.bindingTypes as IResultStrategy<
         ReturnType<R['bindingTypes']>
       >,
+      options?.analyse,
     );
   }
 
@@ -860,12 +874,14 @@ export class AdtServiceBinding<
   }
 
   /** Generate the service the binding exposes. */
-  async generateServiceBinding(
+  async generateServiceBinding<E extends IAdtError = IAdtError>(
     params: IGenerateServiceBindingParams,
-  ): Promise<IAdtResponse<ReturnType<R['generation']>>> {
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['generation']>, E>> {
     return answering(
       () => this.generateRequest(this.connection, params),
       this.results.generation as IResultStrategy<ReturnType<R['generation']>>,
+      options?.analyse,
     );
   }
 
@@ -908,12 +924,14 @@ export class AdtServiceBinding<
    * sends it — a system that only serves v1 answered 406 to the v2-only header
    * this used to send.
    */
-  async getServiceGroup(
+  async getServiceGroup<E extends IAdtError = IAdtError>(
     params: IServiceGroupParams,
-  ): Promise<IAdtResponse<ReturnType<R['odata']>>> {
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['odata']>, E>> {
     return answering(
       () => this.serviceGroupRequest(this.connection, params),
       this.results.odata as IResultStrategy<ReturnType<R['odata']>>,
+      options?.analyse,
     );
   }
 
@@ -938,14 +956,16 @@ export class AdtServiceBinding<
     });
   }
 
-  async classifyServiceBinding(
+  async classifyServiceBinding<E extends IAdtError = IAdtError>(
     params: IClassifyServiceBindingParams,
-  ): Promise<IAdtResponse<ReturnType<R['classification']>>> {
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['classification']>, E>> {
     return answering(
       () => this.classifyRequest(this.connection, params),
       this.results.classification as IResultStrategy<
         ReturnType<R['classification']>
       >,
+      options?.analyse,
     );
   }
 

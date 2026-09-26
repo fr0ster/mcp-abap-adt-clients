@@ -6,6 +6,7 @@
  */
 import type {
   IAdtActivatable,
+  IAdtAnalyseOptions,
   IAdtCheckable,
   IAdtCreatable,
   IAdtCreateOptions,
@@ -27,13 +28,14 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
+import { lockHandleOf } from '../../utils/lockHandle';
+import { nothing } from '../../utils/resultStrategy';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import {
   createLockTracker,
   type LockRegistry,
   type LockTracker,
 } from '../shared/LockRegistry';
-import type { ObjectVersion } from '../shared/results';
 import type { IReadOptions } from '../shared/types';
 import { activateServiceDefinition } from './activation';
 import { checkServiceDefinition } from './check';
@@ -75,7 +77,11 @@ export class AdtServiceDefinition<
     IAdtActivatable<IServiceDefinitionConfig, ReturnType<R['activation']>>,
     IAdtLockable<IServiceDefinitionConfig>,
     IAdtTransportAware<IServiceDefinitionConfig, ReturnType<R['transport']>>,
-    IAdtVersionable<IServiceDefinitionConfig, ObjectVersion[], string>
+    IAdtVersionable<
+      IServiceDefinitionConfig,
+      ReturnType<R['versions']>,
+      ReturnType<R['versionSource']>
+    >
 {
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
@@ -378,39 +384,37 @@ export class AdtServiceDefinition<
     );
   }
 
-  /** Lock the object for modification. */
-  async lock(
+  /**
+   * Lock the object — one LOCK, its handle read by `lockHandleOf`. A 200
+   * carrying no handle reads as `''`; whether that is a refusal is the
+   * caller's `analyse` to say.
+   */
+  async lock<E extends IAdtError = IAdtError>(
     config: Partial<IServiceDefinitionConfig>,
-  ): Promise<IAdtResponse<string>> {
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<string, E>> {
     const name = this.name(config);
-
-    return answering(
-      async () => {
-        // Stateful for the LOCK request and no longer — see LockCapability.
-        const lockHandle = await inStatefulSession(this.connection, () =>
+    const answer = await answering(
+      () =>
+        inStatefulSession(this.connection, () =>
           lockServiceDefinition(this.connection, name),
-        );
-        this.lockTracker.track(name, lockHandle);
-        // The handle is the value, and the request does not keep the wire it
-        // came on — so the answer is built around what the request produced.
-        return {
-          data: lockHandle,
-          status: 200,
-          statusText: 'OK',
-          headers: {},
-        };
-      },
-      (answer) => String(answer.data),
+        ),
+      lockHandleOf,
+      options?.analyse,
     );
+    if (answer.ok && answer.getResult().value) {
+      this.lockTracker.track(name, answer.getResult().value);
+    }
+    return answer;
   }
 
   /** Unlock the object. */
-  async unlock(
+  async unlock<E extends IAdtError = IAdtError>(
     config: Partial<IServiceDefinitionConfig>,
     lockHandle: string,
-  ): Promise<IAdtResponse<void>> {
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<void, E>> {
     const name = this.name(config);
-
     return answering(
       async () => {
         // UNLOCK must run stateful (older BASIS #106); stateless after.
@@ -426,38 +430,34 @@ export class AdtServiceDefinition<
           this.lockTracker.untrack(name);
         }
       },
-      () => undefined,
+      nothing,
+      options?.analyse,
     );
   }
 
   /** Version history of the object's source. */
-  async getVersions(
+  async getVersions<E extends IAdtError = IAdtError>(
     config: Partial<IServiceDefinitionConfig>,
-  ): Promise<IAdtResponse<ObjectVersion[]>> {
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['versions']>, E>> {
     return answering(
-      async () => ({
-        data: await getServiceDefinitionVersions(this.connection, config),
-        status: 200,
-        statusText: 'OK',
-        headers: {},
-      }),
-      (answer) => answer.data as ObjectVersion[],
+      () => getServiceDefinitionVersions(this.connection, config),
+      this.results.versions as IResultStrategy<ReturnType<R['versions']>>,
+      options?.analyse,
     );
   }
 
-  /** The source of one version, by the `contentUri` an entry carries. */
-  async getVersionSource(contentUri: string): Promise<IAdtResponse<string>> {
+  /** Source of one version, by the `contentUri` its entry carried. */
+  async getVersionSource<E extends IAdtError = IAdtError>(
+    contentUri: string,
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['versionSource']>, E>> {
     return answering(
-      async () => ({
-        data: await getServiceDefinitionVersionSource(
-          this.connection,
-          contentUri,
-        ),
-        status: 200,
-        statusText: 'OK',
-        headers: {},
-      }),
-      (answer) => String(answer.data),
+      () => getServiceDefinitionVersionSource(this.connection, contentUri),
+      this.results.versionSource as IResultStrategy<
+        ReturnType<R['versionSource']>
+      >,
+      options?.analyse,
     );
   }
 }

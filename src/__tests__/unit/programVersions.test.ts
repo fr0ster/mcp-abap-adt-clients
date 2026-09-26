@@ -14,31 +14,32 @@ function conn(handler: (o: any) => Promise<IAdtWireResponse>): IAbapConnection {
 }
 
 describe('getProgramVersions', () => {
-  it('GETs source/main/versions with the atom-feed Accept and parses it', async () => {
+  it('GETs source/main/versions with the atom-feed Accept, and answers the feed', async () => {
     let seen: any;
     const c = conn(async (o) => {
       seen = o;
       return { data: FEED, status: 200, headers: {} } as IAdtWireResponse;
     });
-    const list = await getProgramVersions(c, { programName: 'ZPROG' });
+    const answer = await getProgramVersions(c, { programName: 'ZPROG' });
     expect(seen.url).toBe(
       '/sap/bc/adt/programs/programs/ZPROG/source/main/versions',
     );
     expect(seen.headers.Accept).toContain('application/atom+xml;type=feed');
-    expect(list).toHaveLength(1);
-    expect(list[0].contentUri).toContain('/00000/content');
+    // The feed as it arrived — `objectVersions` in adt-strategies reads it.
+    expect(answer.data).toBe(FEED);
   });
 
-  it('translates a 404 into UNSUPPORTED_OPERATION (no raw HTTP outward)', async () => {
-    expect.assertions(1);
+  it('lets a 404 through as the transport raised it, not as a library error', async () => {
+    const err: any = new Error('not found');
+    err.response = { status: 404 };
     const c = conn(async () => {
-      const err: any = new Error('not found');
-      err.response = { status: 404 };
       throw err;
     });
-    await expect(
-      getProgramVersions(c, { programName: 'ZPROG' }),
-    ).rejects.toMatchObject({ code: 'ADT_UNSUPPORTED_OPERATION' });
+    // A system without the resource said so; the member hands that to the
+    // caller's analyse (`analyseUnsupportedStatus([404, 406], …)` names it).
+    await expect(getProgramVersions(c, { programName: 'ZPROG' })).rejects.toBe(
+      err,
+    );
   });
 });
 
@@ -53,9 +54,12 @@ describe('getProgramVersionSource', () => {
         headers: {},
       } as IAdtWireResponse;
     });
-    const src = await getProgramVersionSource(c, '/sap/bc/adt/x/00000/content');
+    const answer = await getProgramVersionSource(
+      c,
+      '/sap/bc/adt/x/00000/content',
+    );
     expect(seen.url).toBe('/sap/bc/adt/x/00000/content');
     expect(seen.headers.Accept).toBe('text/plain');
-    expect(src).toContain('REPORT');
+    expect(String(answer.data)).toContain('REPORT');
   });
 });

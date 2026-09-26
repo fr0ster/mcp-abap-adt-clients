@@ -13,6 +13,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtRequest } from '../../../../core/transport/AdtRequest';
+import { transportParsing } from '../../../helpers/transportParsing';
 
 const CONFIGURATIONS = (...uris: string[]) =>
   '<configurations:configurations xmlns:configurations="c">' +
@@ -69,7 +70,12 @@ describe('list runs the named search', () => {
       bodies(CONFIGURATIONS('/a', '/b')),
     );
 
-    const answer = await new AdtRequest(connection).searchConfigurations();
+    const answer = await new AdtRequest(
+      connection,
+      undefined,
+      undefined,
+      transportParsing,
+    ).searchConfigurations();
 
     expect(calls).toHaveLength(1);
     expect(calls[0].url).toContain('searchconfiguration/configurations');

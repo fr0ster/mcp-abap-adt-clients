@@ -89,7 +89,7 @@ export { extractRunId } from './core/shared/groupActivation';
  * What a deletion check answers, named once for every result set that carries a
  * `deletionCheck` strategy. It is a different document from `check`'s.
  */
-export type { DeletionCheckResult, ObjectVersion } from './core/shared/results';
+export type { DeletionCheckResult } from './core/shared/results';
 /** The shapes the shipped readings build. See `IUtilResults` for which member. */
 export type { IUtilResults } from './core/shared/utilResultSet';
 export { utilDocuments } from './core/shared/utilResultSet';
@@ -122,15 +122,6 @@ export type { ITableTypeResults } from './core/tabletype/types';
 export { tableTypeDocuments } from './core/tabletype/types';
 export type { ITransformationResults } from './core/transformation/types';
 export { transformationDocuments } from './core/transformation/types';
-export type {
-  ICreatedTransport,
-  ITransportObjectEntry,
-  ITransportTree,
-  ITransportTreeLink,
-  ITransportTreeNode,
-  ITransportTreeRequest,
-  ITransportTreeTask,
-} from './core/transport';
 export type { ITransportResults } from './core/transport/types';
 export { transportDocuments } from './core/transport/types';
 export type { IUnitTestResults } from './core/unitTest/types';

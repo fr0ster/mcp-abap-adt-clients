@@ -66,7 +66,6 @@ export async function validateFunctionModuleName(
  * @param version - 'active' (default) or 'inactive' - version context for validation
  * @param sessionId - Optional session ID
  * @returns Check result with errors/warnings
- * @throws Error if validation finds syntax errors
  */
 export async function validateFunctionModuleSource(
   connection: IAbapConnection,

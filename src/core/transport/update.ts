@@ -14,12 +14,8 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_TRANSPORT } from '../../constants/contentTypes';
-import {
-  encodeSapObjectName,
-  limitDescription,
-} from '../../utils/internalUtils';
+import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
-import { extractXmlString, patchXmlAttribute } from '../../utils/xmlPatch';
 
 /**
  * Write the document the caller built.

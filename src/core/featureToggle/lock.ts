@@ -1,16 +1,23 @@
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
-import { XMLParser } from 'fast-xml-parser';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
+/**
+ * `POST …?_action=LOCK` on the feature toggle — answered as it arrived.
+ *
+ * The handle is read by `lockHandleOf` in the member. Until 23.0.0 this parsed
+ * it and threw when SAP's answer had none, which turned a statement about SAP's
+ * answer into a library failure and dropped the answer.
+ */
 export async function lockFeatureToggle(
   connection: IAbapConnection,
   name: string,
-  logger?: ILogger,
-): Promise<string> {
+): Promise<IAdtWireResponse> {
   const encoded = encodeSapObjectName(name.toLowerCase());
-  const resp = await connection.makeAdtRequest({
+  return connection.makeAdtRequest({
     method: 'POST',
     url: `/sap/bc/adt/sfw/featuretoggles/${encoded}`,
     timeout: getTimeout('default'),
@@ -25,15 +32,4 @@ export async function lockFeatureToggle(
         'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.Result',
     },
   });
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: '',
-  });
-  const parsed = parser.parse(resp.data);
-  const handle = parsed?.['asx:abap']?.['asx:values']?.DATA?.LOCK_HANDLE;
-  if (!handle) {
-    logger?.error?.(`FeatureToggle lock: no LOCK_HANDLE in response`);
-    throw new Error(`FeatureToggle ${name}: lock response has no LOCK_HANDLE`);
-  }
-  return String(handle);
 }

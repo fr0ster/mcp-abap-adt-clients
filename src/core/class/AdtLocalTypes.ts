@@ -11,6 +11,7 @@
 
 import type {
   IAdtActivatable,
+  IAdtAnalyseOptions,
   IAdtCheckable,
   IAdtContentTypes,
   IAdtError,
@@ -29,7 +30,6 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import type { LockRegistry } from '../shared/LockRegistry';
-import type { ObjectVersion } from '../shared/results';
 import type { IReadOptions } from '../shared/types';
 import { AdtClassMemberBase } from './AdtClassMemberBase';
 import { checkClassLocalTypes } from './check';
@@ -215,18 +215,14 @@ export class AdtLocalTypes<R extends IClassResults = typeof classDocuments>
   }
 
   /** Version history of this include. */
-  async getVersions(
+  async getVersions<E extends IAdtError = IAdtError>(
     config: Partial<ILocalTypesConfig>,
-  ): Promise<IAdtResponse<ObjectVersion[]>> {
-    const name = config.className as string;
-    return answering(
-      async () => ({
-        data: await this.getIncludeVersions(name, 'implementations'),
-        status: 200,
-        statusText: 'OK',
-        headers: {},
-      }),
-      (answer) => answer.data as ObjectVersion[],
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['versions']>, E>> {
+    return this.includeVersions(
+      config.className as string,
+      'implementations',
+      options,
     );
   }
 }

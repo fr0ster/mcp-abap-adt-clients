@@ -6,7 +6,6 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import type { HttpError } from '@mcp-abap-adt/interfaces-network';
 import { CT_BEHAVIOR_DEFINITION } from '../../constants/contentTypes';
 import { limitDescription } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -39,48 +38,42 @@ export async function create(
   connection: IAbapConnection,
   params: IBehaviorDefinitionCreateParams,
 ): Promise<IAdtWireResponse> {
-  try {
-    const language = params.language || 'EN';
+  const language = params.language || 'EN';
 
-    const masterSystem = params.masterSystem || '';
-    const responsible = params.responsible || '';
+  const masterSystem = params.masterSystem || '';
+  const responsible = params.responsible || '';
 
-    // Description is limited to 60 characters in SAP ADT
-    const description = limitDescription(params.description);
-    const masterSystemAttr = masterSystem
-      ? ` adtcore:masterSystem="${masterSystem}"`
-      : '';
-    const responsibleAttr = responsible
-      ? ` adtcore:responsible="${responsible}"`
-      : '';
+  // Description is limited to 60 characters in SAP ADT
+  const description = limitDescription(params.description);
+  const masterSystemAttr = masterSystem
+    ? ` adtcore:masterSystem="${masterSystem}"`
+    : '';
+  const responsibleAttr = responsible
+    ? ` adtcore:responsible="${responsible}"`
+    : '';
 
-    const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><blue:blueSource xmlns:blue="http://www.sap.com/wbobj/blue" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="${language}" adtcore:name="${params.name}" adtcore:type="BDEF/BDO" adtcore:masterLanguage="${language}"${masterSystemAttr}${responsibleAttr}>
+  const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><blue:blueSource xmlns:blue="http://www.sap.com/wbobj/blue" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="${language}" adtcore:name="${params.name}" adtcore:type="BDEF/BDO" adtcore:masterLanguage="${language}"${masterSystemAttr}${responsibleAttr}>
     <adtcore:adtTemplate>
         <adtcore:adtProperty adtcore:key="implementation_type">${params.implementationType}</adtcore:adtProperty>
     </adtcore:adtTemplate>
     <adtcore:packageRef adtcore:name="${params.package}"/>
 </blue:blueSource>`;
 
-    const headers = {
-      Accept: CT_BEHAVIOR_DEFINITION,
-      'Content-Type': CT_BEHAVIOR_DEFINITION,
-    };
+  const headers = {
+    Accept: CT_BEHAVIOR_DEFINITION,
+    'Content-Type': CT_BEHAVIOR_DEFINITION,
+  };
 
-    const url = `/sap/bc/adt/bo/behaviordefinitions${params.transportRequest ? `?corrNr=${params.transportRequest}` : ''}`;
+  const url = `/sap/bc/adt/bo/behaviordefinitions${params.transportRequest ? `?corrNr=${params.transportRequest}` : ''}`;
 
-    const response = await connection.makeAdtRequest({
-      url,
-      method: 'POST',
-      timeout: getTimeout('default'),
-      data: xmlBody,
-      headers,
-    });
-
-    return response;
-  } catch (error: unknown) {
-    const e = error as HttpError;
-    throw new Error(
-      `Failed to create behavior definition ${params.name}: ${e.message}`,
-    );
-  }
+  // A refusal comes back as the transport's failure, with SAP's answer on it.
+  // It used to be rewrapped in a new Error carrying the message alone, which
+  // dropped the response the caller's `analyse` reads.
+  return connection.makeAdtRequest({
+    url,
+    method: 'POST',
+    timeout: getTimeout('default'),
+    data: xmlBody,
+    headers,
+  });
 }

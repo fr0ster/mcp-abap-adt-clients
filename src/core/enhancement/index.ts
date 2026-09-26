@@ -17,7 +17,7 @@ export { check, checkEnhancement } from './check';
 // Low-level functions
 export { create } from './create';
 export { checkDeletion, deleteEnhancement } from './delete';
-export { lockEnhancement, lockEnhancementForUpdate } from './lock';
+export { lockEnhancement } from './lock';
 export {
   getEnhancementMetadata,
   getEnhancementSource,

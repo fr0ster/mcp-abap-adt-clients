@@ -1,5 +1,4 @@
 import { withCallTimeout } from '../../utils/callTimeout';
-import { beginCriticalSection } from '../../utils/criticalSection';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 
 /**
@@ -23,6 +22,7 @@ import { inStatefulSession } from '../shared/capabilities/statefulSession';
 
 import type {
   IAdtActivatable,
+  IAdtAnalyseOptions,
   IAdtCheckable,
   IAdtContentTypes,
   IAdtCreatable,
@@ -40,15 +40,12 @@ import type {
   IAdtVersionable,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
-import type {
-  IAbapConnection,
-  IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt-connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { answering } from '../../utils/adtResponse';
-import { safeErrorMessage } from '../../utils/internalUtils';
+import { lockHandleOf } from '../../utils/lockHandle';
+import { nothing } from '../../utils/resultStrategy';
 import type { LockRegistry } from '../shared/LockRegistry';
-import type { ObjectVersion } from '../shared/results';
 import type { IReadOptions } from '../shared/types';
 import { AdtClassMemberBase } from './AdtClassMemberBase';
 import { checkClass, checkClassLocalTestClass } from './check';
@@ -56,10 +53,7 @@ import { create as createClass } from './create';
 import { checkDeletion, deleteClass } from './delete';
 import { lockClass } from './lock';
 import { getClassSource } from './read';
-import {
-  activateClassTestClasses,
-  updateClassTestInclude,
-} from './testclasses';
+import { activateClassTestClasses } from './testclasses';
 import { classDocuments, type IClassConfig, type IClassResults } from './types';
 import { unlockClass } from './unlock';
 import { updateClass } from './update';
@@ -81,7 +75,11 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
     IAdtCheckable<IClassConfig, ReturnType<R['check']>>,
     IAdtActivatable<IClassConfig, ReturnType<R['activation']>>,
     IAdtLockable<IClassConfig>,
-    IAdtVersionable<IClassConfig, ObjectVersion[], string>
+    IAdtVersionable<
+      IClassConfig,
+      ReturnType<R['versions']>,
+      ReturnType<R['versionSource']>
+    >
 {
   public readonly objectType: string = 'Class';
 
@@ -345,81 +343,98 @@ export class AdtClass<R extends IClassResults = typeof classDocuments>
   }
 
   /**
-   * Lock test classes (local classes) for modification
-   * Uses parent class lock - sufficient for updating testclasses include
+   * Lock test classes (local classes) for modification — one LOCK on the
+   * parent class, whose handle serves the testclasses include.
+   *
+   * Answers through `lockHandleOf` like `lock`; unlike `lock` it registers
+   * nothing with the lock tracker, as it never did. Until 23.0.0 it answered
+   * the bare handle and threw when SAP's answer carried none.
    */
-  async lockTestClasses(config: Partial<IClassConfig>): Promise<string> {
-    // Stateful for the LOCK request alone.
-    //
-    // This used to say "stay stateful while the lock is held … avoids 423 on
-    // older BASIS (#106)", and read the issue wider than it is: what #106
-    // requires is that LOCK and UNLOCK themselves run stateful, which they
-    // still do. The window between them does not — Eclipse's stateful session
-    // carries those two requests and nothing else, and a request that runs
-    // inside the session leaves what it takes there.
-    // Bound before the closure: `config.className` is a mutable property, so
-    // the guard above does not narrow it inside a callback.
+  async lockTestClasses<E extends IAdtError = IAdtError>(
+    config: Partial<IClassConfig>,
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<string, E>> {
+    // Stateful for the LOCK request alone: what #106 requires is that LOCK and
+    // UNLOCK themselves run stateful. The window between them does not.
+    // Bound before the closure: `config.className` is a mutable property.
     const className = config.className as string;
-    return await inStatefulSession(this.connection, () =>
-      lockClass(this.connection, className),
+    return answering(
+      () =>
+        inStatefulSession(this.connection, () =>
+          lockClass(this.connection, className),
+        ),
+      lockHandleOf,
+      options?.analyse,
     );
   }
 
   /**
-   * Unlock test classes (local classes)
-   * Uses parent class unlock
+   * Unlock test classes (local classes) — one UNLOCK on the parent class.
    */
-  async unlockTestClasses(
+  async unlockTestClasses<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig>,
     lockHandle: string,
-  ): Promise<IAdtWireResponse> {
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<void, E>> {
     const className = config.className as string;
-    return await inStatefulSession(this.connection, () =>
-      unlockClass(this.connection, className, lockHandle),
+    return answering(
+      () =>
+        inStatefulSession(this.connection, () =>
+          unlockClass(this.connection, className, lockHandle),
+        ),
+      nothing,
+      options?.analyse,
     );
   }
 
   /**
-   * Check test class code (local class)
+   * Check test class code (local class) — one check run, read by the `check`
+   * strategy.
    */
-  async checkTestClass(
+  async checkTestClass<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig> & { testClassCode: string },
     version: 'active' | 'inactive' = 'inactive',
-  ): Promise<IAdtWireResponse> {
-    return await checkClassLocalTestClass(
-      this.connection,
-      config.className as string,
-      config.testClassCode,
-      version,
-      this.contentTypes?.sourceArtifactContentType(),
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+    return answering(
+      () =>
+        checkClassLocalTestClass(
+          this.connection,
+          config.className as string,
+          config.testClassCode,
+          version,
+          this.contentTypes?.sourceArtifactContentType(),
+        ),
+      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      options?.analyse,
     );
   }
 
   /**
-   * Activate test classes (local classes)
+   * Activate test classes (local classes) — one activation POST, read by the
+   * `activation` strategy.
    */
-  async activateTestClasses(
+  async activateTestClasses<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig> & { testClassName: string },
-  ): Promise<IAdtWireResponse> {
-    return await activateClassTestClasses(
-      this.connection,
-      config.className as string,
-      config.testClassName,
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+    return answering(
+      () =>
+        activateClassTestClasses(
+          this.connection,
+          config.className as string,
+          config.testClassName,
+        ),
+      this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
+      options?.analyse,
     );
   }
 
-  async getVersions(
+  /** Version history of the class's `main` include. */
+  async getVersions<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig>,
-  ): Promise<IAdtResponse<ObjectVersion[]>> {
-    const name = config.className as string;
-    return answering(
-      async () => ({
-        data: await this.getIncludeVersions(name, 'main'),
-        status: 200,
-        statusText: 'OK',
-        headers: {},
-      }),
-      (answer) => answer.data as ObjectVersion[],
-    );
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['versions']>, E>> {
+    return this.includeVersions(config.className as string, 'main', options);
   }
 }

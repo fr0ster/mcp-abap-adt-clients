@@ -120,16 +120,11 @@ describe('AdtMessageClass', () => {
 
   it('update carries the handle and the transport it was given', async () => {
     const { conn: c, calls } = recorder(
-      async () =>
-        ({
-          data: CLASS_XML_WITH_MSG,
-          status: 200,
-          headers: {},
-        }) as IAdtWireResponse,
+      async () => ({ data: '', status: 200, headers: {} }) as IAdtWireResponse,
     );
     await new AdtMessageClass(c, noopLogger).updateMetadata(
-      { name: 'ZT', description: 'NEW', transportRequest: 'DEVK900001' },
-      { lockHandle: 'LOCK_HANDLE_42' },
+      { name: 'ZT', transportRequest: 'DEVK900001' },
+      { source: CLASS_XML_WITH_MSG, lockHandle: 'LOCK_HANDLE_42' },
     );
     const put = calls.find((x) => x.method === 'PUT');
     expect(put?.url).toContain('lockHandle=LOCK_HANDLE_42');
@@ -237,40 +232,31 @@ describe('AdtMessageClass', () => {
     }
   });
 
-  it('update is GET(read)→PUT, and it preserves the messages it did not touch', async () => {
+  it('update is one PUT whose body is the document the caller passed', async () => {
     const {
       conn: c,
       calls,
       sessionTypes,
     } = recorder(
-      async (_rec, idx) =>
-        ({
-          // The class's own document is a read-modify-write: the description is
-          // patched into the XML the server holds, so the messages in it
-          // survive. That read is part of building the body, not a step of its
-          // own — it addresses the same resource the PUT does.
-          data: idx === 0 ? CLASS_XML_WITH_MSG : '',
-          status: 200,
-          headers: {},
-        }) as IAdtWireResponse,
+      async () => ({ data: '', status: 200, headers: {} }) as IAdtWireResponse,
     );
 
     const mc = new AdtMessageClass(c, noopLogger);
+    // The caller built this document — here the class with a new description
+    // and its message kept. Until 23.0.0 the member read the class itself and
+    // patched `config.description` into it; that read is the caller's now.
+    const document = CLASS_XML_WITH_MSG.replace('"OLD"', '"NEW"');
     await mc.updateMetadata(
-      { name: 'ZT', description: 'NEW' },
-      { lockHandle: 'LOCK_HANDLE_42' },
+      { name: 'ZT' },
+      { source: document, lockHandle: 'LOCK_HANDLE_42' },
     );
 
-    expect(calls).toHaveLength(2);
-
-    expect(calls[0].method).toBe('GET');
-    expect(calls[0].url).toContain('/sap/bc/adt/messageclass/');
-
-    expect(calls[1].method).toBe('PUT');
-    expect(calls[1].url).toContain('lockHandle=LOCK_HANDLE_42');
-    const putBody = String(calls[1].data);
-    expect(putBody).toContain('NEW');
-    expect(putBody).toContain('mc:msgno="001"');
+    expect(calls).toHaveLength(1);
+    expect(calls[0].method).toBe('PUT');
+    expect(calls[0].url).toContain('/sap/bc/adt/messageclass/zt');
+    expect(calls[0].url).toContain('lockHandle=LOCK_HANDLE_42');
+    // Sent as given, byte for byte: nothing here rebuilds it.
+    expect(calls[0].data).toBe(document);
 
     // No lock, no unlock, and the session untouched: the window is the
     // consumer's to open, and it is the consumer that holds the handle above.
@@ -319,13 +305,7 @@ describe('AdtMessageClass', () => {
       conn: c,
       calls,
       sessionTypes,
-    } = recorder(async (_rec, idx) => {
-      if (idx === 0)
-        return {
-          data: CLASS_XML_WITH_MSG,
-          status: 200,
-          headers: {},
-        } as IAdtWireResponse;
+    } = recorder(async () => {
       throw Object.assign(new Error('PUT failed'), {
         response: { status: 500 },
       });
@@ -335,8 +315,8 @@ describe('AdtMessageClass', () => {
     expect(
       expectFailure(
         await mc.updateMetadata(
-          { name: 'ZT', description: 'NEW' },
-          { lockHandle: 'LOCK_HANDLE_42' },
+          { name: 'ZT' },
+          { source: CLASS_XML_WITH_MSG, lockHandle: 'LOCK_HANDLE_42' },
         ),
         'update whose PUT the server refused',
       ).message,
@@ -344,7 +324,24 @@ describe('AdtMessageClass', () => {
 
     // Nothing after it: no unlock this member never made, and no session to
     // put back. The handle is the caller's, and so is releasing it.
-    expect(calls).toHaveLength(2);
+    expect(calls).toHaveLength(1);
     expect(sessionTypes).toEqual([]);
+  });
+
+  it('lock answers the handle SAP gave, and a handle-less 200 as an empty one', async () => {
+    let body = LOCK_XML;
+    const mc = new AdtMessageClass(
+      conn(
+        async () =>
+          ({ data: body, status: 200, headers: {} }) as IAdtWireResponse,
+      ),
+      noopLogger,
+    );
+    expect(expectResult(await mc.lock({ name: 'ZT' }), 'lock')).toBe('LH');
+
+    // Until 23.0.0 this threw "Failed to extract lock handle". Whether a 200
+    // without a handle is a refusal is the caller's analyse to say.
+    body = '<asx:abap xmlns:asx="http://www.sap.com/abapxml"/>';
+    expect(expectResult(await mc.lock({ name: 'ZT' }), 'lock')).toBe('');
   });
 });

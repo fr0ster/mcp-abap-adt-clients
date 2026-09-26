@@ -3,47 +3,30 @@
  * NOTE: Caller should call connection.setSessionType("stateful") before locking
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import { XMLParser } from 'fast-xml-parser';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_LOCK } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
- * Lock structure for modification
- * Returns lock handle that must be used in subsequent requests
+ * `POST …?_action=LOCK` — answered as it arrived. The handle is read by
+ * `lockHandleOf` in the member; until 23.0.0 this parsed it and threw when
+ * SAP's answer had none, which dropped the answer.
  */
 export async function lockStructure(
   connection: IAbapConnection,
   structureName: string,
-): Promise<string> {
+): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/ddic/structures/${encodeSapObjectName(structureName).toLowerCase()}?_action=LOCK&accessMode=MODIFY`;
 
-  const headers = {
-    Accept: ACCEPT_LOCK,
-  };
-
-  const response = await connection.makeAdtRequest({
+  return connection.makeAdtRequest({
     url,
     method: 'POST',
     timeout: getTimeout('default'),
     data: null,
-    headers,
+    headers: { Accept: ACCEPT_LOCK },
   });
-
-  // Parse lock handle from XML response
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: '',
-  });
-  const result = parser.parse(response.data);
-  const lockHandle = result?.['asx:abap']?.['asx:values']?.DATA?.LOCK_HANDLE;
-
-  if (!lockHandle) {
-    throw new Error(
-      'Failed to obtain lock handle from SAP. Structure may be locked by another user.',
-    );
-  }
-
-  return lockHandle;
 }

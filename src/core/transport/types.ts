@@ -1,20 +1,15 @@
 /**
  * Transport module type definitions.
  *
- * The tree shapes below left `@mcp-abap-adt/interfaces` in 31.0.0 with the
- * other result shapes: `IAdtRequest<TList>` says a listing answers *something*,
- * and what that something looks like is the reading's to name — which is here,
- * beside {@link parseTransportTree}, the reading that builds it.
+ * The tree shapes and the readings that build them moved to
+ * `@mcp-abap-adt/adt-strategies` in 23.0.0 (`transportTree` and its types):
+ * this implementation answers documents as they arrived.
  */
 
 export type { IAbapObjectEntry } from '@mcp-abap-adt/interfaces-adt';
 
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
 import { rawDocument } from '../../utils/resultStrategy';
-import { parseCreatedTransport } from './parseCreatedTransport';
-import { parseObjectEntries } from './parseObjectEntries';
-import { parseSearchConfigurations } from './parseSearchConfigurations';
-import { parseTransportTree } from './parseTransportTree';
 
 // Types defined in @mcp-abap-adt/interfaces
 export type {
@@ -23,106 +18,19 @@ export type {
 } from '@mcp-abap-adt/interfaces-adt';
 
 /**
- * One container a request was nested under — `tm:workbench`, `tm:target`,
- * `tm:modifiable` and whatever else a system groups by.
+ * One strategy per member of a transport-request implementation.
  *
- * A list rather than named fields because the chain is not fixed: `?targets=true`
- * inserts a `tm:target` level, and a parser that assumed a shape would return
- * nothing on the other form.
+ * Every slot is required. The seven that arrived after 19.0.0 were optional
+ * and fell back to the shipped defaults inside the implementation, which kept
+ * a hand-written result set compiling at the cost of a reading the caller had
+ * not chosen. A result set now names every reading it answers.
  */
-export interface ITransportTreeNode {
-  /** Element name without its prefix: "workbench", "target", "modifiable" … */
-  element: string;
-  /** The container's own attributes, verbatim. */
-  attributes: Record<string, string | undefined>;
-}
-
-/**
- * One `atom:link` on a request or a task.
- *
- * These are how ADT names its own operations — `release`, `addobject`,
- * `changeowner`, `merge`, `newtask` — so a caller follows an href rather than
- * assembling a URL by convention.
- */
-export interface ITransportTreeLink {
-  /** href, rel, type, title — verbatim, unprefixed of the parser's own marker. */
-  attributes: Record<string, string | undefined>;
-}
-
-export interface ITransportTreeTask {
-  /** tm:number, tm:parent, tm:owner, tm:desc, tm:type, tm:status … verbatim. */
-  attributes: Record<string, string | undefined>;
-  /**
-   * Every `atom:link`, in document order. These carry the operation URIs —
-   * release, reassign, addobject, consistencycheck — so dropping them would
-   * force a consumer to rebuild ADT URLs by convention.
-   */
-  links: ITransportTreeLink[];
-  /**
-   * `tm:long_desc` text. `''` when present and empty, `undefined` when absent.
-   */
-  longDesc: string | undefined;
-}
-
-/**
- * One transport request, with its tasks and the containers it was found under.
- *
- * The containers are kept because they carry information the request does not:
- * `tm:target` has a human name (`"Local Change Requests"`) where the request has
- * `tm:target=""`. Dropping them would be this library deciding what a consumer
- * needs.
- */
-export interface ITransportTreeRequest {
-  /** Attributes verbatim — `tm:number`, not `number`. No renaming, no selection. */
-  attributes: Record<string, string | undefined>;
-  /** Ancestors, outermost first. Empty only if the server nested it under nothing. */
-  containers: ITransportTreeNode[];
-  /** Every `atom:link` on the request, in document order. */
-  links: ITransportTreeLink[];
-  /**
-   * `tm:long_desc` text. `''` when the element is present and empty;
-   * `undefined` when the element is absent. The two are not the same thing and
-   * the type does not pretend they are.
-   */
-  longDesc: string | undefined;
-  /** Empty when the request has no tasks — never undefined. */
-  tasks: ITransportTreeTask[];
-}
-
-/**
- * The parsed transport tree. Empty `requests` is a legitimate answer, not a
- * failure.
- *
- * `attributes` are the root's own — `adtcore:name` is the user the saved search
- * ran for, plus the four created/changed stamps. They are the only record of
- * *whose* list this is, so dropping them would leave a caller unable to tell two
- * lists apart.
- */
-export interface ITransportTree {
-  attributes: Record<string, string | undefined>;
-  requests: ITransportTreeRequest[];
-}
-
-/** One strategy per member of a transport-request implementation. */
 export interface ITransportResults {
-  /**
-   * What the create answers.
-   *
-   * The new request by default: a create whose number a caller cannot reach is
-   * a create they cannot use, and the number is the only thing the document is
-   * there to deliver. `rawDocument` gives the document back untouched.
-   */
+  /** What the create answers: the created-request document. */
   readonly created: IResultStrategy<unknown>;
   /** What a read of one request answers. */
   readonly metadata: IResultStrategy<unknown>;
-  /**
-   * What the listing answers.
-   *
-   * The tree by default, because it is the only reading that carries the
-   * containers, the description and the language a request holds — none of
-   * which a consumer could reach before without re-fetching and parsing the
-   * document themselves. `rawDocument` gives the document back untouched.
-   */
+  /** What the listing answers: the transport tree document. */
   readonly list: IResultStrategy<unknown>;
   /** What the description update answers. */
   readonly metadataUpdated: IResultStrategy<unknown>;
@@ -130,77 +38,61 @@ export interface ITransportResults {
   readonly deleted: IResultStrategy<unknown>;
   /** What a deletion check answers: `del:checkResponse`. */
   readonly deletionCheck: IResultStrategy<unknown>;
-  /**
-   * What the saved-search listing answers.
-   *
-   * **Optional, where every slot above is required, and deliberately so.**
-   * This member arrived after 19.0.0; making its slot required would stop a
-   * hand-written result set compiling over a member it never had. Left out, the
-   * shipped `parseSearchConfigurations` reads it — the same reading the
-   * internal resolver has always used.
-   */
-  readonly searchConfigurations?: IResultStrategy<unknown>;
+  /** What the saved-search listing answers. */
+  readonly searchConfigurations: IResultStrategy<unknown>;
   /**
    * What detaching an object answers.
    *
-   * **Optional, like `searchConfigurations` above and for the same reason:**
-   * a hand-written result set from before these members existed must keep
-   * compiling. The document is echoed back untouched by default — it repeats
-   * the object that was asked about and says nothing else, so the reading that
-   * confirms a removal is `readActionLog`, not this.
+   * It repeats the object that was asked about and says nothing else, so the
+   * reading that confirms a removal is `readActionLog`, not this.
    */
-  readonly removedObject?: IResultStrategy<unknown>;
-  /** What attaching an object answers. Optional, as above. */
-  readonly addedObject?: IResultStrategy<unknown>;
+  readonly removedObject: IResultStrategy<unknown>;
+  /** What attaching an object answers. */
+  readonly addedObject: IResultStrategy<unknown>;
   /**
-   * What creating a task answers: the new number, the way `created` answers a
-   * new request's. Optional, as above.
+   * What creating a task answers: the new task's document, carrying its
+   * number the way `created` carries a new request's.
    */
-  readonly createdTask?: IResultStrategy<unknown>;
-  /** What the action log answers. Optional, as above. */
-  readonly actionLog?: IResultStrategy<unknown>;
+  readonly createdTask: IResultStrategy<unknown>;
+  /** What the action log answers. */
+  readonly actionLog: IResultStrategy<unknown>;
   /**
-   * What giving a task its type answers. Optional, as above.
-   *
-   * The document back is the organizer's own echo, so `rawDocument` like its
-   * user-action siblings — and like them, a `200` says the request was
-   * understood. A re-read is what shows the type.
+   * What giving a task its type answers: the organizer's own echo. A `200`
+   * says the request was understood; a re-read is what shows the type.
    */
-  readonly taskTypeChanged?: IResultStrategy<unknown>;
+  readonly taskTypeChanged: IResultStrategy<unknown>;
   /**
-   * What the object list answers. Optional, as above.
-   *
-   * **Parsed by default, where its siblings hand the document back.** They can
-   * afford to: the document they echo is the answer. This one exists so that
-   * `removeObject` has a `tm:position` to be given, and a caller left to find
-   * that in a document would be regexing XML — which is what this member was
-   * added to stop.
+   * What the object list answers: the request document, whose
+   * `tm:abap_object` entries carry the `tm:position` `removeObject` needs.
    */
-  readonly objects?: IResultStrategy<unknown>;
+  readonly objects: IResultStrategy<unknown>;
 }
 
 /**
- * The shipped default: documents as they arrived, and the tree for the listing.
+ * The shipped default: every member answers its document as it arrived.
+ *
+ * The readings that used to be the defaults here — `parseCreatedTransport`
+ * (created, createdTask), `parseTransportTree` (list),
+ * `parseSearchConfigurations` (searchConfigurations) and `parseObjectEntries`
+ * (objects) — are strategies a caller passes; the library interprets nothing
+ * on its own.
  *
  * `satisfies`, never an annotation — see `classDocuments` for why.
  */
 export const transportDocuments = {
-  created: (answer) => parseCreatedTransport(answer.data),
+  created: rawDocument,
   metadata: rawDocument,
-  list: (answer) => parseTransportTree(answer.data),
+  list: rawDocument,
   metadataUpdated: rawDocument,
   deleted: rawDocument,
   deletionCheck: rawDocument,
-  searchConfigurations: (answer) => parseSearchConfigurations(answer.data),
+  searchConfigurations: rawDocument,
   removedObject: rawDocument,
   addedObject: rawDocument,
-  // The same reading as `created`: a task is a request resource, and its
-  // number arrives the same way — in `Location`, with the body carrying it
-  // too.
-  createdTask: (answer) => parseCreatedTransport(answer.data),
+  createdTask: rawDocument,
   actionLog: rawDocument,
   taskTypeChanged: rawDocument,
-  objects: (answer) => parseObjectEntries(answer.data),
+  objects: rawDocument,
 } satisfies ITransportResults;
 
 /**
