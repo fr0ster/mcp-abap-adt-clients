@@ -30,6 +30,7 @@ describe('the published surface', () => {
       'analyseValidation',
       'asItCame',
       'isIndeterminateWalkAnswer',
+      'objectVersions',
       'rawOf',
       'readActivationRefusal',
       'readAdtRefusal',

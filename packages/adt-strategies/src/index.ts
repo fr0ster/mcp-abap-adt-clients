@@ -70,3 +70,4 @@ export {
   type IAbapGitRepo,
 } from './results/abapGit';
 export { unitTestRunId } from './results/unitTest';
+export { type IObjectVersion, objectVersions } from './results/versions';
