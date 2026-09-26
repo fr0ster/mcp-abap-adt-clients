@@ -126,6 +126,8 @@ caller who asks for those shapes rather than the document.
 - [`MIGRATION-23.md`](MIGRATION-23.md) — the readings and verdicts that moved
   to `@mcp-abap-adt/adt-strategies` in 23.0.0
 - [`MIGRATION-19.md`](MIGRATION-19.md) — what moved to the consumer in 19.0.0
+- [`WORKAROUNDS.md`](WORKAROUNDS.md) — the SAP-side behaviour behind several of
+  these answers, and what a consumer does about it
 - [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md) — answers that are accurate about
   the wrong thing, including the `S_ABPLNGVS` language-version refusal
 - [`../../examples`](../../examples) — the sequences, written out

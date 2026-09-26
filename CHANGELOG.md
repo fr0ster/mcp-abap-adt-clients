@@ -37,13 +37,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ### Documentation
 
-- **PAK/058 is `CL_PACKAGE`'s session buffer.** A package create or update
-  leaves the package in the ABAP session's static buffer as `requested`, and
-  the next update or delete from the same session is refused with PAK/058;
-  from a new session it succeeds. Measured on E19 over HTTP and RFC. The
-  RFC and session guides and the `AdtPackage` comments state the rule — one
-  session per package save — where they blamed state lost between RFC
-  contexts and called the cause unknown.
+- **SAP-side behaviour a consumer has to work around is in one place:
+  [`docs/usage/WORKAROUNDS.md`](docs/usage/WORKAROUNDS.md).** Sixteen cases,
+  each with the same sections — symptom, cause, rule, workaround, evidence
+  (system and date) and the members it bites: PAK/058, the session-type
+  header, class includes under the class lock, the service-binding lock,
+  refusals inside a `200`, empty `200` reads, the untyped `S::000` message on a
+  successful delete, `S_ABPLNGVS` for a missing package, what a bare create
+  leaves, check runs without the object, activation flags and settling, the
+  transport search, tree and task typing, and the ATC check variant.
+- **PAK/058 now states the rule for both transports.** A package can be saved
+  only once per ABAP session: over RFC from the create onward, over HTTP every
+  stateful lock → update → unlock counts (the stateless create does not), and
+  a delete from a session that saved the package is refused. Measured on E19
+  over HTTP and RFC (#176). It is `CL_PACKAGE`'s session buffer, not state lost
+  between RFC contexts.
+- **The guides point to it instead of repeating it.** `RFC_TESTING.md`,
+  `RFC_CONNECTION.md`, `STATEFUL_SESSION_GUIDE.md`, `TROUBLESHOOTING.md` and
+  `OBJECT_LIFECYCLE.md` keep a sentence or two and a link, and the
+  `AdtPackage` `create` / `updateMetadata` / `delete` comments carry the
+  one-line rule. Linked from `README.md`, `docs/README.md` and
+  `ANSWER_SHAPES.md`.
+
 ## [23.0.0] - 2026-09-26
 
 **This package interprets nothing.** Every member makes one ADT request. What

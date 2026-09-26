@@ -158,60 +158,16 @@ The function group read endpoint via RFC does not accept specific content types 
 
 `BaseTester` resolves object names from config using camelCase property names (e.g., `config.functionGroupName`). The `loggerPrefix` is converted to camelCase: `'FunctionGroup'` -> `'functionGroup'` + `'Name'` = `'functionGroupName'`.
 
-## Packages: a session that saved a package cannot save or delete it again
+## Packages: one save per ABAP session
 
-**The rule.** An ABAP session that has created or updated a package cannot
-update or delete that package afterwards. The save is refused with
-`400 ExceptionResourceAlreadyExists`, `PAK/058` ("Package … is already
-locked"); the delete answers `200` carrying `isDeleted="false"` and the same
-`PAK/058`. A session that has not saved the package does both without trouble.
-This holds on either transport — it is a property of the ABAP session, not of
-RFC.
+A package can be saved — created, updated or deleted — only once per ABAP
+session; the next save from that session is refused with `PAK/058`. Over RFC
+that bites from the create onward, because every call shares one session; over
+HTTP every stateful lock → update → unlock counts. The cause, the measured
+answers of both transports and the consumer-side workaround are in
+[WORKAROUNDS.md](../usage/WORKAROUNDS.md#a-package-can-be-saved-only-once-per-abap-session).
 
-**The cause** (issue #176, read from the ABAP code on E19). `PAK/058` has one
-source, `CL_PACKAGE->IF_PACKAGE~SET_CHANGEABLE`, and it checks
-`m_lock_state` on the **in-memory package instance**, not an enqueue lock.
-`CL_PACKAGE` keeps those instances in a static buffer that lives as long as the
-ABAP session. The ADT create and the ADT update both end in `M_SAVE`, which
-leaves the instance in state `requested`; the next update or delete loads the
-package through `load_package`, gets the buffered instance back without reading
-the database, and `set_changeable` refuses. No ADT package call resets the
-buffer — nothing in `CL_PAK_ADT_*` calls `set_changeable( abap_false )` or
-`undo_all_changes`.
-
-**Why it looks like an RFC problem.** Over HTTP the create is a stateless
-request whose session is gone by the time the stateful lock → PUT → unlock
-starts, so the update succeeds; only a delete after that update, from the same
-stateful session, meets the buffer. Over RFC every call shares one ABAP
-session, so the update right after the create is already refused.
-
-**Measured on E19, 2026-09-26**, one session throughout, the same sequence over
-both transports (`ZAC_INNER_PKG02`, transport `E19K907111`):
-
-| Step | HTTP | RFC |
-| --- | --- | --- |
-| create | 200 | 200 |
-| `_action=LOCK` | 200, handle | 200, handle |
-| `PUT` with a made-up handle | 423 `ExceptionResourceInvalidLockHandle`, `SADT_RESOURCE/026` | same |
-| a second `_action=LOCK` | 403 `ExceptionResourceNoAccess`, `EU/510` | same |
-| `PUT` with our handle | **200**, the change is saved | **400 `ExceptionResourceAlreadyExists`, `PAK/058`** |
-| `_action=UNLOCK` | 200 | 200 |
-| `deletion/check` | `isDeletable="true"` | `isDeletable="true"` |
-| `deletion/delete`, same session | **`isDeleted="false"`, `PAK/058`** | **`isDeleted="false"`, `PAK/058`** |
-| `deletion/delete`, a new session | `isDeleted="true"` | `isDeleted="true"` |
-
-The handle is not the problem: a made-up one is refused with 423, and ours is
-accepted — over HTTP the same `PUT` saves. The enqueue lock is not either: a
-second `LOCK` is refused under `EU/510`, a different message class, and a
-separate session can update the package while the first still holds its
-buffered instance (measured in mcp-abap-adt, issue #176).
-
-**The workaround is the consumer's**: a new ABAP session for each step that
-saves the package after the first — a new RFC connection, or a new stateful HTTP
-session. This library does not do it inside its members: each member stays one
-request on the connection it was given.
-
-The package lifecycle test does exactly that. `afterCreate` replaces the test's
+The package lifecycle test works around it. `afterCreate` replaces the test's
 session before the update, and the cleanup replaces it again before the delete
 — `recycleTestSession()`, which ends the session and opens its replacement, never
 a second one beside it. The test runs over RFC as well as HTTP; it used to be

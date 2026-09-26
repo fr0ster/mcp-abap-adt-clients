@@ -4,6 +4,10 @@ ADT answers are often accurate about the wrong thing. Everything below was
 observed against a running system, and each entry says what the message looks
 like, what it actually means, and how to tell the two apart.
 
+SAP-side behaviour with a consumer-side workaround is collected in
+[WORKAROUNDS.md](WORKAROUNDS.md); the entries below that belong there are short
+and link to it.
+
 ## "You are not authorized to make changes (authorization object S_ABPLNGVS)"
 
 Arrives as a `403` with an `<exc:exception>` document, `adtType`
@@ -54,76 +58,30 @@ language version its software component fixes; whether the user holds that value
 in `ABP_LNG_VS`; and whether they hold the specific `ACTVT` for the operation
 that failed rather than for the one that succeeded.
 
-**The trap.** It is raised wherever the language version cannot be satisfied —
-including cases that have nothing to do with your rights. Creating a class into a
-package **that does not exist** answers with this object rather than "package not
-found": with no package there is no software component, so there is no language
-version to check against, and the refusal surfaces as an authorization failure.
-
-Before going to PFCG, check that the package in the request exists and that its
-software component allows the language version you are writing.
+**The trap.** It is also raised for a create into a package **that does not
+exist** — before going to PFCG, check the package. See
+[WORKAROUNDS.md](WORKAROUNDS.md#s_abplngvs-refuses-a-create-into-a-package-that-does-not-exist).
 
 ## A read of an object that is not there returns 200 and an empty body
 
-ADT largely does not refuse a request for a missing object. `source/main` never
-answers 404; it answers **200 with zero bytes**. A not-yet-ready read of a
-domain, data element, package, table type or function group does the same.
-
-So "the object is not there" and "the object is there and empty" arrive as the
-identical answer, and neither the status nor the body can tell them apart.
-
-**Why it matters more than it looks.** A read-modify-write that trusts the status
-reads nothing, writes nothing back, and erases the object. A listing that treats
-the same answer as a failure reports an error for an empty package.
-
-Neither reading can be the library's, which is why it is a decision you supply:
-pass `analyse` in the operation options to say which one applies to your call.
+`source/main` never answers 404, and a not-yet-ready metadata read answers the
+same `200` with zero bytes, so "not there" and "there and empty" are one answer.
+A read-modify-write that trusts the status erases the object. See
+[WORKAROUNDS.md](WORKAROUNDS.md#a-read-answers-200-with-an-empty-body-instead-of-404).
 
 ## "Resource  ZCL_X: wrong input data for processing" on a read
 
-A `400` with an `<exc:exception>`, `adtType` `ExceptionResourceWrongData`, T100
-`SADT_RESOURCE/007`. Note the double space: the object type belongs there and
-the server left it out, which is the first sign the message is not about your
-request at all.
-
-It means **a class was created and no source has been written to it yet**. Every
-read of one refuses this way — `active`, `inactive`, or neither, metadata or
-source. Waiting thirty seconds does not help, and neither does a lock/unlock
-cycle. Writing the source does, immediately and without any activation.
-
-The object is not empty and it is not broken: SAP generated a minimal class and
-stored it as the active version, and you can read it back the moment the first
-write lands. It is unfinished, not absent.
-
-Specific to classes. An interface created the same way reads its generated
-skeleton at once, a domain is complete on creation, a DDL source answers 200
-with an empty body, and a service definition cannot be created bare at all —
-its POST is refused with "Check of condition failed".
-
-The trap is that it reads as "your request is malformed", so the natural
-response is to retry, and retrying never works. This library's own suite spent
-sixteen seconds a run on eight such retries before anyone measured it, and the
-assertion after them had never once executed.
-
-**What to do:** write the source. A class reads at `version=inactive` while
-still under its lock, long before any activation. Do not reach for
-`getVersions()` to test readiness — it answers `ok` in this state too, listing
-version slots rather than content. See
-[OBJECT_LIFECYCLE.md](OBJECT_LIFECYCLE.md#what-a-bare-create-actually-leaves-per-type).
+A `400 ExceptionResourceWrongData`, `SADT_RESOURCE/007`, on every read of a
+class that was created and has no source written yet. It is unfinished, not
+absent or broken: write the source, do not retry. See
+[WORKAROUNDS.md](WORKAROUNDS.md#what-a-bare-create-leaves-depends-on-the-type).
 
 ## "Class ZCL_X does not have a TMDIR entry" on an activation
 
-A `200` carrying `<msg type="E" code="OO(045)">`, alongside an informational
-`EU(239)` "Errors occurred during generation" — note that the summary of the
-errors is severity `I`, so counting by severity finds one error, not two.
-
-It means **the object does not exist**. The activation went straight to
-generation, looked for the class in the method directory, and found nothing.
-It does not say "not found", so it reads like a corrupt object; it is an absent
-one. The same message serves interfaces, with `Interface` in `T100KEY-V1`.
-
-Distinguish it from the entry above: `wrong input data` is an object that exists
-with nothing in it, `TMDIR` is an object that is not there at all.
+A `200` carrying `<msg type="E" code="OO(045)">`: the object **does not exist**.
+Distinguish it from the entry above — `wrong input data` is an object that
+exists with nothing in it, `TMDIR` is an object that is not there at all. See
+[WORKAROUNDS.md](WORKAROUNDS.md#activationexecuted-false-is-not-a-failure).
 
 ## A message class exists; its messages do not
 
@@ -201,31 +159,15 @@ an object already in this state is SAP GUI territory.
 
 ## A refusal can arrive with a 2xx
 
-ADT answers some refusals with **200** carrying an `<exc:exception>` document.
-The request reached the server and came back, so nothing throws and every layer
-above stores the body as a result.
-
-Measured on a trial: five of seven probed operations reported no errors
-while SAP had refused, three of them writes — a caller believed an object existed
-that did not, and that one had been deleted that had not.
-
-**The status is the channel; the document is the verdict.** There are at least
-three refusal shapes and they are not interchangeable:
-
-| shape | resource |
-|---|---|
-| `<exc:exception>` | most resources, any status including 200 |
-| `<del:message del:type="E">` in `del:checkResponse` | `/deletion/check` |
-| `<msg type="E">` in `chkl:messages` | `/activation` |
+The status is the channel; the document is the verdict. ADT has at least three
+refusal shapes, and a `200` can carry any of them. See
+[WORKAROUNDS.md](WORKAROUNDS.md#a-refusal-can-arrive-with-a-2xx-and-an-error-status-names-the-fix).
 
 ## Activation reports `activationExecuted="false"` and nothing is wrong
 
-The flag says whether ADT did any work, not whether the work succeeded. An object
-that is already active answers `false` with an empty message list — identical, by
-the flag alone, to an object that does not exist.
-
-**Only `<msg type="E">` is the verdict.** An object locked by another session is
-a `403` and never reaches this document at all.
+The flag says whether ADT did any work, not whether it succeeded; only
+`<msg type="E">` is the verdict. See
+[WORKAROUNDS.md](WORKAROUNDS.md#activationexecuted-false-is-not-a-failure).
 
 ## A deletion check that says "no" is not a failure
 
@@ -237,12 +179,8 @@ the objects are still on the system, and that is a failure.
 
 ## 406 and 415 name the exact content type in their text
 
-The status number says nothing actionable; the sentence names the header:
-
-- `406` — "Accepted content types: application/vnd.sap.adt.deletion.check.response.v1+xml"
-- `415` — "Supported Media Types: …check.request.v1+xml"
-
-Reading the body is cheaper than guessing content types from a status.
+The status number says nothing actionable; the sentence names the header. See
+[WORKAROUNDS.md](WORKAROUNDS.md#a-refusal-can-arrive-with-a-2xx-and-an-error-status-names-the-fix).
 
 ## "No URI-Mapping defined for URI", inside a 200
 
