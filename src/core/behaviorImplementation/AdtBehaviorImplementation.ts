@@ -128,8 +128,8 @@ export class AdtBehaviorImplementation<
     lockRegistry?: LockRegistry,
     // The one cast in this file, and it is on the default. See AdtClass.
     private readonly results: R = classDocuments as unknown as R,
-    // Handed to the inner class so a create carries the responsible person and
-    // master system the client knows, like a class create does.
+    // Handed to the inner class so a create carries the master system and
+    // master language the client knows, like a class create does.
     systemContext?: IAdtSystemContext,
   ) {
     this.connection = connection;

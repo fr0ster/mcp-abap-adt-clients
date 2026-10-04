@@ -146,7 +146,6 @@ export interface ICreateClassParams {
   package_name: string;
   transport_request?: string;
   master_system?: string;
-  responsible?: string;
   masterLanguage?: string;
   superclass?: string;
   final?: boolean;

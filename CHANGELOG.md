@@ -24,6 +24,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+### Fixed
+
+- A class create no longer sends `adtcore:responsible`. SAP stores that
+  attribute on a class create as the class's **creator** (`createdBy`,
+  `SEOCLASSDF-AUTHOR`), and records the logon user as the **responsible**
+  person (`TADIR-AUTHOR`) whatever is sent. Measured on an on-premise system
+  (2026-10-04): a create sending another user as responsible left
+  responsible = logon user and createdBy = that other user; a create without
+  the attribute left both as the logon user. No ADT request sets it later
+  either: a locked metadata `PUT` carrying another responsible answers `200`
+  and changes neither field, and discovery offers no resource for it. So
+  `responsible` (in the config or the system context) is not sent for a class
+  or a behavior implementation; it only ever falsified the creator. The
+  responsible person of a class is set outside ADT (object directory entry,
+  SE03 / SE80).
+
 ## [25.0.1] - 2026-10-03
 
 Every create carries the responsible person and the master system the client
