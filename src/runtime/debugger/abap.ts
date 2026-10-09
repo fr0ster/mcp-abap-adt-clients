@@ -33,6 +33,7 @@ import { createBatchBoundary } from './batchPayload';
 import type {
   IDebuggerBreakpoint,
   IDebuggerIdentity,
+  IDebuggerListenerConflict,
   IDebuggerStepMethod,
 } from './contracts';
 
@@ -159,17 +160,37 @@ export async function deleteBreakpoint(
  *
  * The server holds it for `holdSeconds` and answers 200 with an empty body
  * when nothing stopped, or 200 with a `DebuggeesList` naming the debuggee
- * (`DEBUGGEE_ID`, `DBGEE_KIND`, where it stands). One listener per SAP user:
- * a second one is refused 409 whatever its terminal id. The client waits a
- * minute longer than the server holds.
+ * (`DEBUGGEE_ID`, `DBGEE_KIND`, where it stands). The client waits a minute
+ * longer than the server holds.
+ *
+ * One listener per SAP user holds the user's breakpoints, and `onConflict`
+ * says what to do when another one — an Eclipse, another agent — already
+ * does. Measured on premise (2026-10-09) with Eclipse listening for the same
+ * user:
+ *
+ * - `refuse` sends `checkConflict=true&isNotifiedOnConflict=true`, as Eclipse
+ *   does: the answer is 409 `conflictDetected` (T100 `SY 530`, "Another
+ *   session … exists with global debugging scope") and the other listener is
+ *   left alone;
+ * - `takeOver` sends neither: the server accepts this listener and the other
+ *   one is gone — its holder only gets a notice (Eclipse shows one and stops
+ *   listening).
+ *
+ * There is no default. Which of the two is right depends on whose debugger is
+ * displaced, and only the caller knows that.
  */
 export async function listen(
   connection: IAbapConnection,
   identity: IDebuggerIdentity,
+  onConflict: IDebuggerListenerConflict,
   holdSeconds = 60,
 ): Promise<IAdtWireResponse> {
+  const conflict: Record<string, boolean> =
+    onConflict === 'refuse'
+      ? { checkConflict: true, isNotifiedOnConflict: true }
+      : {};
   return connection.makeAdtRequest({
-    url: `${DEBUGGER}/listeners?${query({ ...identityQuery(identity), timeout: holdSeconds })}`,
+    url: `${DEBUGGER}/listeners?${query({ ...identityQuery(identity), timeout: holdSeconds, ...conflict })}`,
     method: 'POST',
     timeout: getTimeout((holdSeconds + 60) * 1000),
     headers: { Accept: 'application/vnd.sap.as+xml' },

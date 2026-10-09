@@ -8,6 +8,9 @@
  *
  *   MCP_ENV_PATH=<session>.env npx ts-node scripts/probe-debugger-cycle-client.ts
  *   ... --keep            leave the probe class in place
+ *   ... --deploy          only create and activate the probe class, and leave it
+ *   ... --run-only        only run the class: no breakpoints, no listener of ours
+ *   ... --take-over       let our listener displace another one of the same user
  *   ... --package <name>  package for the probe class (default: $TMP)
  */
 
@@ -396,11 +399,40 @@ async function deployProbeClass(
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
-  const keep = args.includes('--keep');
+  // --deploy: create and activate the probe class, leave it, and stop there.
+  const deployOnly = args.includes('--deploy');
+  const keep = deployOnly || args.includes('--keep');
+  // Whether our listener may displace another debugger of the same user
+  // (Eclipse): refused with 409 by default, displaced with --take-over.
+  const onConflict = args.includes('--take-over') ? 'takeOver' : 'refuse';
   const packageIndex = args.indexOf('--package');
   const packageName = packageIndex >= 0 ? args[packageIndex + 1] : '$TMP';
 
   section('Connect', process.env.SAP_URL ?? '');
+  if (args.includes('--run-only')) {
+    // --run-only: no breakpoints and no listener of ours — the class just
+    // runs, so another debugger listening for the same user (Eclipse) can
+    // catch it. The call stays open while that debugger holds the program.
+    const only = await createTestConnection(quietLogger, { ownSession: true });
+    try {
+      section('Run', 'nothing of ours listens');
+      info(
+        'run',
+        `classrun ${CLASS_NAME} — if a debugger catches it, this waits until it is released`,
+      );
+      const run = await call('run', 'classrun returned', () =>
+        new ClassExecutor(only, quietLogger).run({ className: CLASS_NAME }),
+      );
+      section('Program output');
+      out(
+        `   ${run.ok ? c.green(run.body.trim() || "''") : c.red(run.body.trim())}`,
+      );
+    } finally {
+      await closeOwnTestConnection(only);
+      out();
+    }
+    return;
+  }
   const debuggerConnection = await createTestConnection(quietLogger, {
     ownSession: true,
   });
@@ -420,6 +452,12 @@ async function main(): Promise<void> {
   try {
     section('Probe class');
     if (!(await deployProbeClass(debuggerConnection, packageName))) return;
+    if (deployOnly) {
+      out(
+        `\n   ${c.green('■')} ${CLASS_NAME} is active in ${packageName} and stays there`,
+      );
+      return;
+    }
     const lines = markerLines();
     const identity = identityFor();
     const source = `/sap/bc/adt/oo/classes/${CLASS_NAME.toLowerCase()}/source/main`;
@@ -457,8 +495,12 @@ async function main(): Promise<void> {
     section('Listen & run');
     const listener = call(
       'listen',
-      `user-mode listener, held ${LISTEN_SECONDS} s`,
-      () => debuggerApi.listen(identity, { holdSeconds: LISTEN_SECONDS }),
+      `user-mode listener, held ${LISTEN_SECONDS} s, ${onConflict === 'refuse' ? 'refusing to displace another' : 'taking over from another'}`,
+      () =>
+        debuggerApi.listen(identity, {
+          onConflict,
+          holdSeconds: LISTEN_SECONDS,
+        }),
     );
     await new Promise((resolve) => setTimeout(resolve, ARM_DELAY_MS));
     info(

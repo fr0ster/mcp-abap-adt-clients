@@ -93,12 +93,30 @@ describe('AbapDebugger', () => {
 
   it('listen posts the long poll and waits a minute longer than the server holds', async () => {
     const { debugger_, sent } = setup();
-    await debugger_.listen(identity, { holdSeconds: 30 });
+    await debugger_.listen(identity, {
+      onConflict: 'takeOver',
+      holdSeconds: 30,
+    });
     expect(sent()).toMatchObject({
       method: 'POST',
       url: `/sap/bc/adt/debugger/listeners?${identityQuery}&timeout=30`,
       timeout: 90_000,
     });
+  });
+
+  it('listen with refuse asks the server to check for another listener, as Eclipse does', async () => {
+    const { debugger_, sent } = setup();
+    await debugger_.listen(identity, { onConflict: 'refuse', holdSeconds: 30 });
+    expect(sent().url).toBe(
+      `/sap/bc/adt/debugger/listeners?${identityQuery}&timeout=30&checkConflict=true&isNotifiedOnConflict=true`,
+    );
+  });
+
+  it('listen with takeOver sends no conflict parameters', async () => {
+    const { debugger_, sent } = setup();
+    await debugger_.listen(identity, { onConflict: 'takeOver' });
+    expect(sent().url).not.toContain('checkConflict');
+    expect(sent().url).not.toContain('isNotifiedOnConflict');
   });
 
   it('stopListener deletes the listener', async () => {

@@ -37,6 +37,7 @@ import type {
   IAbapDebugger,
   IDebuggerBreakpoint,
   IDebuggerIdentity,
+  IDebuggerListenerConflict,
   IDebuggerStepMethod,
 } from './contracts';
 
@@ -136,12 +137,21 @@ export class AbapDebugger<
 
   async listen<E extends IAdtError = IAdtError>(
     identity: IDebuggerIdentity,
-    options?: { holdSeconds?: number } & IAdtAnalyseOptions<E>,
+    options: {
+      onConflict: IDebuggerListenerConflict;
+      holdSeconds?: number;
+    } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<Of<R, 'listener'>, E>> {
     return answering(
-      () => listen(this.connection, identity, options?.holdSeconds),
+      () =>
+        listen(
+          this.connection,
+          identity,
+          options.onConflict,
+          options.holdSeconds,
+        ),
       this.reading('listener'),
-      options?.analyse,
+      options.analyse,
     );
   }
 

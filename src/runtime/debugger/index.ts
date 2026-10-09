@@ -33,4 +33,5 @@ export {
   stopListener,
   terminateDebuggee,
 } from './abap';
+export type * from './contracts';
 export { Debugger } from './Debugger';
