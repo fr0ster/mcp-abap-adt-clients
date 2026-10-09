@@ -8,7 +8,8 @@
  * few seconds, and prints what the server answered. Watch Eclipse between the
  * variants — whether its listener survived is half the answer.
  *
- * - A: AbapDebugger.listen with onConflict 'takeOver' — no conflict parameters.
+ * - A: AbapDebugger constructed with onConflict 'takeOver' — no conflict
+ *      parameters.
  * - B: the listener as Eclipse sends it — checkConflict=true and
  *      isNotifiedOnConflict=true.
  *
@@ -25,7 +26,10 @@ import {
   closeOwnTestConnection,
   createTestConnection,
 } from '../src/__tests__/helpers/sessionConfig';
-import { AbapDebugger } from '../src/runtime/debugger/AbapDebugger';
+import {
+  AbapDebugger,
+  abapDebuggerDocuments,
+} from '../src/runtime/debugger/AbapDebugger';
 import type { IDebuggerIdentity } from '../src/runtime/debugger/contracts';
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../.env');
@@ -91,7 +95,6 @@ async function variantA(
 ): Promise<number | undefined> {
   const t0 = Date.now();
   const answer = await debuggerApi.listen(identity, {
-    onConflict: 'takeOver',
     holdSeconds: HOLD_SECONDS,
   });
   const ms = Date.now() - t0;
@@ -162,7 +165,15 @@ async function main(): Promise<void> {
   const connection = await createTestConnection(quietLogger, {
     ownSession: true,
   });
-  const debuggerApi = new AbapDebugger(connection, quietLogger);
+  // Variant A's debugger displaces; B goes out raw, with Eclipse's parameters.
+  const debuggerApi = new AbapDebugger(
+    connection,
+    quietLogger,
+    abapDebuggerDocuments,
+    {
+      onConflict: 'takeOver',
+    },
+  );
   connection.setSessionType('stateful');
   try {
     for (const variant of variants) {

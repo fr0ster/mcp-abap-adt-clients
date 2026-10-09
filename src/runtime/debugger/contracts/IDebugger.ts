@@ -49,13 +49,6 @@ export type IDebuggerBreakpoint =
       msgTy: string;
     });
 
-/**
- * What a listener does when another one already holds the user's debugging:
- * `refuse` is answered 409 and leaves the other alone; `takeOver` displaces
- * it, and its holder only gets a notice.
- */
-export type IDebuggerListenerConflict = 'refuse' | 'takeOver';
-
 export type IDebuggerStepMethod =
   | 'stepInto'
   | 'stepOver'
@@ -132,10 +125,7 @@ export interface IAbapDebugger<
 
   listen<E extends IAdtError = IAdtError>(
     identity: IDebuggerIdentity,
-    options: {
-      onConflict: IDebuggerListenerConflict;
-      holdSeconds?: number;
-    } & IAdtAnalyseOptions<E>,
+    options?: { holdSeconds?: number } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<TListener, E>>;
   stopListener<E extends IAdtError = IAdtError>(
     identity: IDebuggerIdentity,

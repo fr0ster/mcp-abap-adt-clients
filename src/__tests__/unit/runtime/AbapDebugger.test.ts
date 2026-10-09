@@ -1,5 +1,9 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import { AbapDebugger } from '../../../runtime/debugger/AbapDebugger';
+import {
+  AbapDebugger,
+  abapDebuggerDocuments,
+  type IAbapDebuggerOptions,
+} from '../../../runtime/debugger/AbapDebugger';
 import type { IDebuggerIdentity } from '../../../runtime/debugger/contracts';
 
 /**
@@ -15,16 +19,24 @@ describe('AbapDebugger', () => {
   const identityQuery =
     'debuggingMode=user&requestUser=SAPUSER01&terminalId=EC80D3662BADB8CD21C70406E0E96D4C&ideId=7194D729E68FDAF6E185C7E5124CC900';
 
-  function setup(answer: unknown = { status: 200, data: '', headers: {} }) {
+  function setup(
+    answer: unknown = { status: 200, data: '', headers: {} },
+    options: IAbapDebuggerOptions = {},
+  ) {
     const connection = {
       makeAdtRequest: jest.fn().mockResolvedValue(answer),
     } as unknown as IAbapConnection;
-    const debugger_ = new AbapDebugger(connection, {
-      info: jest.fn(),
-      error: jest.fn(),
-      warn: jest.fn(),
-      debug: jest.fn(),
-    } as never);
+    const debugger_ = new AbapDebugger(
+      connection,
+      {
+        info: jest.fn(),
+        error: jest.fn(),
+        warn: jest.fn(),
+        debug: jest.fn(),
+      } as never,
+      abapDebuggerDocuments,
+      options,
+    );
     const sent = () =>
       (connection.makeAdtRequest as jest.Mock).mock.calls[0][0] as {
         url: string;
@@ -92,11 +104,8 @@ describe('AbapDebugger', () => {
   });
 
   it('listen posts the long poll and waits a minute longer than the server holds', async () => {
-    const { debugger_, sent } = setup();
-    await debugger_.listen(identity, {
-      onConflict: 'takeOver',
-      holdSeconds: 30,
-    });
+    const { debugger_, sent } = setup(undefined, { onConflict: 'takeOver' });
+    await debugger_.listen(identity, { holdSeconds: 30 });
     expect(sent()).toMatchObject({
       method: 'POST',
       url: `/sap/bc/adt/debugger/listeners?${identityQuery}&timeout=30`,
@@ -104,17 +113,17 @@ describe('AbapDebugger', () => {
     });
   });
 
-  it('listen with refuse asks the server to check for another listener, as Eclipse does', async () => {
+  it('by default listen refuses to displace another listener, as Eclipse does', async () => {
     const { debugger_, sent } = setup();
-    await debugger_.listen(identity, { onConflict: 'refuse', holdSeconds: 30 });
+    await debugger_.listen(identity, { holdSeconds: 30 });
     expect(sent().url).toBe(
       `/sap/bc/adt/debugger/listeners?${identityQuery}&timeout=30&checkConflict=true&isNotifiedOnConflict=true`,
     );
   });
 
-  it('listen with takeOver sends no conflict parameters', async () => {
-    const { debugger_, sent } = setup();
-    await debugger_.listen(identity, { onConflict: 'takeOver' });
+  it('constructed with takeOver, listen sends no conflict parameters', async () => {
+    const { debugger_, sent } = setup(undefined, { onConflict: 'takeOver' });
+    await debugger_.listen(identity);
     expect(sent().url).not.toContain('checkConflict');
     expect(sent().url).not.toContain('isNotifiedOnConflict');
   });

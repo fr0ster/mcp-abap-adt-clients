@@ -5,10 +5,14 @@
 export {
   AbapDebugger,
   abapDebuggerDocuments,
+  type IAbapDebuggerOptions,
   type IAbapDebuggerResults,
 } from './AbapDebugger';
 export { AmdpDebugger } from './AmdpDebugger';
-export type { IDebuggerBatchPayload } from './abap';
+export type {
+  IDebuggerBatchPayload,
+  IDebuggerListenerConflict,
+} from './abap';
 export {
   attach,
   buildBreakpointsXml,

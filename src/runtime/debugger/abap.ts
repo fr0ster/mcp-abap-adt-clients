@@ -33,7 +33,6 @@ import { createBatchBoundary } from './batchPayload';
 import type {
   IDebuggerBreakpoint,
   IDebuggerIdentity,
-  IDebuggerListenerConflict,
   IDebuggerStepMethod,
 } from './contracts';
 
@@ -154,6 +153,14 @@ export async function deleteBreakpoint(
 }
 
 // --- listener ------------------------------------------------------------------
+
+/**
+ * What a listener does when another one already holds the user's debugging:
+ * `refuse` is answered 409 and leaves the other alone; `takeOver` displaces
+ * it, and its holder only gets a notice. A setting of this implementation,
+ * not of the contract: another implementation may decide it differently.
+ */
+export type IDebuggerListenerConflict = 'refuse' | 'takeOver';
 
 /**
  * Wait for a debuggee: the long poll.

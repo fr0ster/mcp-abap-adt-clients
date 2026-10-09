@@ -27,7 +27,10 @@ import {
 } from '../src/__tests__/helpers/sessionConfig';
 import { AdtClient } from '../src/clients/AdtClient';
 import { ClassExecutor } from '../src/executors/class/ClassExecutor';
-import { AbapDebugger } from '../src/runtime/debugger/AbapDebugger';
+import {
+  AbapDebugger,
+  abapDebuggerDocuments,
+} from '../src/runtime/debugger/AbapDebugger';
 import type {
   IDebuggerBreakpoint,
   IDebuggerIdentity,
@@ -447,7 +450,12 @@ async function main(): Promise<void> {
     'trigger',
     `session ${c.gray(String(triggerConnection.getSessionId()))}`,
   );
-  const debuggerApi = new AbapDebugger(debuggerConnection, quietLogger);
+  const debuggerApi = new AbapDebugger(
+    debuggerConnection,
+    quietLogger,
+    abapDebuggerDocuments,
+    { onConflict },
+  );
 
   try {
     section('Probe class');
@@ -496,23 +504,36 @@ async function main(): Promise<void> {
     const listener = call(
       'listen',
       `user-mode listener, held ${LISTEN_SECONDS} s, ${onConflict === 'refuse' ? 'refusing to displace another' : 'taking over from another'}`,
-      () =>
-        debuggerApi.listen(identity, {
-          onConflict,
-          holdSeconds: LISTEN_SECONDS,
+      () => debuggerApi.listen(identity, { holdSeconds: LISTEN_SECONDS }),
+    );
+    // A refused listener answers 409 within the delay. Running the program
+    // then would hand it to whoever holds the user's debugging — and wait
+    // until they release it — so a refusal ends the cycle here.
+    const early = await Promise.race([
+      listener,
+      new Promise<undefined>((resolve) =>
+        setTimeout(() => resolve(undefined), ARM_DELAY_MS),
+      ),
+    ]);
+    if (early && !early.ok) {
+      info(
+        'refused',
+        `another debugger holds ${identity.requestUser}'s debugging — the program is not run`,
+      );
+    }
+    let trigger: ReturnType<typeof call> | undefined;
+    if (!early || early.ok) {
+      info(
+        'run',
+        `classrun ${CLASS_NAME} on the trigger session ${c.gray(`(${ARM_DELAY_MS} ms after the listener)`)}`,
+      );
+      // The run stays open while the debuggee is suspended.
+      trigger = call('run', 'classrun returned', () =>
+        new ClassExecutor(triggerConnection, quietLogger).run({
+          className: CLASS_NAME,
         }),
-    );
-    await new Promise((resolve) => setTimeout(resolve, ARM_DELAY_MS));
-    info(
-      'run',
-      `classrun ${CLASS_NAME} on the trigger session ${c.gray(`(${ARM_DELAY_MS} ms after the listener)`)}`,
-    );
-    // The run stays open while the debuggee is suspended.
-    const trigger = call('run', 'classrun returned', () =>
-      new ClassExecutor(triggerConnection, quietLogger).run({
-        className: CLASS_NAME,
-      }),
-    );
+      );
+    }
 
     const caught = await listener;
     const debuggeeId = tag(caught.body, 'DEBUGGEE_ID');
@@ -527,7 +548,7 @@ async function main(): Promise<void> {
         debuggerApi.attach(identity.requestUser, debuggeeId),
       );
       attached = attach.ok;
-    } else {
+    } else if (caught.ok) {
       info('caught', c.red('nothing — the listener came back empty'));
     }
 
@@ -578,6 +599,7 @@ async function main(): Promise<void> {
     );
     debuggerConnection.setSessionType('stateless');
 
+    if (!trigger) return;
     const run = await trigger;
     section('Program output');
     out(

@@ -24,6 +24,7 @@ import {
   getChildVariables,
   getStack,
   getVariables,
+  type IDebuggerListenerConflict,
   listen,
   listWatchpoints,
   setBreakpoints,
@@ -37,7 +38,6 @@ import type {
   IAbapDebugger,
   IDebuggerBreakpoint,
   IDebuggerIdentity,
-  IDebuggerListenerConflict,
   IDebuggerStepMethod,
 } from './contracts';
 
@@ -71,6 +71,17 @@ export const abapDebuggerDocuments = {
   watchpoints: rawDocument,
 } satisfies IAbapDebuggerResults;
 
+/** How this implementation behaves, fixed when it is constructed. */
+export interface IAbapDebuggerOptions {
+  /**
+   * When another listener already holds the user's debugging — an Eclipse,
+   * another agent: `refuse` (the default) is answered 409 and leaves it
+   * alone, `takeOver` displaces it. A consumer wanting both constructs two
+   * debuggers.
+   */
+  readonly onConflict?: IDebuggerListenerConflict;
+}
+
 type Of<
   R extends IAbapDebuggerResults,
   K extends keyof IAbapDebuggerResults,
@@ -97,6 +108,7 @@ export class AbapDebugger<
     _logger?: ILogger,
     // The one cast in this file, and it is on the default. See AdtClass.
     private readonly results: R = abapDebuggerDocuments as unknown as R,
+    private readonly options: IAbapDebuggerOptions = {},
   ) {}
 
   private reading<K extends keyof IAbapDebuggerResults>(
@@ -137,21 +149,18 @@ export class AbapDebugger<
 
   async listen<E extends IAdtError = IAdtError>(
     identity: IDebuggerIdentity,
-    options: {
-      onConflict: IDebuggerListenerConflict;
-      holdSeconds?: number;
-    } & IAdtAnalyseOptions<E>,
+    options?: { holdSeconds?: number } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<Of<R, 'listener'>, E>> {
     return answering(
       () =>
         listen(
           this.connection,
           identity,
-          options.onConflict,
-          options.holdSeconds,
+          this.options.onConflict ?? 'refuse',
+          options?.holdSeconds,
         ),
       this.reading('listener'),
-      options.analyse,
+      options?.analyse,
     );
   }
 
