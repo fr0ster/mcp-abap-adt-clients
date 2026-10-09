@@ -11,9 +11,10 @@
  * references take a required limit: without it they answer 400 "Parameter …
  * could not be found", on premise and cloud alike (2026-10-10).
  *
- * A user not authorized to display snapshots is answered 200 and an empty
- * list, not 403: on premise the list stayed empty while snapshots were
- * written, until a role granted the display (2026-10-10).
+ * Reading snapshots needs the authorization object `S_MEM_SNAP` in one of the
+ * user's roles. Without it the list is answered 200 and empty — no 403, and
+ * `jobErrorCode` and `jobErrorText` empty too: on premise the list stayed
+ * empty while snapshots were written, until a role granted it (2026-10-10).
  */
 
 import type {

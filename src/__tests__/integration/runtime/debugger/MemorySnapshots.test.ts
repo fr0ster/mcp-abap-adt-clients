@@ -11,8 +11,9 @@
  * - `adt_memory_debugger` — sizes and snapshot writing;
  * - `adt_memory_snapshots` — the snapshots read back. A written snapshot
  *   reaches the list minutes later, so the test waits for it
- *   (`list_wait_seconds`). The user must be authorized to display snapshots:
- *   without it the list answers 200 and empty, and the wait runs out.
+ *   (`list_wait_seconds`). The user needs the authorization object
+ *   `S_MEM_SNAP` in a role: without it the list answers 200 and empty, with
+ *   no error, and the wait runs out.
  *
  * Nothing else may listen for the same SAP user while this runs (see
  * AbapDebugger.test.ts).

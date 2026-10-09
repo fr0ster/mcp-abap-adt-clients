@@ -2353,7 +2353,7 @@ runtime_debugger:
 
     - name: "adt_memory_snapshots"
       enabled: true
-      available_in: ["onprem", "cloud"]   # needs the authorization to display snapshots; without it the list is empty
+      available_in: ["onprem", "cloud"]   # needs S_MEM_SNAP in a role; without it the list is answered 200 and empty
       description: "Memory snapshots read back: list, snapshot, overview, ranking list, children, references, deltas"
       params:
         list_wait_seconds: 900        # a written snapshot reaches the list minutes later

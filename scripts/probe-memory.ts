@@ -9,8 +9,8 @@
  *
  * Measured before (on premise, 2026-10-09): the action answers
  * "Memory Snapshot abDbgMemory_… created … Use transaction S_MEMORY_INSPECTOR",
- * and the ADT list stays empty — until the user is authorized to display
- * snapshots (2026-10-10).
+ * and the ADT list stays empty — until the user's role carries
+ * `S_MEM_SNAP` (2026-10-10).
  *
  *   MCP_ENV_PATH=<session>.env npx ts-node scripts/probe-memory.ts [--keep]
  *

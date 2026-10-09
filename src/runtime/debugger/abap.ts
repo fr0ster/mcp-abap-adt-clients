@@ -450,10 +450,11 @@ export async function getMemorySizes(
  * whether it was written — a 200 either way. It names the file, not an id:
  * the list below gives each snapshot its `fileName`, and the snapshot reaches
  * `/runtime/memory/snapshots` — where an id is learnt — only later, and on
- * the cloud after a few minutes (measured 2026-10-09). The list answers 200
- * and empty to a user not authorized to display snapshots — on premise the
- * file was written and nothing was listed, from this call or from Eclipse,
- * until a role granted it (2026-10-10).
+ * the cloud after a few minutes (measured 2026-10-09). Writing needs no
+ * more than debugging; listing needs `S_MEM_SNAP`, and without it the list
+ * answers 200 and empty — on premise the file was written and nothing was
+ * listed, from this call or from Eclipse, until a role granted it
+ * (2026-10-10).
  */
 export async function createMemorySnapshot(
   connection: IAbapConnection,
