@@ -16,12 +16,12 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import {
   closeOwnTestConnection,
   createTestConnection,
 } from '../src/__tests__/helpers/sessionConfig';
-import { createConnectionLogger } from '../src/__tests__/helpers/testLogger';
 import { AdtClient } from '../src/clients/AdtClient';
 import { ClassExecutor } from '../src/executors/class/ClassExecutor';
 import { AbapDebugger } from '../src/runtime/debugger/AbapDebugger';
@@ -85,11 +85,51 @@ function markerLines(): Record<string, number> {
   return lines;
 }
 
-const started = Date.now();
+// --- presentation -------------------------------------------------------------
 
-function say(line: string): void {
-  const seconds = ((Date.now() - started) / 1000).toFixed(1).padStart(6);
-  process.stdout.write(`${seconds}s  ${line}\n`);
+const VERBOSE = process.env.PROBE_VERBOSE === '1';
+const COLOR =
+  !process.env.NO_COLOR &&
+  (Boolean(process.env.FORCE_COLOR) || Boolean(process.stdout.isTTY));
+const paint =
+  (code: string) =>
+  (text: string): string =>
+    COLOR ? `\x1b[${code}m${text}\x1b[0m` : text;
+const c = {
+  bold: paint('1'),
+  dim: paint('2'),
+  red: paint('31'),
+  green: paint('32'),
+  yellow: paint('33'),
+  blue: paint('34'),
+  magenta: paint('35'),
+  cyan: paint('36'),
+  gray: paint('90'),
+  hilite: paint('1;30;43'),
+};
+
+const started = Date.now();
+const WIDTH = 78;
+
+function clock(): string {
+  return c.gray(`${((Date.now() - started) / 1000).toFixed(1).padStart(5)}s`);
+}
+
+function out(line = ''): void {
+  process.stdout.write(`${line}\n`);
+}
+
+function section(title: string, note = ''): void {
+  const head = ` ${title} ${note ? `${c.dim(note)} ` : ''}`;
+  const visible = ` ${title} ${note ? `${note} ` : ''}`.length;
+  out();
+  out(
+    c.cyan(`━━${c.bold(head)}${'━'.repeat(Math.max(4, WIDTH - visible - 2))}`),
+  );
+}
+
+function info(label: string, text: string): void {
+  out(`${clock()}  ${c.blue('•')} ${c.bold(label.padEnd(10))} ${text}`);
 }
 
 function clip(text: string): string {
@@ -101,30 +141,35 @@ function clip(text: string): string {
 }
 
 /**
- * Run one member and log its answer: the document on success, the status and
- * body the failure carries otherwise. The body comes back either way, which is
- * what the cycle reads.
+ * Run one member and print one line for it: what it did, how it went, how
+ * long it took. The body comes back either way — a failure carries it too —
+ * and is printed only with PROBE_VERBOSE=1.
  */
 async function call(
   label: string,
+  what: string,
   run: () => Promise<IAdtResponse<unknown>>,
-): Promise<{ ok: boolean; body: string }> {
+): Promise<{ ok: boolean; body: string; status?: number }> {
   const t0 = Date.now();
   const answer = await run();
-  const ms = Date.now() - t0;
+  const ms = c.gray(`${Date.now() - t0} ms`);
   if (answer.ok) {
     const body = String(answer.getResult().value ?? '');
-    say(`${label} ok in ${ms} ms`);
-    if (body) say(`${label}   ${clip(body)}`);
+    out(
+      `${clock()}  ${c.green('✓')} ${c.bold(label.padEnd(10))} ${what} ${ms}`,
+    );
+    if (VERBOSE && body) out(c.gray(`              ${clip(body)}`));
     return { ok: true, body };
   }
   const error = answer.getError();
   const body = String(error.response?.data ?? '');
-  say(
-    `${label} FAILED in ${ms} ms: ${error.response?.status ?? ''} ${error.message}`,
+  const status = error.response?.status;
+  const subtype = /subType">([^<]*)</.exec(body)?.[1];
+  out(
+    `${clock()}  ${c.red('✗')} ${c.bold(label.padEnd(10))} ${what} ${c.red(`${status ?? ''} ${subtype ?? error.message}`)} ${ms}`,
   );
-  if (body) say(`${label}   ${clip(body)}`);
-  return { ok: false, body };
+  if (VERBOSE && body) out(c.gray(`              ${clip(body)}`));
+  return { ok: false, body, status };
 }
 
 function attr(xml: string, name: string): string | undefined {
@@ -134,6 +179,165 @@ function attr(xml: string, name: string): string | undefined {
 function tag(xml: string, name: string): string | undefined {
   return new RegExp(`<${name}>([^<]*)</${name}>`).exec(xml)?.[1];
 }
+
+/** A breakpoint id as a person reads it: kind and where. */
+function describeBreakpoint(id: string, lines: Record<string, number>): string {
+  const line = /LINE_NR=(\d+)/.exec(id)?.[1];
+  if (line) {
+    const include = /INCLUDE=([A-Z0-9_]+?)=*CM(\d+)/.exec(id);
+    return `${c.magenta('line')} ${include ? `method include CM${include[2]}` : ''} line ${line}`;
+  }
+  const exception = /EXCEPTION_CLASS=(\w+)/.exec(id)?.[1];
+  if (exception) return `${c.magenta('exception')} ${exception}`;
+  void lines;
+  return id;
+}
+
+/** The source around a line, the line itself marked. */
+function showSource(line: number): void {
+  const source = SOURCE.split('\n');
+  for (let n = line - 1; n <= line + 1; n++) {
+    const text = source[n - 1];
+    if (text === undefined) continue;
+    const number = String(n).padStart(4);
+    const code = text.replace(/\s*"BP:\w+/, '');
+    out(
+      n === line
+        ? `   ${c.yellow('➜')} ${c.yellow(number)} ${c.gray('│')} ${c.hilite(code)}`
+        : `     ${c.gray(number)} ${c.gray('│')} ${c.dim(code)}`,
+    );
+  }
+}
+
+interface IStackFrame {
+  position: string;
+  program: string;
+  event: string;
+  eventType: string;
+  line: number;
+  ours: boolean;
+}
+
+function parseStack(xml: string): IStackFrame[] {
+  return [...xml.matchAll(/<stackEntry\b[^>]*>/g)]
+    .map((m) => m[0])
+    .filter((e) => attr(e, 'stackType') === 'ABAP')
+    .map((e) => ({
+      position: attr(e, 'stackPosition') ?? '',
+      program: (attr(e, 'programName') ?? '').replace(/=+CP$/, ''),
+      event: attr(e, 'eventName') ?? '',
+      eventType: attr(e, 'eventType') ?? '',
+      line: Number(attr(e, 'line') ?? '0'),
+      ours: (attr(e, 'programName') ?? '').startsWith(CLASS_NAME),
+    }));
+}
+
+interface IVariable {
+  name: string;
+  value: string;
+  type: string;
+  kind: string;
+}
+
+/** Values from the previous stop, so a change can be shown as one. */
+let previousValues = new Map<string, string>();
+
+/**
+ * One stop, read and drawn: where it is (the line in its source), the frames
+ * of the probe class above the framework, and every variable by scope, the
+ * changed ones marked.
+ */
+async function readStop(debuggerApi: AbapDebugger): Promise<void> {
+  const stack = await call('stack', 'read the call stack', () =>
+    debuggerApi.getStack(),
+  );
+  const frames = parseStack(stack.body);
+  const root = await call('variables', 'list the scopes', () =>
+    debuggerApi.getChildVariables(['@ROOT']),
+  );
+  const scopes = [
+    ...root.body.matchAll(
+      /<CHILD_ID>([^<]*)<\/CHILD_ID><CHILD_NAME>([^<]*)<\/CHILD_NAME>/g,
+    ),
+  ].map((m) => ({ id: m[1], name: m[2] }));
+  const all = scopes.length
+    ? await call(
+        'variables',
+        `read ${scopes.length} scope${scopes.length === 1 ? '' : 's'}`,
+        () => debuggerApi.getChildVariables(scopes.map((s) => s.id)),
+      )
+    : { ok: true, body: '' };
+
+  const top = frames[0];
+  out();
+  if (top) {
+    out(
+      `   ${c.bold('at')} ${c.cyan(top.program)} ${c.bold(top.event)} ${c.gray(`(${top.eventType.toLowerCase()})`)}  line ${c.yellow(String(top.line))}`,
+    );
+    if (top.ours) showSource(top.line);
+  }
+  const ours = frames.filter((f) => f.ours);
+  const framework = frames.length - ours.length;
+  out(
+    `   ${c.bold('stack')} ${ours
+      .map((f) => `${c.cyan(f.event)}${c.gray(`:${f.line}`)}`)
+      .join(
+        c.gray(' ← '),
+      )}${framework ? c.gray(`  ← ${framework} framework frames`) : ''}`,
+  );
+
+  const parentOf = new Map<string, string>();
+  for (const m of all.body.matchAll(
+    /<PARENT_ID>([^<]*)<\/PARENT_ID><CHILD_ID>([^<]*)<\/CHILD_ID>/g,
+  )) {
+    parentOf.set(m[2], m[1]);
+  }
+  const byScope = new Map<string, IVariable[]>();
+  for (const row of all.body.matchAll(
+    /<STPDA_ADT_VARIABLE>([\s\S]*?)<\/STPDA_ADT_VARIABLE>/g,
+  )) {
+    const id = tag(row[1], 'ID') ?? '';
+    const scope = parentOf.get(id) ?? '?';
+    const list = byScope.get(scope) ?? [];
+    list.push({
+      name: tag(row[1], 'NAME') ?? id,
+      value: tag(row[1], 'VALUE') ?? '',
+      type: tag(row[1], 'TECHNICAL_TYPE') || tag(row[1], 'META_TYPE') || '',
+      kind: tag(row[1], 'KIND') ?? '',
+    });
+    byScope.set(scope, list);
+  }
+
+  const current = new Map<string, string>();
+  for (const scope of scopes) {
+    const variables = (byScope.get(scope.id) ?? []).filter(
+      (v) => !/^\{O:/.test(v.value) || VERBOSE,
+    );
+    if (variables.length === 0) continue;
+    out(`   ${c.bold(scope.name)}`);
+    for (const v of variables) {
+      const key = `${scope.id}/${v.name}`;
+      current.set(key, v.value);
+      const before = previousValues.get(key);
+      const changed = before !== undefined && before !== v.value;
+      const value = changed
+        ? `${c.bold(c.yellow(v.value.trim() || "''"))} ${c.gray(`(was ${before?.trim() || "''"})`)}`
+        : v.value.trim() || c.gray("''");
+      out(
+        `     ${(changed ? c.yellow : c.green)(v.name.padEnd(14))} ${c.gray(v.type.padEnd(22).slice(0, 22))} ${value}`,
+      );
+    }
+  }
+  previousValues = current;
+}
+
+function ended(answer: { ok: boolean; body: string }): boolean {
+  return answer.ok
+    ? /isSteppingPossible="false"/.test(answer.body)
+    : /debuggeeEnded|noSessionAttached|DEBUGGEE_ENDED/.test(answer.body);
+}
+
+// --- the cycle ----------------------------------------------------------------
 
 function identityFor(): IDebuggerIdentity {
   const requestUser = String(process.env.SAP_USERNAME ?? '').toUpperCase();
@@ -147,64 +351,47 @@ function identityFor(): IDebuggerIdentity {
   return { requestUser, terminalId: id('terminalId'), ideId: id('ideId') };
 }
 
+/**
+ * Connection noise stays out of the picture. The connection logs an error for
+ * every refused request, the expected end of the debuggee included, so its
+ * warnings and errors go to stderr only with PROBE_VERBOSE=1.
+ */
+const toStderr = (...args: unknown[]): void => {
+  if (VERBOSE) process.stderr.write(`${args.map(String).join(' ')}\n`);
+};
+const quietLogger: ILogger = {
+  debug: () => {},
+  info: () => {},
+  warn: toStderr,
+  error: toStderr,
+} as ILogger;
+
 async function deployProbeClass(
   connection: IAbapConnection,
   packageName: string,
 ): Promise<boolean> {
-  const cls = new AdtClient(connection, createConnectionLogger()).getClass();
+  const cls = new AdtClient(connection, quietLogger).getClass();
   const config = {
     className: CLASS_NAME,
     packageName,
     description: 'Debugger probe',
   };
-  const created = await cls.create(config);
-  if (!created.ok && !/exist/i.test(created.getError().message ?? '')) {
-    say(`class create REFUSED: ${created.getError().message}`);
-    return false;
-  }
+  const created = await call('create', `${CLASS_NAME} in ${packageName}`, () =>
+    cls.create(config),
+  );
+  if (!created.ok && !/exist/i.test(created.body)) return false;
   const lock = await cls.lock(config);
   if (!lock.ok) {
-    say(`class lock REFUSED: ${lock.getError().message}`);
+    info('lock', c.red(lock.getError().message ?? 'refused'));
     return false;
   }
   const lockHandle = String(lock.getResult().value ?? '');
-  const written = await cls.update(config, { source: SOURCE, lockHandle });
+  const written = await call('write', 'source with markers', () =>
+    cls.update(config, { source: SOURCE, lockHandle }),
+  );
   await cls.unlock(config, lockHandle);
-  const activated = written.ok && (await cls.activate(config)).ok;
-  say(
-    `class ${created.ok ? 'created' : 'reused'}, activate ${activated ? 'ok' : 'FAILED'}`,
-  );
-  return activated;
-}
-
-/** Stack frames and the two-hop variable survey, as one stop's reading. */
-async function readStop(debuggerApi: AbapDebugger): Promise<void> {
-  const stack = await call('stack', () => debuggerApi.getStack());
-  const top = /<stackEntry\b[^>]*>/.exec(stack.body)?.[0] ?? '';
-  say(
-    `stop   ${attr(top, 'programName')} ${attr(top, 'includeName')}:${attr(top, 'line')}`,
-  );
-
-  const root = await call('vars', () =>
-    debuggerApi.getChildVariables(['@ROOT']),
-  );
-  const scopes = [...root.body.matchAll(/<CHILD_ID>([^<]*)<\/CHILD_ID>/g)].map(
-    (m) => m[1],
-  );
-  if (scopes.length === 0) return;
-  const all = await call('vars', () => debuggerApi.getChildVariables(scopes));
-  for (const row of all.body.matchAll(
-    /<STPDA_ADT_VARIABLE>([\s\S]*?)<\/STPDA_ADT_VARIABLE>/g,
-  )) {
-    const name = tag(row[1], 'NAME') ?? '';
-    if (name.startsWith('LV_')) say(`vars   ${name} = ${tag(row[1], 'VALUE')}`);
-  }
-}
-
-function ended(answer: { ok: boolean; body: string }): boolean {
-  return answer.ok
-    ? /isSteppingPossible="false"/.test(answer.body)
-    : /debuggeeEnded|noSessionAttached|DEBUGGEE_ENDED/.test(answer.body);
+  if (!written.ok) return false;
+  return (await call('activate', CLASS_NAME, () => cls.activate(config))).ok;
 }
 
 async function main(): Promise<void> {
@@ -213,16 +400,25 @@ async function main(): Promise<void> {
   const packageIndex = args.indexOf('--package');
   const packageName = packageIndex >= 0 ? args[packageIndex + 1] : '$TMP';
 
-  const logger = createConnectionLogger();
-  const debuggerConnection = await createTestConnection(logger, {
+  section('Connect', process.env.SAP_URL ?? '');
+  const debuggerConnection = await createTestConnection(quietLogger, {
     ownSession: true,
   });
-  const triggerConnection = await createTestConnection(logger, {
+  info(
+    'debugger',
+    `session ${c.gray(String(debuggerConnection.getSessionId()))}`,
+  );
+  const triggerConnection = await createTestConnection(quietLogger, {
     ownSession: true,
   });
-  const debuggerApi = new AbapDebugger(debuggerConnection, logger);
+  info(
+    'trigger',
+    `session ${c.gray(String(triggerConnection.getSessionId()))}`,
+  );
+  const debuggerApi = new AbapDebugger(debuggerConnection, quietLogger);
 
   try {
+    section('Probe class');
     if (!(await deployProbeClass(debuggerConnection, packageName))) return;
     const lines = markerLines();
     const identity = identityFor();
@@ -233,30 +429,45 @@ async function main(): Promise<void> {
       { kind: 'exception', exceptionClass: 'CX_SY_ZERODIVIDE' },
     ];
 
+    section('Breakpoints', `user ${identity.requestUser}`);
     // The debugger's session is stateful for the whole cycle — the caller's call.
     debuggerConnection.setSessionType('stateful');
-
-    await call('bp-validate', () =>
-      debuggerApi.setBreakpoints(identity, breakpoints, {
-        validationOnly: true,
-      }),
+    await call(
+      'validate',
+      `${breakpoints.length} breakpoints, nothing armed`,
+      () =>
+        debuggerApi.setBreakpoints(identity, breakpoints, {
+          validationOnly: true,
+        }),
     );
-    const armed = await call('bp-arm', () =>
+    const armed = await call('arm', `${breakpoints.length} breakpoints`, () =>
       debuggerApi.setBreakpoints(identity, breakpoints),
     );
     const owned = [
       ...armed.body.matchAll(/<breakpoint\b[^>]*\bid="([^"]*)"/g),
     ].map((m) => m[1]);
-    say(`armed ${owned.length}: ${owned.join(' | ')}`);
+    for (const id of owned)
+      out(`              ${c.magenta('◆')} ${describeBreakpoint(id, lines)}`);
+    out(
+      c.gray(
+        `              source lines ${lines.loop} and ${lines.catch}; the server renumbers them into the method include`,
+      ),
+    );
 
-    const listener = call('listener', () =>
-      debuggerApi.listen(identity, { holdSeconds: LISTEN_SECONDS }),
+    section('Listen & run');
+    const listener = call(
+      'listen',
+      `user-mode listener, held ${LISTEN_SECONDS} s`,
+      () => debuggerApi.listen(identity, { holdSeconds: LISTEN_SECONDS }),
     );
     await new Promise((resolve) => setTimeout(resolve, ARM_DELAY_MS));
-    // The run, on the other session: classrun through the class executor.
-    // It stays open while the debuggee is suspended.
-    const trigger = call('trigger', () =>
-      new ClassExecutor(triggerConnection, logger).run({
+    info(
+      'run',
+      `classrun ${CLASS_NAME} on the trigger session ${c.gray(`(${ARM_DELAY_MS} ms after the listener)`)}`,
+    );
+    // The run stays open while the debuggee is suspended.
+    const trigger = call('run', 'classrun returned', () =>
+      new ClassExecutor(triggerConnection, quietLogger).run({
         className: CLASS_NAME,
       }),
     );
@@ -266,61 +477,86 @@ async function main(): Promise<void> {
     let attached = false;
     let done = false;
     if (debuggeeId) {
-      say(
-        `caught ${tag(caught.body, 'DBGEE_KIND')} at ${tag(caught.body, 'URI')}`,
+      info(
+        'caught',
+        `${c.green(tag(caught.body, 'DBGEE_KIND') ?? '')} ${c.gray(debuggeeId)} at line ${c.yellow(/#start=(\d+)/.exec(tag(caught.body, 'URI') ?? '')?.[1] ?? '?')}`,
       );
-      const attach = await call('attach', () =>
+      const attach = await call('attach', 'to the debuggee', () =>
         debuggerApi.attach(identity.requestUser, debuggeeId),
       );
       attached = attach.ok;
     } else {
-      say('nothing was caught');
+      info('caught', c.red('nothing — the listener came back empty'));
     }
 
     if (attached) {
+      section('Stop 1', 'first breakpoint');
       await readStop(debuggerApi);
       const plan: IDebuggerStepMethod[] = [
         'stepInto',
         'stepReturn',
         ...Array<IDebuggerStepMethod>(MAX_CONTINUES).fill('stepContinue'),
       ];
-      for (const method of plan) {
-        const answer = await call(method, () => debuggerApi.step(method));
+      for (const [index, method] of plan.entries()) {
+        section(`Stop ${index + 2}`, method);
+        const answer = await call('step', method, () =>
+          debuggerApi.step(method),
+        );
         if (ended(answer)) {
-          say(`debuggee ended on ${method}`);
+          out(
+            `   ${c.green('■')} ${c.bold('the program ran to its end')} ${c.gray('(500 debuggeeEnded)')}`,
+          );
           done = true;
           break;
         }
+        const reached = [
+          ...answer.body.matchAll(/<dbg:breakpoint id="([^"]*)"/g),
+        ].map((m) => m[1]);
+        for (const id of reached)
+          out(
+            `              ${c.magenta('◆')} reached ${describeBreakpoint(id, lines)}`,
+          );
         await readStop(debuggerApi);
       }
     }
 
+    section('Cleanup');
     for (const id of owned) {
-      await call('bp-delete', () => debuggerApi.deleteBreakpoint(identity, id));
+      await call('delete', describeBreakpoint(id, lines), () =>
+        debuggerApi.deleteBreakpoint(identity, id),
+      );
     }
     if (attached && !done) {
-      await call('terminate', () => debuggerApi.terminateDebuggee());
+      await call('terminate', 'the debuggee', () =>
+        debuggerApi.terminateDebuggee(),
+      );
     }
-    await call('listener-delete', () => debuggerApi.stopListener(identity));
+    await call('unlisten', 'the listener', () =>
+      debuggerApi.stopListener(identity),
+    );
     debuggerConnection.setSessionType('stateless');
 
     const run = await trigger;
-    say(`trigger settled: ${run.ok ? 'ok' : 'failed'} ${clip(run.body)}`);
+    section('Program output');
+    out(
+      `   ${run.ok ? c.green(run.body.trim() || "''") : c.red(run.body.trim())}`,
+    );
   } finally {
     if (!keep) {
-      const deleted = await new AdtClient(debuggerConnection, logger)
-        .getClass()
-        .delete({ className: CLASS_NAME, packageName });
-      say(
-        `class delete ${deleted.ok ? 'ok' : `REFUSED: ${deleted.getError().message}`}`,
+      section('Teardown');
+      await call('delete', CLASS_NAME, () =>
+        new AdtClient(debuggerConnection, quietLogger)
+          .getClass()
+          .delete({ className: CLASS_NAME, packageName }),
       );
     }
     await closeOwnTestConnection(triggerConnection);
     await closeOwnTestConnection(debuggerConnection);
+    out();
   }
 }
 
 main().catch((error) => {
-  say(`FAILED: ${error instanceof Error ? error.stack : String(error)}`);
+  out(c.red(`FAILED: ${error instanceof Error ? error.stack : String(error)}`));
   process.exitCode = 1;
 });

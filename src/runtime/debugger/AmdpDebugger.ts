@@ -34,7 +34,7 @@ export class AmdpDebugger implements IAmdpDebugger {
 
   constructor(
     private readonly connection: IAbapConnection,
-    private readonly logger: ILogger,
+    _logger?: ILogger,
   ) {}
 
   async start(options?: IStartAmdpDebuggerOptions): Promise<IAdtWireResponse> {

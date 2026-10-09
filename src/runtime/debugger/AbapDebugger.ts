@@ -93,7 +93,7 @@ export class AbapDebugger<
 
   constructor(
     private readonly connection: IAbapConnection,
-    private readonly logger: ILogger,
+    _logger?: ILogger,
     // The one cast in this file, and it is on the default. See AdtClass.
     private readonly results: R = abapDebuggerDocuments as unknown as R,
   ) {}

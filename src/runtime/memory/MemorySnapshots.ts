@@ -28,7 +28,7 @@ export class MemorySnapshots implements IMemorySnapshots {
 
   constructor(
     private readonly connection: IAbapConnection,
-    private readonly logger: ILogger,
+    _logger?: ILogger,
   ) {}
 
   async list(options?: IMemorySnapshotsListOptions): Promise<IAdtWireResponse> {

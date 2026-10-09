@@ -291,7 +291,9 @@ describe('Debugger Batch Endpoint Scope', () => {
           const respBoundary = boundaryMatch?.[1]?.trim();
 
           if (process.env.DEBUG_ADT_TESTS === 'true') {
-            console.log(`[BATCH-SCOPE] response boundary: ${respBoundary}`);
+            testsLogger.info(
+              `[BATCH-SCOPE] response boundary: ${respBoundary}`,
+            );
           }
 
           if (respBoundary) {
@@ -309,13 +311,15 @@ describe('Debugger Batch Endpoint Scope', () => {
                 const status = statusMatch
                   ? `${statusMatch[1]} ${statusMatch[2]}`
                   : 'unknown';
-                console.log(`[BATCH-SCOPE] part ${i + 1} status: ${status}`);
-                console.log(
+                testsLogger.info(
+                  `[BATCH-SCOPE] part ${i + 1} status: ${status}`,
+                );
+                testsLogger.info(
                   `[BATCH-SCOPE] part ${i + 1} preview (500 chars): ${part.substring(0, 500)}`,
                 );
               }
 
-              console.log(`[BATCH-SCOPE] total parts: ${parts.length}`);
+              testsLogger.info(`[BATCH-SCOPE] total parts: ${parts.length}`);
             }
             expect(parts.length).toBe(2);
           }
@@ -327,7 +331,7 @@ describe('Debugger Batch Endpoint Scope', () => {
             response.data.includes('sapmhttp') ||
             response.data.includes('SAPMHTTP');
           if (process.env.DEBUG_ADT_TESTS === 'true') {
-            console.log(
+            testsLogger.info(
               `[BATCH-SCOPE] class content found: ${hasClassContent}, program content found: ${hasProgramContent}`,
             );
           }
