@@ -77,11 +77,11 @@ describe('MemorySnapshots', () => {
     const connection = createConnectionMock();
     const snapshots = new MemorySnapshots(connection, createLogger());
 
-    await snapshots.getRankingList('snap123');
+    await snapshots.getRankingList('snap123', { maxNumberOfObjects: 5 });
 
     expect(connection.makeAdtRequest).toHaveBeenCalledWith(
       expect.objectContaining({
-        url: '/sap/bc/adt/runtime/memory/snapshots/snap123/rankinglist',
+        url: '/sap/bc/adt/runtime/memory/snapshots/snap123/rankinglist?maxNumberOfObjects=5',
         method: 'GET',
       }),
     );

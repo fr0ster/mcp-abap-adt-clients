@@ -127,7 +127,7 @@ export class MemorySnapshots<
 
   async getRankingList<E extends IAdtError = IAdtError>(
     snapshotId: string,
-    options?: ISnapshotRankingListOptions & IAdtAnalyseOptions<E>,
+    options: ISnapshotRankingListOptions & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<Of<R, 'rankingList'>, E>> {
     return answering(
       () => getSnapshotRankingList(this.connection, snapshotId, options),
@@ -139,7 +139,7 @@ export class MemorySnapshots<
   async getChildren<E extends IAdtError = IAdtError>(
     snapshotId: string,
     parentKey: string,
-    options?: ISnapshotChildrenOptions & IAdtAnalyseOptions<E>,
+    options: ISnapshotChildrenOptions & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<Of<R, 'children'>, E>> {
     return answering(
       () =>
@@ -152,7 +152,7 @@ export class MemorySnapshots<
   async getReferences<E extends IAdtError = IAdtError>(
     snapshotId: string,
     objectKey: string,
-    options?: ISnapshotReferencesOptions & IAdtAnalyseOptions<E>,
+    options: ISnapshotReferencesOptions & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<Of<R, 'references'>, E>> {
     return answering(
       () =>
@@ -177,7 +177,7 @@ export class MemorySnapshots<
   async getDeltaRankingList<E extends IAdtError = IAdtError>(
     fromId: string,
     toId: string,
-    options?: ISnapshotRankingListOptions & IAdtAnalyseOptions<E>,
+    options: ISnapshotRankingListOptions & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<Of<R, 'rankingList'>, E>> {
     return answering(
       () => getSnapshotDeltaRankingList(this.connection, fromId, toId, options),
@@ -190,7 +190,7 @@ export class MemorySnapshots<
     fromId: string,
     toId: string,
     parentKey: string,
-    options?: ISnapshotChildrenOptions & IAdtAnalyseOptions<E>,
+    options: ISnapshotChildrenOptions & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<Of<R, 'children'>, E>> {
     return answering(
       () =>
@@ -210,7 +210,7 @@ export class MemorySnapshots<
     fromId: string,
     toId: string,
     objectKey: string,
-    options?: ISnapshotReferencesOptions & IAdtAnalyseOptions<E>,
+    options: ISnapshotReferencesOptions & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<Of<R, 'references'>, E>> {
     return answering(
       () =>

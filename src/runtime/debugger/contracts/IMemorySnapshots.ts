@@ -10,8 +10,13 @@ export interface IMemorySnapshotsListOptions {
   originalUser?: string;
 }
 
+/**
+ * The limits are required: without one, every view that takes it answers 400
+ * "Parameter … could not be found" (measured on premise and cloud,
+ * 2026-10-10).
+ */
 export interface ISnapshotRankingListOptions {
-  maxNumberOfObjects?: number;
+  maxNumberOfObjects: number;
   excludeAbapType?: string[];
   sortAscending?: boolean;
   sortByColumnName?: string;
@@ -19,13 +24,13 @@ export interface ISnapshotRankingListOptions {
 }
 
 export interface ISnapshotChildrenOptions {
-  maxNumberOfObjects?: number;
+  maxNumberOfObjects: number;
   sortAscending?: boolean;
   sortByColumnName?: string;
 }
 
 export interface ISnapshotReferencesOptions {
-  maxNumberOfReferences?: number;
+  maxNumberOfReferences: number;
 }
 
 /**
@@ -55,17 +60,17 @@ export interface IMemorySnapshots<
   ): Promise<IAdtResponse<TOverview, E>>;
   getRankingList<E extends IAdtError = IAdtError>(
     snapshotId: string,
-    options?: ISnapshotRankingListOptions & IAdtAnalyseOptions<E>,
+    options: ISnapshotRankingListOptions & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<TRankingList, E>>;
   getChildren<E extends IAdtError = IAdtError>(
     snapshotId: string,
     parentKey: string,
-    options?: ISnapshotChildrenOptions & IAdtAnalyseOptions<E>,
+    options: ISnapshotChildrenOptions & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<TChildren, E>>;
   getReferences<E extends IAdtError = IAdtError>(
     snapshotId: string,
     objectKey: string,
-    options?: ISnapshotReferencesOptions & IAdtAnalyseOptions<E>,
+    options: ISnapshotReferencesOptions & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<TReferences, E>>;
   getDeltaOverview<E extends IAdtError = IAdtError>(
     fromId: string,
@@ -75,18 +80,18 @@ export interface IMemorySnapshots<
   getDeltaRankingList<E extends IAdtError = IAdtError>(
     fromId: string,
     toId: string,
-    options?: ISnapshotRankingListOptions & IAdtAnalyseOptions<E>,
+    options: ISnapshotRankingListOptions & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<TRankingList, E>>;
   getDeltaChildren<E extends IAdtError = IAdtError>(
     fromId: string,
     toId: string,
     parentKey: string,
-    options?: ISnapshotChildrenOptions & IAdtAnalyseOptions<E>,
+    options: ISnapshotChildrenOptions & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<TChildren, E>>;
   getDeltaReferences<E extends IAdtError = IAdtError>(
     fromId: string,
     toId: string,
     objectKey: string,
-    options?: ISnapshotReferencesOptions & IAdtAnalyseOptions<E>,
+    options: ISnapshotReferencesOptions & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<TReferences, E>>;
 }

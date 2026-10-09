@@ -7,12 +7,12 @@
  * memory snapshot. The table is what the reading must show: the sizes grow
  * between the stops, and the delta of the two snapshots puts the table first.
  *
- * Two test cases, because the platforms differ:
- * - `adt_memory_debugger` — sizes and snapshot writing, on premise and cloud;
- * - `adt_memory_snapshots` — the snapshots read back. On the cloud a written
- *   snapshot reaches the list a few minutes later, so the test waits for it
- *   (`list_wait_seconds`); on premise (BASIS 816, 2026-10-09) it never did,
- *   from this code or from Eclipse, so the case is cloud-only.
+ * Two test cases, because reading back needs more than writing:
+ * - `adt_memory_debugger` — sizes and snapshot writing;
+ * - `adt_memory_snapshots` — the snapshots read back. A written snapshot
+ *   reaches the list minutes later, so the test waits for it
+ *   (`list_wait_seconds`). The user must be authorized to display snapshots:
+ *   without it the list answers 200 and empty, and the wait runs out.
  *
  * Nothing else may listen for the same SAP user while this runs (see
  * AbapDebugger.test.ts).
@@ -218,8 +218,15 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
       ...(transportRequest ? { transportRequest } : {}),
     };
     const created = await cls.create(config);
-    if (!created.ok && !/exist/i.test(created.getError().message ?? '')) {
-      throw new Error(`probe create: ${created.getError().message}`);
+    // A probe kept from an earlier run is rewritten in place; the 400 says so
+    // in its body, not in the message.
+    if (
+      !created.ok &&
+      !/exist/i.test(String(created.getError().response?.data ?? ''))
+    ) {
+      throw new Error(
+        `probe create: ${created.getError().message} ${String(created.getError().response?.data ?? '').slice(0, 300)}`,
+      );
     }
     const lock = await cls.lock(config);
     if (!lock.ok) throw new Error(`probe lock: ${lock.getError().message}`);
@@ -364,8 +371,11 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
     async () => {
       if (skipped()) return;
       needs(run, 'the run');
-      const moved = await debuggerApi.step('stepContinue');
-      expect(moved.ok).toBe(true);
+      // Continuing to the end is answered 500 debuggeeEnded (see
+      // AbapDebugger.test.ts): a failure to the default analyse, the end here.
+      const toEnd = await debuggerApi.step('stepContinue');
+      expect(toEnd.ok).toBe(false);
+      expect(documentOf(toEnd)).toContain('debuggeeEnded');
       attached = false;
       const ran = await run;
       expect(documentOf(ran as IAdtResponse<unknown>)).toContain(
@@ -375,7 +385,7 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
     STEP_TIMEOUT,
   );
 
-  // --- read back: cloud only ------------------------------------------------------
+  // --- read back ------------------------------------------------------------------
 
   it(
     'both snapshots reach the list',
@@ -452,7 +462,9 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
       expect(deltaOverview.ok).toBe(true);
       expect(documentOf(deltaOverview)).toContain('<mi:delta>');
 
-      const references = await snapshots.getReferences(after, key);
+      const references = await snapshots.getReferences(after, key, {
+        maxNumberOfReferences: 5,
+      });
       expect(references.ok).toBe(true);
       expect(documentOf(references)).toContain('LT_ROWS');
 
@@ -460,16 +472,20 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
         before,
         after,
         key,
+        { maxNumberOfReferences: 5 },
       );
       expect(deltaReferences.ok).toBe(true);
 
       // A table of strings has no children of its own.
-      const children = await snapshots.getChildren(after, key);
+      const children = await snapshots.getChildren(after, key, {
+        maxNumberOfObjects: 5,
+      });
       expect(children.ok).toBe(true);
       const deltaChildren = await snapshots.getDeltaChildren(
         before,
         after,
         key,
+        { maxNumberOfObjects: 5 },
       );
       expect(deltaChildren.ok).toBe(true);
 

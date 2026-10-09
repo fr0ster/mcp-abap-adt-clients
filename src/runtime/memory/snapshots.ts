@@ -7,10 +7,13 @@
  * types are below. Measured on the cloud (2026-10-09) on two snapshots of
  * one debuggee, before and after it filled a table: the delta ranking list
  * put that table first, marked `added`. A snapshot id that does not exist is
- * answered 404 `MEMORY_INSPECTOR 010`.
+ * answered 404 `MEMORY_INSPECTOR 010`. The ranking list, children and
+ * references take a required limit: without it they answer 400 "Parameter …
+ * could not be found", on premise and cloud alike (2026-10-10).
  *
- * On premise (BASIS 816, the same day) the list stayed empty while the
- * snapshots were written, so there was nothing to read by id.
+ * A user not authorized to display snapshots is answered 200 and an empty
+ * list, not 403: on premise the list stayed empty while snapshots were
+ * written, until a role granted the display (2026-10-10).
  */
 
 import type {
@@ -66,17 +69,16 @@ function deltaParams(fromId: string, toId: string): URLSearchParams {
 
 function rankingParams(
   params: URLSearchParams,
-  options?: ISnapshotRankingListOptions,
+  options: ISnapshotRankingListOptions,
 ): URLSearchParams {
-  if (options?.maxNumberOfObjects)
-    params.append('maxNumberOfObjects', String(options.maxNumberOfObjects));
-  for (const type of options?.excludeAbapType ?? [])
+  params.append('maxNumberOfObjects', String(options.maxNumberOfObjects));
+  for (const type of options.excludeAbapType ?? [])
     params.append('excludeAbapType', type);
-  if (options?.sortAscending !== undefined)
+  if (options.sortAscending !== undefined)
     params.append('sortAscending', String(options.sortAscending));
-  if (options?.sortByColumnName)
+  if (options.sortByColumnName)
     params.append('sortByColumnName', options.sortByColumnName);
-  if (options?.groupByParentType !== undefined)
+  if (options.groupByParentType !== undefined)
     params.append('groupByParentType', String(options.groupByParentType));
   return params;
 }
@@ -84,14 +86,13 @@ function rankingParams(
 function childrenParams(
   params: URLSearchParams,
   parentKey: string,
-  options?: ISnapshotChildrenOptions,
+  options: ISnapshotChildrenOptions,
 ): URLSearchParams {
   params.append('parentKey', parentKey);
-  if (options?.maxNumberOfObjects)
-    params.append('maxNumberOfObjects', String(options.maxNumberOfObjects));
-  if (options?.sortAscending !== undefined)
+  params.append('maxNumberOfObjects', String(options.maxNumberOfObjects));
+  if (options.sortAscending !== undefined)
     params.append('sortAscending', String(options.sortAscending));
-  if (options?.sortByColumnName)
+  if (options.sortByColumnName)
     params.append('sortByColumnName', options.sortByColumnName);
   return params;
 }
@@ -99,14 +100,10 @@ function childrenParams(
 function referencesParams(
   params: URLSearchParams,
   objectKey: string,
-  options?: ISnapshotReferencesOptions,
+  options: ISnapshotReferencesOptions,
 ): URLSearchParams {
   params.append('objectKey', objectKey);
-  if (options?.maxNumberOfReferences)
-    params.append(
-      'maxNumberOfReferences',
-      String(options.maxNumberOfReferences),
-    );
+  params.append('maxNumberOfReferences', String(options.maxNumberOfReferences));
   return params;
 }
 
@@ -155,7 +152,7 @@ export async function getSnapshotOverview(
 export async function getSnapshotRankingList(
   connection: IAbapConnection,
   snapshotId: string,
-  options?: ISnapshotRankingListOptions,
+  options: ISnapshotRankingListOptions,
 ): Promise<IAdtWireResponse> {
   return get(
     connection,
@@ -169,7 +166,7 @@ export async function getSnapshotChildren(
   connection: IAbapConnection,
   snapshotId: string,
   parentKey: string,
-  options?: ISnapshotChildrenOptions,
+  options: ISnapshotChildrenOptions,
 ): Promise<IAdtWireResponse> {
   return get(
     connection,
@@ -184,7 +181,7 @@ export async function getSnapshotReferences(
   connection: IAbapConnection,
   snapshotId: string,
   objectKey: string,
-  options?: ISnapshotReferencesOptions,
+  options: ISnapshotReferencesOptions,
 ): Promise<IAdtWireResponse> {
   return get(
     connection,
@@ -213,7 +210,7 @@ export async function getSnapshotDeltaRankingList(
   connection: IAbapConnection,
   fromId: string,
   toId: string,
-  options?: ISnapshotRankingListOptions,
+  options: ISnapshotRankingListOptions,
 ): Promise<IAdtWireResponse> {
   return get(
     connection,
@@ -228,7 +225,7 @@ export async function getSnapshotDeltaChildren(
   fromId: string,
   toId: string,
   parentKey: string,
-  options?: ISnapshotChildrenOptions,
+  options: ISnapshotChildrenOptions,
 ): Promise<IAdtWireResponse> {
   return get(
     connection,
@@ -243,7 +240,7 @@ export async function getSnapshotDeltaReferences(
   fromId: string,
   toId: string,
   objectKey: string,
-  options?: ISnapshotReferencesOptions,
+  options: ISnapshotReferencesOptions,
 ): Promise<IAdtWireResponse> {
   return get(
     connection,

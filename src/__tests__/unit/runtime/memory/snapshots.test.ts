@@ -169,26 +169,41 @@ describe('runtime/memory/snapshots', () => {
     ['list', () => listSnapshots, [], 'snapshots'],
     ['snapshot', () => getSnapshot, ['S'], 'snapshot'],
     ['overview', () => getSnapshotOverview, ['S'], 'overview'],
-    ['rankingList', () => getSnapshotRankingList, ['S'], 'rankinglist'],
-    ['children', () => getSnapshotChildren, ['S', 'K'], 'children'],
-    ['references', () => getSnapshotReferences, ['S', 'K'], 'references'],
+    [
+      'rankingList',
+      () => getSnapshotRankingList,
+      ['S', { maxNumberOfObjects: 1 }],
+      'rankinglist',
+    ],
+    [
+      'children',
+      () => getSnapshotChildren,
+      ['S', 'K', { maxNumberOfObjects: 1 }],
+      'children',
+    ],
+    [
+      'references',
+      () => getSnapshotReferences,
+      ['S', 'K', { maxNumberOfReferences: 1 }],
+      'references',
+    ],
     ['delta overview', () => getSnapshotDeltaOverview, ['A', 'B'], 'overview'],
     [
       'delta ranking',
       () => getSnapshotDeltaRankingList,
-      ['A', 'B'],
+      ['A', 'B', { maxNumberOfObjects: 1 }],
       'rankinglist',
     ],
     [
       'delta children',
       () => getSnapshotDeltaChildren,
-      ['A', 'B', 'K'],
+      ['A', 'B', 'K', { maxNumberOfObjects: 1 }],
       'children',
     ],
     [
       'delta references',
       () => getSnapshotDeltaReferences,
-      ['A', 'B', 'K'],
+      ['A', 'B', 'K', { maxNumberOfReferences: 1 }],
       'references',
     ],
   ] as const)('%s asks for its own type', async (_label, fn, args, type) => {
@@ -201,5 +216,15 @@ describe('runtime/memory/snapshots', () => {
         },
       }),
     );
+  });
+
+  it('the limits are always sent: a view without one is answered 400', async () => {
+    const connection = createConnectionMock();
+    await getSnapshotReferences(connection, 'S', 'K', {
+      maxNumberOfReferences: 3,
+    });
+    expect(
+      (connection.makeAdtRequest as jest.Mock).mock.calls[0][0].url,
+    ).toContain('maxNumberOfReferences=3');
   });
 });
