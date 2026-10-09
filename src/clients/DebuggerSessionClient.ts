@@ -3,7 +3,7 @@ import type {
   IDebuggerGetVariablesParams,
   IDebuggerListenParams,
   IDebuggerStepParams,
-} from '@mcp-abap-adt/interfaces';
+} from '../runtime/debugger/contracts';
 import type { AdtClientsWS } from './AdtClientsWS';
 
 /**

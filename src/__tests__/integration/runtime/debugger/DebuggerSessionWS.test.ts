@@ -21,9 +21,10 @@ import type {
   IWebSocketMessageEnvelope,
   IWebSocketMessageHandler,
   IWebSocketTransport,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-network';
 import * as dotenv from 'dotenv';
 import { AdtClientsWS } from '../../../../clients/AdtClientsWS';
+import { DebuggerSessionClient } from '../../../../clients/DebuggerSessionClient';
 import { createTestsLogger } from '../../../helpers/testLogger';
 import {
   logTestEnd,
@@ -259,7 +260,7 @@ describe('WS debugger session integration', () => {
       const wsClient = new AdtClientsWS(transport, testsLogger, {
         requestTimeoutMs,
       });
-      const debuggerSession = wsClient.getDebuggerSessionClient();
+      const debuggerSession = new DebuggerSessionClient(wsClient);
 
       let sessionId: string | undefined;
       try {

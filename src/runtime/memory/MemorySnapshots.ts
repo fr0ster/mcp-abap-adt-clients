@@ -1,13 +1,15 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-  ILogger,
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type {
   IMemorySnapshots,
   IMemorySnapshotsListOptions,
   ISnapshotChildrenOptions,
   ISnapshotRankingListOptions,
   ISnapshotReferencesOptions,
-} from '@mcp-abap-adt/interfaces';
+} from '../debugger/contracts';
 import {
   getSnapshot,
   getSnapshotChildren,

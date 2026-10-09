@@ -11,7 +11,7 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -81,10 +81,6 @@ export async function getSnapshot(
   connection: IAbapConnection,
   snapshotId: string,
 ): Promise<IAdtWireResponse> {
-  if (!snapshotId) {
-    throw new Error('Snapshot ID is required');
-  }
-
   const url = `/sap/bc/adt/runtime/memory/snapshots/${snapshotId}`;
 
   return connection.makeAdtRequest({
@@ -110,10 +106,6 @@ export async function getSnapshotRankingList(
   snapshotId: string,
   options?: ISnapshotRankingListOptions,
 ): Promise<IAdtWireResponse> {
-  if (!snapshotId) {
-    throw new Error('Snapshot ID is required');
-  }
-
   const params = new URLSearchParams();
   if (options?.maxNumberOfObjects)
     params.append('maxNumberOfObjects', String(options.maxNumberOfObjects));
@@ -156,10 +148,6 @@ export async function getSnapshotDeltaRankingList(
   uri2: string,
   options?: ISnapshotRankingListOptions,
 ): Promise<IAdtWireResponse> {
-  if (!uri1 || !uri2) {
-    throw new Error('Both snapshot URIs are required');
-  }
-
   const params = new URLSearchParams();
   params.append('uri1', uri1);
   params.append('uri2', uri2);
@@ -204,13 +192,6 @@ export async function getSnapshotChildren(
   parentKey: string,
   options?: ISnapshotChildrenOptions,
 ): Promise<IAdtWireResponse> {
-  if (!snapshotId) {
-    throw new Error('Snapshot ID is required');
-  }
-  if (!parentKey) {
-    throw new Error('Parent key is required');
-  }
-
   const params = new URLSearchParams();
   params.append('parentKey', parentKey);
   if (options?.maxNumberOfObjects)
@@ -249,13 +230,6 @@ export async function getSnapshotDeltaChildren(
   parentKey: string,
   options?: ISnapshotChildrenOptions,
 ): Promise<IAdtWireResponse> {
-  if (!uri1 || !uri2) {
-    throw new Error('Both snapshot URIs are required');
-  }
-  if (!parentKey) {
-    throw new Error('Parent key is required');
-  }
-
   const params = new URLSearchParams();
   params.append('uri1', uri1);
   params.append('uri2', uri2);
@@ -294,13 +268,6 @@ export async function getSnapshotReferences(
   objectKey: string,
   options?: ISnapshotReferencesOptions,
 ): Promise<IAdtWireResponse> {
-  if (!snapshotId) {
-    throw new Error('Snapshot ID is required');
-  }
-  if (!objectKey) {
-    throw new Error('Object key is required');
-  }
-
   const params = new URLSearchParams();
   params.append('objectKey', objectKey);
   if (options?.maxNumberOfReferences)
@@ -338,13 +305,6 @@ export async function getSnapshotDeltaReferences(
   objectKey: string,
   options?: ISnapshotReferencesOptions,
 ): Promise<IAdtWireResponse> {
-  if (!uri1 || !uri2) {
-    throw new Error('Both snapshot URIs are required');
-  }
-  if (!objectKey) {
-    throw new Error('Object key is required');
-  }
-
   const params = new URLSearchParams();
   params.append('uri1', uri1);
   params.append('uri2', uri2);
@@ -378,10 +338,6 @@ export async function getSnapshotOverview(
   connection: IAbapConnection,
   snapshotId: string,
 ): Promise<IAdtWireResponse> {
-  if (!snapshotId) {
-    throw new Error('Snapshot ID is required');
-  }
-
   const url = `/sap/bc/adt/runtime/memory/snapshots/${snapshotId}/overview`;
 
   return connection.makeAdtRequest({
@@ -407,10 +363,6 @@ export async function getSnapshotDeltaOverview(
   uri1: string,
   uri2: string,
 ): Promise<IAdtWireResponse> {
-  if (!uri1 || !uri2) {
-    throw new Error('Both snapshot URIs are required');
-  }
-
   const params = new URLSearchParams();
   params.append('uri1', uri1);
   params.append('uri2', uri2);

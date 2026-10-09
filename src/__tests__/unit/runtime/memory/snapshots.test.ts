@@ -1,4 +1,4 @@
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   getSnapshot,
   getSnapshotChildren,
@@ -41,12 +41,9 @@ describe('runtime/memory/snapshots', () => {
     );
   });
 
-  it('getSnapshot validates required snapshotId', async () => {
+  it('getSnapshot builds the snapshot URL', async () => {
     const connection = createConnectionMock();
 
-    await expect(getSnapshot(connection, '')).rejects.toThrow(
-      'Snapshot ID is required',
-    );
     await getSnapshot(connection, 'SNAP1');
 
     expect(connection.makeAdtRequest).toHaveBeenCalledWith(
@@ -76,12 +73,9 @@ describe('runtime/memory/snapshots', () => {
     );
   });
 
-  it('getSnapshotDeltaRankingList validates uris and builds URL', async () => {
+  it('getSnapshotDeltaRankingList builds URL', async () => {
     const connection = createConnectionMock();
 
-    await expect(
-      getSnapshotDeltaRankingList(connection, '', 'uri2'),
-    ).rejects.toThrow('Both snapshot URIs are required');
     await getSnapshotDeltaRankingList(connection, '/snap/1', '/snap/2', {
       maxNumberOfObjects: 10,
       sortAscending: false,
@@ -94,27 +88,15 @@ describe('runtime/memory/snapshots', () => {
     );
   });
 
-  it('getSnapshotChildren and getSnapshotDeltaChildren validate params', async () => {
+  it('getSnapshotChildren and getSnapshotDeltaChildren build URLs', async () => {
     const connection = createConnectionMock();
 
-    await expect(getSnapshotChildren(connection, '', 'PARENT')).rejects.toThrow(
-      'Snapshot ID is required',
-    );
-    await expect(getSnapshotChildren(connection, 'SNAP1', '')).rejects.toThrow(
-      'Parent key is required',
-    );
     await getSnapshotChildren(connection, 'SNAP1', 'NODE1', {
       maxNumberOfObjects: 20,
       sortAscending: true,
       sortByColumnName: 'name',
     });
 
-    await expect(
-      getSnapshotDeltaChildren(connection, '', '/s2', 'NODE1'),
-    ).rejects.toThrow('Both snapshot URIs are required');
-    await expect(
-      getSnapshotDeltaChildren(connection, '/s1', '/s2', ''),
-    ).rejects.toThrow('Parent key is required');
     await getSnapshotDeltaChildren(connection, '/s1', '/s2', 'NODE1', {
       maxNumberOfObjects: 7,
       sortAscending: false,
@@ -135,25 +117,13 @@ describe('runtime/memory/snapshots', () => {
     );
   });
 
-  it('getSnapshotReferences and delta references validate params', async () => {
+  it('getSnapshotReferences and delta references build URLs', async () => {
     const connection = createConnectionMock();
 
-    await expect(getSnapshotReferences(connection, '', 'OBJ')).rejects.toThrow(
-      'Snapshot ID is required',
-    );
-    await expect(
-      getSnapshotReferences(connection, 'SNAP1', ''),
-    ).rejects.toThrow('Object key is required');
     await getSnapshotReferences(connection, 'SNAP1', 'OBJ1', {
       maxNumberOfReferences: 42,
     });
 
-    await expect(
-      getSnapshotDeltaReferences(connection, '', '/s2', 'OBJ1'),
-    ).rejects.toThrow('Both snapshot URIs are required');
-    await expect(
-      getSnapshotDeltaReferences(connection, '/s1', '/s2', ''),
-    ).rejects.toThrow('Object key is required');
     await getSnapshotDeltaReferences(connection, '/s1', '/s2', 'OBJ1', {
       maxNumberOfReferences: 11,
     });
@@ -172,17 +142,11 @@ describe('runtime/memory/snapshots', () => {
     );
   });
 
-  it('getSnapshotOverview and delta overview validate required params', async () => {
+  it('getSnapshotOverview and delta overview build URLs', async () => {
     const connection = createConnectionMock();
 
-    await expect(getSnapshotOverview(connection, '')).rejects.toThrow(
-      'Snapshot ID is required',
-    );
     await getSnapshotOverview(connection, 'SNAP1');
 
-    await expect(
-      getSnapshotDeltaOverview(connection, '/s1', ''),
-    ).rejects.toThrow('Both snapshot URIs are required');
     await getSnapshotDeltaOverview(connection, '/s1', '/s2');
 
     expect(connection.makeAdtRequest).toHaveBeenNthCalledWith(

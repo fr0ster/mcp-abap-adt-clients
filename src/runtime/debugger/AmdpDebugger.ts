@@ -1,12 +1,8 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-  IAmdpDebugger,
-  IGetAmdpCellSubstringOptions,
-  IGetAmdpDataPreviewOptions,
-  ILogger,
-  IStartAmdpDebuggerOptions,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
   getAmdpBreakpoints,
   getAmdpBreakpointsLlang,
@@ -22,6 +18,12 @@ import {
   terminateAmdpDebugger,
 } from './amdp';
 import { getAmdpCellSubstring, getAmdpDataPreview } from './amdpDataPreview';
+import type {
+  IAmdpDebugger,
+  IGetAmdpCellSubstringOptions,
+  IGetAmdpDataPreviewOptions,
+  IStartAmdpDebuggerOptions,
+} from './contracts';
 
 /**
  * @experimental

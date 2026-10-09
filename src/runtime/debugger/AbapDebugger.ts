@@ -1,17 +1,8 @@
 import type {
   IAbapConnection,
-  IAbapDebugger,
-  IAbapDebuggerStepMethod,
   IAdtWireResponse,
-  IGetDebuggerOptions,
-  IGetSystemAreaOptions,
-  IGetVariableAsCsvOptions,
-  IGetVariableAsJsonOptions,
-  IGetVariableValueStatementOptions,
-  ILaunchDebuggerOptions,
-  ILogger,
-  IStopDebuggerOptions,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
   buildDebuggerBatchPayload,
   buildDebuggerStepWithStackBatchPayload,
@@ -42,6 +33,17 @@ import {
   synchronizeBreakpoints,
   validateBreakpoints,
 } from './abap';
+import type {
+  IAbapDebugger,
+  IAbapDebuggerStepMethod,
+  IGetDebuggerOptions,
+  IGetSystemAreaOptions,
+  IGetVariableAsCsvOptions,
+  IGetVariableAsJsonOptions,
+  IGetVariableValueStatementOptions,
+  ILaunchDebuggerOptions,
+  IStopDebuggerOptions,
+} from './contracts';
 
 export class AbapDebugger implements IAbapDebugger {
   readonly kind = 'abapDebugger' as const;

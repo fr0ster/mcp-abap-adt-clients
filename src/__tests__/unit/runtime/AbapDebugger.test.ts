@@ -1,4 +1,4 @@
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AbapDebugger } from '../../../runtime/debugger/AbapDebugger';
 
 describe('AbapDebugger', () => {
@@ -97,17 +97,6 @@ describe('AbapDebugger', () => {
     expect(result).toHaveProperty('body');
     expect(typeof result.boundary).toBe('string');
     expect(result.body).toContain('Content-Type: application/http');
-  });
-
-  it('buildBatchPayload() throws when no requests provided', () => {
-    const debugger_ = new AbapDebugger(
-      {} as unknown as IAbapConnection,
-      createLogger(),
-    );
-
-    expect(() => debugger_.buildBatchPayload([])).toThrow(
-      'At least one batch request is required',
-    );
   });
 
   it('buildStepWithStackBatchPayload() returns payload containing stepInto and getStack', () => {

@@ -1,14 +1,14 @@
-import type {
-  IAbapConnection,
-  IAbapDebugger,
-  IAmdpDebugger,
-  IDebugger,
-  ILogger,
-  IMemorySnapshots,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { MemorySnapshots } from '../memory/MemorySnapshots';
 import { AbapDebugger } from './AbapDebugger';
 import { AmdpDebugger } from './AmdpDebugger';
+import type {
+  IAbapDebugger,
+  IAmdpDebugger,
+  IDebugger,
+  IMemorySnapshots,
+} from './contracts';
 
 export class Debugger implements IDebugger {
   readonly kind = 'debugger' as const;

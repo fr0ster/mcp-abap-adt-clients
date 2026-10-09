@@ -1,4 +1,4 @@
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { MemorySnapshots } from '../../../runtime/memory/MemorySnapshots';
 
 describe('MemorySnapshots', () => {
@@ -56,15 +56,6 @@ describe('MemorySnapshots', () => {
         url: '/sap/bc/adt/runtime/memory/snapshots/snap123',
         method: 'GET',
       }),
-    );
-  });
-
-  it('getById() throws when snapshotId is empty', async () => {
-    const connection = createConnectionMock();
-    const snapshots = new MemorySnapshots(connection, createLogger());
-
-    await expect(snapshots.getById('')).rejects.toThrow(
-      'Snapshot ID is required',
     );
   });
 

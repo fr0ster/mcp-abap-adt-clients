@@ -16,7 +16,7 @@
 import type {
   IAbapConnection,
   IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { getTimeout } from '../../utils/timeouts';
 import { createBatchBoundary, createRequestId } from './batchPayload';
 
@@ -202,10 +202,6 @@ export async function getSystemArea(
   systemarea: string,
   options?: IGetSystemAreaOptions,
 ): Promise<IAdtWireResponse> {
-  if (!systemarea) {
-    throw new Error('System area is required');
-  }
-
   const url = `/sap/bc/adt/debugger/systemareas/${encodeURIComponent(systemarea)}`;
   const params: Record<string, string | number | boolean> = {};
 
@@ -381,10 +377,6 @@ export async function getVariableMaxLength(
   part: string,
   maxLength?: number,
 ): Promise<IAdtWireResponse> {
-  if (!variableName || !part) {
-    throw new Error('Variable name and part are required');
-  }
-
   const url = `/sap/bc/adt/debugger/variables/${encodeURIComponent(variableName)}/${encodeURIComponent(part)}`;
   const params: Record<string, string | number | boolean> = {};
 
@@ -420,10 +412,6 @@ export async function getVariableSubcomponents(
   component?: string,
   line?: number,
 ): Promise<IAdtWireResponse> {
-  if (!variableName || !part) {
-    throw new Error('Variable name and part are required');
-  }
-
   const url = `/sap/bc/adt/debugger/variables/${encodeURIComponent(variableName)}/${encodeURIComponent(part)}`;
   const params: Record<string, string | number | boolean> = {};
 
@@ -468,10 +456,6 @@ export async function getVariableAsCsv(
   part: string,
   options?: IGetVariableAsCsvOptions,
 ): Promise<IAdtWireResponse> {
-  if (!variableName || !part) {
-    throw new Error('Variable name and part are required');
-  }
-
   const url = `/sap/bc/adt/debugger/variables/${encodeURIComponent(variableName)}/${encodeURIComponent(part)}`;
   const params: Record<string, string | number | boolean> = {};
 
@@ -520,10 +504,6 @@ export async function getVariableAsJson(
   part: string,
   options?: IGetVariableAsJsonOptions,
 ): Promise<IAdtWireResponse> {
-  if (!variableName || !part) {
-    throw new Error('Variable name and part are required');
-  }
-
   const url = `/sap/bc/adt/debugger/variables/${encodeURIComponent(variableName)}/${encodeURIComponent(part)}`;
   const params: Record<string, string | number | boolean> = {};
 
@@ -572,10 +552,6 @@ export async function getVariableValueStatement(
   part: string,
   options?: IGetVariableValueStatementOptions,
 ): Promise<IAdtWireResponse> {
-  if (!variableName || !part) {
-    throw new Error('Variable name and part are required');
-  }
-
   const url = `/sap/bc/adt/debugger/variables/${encodeURIComponent(variableName)}/${encodeURIComponent(part)}`;
   const params: Record<string, string | number | boolean> = {};
 
@@ -618,9 +594,6 @@ export async function executeDebuggerAction(
   action: string,
   value?: string,
 ): Promise<IAdtWireResponse> {
-  if (!action) {
-    throw new Error('Action is required');
-  }
   if (
     action === 'stepInto' ||
     action === 'stepOut' ||
@@ -682,10 +655,6 @@ export async function insertWatchpoint(
   variableName: string,
   condition?: string,
 ): Promise<IAdtWireResponse> {
-  if (!variableName) {
-    throw new Error('Variable name is required');
-  }
-
   const url = `/sap/bc/adt/debugger/watchpoints`;
   const params: Record<string, string | number | boolean> = { variableName };
 
@@ -736,10 +705,6 @@ export async function executeBatchRequest(
   connection: IAbapConnection,
   requests: string,
 ): Promise<IAdtWireResponse> {
-  if (!requests) {
-    throw new Error('Requests are required');
-  }
-
   const url = `/sap/bc/adt/debugger/batch`;
 
   return connection.makeAdtRequest({
@@ -765,10 +730,6 @@ export function buildDebuggerBatchPayload(
   requests: string[],
   boundary = createBatchBoundary(),
 ): IDebuggerBatchPayload {
-  if (!requests.length) {
-    throw new Error('At least one batch request is required');
-  }
-
   const parts = requests
     .map((request) => {
       if (!request.trim()) {
