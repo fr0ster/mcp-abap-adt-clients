@@ -7,10 +7,11 @@
  * premise (2026-10-09) over HTTP and RFC by `scripts/probe-debugger-cycle.ts`.
  * Each function below is one request of that walk; the order is the caller's.
  *
- * **Every debugger request needs a stateful session.** The attach is bound to
- * the session that sent it, and every request after it addresses that
- * debuggee through the same session. Setting the connection stateful is the
- * caller's, as the rest of the sequence is.
+ * **Every debugger request needs a stateful session — two of them.** The
+ * listener holds one; the attach opens the debug session on another, and
+ * every request after it addresses the debuggee through that one (see
+ * {@link attach}). Opening them and setting them stateful is the caller's, as
+ * the rest of the sequence is.
  *
  * **Nothing else may go out on that session while {@link listen} is open.** The
  * listener is a long poll on the same ABAP session, and a second request on it
@@ -227,23 +228,46 @@ export async function stopListener(
  * reached and `isSteppingPossible`. From here on the debuggee belongs to the
  * session that attached.
  *
- * **One debug session per connection.** A connection that has attached once
- * cannot attach again: measured on premise (2026-10-09), the second attach is
- * answered 500 `AdiFailed` "Debuggee already attached", even after the first
- * debuggee ran to its end. A new debug session needs a new connection; the
- * breakpoints are the user's and stay armed across it.
+ * **Attach on a new connection, never on the listener's.** The listener and
+ * the debug session are two sessions: the attach, and everything after it,
+ * goes on a connection opened for this debuggee. Measured (2026-10-09):
+ *
+ * - on the cloud, with several application servers, the listener's answer
+ *   says whether the debuggee runs on the listener's server
+ *   (`IS_SAME_SERVER`). An attach on the listener's connection was refused
+ *   500 `invalidDebuggee` whenever it did not (3 of 3); on a new connection
+ *   it succeeded across servers (4 of 4);
+ * - on premise, a connection that has attached once cannot attach again:
+ *   500 `AdiFailed` "Debuggee already attached", even after the first
+ *   debuggee ran to its end.
+ *
+ * The breakpoints are the user's and stay armed across sessions.
+ *
+ * **`server` routes the attach to the debuggee's application server.** The
+ * listener's answer names it in `INSTANCE_NAME`; sent as the `saplb` header,
+ * it makes the load balancer hand this request — and the session it opens —
+ * to that server. This is what Eclipse ADT does (its Communication Log,
+ * 2026-10-09, cloud: the attach carried `saplb`, and the answer set
+ * `sap-contextid=…:<server>:…`). Without it, the new session lands on
+ * whichever server the balancer picks.
  */
 export async function attach(
   connection: IAbapConnection,
   requestUser: string,
   debuggeeId: string,
   dynproDebugging = true,
+  server?: string,
 ): Promise<IAdtWireResponse> {
   return connection.makeAdtRequest({
     url: `${DEBUGGER}?${query({ method: 'attach', debuggeeId, debuggingMode: 'user', requestUser, dynproDebugging })}`,
     method: 'POST',
     timeout: getTimeout('default'),
-    headers: { Accept: 'application/xml' },
+    headers: {
+      Accept: 'application/xml',
+      // The load balancer's routing header: the attach — and the debug
+      // session it opens — goes to the application server named here.
+      ...(server ? { saplb: server } : {}),
+    },
   });
 }
 

@@ -146,6 +146,25 @@ describe('AbapDebugger', () => {
     });
   });
 
+  it('attach routed to a server sends the saplb header, and none otherwise', async () => {
+    const routed = setup();
+    await routed.debugger_.attach(
+      'SAPUSER01',
+      '0CC47A1E68C11FE1B0F9C08CD46015CB',
+      {
+        server: 'appserver-a1b2c',
+      },
+    );
+    expect(routed.sent().headers?.saplb).toBe('appserver-a1b2c');
+
+    const plain = setup();
+    await plain.debugger_.attach(
+      'SAPUSER01',
+      '0CC47A1E68C11FE1B0F9C08CD46015CB',
+    );
+    expect(plain.sent().headers?.saplb).toBeUndefined();
+  });
+
   it('getStack reads the stack with semantic URIs', async () => {
     const { debugger_, sent } = setup();
     await debugger_.getStack();

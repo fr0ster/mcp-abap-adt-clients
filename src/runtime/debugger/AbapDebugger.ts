@@ -178,7 +178,11 @@ export class AbapDebugger<
   async attach<E extends IAdtError = IAdtError>(
     requestUser: string,
     debuggeeId: string,
-    options?: { dynproDebugging?: boolean } & IAdtAnalyseOptions<E>,
+    options?: {
+      dynproDebugging?: boolean;
+      /** The debuggee's application server (`INSTANCE_NAME` in the listener's answer). */
+      server?: string;
+    } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<Of<R, 'attach'>, E>> {
     return answering(
       () =>
@@ -187,6 +191,7 @@ export class AbapDebugger<
           requestUser,
           debuggeeId,
           options?.dynproDebugging,
+          options?.server,
         ),
       this.reading('attach'),
       options?.analyse,

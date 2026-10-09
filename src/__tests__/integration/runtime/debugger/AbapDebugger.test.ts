@@ -180,6 +180,28 @@ function identityFor(user: string): IDebuggerIdentity {
   return { requestUser, terminalId: id('terminalId'), ideId: id('ideId') };
 }
 
+/**
+ * The ABAP user the session runs as — the one breakpoints and listeners are
+ * keyed on. Basic authentication names it; with a token (the cloud) the login
+ * is an e-mail and the ABAP user is another name, so the system is asked.
+ */
+async function abapUserOf(connection: IAbapConnection): Promise<string> {
+  const configured = process.env.SAP_USERNAME?.trim();
+  if (configured) return configured;
+  const answer = await connection.makeAdtRequest({
+    url: '/sap/bc/adt/core/http/systeminformation',
+    method: 'GET',
+    timeout: 30_000,
+    headers: {
+      Accept: 'application/vnd.sap.adt.core.http.systeminformation.v1+json',
+    },
+  });
+  const info =
+    typeof answer.data === 'string' ? JSON.parse(answer.data) : answer.data;
+  if (!info?.userName) throw new Error('the system named no ABAP user');
+  return String(info.userName);
+}
+
 // --- the test --------------------------------------------------------------------
 
 type Connection = IAbapConnection & ISessionLifecycleAware;
@@ -200,8 +222,12 @@ function otherIde(of: IDebuggerIdentity, label: string): IDebuggerIdentity {
 }
 
 describe('ABAP debugger (AbapDebugger)', () => {
-  let debuggerConnection: Connection | undefined;
+  let listenerConnection: Connection | undefined;
   let triggerConnection: Connection | undefined;
+  /** Arms breakpoints and listens; never attaches. */
+  let listenerApi: AbapDebugger;
+  /** The debug session: a connection of its own, opened after each catch. */
+  let sessionConnection: Connection | undefined;
   let debuggerApi: AbapDebugger;
   let identity: IDebuggerIdentity;
   let packageName = '';
@@ -234,8 +260,8 @@ describe('ABAP debugger (AbapDebugger)', () => {
   async function catchRun<TTarget>(
     runnable: (connection: Connection) => IAdtRunnable<TTarget, unknown>,
     target: TTarget,
-  ): Promise<string> {
-    const listener = debuggerApi.listen(identity, {
+  ): Promise<{ debuggeeId: string; server?: string }> {
+    const listener = listenerApi.listen(identity, {
       holdSeconds: HOLD_SECONDS,
     });
     const early = await Promise.race([
@@ -261,7 +287,40 @@ describe('ABAP debugger (AbapDebugger)', () => {
       `a debuggee in the listener's answer: ${document.slice(0, 300)}`,
     );
     expect(tag(document, 'DBGEE_KIND')).toBe('DEBUGGEE');
-    return debuggeeId as string;
+    process.stdout.write(
+      `MEASURED caught on ${tag(document, 'APPSERVER')} same=${tag(document, 'IS_SAME_SERVER')} cross=${tag(document, 'CAN_ADT_CROSS_SERVER')} impossible=${tag(document, 'IS_ATTACH_IMPOSSIBLE')}\n`,
+    );
+    // The debuggee's application server, which the attach is routed to.
+    return {
+      debuggeeId: debuggeeId as string,
+      server: tag(document, 'INSTANCE_NAME'),
+    };
+  }
+
+  /**
+   * Open the debug session the next attach goes on: a new connection, never
+   * the listener's, and the attach routed to the debuggee's server. Measured
+   * (2026-10-09): on the cloud, an attach on the listener's connection is
+   * refused 500 invalidDebuggee whenever the debuggee runs on another
+   * application server; on a new connection routed by saplb it succeeded 10
+   * of 10, 5 of them across servers. On premise, a connection that has
+   * attached once cannot attach again (500 "Debuggee already attached").
+   */
+  async function openDebugSession(): Promise<void> {
+    const previous = sessionConnection;
+    sessionConnection = await createTestConnection(connectionLogger, {
+      ownSession: true,
+    });
+    sessionConnection.setSessionType('stateful');
+    debuggerApi = new AbapDebugger(
+      sessionConnection,
+      connectionLogger,
+      abapDebuggerDocuments,
+    );
+    if (previous) {
+      previous.setSessionType('stateless');
+      await closeOwnTestConnection(previous);
+    }
   }
 
   async function topFrame(): Promise<IFrame> {
@@ -277,7 +336,7 @@ describe('ABAP debugger (AbapDebugger)', () => {
       return;
     }
     try {
-      debuggerConnection = await createTestConnection(connectionLogger, {
+      listenerConnection = await createTestConnection(connectionLogger, {
         ownSession: true,
       });
       triggerConnection = await createTestConnection(connectionLogger, {
@@ -288,9 +347,10 @@ describe('ABAP debugger (AbapDebugger)', () => {
       skipReason = 'no SAP configuration';
       return;
     }
-    identity = identityFor(String(process.env.SAP_USERNAME ?? ''));
-    debuggerApi = new AbapDebugger(
-      debuggerConnection,
+    identity = identityFor(await abapUserOf(listenerConnection));
+    logTestStep(`debugging as ${identity.requestUser}`, testsLogger);
+    listenerApi = new AbapDebugger(
+      listenerConnection,
       connectionLogger,
       abapDebuggerDocuments,
     );
@@ -301,7 +361,7 @@ describe('ABAP debugger (AbapDebugger)', () => {
       : resolveTransportRequest(testCase.params?.transport_request) ||
         undefined;
 
-    const cls = new AdtClient(debuggerConnection, connectionLogger).getClass();
+    const cls = new AdtClient(listenerConnection, connectionLogger).getClass();
     const config = {
       className: CLASS_NAME,
       packageName,
@@ -325,25 +385,29 @@ describe('ABAP debugger (AbapDebugger)', () => {
     logTestStep(`probe ${CLASS_NAME} active in ${packageName}`, testsLogger);
 
     // Every debugger request needs the stateful session it attached on.
-    debuggerConnection.setSessionType('stateful');
+    listenerConnection.setSessionType('stateful');
   }, STEP_TIMEOUT);
 
   afterAll(async () => {
-    if (!debuggerConnection) return;
+    if (!listenerConnection) return;
     for (const id of armed) {
-      await debuggerApi.deleteBreakpoint(identity, id);
+      await listenerApi.deleteBreakpoint(identity, id);
     }
     if (attached) await debuggerApi.terminateDebuggee();
-    await debuggerApi.stopListener(identity);
+    if (sessionConnection) {
+      sessionConnection.setSessionType('stateless');
+      await closeOwnTestConnection(sessionConnection);
+    }
+    await listenerApi.stopListener(identity);
     if (run) {
       await Promise.race([
         run,
         new Promise((resolve) => setTimeout(resolve, 15_000)),
       ]);
     }
-    debuggerConnection.setSessionType('stateless');
+    listenerConnection.setSessionType('stateless');
     if (!testCase?.params?.keep_probe) {
-      await new AdtClient(debuggerConnection, connectionLogger)
+      await new AdtClient(listenerConnection, connectionLogger)
         .getClass()
         .delete({
           className: CLASS_NAME,
@@ -352,7 +416,7 @@ describe('ABAP debugger (AbapDebugger)', () => {
         });
     }
     await closeOwnTestConnection(triggerConnection);
-    await closeOwnTestConnection(debuggerConnection);
+    await closeOwnTestConnection(listenerConnection);
   }, STEP_TIMEOUT);
 
   // --- breakpoints -----------------------------------------------------------------
@@ -367,7 +431,7 @@ describe('ABAP debugger (AbapDebugger)', () => {
         { kind: 'statement', statement: 'RAISE EXCEPTION' },
         { kind: 'message', msgId: '00', msgNo: '001', msgTy: 'E' },
       ];
-      const answer = await debuggerApi.setBreakpoints(identity, all, {
+      const answer = await listenerApi.setBreakpoints(identity, all, {
         validationOnly: true,
       });
       const document = documentOf(answer);
@@ -390,7 +454,7 @@ describe('ABAP debugger (AbapDebugger)', () => {
     'arms a line and an exception breakpoint; the line comes back in its include',
     async () => {
       if (skipped()) return;
-      const answer = await debuggerApi.setBreakpoints(identity, [
+      const answer = await listenerApi.setBreakpoints(identity, [
         { kind: 'line', uri: `${SOURCE_URI}#start=${LINE.loop}` },
         { kind: 'line', uri: `${SOURCE_URI}#start=${LINE.catch}` },
         { kind: 'exception', exceptionClass: 'CX_SY_ZERODIVIDE' },
@@ -416,9 +480,23 @@ describe('ABAP debugger (AbapDebugger)', () => {
     async () => {
       if (skipped()) return;
       needs(armed.length === 3, 'armed breakpoints');
-      const debuggeeId = await catchRun(asClass, { className: CLASS_NAME });
-      const answer = await debuggerApi.attach(identity.requestUser, debuggeeId);
+      const { debuggeeId, server } = await catchRun(asClass, {
+        className: CLASS_NAME,
+      });
+      await openDebugSession();
+      const answer = await debuggerApi.attach(
+        identity.requestUser,
+        debuggeeId,
+        {
+          server,
+        },
+      );
       const document = documentOf(answer);
+      if (!answer.ok) {
+        process.stdout.write(
+          `MEASURED attach refused: ${statusOf(answer)} ${subtypeOf(answer) ?? ''} ${document.slice(0, 900)}\n`,
+        );
+      }
       expect(answer.ok).toBe(true);
       expect(attr(document, 'isSteppingPossible')).toBe('true');
       expect(attr(document, 'debugSessionId')).toBeTruthy();
@@ -683,26 +761,22 @@ describe('ABAP debugger (AbapDebugger)', () => {
     async () => {
       if (skipped()) return;
       needs(armed.length === 3, 'armed breakpoints');
-      // A session that has attached once cannot attach again: measured on
-      // premise (2026-10-09), the second attach on the same connection is
-      // answered 500 AdiFailed "Debuggee already attached". A new debug
-      // session gets a connection of its own; the breakpoints are the user's
-      // and stay armed.
-      const used = debuggerConnection;
-      debuggerConnection = await createTestConnection(connectionLogger, {
-        ownSession: true,
+      const { debuggeeId, server } = await catchRun(asClass, {
+        className: CLASS_NAME,
       });
-      debuggerConnection.setSessionType('stateful');
-      debuggerApi = new AbapDebugger(
-        debuggerConnection,
-        connectionLogger,
-        abapDebuggerDocuments,
+      await openDebugSession();
+      const second = await debuggerApi.attach(
+        identity.requestUser,
+        debuggeeId,
+        {
+          server,
+        },
       );
-      used?.setSessionType('stateless');
-      await closeOwnTestConnection(used);
-
-      const debuggeeId = await catchRun(asClass, { className: CLASS_NAME });
-      const second = await debuggerApi.attach(identity.requestUser, debuggeeId);
+      if (!second.ok) {
+        process.stdout.write(
+          `MEASURED attach refused: ${statusOf(second)} ${subtypeOf(second) ?? ''} ${documentOf(second).slice(0, 900)}\n`,
+        );
+      }
       expect(second.ok).toBe(true);
       attached = true;
       expect((await topFrame()).line).toBe(LINE.loop);
@@ -739,11 +813,11 @@ describe('ABAP debugger (AbapDebugger)', () => {
     async () => {
       if (skipped()) return;
       for (const id of armed.splice(0)) {
-        expect((await debuggerApi.deleteBreakpoint(identity, id)).ok).toBe(
+        expect((await listenerApi.deleteBreakpoint(identity, id)).ok).toBe(
           true,
         );
       }
-      expect((await debuggerApi.stopListener(identity)).ok).toBe(true);
+      expect((await listenerApi.stopListener(identity)).ok).toBe(true);
     },
     STEP_TIMEOUT,
   );
@@ -771,7 +845,7 @@ describe('ABAP debugger (AbapDebugger)', () => {
         const holding = holder.listen(holderIdentity, { holdSeconds: 10 });
         await new Promise((resolve) => setTimeout(resolve, 2000));
 
-        const refused = await debuggerApi.listen(identity, {
+        const refused = await listenerApi.listen(identity, {
           holdSeconds: 10,
         });
         expect(statusOf(refused)).toBe(409);
@@ -804,7 +878,7 @@ describe('ABAP debugger (AbapDebugger)', () => {
         { onConflict: 'refuse' },
       );
       const taker = new AbapDebugger(
-        debuggerConnection as Connection,
+        listenerConnection as Connection,
         connectionLogger,
         abapDebuggerDocuments,
         { onConflict: 'takeOver' },
@@ -853,13 +927,13 @@ describe('ABAP debugger (AbapDebugger)', () => {
 
         // Measured on premise (2026-10-09): the conflict is seen whatever
         // parameters the other listener registered with.
-        const beside = await debuggerApi.listen(identity, { holdSeconds: 3 });
+        const beside = await listenerApi.listen(identity, { holdSeconds: 3 });
         expect(statusOf(beside)).toBe(409);
         expect(subtypeOf(beside)).toBe('conflictDetected');
 
         await holding;
       } finally {
-        await debuggerApi.stopListener(identity);
+        await listenerApi.stopListener(identity);
         await holder.stopListener(holderIdentity);
         holderConnection.setSessionType('stateless');
         await closeOwnTestConnection(holderConnection);
@@ -890,11 +964,11 @@ describe('ABAP debugger (AbapDebugger)', () => {
         const holding = other.listen(sameIde, { holdSeconds: 10 });
         await new Promise((resolve) => setTimeout(resolve, 2000));
         // Measured on premise (2026-10-09): 200 after the hold, no 409.
-        const beside = await debuggerApi.listen(identity, { holdSeconds: 3 });
+        const beside = await listenerApi.listen(identity, { holdSeconds: 3 });
         expect(statusOf(beside)).toBe(200);
         await holding;
       } finally {
-        await debuggerApi.stopListener(identity);
+        await listenerApi.stopListener(identity);
         await other.stopListener(sameIde);
         otherConnection.setSessionType('stateless');
         await closeOwnTestConnection(otherConnection);

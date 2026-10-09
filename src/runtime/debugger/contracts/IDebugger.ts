@@ -135,7 +135,11 @@ export interface IAbapDebugger<
   attach<E extends IAdtError = IAdtError>(
     requestUser: string,
     debuggeeId: string,
-    options?: { dynproDebugging?: boolean } & IAdtAnalyseOptions<E>,
+    options?: {
+      dynproDebugging?: boolean;
+      /** The debuggee's application server (`INSTANCE_NAME` in the listener's answer). */
+      server?: string;
+    } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<TAttach, E>>;
   getStack<E extends IAdtError = IAdtError>(
     options?: IAdtAnalyseOptions<E>,

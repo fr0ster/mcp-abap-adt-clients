@@ -2319,11 +2319,11 @@ runtime_debugger:
   test_cases:
     - name: "adt_abap_debugger"
       enabled: true
-      available_in: ["onprem"]   # measured on premise only; the cloud is not yet
+      available_in: ["onprem", "cloud"]   # measured on both (2026-10-09)
       description: "ABAP debugger: breakpoints, listener, attach, stack, variables, steps, watchpoints, set value, terminate, listener conflict"
       params:
         class_name: "ZAC_DBG_PROBE"   # created, run under the debugger, deleted
-        package_name: ""              # "" → environment.default_package; a local package needs no transport
+        package_name: ""              # "" → environment.default_package; a local package needs no transport (the cloud has none)
         transport_request: ""         # "" → environment.default_transport (ignored for a local package)
         keep_probe: false             # true leaves the class in place after the run
       # Nothing else may listen for the same SAP user while this runs: an IDE
