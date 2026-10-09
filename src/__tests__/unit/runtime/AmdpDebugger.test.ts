@@ -98,6 +98,33 @@ describe('AmdpDebugger', () => {
     });
   });
 
+  it('getDataPreview posts text/plain — empty without a SELECT, the SELECT otherwise', async () => {
+    const whole = setup({ status: 200, data: '', headers: {} });
+    await whole.debugger_.getDataPreview({
+      rowNumber: 100,
+      sessionId: 'dbhost:30103:263414',
+      debuggerId: MAIN_ID,
+      debuggeeId: DEBUGGEE,
+      variableName: 'LT_ROWS',
+      provideRowId: true,
+    });
+    expect(whole.sent()).toMatchObject({
+      method: 'POST',
+      url: `/sap/bc/adt/datapreview/amdpdebugger?rowNumber=100&sessionId=dbhost%3A30103%3A263414&debuggerId=${MAIN_ID}&debuggeeId=dbhost%3A30103%3A263414%3A259135%3A1&variableName=LT_ROWS&provideRowId=true`,
+      data: '',
+    });
+    expect(whole.sent().headers?.['Content-Type']).toBe('text/plain');
+
+    const select = setup({ status: 200, data: '', headers: {} });
+    await select.debugger_.getDataPreview({
+      variableName: 'LT_ROWS',
+      query: 'SELECT ":LT_ROWS"."N" AS "N" FROM ":LT_ROWS"',
+    });
+    expect(select.sent().data).toBe(
+      'SELECT ":LT_ROWS"."N" AS "N" FROM ":LT_ROWS"',
+    );
+  });
+
   it('deleteDebuggee deletes the debuggee; stop deletes the session, hardStop false by default', async () => {
     const remove = setup();
     await remove.debugger_.deleteDebuggee(MAIN_ID, DEBUGGEE);

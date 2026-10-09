@@ -87,6 +87,8 @@ export interface IGetAmdpDataPreviewOptions {
   schema?: string;
   provideRowId?: boolean;
   action?: string;
+  /** The SELECT over the variable, sent as the body. */
+  query?: string;
 }
 
 export interface IGetAmdpCellSubstringOptions {
@@ -233,7 +235,7 @@ export interface IAmdpDebugger<
     mainId: string,
     options?: { hardStop?: boolean } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<TCommand, E>>;
-  /** A table variable's rows. Not yet measured. */
+  /** A table variable's rows: a SELECT over it, answered at once, by column. */
   getDataPreview<E extends IAdtError = IAdtError>(
     options?: IGetAmdpDataPreviewOptions & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<TPreview, E>>;

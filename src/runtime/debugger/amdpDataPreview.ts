@@ -25,14 +25,26 @@ export interface IGetAmdpDataPreviewOptions {
   schema?: string;
   provideRowId?: boolean;
   action?: string;
+  /** The SELECT over the variable, sent as the body. */
+  query?: string;
 }
 
 /**
- * Get AMDP debugger data preview
+ * A table variable's rows at the current stop.
  *
- * @param connection - ABAP connection
- * @param options - Data preview options
- * @returns Axios response with data preview
+ * Measured from Eclipse ADT's Communication Log on premise (S/4HANA,
+ * 2026-10-09): a POST from a stateless session, answered at once — no
+ * request id, no event. `sessionId` is the HANA session the start named,
+ * `debuggerId` the session's main id, `rowNumber` the most rows wanted.
+ * Without a body the server selects every column itself — with
+ * `provideRowId=true` adding `_rowId__` — so the whole variable and its
+ * column types come back with no SQL written; Eclipse sends that first. With
+ * a body, `text/plain`, the SELECT is the caller's
+ * (`SELECT ":LT_ROWS"."N" AS "N", … FROM ":LT_ROWS"`): a filter, an order, a
+ * subset. The answer (`datapreview.table.v1+xml`) is by column: each
+ * `columns` carries its `metadata` and a `dataSet` of values, and
+ * `executedQueryString` the SELECT that ran. `totalRows` answered 0 for a
+ * table of two rows; count the values.
  */
 export async function getAmdpDataPreview(
   connection: IAbapConnection,
@@ -52,15 +64,20 @@ export async function getAmdpDataPreview(
     params.provideRowId = options.provideRowId;
   if (options?.action) params.action = options.action;
 
+  const query = new URLSearchParams(
+    Object.entries(params).map(([key, value]) => [key, String(value)]),
+  );
   return connection.makeAdtRequest({
-    url,
-    method: 'GET',
+    url: `${url}?${query}`,
+    method: 'POST',
     timeout: getTimeout('default'),
-    params,
+    // The server refuses a request without a content type, the empty one too
+    // (400 "Content type missing"); no SELECT is an empty body.
+    data: options?.query ?? '',
     headers: {
-      Accept: 'application/xml',
-      'X-sap-adt-relation':
-        'http://www.sap.com/adt/categories/datapreview/amdpdebugger',
+      Accept:
+        'application/xml, application/vnd.sap.adt.datapreview.table.v1+xml',
+      'Content-Type': 'text/plain',
     },
   });
 }

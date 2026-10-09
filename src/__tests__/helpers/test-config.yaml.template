@@ -2330,6 +2330,16 @@ runtime_debugger:
       # with a breakpoint set holds the user's debugging, and the listeners
       # here refuse to displace it.
 
+    - name: "adt_amdp_debugger"
+      enabled: true
+      available_in: ["onprem"]   # SAP HANA only; measured on premise (2026-10-09)
+      description: "AMDP debugger: session, breakpoints, events, steps, table variables, finish, cancel, stop"
+      params:
+        class_name: "ZAC_DBG_AMDP2"   # created with its table function, run under the debugger, deleted
+        ddl_name: "ZAC_DBG_TF2"
+        package_name: ""              # "" → environment.default_package; a local package needs no transport
+        transport_request: ""
+        keep_probe: false
 runtime_dumps:
   test_cases:
     - name: "adt_runtime_dumps"

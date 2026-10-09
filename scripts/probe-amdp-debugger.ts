@@ -49,7 +49,7 @@ if (fs.existsSync(envPath)) {
 }
 
 type Connection = IAbapConnection & ISessionLifecycleAware;
-const CLASS_NAME = 'ZAC_DBG_AMDP';
+const CLASS_NAME = (process.env.PROBE_CLASS ?? 'ZAC_DBG_AMDP').toUpperCase();
 const AMDP = '/sap/bc/adt/amdp/debugger/main';
 const MAIN_ACCEPT = [4, 3, 2, 1]
   .map((v) => `application/vnd.sap.adt.amdp.dbg.main.v${v}+xml`)
@@ -87,7 +87,7 @@ async function send(
     answer = {
       status: r.status,
       headers: r.headers as Record<string, unknown>,
-      data: typeof r.data === 'string' ? r.data : String(r.data ?? ''),
+      data: typeof r.data === 'string' ? r.data : JSON.stringify(r.data ?? ''),
     };
   } catch (error) {
     // biome-ignore lint/suspicious/noExplicitAny: an axios-shaped error, read defensively
@@ -172,7 +172,19 @@ async function main(): Promise<void> {
   const T = (await createTestConnection(quiet, {
     ownSession: true,
   })) as Connection;
-  const user = String(process.env.SAP_USERNAME ?? '').toUpperCase();
+  // Basic authentication names the user; with a token the system is asked.
+  let user = String(process.env.SAP_USERNAME ?? '').toUpperCase();
+  if (!user) {
+    const info = await send('whoami', C, {
+      url: '/sap/bc/adt/core/http/systeminformation',
+      method: 'GET',
+      timeout: 30_000,
+      headers: {
+        Accept: 'application/vnd.sap.adt.core.http.systeminformation.v1+json',
+      },
+    });
+    user = String(JSON.parse(info.data).userName ?? '').toUpperCase();
+  }
   let mainId: string | undefined;
   let run: Promise<unknown> | undefined;
   let hardStop = false;
@@ -195,7 +207,7 @@ async function main(): Promise<void> {
     // The debug session: stateful, started here, and every event read here.
     M.setSessionType('stateful');
     const start = await send('start', M, {
-      url: `${AMDP}?${new URLSearchParams({ stopExisting: 'false', requestUser: user, cascadeMode: 'NONE' })}`,
+      url: `${AMDP}?${new URLSearchParams({ stopExisting: process.env.PROBE_STOP_EXISTING === '1' ? 'true' : 'false', requestUser: user, cascadeMode: 'NONE' })}`,
       method: 'POST',
       timeout: 60_000,
       headers: { Accept: 'application/vnd.sap.adt.amdp.dbg.startmain.v1+xml' },
@@ -204,6 +216,7 @@ async function main(): Promise<void> {
       start.headers.location ?? start.headers.Location ?? '',
     );
     mainId = /\/main\/([^/?]+)/.exec(location)?.[1];
+    const hanaSession = attr(start.data, 'amdpdbg:value') ?? '';
     out(
       `   main ${mainId ?? '(none)'}, HANA session ${attr(start.data, 'amdpdbg:value') ?? '?'}`,
     );
@@ -274,6 +287,54 @@ async function main(): Promise<void> {
      * A breakpoint turning active (ON_TOGGLE_BREAKPOINTS) or a command's own
      * answer is an event too, and the wait goes on after it.
      */
+    /** PROBE_PREVIEW=1: read LT_ROWS the way Eclipse does, both requests. */
+    const previewTable = async (debuggee: string): Promise<void> => {
+      const params = new URLSearchParams({
+        rowNumber: '100',
+        sessionId: hanaSession,
+        debuggerId: String(mainId),
+        debuggeeId: debuggee,
+        variableName: 'LT_ROWS',
+      });
+      const accept =
+        'application/xml, application/vnd.sap.adt.datapreview.table.v1+xml';
+      const first = await send('preview', C, {
+        url: `/sap/bc/adt/datapreview/amdpdebugger?${params}&provideRowId=true`,
+        method: 'POST',
+        timeout: 30_000,
+        data: '',
+        headers: { Accept: accept, 'Content-Type': 'text/plain' },
+      });
+      const select = await send('preview sql', C, {
+        url: `/sap/bc/adt/datapreview/amdpdebugger?${params}`,
+        method: 'POST',
+        timeout: 30_000,
+        data: 'SELECT ":LT_ROWS"."N" AS "N",":LT_ROWS"."SQUARE" AS "SQUARE",":LT_ROWS"."_rowId__" AS "_rowId__" FROM ":LT_ROWS"',
+        headers: { Accept: accept, 'Content-Type': 'text/plain' },
+      });
+      for (const [label, answer] of [
+        ['no body', first],
+        ['with SQL', select],
+      ] as const) {
+        const columns = [
+          ...answer.data.matchAll(
+            /<dataPreview:columns>([\s\S]*?)<\/dataPreview:columns>/g,
+          ),
+        ].map((c) => {
+          const name = /dataPreview:name="([^"]*)"/.exec(c[1])?.[1];
+          const values = [
+            ...c[1].matchAll(/<dataPreview:data>([^<]*)<\/dataPreview:data>/g),
+          ].map((d) => d[1]);
+          return `${name}=[${values.join(',')}]`;
+        });
+        const query = /<dataPreview:executedQueryString>([^<]*)</.exec(
+          answer.data,
+        )?.[1];
+        out(`     ${label}: ${columns.join(' ') || answer.data.slice(0, 300)}`);
+        if (query) out(`       executed: ${decode(query).trim()}`);
+      }
+    };
+
     const awaitStop = async (): Promise<void> => {
       atBreak = false;
       for (let reads = 0; reads < 20 && !atBreak && !stopped; reads++) {
@@ -282,6 +343,12 @@ async function main(): Promise<void> {
             debuggeeId = e.debuggeeId;
             atBreak = true;
             showBreak(e, source);
+            if (
+              process.env.PROBE_PREVIEW === '1' &&
+              e.body.includes('=&gt;TF"')
+            ) {
+              await previewTable(e.debuggeeId);
+            }
           } else {
             out(
               `   ${e.kind}${e.requestId ? ` (request ${e.requestId})` : ''}`,
