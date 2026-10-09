@@ -555,6 +555,64 @@ async function main(): Promise<void> {
     if (attached) {
       section('Stop 1', 'first breakpoint');
       await readStop(debuggerApi);
+      // PROBE_SNAPSHOT=1: take a memory snapshot of the debuggee here — the
+      // memorySnapshot action the attach answer lists — and list the snapshots.
+      if (process.env.PROBE_SNAPSHOT === '1') {
+        section('Memory snapshot');
+        const raw = async (
+          label: string,
+          method: string,
+          url: string,
+          accept?: string,
+        ) => {
+          const t0 = Date.now();
+          try {
+            const r = await debuggerConnection.makeAdtRequest({
+              url,
+              method,
+              timeout: 120_000,
+              ...(accept ? { headers: { Accept: accept } } : {}),
+            });
+            out(
+              `   ${label} ${method} ${url} → ${r.status} in ${Date.now() - t0} ms`,
+            );
+            out(
+              c.gray(
+                `     ${String(
+                  typeof r.data === 'string' ? r.data : JSON.stringify(r.data),
+                )
+                  .replace(/\s+/g, ' ')
+                  .slice(0, 1500)}`,
+              ),
+            );
+            return r.status;
+          } catch (error) {
+            // biome-ignore lint/suspicious/noExplicitAny: an axios-shaped error, read defensively
+            const r = (error as any)?.response;
+            out(
+              `   ${label} ${method} ${url} → ${r?.status ?? 'no answer'} in ${Date.now() - t0} ms`,
+            );
+            out(
+              c.gray(
+                `     ${String(r?.data ?? (error as Error).message)
+                  .replace(/\s+/g, ' ')
+                  .slice(0, 800)}`,
+              ),
+            );
+            return r?.status ?? 0;
+          }
+        };
+        const action = '/sap/bc/adt/debugger/actions?action=memorySnapshot';
+        const posted = await raw('snapshot', 'POST', action, 'application/xml');
+        if (posted >= 400 || posted === 0)
+          await raw('snapshot', 'GET', action, 'application/xml');
+        await raw(
+          'list',
+          'GET',
+          `/sap/bc/adt/runtime/memory/snapshots?user=${identity.requestUser}`,
+          'application/vnd.sap.adt.runtime.memory.snapshots.v1+xml',
+        );
+      }
       const plan: IDebuggerStepMethod[] = [
         'stepInto',
         'stepReturn',
