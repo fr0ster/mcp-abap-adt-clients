@@ -2,36 +2,35 @@
  * Runtime Debugger - Exports
  */
 
-export { AbapDebugger } from './AbapDebugger';
+export {
+  AbapDebugger,
+  abapDebuggerDocuments,
+  type IAbapDebuggerResults,
+} from './AbapDebugger';
 export { AmdpDebugger } from './AmdpDebugger';
 export type { IDebuggerBatchPayload } from './abap';
 export {
+  attach,
+  buildBreakpointsXml,
+  buildChildVariablesXml,
   buildDebuggerBatchPayload,
-  buildDebuggerStepWithStackBatchPayload,
+  buildVariablesXml,
+  createWatchpoint,
+  DEBUGGER_CHILD_VARIABLES_CONTENT_TYPE,
+  DEBUGGER_VARIABLES_CONTENT_TYPE,
+  deleteBreakpoint,
+  deleteWatchpoint,
   executeBatchRequest,
-  executeDebuggerAction,
-  executeDebuggerStepBatch,
-  getBreakpointConditions,
-  getBreakpointMessageTypes,
-  getBreakpointStatements,
-  getCallStack,
-  getDebugger,
-  getMemorySizes,
-  getSystemArea,
-  getVariableAsCsv,
-  getVariableAsJson,
-  getVariableMaxLength,
-  getVariableSubcomponents,
-  getVariableValueStatement,
-  getVitBreakpoints,
-  getWatchpoints,
-  insertWatchpoint,
-  launchDebugger,
-  stepContinueDebuggerBatch,
-  stepIntoDebuggerBatch,
-  stepOutDebuggerBatch,
-  stopDebugger,
-  synchronizeBreakpoints,
-  validateBreakpoints,
+  getChildVariables,
+  getStack,
+  getVariables,
+  listen,
+  listWatchpoints,
+  setBreakpoints,
+  setStackPosition,
+  setVariableValue,
+  step,
+  stopListener,
+  terminateDebuggee,
 } from './abap';
 export { Debugger } from './Debugger';

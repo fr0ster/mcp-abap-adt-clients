@@ -1,131 +1,247 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AbapDebugger } from '../../../runtime/debugger/AbapDebugger';
+import type { IDebuggerIdentity } from '../../../runtime/debugger/contracts';
 
+/**
+ * Each member sends the request the measured sequence sends
+ * (scripts/probe-debugger-cycle.ts, on premise 2026-10-09, HTTP and RFC).
+ */
 describe('AbapDebugger', () => {
-  function createConnectionMock() {
-    return {
-      makeAdtRequest: jest.fn().mockResolvedValue({ status: 200, data: '' }),
-    } as unknown as IAbapConnection;
-  }
+  const identity: IDebuggerIdentity = {
+    requestUser: 'SAPUSER01',
+    terminalId: 'EC80D3662BADB8CD21C70406E0E96D4C',
+    ideId: '7194D729E68FDAF6E185C7E5124CC900',
+  };
+  const identityQuery =
+    'debuggingMode=user&requestUser=SAPUSER01&terminalId=EC80D3662BADB8CD21C70406E0E96D4C&ideId=7194D729E68FDAF6E185C7E5124CC900';
 
-  function createLogger() {
-    return {
-      log: jest.fn(),
+  function setup(answer: unknown = { status: 200, data: '', headers: {} }) {
+    const connection = {
+      makeAdtRequest: jest.fn().mockResolvedValue(answer),
+    } as unknown as IAbapConnection;
+    const debugger_ = new AbapDebugger(connection, {
+      info: jest.fn(),
       error: jest.fn(),
       warn: jest.fn(),
       debug: jest.fn(),
-    } as any;
+    } as never);
+    const sent = () =>
+      (connection.makeAdtRequest as jest.Mock).mock.calls[0][0] as {
+        url: string;
+        method: string;
+        data?: string;
+        headers?: Record<string, string>;
+        timeout: number;
+      };
+    return { debugger_, sent };
   }
 
-  it('launch() delegates to /sap/bc/adt/debugger/listeners with launch relation', async () => {
-    const connection = createConnectionMock();
-    const debugger_ = new AbapDebugger(connection, createLogger());
-
-    await debugger_.launch();
-
-    expect(connection.makeAdtRequest).toHaveBeenCalledWith(
-      expect.objectContaining({
-        url: '/sap/bc/adt/debugger/listeners',
-        method: 'GET',
-        headers: expect.objectContaining({
-          'X-sap-adt-relation':
-            'http://www.sap.com/adt/debugger/relations/launch',
-        }),
-      }),
-    );
-  });
-
-  it('launch() passes options as params', async () => {
-    const connection = createConnectionMock();
-    const debugger_ = new AbapDebugger(connection, createLogger());
-
-    await debugger_.launch({ debuggingMode: 'user', terminalId: 'term1' });
-
-    expect(connection.makeAdtRequest).toHaveBeenCalledWith(
-      expect.objectContaining({
-        params: expect.objectContaining({
-          debuggingMode: 'user',
-          terminalId: 'term1',
-        }),
-      }),
-    );
-  });
-
-  it('stop() delegates to /sap/bc/adt/debugger/listeners with stop relation', async () => {
-    const connection = createConnectionMock();
-    const debugger_ = new AbapDebugger(connection, createLogger());
-
-    await debugger_.stop();
-
-    expect(connection.makeAdtRequest).toHaveBeenCalledWith(
-      expect.objectContaining({
-        url: '/sap/bc/adt/debugger/listeners',
-        method: 'GET',
-        headers: expect.objectContaining({
-          'X-sap-adt-relation':
-            'http://www.sap.com/adt/debugger/relations/stop',
-        }),
-      }),
-    );
-  });
-
-  it('getCallStack() delegates to /sap/bc/adt/debugger/stack', async () => {
-    const connection = createConnectionMock();
-    const debugger_ = new AbapDebugger(connection, createLogger());
-
-    await debugger_.getCallStack();
-
-    expect(connection.makeAdtRequest).toHaveBeenCalledWith(
-      expect.objectContaining({
-        url: '/sap/bc/adt/debugger/stack',
-        method: 'GET',
-      }),
-    );
-  });
-
-  it('buildBatchPayload() returns boundary and body for given requests', () => {
-    const debugger_ = new AbapDebugger(
-      {} as unknown as IAbapConnection,
-      createLogger(),
-    );
-
-    const result = debugger_.buildBatchPayload([
-      'GET /sap/bc/adt/debugger HTTP/1.1\r\n',
+  it('setBreakpoints posts the user-mode set, adding without syncScope', async () => {
+    const { debugger_, sent } = setup();
+    await debugger_.setBreakpoints(identity, [
+      {
+        kind: 'line',
+        uri: '/sap/bc/adt/oo/classes/zcl_probe/source/main#start=16',
+      },
+      { kind: 'exception', exceptionClass: 'CX_SY_ZERODIVIDE' },
+      { kind: 'statement', statement: 'RAISE' },
+      { kind: 'message', msgId: '00', msgNo: '001', msgTy: 'E' },
     ]);
 
-    expect(result).toHaveProperty('boundary');
-    expect(result).toHaveProperty('body');
-    expect(typeof result.boundary).toBe('string');
-    expect(result.body).toContain('Content-Type: application/http');
+    const request = sent();
+    expect(request.url).toBe('/sap/bc/adt/debugger/breakpoints');
+    expect(request.method).toBe('POST');
+    expect(request.data).toContain(
+      'debuggingMode="user" scope="external" requestUser="SAPUSER01" terminalId="EC80D3662BADB8CD21C70406E0E96D4C" ideId="7194D729E68FDAF6E185C7E5124CC900"',
+    );
+    expect(request.data).toContain(
+      '<breakpoint kind="line" adtcore:uri="/sap/bc/adt/oo/classes/zcl_probe/source/main#start=16"/>',
+    );
+    expect(request.data).toContain(
+      '<breakpoint kind="exception" exceptionClass="CX_SY_ZERODIVIDE"/>',
+    );
+    expect(request.data).toContain(
+      '<breakpoint kind="statement" statement="RAISE"/>',
+    );
+    expect(request.data).toContain(
+      '<breakpoint kind="message" msgId="00" msgNo="001" msgTy="E"/>',
+    );
+    expect(request.data).not.toContain('syncScope');
+    expect(request.data).not.toContain('validationOnly');
   });
 
-  it('buildStepWithStackBatchPayload() returns payload containing stepInto and getStack', () => {
-    const debugger_ = new AbapDebugger(
-      {} as unknown as IAbapConnection,
-      createLogger(),
+  it('setBreakpoints with validationOnly marks every breakpoint', async () => {
+    const { debugger_, sent } = setup();
+    await debugger_.setBreakpoints(
+      identity,
+      [{ kind: 'exception', exceptionClass: 'CX_SY_ZERODIVIDE' }],
+      { validationOnly: true },
+    );
+    expect(sent().data).toContain(
+      'exceptionClass="CX_SY_ZERODIVIDE" validationOnly="true"/>',
+    );
+  });
+
+  it('deleteBreakpoint encodes the id and carries the external scope', async () => {
+    const { debugger_, sent } = setup();
+    await debugger_.deleteBreakpoint(identity, 'KIND=5.EXCEPTION_CLASS=CX_X');
+    expect(sent()).toMatchObject({
+      method: 'DELETE',
+      url: `/sap/bc/adt/debugger/breakpoints/KIND%3D5.EXCEPTION_CLASS%3DCX_X?scope=external&${identityQuery}`,
+    });
+  });
+
+  it('listen posts the long poll and waits a minute longer than the server holds', async () => {
+    const { debugger_, sent } = setup();
+    await debugger_.listen(identity, { holdSeconds: 30 });
+    expect(sent()).toMatchObject({
+      method: 'POST',
+      url: `/sap/bc/adt/debugger/listeners?${identityQuery}&timeout=30`,
+      timeout: 90_000,
+    });
+  });
+
+  it('stopListener deletes the listener', async () => {
+    const { debugger_, sent } = setup();
+    await debugger_.stopListener(identity);
+    expect(sent()).toMatchObject({
+      method: 'DELETE',
+      url: `/sap/bc/adt/debugger/listeners?${identityQuery}`,
+    });
+  });
+
+  it('attach goes through the dispatcher with the debuggee id', async () => {
+    const { debugger_, sent } = setup();
+    await debugger_.attach('SAPUSER01', '0CC47A1E68C11FE1B0F9C08CD46015CB');
+    expect(sent()).toMatchObject({
+      method: 'POST',
+      url: '/sap/bc/adt/debugger?method=attach&debuggeeId=0CC47A1E68C11FE1B0F9C08CD46015CB&debuggingMode=user&requestUser=SAPUSER01&dynproDebugging=true',
+    });
+  });
+
+  it('getStack reads the stack with semantic URIs', async () => {
+    const { debugger_, sent } = setup();
+    await debugger_.getStack();
+    expect(sent()).toMatchObject({
+      method: 'GET',
+      url: '/sap/bc/adt/debugger/stack?emode=_&semanticURIs=true',
+    });
+  });
+
+  it('getChildVariables sends the hierarchy rows in the ChildVariables type', async () => {
+    const { debugger_, sent } = setup();
+    await debugger_.getChildVariables(['@ROOT']);
+    const request = sent();
+    expect(request.url).toBe('/sap/bc/adt/debugger?method=getChildVariables');
+    expect(request.headers?.['Content-Type']).toContain(
+      'dataname=com.sap.adt.debugger.ChildVariables',
+    );
+    expect(request.data).toContain(
+      '<STPDA_ADT_VARIABLE_HIERARCHY><PARENT_ID>@ROOT</PARENT_ID></STPDA_ADT_VARIABLE_HIERARCHY>',
+    );
+  });
+
+  it('getVariables sends one row per id in the Variables type', async () => {
+    const { debugger_, sent } = setup();
+    await debugger_.getVariables(['LT_ITEMS[3]-MATNR']);
+    const request = sent();
+    expect(request.url).toBe('/sap/bc/adt/debugger?method=getVariables');
+    expect(request.headers?.['Content-Type']).toContain(
+      'dataname=com.sap.adt.debugger.Variables',
+    );
+    expect(request.data).toContain(
+      '<STPDA_ADT_VARIABLE><ID>LT_ITEMS[3]-MATNR</ID></STPDA_ADT_VARIABLE>',
+    );
+  });
+
+  it('step posts the step method, with a target line when given', async () => {
+    const { debugger_, sent } = setup();
+    await debugger_.step('stepRunToLine', {
+      uri: '/sap/bc/adt/oo/classes/zcl_probe/source/main#start=18',
+    });
+    expect(sent()).toMatchObject({
+      method: 'POST',
+      url: '/sap/bc/adt/debugger?method=stepRunToLine&uri=%2Fsap%2Fbc%2Fadt%2Foo%2Fclasses%2Fzcl_probe%2Fsource%2Fmain%23start%3D18',
+    });
+  });
+
+  it('setStackPosition, setVariableValue and terminateDebuggee use the dispatcher', async () => {
+    const position = setup();
+    await position.debugger_.setStackPosition(2);
+    expect(position.sent().url).toBe(
+      '/sap/bc/adt/debugger?method=setStackPosition&position=2',
     );
 
-    const result = debugger_.buildStepWithStackBatchPayload('stepInto');
+    const value = setup();
+    await value.debugger_.setVariableValue('LV_TOTAL', '7');
+    expect(value.sent()).toMatchObject({
+      url: '/sap/bc/adt/debugger?method=setVariableValue&variableName=LV_TOTAL',
+      data: '7',
+    });
 
-    expect(result.body).toContain('stepInto');
-    expect(result.body).toContain('getStack');
+    const terminate = setup();
+    await terminate.debugger_.terminateDebuggee();
+    expect(terminate.sent().url).toBe(
+      '/sap/bc/adt/debugger?method=terminateDebuggee',
+    );
   });
 
-  it('executeAction() delegates to /sap/bc/adt/debugger/actions', async () => {
-    const connection = createConnectionMock();
-    const debugger_ = new AbapDebugger(connection, createLogger());
+  it('watchpoints: create, list and delete', async () => {
+    const create = setup();
+    await create.debugger_.createWatchpoint('LV_TOTAL', {
+      condition: 'LV_TOTAL > 3',
+    });
+    expect(create.sent()).toMatchObject({
+      method: 'POST',
+      url: '/sap/bc/adt/debugger/watchpoints?variableName=LV_TOTAL&condition=LV_TOTAL+%3E+3',
+    });
 
-    await debugger_.executeAction('jumpToLine', 'line42');
+    const list = setup();
+    await list.debugger_.listWatchpoints();
+    expect(list.sent()).toMatchObject({
+      method: 'GET',
+      url: '/sap/bc/adt/debugger/watchpoints',
+    });
 
-    expect(connection.makeAdtRequest).toHaveBeenCalledWith(
-      expect.objectContaining({
-        url: '/sap/bc/adt/debugger/actions',
-        method: 'GET',
-        params: expect.objectContaining({
-          action: 'jumpToLine',
-          value: 'line42',
+    const remove = setup();
+    await remove.debugger_.deleteWatchpoint('3');
+    expect(remove.sent()).toMatchObject({
+      method: 'DELETE',
+      url: '/sap/bc/adt/debugger/watchpoints/3',
+    });
+  });
+
+  it('answers the document by default and nothing for a delete', async () => {
+    const stack = setup({ status: 200, data: '<dbg:stack/>', headers: {} });
+    const answer = await stack.debugger_.getStack();
+    expect(answer.ok && answer.getResult().value).toBe('<dbg:stack/>');
+
+    const deleted = setup();
+    const done = await deleted.debugger_.stopListener(identity);
+    expect(done.ok).toBe(true);
+  });
+
+  it('a debuggee that ended comes back as a failure carrying the answer', async () => {
+    const ended = {
+      status: 500,
+      headers: {},
+      data: '<exc:exception><type id="AdiFailed"/><properties><entry key="com.sap.adt.communicationFramework.subType">debuggeeEnded</entry></properties></exc:exception>',
+    };
+    const connection = {
+      makeAdtRequest: jest.fn().mockRejectedValue(
+        Object.assign(new Error('Request failed with status code 500'), {
+          response: ended,
         }),
-      }),
-    );
+      ),
+    } as unknown as IAbapConnection;
+    const debugger_ = new AbapDebugger(connection, {} as never);
+
+    const answer = await debugger_.step('stepContinue');
+    expect(answer.ok).toBe(false);
+    if (!answer.ok) {
+      expect(String(answer.getError().response?.data)).toContain(
+        'debuggeeEnded',
+      );
+    }
   });
 });
