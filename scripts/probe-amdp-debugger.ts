@@ -20,6 +20,9 @@
  * class's source as the system has it.
  *
  *   MCP_ENV_PATH=<session>.env npx ts-node scripts/probe-amdp-debugger.ts
+ *   PROBE_FINISH=1     at the first break: clear the breakpoints and continue
+ *   PROBE_RELEASE=1    at the first break: delete the debuggee (cancels it)
+ *   PROBE_HARD_STOP=1  at the first break: stop the session with hardStop=true
  *
  * The class (scripts/probe-amdp.ts --deploy) must exist and be active.
  */
@@ -307,6 +310,43 @@ async function main(): Promise<void> {
     };
 
     await awaitStop();
+    // PROBE_HARD_STOP=1: stop hard while the debuggee stands on its first
+    // break, and see what becomes of the run.
+    // PROBE_FINISH=1: let the debuggee run to its end — clear the breakpoints
+    // (a FULL sync with none), continue, and wait for the method to end.
+    if (process.env.PROBE_FINISH === '1' && atBreak) {
+      await send('clear bps', C, {
+        url: `${mainUrl}/breakpoints`,
+        method: 'POST',
+        timeout: 30_000,
+        headers: {
+          'Content-Type': 'application/vnd.sap.adt.amdp.dbg.bpsync.v1+xml',
+        },
+        data: '<?xml version="1.0" encoding="UTF-8"?><amdpdbg:breakpointsSyncRequest xmlns:amdpdbg="http://www.sap.com/adt/amdp/debugger" amdpdbg:syncMode="FULL" amdpdbg:clearCache="false"><amdpdbg:breakpoints/></amdpdbg:breakpointsSyncRequest>',
+      });
+      await send('step continue', C, {
+        url: `${mainUrl}/debuggees/${encodeURIComponent(debuggeeId)}?step=continue`,
+        method: 'POST',
+        timeout: 30_000,
+      });
+      await awaitStop();
+      return;
+    }
+    // PROBE_RELEASE=1: let the debuggee go through the deleteDebuggee link the
+    // ON_BREAK event carries, then end the session the ordinary way.
+    if (process.env.PROBE_RELEASE === '1' && atBreak) {
+      await send('release', C, {
+        url: `${mainUrl}/debuggees/${encodeURIComponent(debuggeeId)}`,
+        method: 'DELETE',
+        timeout: 30_000,
+      });
+      await awaitStop();
+      return;
+    }
+    if (process.env.PROBE_HARD_STOP === '1' && atBreak) {
+      hardStop = true;
+      return;
+    }
     const plan = [
       ...Array<string>(STEPS_OVER).fill('over'),
       ...Array<string>(8).fill('continue'),
