@@ -71,7 +71,7 @@ const CLASS_SOURCE = `CLASS zac_dbg_amdp DEFINITION PUBLIC FINAL CREATE PUBLIC.
   PUBLIC SECTION.
     INTERFACES if_amdp_marker_hdb.
     INTERFACES if_oo_adt_classrun.
-    METHODS sum_to
+    METHODS sum_to AMDP OPTIONS READ-ONLY CLIENT INDEPENDENT
       IMPORTING VALUE(iv_limit) TYPE i
       EXPORTING VALUE(ev_total) TYPE i
                 VALUE(ev_steps) TYPE i.

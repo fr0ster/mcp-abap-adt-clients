@@ -85,7 +85,7 @@ const CLASS_SOURCE = `CLASS ${CLASS_NAME.toLowerCase()} DEFINITION PUBLIC FINAL 
   PUBLIC SECTION.
     INTERFACES if_amdp_marker_hdb.
     INTERFACES if_oo_adt_classrun.
-    METHODS sum_to
+    METHODS sum_to AMDP OPTIONS READ-ONLY CLIENT INDEPENDENT
       IMPORTING VALUE(iv_limit) TYPE i
       EXPORTING VALUE(ev_total) TYPE i
                 VALUE(ev_steps) TYPE i.
@@ -364,8 +364,18 @@ describe('AMDP debugger (AmdpDebugger)', () => {
     }
     const outcome = await utils.getActivationResults(runId);
     const results = String(outcome.ok ? outcome.getResult().value : '');
-    if (!/activationExecuted="true"/.test(results)) {
-      throw new Error(`group activation: ${results.slice(0, 600)}`);
+    // activationExecuted="true" beside an error message is still a failure
+    // (the errata): the class stays inactive, and a breakpoint in it is
+    // answered with an empty state and never stops.
+    const errors = [
+      ...results.matchAll(
+        /<msg\b[^>]*type="E"[^>]*>[\s\S]*?<txt>([^<]*)<\/txt>/g,
+      ),
+    ].map((m) => m[1]);
+    if (!/activationExecuted="true"/.test(results) || errors.length) {
+      throw new Error(
+        `group activation: ${errors.join('; ') || results.slice(0, 600)}`,
+      );
     }
     logTestStep(
       `${CLASS_NAME} and ${DDL_NAME} active in ${packageName}`,
